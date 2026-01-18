@@ -1,0 +1,83 @@
+<div class="login-wrapper">
+  <mat-card class="login-card">
+    <div class="slash blue"></div>
+    <div class="slash orange"></div>
+    <div class="slash green"></div>
+
+    <h1 class="title">Palagai</h1>
+    <p class="subtitle">{{ isSignUp ? 'Create your account' : 'Sign in to your account' }}</p>
+
+    <form (ngSubmit)="submitEmail()">
+      <div class="form-group">
+        <label for="email" class="input-label">Email</label>
+        <mat-form-field appearance="outline" class="full-width">
+          <input
+            matInput
+            id="email"
+            type="email"
+            placeholder="Enter your email"
+            [(ngModel)]="email"
+            name="email"
+            [disabled]="loading"
+            required
+          />
+          <mat-error *ngIf="message && message.includes('email')">{{ message }}</mat-error>
+        </mat-form-field>
+      </div>
+
+      <div class="form-group">
+        <label for="password" class="input-label">Password</label>
+        <mat-form-field appearance="outline" class="full-width">
+          <input
+            matInput
+            id="password"
+            [type]="hidePassword ? 'password' : 'text'"
+            placeholder="Enter your password"
+            [(ngModel)]="password"
+            name="password"
+            [disabled]="loading"
+            required
+          />
+          <button
+            mat-icon-button
+            matSuffix
+            (click)="hidePassword = !hidePassword"
+            [attr.aria-label]="'Hide password'"
+            [attr.aria-pressed]="hidePassword"
+            type="button"
+          >
+            <mat-icon>{{ hidePassword ? 'visibility_off' : 'visibility' }}</mat-icon>
+          </button>
+          <mat-hint *ngIf="isSignUp">Password must be at least 6 characters long</mat-hint>
+          <mat-error *ngIf="message && message.includes('password')">{{ message }}</mat-error>
+        </mat-form-field>
+      </div>
+
+      <div class="forgot-password-wrapper" *ngIf="!isSignUp">
+        <a (click)="onForgotPassword()" class="forgot-link" *ngIf="!loading">
+          Forgot password?
+        </a>
+      </div>
+
+      <button
+        mat-raised-button
+        color="primary"
+        type="submit"
+        [disabled]="loading"
+        class="full-width"
+      >
+        {{ loading ? 'Please wait...' : (isSignUp ? 'Sign Up' : 'Log In') }}
+      </button>
+    </form>
+
+    <p class="message" *ngIf="message && !message.includes('email') && !message.includes('password')">{{ message }}</p>
+
+    <p class="micro-line">
+      <a (click)="isSignUp = !isSignUp" class="micro-link">
+        {{ isSignUp ? 'Already have an account? Log in' : 'New user? Sign up' }}
+      </a>
+      <br>
+      Or go back to the <a routerLink="/" class="micro-link">home page</a>.
+    </p>
+  </mat-card>
+</div>

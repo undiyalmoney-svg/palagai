@@ -1,0 +1,154 @@
+<mat-toolbar color="primary" class="subboard-toolbar" *ngIf="!isFullPage">
+  <span class="brand">Palagai</span>
+  <span class="spacer"></span>
+  <a mat-button routerLink="/login">Edit my board</a>
+</mat-toolbar>
+
+<div class="subboard-wrapper" [class.full-page]="isFullPage">
+  <mat-card class="subboard-card" *ngIf="!isFullPage && !isPreviewMode">
+    <form [formGroup]="form" (ngSubmit)="loadBoard()" *ngIf="form">
+      <div class="subboard-controls">
+        <mat-form-field appearance="fill" class="board-id-field">
+          <mat-label>Board ID</mat-label>
+          <input
+            matInput
+            type="text"
+            placeholder="e.g. 26011347KQX"
+            formControlName="boardId"
+          />
+          <mat-error *ngIf="boardIdControl.hasError('required') && boardIdControl.touched">
+            Board ID is required
+          </mat-error>
+        </mat-form-field>
+
+        <mat-form-field appearance="fill" class="email-field" *ngIf="showEmailInput">
+          <mat-label>Email (for protected boards)</mat-label>
+          <input
+            matInput
+            type="email"
+            placeholder="Enter authorized email"
+            formControlName="email"
+          />
+          <mat-hint>Required only for protected boards</mat-hint>
+          <mat-error *ngIf="emailControl.hasError('email') && emailControl.touched">
+            Please enter a valid email address
+          </mat-error>
+        </mat-form-field>
+
+        <button mat-raised-button color="primary" type="submit" [disabled]="loading || form.invalid" class="load-button">
+          {{ loading ? 'Loading...' : 'Load Board' }}
+        </button>
+      </div>
+    </form>
+
+    <div class="loading-indicator" *ngIf="loading">
+      <div class="spinner"></div>
+      <p>Loading board...</p>
+    </div>
+
+    <section class="subboard-board" *ngIf="!loading">
+      <div class="board-header" *ngIf="board">
+        <div class="board-meta">
+          <p class="updated" *ngIf="lastUpdated">
+            Last updated: <strong>{{ lastUpdated | date: 'medium' }}</strong>
+          </p>
+        </div>
+        <button
+          mat-icon-button
+          class="fullscreen-btn"
+          *ngIf="!isPreviewMode"
+          (click)="toggleFullPage()"
+          [attr.aria-label]="isFullPage ? 'Exit full page' : 'View full page'"
+        >
+          <mat-icon>{{ isFullPage ? 'fullscreen_exit' : 'fullscreen' }}</mat-icon>
+        </button>
+      </div>
+      
+      <div class="board-surface palagai-display-container">
+        <!-- Show board message if loaded, otherwise show Tamil verse -->
+        <div class="palagai-message-renderer" *ngIf="hasBoardMessage" [innerHTML]="boardMessageHtml"></div>
+        <div class="palagai-message-renderer verse-display" *ngIf="!hasBoardMessage">
+          <p class="tamil-verse">
+            முயற்சி திருவினை ஆக்கும்; முயற்றின்மை<br>
+            இன்மை புகுத்தி விடும்.
+          </p>
+        </div>
+      </div>
+    </section>
+  </mat-card>
+
+  <!-- Full page kiosk mode - Two Layer Structure -->
+  <div class="kiosk-container" *ngIf="isFullPage && board">
+    <!-- Exit/Back button -->
+    <div class="kiosk-exit-btn">
+      <button
+        mat-icon-button
+        class="exit-fullscreen-btn"
+        *ngIf="!isPreviewMode"
+        (click)="toggleFullPage()"
+        aria-label="Exit full page"
+      >
+        <mat-icon>fullscreen_exit</mat-icon>
+      </button>
+      <button
+        mat-icon-button
+        class="back-to-mainboard-btn"
+        *ngIf="isPreviewMode"
+        (click)="goToMainboard()"
+        aria-label="Back to main board"
+      >
+        <mat-icon>arrow_back</mat-icon>
+      </button>
+    </div>
+    
+    <!-- Message Content directly in container -->
+    <div
+      #kioskMessageContent
+      class="kiosk-message-content palagai-display-container"
+    >
+      <!-- Show board message if loaded, otherwise show Tamil verse -->
+      <div class="palagai-message-renderer" *ngIf="hasBoardMessage" [innerHTML]="boardMessageHtml"></div>
+      <div class="palagai-message-renderer verse-display" *ngIf="!hasBoardMessage">
+        <p class="tamil-verse">
+          முயற்சி திருவினை ஆக்கும்; முயற்றின்மை<br>
+          இன்மை புகுத்தி விடும்.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Full page loading state -->
+  <div class="kiosk-container" *ngIf="isFullPage && !board && loading">
+    <div class="loading-indicator-kiosk">
+      <div class="spinner"></div>
+      <p>Loading board...</p>
+    </div>
+  </div>
+
+  <!-- Full page empty state (no board loaded) -->
+  <div class="kiosk-container" *ngIf="isFullPage && !board && !loading">
+    <div class="kiosk-exit-btn">
+      <button
+        mat-icon-button
+        class="exit-fullscreen-btn"
+        *ngIf="!isPreviewMode"
+        (click)="toggleFullPage()"
+        aria-label="Exit full page"
+      >
+        <mat-icon>fullscreen_exit</mat-icon>
+      </button>
+      <button
+        mat-icon-button
+        class="back-to-mainboard-btn"
+        *ngIf="isPreviewMode"
+        (click)="goToMainboard()"
+        aria-label="Back to main board"
+      >
+        <mat-icon>arrow_back</mat-icon>
+      </button>
+    </div>
+    <div class="loading-indicator-kiosk">
+      <p>Please load a board first</p>
+    </div>
+  </div>
+</div>

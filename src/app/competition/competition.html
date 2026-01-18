@@ -1,0 +1,49 @@
+<div class="competition-wrapper">
+  <div class="loading-container" *ngIf="loading">
+    <div class="spinner"></div>
+    <p>Loading submissions...</p>
+  </div>
+
+  <div class="empty-state" *ngIf="!loading && boards.length === 0">
+    <mat-icon class="empty-icon">favorite_border</mat-icon>
+    <p class="empty-text">No submissions yet</p>
+    <p class="empty-hint">Be the first to submit your Kavithai!</p>
+  </div>
+
+  <div class="boards-grid" *ngIf="!loading && boards.length > 0">
+    <mat-card class="board-card" *ngFor="let boardItem of boards; let i = index">
+      <div class="board-header">
+        <div class="board-number">#{{ i + 1 }}</div>
+        <div class="vote-section">
+          <button
+            mat-icon-button
+            (click)="voteForBoard(boardItem)"
+            [disabled]="boardItem.hasVoted"
+            class="vote-btn"
+            [class.voted]="boardItem.hasVoted"
+            aria-label="Vote for this Kavithai"
+            title="Vote for this Kavithai"
+          >
+            <mat-icon>{{ boardItem.hasVoted ? 'favorite' : 'favorite_border' }}</mat-icon>
+          </button>
+          <span class="vote-count">{{ boardItem.voteCount }}</span>
+        </div>
+      </div>
+      
+      <div class="board-content palagai-display-container">
+        <div class="palagai-message-renderer" *ngIf="boardItem.board.message.html" [innerHTML]="boardItem.board.message.html"></div>
+        <div *ngIf="!boardItem.board.message.html" class="no-message" style="padding: 20px; text-align: center; color: #999;">
+          <p>No message content available</p>
+        </div>
+      </div>
+
+      <div class="board-footer">
+        <a [href]="getBoardLink(boardItem.boardKey)" target="_blank" class="view-link">
+          <mat-icon>open_in_new</mat-icon>
+          View Full Board
+        </a>
+      </div>
+    </mat-card>
+  </div>
+</div>
+

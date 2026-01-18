@@ -1,0 +1,118 @@
+<mat-toolbar color="primary" class="mainboard-toolbar">
+  <div class="toolbar-content">
+    <div class="toolbar-left">
+      <button mat-icon-button routerLink="/" class="back-btn">
+        <mat-icon>arrow_back</mat-icon>
+      </button>
+      <div class="toolbar-title-wrapper">
+        <span class="toolbar-title">My Palagai Board</span>
+        <span class="toolbar-subtitle mobile-only" *ngIf="lastUpdated">
+          Last updated: {{ lastUpdated | date: 'short' }}
+        </span>
+      </div>
+    </div>
+    <span class="toolbar-subtitle desktop-only" *ngIf="lastUpdated">
+      Last updated: {{ lastUpdated | date: 'short' }}
+    </span>
+  </div>
+</mat-toolbar>
+
+<div class="mainboard-wrapper" [formGroup]="form">
+
+  <mat-card class="editor-section">
+    <div class="board-header">
+      <div class="board-header-left">
+        <h2>Board Content</h2>
+        <div class="setting-item">
+          <div class="checkbox-with-icon">
+            <mat-checkbox
+              formControlName="boardProtection"
+              (change)="toggleBoardProtection($event)"
+              [disabled]="loading"
+            >
+              Board Protection
+            </mat-checkbox>
+            <button
+              mat-icon-button
+              (click)="openEmailDialog()"
+              [disabled]="loading || !boardProtectionControl.value"
+              class="email-icon-btn"
+              aria-label="Manage authorized emails"
+              title="Manage authorized emails"
+              *ngIf="boardProtectionControl.value"
+            >
+              <mat-icon>email</mat-icon>
+            </button>
+          </div>
+          <p class="setting-hint">Enable to restrict board access</p>
+        </div>
+      </div>
+      <div class="board-header-right">
+        <button 
+          mat-icon-button 
+          (click)="openCompetitionDialog()" 
+          [disabled]="loading"
+          class="header-icon-btn competition-heart-btn"
+          [class.submitted]="competitionSubmissionControl.value"
+          aria-label="Submit for Kavithai Competition"
+          title="Submit for Kavithai Competition"
+        >
+          <mat-icon>favorite</mat-icon>
+        </button>
+        <button 
+          mat-icon-button 
+          (click)="openPreview()" 
+          [disabled]="loading"
+          class="header-icon-btn"
+          aria-label="Preview"
+          title="Preview"
+        >
+          <mat-icon>visibility</mat-icon>
+        </button>
+        <button 
+          mat-icon-button 
+          (click)="openLinkDialog()" 
+          [disabled]="loading || !auth.user?.boardKey"
+          class="header-icon-btn"
+          aria-label="Get shareable link"
+          title="Get shareable link"
+        >
+          <mat-icon>link</mat-icon>
+        </button>
+      </div>
+    </div>
+    
+    <quill-editor
+      formControlName="content"
+      [modules]="quillModules"
+      class="full-screen-editor"
+    >
+    </quill-editor>
+  </mat-card>
+
+  <p class="status" *ngIf="message">{{ message }}</p>
+</div>
+
+<!-- Footer bar with action buttons -->
+<footer class="mainboard-footer">
+  <div class="footer-content">
+    <button 
+      mat-raised-button 
+      color="primary" 
+      (click)="saveEditorContent()" 
+      [disabled]="loading || saving"
+      class="footer-btn primary-btn"
+    >
+      {{ saving ? 'Saving...' : (board ? 'Update Board' : 'Create Board') }}
+    </button>
+    <button 
+      mat-stroked-button 
+      color="warn" 
+      (click)="clearBoard()" 
+      [disabled]="loading || clearing"
+      class="footer-btn clear-btn"
+    >
+      {{ clearing ? 'Clearing...' : 'Clear Board' }}
+    </button>
+  </div>
+</footer>

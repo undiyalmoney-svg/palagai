@@ -1,1 +1,35 @@
-/* You can add global styles to this file, and also import other style files */
+/* ============================================
+   FIXED DIALOG STYLING - REMOVE UNWANTED SPACE
+   ============================================ */
+
+/* Set dialog width to 75%, but let height adjust to content */
+::ng-deep .mat-mdc-dialog-surface {
+  width: 75% !important;
+  max-width: 75% !important;
+  height: auto !important;      /* Allow height to shrink to content */
+  max-height: 85vh !important;  /* Prevent it from going off-screen */
+  border-radius: 28px !important; /* Matches modern Material look */
+  display: flex;
+  flex-direction: column;
+}
+
+::ng-deep .mat-mdc-dialog-container {
+  width: 100% !important;
+  height: auto !important;      /* Ensure container follows surface height */
+}
+
+::ng-deep .cdk-overlay-pane {
+  width: 75% !important;
+  max-width: 75% !important;
+  height: auto !important;      /* Fixes the ghost scroll area */
+  display: flex !important;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Optional: Clean up the "Authorized Email List" spacing */
+.mat-mdc-dialog-content {
+  padding: 20px !important;
+  margin: 0 !important;
+  overflow-y: auto; /* Only scroll if text is actually too long */
+}
