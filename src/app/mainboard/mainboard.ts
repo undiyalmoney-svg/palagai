@@ -1,9 +1,8 @@
-import { Component, OnInit, ChangeDetectorRef, AfterViewInit } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef, AfterViewInit, ViewChild, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormArray, FormBuilder, FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { FormsModule } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
-import { QuillModule } from 'ngx-quill';
+import { Router } from '@angular/router';
 import { AuthService } from '../auth.service';
 import { Board, BoardService } from '../board.service';
 import { MatToolbarModule } from '@angular/material/toolbar';
@@ -18,6 +17,9 @@ import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { LinkDialogComponent } from './link-dialog.component';
 import { EmailDialogComponent } from './email-dialog.component';
 import { CompetitionDialogComponent } from './competition-dialog.component';
+import { SaveConfirmationDialogComponent } from './save-confirmation-dialog.component';
+import { CompetitionAlertDialogComponent } from './competition-alert-dialog.component';
+import { CustomEditorComponent } from './custom-editor/custom-editor.component';
 
 @Component({
   selector: 'app-mainboard',
@@ -26,8 +28,7 @@ import { CompetitionDialogComponent } from './competition-dialog.component';
     CommonModule,
     ReactiveFormsModule,
     FormsModule,
-    QuillModule,
-    RouterLink,
+    CustomEditorComponent,
     MatToolbarModule,
     MatButtonModule,
     MatFormFieldModule,
@@ -47,22 +48,13 @@ export class Mainboard implements OnInit, AfterViewInit {
   clearing = false;
   message = '';
   board: Board | null = null;
+  boardSize: 'min' | 'normal' | 'max' = 'normal'; // Board size control
+  private savedContent = ''; // Track saved content for unsaved changes detection
+  @ViewChild('competitionHeartBtn') competitionHeartBtn!: ElementRef<HTMLButtonElement>;
 
   form: FormGroup;
   emailControl = new FormControl<string | null>('', [Validators.email]);
   addingEmail = false;
-
-  quillModules = {
-    toolbar: [
-      [{ 'font': ['Arial', 'Georgia', 'Times New Roman', 'Courier New', 'Verdana'] }],
-      ['bold', 'italic', 'underline', 'strike'],
-      [{ 'header': [1, 2, 3, false] }],
-      [{ 'list': 'ordered'}, { 'list': 'bullet' }],
-      [{ 'align': [] }],
-      ['link'],
-      ['clean']
-    ],
-  };
 
   constructor(
     private readonly router: Router,
@@ -79,32 +71,6 @@ export class Mainboard implements OnInit, AfterViewInit {
       isSubmittedForCompetition: [false],
       emails: this.fb.array<FormControl<string | null>>([]),
     });
-    
-    // Register Quill fonts in constructor to ensure they're available before editor init
-    this.registerQuillFonts();
-  }
-
-  private registerQuillFonts() {
-    if (typeof window !== 'undefined') {
-      const register = () => {
-        const Quill = (window as any).Quill;
-        if (Quill && Quill.import) {
-          try {
-            const Font = Quill.import('formats/font');
-            Font.whitelist = ['Arial', 'Georgia', 'Times New Roman', 'Courier New', 'Verdana'];
-            Quill.register(Font, true);
-          } catch (e) {
-            // Font already registered or Quill not ready
-          }
-        }
-      };
-      
-      // Try immediately
-      register();
-      // Also try after delays in case Quill loads asynchronously
-      setTimeout(register, 0);
-      setTimeout(register, 100);
-    }
   }
 
   get contentControl(): FormControl<string | null> {
@@ -132,7 +98,16 @@ export class Mainboard implements OnInit, AfterViewInit {
       return '';
     }
     const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+    // Size will be loaded from DB in subboard, so we don't need to pass it in URL
     return `${baseUrl}/?id=${this.auth.user.boardKey}`;
+  }
+
+  private updateFormControlsDisabledState() {
+    if (this.loading) {
+      this.boardProtectionControl.disable({ emitEvent: false });
+    } else {
+      this.boardProtectionControl.enable({ emitEvent: false });
+    }
   }
 
   copyBoardId() {
@@ -186,7 +161,18 @@ export class Mainboard implements OnInit, AfterViewInit {
     }
   }
 
-  openPreview() {
+  async openPreview() {
+    // Check for unsaved changes
+    if (this.hasUnsavedChanges()) {
+      const result = await this.showSaveConfirmation('You have unsaved changes. Would you like to save before previewing?');
+      if (result === 'save') {
+        await this.saveEditorContent();
+      } else if (result === 'cancel') {
+        return; // User cancelled
+      }
+      // If 'discard', continue with preview
+    }
+
     const content = this.contentControl.value;
     if (!content) {
       this.snackBar.open('No content to preview', 'OK', {
@@ -198,12 +184,140 @@ export class Mainboard implements OnInit, AfterViewInit {
 
     // Encode the HTML content and navigate to preview
     const encodedContent = encodeURIComponent(content);
-    this.router.navigate(['/preview'], { 
-      queryParams: { 
-        preview: 'true',
-        content: encodedContent 
-      } 
+    const queryParams: any = { 
+      preview: 'true',
+      content: encodedContent,
+      size: this.boardSize // Pass board size to preview (from DB)
+    };
+    
+    // Add boardKey if available so preview can save size to RTDB
+    if (this.auth.user?.boardKey) {
+      queryParams.boardKey = this.auth.user.boardKey;
+    }
+    
+    this.router.navigate(['/preview'], { queryParams });
+  }
+
+  hasUnsavedChanges(): boolean {
+    const currentContent = this.contentControl.value || '';
+    return currentContent !== this.savedContent;
+  }
+
+  async showSaveConfirmation(message: string): Promise<'save' | 'discard' | 'cancel'> {
+    return new Promise((resolve) => {
+      const dialogRef = this.dialog.open(SaveConfirmationDialogComponent, {
+        width: '90%',
+        maxWidth: '450px',
+        disableClose: true,
+        data: { message }
+      });
+
+      dialogRef.afterClosed().subscribe(result => {
+        resolve(result || 'cancel');
+      });
     });
+  }
+
+  async handleBackNavigation() {
+    // Check for unsaved changes
+    if (this.hasUnsavedChanges()) {
+      const result = await this.showSaveConfirmation('You have unsaved changes. Would you like to save before leaving?');
+      if (result === 'save') {
+        await this.saveEditorContent();
+        this.router.navigate(['/']);
+      } else if (result === 'discard') {
+        this.router.navigate(['/']);
+      }
+      // If 'cancel', stay on page
+    } else {
+      this.router.navigate(['/']);
+    }
+  }
+
+  checkAndShowCompetitionAlert() {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    // Check if competitionInterest is already set in RTDB (true or false)
+    // If it's set, don't show the dialog
+    if (this.board?.competitionInterest !== undefined && this.board?.competitionInterest !== null) {
+      return;
+    }
+
+    // Check if already shown or marked as not interested
+    const displayed = localStorage.getItem('displayedCompetitionAlert');
+    if (displayed === 'not interested') {
+      return;
+    }
+
+    // Check if user is already registered for competition (submitted)
+    if (this.competitionSubmissionControl.value === true) {
+      return;
+    }
+
+    // Check if user has a board and marked as not interested
+    const notInterested = localStorage.getItem('competitionNotInterested');
+    if (notInterested === 'true') {
+      return;
+    }
+
+    // Show the alert dialog (for new users or users who haven't seen it)
+    setTimeout(() => {
+      this.dialog.open(CompetitionAlertDialogComponent, {
+        width: '90%',
+        maxWidth: '450px',
+        disableClose: false,
+        data: {
+          onInterested: async () => {
+            // User is interested - store in local storage and RTDB
+            // Don't open competition dialog here - user needs to save content first
+            localStorage.setItem('displayedCompetitionAlert', 'true');
+            localStorage.setItem('competitionInterested', 'true');
+            
+            // Store in RTDB if user has a board
+            if (this.auth.user?.boardKey) {
+              try {
+                await this.boards.setCompetitionInterest(this.auth.user.boardKey, true);
+              } catch (e) {
+                console.error('Failed to store competition interest in RTDB:', e);
+              }
+            }
+          },
+          onNotInterested: async () => {
+            // User is not interested - mark and don't show again
+            localStorage.setItem('displayedCompetitionAlert', 'not interested');
+            localStorage.setItem('competitionNotInterested', 'true');
+            localStorage.setItem('competitionInterested', 'false');
+            
+            // Store in RTDB if user has a board
+            if (this.auth.user?.boardKey) {
+              try {
+                await this.boards.setCompetitionInterest(this.auth.user.boardKey, false);
+              } catch (e) {
+                console.error('Failed to store competition interest in RTDB:', e);
+              }
+            }
+          }
+        }
+      });
+    }, 1000); // Show after 1 second delay
+  }
+
+  async setBoardSize(size: 'min' | 'normal' | 'max') {
+    this.boardSize = size;
+    // Save to database if user is authenticated and has a board
+    if (this.auth.user?.boardKey) {
+      try {
+        await this.boards.updateBoardSize(this.auth.user.boardKey, size);
+        if (this.board) {
+          this.board.boardSize = size;
+        }
+      } catch (e: any) {
+        console.error('Failed to save board size:', e);
+        // Don't show error to user, just log it
+      }
+    }
   }
 
   openLinkDialog() {
@@ -359,18 +473,22 @@ export class Mainboard implements OnInit, AfterViewInit {
   async ngOnInit() {
     // Ensure loading and saving are false initially
     this.loading = false;
+    this.updateFormControlsDisabledState();
     this.saving = false;
+    // Board size will be loaded from board data below
     this.cdr.detectChanges();
     
     const user = this.auth.user;
     if (!user) {
       await this.router.navigate(['/login']);
       this.loading = false;
+      this.updateFormControlsDisabledState();
       this.cdr.detectChanges();
       return;
     }
 
     this.loading = true;
+    this.updateFormControlsDisabledState();
     this.message = '';
     this.emailControl.disable();
     this.cdr.detectChanges();
@@ -432,19 +550,34 @@ export class Mainboard implements OnInit, AfterViewInit {
         }
       }
 
-      // Use local storage content if available, otherwise use board content
-      const content = localContent || this.board?.message?.html || '';
+      // Prioritize RTDB content over localStorage
+      const dbContent = this.board?.message?.html || '';
+      const content = dbContent || localContent || '';
       const protection = this.board?.boardProtection ?? false;
       const competitionSubmission = this.board?.isSubmittedForCompetition ?? false;
+      
+      // Check if board is blocked
+      if (this.board?.isBlocked) {
+        this.snackBar.open('Your board has been blocked. Please contact the ADMIN for retrieving your account.', 'OK', {
+          duration: 5000,
+          panelClass: ['error-snackbar'],
+        });
+      }
       const list = this.board?.authorizedMailList ?? [];
+      const boardSize = this.board?.boardSize ?? 'normal';
 
       this.contentControl.setValue(content);
+      this.savedContent = content; // Track saved content
       this.boardProtectionControl.setValue(protection);
       this.competitionSubmissionControl.setValue(competitionSubmission);
+      this.boardSize = boardSize;
       this.emails.clear();
       list.forEach((email) => {
         this.emails.push(new FormControl<string | null>(email));
       });
+      
+      // Show competition alert dialog if needed
+      this.checkAndShowCompetitionAlert();
     } catch (e: any) {
       const errorMsg = e?.message || 'Error loading board';
       this.message = errorMsg;
@@ -454,26 +587,32 @@ export class Mainboard implements OnInit, AfterViewInit {
       });
     } finally {
       this.loading = false;
+      this.updateFormControlsDisabledState();
       this.updateEmailControlState();
       this.cdr.detectChanges();
     }
   }
 
   ngAfterViewInit() {
-    // Ensure Quill fonts are registered after view init
+    // Custom editor handles its own initialization
+    // Check if returning from preview with updated board size
     if (typeof window !== 'undefined') {
-      setTimeout(() => {
-        const Quill = (window as any).Quill;
-        if (Quill) {
-          try {
-            const Font = Quill.import('formats/font');
-            Font.whitelist = ['Arial', 'Georgia', 'Times New Roman', 'Courier New', 'Verdana'];
-            Quill.register(Font, true);
-          } catch (e) {
-            console.warn('Could not register Quill fonts:', e);
+      const previewSize = localStorage.getItem('palagai_preview_board_size') as 'min' | 'normal' | 'max' | null;
+      if (previewSize && ['min', 'normal', 'max'].includes(previewSize) && previewSize !== this.boardSize) {
+        this.boardSize = previewSize;
+        // Save to DB immediately
+        if (this.auth.user?.boardKey) {
+          this.boards.updateBoardSize(this.auth.user.boardKey, previewSize).catch(e => {
+            console.error('Failed to save board size:', e);
+          });
+          if (this.board) {
+            this.board.boardSize = previewSize;
           }
         }
-      }, 100);
+        // Clear the preview size from localStorage
+        localStorage.removeItem('palagai_preview_board_size');
+        this.cdr.detectChanges();
+      }
     }
   }
 
@@ -495,16 +634,56 @@ export class Mainboard implements OnInit, AfterViewInit {
       return;
     }
     
-    const content = this.contentControl.value || '';
+    // Get content and ensure alignment styles are preserved
+    let content = this.contentControl.value || '';
+    
+    // Force normalization by triggering editor input one more time
+    // This ensures all alignments are saved as inline styles
+    this.contentControl.updateValueAndValidity({ emitEvent: false });
+    
+    // Get the final content after normalization
+    content = this.contentControl.value || '';
+    
+    // Check if user is interested in competition and not already submitted
+    const isInterested = typeof window !== 'undefined' && localStorage.getItem('competitionInterested') === 'true';
+    const isAlreadySubmitted = this.competitionSubmissionControl.value === true;
+    
+    // If user is interested and not already submitted, ask for competition submission
+    if (isInterested && !isAlreadySubmitted && content.trim().length > 0) {
+      const textContent = content.replace(/<[^>]*>/g, '').trim();
+      if (textContent.length > 0) {
+        const shouldSubmit = await this.askForCompetitionSubmission();
+        if (shouldSubmit === 'yes') {
+          // User wants to submit - save first, then submit
+          await this.saveBoardContent(content);
+          await this.submitToCompetition();
+          return;
+        } else if (shouldSubmit === 'cancel') {
+          // User cancelled - don't save
+          return;
+        }
+        // If 'no', continue with normal save
+      }
+    }
+    
+    // Normal save flow
+    await this.saveBoardContent(content);
+  }
+
+  private async saveBoardContent(content: string) {
     this.saving = true;
     this.message = '';
     this.updateEmailControlState();
 
     try {
-      await this.boards.updateBoardMessage(this.auth.user.boardKey, content);
+      await this.boards.updateBoardMessage(this.auth.user!.boardKey!, content);
+      // Save board size to database
+      await this.boards.updateBoardSize(this.auth.user!.boardKey!, this.boardSize);
+      this.savedContent = content; // Update saved content
       if (this.board) {
         this.board.message.updatedAt = Date.now();
         this.board.message.html = content;
+        this.board.boardSize = this.boardSize;
       } else {
         // If board doesn't exist, create it
         this.board = {
@@ -515,7 +694,7 @@ export class Mainboard implements OnInit, AfterViewInit {
           },
           boardProtection: false,
           authorizedMailList: [],
-          ownerUid: this.auth.user.uid,
+          ownerUid: this.auth.user!.uid,
           userType: 'user',
           planType: 'free',
           createdAt: Date.now(),
@@ -539,6 +718,33 @@ export class Mainboard implements OnInit, AfterViewInit {
       this.updateEmailControlState();
       this.cdr.detectChanges();
     }
+  }
+
+  private async askForCompetitionSubmission(): Promise<'yes' | 'no' | 'cancel'> {
+    return new Promise((resolve) => {
+      const dialogRef = this.dialog.open(SaveConfirmationDialogComponent, {
+        width: '90%',
+        maxWidth: '450px',
+        disableClose: true,
+        data: { 
+          message: 'Can I post this content as kavithai for competition?',
+          showCancel: true,
+          saveLabel: 'Yes, Submit',
+          discardLabel: 'No, Just Save',
+          cancelLabel: 'Cancel'
+        }
+      });
+
+      dialogRef.afterClosed().subscribe(result => {
+        if (result === 'save') {
+          resolve('yes');
+        } else if (result === 'discard') {
+          resolve('no');
+        } else {
+          resolve('cancel');
+        }
+      });
+    });
   }
 
   async clearBoard() {
@@ -590,6 +796,7 @@ export class Mainboard implements OnInit, AfterViewInit {
     // Get the new value from the event, or from the form control
     const newValue = event?.checked ?? this.boardProtectionControl.value ?? false;
     this.loading = true;
+    this.updateFormControlsDisabledState();
     this.message = '';
 
     try {
@@ -632,6 +839,7 @@ export class Mainboard implements OnInit, AfterViewInit {
       });
     } finally {
       this.loading = false;
+      this.updateFormControlsDisabledState();
       this.updateEmailControlState();
       this.cdr.detectChanges();
     }
@@ -651,12 +859,41 @@ export class Mainboard implements OnInit, AfterViewInit {
       return;
     }
 
+    // Check if user is interested in competition
+    const isInterested = localStorage.getItem('competitionInterested') === 'true';
+    if (!isInterested) {
+      this.snackBar.open('Please express your interest in the competition first.', 'OK', {
+        duration: 4000,
+        panelClass: ['info-snackbar'],
+      });
+      return;
+    }
+
+    // Check if user has saved content (board has content)
+    const savedContent = this.board?.message?.html || '';
+    const savedTextContent = savedContent.replace(/<[^>]*>/g, '').trim();
+    
+    if (!savedTextContent || savedTextContent.length === 0) {
+      this.snackBar.open('Please save your content first before submitting to competition.', 'OK', {
+        duration: 4000,
+        panelClass: ['info-snackbar'],
+      });
+      return;
+    }
+
+    const isSubmitted = this.competitionSubmissionControl.value;
+    
     this.dialog.open(CompetitionDialogComponent, {
       width: '90%',
       maxWidth: '500px',
       data: {
+        isSubmitted: isSubmitted,
         onSubmit: async () => {
-          await this.submitToCompetition();
+          if (isSubmitted) {
+            await this.removeFromCompetition();
+          } else {
+            await this.submitToCompetition();
+          }
         }
       }
     });
@@ -667,7 +904,16 @@ export class Mainboard implements OnInit, AfterViewInit {
       throw new Error('User not authenticated');
     }
 
+    // Check if editor is empty
+    const content = this.contentControl.value || '';
+    const textContent = content.replace(/<[^>]*>/g, '').trim();
+    
+    if (!textContent || textContent.length === 0) {
+      throw new Error('Add something in the board. Your board is empty.');
+    }
+
     this.loading = true;
+    this.updateFormControlsDisabledState();
     this.message = '';
 
     try {
@@ -676,10 +922,10 @@ export class Mainboard implements OnInit, AfterViewInit {
       if (this.board) {
         this.board.isSubmittedForCompetition = true;
       }
-      const successMsg = 'Your Kavithai has been submitted for the competition!';
+      const successMsg = 'Your Kavithai has been submitted for the competition! You can edit it anywhere.';
       this.message = successMsg;
       this.snackBar.open(successMsg, 'OK', {
-        duration: 3000,
+        duration: 5000,
         panelClass: ['success-snackbar'],
       });
     } catch (e: any) {
@@ -692,6 +938,43 @@ export class Mainboard implements OnInit, AfterViewInit {
       throw e; // Re-throw so dialog can handle it
     } finally {
       this.loading = false;
+      this.updateFormControlsDisabledState();
+      this.cdr.detectChanges();
+    }
+  }
+
+  async removeFromCompetition() {
+    if (!this.auth.user?.boardKey) {
+      throw new Error('User not authenticated');
+    }
+
+    this.loading = true;
+    this.updateFormControlsDisabledState();
+    this.message = '';
+
+    try {
+      await this.boards.updateCompetitionSubmission(this.auth.user.boardKey, false);
+      this.competitionSubmissionControl.setValue(false);
+      if (this.board) {
+        this.board.isSubmittedForCompetition = false;
+      }
+      const successMsg = 'Your Kavithai has been removed from the competition.';
+      this.message = successMsg;
+      this.snackBar.open(successMsg, 'OK', {
+        duration: 3000,
+        panelClass: ['success-snackbar'],
+      });
+    } catch (e: any) {
+      const errorMsg = e?.message || 'Error removing from competition';
+      this.message = errorMsg;
+      this.snackBar.open(errorMsg, 'OK', {
+        duration: 4000,
+        panelClass: ['error-snackbar'],
+      });
+      throw e;
+    } finally {
+      this.loading = false;
+      this.updateFormControlsDisabledState();
       this.cdr.detectChanges();
     }
   }
@@ -787,6 +1070,7 @@ export class Mainboard implements OnInit, AfterViewInit {
     }
 
     this.loading = true;
+    this.updateFormControlsDisabledState();
     this.message = '';
     this.updateEmailControlState();
 
@@ -810,6 +1094,7 @@ export class Mainboard implements OnInit, AfterViewInit {
       });
     } finally {
       this.loading = false;
+      this.updateFormControlsDisabledState();
       this.updateEmailControlState();
       this.cdr.detectChanges();
     }

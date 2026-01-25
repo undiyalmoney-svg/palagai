@@ -1,0 +1,133 @@
+<div class="login-wrapper">
+  <mat-card class="login-card">
+    <h1 class="title">Palagai</h1>
+    <p class="subtitle">Create your account</p>
+
+    <form [formGroup]="signupForm" (ngSubmit)="submitSignup()">
+      <div class="form-group">
+        <label class="input-label">Email</label>
+        <mat-form-field appearance="outline" class="full-width">
+          <input
+            matInput
+            type="email"
+            placeholder="Enter your email"
+            formControlName="email"
+          />
+          <mat-error *ngIf="signupForm.controls['email'].errors?.['email'] && signupForm.controls['email'].touched">
+            Enter a valid email
+          </mat-error>
+          <mat-error *ngIf="signupForm.controls['email'].errors?.['required'] && signupForm.controls['email'].touched">
+            Email is required
+          </mat-error>
+        </mat-form-field>
+      </div>
+
+      <div class="form-group">
+        <label class="input-label">Password</label>
+        <mat-form-field appearance="outline" class="full-width">
+          <input
+            matInput
+            [type]="hidePassword ? 'password' : 'text'"
+            placeholder="Enter your password"
+            formControlName="password"
+          />
+          <button
+            mat-icon-button
+            matSuffix
+            type="button"
+            (click)="hidePassword = !hidePassword"
+            tabindex="-1"
+          >
+            <mat-icon>{{ hidePassword ? 'visibility_off' : 'visibility' }}</mat-icon>
+          </button>
+          <mat-hint>Password must be at least 6 characters long</mat-hint>
+          <mat-error *ngIf="signupForm.controls['password'].errors?.['required'] && signupForm.controls['password'].touched">
+            Password is required
+          </mat-error>
+          <mat-error *ngIf="signupForm.controls['password'].errors?.['minlength'] && signupForm.controls['password'].touched">
+            Password must be at least 6 characters long
+          </mat-error>
+        </mat-form-field>
+      </div>
+
+      <div class="form-group">
+        <label class="input-label">Gender</label>
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-select formControlName="gender">
+            <mat-option value="male">Male</mat-option>
+            <mat-option value="female">Female</mat-option>
+            <mat-option value="other">Other</mat-option>
+            <mat-option value="prefer-not-to-say">Prefer not to say</mat-option>
+          </mat-select>
+          <mat-error *ngIf="signupForm.controls['gender'].errors?.['required'] && signupForm.controls['gender'].touched">
+            Gender is required
+          </mat-error>
+        </mat-form-field>
+      </div>
+
+      <div class="form-group">
+        <label class="input-label">Date of Birth</label>
+        <mat-form-field appearance="outline" class="full-width">
+          <input
+            matInput
+            [matDatepicker]="picker"
+            placeholder="Select your date of birth"
+            formControlName="dateOfBirth"
+          />
+          <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
+          <mat-datepicker #picker></mat-datepicker>
+          <mat-error *ngIf="signupForm.controls['dateOfBirth'].errors?.['required'] && signupForm.controls['dateOfBirth'].touched">
+            Date of birth is required
+          </mat-error>
+        </mat-form-field>
+      </div>
+
+      <div class="form-group">
+        <label class="input-label">Security Question</label>
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-select formControlName="securityQuestion">
+            <mat-option *ngFor="let question of securityQuestions" [value]="question">
+              {{ question }}
+            </mat-option>
+          </mat-select>
+          <mat-error *ngIf="signupForm.controls['securityQuestion'].errors?.['required'] && signupForm.controls['securityQuestion'].touched">
+            Security question is required
+          </mat-error>
+        </mat-form-field>
+      </div>
+
+      <div class="form-group">
+        <label class="input-label">Security Answer</label>
+        <mat-form-field appearance="outline" class="full-width">
+          <input
+            matInput
+            type="text"
+            placeholder="Enter your answer"
+            formControlName="securityAnswer"
+          />
+          <mat-hint>This will be used to reset your password if you forget it</mat-hint>
+          <mat-error *ngIf="signupForm.controls['securityAnswer'].errors?.['required'] && signupForm.controls['securityAnswer'].touched">
+            Security answer is required
+          </mat-error>
+        </mat-form-field>
+      </div>
+
+      <button
+        mat-flat-button
+        class="full-width"
+        type="submit"
+        [disabled]="isSubmitting"
+      >
+        <span *ngIf="!isSubmitting">Sign Up</span>
+        <span *ngIf="isSubmitting">Please wait...</span>
+      </button>
+    </form>
+
+    <p class="micro-line">
+      Already have an account? <a routerLink="/login" class="micro-link">Log in</a>
+      <br>
+      Or go back to the <a routerLink="/" class="micro-link">home page</a>.
+    </p>
+  </mat-card>
+</div>
+

@@ -15,6 +15,9 @@ import {
   update,
 } from 'firebase/database';
 import { db } from './firebase.config';
+import { BehaviorSubject, Observable, from } from 'rxjs';
+import { map, catchError } from 'rxjs/operators';
+import { of } from 'rxjs';
 
 export interface BoardMessage {
   html: string;
@@ -32,7 +35,10 @@ export interface Board {
   boardProtection?: boolean;
   authorizedMailList?: string[];
   isSubmittedForCompetition?: boolean;
-  votes?: { [ip: string]: number };
+  competitionInterest?: boolean;
+  voteCount?: number; // Vote count stored in board for UI
+  boardSize?: 'min' | 'normal' | 'max';
+  isBlocked?: boolean;
 }
 
 export interface UserRecord {
@@ -40,6 +46,17 @@ export interface UserRecord {
   passwordHash?: string; // SHA-256 hash of the password
   boardKey?: string;
   createdAt: number;
+  gender?: string;
+  dateOfBirth?: string; // Format: YYYY-MM-DD
+  securityQuestion?: string;
+  securityAnswerHash?: string; // SHA-256 hash of the security answer
+}
+
+export interface VoteRecord {
+  ip: string;
+  dateTime: string;
+  boardId: string;
+  timestamp: number;
 }
 
 @Injectable({
@@ -48,10 +65,14 @@ export interface UserRecord {
 export class BoardService {
   private usersRef: DatabaseReference;
   private boardsRef: DatabaseReference;
+  private adminRef: DatabaseReference;
+  private votesRef: DatabaseReference;
 
   constructor() {
     this.usersRef = ref(db, 'users');
     this.boardsRef = ref(db, 'boards');
+    this.adminRef = ref(db, 'admin');
+    this.votesRef = ref(db, 'votes');
   }
 
   /**
@@ -250,7 +271,16 @@ export class BoardService {
     }
   }
 
-  async createUser(email: string, passwordHash: string): Promise<{ uid: string; user: UserRecord }> {
+  async createUser(
+    email: string,
+    passwordHash: string,
+    additionalData?: {
+      gender?: string;
+      dateOfBirth?: string;
+      securityQuestion?: string;
+      securityAnswerHash?: string;
+    }
+  ): Promise<{ uid: string; user: UserRecord }> {
     if (!email || !email.trim()) {
       throw new Error('Email is required to create user');
     }
@@ -276,9 +306,35 @@ export class BoardService {
       email: normalizedEmail,
       passwordHash: passwordHash.trim(),
       createdAt: Date.now(),
+      ...(additionalData?.gender && { gender: additionalData.gender }),
+      ...(additionalData?.dateOfBirth && { dateOfBirth: additionalData.dateOfBirth }),
+      ...(additionalData?.securityQuestion && { securityQuestion: additionalData.securityQuestion }),
+      ...(additionalData?.securityAnswerHash && { securityAnswerHash: additionalData.securityAnswerHash.trim() }),
     };
     await set(newRef, user);
     return { uid, user };
+  }
+
+  /**
+   * Update user password hash in RTDB
+   */
+  async updateUserPassword(uid: string, newPasswordHash: string): Promise<void> {
+    if (!uid || !uid.trim()) {
+      throw new Error('User ID is required');
+    }
+    if (!newPasswordHash || !newPasswordHash.trim()) {
+      throw new Error('Password hash is required');
+    }
+
+    try {
+      const userRef = child(this.usersRef, uid);
+      await update(userRef, {
+        passwordHash: newPasswordHash.trim(),
+      });
+    } catch (err: any) {
+      console.error('[BoardService] Error updating user password:', err);
+      throw new Error('Failed to update password. Please try again.');
+    }
   }
 
   async updateUserBoardKey(uid: string, boardKey: string): Promise<void> {
@@ -503,6 +559,26 @@ export class BoardService {
     await this.updateBoardMessage(boardKey, '');
   }
 
+  async updateBoardSize(boardKey: string, size: 'min' | 'normal' | 'max'): Promise<void> {
+    if (!boardKey || !boardKey.trim()) {
+      throw new Error('Board ID is required');
+    }
+    
+    try {
+      await update(child(this.boardsRef, boardKey.trim()), {
+        boardSize: size,
+      });
+    } catch (err: any) {
+      if (err?.code === 'PERMISSION_DENIED') {
+        throw new Error('Permission denied. Unable to update board size.');
+      }
+      if (err?.code === 'NETWORK_ERROR') {
+        throw new Error('Network error. Please check your connection and try again.');
+      }
+      throw new Error(`Failed to update board size: ${err?.message || 'Unknown error'}`);
+    }
+  }
+
   async updateBoardProtection(boardKey: string, enabled: boolean): Promise<void> {
     if (!boardKey || !boardKey.trim()) {
       throw new Error('Board ID is required');
@@ -627,6 +703,29 @@ export class BoardService {
   }
 
   /**
+   * Store competition interest for a user
+   */
+  async setCompetitionInterest(boardKey: string, isInterested: boolean): Promise<void> {
+    if (!boardKey || !boardKey.trim()) {
+      throw new Error('Board ID is required');
+    }
+    
+    try {
+      await update(child(this.boardsRef, boardKey.trim()), {
+        competitionInterest: isInterested,
+      });
+    } catch (err: any) {
+      if (err?.code === 'PERMISSION_DENIED') {
+        throw new Error('Permission denied. Please check your board ID.');
+      }
+      if (err?.code === 'NETWORK_ERROR') {
+        throw new Error('Network error. Please check your connection and try again.');
+      }
+      throw new Error(`Failed to update competition interest: ${err?.message || 'Unknown error'}`);
+    }
+  }
+
+  /**
    * Get all boards submitted for competition
    */
   async getCompetitionBoards(): Promise<Array<{ boardKey: string; board: Board }>> {
@@ -652,7 +751,7 @@ export class BoardService {
           isSubmittedType: typeof board.isSubmittedForCompetition,
           hasMessage: !!board.message,
           messageHtml: board.message?.html?.substring(0, 50) || 'no message',
-          hasVotes: !!board.votes
+          hasVotes: !!(board.voteCount && board.voteCount > 0)
         });
         
         // Check if board is submitted
@@ -717,29 +816,12 @@ export class BoardService {
   }
 
   /**
-   * Check if IP has already voted for a board
+   * Check if IP has already voted for a board (deprecated - now allows multiple votes)
+   * Kept for backward compatibility but always returns false
    */
   async hasVoted(boardKey: string, ip: string): Promise<boolean> {
-    if (!boardKey || !boardKey.trim()) {
-      console.log(`⚠️ [BoardService] Invalid boardKey for hasVoted check`);
-      return false;
-    }
-
-    try {
-      console.log(`🔍 [BoardService] Checking if IP ${ip} has voted for board: ${boardKey}`);
-      const board = await this.getBoard(boardKey);
-      if (!board || !board.votes) {
-        console.log(`  No votes object found for board ${boardKey}`);
-        return false;
-      }
-
-      const hasVoted = board.votes[ip] !== undefined && board.votes[ip] > 0;
-      console.log(`  ✅ Has voted check result: ${hasVoted}`, board.votes);
-      return hasVoted;
-    } catch (err: any) {
-      console.error(`❌ [BoardService] Error checking vote for ${boardKey}:`, err);
-      return false;
-    }
+    // Always return false to allow unlimited votes
+    return false;
   }
 
   /**
@@ -756,23 +838,27 @@ export class BoardService {
         throw new Error('Board not found');
       }
 
-      // Get current votes or initialize empty object
-      const currentVotes = board.votes || {};
+      // Generate unique vote ID
+      const now = new Date();
+      const dateTime = now.toISOString();
+      const timestamp = Date.now();
+      const voteId = `vote_${timestamp}_${Math.random().toString(36).substr(2, 9)}`;
       
-      // Check if IP already voted
-      if (currentVotes[ip] && currentVotes[ip] > 0) {
-        throw new Error('You have already voted for this Kavithai!');
-      }
-
-      // Add vote: IP:Count (count is always 1 for a vote)
-      const updatedVotes = {
-        ...currentVotes,
-        [ip]: 1
+      // Create vote record with IP, date, time, and board ID
+      const voteRecord: VoteRecord = {
+        ip: ip,
+        dateTime: dateTime,
+        boardId: boardKey.trim(),
+        timestamp: timestamp
       };
 
-      // Update board with new votes
+      // Store vote in separate votes structure (for internal tracking)
+      await set(child(this.votesRef, voteId), voteRecord);
+      
+      // Update vote count in board (for UI display)
+      const currentVoteCount = board.voteCount || 0;
       await update(child(this.boardsRef, boardKey.trim()), {
-        votes: updatedVotes,
+        voteCount: currentVoteCount + 1
       });
     } catch (err: any) {
       if (err?.code === 'PERMISSION_DENIED') {
@@ -789,7 +875,7 @@ export class BoardService {
   }
 
   /**
-   * Get vote count for a board
+   * Get vote count for a board from board data
    */
   async getVoteCount(boardKey: string): Promise<number> {
     if (!boardKey || !boardKey.trim()) {
@@ -798,12 +884,7 @@ export class BoardService {
 
     try {
       const board = await this.getBoard(boardKey);
-      if (!board || !board.votes) {
-        return 0;
-      }
-
-      // Count all IPs that have voted (count > 0)
-      return Object.values(board.votes).reduce((total, count) => total + (count > 0 ? 1 : 0), 0);
+      return board?.voteCount || 0;
     } catch (err: any) {
       console.error('Error getting vote count:', err);
       return 0;
@@ -811,7 +892,7 @@ export class BoardService {
   }
 
   /**
-   * Subscribe to vote count changes for a board
+   * Subscribe to vote count changes for a board from board data
    */
   subscribeToVoteCount(boardKey: string, callback: (count: number) => void): Unsubscribe {
     const boardRef = child(this.boardsRef, boardKey.trim());
@@ -822,16 +903,199 @@ export class BoardService {
         return;
       }
       const board = snapshot.val() as Board;
-      if (!board.votes) {
-        callback(0);
-        return;
-      }
-      // Count all IPs that have voted
-      const count = Object.values(board.votes).reduce((total, voteCount) => total + (voteCount > 0 ? 1 : 0), 0);
-      callback(count);
+      callback(board?.voteCount || 0);
     });
 
     return unsubscribe;
+  }
+
+  /**
+   * Admin: Get admin credentials
+   */
+  async getAdminCredentials(): Promise<{ username: string; passwordHash: string } | null> {
+    try {
+      const snapshot = await get(this.adminRef);
+      if (!snapshot.exists()) {
+        return null;
+      }
+      return snapshot.val();
+    } catch (err: any) {
+      console.error('Error fetching admin credentials:', err);
+      throw new Error(`Failed to fetch admin credentials: ${err?.message || 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Admin: Set admin credentials (initial setup)
+   */
+  async setAdminCredentials(username: string, passwordHash: string): Promise<void> {
+    try {
+      await set(this.adminRef, {
+        username,
+        passwordHash,
+        createdAt: Date.now()
+      });
+    } catch (err: any) {
+      console.error('Error setting admin credentials:', err);
+      throw new Error(`Failed to set admin credentials: ${err?.message || 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Admin: Get all boards (Promise version - kept for backward compatibility)
+   */
+  async getAllBoards(): Promise<Array<{ boardKey: string; board: Board; ownerEmail?: string }>> {
+    try {
+      console.log('[BoardService] Fetching all boards...');
+      const boardsSnapshot = await get(this.boardsRef);
+      
+      if (!boardsSnapshot.exists()) {
+        console.log('[BoardService] No boards found in database');
+        return [];
+      }
+
+      const boardsData = boardsSnapshot.val();
+      console.log('[BoardService] Found boards:', Object.keys(boardsData).length);
+      
+      const usersSnapshot = await get(this.usersRef);
+      const usersData = usersSnapshot.exists() ? usersSnapshot.val() : {};
+      console.log('[BoardService] Found users:', Object.keys(usersData).length);
+
+      const allBoards: Array<{ boardKey: string; board: Board; ownerEmail?: string }> = [];
+
+      for (const [boardKey, boardData] of Object.entries(boardsData)) {
+        try {
+          const board = boardData as Board;
+          let ownerEmail: string | undefined;
+
+          // Find owner email
+          if (board.ownerUid) {
+            for (const [uid, userData] of Object.entries(usersData)) {
+              const user = userData as UserRecord;
+              if (uid === board.ownerUid) {
+                ownerEmail = user.email;
+                break;
+              }
+            }
+          }
+
+          allBoards.push({ boardKey, board, ownerEmail });
+        } catch (e) {
+          console.error(`[BoardService] Error processing board ${boardKey}:`, e);
+          // Continue with other boards even if one fails
+        }
+      }
+
+      // Sort by creation date (newest first)
+      allBoards.sort((a, b) => (b.board.createdAt || 0) - (a.board.createdAt || 0));
+
+      console.log('[BoardService] Returning', allBoards.length, 'boards');
+      return allBoards;
+    } catch (err: any) {
+      console.error('[BoardService] Error fetching all boards:', err);
+      if (err?.code === 'PERMISSION_DENIED') {
+        throw new Error('Permission denied. Please check Firebase rules.');
+      }
+      throw new Error(`Failed to fetch boards: ${err?.message || 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Admin: Get all boards as Observable (RxJS pattern)
+   */
+  getAllBoards$(): Observable<Array<{ boardKey: string; board: Board; ownerEmail?: string }>> {
+    return from(this.getAllBoards()).pipe(
+      catchError((err) => {
+        console.error('[BoardService] Error in getAllBoards$:', err);
+        return of([]); // Return empty array on error
+      })
+    );
+  }
+
+  /**
+   * Admin: Block a board
+   */
+  async blockBoard(boardKey: string): Promise<void> {
+    try {
+      await update(child(this.boardsRef, boardKey), {
+        isBlocked: true
+      });
+    } catch (err: any) {
+      console.error('Error blocking board:', err);
+      throw new Error(`Failed to block board: ${err?.message || 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Admin: Unblock a board
+   */
+  async unblockBoard(boardKey: string): Promise<void> {
+    try {
+      await update(child(this.boardsRef, boardKey), {
+        isBlocked: false
+      });
+    } catch (err: any) {
+      console.error('Error unblocking board:', err);
+      throw new Error(`Failed to unblock board: ${err?.message || 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Admin: Delete a board
+   */
+  async deleteBoard(boardKey: string): Promise<void> {
+    try {
+      await set(child(this.boardsRef, boardKey), null);
+    } catch (err: any) {
+      console.error('Error deleting board:', err);
+      throw new Error(`Failed to delete board: ${err?.message || 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Admin: Delete a user by UID
+   */
+  async deleteUser(uid: string): Promise<void> {
+    if (!uid || !uid.trim()) {
+      throw new Error('User ID is required to delete user');
+    }
+
+    try {
+      await set(child(this.usersRef, uid.trim()), null);
+      console.log('[BoardService] User deleted from RTDB:', uid);
+    } catch (err: any) {
+      console.error('Error deleting user:', err);
+      throw new Error(`Failed to delete user: ${err?.message || 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Admin: Delete both user and board (complete account deletion)
+   */
+  async deleteAccount(boardKey: string, ownerUid: string): Promise<void> {
+    if (!boardKey || !boardKey.trim()) {
+      throw new Error('Board key is required');
+    }
+    if (!ownerUid || !ownerUid.trim()) {
+      throw new Error('Owner UID is required');
+    }
+
+    try {
+      console.log('[BoardService] Deleting account - Board:', boardKey, 'User:', ownerUid);
+      
+      // Delete board first
+      await this.deleteBoard(boardKey);
+      console.log('[BoardService] Board deleted successfully');
+      
+      // Delete user
+      await this.deleteUser(ownerUid);
+      console.log('[BoardService] User deleted successfully');
+      
+      console.log('[BoardService] Account deletion complete');
+    } catch (err: any) {
+      console.error('Error deleting account:', err);
+      throw new Error(`Failed to delete account: ${err?.message || 'Unknown error'}`);
+    }
   }
 }
 

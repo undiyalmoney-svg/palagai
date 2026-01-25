@@ -12,7 +12,6 @@ interface CompetitionBoard {
   boardKey: string;
   board: Board;
   voteCount: number;
-  hasVoted: boolean;
   unsubscribe?: Unsubscribe;
 }
 
@@ -34,6 +33,7 @@ export class Competition implements OnInit, OnDestroy {
   boards: CompetitionBoard[] = [];
   loading = true;
   userIP: string = '';
+  votedBoards: Set<string> = new Set(); // Track boards voted in this session
 
   private voteUnsubscribes: Map<string, Unsubscribe> = new Map();
 
@@ -81,6 +81,13 @@ export class Competition implements OnInit, OnDestroy {
         this.userIP = sessionStorage.getItem('palagai_session_id') || 
           `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         sessionStorage.setItem('palagai_session_id', this.userIP);
+        
+        // Load voted boards from session
+        const votedBoards = sessionStorage.getItem('palagai_voted_boards');
+        if (votedBoards) {
+          const votedBoardList = JSON.parse(votedBoards);
+          this.votedBoards = new Set(votedBoardList);
+        }
       } else {
         this.userIP = 'unknown';
       }
@@ -107,12 +114,8 @@ export class Competition implements OnInit, OnDestroy {
       
       for (const { boardKey, board } of competitionBoards) {
         try {
-          // Calculate vote count from board data
-          const votes = board.votes || {};
-          const voteCount = Object.values(votes).reduce((total, count) => total + (count > 0 ? 1 : 0), 0);
-          
-          // Check if user has voted from board data
-          const hasVoted = votes[this.userIP] !== undefined && votes[this.userIP] > 0;
+          // Get vote count from board data
+          const voteCount = board.voteCount || 0;
 
           // Subscribe to real-time vote count updates (non-blocking)
           try {
@@ -133,15 +136,13 @@ export class Competition implements OnInit, OnDestroy {
             boardKey,
             board,
             voteCount,
-            hasVoted,
           });
         } catch (err) {
           console.error(`Error processing board ${boardKey}:`, err);
           boardsWithVotes.push({
             boardKey,
             board,
-            voteCount: 0,
-            hasVoted: false,
+            voteCount: board.voteCount || 0,
           });
         }
       }
@@ -186,22 +187,23 @@ export class Competition implements OnInit, OnDestroy {
   }
 
   async voteForBoard(board: CompetitionBoard) {
-    if (board.hasVoted) {
-      this.snackBar.open('You have already voted for this Kavithai!', 'OK', {
-        duration: 3000,
-        panelClass: ['info-snackbar'],
-      });
+    // Check if already voted in this session
+    if (this.votedBoards.has(board.boardKey)) {
       return;
     }
 
     try {
       console.log(`🗳️ Voting for board: ${board.boardKey} with IP: ${this.userIP}`);
       
-      // Add the vote to Firebase
+      // Add the vote to Firebase (allows multiple votes)
       await this.boardsService.addVote(board.boardKey, this.userIP);
       
-      // Update local state immediately
-      board.hasVoted = true;
+      // Mark as voted in session
+      this.votedBoards.add(board.boardKey);
+      if (typeof window !== 'undefined') {
+        const votedBoardList = Array.from(this.votedBoards);
+        sessionStorage.setItem('palagai_voted_boards', JSON.stringify(votedBoardList));
+      }
       
       // Refresh vote count from Firebase to ensure accuracy
       const updatedVoteCount = await this.boardsService.getVoteCount(board.boardKey);
@@ -212,8 +214,8 @@ export class Competition implements OnInit, OnDestroy {
       this.boards.sort((a, b) => b.voteCount - a.voteCount);
       console.log(`🔄 Boards re-sorted. Top board now: ${this.boards[0]?.boardKey} with ${this.boards[0]?.voteCount} votes`);
 
-      this.snackBar.open('Thank you for your vote! ❤️', 'OK', {
-        duration: 3000,
+      this.snackBar.open('⭐ Thanks for your vote!', 'OK', {
+        duration: 2000,
         panelClass: ['success-snackbar'],
       });
       

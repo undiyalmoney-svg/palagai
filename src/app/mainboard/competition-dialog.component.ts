@@ -5,6 +5,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 
 export interface CompetitionDialogData {
+  isSubmitted?: boolean;
   onSubmit: () => Promise<void>;
 }
 
@@ -20,21 +21,42 @@ export interface CompetitionDialogData {
   template: `
     <div class="competition-dialog-wrapper">
       <h2 mat-dialog-title class="dialog-title">
-        <mat-icon class="heart-icon">favorite</mat-icon>
-        Submit for Kavithai Competition
+        <mat-icon class="heart-icon">{{ data.isSubmitted ? 'favorite' : 'favorite_border' }}</mat-icon>
+        {{ data.isSubmitted ? 'Remove from Competition' : 'Submit for Kavithai Competition' }}
       </h2>
       
       <mat-dialog-content class="dialog-content">
-        <div class="competition-info">
-          <p class="info-text">
-            This competition is for Valentine's Day. You can share your board too!
+        <div class="competition-info" *ngIf="!data.isSubmitted">
+          <p class="topic-text">
+            <strong>Topic:</strong> என்னவள்
           </p>
           <p class="info-text">
-            We will publish your Kavithai and get public votes. The Kavithai getting more votes will win ₹500 cash prize.
+            This competition is for <strong>Valentine's Day</strong>. You can share your board too!
+          </p>
+          <p class="info-text">
+            We will publish your Kavithai and get public votes. The Kavithai getting more votes will win <strong>₹500 cash prize</strong>.
+          </p>
+          <p class="info-text">
+            <strong>Hit the heart icon</strong> to submit your kavithai to the competition.
+          </p>
+          <p class="info-text">
+            You can submit your kavithai in <strong>Tamil</strong>, <strong>English</strong>, or even <strong>Thanglish</strong>!
+          </p>
+          <p class="info-text">
+            Competition ends on <strong>28th Feb</strong>. For any queries send email to <strong>palagaiofficial@gmail.com</strong>.
           </p>
         </div>
+        <div class="rules-section" *ngIf="!data.isSubmitted">
+          <p class="rules-title">Make sure your kavithai following these rules:</p>
+          <ul class="rules-list">
+            <li>Not copying from anywhere outside</li>
+            <li>Only own contents is allowed</li>
+          </ul>
+        </div>
         <p class="confirmation-text">
-          Are you sure you want to submit your Kavithai for this competition?
+          {{ data.isSubmitted 
+            ? 'Are you sure you want to remove your Kavithai from the competition?' 
+            : 'Are you sure you want to submit your Kavithai for this competition?' }}
         </p>
       </mat-dialog-content>
       
@@ -42,13 +64,14 @@ export interface CompetitionDialogData {
         <button mat-button (click)="close()" class="cancel-btn">Cancel</button>
         <button 
           mat-raised-button 
-          color="primary" 
+          [color]="data.isSubmitted ? 'warn' : 'primary'"
           (click)="submit()" 
           [disabled]="submitting"
           class="submit-btn"
+          [class.remove-btn]="data.isSubmitted"
         >
-          <mat-icon>{{ submitting ? 'hourglass_empty' : 'favorite' }}</mat-icon>
-          {{ submitting ? 'Submitting...' : 'Submit' }}
+          <mat-icon>{{ submitting ? 'hourglass_empty' : (data.isSubmitted ? 'favorite_border' : 'favorite') }}</mat-icon>
+          {{ submitting ? (data.isSubmitted ? 'Removing...' : 'Submitting...') : (data.isSubmitted ? 'Remove' : 'Submit') }}
         </button>
       </mat-dialog-actions>
     </div>
@@ -93,6 +116,19 @@ export interface CompetitionDialogData {
       margin-bottom: 20px;
     }
 
+    .topic-text {
+      margin: 0 0 16px 0;
+      font-size: 16px;
+      font-weight: 600;
+      color: #e91e63;
+      padding-bottom: 12px;
+      border-bottom: 2px solid #ffc1d6;
+    }
+
+    .topic-text strong {
+      color: #c2185b;
+    }
+
     .info-text {
       margin: 0 0 12px 0;
       font-size: 14px;
@@ -101,6 +137,37 @@ export interface CompetitionDialogData {
     }
 
     .info-text:last-child {
+      margin-bottom: 0;
+    }
+
+    .rules-section {
+      background: #fff3e0;
+      border: 1px solid #ffb74d;
+      border-radius: 8px;
+      padding: 16px;
+      margin: 20px 0;
+    }
+
+    .rules-title {
+      margin: 0 0 12px 0;
+      font-size: 15px;
+      font-weight: 600;
+      color: #e65100;
+    }
+
+    .rules-list {
+      margin: 0;
+      padding-left: 20px;
+      color: #555;
+      font-size: 14px;
+      line-height: 1.8;
+    }
+
+    .rules-list li {
+      margin-bottom: 8px;
+    }
+
+    .rules-list li:last-child {
       margin-bottom: 0;
     }
 
@@ -137,6 +204,14 @@ export interface CompetitionDialogData {
 
     .submit-btn:hover:not(:disabled) {
       background: #c2185b;
+    }
+
+    .submit-btn.remove-btn {
+      background: #f44336;
+    }
+
+    .submit-btn.remove-btn:hover:not(:disabled) {
+      background: #d32f2f;
     }
 
     .submit-btn:disabled {
@@ -193,6 +268,11 @@ export class CompetitionDialogComponent {
     this.dialogRef.close(false);
   }
 }
+
+
+
+
+
 
 
 

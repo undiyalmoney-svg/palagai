@@ -1,83 +1,40 @@
 <div class="login-wrapper">
   <mat-card class="login-card">
-    <div class="slash blue"></div>
-    <div class="slash orange"></div>
-    <div class="slash green"></div>
-
     <h1 class="title">Palagai</h1>
-    <p class="subtitle">{{ isSignUp ? 'Create your account' : 'Sign in to your account' }}</p>
+    <p class="subtitle">Sign in to your account</p>
 
-    <form (ngSubmit)="submitEmail()">
+    <form [formGroup]="loginForm" (ngSubmit)="onSubmit()">
       <div class="form-group">
-        <label for="email" class="input-label">Email</label>
+        <label class="input-label">Email</label>
         <mat-form-field appearance="outline" class="full-width">
-          <input
-            matInput
-            id="email"
-            type="email"
-            placeholder="Enter your email"
-            [(ngModel)]="email"
-            name="email"
-            [disabled]="loading"
-            required
-          />
-          <mat-error *ngIf="message && message.includes('email')">{{ message }}</mat-error>
+          <input matInput formControlName="email" placeholder="name@company.com" />
+          <mat-error *ngIf="loginForm.get('email')?.hasError('email')">Enter a valid email</mat-error>
+          <mat-error *ngIf="loginForm.get('email')?.hasError('required')">Email is required</mat-error>
         </mat-form-field>
       </div>
 
       <div class="form-group">
-        <label for="password" class="input-label">Password</label>
+        <label class="input-label">Password</label>
         <mat-form-field appearance="outline" class="full-width">
-          <input
-            matInput
-            id="password"
-            [type]="hidePassword ? 'password' : 'text'"
-            placeholder="Enter your password"
-            [(ngModel)]="password"
-            name="password"
-            [disabled]="loading"
-            required
-          />
-          <button
-            mat-icon-button
-            matSuffix
-            (click)="hidePassword = !hidePassword"
-            [attr.aria-label]="'Hide password'"
-            [attr.aria-pressed]="hidePassword"
-            type="button"
-          >
+          <input matInput [type]="hidePassword ? 'password' : 'text'" formControlName="password" placeholder="••••••••" />
+          <button mat-icon-button matSuffix type="button" (click)="hidePassword = !hidePassword" tabindex="-1">
             <mat-icon>{{ hidePassword ? 'visibility_off' : 'visibility' }}</mat-icon>
           </button>
-          <mat-hint *ngIf="isSignUp">Password must be at least 6 characters long</mat-hint>
-          <mat-error *ngIf="message && message.includes('password')">{{ message }}</mat-error>
+          <mat-error *ngIf="loginForm.get('password')?.invalid">Password is required</mat-error>
         </mat-form-field>
       </div>
 
-      <div class="forgot-password-wrapper" *ngIf="!isSignUp">
-        <a (click)="onForgotPassword()" class="forgot-link" *ngIf="!loading">
-          Forgot password?
-        </a>
+      <div class="forgot-password-wrapper">
+        <a class="forgot-link" (click)="onForgotPassword()">Forgot password?</a>
       </div>
 
-      <button
-        mat-raised-button
-        color="primary"
-        type="submit"
-        [disabled]="loading"
-        class="full-width"
-      >
-        {{ loading ? 'Please wait...' : (isSignUp ? 'Sign Up' : 'Log In') }}
+      <button mat-flat-button class="full-width" type="submit" [disabled]="isSubmitting">
+        {{ isSubmitting ? 'Please wait...' : 'Login' }}
       </button>
     </form>
 
-    <p class="message" *ngIf="message && !message.includes('email') && !message.includes('password')">{{ message }}</p>
-
     <p class="micro-line">
-      <a (click)="isSignUp = !isSignUp" class="micro-link">
-        {{ isSignUp ? 'Already have an account? Log in' : 'New user? Sign up' }}
-      </a>
-      <br>
-      Or go back to the <a routerLink="/" class="micro-link">home page</a>.
+      New user? <a class="micro-link" routerLink="/signup">Sign up</a>
     </p>
   </mat-card>
 </div>

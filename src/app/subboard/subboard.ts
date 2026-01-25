@@ -1,7 +1,7 @@
 import { Component, OnInit, ChangeDetectorRef, AfterViewInit, OnDestroy, ViewChild, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators, FormControl } from '@angular/forms';
-import { RouterLink, ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Board, BoardService } from '../board.service';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatButtonModule } from '@angular/material/button';
@@ -10,6 +10,11 @@ import { MatInputModule } from '@angular/material/input';
 import { MatCardModule } from '@angular/material/card';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatIconModule } from '@angular/material/icon';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
+import { BoardIdDialogComponent, BoardIdDialogData } from './board-id-dialog.component';
+import { SaveConfirmationDialogComponent } from '../mainboard/save-confirmation-dialog.component';
 const SESSION_BOARD_KEY = 'palagai_session_board_id';
 
 @Component({
@@ -26,6 +31,8 @@ const SESSION_BOARD_KEY = 'palagai_session_board_id';
     MatCardModule,
     MatSnackBarModule,
     MatIconModule,
+    MatDialogModule,
+    MatProgressSpinnerModule,
   ],
   templateUrl: './subboard.html',
   styleUrls: ['./subboard.css', './display-renderer.css'],
@@ -40,12 +47,21 @@ export class Subboard implements OnInit, AfterViewInit, OnDestroy {
   isFullPage = false;
   isPreviewMode = false;
   showEmailInput = false; // Show email input only if board is protected
+  showLandingPage = true; // Show landing page when no board is loaded
+  boardSize: 'min' | 'normal' | 'max' = 'normal'; // Board size control
+  savedBoardSize: 'min' | 'normal' | 'max' = 'normal'; // Track saved board size for unsaved changes
   private loadingFromQueryParam = false; // Track if board was loaded from query param
   private _lastUpdated: number | null = null;
   private autoScrollInterval?: number;
   private isScrolling = false;
   private scrollDirection: 'down' | 'up' = 'down';
   private boardUnsubscribe?: () => void; // Firebase listener unsubscribe function
+  currentBoardKey: string | null = null; // Store current board key for voting
+  voteCount: number = 0;
+  isVoting: boolean = false;
+  userIP: string = '';
+  isInCompetition: boolean = false; // Property instead of getter to avoid NG0100
+  hasVotedInSession: boolean = false; // Track if user voted in current session
 
   readonly defaultHtml = '<p>Enter a board ID and load a Palagai board.</p>';
   readonly backgroundImageUrl = '/doodle-background.png';
@@ -57,6 +73,8 @@ export class Subboard implements OnInit, AfterViewInit, OnDestroy {
     private readonly fb: FormBuilder,
     private readonly route: ActivatedRoute,
     private readonly router: Router,
+    private readonly sanitizer: DomSanitizer,
+    private readonly dialog: MatDialog,
   ) {
     // Initialize form - use try-catch for SSR safety
     // FormBuilder should always be available via DI, but add safety for edge cases
@@ -84,25 +102,6 @@ export class Subboard implements OnInit, AfterViewInit, OnDestroy {
   }
 
   ngOnInit() {
-    // TEMPORARY: Add dummy data for testing
-    const now = Date.now();
-    this.board = {
-      message: {
-        html: '<p class="tamil-verse">முயற்சி திருவினை ஆக்கும்; முயற்றின்மை<br><br>இன்மை புகுத்தி விடும்.</p></p>',
-        updatedAt: now,
-        status: 'active'
-      },
-      boardProtection: false,
-      authorizedMailList: [],
-      ownerUid: 'test',
-      userType: 'test',
-      planType: 'free',
-      createdAt: now,
-      activeDate: new Date(now).toISOString()
-    };
-    this._lastUpdated = now;
-    this.form.patchValue({ boardId: 'TEST-BOARD-ID' });
-    
     // Check for preview mode first
     this.route.queryParams.subscribe(params => {
       const isPreview = params['preview'] === 'true';
@@ -112,6 +111,7 @@ export class Subboard implements OnInit, AfterViewInit, OnDestroy {
         // Preview mode - show content directly
         this.isPreviewMode = true;
         const decodedContent = decodeURIComponent(previewContent);
+        const sizeFromQuery = params['size'] as 'min' | 'normal' | 'max' | undefined;
         const now = Date.now();
         this.board = {
           message: {
@@ -125,9 +125,20 @@ export class Subboard implements OnInit, AfterViewInit, OnDestroy {
           userType: 'preview',
           planType: 'free',
           createdAt: now,
-          activeDate: new Date(now).toISOString()
+          activeDate: new Date(now).toISOString(),
+          boardSize: (sizeFromQuery && ['min', 'normal', 'max'].includes(sizeFromQuery)) ? sizeFromQuery : 'normal'
         };
         this._lastUpdated = Date.now();
+        // Set board size from query param or default to normal
+        this.boardSize = this.board.boardSize || 'normal';
+        this.savedBoardSize = this.boardSize; // Track saved board size
+        
+        // Store boardKey from query params for size updates
+        const boardKeyFromQuery = params['boardKey'] as string | undefined;
+        if (boardKeyFromQuery) {
+          (this as any).previewBoardKey = boardKeyFromQuery;
+        }
+        
         // Auto-enter full page mode for preview
         setTimeout(() => {
           this.isFullPage = true;
@@ -150,11 +161,14 @@ export class Subboard implements OnInit, AfterViewInit, OnDestroy {
         this.form.patchValue({ boardId: boardIdFromQuery.trim() });
         // Mark that we're loading from query param
         this.loadingFromQueryParam = true;
-        // Auto-load the board
+        // Auto-load the board (size will be loaded from DB)
         this.loadBoardFromQuery(boardIdFromQuery.trim());
+        this.showLandingPage = false;
       } else {
-        // No query param, initialize from sessionStorage
+        // No query param, show landing page
         this.loadingFromQueryParam = false;
+        this.showLandingPage = true;
+        this.boardSize = 'normal'; // Default size
         this.initializeFromSessionStorage();
       }
     });
@@ -218,10 +232,25 @@ export class Subboard implements OnInit, AfterViewInit, OnDestroy {
 
       // Board is not protected - load it directly
       this.board = result;
+      this.currentBoardKey = boardId;
       this._lastUpdated = result.message?.updatedAt ?? null;
+      // Load board size from database
+      this.boardSize = result.boardSize || 'normal';
+      this.savedBoardSize = this.boardSize; // Track saved board size
       this.saveToSessionStorage(boardId);
       this.error = '';
       this.loading = false;
+      this.showLandingPage = false; // Hide landing page when board is loaded
+      
+      // Set competition status (defer to avoid NG0100)
+      setTimeout(() => {
+        this.isInCompetition = !!(result.isSubmittedForCompetition);
+        if (this.isInCompetition) {
+          this.initializeVoting(boardId);
+        }
+        this.cdr.detectChanges();
+      }, 0);
+      
       // Re-enable form controls
       this.boardIdControl.enable();
       this.emailControl.enable();
@@ -272,16 +301,193 @@ export class Subboard implements OnInit, AfterViewInit, OnDestroy {
     return this.form.get('email')!;
   }
 
-  get boardMessageHtml(): string {
-    return this.board?.message?.html || '';
+  get boardMessageHtml(): SafeHtml {
+    const html = this.board?.message?.html || '';
+    // Use DomSanitizer to preserve style attributes and other formatting
+    // bypassSecurityTrustHtml allows style attributes to be preserved
+    return this.sanitizer.bypassSecurityTrustHtml(html);
   }
 
   get hasBoardMessage(): boolean {
     return !!(this.board && this.board.message && this.board.message.html);
   }
 
-  goToMainboard() {
-    this.router.navigate(['/mainboard']);
+
+  async initializeVoting(boardKey: string) {
+    try {
+      // Get or create user IP
+      if (typeof window !== 'undefined') {
+        this.userIP = sessionStorage.getItem('palagai_session_id') || '';
+        if (!this.userIP) {
+          this.userIP = await this.boards.getUserIP();
+        }
+        
+        // Check if user has voted in this session
+        const votedBoards = sessionStorage.getItem('palagai_voted_boards');
+        if (votedBoards) {
+          const votedBoardList = JSON.parse(votedBoards);
+          this.hasVotedInSession = votedBoardList.includes(boardKey);
+        }
+      } else {
+        this.userIP = 'unknown';
+      }
+
+      // Get vote count from board
+      if (this.board) {
+        this.voteCount = this.board.voteCount || 0;
+      } else {
+        this.voteCount = await this.boards.getVoteCount(boardKey);
+      }
+      
+      this.cdr.detectChanges();
+    } catch (error) {
+      console.error('Error initializing voting:', error);
+    }
+  }
+
+  async voteForBoard() {
+    if (!this.currentBoardKey || this.isVoting || this.hasVotedInSession) {
+      return;
+    }
+
+    this.isVoting = true;
+    this.cdr.detectChanges();
+
+    try {
+      await this.boards.addVote(this.currentBoardKey, this.userIP);
+      
+      // Mark as voted in session
+      if (typeof window !== 'undefined' && this.currentBoardKey) {
+        const votedBoards = sessionStorage.getItem('palagai_voted_boards');
+        const votedBoardList = votedBoards ? JSON.parse(votedBoards) : [];
+        if (!votedBoardList.includes(this.currentBoardKey)) {
+          votedBoardList.push(this.currentBoardKey);
+          sessionStorage.setItem('palagai_voted_boards', JSON.stringify(votedBoardList));
+        }
+        this.hasVotedInSession = true;
+      }
+      
+      // Update vote count from board after a short delay
+      setTimeout(async () => {
+        try {
+          if (this.currentBoardKey && this.board) {
+            // Refresh board to get updated vote count
+            const updatedBoard = await this.boards.getBoard(this.currentBoardKey);
+            if (updatedBoard) {
+              this.board = updatedBoard;
+              this.voteCount = updatedBoard.voteCount || 0;
+              this.cdr.detectChanges();
+            }
+          }
+        } catch (err) {
+          console.error('Error refreshing vote count:', err);
+        }
+      }, 500);
+      
+      setTimeout(() => {
+        this.snackBar.open('⭐ Thanks for your vote!', 'OK', {
+          duration: 2000,
+          panelClass: ['success-snackbar'],
+        });
+        this.cdr.detectChanges();
+      }, 0);
+      
+    } catch (error: any) {
+      console.error('Error voting:', error);
+      setTimeout(() => {
+        this.snackBar.open(error?.message || 'Error submitting vote. Please try again.', 'OK', {
+          duration: 4000,
+          panelClass: ['error-snackbar'],
+        });
+      }, 0);
+    } finally {
+      setTimeout(() => {
+        this.isVoting = false;
+        this.cdr.detectChanges();
+      }, 0);
+    }
+  }
+
+  async goToMainboard() {
+    // Check for unsaved size changes
+    if (this.isPreviewMode && this.hasUnsavedSizeChanges()) {
+      const result = await this.showSaveConfirmation('You have unsaved board size changes. Would you like to save before leaving?');
+      if (result === 'save') {
+        await this.saveBoardSize();
+        this.router.navigate(['/mainboard']);
+      } else if (result === 'discard') {
+        this.router.navigate(['/mainboard']);
+      }
+      // If 'cancel', stay on page
+    } else {
+      // Save board size to localStorage so mainboard can read it and save to RTDB
+      if (this.isPreviewMode && typeof window !== 'undefined') {
+        localStorage.setItem('palagai_preview_board_size', this.boardSize);
+      }
+      this.router.navigate(['/mainboard']);
+    }
+  }
+
+  async showSaveConfirmation(message: string): Promise<'save' | 'discard' | 'cancel'> {
+    return new Promise((resolve) => {
+      const dialogRef = this.dialog.open(SaveConfirmationDialogComponent, {
+        width: '90%',
+        maxWidth: '450px',
+        disableClose: true,
+        data: { message }
+      });
+
+      dialogRef.afterClosed().subscribe(result => {
+        resolve(result || 'cancel');
+      });
+    });
+  }
+
+  async setBoardSize(size: 'min' | 'normal' | 'max') {
+    this.boardSize = size;
+    // Don't save immediately - user needs to click save button
+    // Just update the local state
+    this.cdr.detectChanges();
+  }
+
+  hasUnsavedSizeChanges(): boolean {
+    return this.boardSize !== this.savedBoardSize;
+  }
+
+  async saveBoardSize() {
+    // In preview mode, save to RTDB if we have boardKey
+    if (this.isPreviewMode && typeof window !== 'undefined') {
+      // Get boardKey from stored value or query params
+      const boardKey = (this as any).previewBoardKey || new URLSearchParams(window.location.search).get('boardKey');
+      
+      if (boardKey) {
+        try {
+          await this.boards.updateBoardSize(boardKey, this.boardSize);
+          this.savedBoardSize = this.boardSize; // Update saved size
+          // Also save to localStorage as backup
+          localStorage.setItem('palagai_preview_board_size', this.boardSize);
+          this.snackBar.open('Board size saved successfully!', 'OK', {
+            duration: 2000,
+            panelClass: ['success-snackbar'],
+          });
+        } catch (e: any) {
+          console.error('Failed to save board size to RTDB:', e);
+          this.snackBar.open('Failed to save board size', 'OK', {
+            duration: 3000,
+            panelClass: ['error-snackbar'],
+          });
+        }
+      } else {
+        // No boardKey, just save to localStorage
+        localStorage.setItem('palagai_preview_board_size', this.boardSize);
+        this.savedBoardSize = this.boardSize;
+        this.snackBar.open('Board size saved!', 'OK', {
+          duration: 2000,
+          panelClass: ['success-snackbar'],
+        });
+      }
+    }
+    this.cdr.detectChanges();
   }
 
   private initializeFromSessionStorage() {
@@ -330,7 +536,7 @@ export class Subboard implements OnInit, AfterViewInit, OnDestroy {
   }
 
 
-  async loadBoard() {
+  async loadBoardDirectlyToFullView() {
     if (this.form.invalid) {
       if (this.boardIdControl.hasError('required')) {
         this.error = 'Please enter a board ID';
@@ -355,11 +561,8 @@ export class Subboard implements OnInit, AfterViewInit, OnDestroy {
     this.error = '';
     this.board = null;
     this._lastUpdated = null;
-    this.showEmailInput = false; // Reset - will be set based on board protection status
-    
-    // Disable form controls during loading
-    this.boardIdControl.disable();
-    this.emailControl.disable();
+    this.showEmailInput = false;
+    this.showLandingPage = false; // Hide landing page immediately when loading
 
     try {
       const result = await this.boards.getBoard(trimmedId);
@@ -371,9 +574,7 @@ export class Subboard implements OnInit, AfterViewInit, OnDestroy {
         this._lastUpdated = null;
         this.showEmailInput = false;
         this.loading = false;
-        // Re-enable form controls
-        this.boardIdControl.enable();
-        this.emailControl.enable();
+        this.showLandingPage = true; // Show landing page again on error
         this.cdr.markForCheck();
         this.snackBar.open(errorMsg, 'OK', {
           duration: 4000,
@@ -400,9 +601,7 @@ export class Subboard implements OnInit, AfterViewInit, OnDestroy {
         this.board = null;
         this._lastUpdated = null;
         this.loading = false;
-        // Re-enable form controls
-        this.boardIdControl.enable();
-        this.emailControl.enable();
+        this.showLandingPage = true; // Show landing page again on error
         this.cdr.markForCheck();
         this.snackBar.open(errorMsg, 'OK', {
           duration: 5000,
@@ -414,38 +613,30 @@ export class Subboard implements OnInit, AfterViewInit, OnDestroy {
       // Success - update state
       this.board = result;
       this._lastUpdated = result.message?.updatedAt ?? null;
+      // Load board size from database
+      this.boardSize = result.boardSize || 'normal';
+      this.savedBoardSize = this.boardSize; // Track saved board size
       this.saveToSessionStorage(trimmedId);
       this.error = '';
       this.loading = false;
-      // Re-enable form controls
-      this.boardIdControl.enable();
-      this.emailControl.enable();
+      this.showLandingPage = false; // Hide landing page when board is loaded
       this.cdr.markForCheck();
       
       // Set up real-time listener for board updates
       this.setupRealtimeListener(trimmedId);
       
-      // Auto-enter full page mode if loading from query param
-      if (this.loadingFromQueryParam) {
-        setTimeout(() => {
-          this.isFullPage = true;
-          if (typeof window !== 'undefined') {
-            document.body.style.overflow = 'hidden';
-            document.body.style.margin = '0';
-            document.body.style.padding = '0';
-            document.documentElement.style.overflow = 'hidden';
-          }
-          this.cdr.detectChanges();
-          setTimeout(() => this.startAutoScroll(), 500);
-        }, 100);
-        // Reset flag after use
-        this.loadingFromQueryParam = false;
-      } else {
-        // Restart auto-scroll after board loads if already in full page
-        if (this.isFullPage) {
-          setTimeout(() => this.startAutoScroll(), 500);
+      // Auto-enter full page mode (always go to full view)
+      setTimeout(() => {
+        this.isFullPage = true;
+        if (typeof window !== 'undefined') {
+          document.body.style.overflow = 'hidden';
+          document.body.style.margin = '0';
+          document.body.style.padding = '0';
+          document.documentElement.style.overflow = 'hidden';
         }
-      }
+        this.cdr.detectChanges();
+        setTimeout(() => this.startAutoScroll(), 500);
+      }, 100);
 
       this.snackBar.open('Board loaded successfully!', 'OK', {
         duration: 3000,
@@ -457,9 +648,7 @@ export class Subboard implements OnInit, AfterViewInit, OnDestroy {
       this.board = null;
       this._lastUpdated = null;
       this.loading = false;
-      // Re-enable form controls
-      this.boardIdControl.enable();
-      this.emailControl.enable();
+      this.showLandingPage = true; // Show landing page again on error
       this.cdr.markForCheck();
       this.snackBar.open(errorMsg, 'OK', {
         duration: 4000,
@@ -483,30 +672,70 @@ export class Subboard implements OnInit, AfterViewInit, OnDestroy {
   }
 
   toggleFullPage() {
-    this.isFullPage = !this.isFullPage;
     if (this.isFullPage) {
+      // Exit full page - go back to landing page
+      this.isFullPage = false;
+      this.showLandingPage = true;
+      this.board = null; // Clear board to show landing page
+      document.body.style.overflow = '';
+      document.body.style.margin = '';
+      document.body.style.padding = '';
+      document.documentElement.style.overflow = '';
+      this.stopAutoScroll();
+    } else {
+      // Enter full page
+      this.isFullPage = true;
       document.body.style.overflow = 'hidden';
       document.body.style.margin = '0';
       document.body.style.padding = '0';
       document.documentElement.style.overflow = 'hidden';
       // Start auto-scroll when entering full page
       setTimeout(() => this.startAutoScroll(), 500);
-    } else {
-      document.body.style.overflow = '';
-      document.body.style.margin = '';
-      document.body.style.padding = '';
-      document.documentElement.style.overflow = '';
-      this.stopAutoScroll();
     }
     this.cdr.detectChanges();
   }
+
+  openBoardIdDialog() {
+    const dialogRef = this.dialog.open(BoardIdDialogComponent, {
+      width: '90%',
+      maxWidth: '450px',
+      data: {
+        boardId: this.boardIdControl.value || '',
+        email: this.emailControl.value || ''
+      } as BoardIdDialogData
+    });
+
+    dialogRef.afterClosed().subscribe(result => {
+      if (result && result.boardId) {
+        this.form.patchValue({ boardId: result.boardId });
+        if (result.email) {
+          this.form.patchValue({ email: result.email });
+        }
+        this.showEmailInput = result.showEmailInput || false;
+        // Load board and go directly to full view
+        this.loadBoardDirectlyToFullView();
+      }
+    });
+  }
+
+  createBoard() {
+    // Navigate to login page to create a board
+    this.router.navigate(['/login']);
+  }
+
 
   private startAutoScroll() {
     if (typeof window === 'undefined' || !this.kioskMessageContent) {
       return;
     }
 
-    const element = this.kioskMessageContent.nativeElement;
+    const container = this.kioskMessageContent.nativeElement;
+    if (!container) {
+      return;
+    }
+
+    // Find the scrollable element (palagai-message-renderer)
+    const element = container.querySelector('.palagai-message-renderer') as HTMLElement;
     if (!element) {
       return;
     }
@@ -599,6 +828,14 @@ export class Subboard implements OnInit, AfterViewInit, OnDestroy {
             const previousUpdatedAt = this._lastUpdated;
             this.board = updatedBoard;
             this._lastUpdated = updatedBoard.message?.updatedAt ?? null;
+            
+            // Update competition status synchronously
+            this.isInCompetition = !!(updatedBoard.isSubmittedForCompetition);
+            
+            // Update vote count from board
+            if (this.isInCompetition) {
+              this.voteCount = updatedBoard.voteCount || 0;
+            }
             
             // Only show notification if this is a new update (not initial load)
             if (previousUpdatedAt !== null && this._lastUpdated !== null && this._lastUpdated > previousUpdatedAt) {

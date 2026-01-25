@@ -10,6 +10,168 @@ body {
   overflow-x: hidden;
 }
 
+/* ============================================
+   LANDING PAGE
+   ============================================ */
+
+.landing-page {
+  min-height: 100vh;
+  background-image: url('/doodle-background.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Mobile background for landing page */
+@media (max-width: 768px) {
+  .landing-page {
+    background-image: url('/doodle-background-mobile.png');
+  }
+}
+
+.landing-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: rgba(255, 255, 255, 0.95) !important;
+  backdrop-filter: blur(10px);
+  color: #111111 !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  border-bottom: 1px solid rgba(102, 126, 234, 0.2);
+  justify-content: center;
+}
+
+.logo-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  position: absolute;
+  left: 16px;
+}
+
+.logo-icon {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+  display: block;
+}
+
+.landing-toolbar .brand {
+  font-weight: 600;
+  font-size: 18px;
+  color: #111111;
+}
+
+.nav-link {
+  color: #111111 !important;
+  font-weight: 500;
+}
+
+.load-my-board-btn {
+  position: absolute;
+  right: 16px;
+}
+
+.menu-icon {
+  display: none;
+  color: #111111 !important;
+}
+
+.landing-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 24px;
+  text-align: center;
+  position: relative;
+  z-index: 1;
+}
+
+.landing-headline {
+  font-size: clamp(2.5rem, 8vw, 5rem);
+  font-weight: 700;
+  color: #2c3e50;
+  margin: 0 0 24px 0;
+  line-height: 1.2;
+}
+
+.landing-subheadline {
+  font-size: clamp(1rem, 3vw, 1.5rem);
+  color: #666666;
+  margin: 0 0 48px 0;
+  max-width: 600px;
+  line-height: 1.6;
+}
+
+.landing-actions {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.create-btn {
+  background: linear-gradient(135deg, #4ade80 0%, #22d3ee 100%) !important;
+  color: white !important;
+  padding: 16px 32px !important;
+  font-size: 16px !important;
+  font-weight: 600 !important;
+  border-radius: 12px !important;
+  box-shadow: 0 4px 12px rgba(74, 222, 128, 0.3) !important;
+  transition: transform 0.2s, box-shadow 0.2s !important;
+}
+
+.create-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(74, 222, 128, 0.4) !important;
+}
+
+.view-btn {
+  background: linear-gradient(135deg, #a78bfa 0%, #22d3ee 100%) !important;
+  color: white !important;
+  padding: 16px 32px !important;
+  font-size: 16px !important;
+  font-weight: 600 !important;
+  border-radius: 12px !important;
+  box-shadow: 0 4px 12px rgba(167, 139, 250, 0.3) !important;
+  transition: transform 0.2s, box-shadow 0.2s !important;
+}
+
+.view-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(167, 139, 250, 0.4) !important;
+}
+
+.competition-btn {
+  background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%) !important;
+  color: #333 !important;
+  padding: 16px 32px !important;
+  font-size: 16px !important;
+  font-weight: 600 !important;
+  border-radius: 12px !important;
+  box-shadow: 0 4px 12px rgba(255, 215, 0, 0.3) !important;
+  transition: transform 0.2s, box-shadow 0.2s !important;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.competition-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(255, 215, 0, 0.4) !important;
+}
+
+.competition-btn mat-icon {
+  font-size: 20px;
+  width: 20px;
+  height: 20px;
+}
+
 /* Background for subboard page */
 .subboard-wrapper {
   background-image: url('/doodle-background.png');
@@ -20,27 +182,13 @@ body {
   min-height: 100vh;
 }
 
-/* Toolbar */
-.subboard-toolbar {
-  position: sticky;
-  top: 0;
-  z-index: 100;
-  background: rgba(255, 255, 255, 0.95) !important;
-  backdrop-filter: blur(10px);
-  color: #111111 !important;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-  border-bottom: 1px solid rgba(102, 126, 234, 0.2);
+/* Mobile background */
+@media (max-width: 768px) {
+  .subboard-wrapper {
+    background-image: url('/doodle-background-mobile.png');
+  }
 }
 
-.brand {
-  font-weight: 600;
-  font-size: 18px;
-  color: #111111;
-}
-
-.spacer {
-  flex: 1 1 auto;
-}
 
 /* Wrapper */
 .subboard-wrapper {
@@ -66,147 +214,48 @@ body {
   background: transparent;
 }
 
-.subboard-wrapper.full-page .subboard-card {
-  display: none;
-}
-
-/* Card Container */
-.subboard-card {
-  width: 100%;
-  max-width: 100%;
-  padding: 32px;
-  margin: 16px 0;
-  background: rgba(255, 255, 255, 0.85);
-  border-radius: 16px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
-  box-sizing: border-box;
-  position: relative;
-  overflow: visible;
-  backdrop-filter: blur(10px);
-}
-
-/* Form Controls */
-.subboard-controls {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  margin-bottom: 24px;
-}
-
-.board-id-field,
-.email-field {
-  width: 100%;
-}
-
-.load-button {
-  width: 100%;
-  padding: 12px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: #ffffff !important;
-  border: none;
-  border-radius: 8px;
-  font-size: 15px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: opacity 0.3s;
-}
-
-.load-button,
-.load-button span,
-.load-button .mat-button-wrapper,
-.load-button .mat-button-wrapper span {
-  color: #ffffff !important;
-}
-
-.load-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-/* Loading Indicator */
-.loading-indicator {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 40px 20px;
-  gap: 16px;
-}
-
-.spinner {
-  width: 40px;
-  height: 40px;
-  border: 3px solid #e5e5e5;
-  border-top-color: #667eea;
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-.loading-indicator p {
-  color: #666666;
-  font-size: 14px;
-  margin: 0;
-}
-
-/* Board Section */
-.subboard-board {
-  margin-top: 24px;
-  width: 100%;
-  position: relative;
-}
-
-.board-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 16px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid #e5e5e5;
-}
-
-.board-meta {
-  flex: 1;
-}
-
-.updated {
-  margin: 0;
-  font-size: 13px;
-  color: #666666;
-}
-
-.updated strong {
-  color: #111111;
-  font-weight: 600;
-}
-
-.fullscreen-btn {
-  color: #111111;
-}
-
-/* Board Surface - Half Screen Mode */
-.board-surface {
-  width: 90%;
-  max-width: none;
-  margin: 5% auto; /* Center horizontally, 5% top/bottom */
-  padding: 0;
-  position: relative;
-  box-sizing: border-box;
-  min-height: 500px;
-  overflow: visible;
-  background: transparent;
-  border: none;
-  border-radius: 0;
-  backdrop-filter: none;
-  display: block;
-}
 
 /* ============================================
    FULL SCREEN MODE (KIOSK)
    ============================================ */
+
+.blocked-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(135deg, #f44336 0%, #d32f2f 100%);
+  color: white;
+  padding: 16px 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  box-shadow: 0 4px 12px rgba(244, 67, 54, 0.3);
+  z-index: 1002;
+}
+
+.blocked-banner mat-icon {
+  font-size: 32px;
+  width: 32px;
+  height: 32px;
+}
+
+.blocked-message strong {
+  display: block;
+  font-size: 16px;
+  margin-bottom: 4px;
+}
+
+.blocked-message p {
+  margin: 0;
+  font-size: 14px;
+  opacity: 0.9;
+}
+
+.kiosk-container.blocked {
+  opacity: 0.6;
+  pointer-events: none;
+}
 
 .kiosk-container {
   position: fixed;
@@ -225,6 +274,141 @@ body {
   background-repeat: no-repeat;
   z-index: 1000;
   overflow: hidden;
+  cursor: none;
+}
+
+.kiosk-container:hover {
+  cursor: default;
+}
+
+/* Mobile background */
+@media (max-width: 768px) {
+  .kiosk-container {
+    background-image: url('/doodle-background-mobile.png');
+  }
+}
+
+/* Competition Header */
+.competition-header {
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  z-index: 1002;
+  display: flex;
+  align-items: center;
+}
+
+.home-header-btn {
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 50%;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  color: #111111;
+  width: 48px;
+  height: 48px;
+}
+
+.home-header-btn:hover {
+  background: rgba(255, 255, 255, 1);
+  transform: scale(1.1);
+}
+
+.home-header-btn mat-icon {
+  font-size: 24px;
+  width: 24px;
+  height: 24px;
+}
+
+/* Vote Section in Kiosk Mode - Top Left for Web, Always Visible for Competition */
+.kiosk-vote-section {
+  position: fixed;
+  top: 16px;
+  left: 80px;
+  z-index: 1001;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+/* For competition boards, always show vote section */
+.kiosk-container.competition-board .kiosk-vote-section {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* For non-competition boards, show on hover */
+.kiosk-container:not(.competition-board) .kiosk-vote-section {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.kiosk-container:not(.competition-board):hover .kiosk-vote-section {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.vote-info-display {
+  background: rgba(255, 255, 255, 0.95);
+  padding: 8px 12px;
+  border-radius: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.vote-count-text {
+  font-size: 14px;
+  font-weight: 600;
+  color: #667eea;
+}
+
+.kiosk-vote-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-weight: 600;
+  font-size: 14px;
+  transition: all 0.3s ease;
+  min-width: 100px;
+  justify-content: center;
+  background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
+  color: #333;
+  border: none;
+  box-shadow: 0 2px 8px rgba(255, 215, 0, 0.3);
+}
+
+.kiosk-vote-button:hover:not(:disabled) {
+  background: linear-gradient(135deg, #ffed4e 0%, #ffd700 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(255, 215, 0, 0.5);
+}
+
+.kiosk-vote-button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.kiosk-vote-button mat-icon {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+}
+
+.mobile-home-btn {
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 50%;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  color: #111111;
+}
+
+.desktop-only {
+  display: block;
+}
+
+@media (max-width: 768px) {
+  .desktop-only {
+    display: none;
+  }
 }
 
 .kiosk-exit-btn {
@@ -236,6 +420,88 @@ body {
   border-radius: 50%;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   padding: 4px;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+.kiosk-container:hover .kiosk-exit-btn {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Board Size Controls - Centered on board */
+.board-size-controls-center {
+  position: fixed;
+  bottom: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1001;
+  display: flex;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 24px;
+  padding: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  backdrop-filter: blur(10px);
+}
+
+.board-size-controls-center .size-btn {
+  color: #111111 !important;
+  width: 44px;
+  height: 44px;
+  transition: all 0.2s;
+}
+
+.board-size-controls-center .size-btn:hover {
+  background: rgba(102, 126, 234, 0.1) !important;
+}
+
+.board-size-controls-center .size-btn.active {
+  background: rgba(102, 126, 234, 0.2) !important;
+  color: #667eea !important;
+}
+
+.board-size-controls-center .size-btn mat-icon {
+  font-size: 20px;
+  width: 20px;
+  height: 20px;
+}
+
+.board-size-controls-center .save-size-btn {
+  color: #111111 !important;
+  width: 44px;
+  height: 44px;
+  transition: all 0.2s;
+  margin-left: 8px;
+  border-left: 1px solid rgba(0, 0, 0, 0.1);
+  padding-left: 8px;
+}
+
+.board-size-controls-center .save-size-btn:hover {
+  background: rgba(76, 175, 80, 0.1) !important;
+  color: #4caf50 !important;
+}
+
+.board-size-controls-center .save-size-btn.has-changes {
+  background: rgba(76, 175, 80, 0.15) !important;
+  color: #4caf50 !important;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.board-size-controls-center .save-size-btn mat-icon {
+  font-size: 20px;
+  width: 20px;
+  height: 20px;
 }
 
 .exit-fullscreen-btn {
@@ -252,9 +518,80 @@ body {
   max-width: none; /* Remove max-width restriction */
   position: relative;
   box-sizing: border-box;
-  overflow: visible;
+  overflow: hidden;
   margin: 5vh auto; /* Center horizontally, 5vh top/bottom */
-  display: block;
+  display: flex;
+  flex-direction: column;
+  transition: all 0.3s ease;
+  background: #f8f8f8; /* Very light grey */
+  border: 2px solid #ffffff; /* White border */
+  border-radius: 20px;
+  padding: 0;
+}
+
+.kiosk-message-content.palagai-display-container {
+  background: #f8f8f8 !important; /* Very light grey */
+  border: 2px solid #ffffff !important; /* White border */
+}
+
+/* Powered by Palagai */
+.powered-by-palagai {
+  padding: 12px 20px;
+  flex-shrink: 0;
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.powered-by-line {
+  width: 100%;
+  height: 1px;
+  background: rgba(0, 0, 0, 0.08);
+  margin-bottom: 8px;
+}
+
+.powered-by-content {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.powered-by-palagai .heart-icon {
+  font-size: 14px;
+  width: 14px;
+  height: 14px;
+  color: #e91e63;
+}
+
+.powered-by-palagai span {
+  font-size: 12px;
+  color: #999999;
+  font-weight: 400;
+  letter-spacing: 0.5px;
+  text-transform: lowercase;
+}
+
+/* Competition Vote Section */
+
+/* Board Size Variations */
+.kiosk-container.board-size-min .kiosk-message-content {
+  width: 60%;
+  height: 60vh;
+  margin: 20vh auto;
+}
+
+.kiosk-container.board-size-normal .kiosk-message-content {
+  width: 90%;
+  height: 90vh;
+  margin: 5vh auto;
+}
+
+.kiosk-container.board-size-max .kiosk-message-content {
+  width: 95%;
+  height: 95vh;
+  margin: 2.5vh auto;
 }
 
 .loading-indicator-kiosk {
@@ -266,15 +603,14 @@ body {
   color: #666666;
 }
 
-.loading-indicator-kiosk .spinner {
-  width: 50px;
-  height: 50px;
-  border-width: 4px;
+.loading-indicator-kiosk mat-spinner {
+  color: #667eea;
 }
 
 .loading-indicator-kiosk p {
   font-size: 16px;
   margin: 0;
+  font-weight: 500;
 }
 
 /* ============================================
@@ -287,20 +623,21 @@ body {
     padding: 16px;
   }
 
-  .subboard-card {
-    padding: 20px;
-  }
-
-  .board-surface {
-    width: 90%;
-    margin: 5% auto;
-  }
-
   .kiosk-message-content {
     width: 90%;
     height: 90vh;
     max-width: none;
     margin: 5vh auto;
+  }
+
+  .kiosk-container.board-size-min .kiosk-message-content {
+    width: 70%;
+    height: 65vh;
+    margin: 17.5vh auto;
+  }
+
+  .landing-content {
+    padding: 40px 20px;
   }
 }
 
@@ -308,27 +645,6 @@ body {
 @media (max-width: 768px) {
   .subboard-wrapper {
     padding: 16px;
-  }
-
-  .subboard-card {
-    padding: 20px;
-    margin: 12px 0;
-    min-height: calc(100vh - 32px); /* Full screen height minus padding */
-  }
-
-  .subboard-controls {
-    gap: 12px;
-  }
-
-  .board-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 8px;
-  }
-
-  .board-surface {
-    width: 90%;
-    margin: 5% auto;
   }
 
   .kiosk-message-content {
@@ -350,22 +666,80 @@ body {
     padding: 12px;
   }
 
-  .subboard-card {
-    padding: 16px;
-    margin: 8px 0;
-    min-height: calc(100vh - 24px); /* Full screen height minus padding */
-  }
-
-  .board-surface {
-    width: 90%;
-    margin: 5% auto;
-  }
-
   .kiosk-message-content {
     width: 90%;
     height: 90vh;
     max-width: none;
     margin: 5vh auto;
+  }
+
+  .kiosk-container.board-size-min .kiosk-message-content {
+    width: 85%;
+    height: 70vh;
+    margin: 15vh auto;
+  }
+
+  .kiosk-container.board-size-max .kiosk-message-content {
+    width: 95%;
+    height: 95vh;
+    margin: 2.5vh auto;
+  }
+
+  .landing-headline {
+    font-size: 2rem;
+  }
+
+  .landing-subheadline {
+    font-size: 1rem;
+  }
+
+  .landing-actions {
+    flex-direction: column;
+    width: 100%;
+    max-width: 300px;
+  }
+
+  .create-btn,
+  .view-btn,
+  .competition-btn {
+    width: 100%;
+  }
+
+  /* Competition Header - Top Center for Mobile */
+  .competition-header {
+    top: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+
+  /* Vote Section - Top Center for Mobile, Below Header */
+  .kiosk-container.competition-board .kiosk-vote-section {
+    top: 72px;
+    left: 50%;
+    transform: translateX(-50%);
+    align-items: center;
+    flex-direction: row;
+    gap: 12px;
+  }
+
+  .kiosk-exit-btn {
+    top: 16px;
+    right: 16px;
+  }
+
+  .load-my-board-btn {
+    font-size: 14px;
+    padding: 0 12px;
+    right: 8px;
+  }
+  
+  .logo-icon {
+    width: 28px;
+    height: 28px;
+  }
+
+  .logo-container {
+    left: 8px;
   }
 }
 

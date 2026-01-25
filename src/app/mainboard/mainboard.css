@@ -1,12 +1,48 @@
 /* Modern Minimalist Design with Doodle Accents */
 
+.blocked-banner {
+  background: linear-gradient(135deg, #f44336 0%, #d32f2f 100%);
+  color: white;
+  padding: 16px 24px;
+  margin: 16px 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  box-shadow: 0 4px 12px rgba(244, 67, 54, 0.3);
+  z-index: 10;
+}
+
+.blocked-banner mat-icon {
+  font-size: 32px;
+  width: 32px;
+  height: 32px;
+}
+
+.blocked-message strong {
+  display: block;
+  font-size: 16px;
+  margin-bottom: 4px;
+}
+
+.blocked-message p {
+  margin: 0;
+  font-size: 14px;
+  opacity: 0.9;
+}
+
+.editor-section.blocked {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
 .mainboard-wrapper {
   max-width: 1200px;
   margin: 0 auto;
   padding: 16px 32px;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
   background: #fafafa;
-  height: calc(100vh - 64px - 72px); /* 100vh - toolbar height - footer height */
+  height: calc(100vh - 64px - 72px + 80px); /* 100vh - toolbar height - footer height + extra height */
   position: relative;
   overflow-x: hidden;
   overflow-y: hidden;
@@ -78,6 +114,13 @@
   align-items: center;
   gap: 8px;
   flex: 1;
+}
+
+.toolbar-logo {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+  display: block;
 }
 
 .toolbar-title-wrapper {
@@ -165,6 +208,7 @@
   visibility: visible;
   opacity: 1;
 }
+
 
 .header-icon-btn {
   color: #111111;
@@ -282,7 +326,7 @@
   overflow: hidden;
 }
 
-::ng-deep .full-screen-editor .quill-editor {
+::ng-deep .full-screen-editor {
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -290,7 +334,7 @@
   height: 100%;
 }
 
-::ng-deep .full-screen-editor .ql-container {
+::ng-deep .full-screen-editor .custom-editor-wrapper {
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -298,7 +342,7 @@
   height: 100%;
 }
 
-::ng-deep .full-screen-editor .ql-editor {
+::ng-deep .full-screen-editor .editor-content {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
@@ -307,21 +351,21 @@
 }
 
 /* Hide scrollbar but allow scrolling */
-::ng-deep .full-screen-editor .ql-editor::-webkit-scrollbar {
+::ng-deep .full-screen-editor .editor-content::-webkit-scrollbar {
   width: 8px;
 }
 
-::ng-deep .full-screen-editor .ql-editor::-webkit-scrollbar-track {
+::ng-deep .full-screen-editor .editor-content::-webkit-scrollbar-track {
   background: #f5f5f5;
   border-radius: 4px;
 }
 
-::ng-deep .full-screen-editor .ql-editor::-webkit-scrollbar-thumb {
+::ng-deep .full-screen-editor .editor-content::-webkit-scrollbar-thumb {
   background: #cccccc;
   border-radius: 4px;
 }
 
-::ng-deep .full-screen-editor .ql-editor::-webkit-scrollbar-thumb:hover {
+::ng-deep .full-screen-editor .editor-content::-webkit-scrollbar-thumb:hover {
   background: #999999;
 }
 
@@ -585,183 +629,16 @@
   cursor: not-allowed;
 }
 
-/* Quill editor styling - Luxury styled with soft lavender border */
-::ng-deep .quill-editor {
-  border: 2px solid #b19cd9; /* Soft lavender border */
-  border-radius: 20px;
-  overflow: hidden;
-  transition: border-color 0.2s ease, box-shadow 0.3s ease, transform 0.3s ease;
-  box-shadow: 
-    0 12px 40px rgba(177, 156, 217, 0.15),
-    0 6px 20px rgba(0, 0, 0, 0.08),
-    0 0 0 1px rgba(177, 156, 217, 0.1) inset;
-  transform: translateY(0);
+/* Custom editor styling - matches previous Quill editor appearance */
+::ng-deep .custom-editor-wrapper {
+  border: 1.5px solid #e0e0e0;
+  border-radius: 4px;
+  background: #ffffff;
+  transition: border-color 0.2s ease;
 }
 
-::ng-deep .quill-editor:hover {
-  transform: translateY(-2px);
-  box-shadow: 
-    0 16px 48px rgba(177, 156, 217, 0.2),
-    0 8px 24px rgba(0, 0, 0, 0.1),
-    0 0 0 1px rgba(177, 156, 217, 0.15) inset;
-}
-
-::ng-deep .quill-editor:hover {
+::ng-deep .custom-editor-wrapper:hover {
   border-color: #111111;
-}
-
-::ng-deep .quill-editor .ql-container {
-  border: none;
-  font-family: inherit;
-  font-size: 15px;
-  color: #111111;
-  overflow: hidden;
-}
-
-::ng-deep .quill-editor .ql-editor {
-  min-height: 350px;
-  padding: 20px;
-  color: #111111;
-  overflow-y: auto;
-  overflow-x: hidden;
-}
-
-/* Hide Quill editor scrollbars */
-::ng-deep .quill-editor .ql-editor::-webkit-scrollbar {
-  display: none;
-  width: 0;
-  height: 0;
-}
-
-::ng-deep .quill-editor .ql-editor {
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-
-::ng-deep .quill-editor .ql-editor.ql-blank::before {
-  color: #999999;
-  font-style: normal;
-  opacity: 0.6;
-}
-
-/* Ensure Quill editor is always editable */
-::ng-deep .quill-editor .ql-editor {
-  pointer-events: auto !important;
-}
-
-::ng-deep .quill-editor .ql-editor[contenteditable="false"] {
-  pointer-events: auto !important;
-}
-
-::ng-deep .quill-editor .ql-toolbar {
-  border: none;
-  border-bottom: 1.5px solid #111111;
-  background: #fafafa;
-  padding: 12px;
-}
-
-::ng-deep .quill-editor .ql-toolbar .ql-stroke {
-  stroke: #666666;
-}
-
-::ng-deep .quill-editor .ql-toolbar .ql-fill {
-  fill: #666666;
-}
-
-::ng-deep .quill-editor .ql-toolbar button:hover .ql-stroke,
-::ng-deep .quill-editor .ql-toolbar button.ql-active .ql-stroke {
-  stroke: #111111;
-}
-
-::ng-deep .quill-editor .ql-toolbar button:hover .ql-fill,
-::ng-deep .quill-editor .ql-toolbar button.ql-active .ql-fill {
-  fill: #111111;
-}
-
-::ng-deep .quill-editor .ql-toolbar button {
-  cursor: pointer;
-}
-
-::ng-deep .quill-editor .ql-toolbar button:disabled {
-  opacity: 0.38;
-  cursor: not-allowed;
-}
-
-/* Hide image upload icon in Quill toolbar */
-::ng-deep .quill-editor .ql-toolbar .ql-image {
-  display: none !important;
-}
-
-/* Font dropdown styling */
-::ng-deep .quill-editor .ql-toolbar .ql-font {
-  width: 150px;
-}
-
-/* Font family classes for Quill editor content - 5 custom fonts */
-::ng-deep .quill-editor .ql-editor .ql-font-Arial {
-  font-family: Arial, sans-serif !important;
-}
-
-::ng-deep .quill-editor .ql-editor .ql-font-Georgia {
-  font-family: Georgia, serif !important;
-}
-
-::ng-deep .quill-editor .ql-editor .ql-font-Times\ New\ Roman {
-  font-family: 'Times New Roman', Times, serif !important;
-}
-
-::ng-deep .quill-editor .ql-editor .ql-font-Courier\ New {
-  font-family: 'Courier New', Courier, monospace !important;
-}
-
-::ng-deep .quill-editor .ql-editor .ql-font-Verdana {
-  font-family: Verdana, Geneva, sans-serif !important;
-}
-
-/* Fix Quill font picker to show actual font names instead of "Sans Serif" */
-/* Quill uses data-label attribute, but we need to override the default behavior */
-::ng-deep .quill-editor .ql-toolbar .ql-font .ql-picker-label::before {
-  content: attr(data-label);
-}
-
-::ng-deep .quill-editor .ql-toolbar .ql-font .ql-picker-item::before {
-  content: attr(data-label);
-}
-
-/* Force specific font names for each option */
-::ng-deep .quill-editor .ql-toolbar .ql-font .ql-picker-label[data-value="Arial"]::before,
-::ng-deep .quill-editor .ql-toolbar .ql-font .ql-picker-item[data-value="Arial"]::before {
-  content: 'Arial' !important;
-  font-family: Arial, sans-serif;
-}
-
-::ng-deep .quill-editor .ql-toolbar .ql-font .ql-picker-label[data-value="Georgia"]::before,
-::ng-deep .quill-editor .ql-toolbar .ql-font .ql-picker-item[data-value="Georgia"]::before {
-  content: 'Georgia' !important;
-  font-family: Georgia, serif;
-}
-
-::ng-deep .quill-editor .ql-toolbar .ql-font .ql-picker-label[data-value="Times New Roman"]::before,
-::ng-deep .quill-editor .ql-toolbar .ql-font .ql-picker-item[data-value="Times New Roman"]::before {
-  content: 'Times New Roman' !important;
-  font-family: 'Times New Roman', Times, serif;
-}
-
-::ng-deep .quill-editor .ql-toolbar .ql-font .ql-picker-label[data-value="Courier New"]::before,
-::ng-deep .quill-editor .ql-toolbar .ql-font .ql-picker-item[data-value="Courier New"]::before {
-  content: 'Courier New' !important;
-  font-family: 'Courier New', Courier, monospace;
-}
-
-::ng-deep .quill-editor .ql-toolbar .ql-font .ql-picker-label[data-value="Verdana"]::before,
-::ng-deep .quill-editor .ql-toolbar .ql-font .ql-picker-item[data-value="Verdana"]::before {
-  content: 'Verdana' !important;
-  font-family: Verdana, Geneva, sans-serif;
-}
-
-/* Hide default "Sans Serif" text */
-::ng-deep .quill-editor .ql-toolbar .ql-font .ql-picker-label:not([data-value])::before {
-  content: 'Font' !important;
 }
 
 /* Material Button Overrides - Black background with white text */
@@ -943,6 +820,11 @@
     width: 100%;
   }
 
+  .toolbar-logo {
+    width: 28px;
+    height: 28px;
+  }
+
   .desktop-only {
     display: none !important;
   }
@@ -957,7 +839,7 @@
 
   .mainboard-wrapper {
     padding: 12px 16px;
-    height: calc(100vh - 80px - 80px);
+    height: calc(100vh - 80px - 80px + 80px);
   }
 
   .mainboard-wrapper::before,
@@ -1064,7 +946,7 @@
 
   .mainboard-wrapper {
     padding: 8px 12px;
-    height: calc(100vh - 64px - 100px);
+    height: calc(100vh - 64px - 100px + 80px);
   }
 
   /* Footer adjustments for small mobile */

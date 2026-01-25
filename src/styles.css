@@ -1,4 +1,73 @@
 /* ============================================
+   OPEN SANS FONT FACE DECLARATIONS
+   ============================================ */
+@font-face {
+  font-family: 'Open Sans';
+  src: url('./assets/fonts/OpenSans-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Open Sans';
+  src: url('./assets/fonts/OpenSans-Bold.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Open Sans';
+  src: url('./assets/fonts/OpenSans-Italic.ttf') format('truetype');
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Open Sans';
+  src: url('./assets/fonts/OpenSans-BoldItalic.ttf') format('truetype');
+  font-weight: 700;
+  font-style: italic;
+  font-display: swap;
+}
+
+/* ============================================
+   MELON POP FONT FACE DECLARATIONS
+   ============================================ */
+@font-face {
+  font-family: 'Melon Pop';
+  src: url('./assets/fonts/MelonPop.ttf') format('truetype'),
+       url('./assets/fonts/MelonPop.otf') format('opentype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ============================================
+   LRAVI REGULAR FONT FACE DECLARATIONS
+   ============================================ */
+@font-face {
+  font-family: 'LRAVI Regular';
+  src: url('./assets/fonts/LRAVIRegular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ============================================
+   NALLUR PLAIN FONT FACE DECLARATIONS
+   ============================================ */
+@font-face {
+  font-family: 'Nallur Plain';
+  src: url('./assets/fonts/NallurPlain.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ============================================
    FIXED DIALOG STYLING - REMOVE UNWANTED SPACE
    ============================================ */
 
@@ -32,4 +101,304 @@
   padding: 20px !important;
   margin: 0 !important;
   overflow-y: auto; /* Only scroll if text is actually too long */
+}
+
+/* ============================================
+   CUSTOM ALERT OVERLAY - NO MATERIAL DESIGN
+   ============================================ */
+
+/* Custom alert overlay container */
+.custom-alert-overlay-container {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 10000;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: calc(100vw - 40px);
+}
+
+/* Animation for alert appearance */
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideOutRight {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+/* Mobile: Position top center */
+@media (max-width: 768px) {
+  .custom-alert-overlay-container {
+    top: 16px;
+    right: auto;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+
+  @keyframes slideInRight {
+    from {
+      transform: translateX(-50%) translateY(-100%);
+      opacity: 0;
+    }
+    to {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+    }
+  }
+
+  @keyframes slideOutRight {
+    from {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+    }
+    to {
+      transform: translateX(-50%) translateY(100%);
+      opacity: 0;
+    }
+  }
+}
+
+/* ============================================
+   SNACKBAR/ALERT STYLING - CARD-BASED DESIGN (LEGACY - NOT USED)
+   ============================================ */
+
+/* Remove ALL borders from snackbar overlay and containers */
+::ng-deep .cdk-overlay-container,
+::ng-deep .cdk-overlay-container *,
+::ng-deep .cdk-overlay-pane,
+::ng-deep .cdk-overlay-pane *,
+::ng-deep .mat-mdc-snack-bar-container,
+::ng-deep .mat-mdc-snack-bar-container *,
+::ng-deep .mdc-snackbar__surface,
+::ng-deep .mdc-snackbar__surface * {
+  border: none !important;
+  border-width: 0 !important;
+  border-style: none !important;
+  border-color: transparent !important;
+  outline: none !important;
+  outline-width: 0 !important;
+  box-shadow: none !important;
+}
+
+/* Force transparent background on all snackbar-related elements */
+::ng-deep .mat-mdc-snack-bar-container,
+::ng-deep .mat-mdc-snack-bar-container *,
+::ng-deep .mdc-snackbar,
+::ng-deep .mdc-snackbar *,
+::ng-deep .mdc-snackbar__surface,
+::ng-deep .mdc-snackbar__surface * {
+  background: transparent !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+}
+
+/* Snackbar container - Position top right for web, top center for mobile */
+::ng-deep .mat-mdc-snack-bar-container {
+  padding: 0 !important;
+  margin: 0 !important;
+  min-width: auto !important;
+  max-width: none !important;
+  position: fixed !important;
+  top: 20px !important;
+  right: 20px !important;
+  left: auto !important;
+  bottom: auto !important;
+  transform: none !important;
+  z-index: 10000 !important;
+  background: transparent !important;
+}
+
+/* Snackbar surface - Remove default styling, borders, and black background */
+::ng-deep .mdc-snackbar__surface,
+::ng-deep .mat-mdc-snackbar-surface {
+  --mat-snack-bar-container-color: transparent !important;
+  --mat-sys-inverse-surface: transparent !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  /* Override the CSS variable that causes black background - Force override */
+  background-color: transparent !important;
+  padding: 0 !important;
+  min-width: auto !important;
+  max-width: none !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  -webkit-box-shadow: none !important;
+  -moz-box-shadow: none !important;
+  /* Remove the specific Material Design box-shadow values */
+  box-shadow: 0 0 0 0 transparent !important;
+}
+
+/* Remove black background from all Material snackbar elements - More specific selectors */
+::ng-deep .mat-mdc-snack-bar-container .mdc-snackbar__surface,
+::ng-deep .mdc-snackbar__surface,
+::ng-deep .mdc-snackbar,
+::ng-deep .mdc-snackbar__surface::before,
+::ng-deep .mdc-snackbar__surface::after {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+}
+
+/* Remove any Material Design default dark theme colors */
+::ng-deep .mat-mdc-snack-bar-container {
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+/* Override Material Design CSS variables for snackbar - Fix the black background */
+::ng-deep .mat-mdc-snack-bar-container,
+::ng-deep .mdc-snackbar__surface,
+::ng-deep .mdc-snackbar,
+::ng-deep .cdk-overlay-pane .mat-mdc-snack-bar-container,
+::ng-deep .cdk-overlay-pane .mdc-snackbar__surface {
+  --mdc-snackbar-container-color: transparent !important;
+  --mdc-snackbar-supporting-text-color: transparent !important;
+  --mat-snack-bar-button-color: transparent !important;
+  --mat-snack-bar-container-color: transparent !important;
+  --mat-sys-inverse-surface: transparent !important;
+  background-color: transparent !important;
+  background-color: var(--mat-snack-bar-container-color, transparent) !important;
+  box-shadow: none !important;
+}
+
+/* Force remove any dark/black colors from snackbar */
+::ng-deep .cdk-overlay-pane .mat-mdc-snack-bar-container,
+::ng-deep .cdk-overlay-pane .mdc-snackbar__surface,
+::ng-deep .cdk-overlay-pane .mdc-snackbar {
+  background: transparent !important;
+  background-color: transparent !important;
+  color: transparent !important;
+  box-shadow: none !important;
+}
+
+/* Ensure custom alert container shows properly and overrides any dark backgrounds */
+::ng-deep .custom-alert-container,
+::ng-deep .mat-mdc-snack-bar-container .custom-alert-container,
+::ng-deep .mdc-snackbar__surface .custom-alert-container {
+  background: #ffffff !important;
+  background-color: #ffffff !important;
+  border: none !important;
+  display: block !important;
+  position: relative !important;
+  z-index: 10 !important;
+}
+
+/* Remove any padding/margin that might show as black */
+::ng-deep .mat-mdc-snack-bar-container,
+::ng-deep .mdc-snackbar__surface {
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+/* Specific border removal for overlay pane containing snackbar */
+::ng-deep .cdk-overlay-pane:has(.mat-mdc-snack-bar-container) {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+
+/* Remove box-shadow from ALL snackbar elements - Comprehensive override */
+::ng-deep .mat-mdc-snack-bar-container,
+::ng-deep .mat-mdc-snack-bar-container *,
+::ng-deep .mdc-snackbar,
+::ng-deep .mdc-snackbar *,
+::ng-deep .mdc-snackbar__surface,
+::ng-deep .mdc-snackbar__surface *,
+::ng-deep .mat-mdc-snackbar-surface,
+::ng-deep .mat-mdc-snackbar-surface *,
+::ng-deep .cdk-overlay-pane .mat-mdc-snack-bar-container,
+::ng-deep .cdk-overlay-pane .mdc-snackbar__surface,
+::ng-deep .cdk-overlay-pane .mat-mdc-snackbar-surface {
+  box-shadow: none !important;
+  -webkit-box-shadow: none !important;
+  -moz-box-shadow: none !important;
+  /* Force remove the specific Material Design shadow values */
+  box-shadow: 0 0 0 0 transparent !important;
+}
+
+/* Specific override for the surface element that's causing the issue */
+::ng-deep .mdc-snackbar__surface.mat-mdc-snackbar-surface {
+  background-color: transparent !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  box-shadow: 0 0 0 0 transparent !important;
+  -webkit-box-shadow: none !important;
+  -moz-box-shadow: none !important;
+}
+
+/* Hide default snackbar label */
+::ng-deep .mdc-snackbar__label {
+  display: none !important;
+}
+
+/* Hide default snackbar action button */
+::ng-deep .mat-mdc-snack-bar-action {
+  display: none !important;
+}
+
+/* Animation for snackbar appearance - slide from right */
+::ng-deep .mat-mdc-snack-bar-container {
+  animation: slideInRight 0.3s ease-out !important;
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* Mobile: Position top center */
+@media (max-width: 768px) {
+  ::ng-deep .mat-mdc-snack-bar-container {
+    top: 16px !important;
+    right: auto !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+  }
+
+  @keyframes slideInRight {
+    from {
+      transform: translateX(-50%) translateY(-100%);
+      opacity: 0;
+    }
+    to {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+    }
+  }
+}
+
+/* Stack multiple snackbars vertically */
+::ng-deep .cdk-overlay-container .cdk-overlay-pane:has(.mat-mdc-snack-bar-container) {
+  position: fixed !important;
+  pointer-events: none !important;
+}
+
+::ng-deep .mat-mdc-snack-bar-container + .mat-mdc-snack-bar-container {
+  margin-top: 12px !important;
 }

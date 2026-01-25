@@ -1,0 +1,145 @@
+<div class="custom-editor-wrapper">
+  <div class="editor-toolbar">
+    <mat-form-field appearance="fill" class="font-selector" (mousedown)="saveSelection()">
+      <mat-select 
+        [value]="selectedFont" 
+        (selectionChange)="onFontChange($event.value)"
+        (opened)="onDropdownOpened()"
+        (closed)="onFontDropdownClosed()"
+      >
+        <mat-option *ngFor="let font of fonts" [value]="font.value" (click)="onFontOptionClick(font.value)">
+          <span [style.font-family]="font.value">{{ font.label }}</span>
+        </mat-option>
+      </mat-select>
+    </mat-form-field>
+
+    <div class="toolbar-divider"></div>
+
+    <button mat-icon-button type="button" (mousedown)="saveSelection()" (click)="toggleBold()" [class.active]="isBold">
+      <mat-icon>format_bold</mat-icon>
+    </button>
+    <button mat-icon-button type="button" (mousedown)="saveSelection()" (click)="toggleItalic()" [class.active]="isItalic">
+      <mat-icon>format_italic</mat-icon>
+    </button>
+    <button mat-icon-button type="button" (mousedown)="saveSelection()" (click)="toggleUnderline()" [class.active]="isUnderline">
+      <mat-icon>format_underlined</mat-icon>
+    </button>
+
+    <div class="toolbar-divider"></div>
+
+    <mat-form-field appearance="fill" class="header-selector" (mousedown)="saveSelection()">
+      <mat-select [value]="selectedHeader" (selectionChange)="onHeaderChange($event.value)" (opened)="onDropdownOpened()">
+        <mat-option value="p">Normal</mat-option>
+        <mat-option value="h1">Heading 1</mat-option>
+        <mat-option value="h2">Heading 2</mat-option>
+        <mat-option value="h3">Heading 3</mat-option>
+      </mat-select>
+    </mat-form-field>
+
+    <div class="toolbar-divider"></div>
+
+    <button mat-icon-button type="button" (mousedown)="saveSelection()" (click)="setAlignment('left')">
+      <mat-icon>format_align_left</mat-icon>
+    </button>
+    <button mat-icon-button type="button" (mousedown)="saveSelection()" (click)="setAlignment('center')">
+      <mat-icon>format_align_center</mat-icon>
+    </button>
+    <button mat-icon-button type="button" (mousedown)="saveSelection()" (click)="setAlignment('right')">
+      <mat-icon>format_align_right</mat-icon>
+    </button>
+
+    <div class="toolbar-divider"></div>
+
+    <div class="color-picker-wrapper" (mouseleave)="showColorPresets = false">
+      <input #colorInput type="color" [(ngModel)]="selectedColor" (input)="onColorChange(selectedColor)" class="color-picker-input" />
+      <button 
+        mat-icon-button 
+        type="button" 
+        (click)="openColorPicker()" 
+        (mousedown)="saveSelection()" 
+        (mouseenter)="showColorPresets = true"
+        class="color-picker-button" 
+        [title]="'Text Color: ' + selectedColor + ' (Click for custom, hover for presets)'"
+      >
+        <mat-icon [style.color]="selectedColor">format_color_text</mat-icon>
+        <span class="color-indicator" [style.background-color]="selectedColor"></span>
+      </button>
+      <div class="color-picker-dropdown" *ngIf="showColorPresets" (mouseenter)="showColorPresets = true">
+        <div class="color-preset-label">Quick Colors</div>
+        <div class="color-presets-grid">
+          <div 
+            *ngFor="let color of presetColors" 
+            class="color-preset" 
+            [style.background-color]="color"
+            [class.active]="selectedColor === color"
+            (click)="setPresetColor(color); showColorPresets = false"
+            [title]="color"
+          ></div>
+        </div>
+        <div class="color-preset-separator"></div>
+        <div 
+          class="color-preset custom-color"
+          (click)="openColorPicker(); showColorPresets = false"
+          title="Custom Color"
+        >
+          <mat-icon>palette</mat-icon>
+        </div>
+      </div>
+    </div>
+
+    <button mat-icon-button type="button" (mousedown)="saveSelection()" (click)="clearFormatting()">
+      <mat-icon>format_clear</mat-icon>
+    </button>
+
+    <div class="toolbar-divider"></div>
+
+    <!-- Mic Icon Insert -->
+    <div class="mic-icon-menu" (mouseleave)="showMicIcons = false">
+      <button 
+        mat-icon-button 
+        type="button" 
+        (mousedown)="saveSelection()" 
+        (click)="showMicIcons = !showMicIcons"
+        [title]="'Insert mic icon'"
+      >
+        <mat-icon>mic</mat-icon>
+      </button>
+      <div class="mic-icons-dropdown" *ngIf="showMicIcons" (mouseenter)="showMicIcons = true">
+        <div class="mic-icon-label">Announcement Icons</div>
+        <div class="mic-icons-grid">
+          <div 
+            *ngFor="let icon of micIcons" 
+            class="mic-icon-item"
+            (click)="insertMicIcon(icon); showMicIcons = false"
+            [title]="'Insert ' + icon.name"
+          >
+            <img [src]="icon.path" [alt]="icon.name" />
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div 
+    #editor
+    class="editor-content"
+    contenteditable="true"
+    (input)="onEditorInput()"
+    (blur)="onEditorBlur()"
+    (mouseup)="saveSelection()"
+    (keyup)="saveSelection()"
+    (dragover)="onDragOver($event)"
+    (drop)="onDrop($event)"
+    (dragstart)="onDragStart($event)"
+    (dragend)="onDragEnd($event)"
+    role="textbox"
+    [class.loading]="loading"
+    [class.dragging]="isDragging"
+  ></div>
+  
+  <!-- Loading Spinner Overlay -->
+  <div class="editor-loading-overlay" *ngIf="loading">
+    <mat-spinner diameter="40"></mat-spinner>
+    <p>Loading message...</p>
+  </div>
+</div>

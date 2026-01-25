@@ -1,94 +1,86 @@
-<mat-toolbar color="primary" class="subboard-toolbar" *ngIf="!isFullPage">
-  <span class="brand">Palagai</span>
-  <span class="spacer"></span>
-  <a mat-button routerLink="/login">Edit my board</a>
-</mat-toolbar>
+<!-- Landing Page -->
+<div class="landing-page" *ngIf="showLandingPage && !isFullPage">
+  <mat-toolbar color="primary" class="landing-toolbar">
+    <div class="logo-container">
+      <img src="/palagai-logo.png" alt="Palagai" class="logo-icon" />
+      <span class="brand">Palagai</span>
+    </div>
+    <span class="spacer"></span>
+    <button mat-button routerLink="/login" class="nav-link load-my-board-btn">Load my board</button>
+  </mat-toolbar>
+
+  <div class="landing-content">
+    <h1 class="landing-headline">Let your thoughts fly</h1>
+    <p class="landing-subheadline">Share notes, ideas, and inspirations – where everyone can see...</p>
+    
+    <div class="landing-actions">
+      <button mat-raised-button class="create-btn" (click)="createBoard()">
+        Create your board
+      </button>
+      <button mat-raised-button class="view-btn" (click)="openBoardIdDialog()">
+        View a board
+      </button>
+      <button mat-raised-button class="competition-btn" routerLink="/competition">
+        <mat-icon>star</mat-icon>
+        Kavithai Competition
+      </button>
+    </div>
+  </div>
+</div>
 
 <div class="subboard-wrapper" [class.full-page]="isFullPage">
-  <mat-card class="subboard-card" *ngIf="!isFullPage && !isPreviewMode">
-    <form [formGroup]="form" (ngSubmit)="loadBoard()" *ngIf="form">
-      <div class="subboard-controls">
-        <mat-form-field appearance="fill" class="board-id-field">
-          <mat-label>Board ID</mat-label>
-          <input
-            matInput
-            type="text"
-            placeholder="e.g. 26011347KQX"
-            formControlName="boardId"
-          />
-          <mat-error *ngIf="boardIdControl.hasError('required') && boardIdControl.touched">
-            Board ID is required
-          </mat-error>
-        </mat-form-field>
-
-        <mat-form-field appearance="fill" class="email-field" *ngIf="showEmailInput">
-          <mat-label>Email (for protected boards)</mat-label>
-          <input
-            matInput
-            type="email"
-            placeholder="Enter authorized email"
-            formControlName="email"
-          />
-          <mat-hint>Required only for protected boards</mat-hint>
-          <mat-error *ngIf="emailControl.hasError('email') && emailControl.touched">
-            Please enter a valid email address
-          </mat-error>
-        </mat-form-field>
-
-        <button mat-raised-button color="primary" type="submit" [disabled]="loading || form.invalid" class="load-button">
-          {{ loading ? 'Loading...' : 'Load Board' }}
-        </button>
-      </div>
-    </form>
-
-    <div class="loading-indicator" *ngIf="loading">
-      <div class="spinner"></div>
-      <p>Loading board...</p>
+  <!-- Blocked Status Banner -->
+  <div class="blocked-banner" *ngIf="board?.isBlocked && isFullPage">
+    <mat-icon>block</mat-icon>
+    <div class="blocked-message">
+      <strong>This board has been blocked</strong>
+      <p>Please contact the ADMIN for retrieving your account.</p>
     </div>
-
-    <section class="subboard-board" *ngIf="!loading">
-      <div class="board-header" *ngIf="board">
-        <div class="board-meta">
-          <p class="updated" *ngIf="lastUpdated">
-            Last updated: <strong>{{ lastUpdated | date: 'medium' }}</strong>
-          </p>
-        </div>
-        <button
-          mat-icon-button
-          class="fullscreen-btn"
-          *ngIf="!isPreviewMode"
-          (click)="toggleFullPage()"
-          [attr.aria-label]="isFullPage ? 'Exit full page' : 'View full page'"
-        >
-          <mat-icon>{{ isFullPage ? 'fullscreen_exit' : 'fullscreen' }}</mat-icon>
-        </button>
-      </div>
-      
-      <div class="board-surface palagai-display-container">
-        <!-- Show board message if loaded, otherwise show Tamil verse -->
-        <div class="palagai-message-renderer" *ngIf="hasBoardMessage" [innerHTML]="boardMessageHtml"></div>
-        <div class="palagai-message-renderer verse-display" *ngIf="!hasBoardMessage">
-          <p class="tamil-verse">
-            முயற்சி திருவினை ஆக்கும்; முயற்றின்மை<br>
-            இன்மை புகுத்தி விடும்.
-          </p>
-        </div>
-      </div>
-    </section>
-  </mat-card>
+  </div>
 
   <!-- Full page kiosk mode - Two Layer Structure -->
-  <div class="kiosk-container" *ngIf="isFullPage && board">
-    <!-- Exit/Back button -->
-    <div class="kiosk-exit-btn">
+  <div class="kiosk-container" *ngIf="isFullPage && board" [class.board-size-min]="boardSize === 'min'" [class.board-size-normal]="boardSize === 'normal'" [class.board-size-max]="boardSize === 'max'" [class.blocked]="board && board.isBlocked === true" [class.competition-board]="isInCompetition">
+    <!-- Header with Home Icon for Competition Boards -->
+    <div class="competition-header" *ngIf="isInCompetition && isFullPage && !isPreviewMode">
+      <button
+        mat-icon-button
+        class="home-header-btn"
+        (click)="toggleFullPage()"
+        aria-label="Back to home"
+        title="Back to home"
+      >
+        <mat-icon>home</mat-icon>
+      </button>
+    </div>
+    
+    <!-- Vote Section (Top Left for Web, Top Center for Mobile) - Always Visible for Competition -->
+    <div class="kiosk-vote-section" *ngIf="isInCompetition && isFullPage">
+      <div class="vote-info-display">
+        <span class="vote-count-text">{{ voteCount }} votes</span>
+      </div>
+      <button
+        mat-raised-button
+        (click)="voteForBoard()"
+        [disabled]="isVoting || hasVotedInSession"
+        *ngIf="!hasVotedInSession"
+        class="kiosk-vote-button can-vote"
+      >
+        <mat-icon>star_border</mat-icon>
+        <span>{{ isVoting ? 'Voting...' : 'Vote' }}</span>
+      </button>
+    </div>
+
+    <!-- Exit/Back button (Desktop only) -->
+    <div class="kiosk-exit-btn desktop-only">
       <button
         mat-icon-button
         class="exit-fullscreen-btn"
         *ngIf="!isPreviewMode"
         (click)="toggleFullPage()"
-        aria-label="Exit full page"
+        aria-label="Back to home"
+        title="Back to home"
       >
-        <mat-icon>fullscreen_exit</mat-icon>
+        <mat-icon>home</mat-icon>
       </button>
       <button
         mat-icon-button
@@ -101,26 +93,81 @@
       </button>
     </div>
     
+    <!-- Board Size Controls - Centered on board (only in preview mode) -->
+    <div class="board-size-controls-center" *ngIf="isPreviewMode">
+      <button
+        mat-icon-button
+        class="size-btn"
+        [class.active]="boardSize === 'min'"
+        (click)="setBoardSize('min')"
+        aria-label="Minimize board"
+        title="Minimize"
+      >
+        <mat-icon>remove</mat-icon>
+      </button>
+      <button
+        mat-icon-button
+        class="size-btn"
+        [class.active]="boardSize === 'normal'"
+        (click)="setBoardSize('normal')"
+        aria-label="Normal board size"
+        title="Normal"
+      >
+        <mat-icon>crop_free</mat-icon>
+      </button>
+      <button
+        mat-icon-button
+        class="size-btn"
+        [class.active]="boardSize === 'max'"
+        (click)="setBoardSize('max')"
+        aria-label="Maximize board"
+        title="Maximize"
+      >
+        <mat-icon>add</mat-icon>
+      </button>
+      <button
+        mat-icon-button
+        class="save-size-btn"
+        [class.has-changes]="hasUnsavedSizeChanges()"
+        (click)="saveBoardSize()"
+        aria-label="Save board size"
+        title="Save board size"
+      >
+        <mat-icon>save</mat-icon>
+      </button>
+    </div>
+    
     <!-- Message Content directly in container -->
     <div
       #kioskMessageContent
       class="kiosk-message-content palagai-display-container"
     >
       <!-- Show board message if loaded, otherwise show Tamil verse -->
-      <div class="palagai-message-renderer" *ngIf="hasBoardMessage" [innerHTML]="boardMessageHtml"></div>
+      <div class="palagai-message-renderer" *ngIf="hasBoardMessage">
+        <div [innerHTML]="boardMessageHtml"></div>
+      </div>
       <div class="palagai-message-renderer verse-display" *ngIf="!hasBoardMessage">
         <p class="tamil-verse">
           முயற்சி திருவினை ஆக்கும்; முயற்றின்மை<br>
           இன்மை புகுத்தி விடும்.
         </p>
       </div>
+      <!-- Powered by Palagai -->
+      <div class="powered-by-palagai">
+        <div class="powered-by-line"></div>
+        <div class="powered-by-content">
+          <mat-icon class="heart-icon">favorite</mat-icon>
+          <span>powered by palagai</span>
+        </div>
+      </div>
+      
     </div>
   </div>
 
   <!-- Full page loading state -->
   <div class="kiosk-container" *ngIf="isFullPage && !board && loading">
     <div class="loading-indicator-kiosk">
-      <div class="spinner"></div>
+      <mat-spinner diameter="50"></mat-spinner>
       <p>Loading board...</p>
     </div>
   </div>
@@ -133,9 +180,10 @@
         class="exit-fullscreen-btn"
         *ngIf="!isPreviewMode"
         (click)="toggleFullPage()"
-        aria-label="Exit full page"
+        aria-label="Back to home"
+        title="Back to home"
       >
-        <mat-icon>fullscreen_exit</mat-icon>
+        <mat-icon>home</mat-icon>
       </button>
       <button
         mat-icon-button

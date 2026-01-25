@@ -38,6 +38,7 @@
   width: 100%;
   box-sizing: border-box;
   position: relative;
+  background: #ffffff;
   
   font-family: inherit;
   font-size: 15px;
@@ -50,6 +51,22 @@
   word-wrap: normal !important;
   overflow-wrap: normal !important; 
   hyphens: none !important;
+  
+  /* CRITICAL: Don't override text-align - let inline styles work */
+  text-align: inherit !important;
+}
+
+/* Topic Title inside Message Renderer */
+.palagai-message-renderer .board-topic-title-kiosk {
+  margin: 0 0 24px 0;
+  font-size: 32px;
+  font-weight: 700;
+  color: #111111;
+  letter-spacing: -0.5px;
+  line-height: 1.2;
+  text-align: center;
+  padding-bottom: 16px;
+  border-bottom: 2px solid #e0e0e0;
 }
 
 /* CRITICAL: All child elements must NOT break words */
@@ -63,6 +80,43 @@
   hyphens: none !important;
 }
 
+/* CRITICAL: Preserve text-align from inline styles (for custom editor alignment) */
+/* Use attribute selectors to match any element with text-align in style attribute */
+.palagai-message-renderer [style*="text-align"] {
+  /* Let the inline style take precedence - don't override it */
+}
+
+/* Specific overrides for common cases to ensure they work */
+.palagai-message-renderer [style*="text-align: center"],
+.palagai-message-renderer [style*="text-align:center"],
+.palagai-message-renderer [style*="text-align: center;"],
+.palagai-message-renderer [style*="text-align:center;"],
+.palagai-message-renderer [style*="text-align: center !important"],
+.palagai-message-renderer [style*="text-align:center !important"] {
+  text-align: center !important;
+}
+
+.palagai-message-renderer [style*="text-align: left"],
+.palagai-message-renderer [style*="text-align:left"],
+.palagai-message-renderer [style*="text-align: left;"],
+.palagai-message-renderer [style*="text-align:left;"] {
+  text-align: left !important;
+}
+
+.palagai-message-renderer [style*="text-align: right"],
+.palagai-message-renderer [style*="text-align:right"],
+.palagai-message-renderer [style*="text-align: right;"],
+.palagai-message-renderer [style*="text-align:right;"] {
+  text-align: right !important;
+}
+
+.palagai-message-renderer [style*="text-align: justify"],
+.palagai-message-renderer [style*="text-align:justify"],
+.palagai-message-renderer [style*="text-align: justify;"],
+.palagai-message-renderer [style*="text-align:justify;"] {
+  text-align: justify !important;
+}
+
 /* Typography & Headings */
 .palagai-message-renderer p {
   margin: 0;
@@ -70,6 +124,8 @@
   display: block;
   word-break: normal !important;
   overflow-wrap: normal !important;
+  /* Preserve text-align from inline styles */
+  text-align: inherit;
 }
 
 .palagai-message-renderer h1,
@@ -203,14 +259,87 @@
 .palagai-message-renderer .ql-font-Courier\ New { font-family: 'Courier New', Courier, monospace !important; }
 .palagai-message-renderer .ql-font-Verdana { font-family: Verdana, Geneva, sans-serif !important; }
 
+/* Custom Editor Font Classes */
+.palagai-message-renderer [style*="font-family: Melon Pop"],
+.palagai-message-renderer [style*="font-family:'Melon Pop'"],
+.palagai-message-renderer [style*='font-family:"Melon Pop"'] {
+  font-family: 'Melon Pop', sans-serif !important;
+}
+
+.palagai-message-renderer [style*="font-family: LRAVI Regular"],
+.palagai-message-renderer [style*="font-family:'LRAVI Regular'"],
+.palagai-message-renderer [style*='font-family:"LRAVI Regular"'] {
+  font-family: 'LRAVI Regular', sans-serif !important;
+}
+
+.palagai-message-renderer [style*="font-family: Nallur Plain"],
+.palagai-message-renderer [style*="font-family:'Nallur Plain'"],
+.palagai-message-renderer [style*='font-family:"Nallur Plain"'] {
+  font-family: 'Nallur Plain', sans-serif !important;
+}
+
 /* Full Screen Mode */
-.kiosk-message-content .palagai-display-container {
+.kiosk-message-content.palagai-display-container {
   min-height: 300px;
+  background: #f8f8f8 !important; /* Very light grey */
+  border: 2px solid #ffffff !important; /* White border */
+  border-radius: 20px;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
 }
 
 .kiosk-message-content .palagai-message-renderer {
   font-size: 24px;
   padding: 40px;
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+  /* Hide scrollbar */
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+}
+
+.kiosk-message-content .palagai-message-renderer::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
+}
+
+.kiosk-message-content .powered-by-palagai {
+  padding: 12px 20px;
+  flex-shrink: 0;
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.kiosk-message-content .powered-by-line {
+  width: 100%;
+  height: 1px;
+  background: rgba(0, 0, 0, 0.08);
+  margin-bottom: 8px;
+}
+
+.kiosk-message-content .powered-by-content {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.kiosk-message-content .powered-by-palagai .heart-icon {
+  font-size: 14px;
+  width: 14px;
+  height: 14px;
+  color: #e91e63;
+}
+
+.kiosk-message-content .powered-by-palagai span {
+  font-size: 12px;
+  color: #999999;
+  font-weight: 400;
+  letter-spacing: 0.5px;
+  text-transform: lowercase;
 }
 
 .kiosk-message-content .palagai-message-renderer h1 { font-size: 2em !important; font-weight: 700 !important; }
@@ -233,6 +362,12 @@
   .palagai-message-renderer h2 { font-size: 1.3em !important; }
   .palagai-message-renderer h3 { font-size: 1.1em !important; }
   
+  .palagai-message-renderer .board-topic-title-kiosk {
+    font-size: 24px;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+  }
+
   .kiosk-message-content .palagai-message-renderer {
     font-size: 18px;
     padding: 24px;
@@ -246,7 +381,13 @@
     width: 98%;
     max-width: 98%;
   }
-  
+
+  .palagai-message-renderer .board-topic-title-kiosk {
+    font-size: 20px;
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+  }
+
   .palagai-message-renderer {
     font-size: 13px;
   }
