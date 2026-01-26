@@ -293,9 +293,17 @@
 
   .vote-button {
     width: 100%;
+    margin: 0;
   }
 
   .view-link {
+    width: 100%;
+    justify-content: center;
+    margin: 0;
+    box-sizing: border-box;
+  }
+
+  .vote-info {
     width: 100%;
     justify-content: center;
   }

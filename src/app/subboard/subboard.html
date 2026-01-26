@@ -40,11 +40,11 @@
 
   <!-- Full page kiosk mode - Two Layer Structure -->
   <div class="kiosk-container" *ngIf="isFullPage && board" [class.board-size-min]="boardSize === 'min'" [class.board-size-normal]="boardSize === 'normal'" [class.board-size-max]="boardSize === 'max'" [class.blocked]="board && board.isBlocked === true" [class.competition-board]="isInCompetition">
-    <!-- Header with Home Icon for Competition Boards -->
-    <div class="competition-header" *ngIf="isInCompetition && isFullPage && !isPreviewMode">
+    <!-- Mobile Home Icon (Bottom Right - Mobile Only) -->
+    <div class="mobile-home-icon" *ngIf="isFullPage && !isPreviewMode">
       <button
         mat-icon-button
-        class="home-header-btn"
+        class="mobile-home-btn"
         (click)="toggleFullPage()"
         aria-label="Back to home"
         title="Back to home"

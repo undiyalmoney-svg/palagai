@@ -8,6 +8,36 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { Unsubscribe } from 'firebase/database';
 
+// Obfuscated localStorage keys (made to look like app preferences/analytics)
+const VOTED_BOARDS_KEY = 'app_pref_cache_v2'; // Stores voted board IDs
+const USER_ANALYTICS_ID = 'usr_analytics_id'; // Stores user session/analytics ID
+
+// Initialize dummy localStorage keys to obfuscate voting data
+function initializeDummyLocalStorage() {
+  if (typeof window === 'undefined') return;
+  
+  try {
+    // Add dummy keys that look like normal app preferences
+    if (!localStorage.getItem('ui_theme_pref')) {
+      localStorage.setItem('ui_theme_pref', 'light');
+    }
+    if (!localStorage.getItem('last_visit_ts')) {
+      localStorage.setItem('last_visit_ts', Date.now().toString());
+    }
+    if (!localStorage.getItem('cache_ver')) {
+      localStorage.setItem('cache_ver', '1.0');
+    }
+    if (!localStorage.getItem('lang_pref')) {
+      localStorage.setItem('lang_pref', 'en');
+    }
+    if (!localStorage.getItem('app_metrics_enabled')) {
+      localStorage.setItem('app_metrics_enabled', 'true');
+    }
+  } catch (e) {
+    // Ignore localStorage errors
+  }
+}
+
 interface CompetitionBoard {
   boardKey: string;
   board: Board;
@@ -44,6 +74,9 @@ export class Competition implements OnInit, OnDestroy {
   ) {}
 
   async ngOnInit() {
+    // Initialize dummy localStorage keys
+    initializeDummyLocalStorage();
+    
     try {
       await this.loadCompetitionBoards();
     } catch (error) {
@@ -76,17 +109,22 @@ export class Competition implements OnInit, OnDestroy {
     }, 8000); // 8 second timeout
 
     try {
-      // Get or create session ID for user identification
+      // Get or create user ID for identification (from localStorage)
       if (typeof window !== 'undefined') {
-        this.userIP = sessionStorage.getItem('palagai_session_id') || 
+        this.userIP = localStorage.getItem(USER_ANALYTICS_ID) || 
           `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        sessionStorage.setItem('palagai_session_id', this.userIP);
+        localStorage.setItem(USER_ANALYTICS_ID, this.userIP);
         
-        // Load voted boards from session
-        const votedBoards = sessionStorage.getItem('palagai_voted_boards');
-        if (votedBoards) {
-          const votedBoardList = JSON.parse(votedBoards);
-          this.votedBoards = new Set(votedBoardList);
+        // Load voted boards from localStorage (obfuscated key)
+        try {
+          const votedBoards = localStorage.getItem(VOTED_BOARDS_KEY);
+          if (votedBoards) {
+            const votedBoardList = JSON.parse(votedBoards);
+            this.votedBoards = new Set(votedBoardList);
+          }
+        } catch (e) {
+          // Invalid data, reset it
+          localStorage.removeItem(VOTED_BOARDS_KEY);
         }
       } else {
         this.userIP = 'unknown';
@@ -198,11 +236,16 @@ export class Competition implements OnInit, OnDestroy {
       // Add the vote to Firebase (allows multiple votes)
       await this.boardsService.addVote(board.boardKey, this.userIP);
       
-      // Mark as voted in session
+      // Mark as voted (store in localStorage with obfuscated key)
       this.votedBoards.add(board.boardKey);
       if (typeof window !== 'undefined') {
-        const votedBoardList = Array.from(this.votedBoards);
-        sessionStorage.setItem('palagai_voted_boards', JSON.stringify(votedBoardList));
+        try {
+          const votedBoardList = Array.from(this.votedBoards);
+          localStorage.setItem(VOTED_BOARDS_KEY, JSON.stringify(votedBoardList));
+        } catch (e) {
+          // If localStorage fails, just keep in memory
+          console.warn('Failed to save voted boards to localStorage:', e);
+        }
       }
       
       // Refresh vote count from Firebase to ensure accuracy

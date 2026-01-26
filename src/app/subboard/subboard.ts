@@ -17,6 +17,36 @@ import { BoardIdDialogComponent, BoardIdDialogData } from './board-id-dialog.com
 import { SaveConfirmationDialogComponent } from '../mainboard/save-confirmation-dialog.component';
 const SESSION_BOARD_KEY = 'palagai_session_board_id';
 
+// Obfuscated localStorage keys (made to look like app preferences/analytics)
+const VOTED_BOARDS_KEY = 'app_pref_cache_v2'; // Stores voted board IDs
+const USER_ANALYTICS_ID = 'usr_analytics_id'; // Stores user session/analytics ID
+
+// Initialize dummy localStorage keys to obfuscate voting data
+function initializeDummyLocalStorage() {
+  if (typeof window === 'undefined') return;
+  
+  try {
+    // Add dummy keys that look like normal app preferences
+    if (!localStorage.getItem('ui_theme_pref')) {
+      localStorage.setItem('ui_theme_pref', 'light');
+    }
+    if (!localStorage.getItem('last_visit_ts')) {
+      localStorage.setItem('last_visit_ts', Date.now().toString());
+    }
+    if (!localStorage.getItem('cache_ver')) {
+      localStorage.setItem('cache_ver', '1.0');
+    }
+    if (!localStorage.getItem('lang_pref')) {
+      localStorage.setItem('lang_pref', 'en');
+    }
+    if (!localStorage.getItem('app_metrics_enabled')) {
+      localStorage.setItem('app_metrics_enabled', 'true');
+    }
+  } catch (e) {
+    // Ignore localStorage errors
+  }
+}
+
 @Component({
   selector: 'app-subboard',
   standalone: true,
@@ -102,6 +132,9 @@ export class Subboard implements OnInit, AfterViewInit, OnDestroy {
   }
 
   ngOnInit() {
+    // Initialize dummy localStorage keys
+    initializeDummyLocalStorage();
+    
     // Check for preview mode first
     this.route.queryParams.subscribe(params => {
       const isPreview = params['preview'] === 'true';
@@ -317,16 +350,22 @@ export class Subboard implements OnInit, AfterViewInit, OnDestroy {
     try {
       // Get or create user IP
       if (typeof window !== 'undefined') {
-        this.userIP = sessionStorage.getItem('palagai_session_id') || '';
+        this.userIP = localStorage.getItem(USER_ANALYTICS_ID) || '';
         if (!this.userIP) {
           this.userIP = await this.boards.getUserIP();
+          localStorage.setItem(USER_ANALYTICS_ID, this.userIP);
         }
         
-        // Check if user has voted in this session
-        const votedBoards = sessionStorage.getItem('palagai_voted_boards');
+        // Check if user has voted (from localStorage)
+        const votedBoards = localStorage.getItem(VOTED_BOARDS_KEY);
         if (votedBoards) {
-          const votedBoardList = JSON.parse(votedBoards);
-          this.hasVotedInSession = votedBoardList.includes(boardKey);
+          try {
+            const votedBoardList = JSON.parse(votedBoards);
+            this.hasVotedInSession = votedBoardList.includes(boardKey);
+          } catch (e) {
+            // Invalid data, reset it
+            localStorage.removeItem(VOTED_BOARDS_KEY);
+          }
         }
       } else {
         this.userIP = 'unknown';
@@ -350,22 +389,29 @@ export class Subboard implements OnInit, AfterViewInit, OnDestroy {
       return;
     }
 
-    this.isVoting = true;
-    this.cdr.detectChanges();
-
-    try {
-      await this.boards.addVote(this.currentBoardKey, this.userIP);
-      
-      // Mark as voted in session
-      if (typeof window !== 'undefined' && this.currentBoardKey) {
-        const votedBoards = sessionStorage.getItem('palagai_voted_boards');
+    // Immediately mark as voted and save to localStorage (hide button instantly)
+    if (typeof window !== 'undefined' && this.currentBoardKey) {
+      try {
+        const votedBoards = localStorage.getItem(VOTED_BOARDS_KEY);
         const votedBoardList = votedBoards ? JSON.parse(votedBoards) : [];
         if (!votedBoardList.includes(this.currentBoardKey)) {
           votedBoardList.push(this.currentBoardKey);
-          sessionStorage.setItem('palagai_voted_boards', JSON.stringify(votedBoardList));
+          localStorage.setItem(VOTED_BOARDS_KEY, JSON.stringify(votedBoardList));
         }
         this.hasVotedInSession = true;
+        this.isVoting = false; // Reset isVoting so button hides immediately
+        this.cdr.detectChanges(); // Trigger change detection to hide button
+      } catch (e) {
+        // If localStorage fails, just mark in memory
+        this.hasVotedInSession = true;
+        this.isVoting = false;
+        this.cdr.detectChanges();
       }
+    }
+
+    // Now proceed with the actual vote (button is already hidden)
+    try {
+      await this.boards.addVote(this.currentBoardKey, this.userIP);
       
       // Update vote count from board after a short delay
       setTimeout(async () => {
@@ -389,21 +435,37 @@ export class Subboard implements OnInit, AfterViewInit, OnDestroy {
           duration: 2000,
           panelClass: ['success-snackbar'],
         });
-        this.cdr.detectChanges();
       }, 0);
       
     } catch (error: any) {
       console.error('Error voting:', error);
+      // On error, remove from localStorage and reset state so user can try again
+      if (typeof window !== 'undefined' && this.currentBoardKey) {
+        try {
+          const votedBoards = localStorage.getItem(VOTED_BOARDS_KEY);
+          if (votedBoards) {
+            const votedBoardList = JSON.parse(votedBoards);
+            const index = votedBoardList.indexOf(this.currentBoardKey);
+            if (index > -1) {
+              votedBoardList.splice(index, 1);
+              localStorage.setItem(VOTED_BOARDS_KEY, JSON.stringify(votedBoardList));
+            }
+          }
+          this.hasVotedInSession = false;
+          this.isVoting = false;
+          this.cdr.detectChanges();
+        } catch (e) {
+          // If localStorage update fails, just reset in memory
+          this.hasVotedInSession = false;
+          this.isVoting = false;
+          this.cdr.detectChanges();
+        }
+      }
       setTimeout(() => {
         this.snackBar.open(error?.message || 'Error submitting vote. Please try again.', 'OK', {
           duration: 4000,
           panelClass: ['error-snackbar'],
         });
-      }, 0);
-    } finally {
-      setTimeout(() => {
-        this.isVoting = false;
-        this.cdr.detectChanges();
       }, 0);
     }
   }
@@ -612,6 +674,7 @@ export class Subboard implements OnInit, AfterViewInit, OnDestroy {
 
       // Success - update state
       this.board = result;
+      this.currentBoardKey = trimmedId; // Set board key for voting
       this._lastUpdated = result.message?.updatedAt ?? null;
       // Load board size from database
       this.boardSize = result.boardSize || 'normal';
@@ -620,6 +683,16 @@ export class Subboard implements OnInit, AfterViewInit, OnDestroy {
       this.error = '';
       this.loading = false;
       this.showLandingPage = false; // Hide landing page when board is loaded
+      
+      // Set competition status (defer to avoid NG0100)
+      setTimeout(() => {
+        this.isInCompetition = !!(result.isSubmittedForCompetition);
+        if (this.isInCompetition) {
+          this.initializeVoting(trimmedId);
+        }
+        this.cdr.detectChanges();
+      }, 0);
+      
       this.cdr.markForCheck();
       
       // Set up real-time listener for board updates

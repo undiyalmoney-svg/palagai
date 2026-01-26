@@ -288,41 +288,13 @@ body {
   }
 }
 
-/* Competition Header */
-.competition-header {
-  position: fixed;
-  top: 16px;
-  left: 16px;
-  z-index: 1002;
-  display: flex;
-  align-items: center;
-}
+/* Competition Header - Removed (using kiosk-exit-btn for desktop hover instead) */
 
-.home-header-btn {
-  background: rgba(255, 255, 255, 0.95);
-  border-radius: 50%;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  color: #111111;
-  width: 48px;
-  height: 48px;
-}
-
-.home-header-btn:hover {
-  background: rgba(255, 255, 255, 1);
-  transform: scale(1.1);
-}
-
-.home-header-btn mat-icon {
-  font-size: 24px;
-  width: 24px;
-  height: 24px;
-}
-
-/* Vote Section in Kiosk Mode - Top Left for Web, Always Visible for Competition */
+/* Vote Section in Kiosk Mode - Top Left for Web, Bottom Center for Mobile */
 .kiosk-vote-section {
   position: fixed;
   top: 16px;
-  left: 80px;
+  left: 16px;
   z-index: 1001;
   display: flex;
   flex-direction: column;
@@ -394,11 +366,34 @@ body {
   height: 18px;
 }
 
-.mobile-home-btn {
-  background: rgba(255, 255, 255, 0.95);
-  border-radius: 50%;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  color: #111111;
+/* Mobile Home Icon - Bottom Right (Hidden on Desktop) */
+.mobile-home-icon {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .mobile-home-icon {
+    display: block;
+    position: fixed;
+    bottom: 16px;
+    right: 16px;
+    z-index: 1002;
+  }
+
+  .mobile-home-btn {
+    width: 40px;
+    height: 40px;
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 50%;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    color: #111111;
+  }
+
+  .mobile-home-btn mat-icon {
+    font-size: 20px;
+    width: 20px;
+    height: 20px;
+  }
 }
 
 .desktop-only {
@@ -705,16 +700,12 @@ body {
     width: 100%;
   }
 
-  /* Competition Header - Top Center for Mobile */
-  .competition-header {
-    top: 16px;
-    left: 50%;
-    transform: translateX(-50%);
-  }
+  /* Competition Header removed - no longer needed */
 
-  /* Vote Section - Top Center for Mobile, Below Header */
+  /* Vote Section - Bottom Center for Mobile, Combined with Home Icon */
   .kiosk-container.competition-board .kiosk-vote-section {
-    top: 72px;
+    top: auto;
+    bottom: 72px;
     left: 50%;
     transform: translateX(-50%);
     align-items: center;

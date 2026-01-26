@@ -785,8 +785,11 @@ export class BoardService {
       return 'unknown';
     }
 
-    // Check session storage first
-    const existingSessionId = sessionStorage.getItem('palagai_session_id');
+    // Obfuscated localStorage key (made to look like analytics)
+    const USER_ANALYTICS_ID = 'usr_analytics_id';
+    
+    // Check localStorage first (using obfuscated key)
+    const existingSessionId = localStorage.getItem(USER_ANALYTICS_ID);
     if (existingSessionId) {
       return existingSessionId;
     }
@@ -804,13 +807,13 @@ export class BoardService {
       const data = await response.json();
       const ip = data.ip || 'unknown';
       
-      // Store in session for future use
-      sessionStorage.setItem('palagai_session_id', ip);
+      // Store in localStorage (using obfuscated key)
+      localStorage.setItem(USER_ANALYTICS_ID, ip);
       return ip;
     } catch (error) {
       // Fallback: use a session-based identifier
       const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      sessionStorage.setItem('palagai_session_id', sessionId);
+      localStorage.setItem(USER_ANALYTICS_ID, sessionId);
       return sessionId;
     }
   }
