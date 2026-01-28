@@ -9,7 +9,7 @@
   overflow-y: auto;
   scroll-behavior: smooth;
   -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
-  padding-top: 64px; /* Account for fixed header */
+  padding-top: 0; /* No padding needed - header is fixed */
 }
 
 .competition-header {
@@ -22,6 +22,10 @@
   background: white !important;
   backdrop-filter: blur(10px);
   border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  display: flex;
+  align-items: center;
+  min-height: 64px;
+  padding: 0;
 }
 
 .header-content {
@@ -29,9 +33,10 @@
   max-width: 1200px;
   margin: 0 auto;
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   align-items: center;
   padding: 0 16px;
+  position: relative;
 }
 
 .competition-header h1 {
@@ -63,19 +68,78 @@
 .submit-btn {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  border-radius: 24px;
+  padding: 8px 20px;
+  font-weight: 500;
+  text-transform: none;
+  box-shadow: 0 2px 8px rgba(25, 118, 210, 0.2);
+  transition: all 0.3s ease;
+}
+
+.submit-btn:hover {
+  box-shadow: 0 4px 12px rgba(25, 118, 210, 0.3);
+  transform: translateY(-1px);
+}
+
+.submit-btn mat-icon {
+  font-size: 20px;
+  width: 20px;
+  height: 20px;
 }
 
 .home-btn {
   color: #1976d2;
   background: rgba(25, 118, 210, 0.1);
+  border-radius: 50%;
+  width: 48px;
+  height: 48px;
+  min-width: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .home-btn:hover {
   background: rgba(25, 118, 210, 0.2);
+}
+
+.desktop-home-btn:hover {
+  transform: translateY(-50%) scale(1.05);
+}
+
+.mobile-home-btn:hover {
+  transform: translateY(-50%) scale(1.05);
+}
+
+.home-btn mat-icon {
+  font-size: 24px;
+  width: 24px;
+  height: 24px;
+}
+
+.mobile-home-btn {
+  display: none; /* Hidden on desktop */
+}
+
+.desktop-home-btn {
+  display: inline-flex !important; /* Visible on desktop */
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 101;
+}
+
+.submit-text-mobile {
+  display: none; /* Hidden on desktop */
+}
+
+.submit-text-desktop {
+  display: inline; /* Visible on desktop */
 }
 
 .loading-container {
@@ -141,7 +205,7 @@
 }
 
 .kavithai-item:first-child {
-  margin-top: 12px; /* Reduced space between paginator and first kavithai item */
+  margin-top: 65px; /* Increased space between paginator and first kavithai item */
 }
 
 .kavithai-item:nth-child(1) { animation-delay: 0.05s; }
@@ -518,10 +582,10 @@
 
 .kavithai-paginator-top {
   position: sticky;
-  top: 0 !important; /* Explicitly set to 0 to override any cached or inherited styles */
+  top: 64px !important; /* Position below fixed header (64px height) */
   z-index: 50;
   margin-bottom: 16px; /* Reduced margin-bottom */
-  margin-top: 24px;
+  margin-top: 100px; /* Increased margin from header */
   border-radius: 12px 12px 0 0;
   border-bottom: 2px solid rgba(25, 118, 210, 0.1);
 }
@@ -577,81 +641,277 @@
 @media (max-width: 768px) {
   .kavithai-list-container {
     background-image: url('/assets/kavithai-bg-mobile.png');
+    padding-top: 0; /* No padding needed */
+  }
+
+  .competition-header {
+    min-height: auto;
+    padding: 0 !important;
+    position: fixed;
+    display: flex;
+    align-items: center;
+    height: 56px;
+    min-height: 56px;
+  }
+
+  .mobile-home-btn {
+    display: inline-flex !important;
+    position: absolute;
+    top: 50%;
+    left: 8px;
+    transform: translateY(-50%);
+    z-index: 101;
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    padding: 0;
+    border-radius: 50%;
+    background: rgba(25, 118, 210, 0.1);
+  }
+
+  .mobile-home-btn mat-icon {
+    font-size: 22px;
+    width: 22px;
+    height: 22px;
+  }
+
+  .desktop-home-btn {
+    display: none !important; /* Hide desktop home button on mobile */
+  }
+
+  .submit-text-mobile {
+    display: inline !important; /* Show "Participate" text on mobile */
+  }
+
+  .submit-text-desktop {
+    display: none !important; /* Hide desktop text on mobile */
   }
 
   .header-content {
-    flex-direction: column;
-    gap: 12px;
-    padding: 12px 16px;
-  }
-
-  .competition-header h1 {
-    font-size: 20px;
-    word-wrap: break-word;
-    overflow-wrap: break-word;
-    flex-wrap: wrap;
-  }
-  
-  .header-actions {
-    flex-wrap: wrap;
-  }
-
-  .competition-header h1 mat-icon {
-    font-size: 24px;
-    width: 24px;
-    height: 24px;
-  }
-
-  .header-actions {
     width: 100%;
-    justify-content: space-between;
-    gap: 8px;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    padding: 0 8px 0 60px; /* Left padding for home icon, right padding for button */
+    margin: 0;
+  }
+
+  .header-actions {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 0;
+    flex-wrap: nowrap;
+    width: auto;
   }
 
   .submit-btn {
-    flex: 1;
-    font-size: 14px;
-    padding: 8px 12px;
-    min-width: 0;
+    font-size: 13px;
+    padding: 6px 16px;
+    min-width: auto;
     white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    display: inline-flex;
+    align-items: center;
+    border-radius: 20px;
+    font-weight: 500;
+    box-shadow: 0 2px 6px rgba(25, 118, 210, 0.2);
   }
 
   .submit-btn mat-icon {
     font-size: 18px;
     width: 18px;
     height: 18px;
-  }
-
-  .home-btn {
+    margin-right: 4px;
     flex-shrink: 0;
   }
 
-  .home-btn mat-icon {
-    font-size: 24px;
-    width: 24px;
-    height: 24px;
-  }
-
   .kavithai-list {
-    padding: 0 16px 120px 16px; /* Extra bottom padding for sticky paginator */
+    padding: 0 12px 100px 12px; /* Reduced side padding, less bottom padding */
+    max-width: 100%;
   }
 
   .kavithai-paginator-top {
-    margin-top: 16px;
-    margin-bottom: 10px; /* Reduced margin-bottom */
-    padding: 8px 0;
+    top: 56px !important; /* Position below fixed header (56px height on mobile) */
+    margin-top: 85px; /* Increased margin from header */
+    margin-bottom: 8px; /* Reduced bottom margin */
+    padding: 6px 0;
   }
 
   .kavithai-paginator-bottom {
-    margin-top: 24px;
-    padding: 8px 0;
+    margin-top: 12px; /* Reduced top margin */
+    padding: 6px 0;
   }
 
   .kavithai-item {
-    margin-top: 8px; /* Reduced space between paginator and kavithai items */
+    margin-top: 0; /* No top margin for first item */
+    margin-bottom: 20px; /* Consistent bottom margin */
+    width: 100%;
+  }
+
+  .kavithai-item:first-child {
+    margin-top: 65px; /* Increased space between paginator and first kavithai item */
+  }
+
+  .kavithai-item:last-child {
+    margin-bottom: 0;
+  }
+
+  .kavithai-card {
+    border-radius: 8px;
+    margin: 0 auto;
+    width: 100%;
+    max-width: 100%;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  }
+
+  .kavithai-content {
+    padding: 20px 16px; /* Better mobile padding */
+    min-height: auto;
+    line-height: 1.8; /* Improved line-height for Tamil text readability */
+    font-size: 16px; /* Slightly larger for better readability */
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    hyphens: auto;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  .kavithai-content.palagai-message-renderer {
+    padding: 20px 16px;
+    font-size: 16px;
+    line-height: 1.8;
+  }
+
+  .kavithai-content.palagai-message-renderer p {
+    margin: 0 0 14px 0;
+    text-align: inherit;
+    line-height: 1.8;
+    font-size: 16px;
+  }
+
+  .kavithai-content.palagai-message-renderer h1,
+  .kavithai-content.palagai-message-renderer h2,
+  .kavithai-content.palagai-message-renderer h3,
+  .kavithai-content.palagai-message-renderer h4,
+  .kavithai-content.palagai-message-renderer h5,
+  .kavithai-content.palagai-message-renderer h6 {
+    margin: 0 0 12px 0;
+    line-height: 1.6;
+  }
+
+  .kavithai-content.palagai-message-renderer div {
+    margin: 0 0 12px 0;
+    text-align: inherit;
+    line-height: 1.8;
+  }
+
+  .kavithai-actions {
+    flex-direction: column;
+    gap: 12px; /* Reduced gap */
+    align-items: stretch;
+    padding: 16px; /* Reduced padding */
+  }
+
+  .vote-info {
+    justify-content: center;
+    padding: 8px 16px;
+    width: fit-content;
+    margin: 0 auto;
+    order: 1; /* Vote info appears first */
+  }
+
+  .vote-icon {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+  }
+
+  .vote-count {
+    font-size: 14px;
+  }
+
+  .vote-button {
+    width: 100%;
+    height: 42px;
+    font-size: 14px;
+    order: 2; /* Vote button appears second */
+  }
+
+  .kavithai-paginator {
+    margin-top: 0;
+    border-radius: 8px;
+    font-size: 12px; /* Smaller pagination text on mobile */
+  }
+}
+
+/* Small mobile styles */
+@media (max-width: 480px) {
+  .kavithai-list-container {
+    padding-top: 0; /* No padding needed */
+  }
+
+  .competition-header {
+    height: 52px;
+    min-height: 52px;
+  }
+
+  .mobile-home-btn {
+    left: 6px;
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+  }
+
+  .mobile-home-btn mat-icon {
+    font-size: 20px;
+    width: 20px;
+    height: 20px;
+  }
+
+  .header-content {
+    padding: 0 6px 0 54px; /* Left padding for home icon, right padding for button */
+  }
+
+  .header-actions {
+    gap: 0;
+  }
+
+  .submit-btn {
+    font-size: 12px;
+    padding: 5px 10px;
+    min-width: auto;
+  }
+
+  .submit-btn mat-icon {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+    margin-right: 3px;
+  }
+
+  .kavithai-list {
+    padding: 0 10px 90px 10px; /* Even tighter padding for small mobile */
+  }
+
+  .kavithai-paginator-top {
+    top: 52px !important; /* Position below fixed header (52px height on small mobile) */
+    margin-top: 85px; /* Increased margin from header */
+    margin-bottom: 6px;
+    padding: 4px 0;
+  }
+
+  .kavithai-paginator-bottom {
+    margin-top: 10px; /* Reduced top margin */
+    padding: 4px 0;
+  }
+
+  .kavithai-item {
+    margin-top: 0;
     margin-bottom: 16px;
+  }
+
+  .kavithai-item:first-child {
+    margin-top: 65px; /* Increased space between paginator and first kavithai item */
   }
 
   .kavithai-card {
@@ -659,18 +919,21 @@
   }
 
   .kavithai-content {
-    padding: 24px 20px;
-    min-height: 100px;
-    line-height: 1.7;
+    padding: 18px 14px; /* Slightly tighter padding */
+    font-size: 15px; /* Slightly smaller but still readable */
+    line-height: 1.75;
+  }
+
+  .kavithai-content.palagai-message-renderer {
+    padding: 18px 14px;
     font-size: 15px;
-    word-wrap: break-word;
-    overflow-wrap: break-word;
-    hyphens: auto;
+    line-height: 1.75;
   }
 
   .kavithai-content.palagai-message-renderer p {
     margin: 0 0 12px 0;
-    text-align: inherit;
+    font-size: 15px;
+    line-height: 1.75;
   }
 
   .kavithai-content.palagai-message-renderer h1,
@@ -684,111 +947,35 @@
 
   .kavithai-content.palagai-message-renderer div {
     margin: 0 0 10px 0;
-    text-align: inherit;
+    line-height: 1.75;
   }
 
   .kavithai-actions {
-    flex-direction: column;
-    gap: 16px;
-    align-items: stretch;
-    padding: 20px;
+    padding: 14px;
+    gap: 10px;
   }
 
   .vote-info {
-    justify-content: center;
-    padding: 10px 20px;
-    width: fit-content;
-    margin: 0 auto;
+    padding: 6px 14px;
   }
 
   .vote-icon {
-    font-size: 20px;
-    width: 20px;
-    height: 20px;
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
   }
 
   .vote-count {
-    font-size: 15px;
-  }
-
-  .vote-button {
-    width: 100%;
-    height: 44px;
-    font-size: 15px;
-  }
-
-  .kavithai-paginator {
-    margin-top: 24px;
-    border-radius: 6px;
-  }
-}
-
-/* Small mobile styles */
-@media (max-width: 480px) {
-  .kavithai-list {
-    padding: 0 12px 120px 12px; /* Extra bottom padding for sticky paginator */
-  }
-
-  .kavithai-paginator-top {
-    margin-top: 12px;
-    margin-bottom: 8px; /* Reduced margin-bottom */
-    padding: 6px 0;
-  }
-
-  .kavithai-paginator-bottom {
-    margin-top: 20px;
-    padding: 6px 0;
-  }
-
-  .kavithai-item {
-    margin-top: 6px; /* Reduced space between paginator and kavithai items */
-    margin-bottom: 14px;
-  }
-
-  .kavithai-content {
-    padding: 20px 16px;
-    font-size: 14px;
-    line-height: 1.6;
-  }
-
-  .kavithai-content.palagai-message-renderer p {
-    margin: 0 0 10px 0;
-  }
-
-  .kavithai-content.palagai-message-renderer h1,
-  .kavithai-content.palagai-message-renderer h2,
-  .kavithai-content.palagai-message-renderer h3,
-  .kavithai-content.palagai-message-renderer h4,
-  .kavithai-content.palagai-message-renderer h5,
-  .kavithai-content.palagai-message-renderer h6 {
-    margin: 0 0 8px 0;
-  }
-
-  .kavithai-content.palagai-message-renderer div {
-    margin: 0 0 8px 0;
-    text-align: inherit;
-  }
-
-  .kavithai-actions {
-    padding: 16px;
-    gap: 12px;
-  }
-
-  .vote-info {
-    padding: 8px 16px;
-  }
-
-  .vote-count {
-    font-size: 14px;
+    font-size: 13px;
   }
 
   .vote-button {
     height: 40px;
-    font-size: 14px;
+    font-size: 13px;
   }
 
   .kavithai-paginator {
-    margin-top: 20px;
+    font-size: 11px;
   }
 }
 

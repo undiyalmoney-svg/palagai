@@ -1,18 +1,18 @@
 <div class="kavithai-list-container">
   <!-- Header -->
   <mat-toolbar class="competition-header">
+    <button mat-icon-button routerLink="/" class="home-btn mobile-home-btn" aria-label="Home" title="Home">
+      <mat-icon>home</mat-icon>
+    </button>
     <div class="header-content">
-      <h1>
-        <mat-icon>star</mat-icon>
-        Kavithai Competition Submissions
-      </h1>
       <div class="header-actions">
+        <button mat-icon-button routerLink="/" class="home-btn desktop-home-btn" aria-label="Home" title="Home">
+          <mat-icon>home</mat-icon>
+        </button>
         <button mat-raised-button color="accent" routerLink="/kavithai/submit" class="submit-btn">
           <mat-icon>edit</mat-icon>
-          Submit Your Kavithai
-        </button>
-        <button mat-icon-button routerLink="/" class="home-btn" aria-label="Home" title="Home">
-          <mat-icon>home</mat-icon>
+          <span class="submit-text-desktop">Participate</span>
+          <span class="submit-text-mobile">Participate</span>
         </button>
       </div>
     </div>
