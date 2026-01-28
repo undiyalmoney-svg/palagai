@@ -48,6 +48,9 @@ export interface UserRecord {
   createdAt: number;
   gender?: string;
   dateOfBirth?: string; // Format: YYYY-MM-DD
+  city?: string;
+  state?: string;
+  country?: string;
   securityQuestion?: string;
   securityAnswerHash?: string; // SHA-256 hash of the security answer
 }
@@ -59,6 +62,24 @@ export interface VoteRecord {
   timestamp: number;
 }
 
+export interface KavithaiVoteDetail {
+  ip: string;
+  votingTime: string;
+  date: string;
+  timestamp: number;
+}
+
+export interface Kavithai {
+  email: string;
+  content: string;
+  id: string;
+  voteCount: number;
+  voteDetails: KavithaiVoteDetail[];
+  createdAt: number;
+  isDuplicate?: boolean; // Flag to mark duplicate email entries
+  isInvalid?: boolean; // Flag to mark invalid entries
+}
+
 @Injectable({
   providedIn: 'root',
 })
@@ -67,12 +88,14 @@ export class BoardService {
   private boardsRef: DatabaseReference;
   private adminRef: DatabaseReference;
   private votesRef: DatabaseReference;
+  private kavithaiRef: DatabaseReference;
 
   constructor() {
     this.usersRef = ref(db, 'users');
     this.boardsRef = ref(db, 'boards');
     this.adminRef = ref(db, 'admin');
     this.votesRef = ref(db, 'votes');
+    this.kavithaiRef = ref(db, 'competition/kavithai');
   }
 
   /**
@@ -277,6 +300,9 @@ export class BoardService {
     additionalData?: {
       gender?: string;
       dateOfBirth?: string;
+      city?: string;
+      state?: string;
+      country?: string;
       securityQuestion?: string;
       securityAnswerHash?: string;
     }
@@ -308,6 +334,9 @@ export class BoardService {
       createdAt: Date.now(),
       ...(additionalData?.gender && { gender: additionalData.gender }),
       ...(additionalData?.dateOfBirth && { dateOfBirth: additionalData.dateOfBirth }),
+      ...(additionalData?.city && { city: additionalData.city.trim() }),
+      ...(additionalData?.state && { state: additionalData.state.trim() }),
+      ...(additionalData?.country && { country: additionalData.country.trim() }),
       ...(additionalData?.securityQuestion && { securityQuestion: additionalData.securityQuestion }),
       ...(additionalData?.securityAnswerHash && { securityAnswerHash: additionalData.securityAnswerHash.trim() }),
     };
@@ -729,41 +758,26 @@ export class BoardService {
    * Get all boards submitted for competition
    */
   async getCompetitionBoards(): Promise<Array<{ boardKey: string; board: Board }>> {
-    console.log('🔍 [BoardService] Fetching all boards from Firebase...');
     try {
       const snapshot = await get(this.boardsRef);
-      console.log('📦 [BoardService] Snapshot received:', snapshot.exists() ? 'exists' : 'empty');
       
       if (!snapshot.exists()) {
-        console.log('⚠️ [BoardService] No boards found in Firebase');
         return [];
       }
 
       const boardsData = snapshot.val();
-      console.log('📋 [BoardService] Total boards in database:', Object.keys(boardsData).length);
-      
       const competitionBoards: Array<{ boardKey: string; board: Board }> = [];
 
+      // Optimize: Use Object.entries and filter efficiently
       for (const [boardKey, boardData] of Object.entries(boardsData)) {
         const board = boardData as Board;
-        console.log(`  Checking board ${boardKey}:`, {
-          isSubmitted: board.isSubmittedForCompetition,
-          isSubmittedType: typeof board.isSubmittedForCompetition,
-          hasMessage: !!board.message,
-          messageHtml: board.message?.html?.substring(0, 50) || 'no message',
-          hasVotes: !!(board.voteCount && board.voteCount > 0)
-        });
         
-        // Check if board is submitted
+        // Check if board is submitted (fast check)
         if (board.isSubmittedForCompetition === true) {
-          console.log(`  ✅ Board ${boardKey} is submitted for competition`);
           competitionBoards.push({ boardKey, board });
-        } else {
-          console.log(`  ❌ Board ${boardKey} is NOT submitted (value: ${board.isSubmittedForCompetition})`);
         }
       }
 
-      console.log(`🎯 [BoardService] Found ${competitionBoards.length} competition boards`);
       return competitionBoards;
     } catch (err: any) {
       console.error('❌ [BoardService] Error fetching competition boards:', err);
@@ -1098,6 +1112,301 @@ export class BoardService {
     } catch (err: any) {
       console.error('Error deleting account:', err);
       throw new Error(`Failed to delete account: ${err?.message || 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Generate a unique kavithai ID
+   */
+  private generateKavithaiId(): string {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    const prefix = 'KAV';
+    
+    const getRandomChars = (length: number): string => {
+      let result = '';
+      if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+        const randomValues = new Uint32Array(length);
+        crypto.getRandomValues(randomValues);
+        for (let i = 0; i < length; i++) {
+          result += chars.charAt(randomValues[i] % chars.length);
+        }
+      } else {
+        for (let i = 0; i < length; i++) {
+          result += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+      }
+      return result;
+    };
+    
+    return `${prefix}-${getRandomChars(6)}-${getRandomChars(6)}`;
+  }
+
+  /**
+   * Submit a new kavithai entry
+   */
+  async submitKavithai(email: string, content: string): Promise<string> {
+    if (!email || !email.trim()) {
+      throw new Error('Email is required');
+    }
+    if (!content || !content.trim()) {
+      throw new Error('Content is required');
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.trim())) {
+      throw new Error('Please enter a valid email address');
+    }
+
+    try {
+      const kavithaiId = this.generateKavithaiId();
+      const now = Date.now();
+      
+      const kavithai: Kavithai = {
+        email: email.trim(),
+        content: content.trim(),
+        id: kavithaiId,
+        voteCount: 0,
+        voteDetails: [],
+        createdAt: now,
+      };
+
+      await set(child(this.kavithaiRef, kavithaiId), kavithai);
+      return kavithaiId;
+    } catch (err: any) {
+      if (err?.code === 'PERMISSION_DENIED') {
+        throw new Error('Permission denied. Unable to submit kavithai.');
+      }
+      if (err?.code === 'NETWORK_ERROR') {
+        throw new Error('Network error. Please check your connection and try again.');
+      }
+      throw new Error(`Failed to submit kavithai: ${err?.message || 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Get all kavithai entries
+   */
+  async getAllKavithai(): Promise<Kavithai[]> {
+    try {
+      const snapshot = await get(this.kavithaiRef);
+      
+      if (!snapshot.exists()) {
+        return [];
+      }
+
+      const kavithaiData = snapshot.val();
+      const kavithaiList: Kavithai[] = [];
+
+      for (const [kavithaiId, kavithai] of Object.entries(kavithaiData)) {
+        kavithaiList.push(kavithai as Kavithai);
+      }
+
+      // Sort by creation date (newest first)
+      kavithaiList.sort((a, b) => b.createdAt - a.createdAt);
+
+      return kavithaiList;
+    } catch (err: any) {
+      console.error('Error fetching kavithai:', err);
+      if (err?.code === 'PERMISSION_DENIED') {
+        throw new Error('Permission denied. Unable to fetch kavithai entries.');
+      }
+      if (err?.code === 'NETWORK_ERROR') {
+        throw new Error('Network error. Please check your connection and try again.');
+      }
+      throw new Error(`Failed to fetch kavithai: ${err?.message || 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Get a single kavithai by ID
+   */
+  async getKavithai(kavithaiId: string): Promise<Kavithai | null> {
+    if (!kavithaiId || !kavithaiId.trim()) {
+      return null;
+    }
+
+    try {
+      const snapshot = await get(child(this.kavithaiRef, kavithaiId.trim()));
+      
+      if (!snapshot.exists()) {
+        return null;
+      }
+
+      return snapshot.val() as Kavithai;
+    } catch (err: any) {
+      console.error('Error getting kavithai:', err);
+      return null;
+    }
+  }
+
+  /**
+   * Add a vote for a kavithai entry
+   */
+  async addKavithaiVote(kavithaiId: string, ip: string): Promise<void> {
+    if (!kavithaiId || !kavithaiId.trim()) {
+      throw new Error('Kavithai ID is required');
+    }
+
+    try {
+      const kavithai = await this.getKavithai(kavithaiId);
+      if (!kavithai) {
+        throw new Error('Kavithai not found');
+      }
+
+      const now = new Date();
+      const dateTime = now.toISOString();
+      const date = now.toLocaleDateString();
+      const timestamp = now.getTime();
+
+      // Create vote detail
+      const voteDetail: KavithaiVoteDetail = {
+        ip,
+        votingTime: dateTime,
+        date,
+        timestamp,
+      };
+
+      // Update kavithai with new vote
+      const updatedVoteDetails = [...(kavithai.voteDetails || []), voteDetail];
+      const updatedVoteCount = (kavithai.voteCount || 0) + 1;
+
+      await update(child(this.kavithaiRef, kavithaiId.trim()), {
+        voteCount: updatedVoteCount,
+        voteDetails: updatedVoteDetails,
+      });
+    } catch (err: any) {
+      if (err?.code === 'PERMISSION_DENIED') {
+        throw new Error('Permission denied. Unable to vote.');
+      }
+      if (err?.code === 'NETWORK_ERROR') {
+        throw new Error('Network error. Please check your connection and try again.');
+      }
+      if (err?.message) {
+        throw err;
+      }
+      throw new Error(`Failed to add vote: ${err?.message || 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Get vote count for a kavithai entry
+   */
+  async getKavithaiVoteCount(kavithaiId: string): Promise<number> {
+    if (!kavithaiId || !kavithaiId.trim()) {
+      return 0;
+    }
+
+    try {
+      const kavithai = await this.getKavithai(kavithaiId);
+      return kavithai?.voteCount || 0;
+    } catch (err: any) {
+      console.error('Error getting kavithai vote count:', err);
+      return 0;
+    }
+  }
+
+  /**
+   * Subscribe to kavithai vote count changes
+   */
+  subscribeToKavithaiVoteCount(kavithaiId: string, callback: (count: number) => void): Unsubscribe {
+    const kavithaiRef = child(this.kavithaiRef, kavithaiId.trim());
+    
+    const unsubscribe = onValue(kavithaiRef, (snapshot) => {
+      if (!snapshot.exists()) {
+        callback(0);
+        return;
+      }
+      const kavithai = snapshot.val() as Kavithai;
+      callback(kavithai?.voteCount || 0);
+    });
+
+    return unsubscribe;
+  }
+
+  /**
+   * Delete a kavithai entry
+   */
+  async deleteKavithai(kavithaiId: string): Promise<void> {
+    if (!kavithaiId || !kavithaiId.trim()) {
+      throw new Error('Kavithai ID is required');
+    }
+
+    try {
+      await set(child(this.kavithaiRef, kavithaiId.trim()), null);
+    } catch (err: any) {
+      console.error('Error deleting kavithai:', err);
+      if (err?.code === 'PERMISSION_DENIED') {
+        throw new Error('Permission denied. Unable to delete kavithai.');
+      }
+      throw new Error(`Failed to delete kavithai: ${err?.message || 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Mark kavithai as duplicate email
+   */
+  async markKavithaiAsDuplicate(kavithaiId: string, isDuplicate: boolean): Promise<void> {
+    if (!kavithaiId || !kavithaiId.trim()) {
+      throw new Error('Kavithai ID is required');
+    }
+
+    try {
+      await update(child(this.kavithaiRef, kavithaiId.trim()), {
+        isDuplicate: isDuplicate,
+      });
+    } catch (err: any) {
+      console.error('Error marking kavithai as duplicate:', err);
+      if (err?.code === 'PERMISSION_DENIED') {
+        throw new Error('Permission denied. Unable to update kavithai.');
+      }
+      throw new Error(`Failed to update kavithai: ${err?.message || 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Mark kavithai as invalid entry
+   */
+  async markKavithaiAsInvalid(kavithaiId: string, isInvalid: boolean): Promise<void> {
+    if (!kavithaiId || !kavithaiId.trim()) {
+      throw new Error('Kavithai ID is required');
+    }
+
+    try {
+      await update(child(this.kavithaiRef, kavithaiId.trim()), {
+        isInvalid: isInvalid,
+      });
+    } catch (err: any) {
+      console.error('Error marking kavithai as invalid:', err);
+      if (err?.code === 'PERMISSION_DENIED') {
+        throw new Error('Permission denied. Unable to update kavithai.');
+      }
+      throw new Error(`Failed to update kavithai: ${err?.message || 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Update kavithai vote count (admin function)
+   */
+  async updateKavithaiVoteCount(kavithaiId: string, newVoteCount: number): Promise<void> {
+    if (!kavithaiId || !kavithaiId.trim()) {
+      throw new Error('Kavithai ID is required');
+    }
+
+    if (newVoteCount < 0) {
+      throw new Error('Vote count cannot be negative');
+    }
+
+    try {
+      await update(child(this.kavithaiRef, kavithaiId.trim()), {
+        voteCount: newVoteCount,
+      });
+    } catch (err: any) {
+      console.error('Error updating kavithai vote count:', err);
+      if (err?.code === 'PERMISSION_DENIED') {
+        throw new Error('Permission denied. Unable to update vote count.');
+      }
+      throw new Error(`Failed to update vote count: ${err?.message || 'Unknown error'}`);
     }
   }
 }

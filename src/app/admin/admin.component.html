@@ -13,25 +13,29 @@
 
   <div class="admin-content">
     <div class="header-section">
-      <h1>All Boards</h1>
+      <h1>Admin Dashboard</h1>
       <p>Manage boards, competition entries, and user accounts</p>
     </div>
 
-    <!-- Loading State -->
-    <div *ngIf="loading" class="loading-container">
-      <mat-spinner diameter="50"></mat-spinner>
-      <p>Loading boards...</p>
-    </div>
+    <mat-tab-group [(selectedIndex)]="selectedTabIndex" (selectedIndexChange)="onTabChange($event)">
+      <!-- Boards Tab -->
+      <mat-tab label="Boards">
+        <div class="tab-content">
+          <!-- Loading State -->
+          <div *ngIf="loading" class="loading-container">
+            <mat-spinner diameter="50"></mat-spinner>
+            <p>Loading boards...</p>
+          </div>
 
-    <!-- Empty State -->
-    <div *ngIf="!loading && boards.length === 0" class="empty-state">
-      <mat-icon>inbox</mat-icon>
-      <p>No boards found</p>
-      <p style="font-size: 14px; color: #999; margin-top: 8px;">There are no boards in the database yet.</p>
-    </div>
+          <!-- Empty State -->
+          <div *ngIf="!loading && boards.length === 0" class="empty-state">
+            <mat-icon>inbox</mat-icon>
+            <p>No boards found</p>
+            <p style="font-size: 14px; color: #999; margin-top: 8px;">There are no boards in the database yet.</p>
+          </div>
 
-    <!-- Boards Table -->
-    <div *ngIf="!loading && boards && boards.length > 0" class="boards-table-container">
+          <!-- Boards Table -->
+          <div *ngIf="!loading && boards && boards.length > 0" class="boards-table-container">
       <div class="boards-count">
         <strong>{{ boards.length }}</strong> board(s) found
       </div>
@@ -125,6 +129,180 @@
         <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
       </table>
     </div>
+        </div>
+      </mat-tab>
+
+      <!-- Competition Tab -->
+      <mat-tab label="Competition">
+        <div class="tab-content">
+          <div class="header-section">
+            <h2>Kavithai Competition Entries</h2>
+            <button mat-raised-button color="primary" (click)="loadKavithai()" [disabled]="loadingKavithai">
+              <mat-icon>refresh</mat-icon>
+              Refresh
+            </button>
+          </div>
+
+          <!-- Loading State -->
+          <div *ngIf="loadingKavithai" class="loading-container">
+            <mat-spinner diameter="50"></mat-spinner>
+            <p>Loading kavithai entries...</p>
+          </div>
+
+          <!-- Empty State -->
+          <div *ngIf="!loadingKavithai && kavithaiList.length === 0" class="empty-state">
+            <mat-icon>inbox</mat-icon>
+            <p>No kavithai entries found</p>
+          </div>
+
+          <!-- Kavithai Table -->
+          <div *ngIf="!loadingKavithai && kavithaiList.length > 0" class="kavithai-table-container">
+            <div class="kavithai-count">
+              <strong>{{ kavithaiList.length }}</strong> kavithai entry/entries found
+              <span *ngIf="selectedKavithai.size > 0" class="selected-count">
+                ({{ selectedKavithai.size }} selected)
+              </span>
+            </div>
+            <div *ngIf="selectedKavithai.size > 0" class="bulk-actions">
+              <button mat-raised-button color="warn" (click)="deleteSelectedKavithai()">
+                <mat-icon>delete</mat-icon>
+                Delete Selected ({{ selectedKavithai.size }})
+              </button>
+            </div>
+            <table mat-table [dataSource]="kavithaiList" class="kavithai-table">
+              <!-- Select Column -->
+              <ng-container matColumnDef="select">
+                <th mat-header-cell *matHeaderCellDef>
+                  <mat-checkbox
+                    [checked]="isAllSelected()"
+                    [indeterminate]="isSomeSelected()"
+                    (change)="toggleSelectAll()"
+                    aria-label="Select all"
+                  ></mat-checkbox>
+                </th>
+                <td mat-cell *matCellDef="let kavithai">
+                  <mat-checkbox
+                    [checked]="isKavithaiSelected(kavithai.id)"
+                    (change)="toggleKavithaiSelection(kavithai.id)"
+                    aria-label="Select kavithai"
+                  ></mat-checkbox>
+                </td>
+              </ng-container>
+
+              <!-- ID Column -->
+              <ng-container matColumnDef="id">
+                <th mat-header-cell *matHeaderCellDef>ID</th>
+                <td mat-cell *matCellDef="let kavithai">
+                  <code class="kavithai-id">{{ kavithai.id }}</code>
+                </td>
+              </ng-container>
+
+              <!-- Email Column -->
+              <ng-container matColumnDef="email">
+                <th mat-header-cell *matHeaderCellDef>Email</th>
+                <td mat-cell *matCellDef="let kavithai">
+                  {{ kavithai.email }}
+                </td>
+              </ng-container>
+
+              <!-- Content Column -->
+              <ng-container matColumnDef="content">
+                <th mat-header-cell *matHeaderCellDef>Content</th>
+                <td mat-cell *matCellDef="let kavithai">
+                  <div class="kavithai-content-preview" [innerHTML]="kavithai.content"></div>
+                </td>
+              </ng-container>
+
+              <!-- Votes Column -->
+              <ng-container matColumnDef="votes">
+                <th mat-header-cell *matHeaderCellDef>Votes</th>
+                <td mat-cell *matCellDef="let kavithai">
+                  <div class="vote-controls">
+                    <button mat-icon-button (click)="updateVoteCount(kavithai.id, kavithai.voteCount - 1)" matTooltip="Decrease votes">
+                      <mat-icon>remove</mat-icon>
+                    </button>
+                    <button mat-icon-button (click)="setVoteCount(kavithai.id)" matTooltip="Set vote count" class="set-votes-btn">
+                      <span class="vote-count-display">{{ kavithai.voteCount }}</span>
+                    </button>
+                    <button mat-icon-button (click)="updateVoteCount(kavithai.id, kavithai.voteCount + 1)" matTooltip="Increase votes">
+                      <mat-icon>add</mat-icon>
+                    </button>
+                    <button mat-icon-button (click)="updateVoteCount(kavithai.id, 0)" matTooltip="Clear votes" class="clear-votes-btn">
+                      <mat-icon>clear</mat-icon>
+                    </button>
+                  </div>
+                </td>
+              </ng-container>
+
+              <!-- Duplicate Column -->
+              <ng-container matColumnDef="duplicate">
+                <th mat-header-cell *matHeaderCellDef>Duplicate</th>
+                <td mat-cell *matCellDef="let kavithai">
+                  <mat-chip-set>
+                    <mat-chip [class.duplicate]="kavithai.isDuplicate">
+                      {{ kavithai.isDuplicate ? 'Yes' : 'No' }}
+                    </mat-chip>
+                  </mat-chip-set>
+                </td>
+              </ng-container>
+
+              <!-- Invalid Column -->
+              <ng-container matColumnDef="invalid">
+                <th mat-header-cell *matHeaderCellDef>Invalid</th>
+                <td mat-cell *matCellDef="let kavithai">
+                  <mat-chip-set>
+                    <mat-chip [class.invalid]="kavithai.isInvalid">
+                      {{ kavithai.isInvalid ? 'Yes' : 'No' }}
+                    </mat-chip>
+                  </mat-chip-set>
+                </td>
+              </ng-container>
+
+              <!-- Actions Column -->
+              <ng-container matColumnDef="actions">
+                <th mat-header-cell *matHeaderCellDef>Actions</th>
+                <td mat-cell *matCellDef="let kavithai">
+                  <button
+                    mat-icon-button
+                    [matMenuTriggerFor]="kavithaiMenu"
+                    matTooltip="Actions"
+                  >
+                    <mat-icon>more_vert</mat-icon>
+                  </button>
+                  <mat-menu #kavithaiMenu="matMenu">
+                    <button
+                      mat-menu-item
+                      (click)="markAsDuplicate(kavithai.id, !kavithai.isDuplicate)"
+                    >
+                      <mat-icon>{{ kavithai.isDuplicate ? 'check_circle' : 'cancel' }}</mat-icon>
+                      <span>{{ kavithai.isDuplicate ? 'Remove Duplicate Mark' : 'Mark as Duplicate' }}</span>
+                    </button>
+                    <button
+                      mat-menu-item
+                      (click)="markAsInvalid(kavithai.id, !kavithai.isInvalid)"
+                    >
+                      <mat-icon>{{ kavithai.isInvalid ? 'check_circle' : 'error' }}</mat-icon>
+                      <span>{{ kavithai.isInvalid ? 'Remove Invalid Mark' : 'Mark as Invalid' }}</span>
+                    </button>
+                    <button
+                      mat-menu-item
+                      (click)="deleteKavithai(kavithai.id)"
+                      class="delete-action"
+                    >
+                      <mat-icon>delete</mat-icon>
+                      <span>Delete Entry</span>
+                    </button>
+                  </mat-menu>
+                </td>
+              </ng-container>
+
+              <tr mat-header-row *matHeaderRowDef="displayedKavithaiColumns"></tr>
+              <tr mat-row *matRowDef="let row; columns: displayedKavithaiColumns"></tr>
+            </table>
+          </div>
+        </div>
+      </mat-tab>
+    </mat-tab-group>
   </div>
 </div>
 

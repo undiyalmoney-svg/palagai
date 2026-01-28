@@ -83,6 +83,51 @@
       </div>
 
       <div class="form-group">
+        <label class="input-label">City</label>
+        <mat-form-field appearance="outline" class="full-width">
+          <input
+            matInput
+            type="text"
+            placeholder="Enter your city"
+            formControlName="city"
+          />
+          <mat-error *ngIf="signupForm.controls['city'].errors?.['required'] && signupForm.controls['city'].touched">
+            City is required
+          </mat-error>
+        </mat-form-field>
+      </div>
+
+      <div class="form-group">
+        <label class="input-label">State</label>
+        <mat-form-field appearance="outline" class="full-width">
+          <input
+            matInput
+            type="text"
+            placeholder="Enter your state"
+            formControlName="state"
+          />
+          <mat-error *ngIf="signupForm.controls['state'].errors?.['required'] && signupForm.controls['state'].touched">
+            State is required
+          </mat-error>
+        </mat-form-field>
+      </div>
+
+      <div class="form-group">
+        <label class="input-label">Country</label>
+        <mat-form-field appearance="outline" class="full-width">
+          <input
+            matInput
+            type="text"
+            placeholder="Enter your country"
+            formControlName="country"
+          />
+          <mat-error *ngIf="signupForm.controls['country'].errors?.['required'] && signupForm.controls['country'].touched">
+            Country is required
+          </mat-error>
+        </mat-form-field>
+      </div>
+
+      <div class="form-group">
         <label class="input-label">Security Question</label>
         <mat-form-field appearance="outline" class="full-width">
           <mat-select formControlName="securityQuestion">

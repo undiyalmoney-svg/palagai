@@ -1,5 +1,6 @@
 import { Component, OnInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { RouterLink } from '@angular/router';
 import { Board, BoardService } from '../board.service';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
@@ -50,6 +51,7 @@ interface CompetitionBoard {
   standalone: true,
   imports: [
     CommonModule,
+    RouterLink,
     MatCardModule,
     MatButtonModule,
     MatIconModule,
@@ -93,27 +95,18 @@ export class Competition implements OnInit, OnDestroy {
   }
 
   private async loadCompetitionBoards() {
-    console.log('🚀 Starting to load competition boards...');
     this.loading = true;
     this.boards = [];
     this.cdr.detectChanges();
 
-    // Set a timeout to prevent infinite loading
-    let timeoutId: ReturnType<typeof setTimeout> | null = setTimeout(() => {
-      if (this.loading) {
-        console.warn('⚠️ Loading timeout - forcing completion');
-        this.loading = false;
-        this.boards = [];
-        this.cdr.detectChanges();
-      }
-    }, 8000); // 8 second timeout
-
     try {
-      // Get or create user ID for identification (from localStorage)
+      // Get or create user ID for identification (from localStorage) - non-blocking
       if (typeof window !== 'undefined') {
         this.userIP = localStorage.getItem(USER_ANALYTICS_ID) || 
           `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        localStorage.setItem(USER_ANALYTICS_ID, this.userIP);
+        if (!localStorage.getItem(USER_ANALYTICS_ID)) {
+          localStorage.setItem(USER_ANALYTICS_ID, this.userIP);
+        }
         
         // Load voted boards from localStorage (obfuscated key)
         try {
@@ -130,10 +123,10 @@ export class Competition implements OnInit, OnDestroy {
         this.userIP = 'unknown';
       }
 
-      // Get all competition boards with timeout
+      // Get all competition boards (reduced timeout to 3 seconds)
       const competitionBoardsPromise = this.boardsService.getCompetitionBoards();
       const timeoutPromise = new Promise<never>((_, reject) => 
-        setTimeout(() => reject(new Error('Request timeout')), 5000)
+        setTimeout(() => reject(new Error('Request timeout')), 3000)
       );
       
       const competitionBoards = await Promise.race([competitionBoardsPromise, timeoutPromise]);
@@ -141,21 +134,25 @@ export class Competition implements OnInit, OnDestroy {
       if (competitionBoards.length === 0) {
         this.loading = false;
         this.cdr.detectChanges();
-        if (timeoutId) {
-          clearTimeout(timeoutId);
-        }
         return;
       }
 
-      // Process boards quickly without additional Firebase calls
-      const boardsWithVotes: CompetitionBoard[] = [];
-      
-      for (const { boardKey, board } of competitionBoards) {
-        try {
-          // Get vote count from board data
-          const voteCount = board.voteCount || 0;
+      // Process boards quickly - build array first, then subscribe async
+      const boardsWithVotes: CompetitionBoard[] = competitionBoards.map(({ boardKey, board }) => ({
+        boardKey,
+        board,
+        voteCount: board.voteCount || 0,
+      }));
 
-          // Subscribe to real-time vote count updates (non-blocking)
+      // Sort by vote count (descending)
+      boardsWithVotes.sort((a, b) => b.voteCount - a.voteCount);
+      this.boards = boardsWithVotes;
+      this.loading = false;
+      this.cdr.detectChanges();
+      
+      // Subscribe to vote count updates asynchronously (non-blocking)
+      Promise.all(competitionBoards.map(({ boardKey }) => {
+        return new Promise<void>((resolve) => {
           try {
             const unsubscribe = this.boardsService.subscribeToVoteCount(boardKey, (count) => {
               const boardIndex = this.boards.findIndex((b) => b.boardKey === boardKey);
@@ -166,35 +163,20 @@ export class Competition implements OnInit, OnDestroy {
               }
             });
             this.voteUnsubscribes.set(boardKey, unsubscribe);
+            resolve();
           } catch (subErr) {
-            console.warn(`Could not subscribe to ${boardKey}:`, subErr);
+            resolve(); // Continue even if subscription fails
           }
-
-          boardsWithVotes.push({
-            boardKey,
-            board,
-            voteCount,
-          });
-        } catch (err) {
-          console.error(`Error processing board ${boardKey}:`, err);
-          boardsWithVotes.push({
-            boardKey,
-            board,
-            voteCount: board.voteCount || 0,
-          });
-        }
-      }
-
-      // Sort by vote count (descending)
-      boardsWithVotes.sort((a, b) => b.voteCount - a.voteCount);
-      this.boards = boardsWithVotes;
-      
-      console.log('✅ Boards loaded successfully:', this.boards.length);
-      console.log('📋 Boards data:', this.boards.map(b => ({ key: b.boardKey, votes: b.voteCount })));
+        });
+      })).catch(() => {
+        // Ignore subscription errors
+      });
       
     } catch (e: any) {
-      console.error('❌ Error loading competition boards:', e);
+      console.error('Error loading competition boards:', e);
       this.boards = [];
+      this.loading = false;
+      this.cdr.detectChanges();
       const errorMsg = e?.message || 'Error loading competition boards';
       try {
         this.snackBar.open(errorMsg, 'OK', {
@@ -202,25 +184,8 @@ export class Competition implements OnInit, OnDestroy {
           panelClass: ['error-snackbar'],
         });
       } catch (snackErr) {
-        console.error('Could not show snackbar:', snackErr);
+        // Ignore snackbar errors
       }
-    } finally {
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-        timeoutId = null;
-      }
-      // Ensure loading is false and trigger change detection
-      if (this.loading) {
-        console.log('🏁 Setting loading to false in finally. Boards count:', this.boards.length);
-        this.loading = false;
-      }
-      console.log('📊 Final state - loading:', this.loading, 'boards:', this.boards.length);
-      
-      // Use setTimeout to ensure change detection happens after all async operations
-      setTimeout(() => {
-        this.cdr.detectChanges();
-        console.log('🔄 Change detection triggered in setTimeout');
-      }, 0);
     }
   }
 
@@ -275,10 +240,7 @@ export class Competition implements OnInit, OnDestroy {
   }
 
   getBoardLink(boardKey: string): string {
-    if (typeof window === 'undefined') {
-      return '';
-    }
-    return `${window.location.origin}/?id=${boardKey}`;
+    return `/board/${boardKey}`;
   }
 }
 

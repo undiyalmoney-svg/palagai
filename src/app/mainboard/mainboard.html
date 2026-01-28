@@ -1,6 +1,9 @@
 <mat-toolbar color="primary" class="mainboard-toolbar">
   <div class="toolbar-content">
     <div class="toolbar-left">
+      <button mat-icon-button routerLink="/" class="home-btn" aria-label="Home" title="Home">
+        <mat-icon>home</mat-icon>
+      </button>
       <button mat-icon-button (click)="handleBackNavigation()" class="back-btn">
         <mat-icon>arrow_back</mat-icon>
       </button>
@@ -57,19 +60,6 @@
         </div>
       </div>
       <div class="board-header-right">
-        <button 
-          #competitionHeartBtn
-          id="competitionHeartBtn"
-          mat-icon-button 
-          (click)="openCompetitionDialog()" 
-          [disabled]="loading"
-          class="header-icon-btn competition-heart-btn"
-          [class.submitted]="competitionSubmissionControl.value"
-          aria-label="Submit for Kavithai Competition"
-          title="Submit for Kavithai Competition"
-        >
-          <mat-icon>{{ competitionSubmissionControl.value ? 'favorite' : 'favorite_border' }}</mat-icon>
-        </button>
         <button 
           mat-icon-button 
           (click)="openPreview()" 

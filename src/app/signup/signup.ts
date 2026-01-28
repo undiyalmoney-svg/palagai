@@ -74,6 +74,9 @@ export class Signup implements OnInit, OnDestroy {
       password: ['', [Validators.required, Validators.minLength(6)]],
       gender: ['', Validators.required],
       dateOfBirth: ['', Validators.required],
+      city: ['', Validators.required],
+      state: ['', Validators.required],
+      country: ['', Validators.required],
       securityQuestion: ['', Validators.required],
       securityAnswer: ['', Validators.required],
     });
@@ -134,6 +137,9 @@ export class Signup implements OnInit, OnDestroy {
       const passwordHash = await hashPassword(password);
       const gender = this.signupForm.value.gender!;
       const dateOfBirth = this.signupForm.value.dateOfBirth as Date;
+      const city = this.signupForm.value.city!.trim();
+      const state = this.signupForm.value.state!.trim();
+      const country = this.signupForm.value.country!.trim();
       const securityQuestion = this.signupForm.value.securityQuestion!;
       const securityAnswer = this.signupForm.value.securityAnswer!.trim();
       const securityAnswerHash = await hashPassword(securityAnswer.toLowerCase());
@@ -151,6 +157,9 @@ export class Signup implements OnInit, OnDestroy {
       const record = await this.boards.createUser(email, passwordHash, {
         gender: gender,
         dateOfBirth: dateOfBirth.toISOString().split('T')[0], // Format as YYYY-MM-DD
+        city: city,
+        state: state,
+        country: country,
         securityQuestion: securityQuestion,
         securityAnswerHash: securityAnswerHash,
       });

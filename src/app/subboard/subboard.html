@@ -20,9 +20,13 @@
       <button mat-raised-button class="view-btn" (click)="openBoardIdDialog()">
         View a board
       </button>
-      <button mat-raised-button class="competition-btn" routerLink="/competition">
-        <mat-icon>star</mat-icon>
+      <button mat-raised-button class="competition-btn" routerLink="/kavithai/submit">
+        <mat-icon>edit</mat-icon>
         Kavithai Competition
+      </button>
+      <button mat-raised-button class="view-submissions-btn" routerLink="/kavithai/list">
+        <mat-icon>list</mat-icon>
+        View Submissions
       </button>
     </div>
   </div>
@@ -40,11 +44,23 @@
 
   <!-- Full page kiosk mode - Two Layer Structure -->
   <div class="kiosk-container" *ngIf="isFullPage && board" [class.board-size-min]="boardSize === 'min'" [class.board-size-normal]="boardSize === 'normal'" [class.board-size-max]="boardSize === 'max'" [class.blocked]="board && board.isBlocked === true" [class.competition-board]="isInCompetition">
-    <!-- Mobile Home Icon (Bottom Right - Mobile Only) -->
-    <div class="mobile-home-icon" *ngIf="isFullPage && !isPreviewMode">
+    <!-- Home/Back Icon (Bottom Left - Only in Full Screen, Not Preview) -->
+    <div class="home-icon-bottom-right" *ngIf="isFullPage && !isPreviewMode">
+      <!-- Show back icon if came from competition, otherwise show home icon -->
       <button
         mat-icon-button
-        class="mobile-home-btn"
+        class="home-bottom-btn"
+        *ngIf="cameFromCompetition"
+        routerLink="/competition"
+        aria-label="Back to competition"
+        title="Back to competition"
+      >
+        <mat-icon>arrow_back</mat-icon>
+      </button>
+      <button
+        mat-icon-button
+        class="home-bottom-btn"
+        *ngIf="!cameFromCompetition"
         (click)="toggleFullPage()"
         aria-label="Back to home"
         title="Back to home"
@@ -53,6 +69,19 @@
       </button>
     </div>
     
+    <!-- Home Icon (Top Left - Preview Mode) -->
+    <div class="home-icon-top-left" *ngIf="isPreviewMode">
+      <button
+        mat-icon-button
+        class="home-top-btn"
+        routerLink="/"
+        aria-label="Back to home"
+        title="Back to home"
+      >
+        <mat-icon>home</mat-icon>
+      </button>
+    </div>
+
     <!-- Vote Section (Top Left for Web, Top Center for Mobile) - Always Visible for Competition -->
     <div class="kiosk-vote-section" *ngIf="isInCompetition && isFullPage">
       <div class="vote-info-display">

@@ -116,6 +116,22 @@
   flex: 1;
 }
 
+.home-btn {
+  color: #111111;
+}
+
+.home-btn:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.back-btn {
+  color: #111111;
+}
+
+.back-btn:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
 .toolbar-logo {
   width: 32px;
   height: 32px;

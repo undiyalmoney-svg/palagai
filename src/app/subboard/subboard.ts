@@ -2,6 +2,8 @@ import { Component, OnInit, ChangeDetectorRef, AfterViewInit, OnDestroy, ViewChi
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators, FormControl } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { Subscription } from 'rxjs';
+import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
 import { Board, BoardService } from '../board.service';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatButtonModule } from '@angular/material/button';
@@ -86,12 +88,16 @@ export class Subboard implements OnInit, AfterViewInit, OnDestroy {
   private isScrolling = false;
   private scrollDirection: 'down' | 'up' = 'down';
   private boardUnsubscribe?: () => void; // Firebase listener unsubscribe function
+  private queryParamsSubscription?: Subscription; // Query params subscription
+  private lastLoadedBoardId: string | null = null; // Track last loaded board to prevent duplicates
+  private hasShownLoadSuccess: boolean = false; // Track if success message already shown for current load
   currentBoardKey: string | null = null; // Store current board key for voting
   voteCount: number = 0;
   isVoting: boolean = false;
   userIP: string = '';
   isInCompetition: boolean = false; // Property instead of getter to avoid NG0100
   hasVotedInSession: boolean = false; // Track if user voted in current session
+  cameFromCompetition: boolean = false; // Track if user came from competition page
 
   readonly defaultHtml = '<p>Enter a board ID and load a Palagai board.</p>';
   readonly backgroundImageUrl = '/doodle-background.png';
@@ -135,8 +141,31 @@ export class Subboard implements OnInit, AfterViewInit, OnDestroy {
     // Initialize dummy localStorage keys
     initializeDummyLocalStorage();
     
+    // Check query params synchronously first (before subscription) to prevent landing page flash
+    const snapshotParams = this.route.snapshot.queryParams;
+    const boardIdFromSnapshot = snapshotParams['id'];
+    const fromCompetitionSnapshot = snapshotParams['from'] === 'competition';
+    const isPreviewSnapshot = snapshotParams['preview'] === 'true';
+    const previewContentSnapshot = snapshotParams['content'];
+    
+    // Handle preview mode synchronously (no landing page flash)
+    if (isPreviewSnapshot && previewContentSnapshot) {
+      this.showLandingPage = false;
+      this.isPreviewMode = true;
+      // Preview mode will be handled in subscription, but we prevent landing page flash
+    }
+    // If board ID exists in URL, redirect to new fullscreen route
+    else if (boardIdFromSnapshot && typeof boardIdFromSnapshot === 'string' && boardIdFromSnapshot.trim()) {
+      const trimmedId = boardIdFromSnapshot.trim();
+      // Redirect to new fullscreen board route
+      this.router.navigate(['/board', trimmedId]);
+    }
+    
     // Check for preview mode first
-    this.route.queryParams.subscribe(params => {
+    // Use debounce to prevent multiple rapid fires (only for subsequent changes)
+    this.queryParamsSubscription = this.route.queryParams.pipe(
+      debounceTime(150)
+    ).subscribe(params => {
       const isPreview = params['preview'] === 'true';
       const previewContent = params['content'];
       
@@ -172,49 +201,62 @@ export class Subboard implements OnInit, AfterViewInit, OnDestroy {
           (this as any).previewBoardKey = boardKeyFromQuery;
         }
         
-        // Auto-enter full page mode for preview
-        setTimeout(() => {
-          this.isFullPage = true;
-          if (typeof window !== 'undefined') {
-            document.body.style.overflow = 'hidden';
-            document.body.style.margin = '0';
-            document.body.style.padding = '0';
-            document.documentElement.style.overflow = 'hidden';
-          }
-          this.cdr.detectChanges();
-          setTimeout(() => this.startAutoScroll(), 500);
-        }, 100);
+        // Auto-enter full page mode for preview immediately
+        this.isFullPage = true;
+        if (typeof window !== 'undefined') {
+          document.body.style.overflow = 'hidden';
+          document.body.style.margin = '0';
+          document.body.style.padding = '0';
+          document.documentElement.style.overflow = 'hidden';
+        }
+        this.cdr.detectChanges();
+        
+        // Start auto-scroll immediately
+        this.startAutoScroll();
         return;
       }
 
       // Normal mode - check for board ID
       const boardIdFromQuery = params['id'];
+      const fromCompetition = params['from'] === 'competition';
+      
+      // Check if user came from competition page (via query param or referrer)
+      if (typeof window !== 'undefined') {
+        const referrer = document.referrer || '';
+        this.cameFromCompetition = fromCompetition || referrer.includes('/competition');
+      }
+      
       if (boardIdFromQuery && typeof boardIdFromQuery === 'string' && boardIdFromQuery.trim()) {
-        // Set the board ID in the form
-        this.form.patchValue({ boardId: boardIdFromQuery.trim() });
-        // Mark that we're loading from query param
-        this.loadingFromQueryParam = true;
-        // Auto-load the board (size will be loaded from DB)
-        this.loadBoardFromQuery(boardIdFromQuery.trim());
-        this.showLandingPage = false;
+        const trimmedId = boardIdFromQuery.trim();
+        // Redirect to new fullscreen board route
+        this.router.navigate(['/board', trimmedId]);
       } else {
         // No query param, show landing page
         this.loadingFromQueryParam = false;
         this.showLandingPage = true;
         this.boardSize = 'normal'; // Default size
+        // Ensure body overflow is hidden when showing landing page
+        if (typeof window !== 'undefined') {
+          document.body.style.overflow = 'hidden';
+          document.body.style.margin = '0';
+          document.body.style.padding = '0';
+          document.documentElement.style.overflow = 'hidden';
+        }
         this.initializeFromSessionStorage();
       }
     });
   }
 
   private async loadBoardFromQuery(boardId: string) {
-    // Prevent multiple simultaneous loads
-    if (this.loading) {
+    // Prevent multiple simultaneous loads or loading the same board
+    if (this.loading || (this.lastLoadedBoardId === boardId && this.board)) {
       return;
     }
 
     // Set loading state
     this.loading = true;
+    this.lastLoadedBoardId = boardId; // Track loaded board
+    this.hasShownLoadSuccess = false; // Reset success message flag
     this.error = '';
     this.board = null;
     this._lastUpdated = null;
@@ -275,46 +317,51 @@ export class Subboard implements OnInit, AfterViewInit, OnDestroy {
       this.loading = false;
       this.showLandingPage = false; // Hide landing page when board is loaded
       
-      // Set competition status (defer to avoid NG0100)
-      setTimeout(() => {
-        this.isInCompetition = !!(result.isSubmittedForCompetition);
-        if (this.isInCompetition) {
-          this.initializeVoting(boardId);
-        }
-        this.cdr.detectChanges();
-      }, 0);
+      // Set competition status immediately
+      this.isInCompetition = !!(result.isSubmittedForCompetition);
+      if (this.isInCompetition) {
+        // Initialize voting asynchronously (non-blocking)
+        this.initializeVoting(boardId).catch(() => {
+          // Ignore errors
+        });
+      }
       
       // Re-enable form controls
       this.boardIdControl.enable();
       this.emailControl.enable();
       this.cdr.markForCheck();
       
-      // Set up real-time listener for board updates
+      // Set up real-time listener for board updates (non-blocking)
       this.setupRealtimeListener(boardId);
       
-      // Auto-enter full page mode when loading from query param
-      setTimeout(() => {
-        this.isFullPage = true;
-        if (typeof window !== 'undefined') {
-          document.body.style.overflow = 'hidden';
-          document.body.style.margin = '0';
-          document.body.style.padding = '0';
-          document.documentElement.style.overflow = 'hidden';
-        }
-        this.cdr.detectChanges();
-        setTimeout(() => this.startAutoScroll(), 500);
-      }, 100);
+      // Auto-enter full page mode immediately when loading from query param
+      this.isFullPage = true;
+      if (typeof window !== 'undefined') {
+        document.body.style.overflow = 'hidden';
+        document.body.style.margin = '0';
+        document.body.style.padding = '0';
+        document.documentElement.style.overflow = 'hidden';
+      }
+      this.cdr.detectChanges();
+      
+      // Start auto-scroll immediately
+      this.startAutoScroll();
 
-      this.snackBar.open('Board loaded successfully!', 'OK', {
-        duration: 3000,
-        panelClass: ['success-snackbar'],
-      });
+      // Only show success message once per board load
+      if (!this.hasShownLoadSuccess) {
+        this.hasShownLoadSuccess = true;
+        this.snackBar.open('Board loaded successfully!', 'OK', {
+          duration: 3000,
+          panelClass: ['success-snackbar'],
+        });
+      }
     } catch (e: any) {
       const errorMsg = e?.message || 'Error loading board. Please check the board ID and try again.';
       this.error = errorMsg;
       this.board = null;
       this._lastUpdated = null;
       this.loading = false;
+      this.hasShownLoadSuccess = false; // Reset on error
       // Re-enable form controls
       this.boardIdControl.enable();
       this.emailControl.enable();
@@ -637,6 +684,13 @@ export class Subboard implements OnInit, AfterViewInit, OnDestroy {
         this.showEmailInput = false;
         this.loading = false;
         this.showLandingPage = true; // Show landing page again on error
+        // Ensure body overflow is hidden when showing landing page
+        if (typeof window !== 'undefined') {
+          document.body.style.overflow = 'hidden';
+          document.body.style.margin = '0';
+          document.body.style.padding = '0';
+          document.documentElement.style.overflow = 'hidden';
+        }
         this.cdr.markForCheck();
         this.snackBar.open(errorMsg, 'OK', {
           duration: 4000,
@@ -664,6 +718,13 @@ export class Subboard implements OnInit, AfterViewInit, OnDestroy {
         this._lastUpdated = null;
         this.loading = false;
         this.showLandingPage = true; // Show landing page again on error
+        // Ensure body overflow is hidden when showing landing page
+        if (typeof window !== 'undefined') {
+          document.body.style.overflow = 'hidden';
+          document.body.style.margin = '0';
+          document.body.style.padding = '0';
+          document.documentElement.style.overflow = 'hidden';
+        }
         this.cdr.markForCheck();
         this.snackBar.open(errorMsg, 'OK', {
           duration: 5000,
@@ -672,56 +733,24 @@ export class Subboard implements OnInit, AfterViewInit, OnDestroy {
         return;
       }
 
-      // Success - update state
-      this.board = result;
-      this.currentBoardKey = trimmedId; // Set board key for voting
-      this._lastUpdated = result.message?.updatedAt ?? null;
-      // Load board size from database
-      this.boardSize = result.boardSize || 'normal';
-      this.savedBoardSize = this.boardSize; // Track saved board size
-      this.saveToSessionStorage(trimmedId);
-      this.error = '';
-      this.loading = false;
-      this.showLandingPage = false; // Hide landing page when board is loaded
-      
-      // Set competition status (defer to avoid NG0100)
-      setTimeout(() => {
-        this.isInCompetition = !!(result.isSubmittedForCompetition);
-        if (this.isInCompetition) {
-          this.initializeVoting(trimmedId);
-        }
-        this.cdr.detectChanges();
-      }, 0);
-      
-      this.cdr.markForCheck();
-      
-      // Set up real-time listener for board updates
-      this.setupRealtimeListener(trimmedId);
-      
-      // Auto-enter full page mode (always go to full view)
-      setTimeout(() => {
-        this.isFullPage = true;
-        if (typeof window !== 'undefined') {
-          document.body.style.overflow = 'hidden';
-          document.body.style.margin = '0';
-          document.body.style.padding = '0';
-          document.documentElement.style.overflow = 'hidden';
-        }
-        this.cdr.detectChanges();
-        setTimeout(() => this.startAutoScroll(), 500);
-      }, 100);
-
-      this.snackBar.open('Board loaded successfully!', 'OK', {
-        duration: 3000,
-        panelClass: ['success-snackbar'],
-      });
+      // Success - redirect to fullscreen board component
+      // (Protected boards with email are already authorized at this point)
+      this.router.navigate(['/board', trimmedId]);
     } catch (e: any) {
       const errorMsg = e?.message || 'Error loading board. Please check the board ID and try again.';
       this.error = errorMsg;
       this.board = null;
       this._lastUpdated = null;
       this.loading = false;
+      this.hasShownLoadSuccess = false; // Reset on error
       this.showLandingPage = true; // Show landing page again on error
+      // Ensure body overflow is hidden when showing landing page
+      if (typeof window !== 'undefined') {
+        document.body.style.overflow = 'hidden';
+        document.body.style.margin = '0';
+        document.body.style.padding = '0';
+        document.documentElement.style.overflow = 'hidden';
+      }
       this.cdr.markForCheck();
       this.snackBar.open(errorMsg, 'OK', {
         duration: 4000,
@@ -731,6 +760,13 @@ export class Subboard implements OnInit, AfterViewInit, OnDestroy {
   }
 
   ngAfterViewInit() {
+    // Ensure body overflow is hidden when landing page is shown
+    if (this.showLandingPage && typeof window !== 'undefined') {
+      document.body.style.overflow = 'hidden';
+      document.body.style.margin = '0';
+      document.body.style.padding = '0';
+      document.documentElement.style.overflow = 'hidden';
+    }
     // Start auto-scroll when view is initialized
     setTimeout(() => this.startAutoScroll(), 1000);
   }
@@ -742,6 +778,13 @@ export class Subboard implements OnInit, AfterViewInit, OnDestroy {
       this.boardUnsubscribe();
       this.boardUnsubscribe = undefined;
     }
+    // Clean up query params subscription
+    if (this.queryParamsSubscription) {
+      this.queryParamsSubscription.unsubscribe();
+      this.queryParamsSubscription = undefined;
+    }
+    // Reset tracking
+    this.lastLoadedBoardId = null;
   }
 
   toggleFullPage() {
@@ -750,18 +793,23 @@ export class Subboard implements OnInit, AfterViewInit, OnDestroy {
       this.isFullPage = false;
       this.showLandingPage = true;
       this.board = null; // Clear board to show landing page
-      document.body.style.overflow = '';
-      document.body.style.margin = '';
-      document.body.style.padding = '';
-      document.documentElement.style.overflow = '';
+      // Keep body overflow hidden when showing landing page to prevent scrollbar
+      if (typeof window !== 'undefined') {
+        document.body.style.overflow = 'hidden';
+        document.body.style.margin = '0';
+        document.body.style.padding = '0';
+        document.documentElement.style.overflow = 'hidden';
+      }
       this.stopAutoScroll();
     } else {
       // Enter full page
       this.isFullPage = true;
-      document.body.style.overflow = 'hidden';
-      document.body.style.margin = '0';
-      document.body.style.padding = '0';
-      document.documentElement.style.overflow = 'hidden';
+      if (typeof window !== 'undefined') {
+        document.body.style.overflow = 'hidden';
+        document.body.style.margin = '0';
+        document.body.style.padding = '0';
+        document.documentElement.style.overflow = 'hidden';
+      }
       // Start auto-scroll when entering full page
       setTimeout(() => this.startAutoScroll(), 500);
     }
@@ -897,10 +945,23 @@ export class Subboard implements OnInit, AfterViewInit, OnDestroy {
               }
             }
 
-            // Update board data
+            // Prevent duplicate updates - only update if content actually changed
             const previousUpdatedAt = this._lastUpdated;
+            const newUpdatedAt = updatedBoard.message?.updatedAt ?? null;
+            
+            // Skip update if it's the same data (prevent duplicate renders)
+            if (previousUpdatedAt === newUpdatedAt && this.board && this.board.message?.html === updatedBoard.message?.html) {
+              // Only update vote count if it changed
+              if (this.isInCompetition && this.voteCount !== (updatedBoard.voteCount || 0)) {
+                this.voteCount = updatedBoard.voteCount || 0;
+                this.cdr.markForCheck();
+              }
+              return; // No need to update if content is the same
+            }
+            
+            // Update board data
             this.board = updatedBoard;
-            this._lastUpdated = updatedBoard.message?.updatedAt ?? null;
+            this._lastUpdated = newUpdatedAt;
             
             // Update competition status synchronously
             this.isInCompetition = !!(updatedBoard.isSubmittedForCompetition);

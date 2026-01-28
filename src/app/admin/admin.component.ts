@@ -14,7 +14,13 @@ import { MatDialogModule, MatDialog } from '@angular/material/dialog';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatTabsModule } from '@angular/material/tabs';
+import { MatInputModule } from '@angular/material/input';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatCheckboxModule } from '@angular/material/checkbox';
+import { FormsModule } from '@angular/forms';
 import { Subscription } from 'rxjs';
+import { Kavithai } from '../board.service';
 
 interface BoardRow {
   boardKey: string;
@@ -38,14 +44,24 @@ interface BoardRow {
     MatProgressSpinnerModule,
     MatMenuModule,
     MatTooltipModule,
+    MatTabsModule,
+    MatInputModule,
+    MatFormFieldModule,
+    MatCheckboxModule,
+    FormsModule,
   ],
   templateUrl: './admin.component.html',
   styleUrl: './admin.component.css',
 })
 export class AdminComponent implements OnInit, OnDestroy, AfterViewInit {
   boards: BoardRow[] = [];
+  kavithaiList: Kavithai[] = [];
   loading = true;
+  loadingKavithai = false;
+  selectedTabIndex = 0;
   displayedColumns: string[] = ['boardKey', 'ownerEmail', 'status', 'competition', 'actions'];
+  displayedKavithaiColumns: string[] = ['select', 'id', 'email', 'content', 'votes', 'duplicate', 'invalid', 'actions'];
+  selectedKavithai = new Set<string>();
   private boardsSubscription?: Subscription;
 
   constructor(
@@ -63,12 +79,14 @@ export class AdminComponent implements OnInit, OnDestroy, AfterViewInit {
       return;
     }
     // Don't load boards here - wait for AfterViewInit
+    console.log('[Admin] Component initialized, selectedTabIndex:', this.selectedTabIndex);
   }
 
   ngAfterViewInit() {
     // Load boards AFTER view is initialized to avoid change detection errors
     if (this.admin.isAdminLoggedIn()) {
       this.loadBoards();
+      this.loadKavithai();
     }
   }
 
@@ -223,7 +241,222 @@ export class AdminComponent implements OnInit, OnDestroy, AfterViewInit {
   viewBoard(boardKey: string) {
     // Navigate to home page with board ID query param
     // The subboard component will automatically load the board and enter full screen mode
-    this.router.navigate(['/'], { queryParams: { id: boardKey } });
+    this.router.navigate(['/board', boardKey]);
+  }
+
+  async loadKavithai() {
+    this.loadingKavithai = true;
+    try {
+      this.kavithaiList = await this.boardsService.getAllKavithai();
+      this.loadingKavithai = false;
+      this.cdr.markForCheck();
+    } catch (err: any) {
+      console.error('[Admin] Error loading kavithai:', err);
+      this.snackBar.open(
+        err?.message || 'Failed to load kavithai entries.',
+        'OK',
+        {
+          duration: 5000,
+          panelClass: ['error-snackbar'],
+        }
+      );
+      this.kavithaiList = [];
+      this.loadingKavithai = false;
+      this.cdr.markForCheck();
+    }
+  }
+
+  async deleteKavithai(kavithaiId: string) {
+    const kavithai = this.kavithaiList.find(k => k.id === kavithaiId);
+    if (!confirm(`Are you sure you want to delete this kavithai entry?\n\nID: ${kavithaiId}\nEmail: ${kavithai?.email || 'N/A'}\n\nThis action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      await this.boardsService.deleteKavithai(kavithaiId);
+      this.snackBar.open('Kavithai deleted successfully', 'OK', {
+        duration: 2000,
+        panelClass: ['success-snackbar'],
+      });
+      await this.loadKavithai();
+    } catch (err: any) {
+      this.snackBar.open(err?.message || 'Failed to delete kavithai', 'OK', {
+        duration: 4000,
+        panelClass: ['error-snackbar'],
+      });
+    }
+  }
+
+  async markAsDuplicate(kavithaiId: string, isDuplicate: boolean) {
+    try {
+      await this.boardsService.markKavithaiAsDuplicate(kavithaiId, isDuplicate);
+      this.snackBar.open(
+        isDuplicate ? 'Marked as duplicate email' : 'Removed duplicate mark',
+        'OK',
+        {
+          duration: 2000,
+          panelClass: ['success-snackbar'],
+        }
+      );
+      await this.loadKavithai();
+    } catch (err: any) {
+      this.snackBar.open(err?.message || 'Failed to update duplicate status', 'OK', {
+        duration: 4000,
+        panelClass: ['error-snackbar'],
+      });
+    }
+  }
+
+  async updateVoteCount(kavithaiId: string, newCount: number) {
+    if (newCount < 0) {
+      this.snackBar.open('Vote count cannot be negative', 'OK', {
+        duration: 3000,
+        panelClass: ['error-snackbar'],
+      });
+      return;
+    }
+
+    try {
+      await this.boardsService.updateKavithaiVoteCount(kavithaiId, newCount);
+      this.snackBar.open('Vote count updated successfully', 'OK', {
+        duration: 2000,
+        panelClass: ['success-snackbar'],
+      });
+      await this.loadKavithai();
+    } catch (err: any) {
+      this.snackBar.open(err?.message || 'Failed to update vote count', 'OK', {
+        duration: 4000,
+        panelClass: ['error-snackbar'],
+      });
+    }
+  }
+
+  async setVoteCount(kavithaiId: string) {
+    const kavithai = this.kavithaiList.find(k => k.id === kavithaiId);
+    if (!kavithai) return;
+
+    const input = prompt(`Enter new vote count for ${kavithaiId}:`, kavithai.voteCount.toString());
+    if (input === null) return; // User cancelled
+
+    const newCount = parseInt(input, 10);
+    if (isNaN(newCount) || newCount < 0) {
+      this.snackBar.open('Please enter a valid number (0 or greater)', 'OK', {
+        duration: 3000,
+        panelClass: ['error-snackbar'],
+      });
+      return;
+    }
+
+    await this.updateVoteCount(kavithaiId, newCount);
+  }
+
+  async markAsInvalid(kavithaiId: string, isInvalid: boolean) {
+    try {
+      await this.boardsService.markKavithaiAsInvalid(kavithaiId, isInvalid);
+      this.snackBar.open(
+        isInvalid ? 'Marked as invalid entry' : 'Removed invalid mark',
+        'OK',
+        {
+          duration: 2000,
+          panelClass: ['success-snackbar'],
+        }
+      );
+      await this.loadKavithai();
+    } catch (err: any) {
+      this.snackBar.open(err?.message || 'Failed to update invalid status', 'OK', {
+        duration: 4000,
+        panelClass: ['error-snackbar'],
+      });
+    }
+  }
+
+  onTabChange(index: number) {
+    this.selectedTabIndex = index;
+    if (index === 1 && this.kavithaiList.length === 0 && !this.loadingKavithai) {
+      this.loadKavithai();
+    }
+    // Clear selections when switching tabs
+    this.selectedKavithai.clear();
+  }
+
+  toggleKavithaiSelection(kavithaiId: string) {
+    if (this.selectedKavithai.has(kavithaiId)) {
+      this.selectedKavithai.delete(kavithaiId);
+    } else {
+      this.selectedKavithai.add(kavithaiId);
+    }
+  }
+
+  isKavithaiSelected(kavithaiId: string): boolean {
+    return this.selectedKavithai.has(kavithaiId);
+  }
+
+  toggleSelectAll() {
+    if (this.isAllSelected()) {
+      this.selectedKavithai.clear();
+    } else {
+      this.kavithaiList.forEach(kavithai => this.selectedKavithai.add(kavithai.id));
+    }
+  }
+
+  isAllSelected(): boolean {
+    return this.kavithaiList.length > 0 && this.selectedKavithai.size === this.kavithaiList.length;
+  }
+
+  isSomeSelected(): boolean {
+    return this.selectedKavithai.size > 0 && !this.isAllSelected();
+  }
+
+  async deleteSelectedKavithai() {
+    if (this.selectedKavithai.size === 0) {
+      this.snackBar.open('Please select at least one entry to delete', 'OK', {
+        duration: 3000,
+        panelClass: ['info-snackbar'],
+      });
+      return;
+    }
+
+    const count = this.selectedKavithai.size;
+    if (!confirm(`Are you sure you want to delete ${count} kavithai entr${count === 1 ? 'y' : 'ies'}?\n\nThis action cannot be undone.`)) {
+      return;
+    }
+
+    const selectedIds = Array.from(this.selectedKavithai);
+    let successCount = 0;
+    let failCount = 0;
+
+    try {
+      for (const id of selectedIds) {
+        try {
+          await this.boardsService.deleteKavithai(id);
+          successCount++;
+        } catch (err) {
+          console.error(`Failed to delete kavithai ${id}:`, err);
+          failCount++;
+        }
+      }
+
+      this.selectedKavithai.clear();
+      
+      if (failCount === 0) {
+        this.snackBar.open(`Successfully deleted ${successCount} entr${successCount === 1 ? 'y' : 'ies'}`, 'OK', {
+          duration: 3000,
+          panelClass: ['success-snackbar'],
+        });
+      } else {
+        this.snackBar.open(`Deleted ${successCount} entr${successCount === 1 ? 'y' : 'ies'}, ${failCount} failed`, 'OK', {
+          duration: 4000,
+          panelClass: ['warning-snackbar'],
+        });
+      }
+
+      await this.loadKavithai();
+    } catch (err: any) {
+      this.snackBar.open(err?.message || 'Failed to delete selected entries', 'OK', {
+        duration: 4000,
+        panelClass: ['error-snackbar'],
+      });
+    }
   }
 }
 

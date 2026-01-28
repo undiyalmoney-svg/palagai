@@ -1,0 +1,90 @@
+<div class="kavithai-list-container">
+  <!-- Header -->
+  <mat-toolbar class="competition-header">
+    <div class="header-content">
+      <h1>
+        <mat-icon>star</mat-icon>
+        Kavithai Competition Submissions
+      </h1>
+      <div class="header-actions">
+        <button mat-raised-button color="accent" routerLink="/kavithai/submit" class="submit-btn">
+          <mat-icon>edit</mat-icon>
+          Submit Your Kavithai
+        </button>
+        <button mat-icon-button routerLink="/" class="home-btn" aria-label="Home" title="Home">
+          <mat-icon>home</mat-icon>
+        </button>
+      </div>
+    </div>
+  </mat-toolbar>
+
+  <!-- Loading State -->
+  <div class="loading-container" *ngIf="loading">
+    <mat-spinner></mat-spinner>
+    <p>Loading kavithai entries...</p>
+  </div>
+
+  <!-- Empty State -->
+  <div class="empty-state" *ngIf="!loading && allKavithai.length === 0">
+    <mat-icon>inbox</mat-icon>
+    <h2>No entries yet</h2>
+    <p>Be the first to submit your kavithai!</p>
+    <button mat-raised-button color="primary" routerLink="/kavithai/submit">
+      <mat-icon>edit</mat-icon>
+      Submit Your Kavithai
+    </button>
+  </div>
+
+  <!-- Kavithai List -->
+  <div class="kavithai-list" *ngIf="!loading && allKavithai.length > 0">
+    <!-- Top Pagination -->
+    <mat-paginator
+      [length]="totalItems"
+      [pageSize]="pageSize"
+      [pageIndex]="pageIndex"
+      [pageSizeOptions]="pageSizeOptions"
+      [showFirstLastButtons]="true"
+      (page)="onPageChange($event)"
+      class="kavithai-paginator kavithai-paginator-top"
+    ></mat-paginator>
+
+    <div class="kavithai-item" *ngFor="let item of displayedKavithai; trackBy: trackByKavithaiId">
+      <mat-card class="kavithai-card">
+        <mat-card-content>
+          <!-- Kavithai Content -->
+          <div class="kavithai-content palagai-message-renderer" [innerHTML]="getSanitizedContent(item.kavithai.content)"></div>
+
+          <!-- Vote Section -->
+          <div class="kavithai-actions">
+            <div class="vote-info">
+              <mat-icon class="vote-icon">star</mat-icon>
+              <span class="vote-count">{{ item.voteCount }} votes</span>
+            </div>
+            <button
+              mat-raised-button
+              color="primary"
+              class="vote-button"
+              [disabled]="hasVoted(item.kavithai.id)"
+              (click)="voteForKavithai(item)"
+            >
+              <mat-icon>{{ hasVoted(item.kavithai.id) ? 'star' : 'star_border' }}</mat-icon>
+              <span>{{ hasVoted(item.kavithai.id) ? 'Voted' : 'Vote' }}</span>
+            </button>
+          </div>
+        </mat-card-content>
+      </mat-card>
+    </div>
+
+    <!-- Bottom Pagination -->
+    <mat-paginator
+      [length]="totalItems"
+      [pageSize]="pageSize"
+      [pageIndex]="pageIndex"
+      [pageSizeOptions]="pageSizeOptions"
+      [showFirstLastButtons]="true"
+      (page)="onPageChange($event)"
+      class="kavithai-paginator kavithai-paginator-bottom"
+    ></mat-paginator>
+  </div>
+</div>
+

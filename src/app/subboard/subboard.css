@@ -3,11 +3,16 @@
    ============================================ */
 
 /* Base Styles */
-body {
+html, body {
   margin: 0;
   padding: 0;
-  background: #ffffff;
+  height: 100%;
+  width: 100%;
   overflow-x: hidden;
+}
+
+body {
+  background: #ffffff;
 }
 
 /* ============================================
@@ -15,7 +20,15 @@ body {
    ============================================ */
 
 .landing-page {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100vw;
+  height: 100vh;
   min-height: 100vh;
+  max-height: 100vh;
   background-image: url('/doodle-background.png');
   background-size: cover;
   background-position: center;
@@ -23,12 +36,27 @@ body {
   background-attachment: fixed;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+  box-sizing: border-box;
+  z-index: 1;
 }
 
 /* Mobile background for landing page */
 @media (max-width: 768px) {
   .landing-page {
     background-image: url('/doodle-background-mobile.png');
+    max-height: 100vh;
+    height: 100vh;
+    width: 100%;
+    overflow: hidden;
+    box-sizing: border-box;
+  }
+
+  .landing-content {
+    padding: 40px 16px;
+    max-height: calc(100vh - 56px);
+    overflow-y: hidden;
+    overflow-x: hidden;
   }
 }
 
@@ -90,6 +118,10 @@ body {
   text-align: center;
   position: relative;
   z-index: 1;
+  overflow-y: hidden;
+  overflow-x: hidden;
+  max-height: calc(100vh - 64px); /* Account for toolbar height */
+  box-sizing: border-box;
 }
 
 .landing-headline {
@@ -172,6 +204,31 @@ body {
   height: 20px;
 }
 
+.view-submissions-btn {
+  background: linear-gradient(135deg, #4ecdc4 0%, #44a08d 100%) !important;
+  color: white !important;
+  padding: 16px 32px !important;
+  font-size: 16px !important;
+  font-weight: 600 !important;
+  border-radius: 12px !important;
+  box-shadow: 0 4px 12px rgba(68, 160, 141, 0.3) !important;
+  transition: transform 0.2s, box-shadow 0.2s !important;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.view-submissions-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(68, 160, 141, 0.4) !important;
+}
+
+.view-submissions-btn mat-icon {
+  font-size: 20px;
+  width: 20px;
+  height: 20px;
+}
+
 /* Background for subboard page */
 .subboard-wrapper {
   background-image: url('/doodle-background.png');
@@ -180,6 +237,11 @@ body {
   background-repeat: no-repeat;
   background-attachment: fixed;
   min-height: 100vh;
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px;
+  box-sizing: border-box;
 }
 
 /* Mobile background */
@@ -187,16 +249,6 @@ body {
   .subboard-wrapper {
     background-image: url('/doodle-background-mobile.png');
   }
-}
-
-
-/* Wrapper */
-.subboard-wrapper {
-  width: 100%;
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 24px;
-  box-sizing: border-box;
 }
 
 .subboard-wrapper.full-page {
@@ -366,41 +418,80 @@ body {
   height: 18px;
 }
 
-/* Mobile Home Icon - Bottom Right (Hidden on Desktop) */
-.mobile-home-icon {
-  display: none;
+/* Home Icon - Bottom Left (Always Visible on All Screens) */
+.home-icon-top-left {
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  z-index: 1002;
+  display: block;
+  opacity: 1;
+  pointer-events: auto;
 }
 
-@media (max-width: 768px) {
-  .mobile-home-icon {
-    display: block;
-    position: fixed;
-    bottom: 16px;
-    right: 16px;
-    z-index: 1002;
-  }
+.home-top-btn {
+  width: 40px;
+  height: 40px;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 50%;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  color: #111111;
+  transition: all 0.3s ease;
+}
 
-  .mobile-home-btn {
-    width: 40px;
-    height: 40px;
-    background: rgba(255, 255, 255, 0.95);
-    border-radius: 50%;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-    color: #111111;
-  }
+.home-top-btn:hover {
+  background: rgba(255, 255, 255, 1);
+  transform: scale(1.1);
+}
 
-  .mobile-home-btn mat-icon {
-    font-size: 20px;
-    width: 20px;
-    height: 20px;
-  }
+.home-top-btn mat-icon {
+  font-size: 20px;
+  width: 20px;
+  height: 20px;
+}
+
+.home-icon-bottom-right {
+  position: fixed;
+  bottom: 16px;
+  left: 16px;
+  z-index: 1002;
+  display: block;
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.home-bottom-btn {
+  width: 40px;
+  height: 40px;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 50%;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  color: #111111;
+  transition: all 0.3s ease;
+}
+
+.home-bottom-btn:hover {
+  background: rgba(255, 255, 255, 1);
+  transform: scale(1.1);
+}
+
+.home-bottom-btn mat-icon {
+  font-size: 20px;
+  width: 20px;
+  height: 20px;
+}
+
+/* Hide top right icon on all screens (we're using bottom left now) */
+.kiosk-exit-btn.desktop-only {
+  display: none;
 }
 
 .desktop-only {
   display: block;
 }
 
-@media (max-width: 768px) {
+/* Hide desktop-only (top right icon) on screens below 1400px */
+@media (max-width: 1399px) {
   .desktop-only {
     display: none;
   }
@@ -633,6 +724,14 @@ body {
 
   .landing-content {
     padding: 40px 20px;
+    max-height: calc(100vh - 56px); /* Account for toolbar height on mobile */
+    overflow-y: hidden;
+    overflow-x: hidden;
+  }
+  
+  .landing-page {
+    max-height: 100vh;
+    height: 100vh;
   }
 }
 
@@ -652,6 +751,11 @@ body {
   .kiosk-exit-btn {
     top: 12px;
     right: 12px;
+  }
+
+  .home-icon-top-left {
+    top: 12px;
+    left: 12px;
   }
 }
 
@@ -696,7 +800,8 @@ body {
 
   .create-btn,
   .view-btn,
-  .competition-btn {
+  .competition-btn,
+  .view-submissions-btn {
     width: 100%;
   }
 

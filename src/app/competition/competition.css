@@ -308,3 +308,35 @@
     justify-content: center;
   }
 }
+
+/* Home Icon - Bottom Left (Always Visible) */
+.home-icon-bottom-right {
+  position: fixed;
+  bottom: 16px;
+  left: 16px;
+  z-index: 1002;
+  display: block;
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.home-bottom-btn {
+  width: 40px;
+  height: 40px;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 50%;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  color: #111111;
+  transition: all 0.3s ease;
+}
+
+.home-bottom-btn:hover {
+  background: rgba(255, 255, 255, 1);
+  transform: scale(1.1);
+}
+
+.home-bottom-btn mat-icon {
+  font-size: 20px;
+  width: 20px;
+  height: 20px;
+}

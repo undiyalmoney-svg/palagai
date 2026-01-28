@@ -6,6 +6,9 @@ import { Mainboard } from './mainboard/mainboard';
 import { Competition } from './competition/competition';
 import { AdminComponent } from './admin/admin.component';
 import { AdminLoginComponent } from './admin/admin-login.component';
+import { FullScreenBoardComponent } from './fullscreen-board/fullscreen-board.component';
+import { KavithaiSubmitComponent } from './kavithai/kavithai-submit.component';
+import { KavithaiListComponent } from './kavithai/kavithai-list.component';
 
 export const routes: Routes = [
   {
@@ -32,6 +35,18 @@ export const routes: Routes = [
   {
     path: 'competition',
     component: Competition,
+  },
+  {
+    path: 'board/:id',
+    component: FullScreenBoardComponent,
+  },
+  {
+    path: 'kavithai/submit',
+    component: KavithaiSubmitComponent,
+  },
+  {
+    path: 'kavithai/list',
+    component: KavithaiListComponent,
   },
   {
     path: 'admin',
