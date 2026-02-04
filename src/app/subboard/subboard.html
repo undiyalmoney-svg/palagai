@@ -2,11 +2,10 @@
 <div class="landing-page" *ngIf="showLandingPage && !isFullPage">
   <mat-toolbar color="primary" class="landing-toolbar">
     <div class="logo-container">
-      <img src="/palagai-logo.png" alt="Palagai" class="logo-icon" />
-      <span class="brand">Palagai</span>
+      <img src="/toolbar-icon.png" alt="Palagai" class="logo-icon" />
     </div>
     <span class="spacer"></span>
-    <button mat-button routerLink="/login" class="nav-link load-my-board-btn">Load my board</button>
+    <button mat-stroked-button routerLink="/login" class="load-my-board-btn">Load my board</button>
   </mat-toolbar>
 
   <div class="landing-content">

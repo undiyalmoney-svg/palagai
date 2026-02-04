@@ -1189,18 +1189,26 @@ export class BoardService {
    */
   async getAllKavithai(): Promise<Kavithai[]> {
     try {
+      console.log('Getting kavithai from Firebase reference:', this.kavithaiRef.toString());
       const snapshot = await get(this.kavithaiRef);
       
+      console.log('Firebase snapshot exists:', snapshot.exists());
+      
       if (!snapshot.exists()) {
+        console.log('No kavithai data found in Firebase');
         return [];
       }
 
       const kavithaiData = snapshot.val();
+      console.log('Kavithai data from Firebase:', kavithaiData);
+      
       const kavithaiList: Kavithai[] = [];
 
       for (const [kavithaiId, kavithai] of Object.entries(kavithaiData)) {
         kavithaiList.push(kavithai as Kavithai);
       }
+
+      console.log('Parsed kavithai list:', kavithaiList.length, 'entries');
 
       // Sort by creation date (newest first)
       kavithaiList.sort((a, b) => b.createdAt - a.createdAt);
@@ -1208,6 +1216,11 @@ export class BoardService {
       return kavithaiList;
     } catch (err: any) {
       console.error('Error fetching kavithai:', err);
+      console.error('Error details:', {
+        code: err?.code,
+        message: err?.message,
+        stack: err?.stack
+      });
       if (err?.code === 'PERMISSION_DENIED') {
         throw new Error('Permission denied. Unable to fetch kavithai entries.');
       }
@@ -1259,21 +1272,12 @@ export class BoardService {
       const date = now.toLocaleDateString();
       const timestamp = now.getTime();
 
-      // Create vote detail
-      const voteDetail: KavithaiVoteDetail = {
-        ip,
-        votingTime: dateTime,
-        date,
-        timestamp,
-      };
-
-      // Update kavithai with new vote
-      const updatedVoteDetails = [...(kavithai.voteDetails || []), voteDetail];
-      const updatedVoteCount = (kavithai.voteCount || 0) + 1;
+      // Increment vote count
+      const currentVoteCount = kavithai.voteCount || 0;
+      const updatedVoteCount = currentVoteCount + 1;
 
       await update(child(this.kavithaiRef, kavithaiId.trim()), {
         voteCount: updatedVoteCount,
-        voteDetails: updatedVoteDetails,
       });
     } catch (err: any) {
       if (err?.code === 'PERMISSION_DENIED') {

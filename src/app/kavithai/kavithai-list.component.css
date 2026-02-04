@@ -166,12 +166,19 @@
   text-align: center;
 }
 
-.empty-state mat-icon {
+.empty-state > mat-icon {
   font-size: 64px;
   width: 64px;
   height: 64px;
   color: #ccc;
   margin-bottom: 16px;
+}
+
+.empty-state button mat-icon {
+  font-size: 20px;
+  width: 20px;
+  height: 20px;
+  margin-bottom: 0;
 }
 
 .empty-state h2 {

@@ -13,6 +13,30 @@
   z-index: 10;
 }
 
+@media (max-width: 768px) {
+  .blocked-banner {
+    margin: 12px 16px;
+    padding: 12px 16px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .blocked-banner mat-icon {
+    font-size: 24px;
+    width: 24px;
+    height: 24px;
+  }
+
+  .blocked-message strong {
+    font-size: 14px;
+  }
+
+  .blocked-message p {
+    font-size: 12px;
+  }
+}
+
 .blocked-banner mat-icon {
   font-size: 32px;
   width: 32px;
@@ -42,10 +66,10 @@
   padding: 16px 32px;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
   background: #fafafa;
-  height: calc(100vh - 64px - 72px + 80px); /* 100vh - toolbar height - footer height + extra height */
+  min-height: calc(100vh - 64px - 72px);
   position: relative;
   overflow-x: hidden;
-  overflow-y: hidden;
+  overflow-y: auto;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -118,6 +142,7 @@
 
 .home-btn {
   color: #111111;
+  flex-shrink: 0;
 }
 
 .home-btn:hover {
@@ -126,6 +151,7 @@
 
 .back-btn {
   color: #111111;
+  flex-shrink: 0;
 }
 
 .back-btn:hover {
@@ -233,6 +259,7 @@
   opacity: 1;
   min-width: 40px;
   min-height: 40px;
+  touch-action: manipulation;
 }
 
 .header-icon-btn:hover:not(:disabled) {
@@ -424,6 +451,7 @@
 .footer-btn {
   flex: 0 0 auto;
   min-width: 120px;
+  touch-action: manipulation;
 }
 
 .footer-btn.primary-btn {
@@ -823,22 +851,52 @@
 @media (max-width: 768px) {
   .mainboard-toolbar {
     min-height: auto;
-    padding: 12px 0;
+    padding: 8px 0;
+    height: auto;
   }
 
   .toolbar-content {
-    flex-direction: column;
-    align-items: flex-start;
+    flex-direction: row;
+    align-items: center;
     gap: 8px;
+    padding: 0 8px;
   }
 
   .toolbar-left {
-    width: 100%;
+    width: auto;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .home-btn,
+  .back-btn {
+    min-width: 40px;
+    min-height: 40px;
+    padding: 0;
+    flex-shrink: 0;
   }
 
   .toolbar-logo {
-    width: 28px;
-    height: 28px;
+    width: 24px;
+    height: 24px;
+    flex-shrink: 0;
+  }
+
+  .toolbar-title {
+    font-size: 16px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .toolbar-title-wrapper {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
   }
 
   .desktop-only {
@@ -849,13 +907,12 @@
     display: block !important;
   }
 
-  .toolbar-title-wrapper {
-    flex: 1;
-  }
-
   .mainboard-wrapper {
     padding: 12px 16px;
-    height: calc(100vh - 80px - 80px + 80px);
+    min-height: calc(100vh - 56px - 80px);
+    padding-bottom: 100px;
+    max-width: 100%;
+    width: 100%;
   }
 
   .mainboard-wrapper::before,
@@ -866,11 +923,20 @@
   .editor-section {
     padding: 16px;
     overflow-x: hidden;
+    overflow-y: auto;
+    min-height: 0;
+    max-width: 100%;
+    width: 100%;
   }
 
   .board-header {
     flex-direction: column;
     gap: 12px;
+    align-items: flex-start;
+  }
+
+  .board-header-left {
+    width: 100%;
   }
 
   .board-header-left h2 {
@@ -879,12 +945,21 @@
   }
 
   .board-header-right {
-    align-self: flex-end;
+    align-self: flex-start;
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .header-icon-btn {
+    min-width: 36px;
+    min-height: 36px;
   }
 
   /* Footer adjustments for mobile */
   .mainboard-footer {
     padding: 0;
+    height: auto;
+    min-height: 80px;
   }
 
   .footer-content {
@@ -892,6 +967,7 @@
     gap: 12px;
     flex-direction: row;
     flex-wrap: nowrap;
+    justify-content: space-between;
   }
 
   .footer-btn {
@@ -900,6 +976,11 @@
     max-width: calc(50% - 6px);
     padding: 12px 16px;
     font-size: 14px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    touch-action: manipulation;
+    min-height: 44px;
   }
 
   .footer-icon-group {
@@ -912,10 +993,6 @@
 
   .footer-btn.clear-btn {
     order: 2;
-  }
-
-  .mainboard-footer {
-    height: 80px;
   }
 
   .email-input-group {
@@ -936,50 +1013,81 @@
     margin-left: 0;
     align-self: flex-end;
   }
+
+  .checkbox-with-icon {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .setting-hint {
+    font-size: 12px;
+  }
 }
 
 @media (max-width: 480px) {
   .mainboard-toolbar {
-    padding: 10px 0;
+    padding: 8px 0;
+  }
+
+  .toolbar-content {
+    padding: 0 4px;
+    gap: 4px;
+  }
+
+  .toolbar-left {
+    gap: 4px;
+  }
+
+  .toolbar-logo {
+    width: 20px;
+    height: 20px;
   }
 
   .toolbar-title {
-    font-size: 16px;
+    font-size: 14px;
   }
 
   .toolbar-subtitle {
-    font-size: 12px;
+    font-size: 11px;
   }
 
   .mainboard-wrapper {
-    height: calc(100vh - 90px - 80px);
+    padding: 8px 12px;
+    min-height: calc(100vh - 52px - 80px);
+    padding-bottom: 100px;
+    max-width: 100%;
+    width: 100%;
   }
 
   .editor-section {
     padding: 12px;
     overflow-x: hidden;
+    overflow-y: auto;
+    max-width: 100%;
+    width: 100%;
   }
 
-  .mainboard-wrapper {
-    padding: 8px 12px;
-    height: calc(100vh - 64px - 100px + 80px);
+  .board-header-left h2 {
+    font-size: 18px;
   }
 
   /* Footer adjustments for small mobile */
   .footer-content {
     flex-direction: row;
-    gap: 10px;
-    padding: 12px 16px;
+    gap: 8px;
+    padding: 10px 12px;
     flex-wrap: nowrap;
   }
 
   .footer-btn {
     flex: 1 1 auto;
     min-width: 0;
-    max-width: calc(50% - 5px);
+    max-width: calc(50% - 4px);
     order: initial !important;
-    padding: 12px 14px;
-    font-size: 13px;
+    padding: 10px 12px;
+    font-size: 12px;
+    touch-action: manipulation;
+    min-height: 44px;
   }
 
   .footer-icon-group {
@@ -987,10 +1095,16 @@
   }
 
   .mainboard-footer {
-    height: 80px;
+    height: auto;
+    min-height: 72px;
   }
 
   .board-preview {
     padding: 20px;
+  }
+
+  .blocked-banner {
+    margin: 8px 12px;
+    padding: 10px 12px;
   }
 }

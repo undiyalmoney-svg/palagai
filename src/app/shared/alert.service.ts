@@ -28,7 +28,7 @@ export class AlertService {
   }
 
   success(message: string, title?: string): void {
-    this.showAlert(message, 'success', title || 'Yay! Everything worked!');
+    this.showAlert(message, 'success', title || 'Success');
   }
 }
 

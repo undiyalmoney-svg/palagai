@@ -121,14 +121,20 @@ export class KavithaiListComponent implements OnInit, OnDestroy {
 
     try {
       // Get or create user ID for identification (from localStorage) - non-blocking
+      // Don't block on getUserIP - use timeout to prevent hanging
       if (typeof window !== 'undefined') {
         try {
-          this.userIP = localStorage.getItem(USER_ANALYTICS_ID) || 
-            await this.boardsService.getUserIP();
+          this.userIP = localStorage.getItem(USER_ANALYTICS_ID) || 'anonymous';
           
-          if (!localStorage.getItem(USER_ANALYTICS_ID)) {
-            localStorage.setItem(USER_ANALYTICS_ID, this.userIP);
-          }
+          // Try to get IP in background, but don't wait for it
+          this.boardsService.getUserIP().then((ip) => {
+            if (ip && !localStorage.getItem(USER_ANALYTICS_ID)) {
+              localStorage.setItem(USER_ANALYTICS_ID, ip);
+              this.userIP = ip;
+            }
+          }).catch((e) => {
+            console.warn('Failed to get user IP:', e);
+          });
 
           // Load voted kavithai from localStorage (obfuscated key)
           try {
@@ -142,32 +148,45 @@ export class KavithaiListComponent implements OnInit, OnDestroy {
             localStorage.removeItem(VOTED_KAVITHAI_KEY);
           }
         } catch (e) {
-          console.warn('Failed to get user IP or load voted kavithai:', e);
+          console.warn('Failed to load voted kavithai:', e);
         }
       }
 
       // Fetch all kavithai entries
+      console.log('Fetching kavithai entries...');
       const kavithaiList = await this.boardsService.getAllKavithai();
+      console.log('Fetched kavithai entries:', kavithaiList.length, kavithaiList);
       
-      this.allKavithai = kavithaiList.map((kavithai) => ({
-        kavithai,
-        voteCount: kavithai.voteCount || 0,
-      }));
+      if (!kavithaiList || kavithaiList.length === 0) {
+        console.log('No kavithai entries found');
+        this.allKavithai = [];
+        this.totalItems = 0;
+        this.updateDisplayedKavithai();
+        // Still continue to set loading to false in finally block
+      } else {
+      
+        this.allKavithai = kavithaiList.map((kavithai) => ({
+          kavithai,
+          voteCount: kavithai.voteCount || 0,
+        }));
+        
+        console.log('Mapped kavithai items:', this.allKavithai.length);
 
-      // Set up real-time vote listeners for each kavithai
-      this.allKavithai.forEach((item) => {
-        const unsubscribe = this.boardsService.subscribeToKavithaiVoteCount(
-          item.kavithai.id,
-          (count) => {
-            item.voteCount = count;
-            this.cdr.detectChanges();
-          }
-        );
-        this.voteUnsubscribes.set(item.kavithai.id, unsubscribe);
-      });
+        // Set up real-time vote listeners for each kavithai
+        this.allKavithai.forEach((item) => {
+          const unsubscribe = this.boardsService.subscribeToKavithaiVoteCount(
+            item.kavithai.id,
+            (count) => {
+              item.voteCount = count;
+              this.cdr.detectChanges();
+            }
+          );
+          this.voteUnsubscribes.set(item.kavithai.id, unsubscribe);
+        });
 
-      this.totalItems = this.allKavithai.length;
-      this.updateDisplayedKavithai();
+        this.totalItems = this.allKavithai.length;
+        this.updateDisplayedKavithai();
+      }
 
       // Only show snackbar in browser (not during SSR)
       if (typeof window !== 'undefined') {

@@ -277,6 +277,20 @@ body {
   margin-bottom: 8px;
 }
 
+.powered-by-content {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.powered-by-palagai .heart-icon {
+  font-size: 14px;
+  width: 14px;
+  height: 14px;
+  color: #e91e63;
+}
+
 .powered-by-text {
   font-size: 12px;
   color: #999999;

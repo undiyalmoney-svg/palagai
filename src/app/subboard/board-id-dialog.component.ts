@@ -27,7 +27,6 @@ export interface BoardIdDialogData {
   template: `
     <div class="board-id-dialog-wrapper">
       <h2 mat-dialog-title class="dialog-title">
-        <mat-icon class="title-icon">dashboard</mat-icon>
         View Board
       </h2>
       
@@ -94,16 +93,6 @@ export interface BoardIdDialogData {
       font-size: 20px;
       font-weight: 600;
       color: #111111;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .title-icon {
-      color: #667eea;
-      font-size: 24px;
-      width: 24px;
-      height: 24px;
     }
 
     .dialog-content {
@@ -202,6 +191,7 @@ export class BoardIdDialogComponent {
     this.dialogRef.close(null);
   }
 }
+
 
 
 

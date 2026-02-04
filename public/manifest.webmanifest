@@ -1,5 +1,5 @@
 {
-  "name": "Palagai Board",
+  "name": "Palagai",
   "short_name": "Palagai",
   "description": "Edit and share your Palagai board",
   "start_url": "/",
@@ -10,13 +10,13 @@
   "orientation": "any",
   "icons": [
     {
-      "src": "/palagai-logo.png",
+      "src": "/header-icon.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/palagai-logo.png",
+      "src": "/header-icon.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
@@ -32,7 +32,7 @@
       "url": "/mainboard",
       "icons": [
         {
-          "src": "/palagai-logo.png",
+          "src": "/header-icon.png",
           "sizes": "64x64",
           "type": "image/png"
         }
@@ -45,7 +45,7 @@
       "url": "/subboard",
       "icons": [
         {
-          "src": "/palagai-logo.png",
+          "src": "/header-icon.png",
           "sizes": "64x64",
           "type": "image/png"
         }

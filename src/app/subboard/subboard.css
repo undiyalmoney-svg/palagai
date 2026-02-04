@@ -41,6 +41,17 @@ body {
   z-index: 1;
 }
 
+.landing-page::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.4);
+  z-index: 0;
+}
+
 /* Mobile background for landing page */
 @media (max-width: 768px) {
   .landing-page {
@@ -58,6 +69,51 @@ body {
     overflow-y: hidden;
     overflow-x: hidden;
   }
+
+  .landing-toolbar {
+    min-height: 56px;
+    height: 56px;
+    padding: 0 16px;
+  }
+
+  .logo-icon {
+    width: auto;
+    height: 30vh;
+    max-height: 60px;
+  }
+
+  .logo-container {
+    left: 16px;
+    gap: 0;
+  }
+
+  .landing-toolbar .brand {
+    font-size: 20px;
+  }
+
+  .load-my-board-btn {
+    right: 16px;
+    padding: 7px 16px !important;
+    font-size: 13px !important;
+    min-height: 34px !important;
+  }
+
+  .create-btn {
+    padding: 16px 32px !important;
+    font-size: 16px !important;
+    min-width: 180px;
+  }
+
+  .landing-actions {
+    gap: 12px;
+  }
+
+  .view-btn,
+  .competition-btn,
+  .view-submissions-btn {
+    padding: 14px 24px !important;
+    font-size: 14px !important;
+  }
 }
 
 .landing-toolbar {
@@ -70,37 +126,62 @@ body {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   border-bottom: 1px solid rgba(102, 126, 234, 0.2);
   justify-content: center;
+  min-height: 64px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
 }
 
 .logo-container {
   display: flex;
   align-items: center;
-  gap: 8px;
   position: absolute;
-  left: 16px;
+  left: 24px;
+  gap: 0;
+  height: 100%;
+  top: 0;
+  justify-content: center;
 }
 
 .logo-icon {
-  width: 32px;
-  height: 32px;
+  width: auto;
+  height: 30vh;
+  max-height: 80px;
   object-fit: contain;
   display: block;
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
+  flex-shrink: 0;
 }
 
 .landing-toolbar .brand {
   font-weight: 600;
-  font-size: 18px;
-  color: #111111;
-}
-
-.nav-link {
-  color: #111111 !important;
-  font-weight: 500;
+  font-size: 22px;
+  color: #1f2937;
+  letter-spacing: -0.4px;
+  line-height: 1;
 }
 
 .load-my-board-btn {
   position: absolute;
-  right: 16px;
+  right: 24px;
+  color: #374151 !important;
+  border-color: rgba(0, 0, 0, 0.12) !important;
+  font-weight: 500 !important;
+  padding: 8px 18px !important;
+  font-size: 14px !important;
+  border-radius: 10px !important;
+  transition: all 0.2s ease !important;
+  line-height: 1.5 !important;
+  min-height: 36px !important;
+  border-width: 1.5px !important;
+}
+
+.load-my-board-btn:hover {
+  background-color: rgba(0, 0, 0, 0.04) !important;
+  border-color: rgba(0, 0, 0, 0.2) !important;
+  color: #111827 !important;
 }
 
 .menu-icon {
@@ -117,7 +198,7 @@ body {
   padding: 60px 24px;
   text-align: center;
   position: relative;
-  z-index: 1;
+  z-index: 2;
   overflow-y: hidden;
   overflow-x: hidden;
   max-height: calc(100vh - 64px); /* Account for toolbar height */
@@ -128,105 +209,118 @@ body {
   font-size: clamp(2.5rem, 8vw, 5rem);
   font-weight: 700;
   color: #2c3e50;
-  margin: 0 0 24px 0;
-  line-height: 1.2;
+  margin: 0 0 28px 0;
+  line-height: 1.3;
+  letter-spacing: -0.5px;
 }
 
 .landing-subheadline {
   font-size: clamp(1rem, 3vw, 1.5rem);
   color: #666666;
-  margin: 0 0 48px 0;
-  max-width: 600px;
-  line-height: 1.6;
+  margin: 0 0 56px 0;
+  max-width: 520px;
+  line-height: 1.7;
+  letter-spacing: 0.01em;
 }
 
 .landing-actions {
   display: flex;
-  gap: 20px;
+  gap: 16px;
   flex-wrap: wrap;
   justify-content: center;
+  align-items: center;
 }
 
 .create-btn {
-  background: linear-gradient(135deg, #4ade80 0%, #22d3ee 100%) !important;
+  background: #10b981 !important;
   color: white !important;
-  padding: 16px 32px !important;
-  font-size: 16px !important;
+  padding: 18px 40px !important;
+  font-size: 17px !important;
   font-weight: 600 !important;
   border-radius: 12px !important;
-  box-shadow: 0 4px 12px rgba(74, 222, 128, 0.3) !important;
-  transition: transform 0.2s, box-shadow 0.2s !important;
+  box-shadow: 0 4px 16px rgba(16, 185, 129, 0.35) !important;
+  transition: all 0.2s ease !important;
+  border: none !important;
+  min-width: 200px;
 }
 
 .create-btn:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(74, 222, 128, 0.4) !important;
+  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.45) !important;
+  background: #059669 !important;
 }
 
 .view-btn {
-  background: linear-gradient(135deg, #a78bfa 0%, #22d3ee 100%) !important;
-  color: white !important;
-  padding: 16px 32px !important;
+  background: transparent !important;
+  color: #10b981 !important;
+  padding: 18px 32px !important;
   font-size: 16px !important;
-  font-weight: 600 !important;
+  font-weight: 500 !important;
   border-radius: 12px !important;
-  box-shadow: 0 4px 12px rgba(167, 139, 250, 0.3) !important;
-  transition: transform 0.2s, box-shadow 0.2s !important;
+  border: 2px solid #10b981 !important;
+  box-shadow: none !important;
+  transition: all 0.2s ease !important;
 }
 
 .view-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(167, 139, 250, 0.4) !important;
+  background: rgba(16, 185, 129, 0.08) !important;
+  border-color: #059669 !important;
+  color: #059669 !important;
+  transform: translateY(-1px);
 }
 
 .competition-btn {
-  background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%) !important;
-  color: #333 !important;
-  padding: 16px 32px !important;
-  font-size: 16px !important;
-  font-weight: 600 !important;
-  border-radius: 12px !important;
-  box-shadow: 0 4px 12px rgba(255, 215, 0, 0.3) !important;
-  transition: transform 0.2s, box-shadow 0.2s !important;
+  background: rgba(139, 92, 246, 0.1) !important;
+  color: #8b5cf6 !important;
+  padding: 16px 28px !important;
+  font-size: 15px !important;
+  font-weight: 500 !important;
+  border-radius: 10px !important;
+  border: 1px solid rgba(139, 92, 246, 0.2) !important;
+  box-shadow: none !important;
+  transition: all 0.2s ease !important;
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
 .competition-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(255, 215, 0, 0.4) !important;
+  background: rgba(139, 92, 246, 0.15) !important;
+  border-color: rgba(139, 92, 246, 0.3) !important;
+  transform: translateY(-1px);
 }
 
 .competition-btn mat-icon {
-  font-size: 20px;
-  width: 20px;
-  height: 20px;
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
 }
 
 .view-submissions-btn {
-  background: linear-gradient(135deg, #4ecdc4 0%, #44a08d 100%) !important;
-  color: white !important;
-  padding: 16px 32px !important;
-  font-size: 16px !important;
-  font-weight: 600 !important;
-  border-radius: 12px !important;
-  box-shadow: 0 4px 12px rgba(68, 160, 141, 0.3) !important;
-  transition: transform 0.2s, box-shadow 0.2s !important;
+  background: transparent !important;
+  color: #6b7280 !important;
+  padding: 16px 24px !important;
+  font-size: 14px !important;
+  font-weight: 400 !important;
+  border-radius: 10px !important;
+  border: 1px solid rgba(107, 114, 128, 0.2) !important;
+  box-shadow: none !important;
+  transition: all 0.2s ease !important;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 .view-submissions-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(68, 160, 141, 0.4) !important;
+  background: rgba(107, 114, 128, 0.05) !important;
+  border-color: rgba(107, 114, 128, 0.3) !important;
+  color: #4b5563 !important;
 }
 
 .view-submissions-btn mat-icon {
-  font-size: 20px;
-  width: 20px;
-  height: 20px;
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
 }
 
 /* Background for subboard page */
@@ -830,12 +924,62 @@ body {
   }
   
   .logo-icon {
-    width: 28px;
-    height: 28px;
+    width: auto;
+    height: 30vh;
+    max-height: 50px;
   }
 
   .logo-container {
     left: 8px;
+  }
+}
+
+/* Tablet view (768px - 1024px) */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .logo-icon {
+    height: 30vh;
+    max-height: 60px;
+    width: auto;
+  }
+
+  .logo-container {
+    left: 20px;
+  }
+}
+
+/* TV and Large screens (1025px and above) */
+@media (min-width: 1025px) {
+  .landing-toolbar {
+    min-height: 48px;
+    height: 48px;
+  }
+
+  .logo-icon {
+    height: 30vh;
+    max-height: 70px;
+    width: auto;
+  }
+
+  .logo-container {
+    left: 24px;
+  }
+}
+
+/* Extra large screens / TV (1920px and above) */
+@media (min-width: 1920px) {
+  .landing-toolbar {
+    min-height: 48px;
+    height: 48px;
+  }
+
+  .logo-icon {
+    height: 30vh;
+    max-height: 80px;
+    width: auto;
+  }
+
+  .logo-container {
+    left: 32px;
   }
 }
 
