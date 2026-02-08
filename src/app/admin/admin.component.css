@@ -273,6 +273,135 @@ mat-chip.inactive {
   }
 }
 
+/* Punch Analytics Styles */
+.punch-stats-container {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.stats-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.stat-card {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4);
+}
+
+.stat-card mat-card-content {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.stat-icon {
+  margin-bottom: 12px;
+}
+
+.stat-icon mat-icon {
+  font-size: 48px;
+  width: 48px;
+  height: 48px;
+  opacity: 0.9;
+}
+
+.stat-value {
+  font-size: 36px;
+  font-weight: 700;
+  margin-bottom: 8px;
+  line-height: 1;
+}
+
+.stat-label {
+  font-size: 14px;
+  opacity: 0.9;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.punch-records-section {
+  background: white;
+  border-radius: 8px;
+  padding: 24px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.punch-records-section h3 {
+  margin: 0 0 16px 0;
+  color: #333;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.punch-records-table-container {
+  overflow-x: auto;
+}
+
+.punch-records-table {
+  width: 100%;
+}
+
+.punch-records-table th {
+  font-weight: 600;
+  color: #333;
+  background: #f5f5f5;
+}
+
+.ip-address {
+  background: #f5f5f5;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-family: 'Courier New', monospace;
+  color: #333;
+}
+
+.message-preview {
+  max-width: 300px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+mat-chip.access {
+  background-color: #2196f3 !important;
+  color: white !important;
+}
+
+mat-chip.completion {
+  background-color: #4caf50 !important;
+  color: white !important;
+}
+
+@media (max-width: 768px) {
+  .stats-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .punch-records-table-container {
+    overflow-x: scroll;
+  }
+
+  .message-preview {
+    max-width: 150px;
+  }
+}
+
 
 
 

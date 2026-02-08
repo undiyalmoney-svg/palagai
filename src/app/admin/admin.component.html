@@ -430,6 +430,133 @@
           </div>
         </div>
       </mat-tab>
+
+      <!-- Punch Analytics Tab -->
+      <mat-tab label="Punch Analytics">
+        <div class="tab-content">
+          <div class="header-section">
+            <h2>Palagai Punch Usage Statistics</h2>
+            <button mat-raised-button color="primary" (click)="loadPunchStats()" [disabled]="loadingPunchStats">
+              <mat-icon>refresh</mat-icon>
+              Refresh
+            </button>
+          </div>
+
+          <!-- Loading State -->
+          <div *ngIf="loadingPunchStats" class="loading-container">
+            <mat-spinner diameter="50"></mat-spinner>
+            <p>Loading punch statistics...</p>
+          </div>
+
+          <!-- Statistics Cards -->
+          <div *ngIf="!loadingPunchStats" class="punch-stats-container">
+            <div class="stats-cards">
+              <mat-card class="stat-card">
+                <mat-card-content>
+                  <div class="stat-icon">
+                    <mat-icon>touch_app</mat-icon>
+                  </div>
+                  <div class="stat-value">{{ punchStats.totalAccesses }}</div>
+                  <div class="stat-label">Total Accesses</div>
+                </mat-card-content>
+              </mat-card>
+
+              <mat-card class="stat-card">
+                <mat-card-content>
+                  <div class="stat-icon">
+                    <mat-icon>celebration</mat-icon>
+                  </div>
+                  <div class="stat-value">{{ punchStats.totalCompletions }}</div>
+                  <div class="stat-label">Total Completions</div>
+                </mat-card-content>
+              </mat-card>
+
+              <mat-card class="stat-card">
+                <mat-card-content>
+                  <div class="stat-icon">
+                    <mat-icon>people</mat-icon>
+                  </div>
+                  <div class="stat-value">{{ punchStats.uniqueIPs }}</div>
+                  <div class="stat-label">Unique Users (IPs)</div>
+                </mat-card-content>
+              </mat-card>
+
+              <mat-card class="stat-card">
+                <mat-card-content>
+                  <div class="stat-icon">
+                    <mat-icon>trending_up</mat-icon>
+                  </div>
+                  <div class="stat-value">
+                    {{ punchStats.totalAccesses > 0 ? ((punchStats.totalCompletions / punchStats.totalAccesses) * 100).toFixed(1) : 0 }}%
+                  </div>
+                  <div class="stat-label">Completion Rate</div>
+                </mat-card-content>
+              </mat-card>
+            </div>
+
+            <!-- Records Table -->
+            <div class="punch-records-section">
+              <h3>Usage Records ({{ punchStats.records.length }})</h3>
+              
+              <div *ngIf="punchStats.records.length === 0" class="empty-state">
+                <mat-icon>inbox</mat-icon>
+                <p>No punch usage records found</p>
+              </div>
+
+              <div *ngIf="punchStats.records.length > 0" class="punch-records-table-container">
+                <table mat-table [dataSource]="punchStats.records" class="punch-records-table">
+                  <!-- IP Column -->
+                  <ng-container matColumnDef="ip">
+                    <th mat-header-cell *matHeaderCellDef>IP Address</th>
+                    <td mat-cell *matCellDef="let record">
+                      <code class="ip-address">{{ record.ip }}</code>
+                    </td>
+                  </ng-container>
+
+                  <!-- Message Column -->
+                  <ng-container matColumnDef="message">
+                    <th mat-header-cell *matHeaderCellDef>Message</th>
+                    <td mat-cell *matCellDef="let record">
+                      <div class="message-preview" [title]="record.message">
+                        {{ record.message.length > 50 ? (record.message.substring(0, 50) + '...') : record.message }}
+                      </div>
+                    </td>
+                  </ng-container>
+
+                  <!-- Punch Count Column -->
+                  <ng-container matColumnDef="punchCount">
+                    <th mat-header-cell *matHeaderCellDef>Punch Count</th>
+                    <td mat-cell *matCellDef="let record">
+                      {{ record.punchCount }}
+                    </td>
+                  </ng-container>
+
+                  <!-- Event Type Column -->
+                  <ng-container matColumnDef="eventType">
+                    <th mat-header-cell *matHeaderCellDef>Event Type</th>
+                    <td mat-cell *matCellDef="let record">
+                      <mat-chip [class.access]="record.eventType === 'access'" [class.completion]="record.eventType === 'completion'">
+                        {{ record.eventType === 'access' ? 'Access' : 'Completion' }}
+                      </mat-chip>
+                    </td>
+                  </ng-container>
+
+                  <!-- Date/Time Column -->
+                  <ng-container matColumnDef="dateTime">
+                    <th mat-header-cell *matHeaderCellDef>Date & Time</th>
+                    <td mat-cell *matCellDef="let record">
+                      {{ formatDateTime(record.dateTime) }}
+                    </td>
+                  </ng-container>
+
+                  <tr mat-header-row *matHeaderRowDef="['ip', 'message', 'punchCount', 'eventType', 'dateTime']"></tr>
+                  <tr mat-row *matRowDef="let row; columns: ['ip', 'message', 'punchCount', 'eventType', 'dateTime']"></tr>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </mat-tab>
     </mat-tab-group>
   </div>
 </div>

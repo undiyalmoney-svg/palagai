@@ -20,7 +20,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { FormsModule } from '@angular/forms';
 import { Subscription } from 'rxjs';
-import { Kavithai } from '../board.service';
+import { Kavithai, PunchUsageRecord } from '../board.service';
 import { GoldenSlateIdDialogComponent } from './golden-slate-id-dialog.component';
 
 interface BoardRow {
@@ -58,9 +58,21 @@ export class AdminComponent implements OnInit, OnDestroy, AfterViewInit {
   boards: BoardRow[] = [];
   pollBoards: BoardRow[] = [];
   kavithaiList: Kavithai[] = [];
+  punchStats: {
+    totalAccesses: number;
+    totalCompletions: number;
+    uniqueIPs: number;
+    records: PunchUsageRecord[];
+  } = {
+    totalAccesses: 0,
+    totalCompletions: 0,
+    uniqueIPs: 0,
+    records: []
+  };
   loading = true;
   loadingKavithai = false;
   loadingPolls = false;
+  loadingPunchStats = false;
   selectedTabIndex = 0;
   displayedColumns: string[] = ['boardKey', 'ownerEmail', 'status', 'competition', 'actions'];
   displayedPollColumns: string[] = ['boardKey', 'ownerEmail', 'question', 'votes', 'status', 'actions'];
@@ -92,6 +104,7 @@ export class AdminComponent implements OnInit, OnDestroy, AfterViewInit {
       this.loadBoards();
       this.loadKavithai();
       this.loadPollBoards();
+      this.loadPunchStats();
     }
   }
 
@@ -512,10 +525,40 @@ export class AdminComponent implements OnInit, OnDestroy, AfterViewInit {
     }
   }
 
+  async loadPunchStats() {
+    this.loadingPunchStats = true;
+    try {
+      this.punchStats = await this.boardsService.getPunchUsageStats();
+      this.loadingPunchStats = false;
+      this.cdr.markForCheck();
+    } catch (err: any) {
+      console.error('[Admin] Error loading punch stats:', err);
+      this.snackBar.open(
+        err?.message || 'Failed to load punch usage statistics.',
+        'OK',
+        {
+          duration: 5000,
+          panelClass: ['error-snackbar'],
+        }
+      );
+      this.punchStats = {
+        totalAccesses: 0,
+        totalCompletions: 0,
+        uniqueIPs: 0,
+        records: []
+      };
+      this.loadingPunchStats = false;
+      this.cdr.markForCheck();
+    }
+  }
+
   onTabChange(index: number) {
     this.selectedTabIndex = index;
     if (index === 1 && this.kavithaiList.length === 0 && !this.loadingKavithai) {
       this.loadKavithai();
+    }
+    if (index === 3 && this.punchStats.records.length === 0 && !this.loadingPunchStats) {
+      this.loadPunchStats();
     }
     // Clear selections when switching tabs
     this.selectedKavithai.clear();
@@ -598,6 +641,21 @@ export class AdminComponent implements OnInit, OnDestroy, AfterViewInit {
         duration: 4000,
         panelClass: ['error-snackbar'],
       });
+    }
+  }
+
+  formatDateTime(dateTimeString: string): string {
+    try {
+      const date = new Date(dateTimeString);
+      return date.toLocaleString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch (error) {
+      return dateTimeString;
     }
   }
 }
