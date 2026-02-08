@@ -10,6 +10,14 @@ export const serverRoutes: ServerRoute[] = [
     path: 'preview',
     renderMode: RenderMode.Server
   },
+  {
+    path: 'punch/:data',
+    renderMode: RenderMode.Server
+  },
+  {
+    path: 'poll/:boardKey/results',
+    renderMode: RenderMode.Server
+  },
   // Static routes can be prerendered
   {
     path: '**',
