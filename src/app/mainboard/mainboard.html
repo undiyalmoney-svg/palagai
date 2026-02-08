@@ -72,14 +72,16 @@
       #pollEditor
       [pollData]="pollData"
       [canModify]="canModifyPoll"
+      [isPrimaryBoard]="isPrimaryBoardControl.value"
       (pollSave)="savePoll($event)"
       (pollClear)="clearPoll()"
+      (primaryBoardChange)="onPrimaryBoardChangeFromPoll($event)"
     ></app-poll-editor>
 
   </div>
 
-  <!-- Board Options (Sticky at bottom) -->
-  <div class="primary-board-section">
+  <!-- Board Options (Sticky at bottom) - Only for standard boards -->
+  <div class="primary-board-section" *ngIf="boardType === 'standard'">
     <div class="board-option-item">
       <mat-checkbox formControlName="isPrimaryBoard" class="primary-board-checkbox" (change)="onPrimaryBoardChange($event)">
         <span class="checkbox-label">Primary Board</span>

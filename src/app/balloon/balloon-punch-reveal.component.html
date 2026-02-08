@@ -1,4 +1,12 @@
 <div class="reveal-container" [class.burst]="isBurst" [class.near-final]="isNearFinal">
+  <!-- Loading Overlay - Shows immediately to prevent landing page flash -->
+  <div class="loading-overlay" *ngIf="!hasError && (totalPunchCount === 0 || decodedMessage === '')">
+    <div class="loading-content">
+      <div class="loading-spinner"></div>
+      <p>Loading...</p>
+    </div>
+  </div>
+
   <!-- Animated Background -->
   <div class="animated-background"></div>
 

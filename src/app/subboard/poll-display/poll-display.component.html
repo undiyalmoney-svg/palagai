@@ -4,8 +4,8 @@
   </div>
 
   <!-- Voting Interface with Form Controls -->
-  <div class="poll-voting" *ngIf="currentPollData && currentPollData.options && currentPollData.options.length > 0 && formReady">
-    <form [formGroup]="pollForm">
+  <div class="poll-voting" *ngIf="currentPollData && currentPollData.options && currentPollData.options.length > 0">
+    <form [formGroup]="pollForm" *ngIf="formReady">
       <!-- Single Choice (Radio Group) -->
       <mat-radio-group
         *ngIf="currentPollData.pollType === 'single'"
@@ -46,24 +46,34 @@
           </mat-checkbox>
         </div>
       </div>
-      
-      <!-- Submit Button -->
-      <div class="submit-button-container">
-        <button
-          mat-raised-button
-          color="primary"
-          type="button"
-          (click)="submitVote()"
-          [disabled]="isVoting || !canVote"
-          class="submit-vote-btn"
-        >
-          <mat-icon *ngIf="!isVoting">how_to_vote</mat-icon>
-          <mat-icon *ngIf="isVoting" class="spinning">hourglass_empty</mat-icon>
-          <span>{{ isVoting ? 'Submitting...' : 'Submit Vote' }}</span>
-        </button>
-      </div>
     </form>
   </div>
+  
+  <!-- Submit Button - ALWAYS VISIBLE - Users can vote unlimited times -->
+  <div class="submit-button-container">
+    <button
+      mat-raised-button
+      color="primary"
+      type="button"
+      (click)="submitVote()"
+      [disabled]="isVoting || !currentPollData || !currentPollData.options || currentPollData.options.length === 0"
+      class="submit-vote-btn"
+    >
+      <mat-icon *ngIf="!isVoting">how_to_vote</mat-icon>
+      <mat-icon *ngIf="isVoting" class="spinning">hourglass_empty</mat-icon>
+      <span>{{ isVoting ? 'Submitting...' : 'Submit Vote' }}</span>
+    </button>
+    <p class="vote-hint" *ngIf="currentPollData && currentPollData.options && currentPollData.options.length > 0">You can vote multiple times</p>
+  </div>
+  
+  <!-- Debug: Show if button container should be visible -->
+  <!-- <div style="color: red; padding: 10px; background: yellow;" *ngIf="currentPollData">
+    Debug: currentPollData exists: {{ !!currentPollData }}, 
+    options: {{ currentPollData?.options?.length }}, 
+    canVote: {{ canVote }}, 
+    formReady: {{ formReady }}, 
+    isVoting: {{ isVoting }}
+  </div> -->
   
   <!-- View Results Button (shown after voting) -->
   <div class="poll-results-section" *ngIf="currentPollData && currentPollData.totalVotes > 0">

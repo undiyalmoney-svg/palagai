@@ -5,6 +5,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 import { PollData, PollOption } from '../../board.service';
 
 @Component({
@@ -17,6 +18,7 @@ import { PollData, PollOption } from '../../board.service';
     MatInputModule,
     MatButtonModule,
     MatIconModule,
+    MatCheckboxModule,
   ],
   templateUrl: './poll-editor.component.html',
   styleUrls: ['./poll-editor.component.css'],
@@ -24,8 +26,10 @@ import { PollData, PollOption } from '../../board.service';
 export class PollEditorComponent implements OnInit {
   @Input() pollData: PollData | null = null;
   @Input() canModify: boolean = true;
+  @Input() isPrimaryBoard: boolean = false;
   @Output() pollSave = new EventEmitter<PollData>();
   @Output() pollClear = new EventEmitter<void>();
+  @Output() primaryBoardChange = new EventEmitter<boolean>();
   
   // Expose savePoll method for parent to call
   public savePollFromParent(): void {
@@ -154,6 +158,10 @@ export class PollEditorComponent implements OnInit {
         });
       }
     });
+  }
+
+  onPrimaryBoardToggle(event: any): void {
+    this.primaryBoardChange.emit(event.checked);
   }
 }
 

@@ -183,8 +183,10 @@ export class UserDashboardComponent implements OnInit {
       return;
     }
 
-    // Navigate to mainboard - it will create a board if needed
-    await this.router.navigate(['/mainboard']);
+    // Navigate to mainboard with create flag and standard board type - it will create a board if needed
+    await this.router.navigate(['/mainboard'], { 
+      queryParams: { create: 'true', type: 'standard' } 
+    });
   }
 
   async editBoard(boardKey: string, boardType: 'standard' | 'poll' | 'job') {

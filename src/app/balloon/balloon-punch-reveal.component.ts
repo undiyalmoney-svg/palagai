@@ -46,10 +46,15 @@ export class BalloonPunchRevealComponent implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit(): void {
-    // Prevent body scrolling
+    // Immediately hide body and prevent scrolling - prevents landing page from showing
     if (typeof document !== 'undefined') {
       document.body.style.overflow = 'hidden';
       document.documentElement.style.overflow = 'hidden';
+      // Hide any background content immediately
+      const appRoot = document.querySelector('app-root');
+      if (appRoot) {
+        (appRoot as HTMLElement).style.overflow = 'hidden';
+      }
     }
 
     const dataParam = this.route.snapshot.paramMap.get('data');
@@ -70,7 +75,13 @@ export class BalloonPunchRevealComponent implements OnInit, OnDestroy {
       
       // Add padding if needed
       const padded = base64String + '='.repeat((4 - base64String.length % 4) % 4);
-      const jsonString = atob(padded);
+      
+      // Decode Base64 to URI-encoded string
+      const uriEncoded = atob(padded);
+      
+      // Decode URI component to handle Unicode characters (emojis, etc.)
+      const jsonString = decodeURIComponent(uriEncoded);
+      
       const data: BalloonData = JSON.parse(jsonString);
 
       // Validate data
@@ -82,6 +93,9 @@ export class BalloonPunchRevealComponent implements OnInit, OnDestroy {
       this.totalPunchCount = data.punchCount;
       this.decodedMessage = data.message;
       this.selectedIcon = data.icon || 1; // Default to icon 1 if not provided
+
+      // Trigger change detection immediately to hide loading overlay
+      this.cdr.detectChanges();
 
       // Record initial access
       this.recordPunchAccess();

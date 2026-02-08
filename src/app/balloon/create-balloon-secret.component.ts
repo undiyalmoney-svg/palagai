@@ -60,6 +60,20 @@ export class CreateBalloonSecretComponent implements OnInit {
     return `/assets/icon-${this.selectedIcon}.png`;
   }
 
+  /**
+   * Unicode-safe Base64 encoding
+   * Uses encodeURIComponent to handle Unicode characters (emojis, etc.)
+   */
+  private encodeUnicodeBase64(str: string): string {
+    // First encode to URI component to handle Unicode properly
+    const uriEncoded = encodeURIComponent(str);
+    // Then base64 encode the URI-encoded string
+    return btoa(uriEncoded)
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '');
+  }
+
   onSubmit(): void {
     if (this.secretForm.invalid || this.isGenerating) {
       return;
@@ -76,12 +90,9 @@ export class CreateBalloonSecretComponent implements OnInit {
         icon: formValue.icon || this.selectedIcon
       };
 
-      // Encode as URL-safe Base64
+      // Encode as URL-safe Base64 with Unicode support
       const jsonString = JSON.stringify(payload);
-      const base64String = btoa(jsonString)
-        .replace(/\+/g, '-')
-        .replace(/\//g, '_')
-        .replace(/=+$/, '');
+      const base64String = this.encodeUnicodeBase64(jsonString);
 
       // Generate shareable URL
       const baseUrl = typeof window !== 'undefined' 

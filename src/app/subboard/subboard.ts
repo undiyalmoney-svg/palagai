@@ -21,6 +21,7 @@ import { BoardIdDialogComponent, BoardIdDialogData } from './board-id-dialog.com
 import { SaveConfirmationDialogComponent } from '../mainboard/save-confirmation-dialog.component';
 import { PollDisplayComponent } from './poll-display/poll-display.component';
 import { AlertService } from '../shared/alert.service';
+import { TermsConditionsDialogComponent } from './terms-conditions-dialog.component';
 const SESSION_BOARD_KEY = 'palagai_session_board_id';
 
 // Obfuscated localStorage keys (made to look like app preferences/analytics)
@@ -1326,5 +1327,15 @@ export class Subboard implements OnInit, AfterViewInit, OnDestroy {
     // Strip HTML tags and get first 100 characters
     const text = (board.message?.html || '').replace(/<[^>]*>/g, '').trim();
     return text.substring(0, 100) + (text.length > 100 ? '...' : '');
+  }
+
+  openTermsAndConditions(): void {
+    this.dialog.open(TermsConditionsDialogComponent, {
+      width: '90%',
+      maxWidth: '800px',
+      maxHeight: '90vh',
+      panelClass: 'terms-dialog-panel',
+      disableClose: false,
+    });
   }
 }

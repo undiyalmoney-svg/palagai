@@ -353,6 +353,29 @@ body {
   align-items: center;
 }
 
+.landing-footer {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  padding: 8px 0;
+}
+
+.terms-link {
+  color: #666;
+  font-size: 12px;
+  text-decoration: none;
+  cursor: pointer;
+  transition: color 0.2s ease;
+  font-weight: 400;
+}
+
+.terms-link:hover {
+  color: #333;
+  text-decoration: underline;
+}
+
 .create-btn {
   background: #10b981 !important;
   color: white !important;
@@ -1041,6 +1064,14 @@ body {
 
   .landing-subheadline {
     font-size: 1rem;
+  }
+
+  .landing-footer {
+    bottom: 8px;
+  }
+
+  .terms-link {
+    font-size: 11px;
   }
 
   .landing-actions {

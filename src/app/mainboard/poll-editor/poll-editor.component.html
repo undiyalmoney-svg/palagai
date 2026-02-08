@@ -1,6 +1,17 @@
 <div class="poll-editor" [formGroup]="pollForm">
   <div class="poll-editor-header">
-    <h3>Poll Editor</h3>
+    <div class="poll-editor-header-content">
+      <h3>Poll Editor</h3>
+      <div class="primary-board-checkbox-container">
+        <mat-checkbox 
+          [checked]="isPrimaryBoard" 
+          (change)="onPrimaryBoardToggle($event)"
+          class="primary-board-checkbox-poll"
+        >
+          <span class="checkbox-label-poll">Primary Board</span>
+        </mat-checkbox>
+      </div>
+    </div>
     <div class="readonly-notice" *ngIf="!canModify && pollData">
       <mat-icon>lock</mat-icon>
       <span>Poll cannot be modified after creation. You can only delete it.</span>
@@ -86,6 +97,21 @@
         </button>
       </div>
     </div>
+  </div>
+
+  <!-- Save Button Section -->
+  <div class="poll-actions" *ngIf="canModify">
+    <button
+      mat-raised-button
+      color="primary"
+      type="button"
+      (click)="savePoll()"
+      [disabled]="pollForm.invalid"
+      class="save-poll-btn"
+    >
+      <mat-icon>save</mat-icon>
+      <span>Save Poll</span>
+    </button>
   </div>
 
 </div>

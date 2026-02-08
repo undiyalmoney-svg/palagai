@@ -500,6 +500,10 @@ export class Mainboard implements OnInit, AfterViewInit {
     // Ensure loading and saving are false initially
     this.loading = false;
     this.updateFormControlsDisabledState();
+
+    // Check if we're creating a new board (from dashboard)
+    const queryParams = this.route.snapshot.queryParams;
+    const isCreating = queryParams['create'] === 'true';
     this.saving = false;
     // Board size will be loaded from board data below
     this.cdr.detectChanges();
@@ -536,6 +540,7 @@ export class Mainboard implements OnInit, AfterViewInit {
       const queryParams = this.route.snapshot.queryParams;
       const boardKeyFromQuery = queryParams['boardKey'] as string | undefined;
       const boardTypeFromQuery = queryParams['type'] as 'standard' | 'poll' | undefined;
+      const isCreating = queryParams['create'] === 'true';
       
       // User should already have a board from login flow
       // But handle edge case where board might not exist
@@ -594,8 +599,8 @@ export class Mainboard implements OnInit, AfterViewInit {
         }
       }
       
-      if (!boardKey) {
-        // Edge case: user exists but board not created (shouldn't happen after login fix)
+      if (!boardKey || isCreating) {
+        // Edge case: user exists but board not created, or explicitly creating a new board
         try {
           const created = await this.boards.createBoardForUser(user.uid);
           boardKey = created.boardKey;
@@ -636,8 +641,12 @@ export class Mainboard implements OnInit, AfterViewInit {
 
       // Load board type and poll data (only if not already set from query params)
       if (!boardKeyFromQuery) {
-        // Not editing a specific board - use default board type
-        this.boardType = this.board?.boardType || 'standard';
+        // Not editing a specific board - use query param type if provided, otherwise use board's type or default to standard
+        if (boardTypeFromQuery === 'poll' || boardTypeFromQuery === 'standard') {
+          this.boardType = boardTypeFromQuery;
+        } else {
+          this.boardType = this.board?.boardType || 'standard';
+        }
         if (this.board?.boardType === 'poll' && this.board.pollData) {
           this.pollData = this.board.pollData;
         } else {
@@ -645,6 +654,17 @@ export class Mainboard implements OnInit, AfterViewInit {
         }
       }
       // If boardKeyFromQuery exists, board type and poll data are already set above
+
+      // Clear the create query param after everything is set up
+      if (isCreating) {
+        // Use setTimeout to ensure all initialization is complete before navigation
+        setTimeout(() => {
+          this.router.navigate(['/mainboard'], { 
+            replaceUrl: true,
+            queryParams: {} 
+          });
+        }, 0);
+      }
 
       // Prioritize RTDB content over localStorage
       const dbContent = this.board?.message?.html || '';
@@ -1216,5 +1236,10 @@ export class Mainboard implements OnInit, AfterViewInit {
       }
       this.alertService.error('Error checking primary board status');
     }
+  }
+
+  onPrimaryBoardChangeFromPoll(checked: boolean): void {
+    this.isPrimaryBoard = checked;
+    this.isPrimaryBoardControl.setValue(checked, { emitEvent: false });
   }
 }

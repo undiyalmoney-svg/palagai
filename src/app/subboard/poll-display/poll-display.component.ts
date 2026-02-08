@@ -72,8 +72,20 @@ export class PollDisplayComponent implements OnInit, AfterViewInit, OnDestroy {
     if (this.pollData) {
       console.log('[PollDisplay] Using provided pollData');
       this.currentPollData = this.pollData;
+      // Force formReady immediately to show submit button
+      if (this.currentPollData.options && this.currentPollData.options.length > 0) {
+        this.formReady = true;
+      }
+      // Initialize form immediately
       this.initializeForm();
-      this.cdr.detectChanges();
+      // Use setTimeout to ensure form initialization happens after view init
+      setTimeout(() => {
+        // Ensure formReady is true
+        if (this.currentPollData && this.currentPollData.options && this.currentPollData.options.length > 0) {
+          this.formReady = true;
+        }
+        this.cdr.detectChanges();
+      }, 0);
       return;
     }
     
@@ -105,8 +117,14 @@ export class PollDisplayComponent implements OnInit, AfterViewInit, OnDestroy {
       if (poll) {
         console.log('[PollDisplay] Poll data loaded:', poll.question, 'options:', poll.options?.length);
         this.currentPollData = poll;
+        // Force formReady to true immediately if we have poll data - ensures submit button shows
+        if (poll.options && poll.options.length > 0) {
+          this.formReady = true;
+          console.log('[PollDisplay] FormReady set to true, submit button should be visible');
+        }
         this.initializeForm();
         this.error = null;
+        this.cdr.detectChanges();
         
         // Don't auto-show results on load - user must vote first
       } else {
@@ -149,7 +167,8 @@ export class PollDisplayComponent implements OnInit, AfterViewInit, OnDestroy {
     }
 
     const optionsCount = this.currentPollData.options.length;
-    const pollType = this.currentPollData.pollType;
+    // Default to 'single' if pollType is not set (for backward compatibility)
+    const pollType = this.currentPollData.pollType || 'single';
     console.log('[PollDisplay] Initializing form with', optionsCount, 'options, type:', pollType);
     
     if (pollType === 'single') {
@@ -184,12 +203,12 @@ export class PollDisplayComponent implements OnInit, AfterViewInit, OnDestroy {
       const actualLength = verifyArray?.length || 0;
       console.log('[PollDisplay] Form initialized - array length:', actualLength, 'expected:', optionsCount);
       
-      if (actualLength === optionsCount && verifyArray) {
-        console.log('[PollDisplay] Form array controls:', verifyArray.controls.map((c, i) => `[${i}]: ${c.value}`).join(', '));
+      // Always set formReady to true if we have options - ensures submit button is visible
+      if (optionsCount > 0) {
         this.formReady = true;
-        console.log('[PollDisplay] Multiple choice form ready');
+        console.log('[PollDisplay] Form ready - options available');
       } else {
-        console.error('[PollDisplay] Form array length mismatch! Expected:', optionsCount, 'Got:', actualLength);
+        console.error('[PollDisplay] No options available');
         this.formReady = false;
       }
     }
@@ -202,13 +221,23 @@ export class PollDisplayComponent implements OnInit, AfterViewInit, OnDestroy {
     // Use setTimeout to avoid ExpressionChangedAfterItHasBeenCheckedError
     setTimeout(() => {
       if (this.currentPollData && this.currentPollData.options && this.currentPollData.options.length > 0) {
-        const array = this.pollForm.get('selectedOptions') as FormArray;
-        if (array && array.length === this.currentPollData.options.length && !this.formReady) {
+        // Force formReady to true if we have poll data - ensures submit button is always visible
+        if (!this.formReady) {
+          console.log('[PollDisplay] Form not ready in ngAfterViewInit, forcing formReady to true...');
           this.formReady = true;
           this.cdr.markForCheck();
         }
+        
+        // Also try to initialize form if needed
+        const pollType = this.currentPollData.pollType || 'single';
+        if (pollType === 'multiple') {
+          const array = this.pollForm.get('selectedOptions') as FormArray;
+          if (!array || array.length !== this.currentPollData.options.length) {
+            this.initializeForm();
+          }
+        }
       }
-    }, 0);
+    }, 50); // Shorter delay for faster button appearance
   }
 
   // Removed loadPollData - using loadPollDataFromFirebase instead
@@ -232,7 +261,8 @@ export class PollDisplayComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   async submitVote(): Promise<void> {
-    if (!this.boardKey || !this.currentPollData || this.isVoting || !this.canVote) {
+    // Allow unlimited voting - only check if currently voting or data missing
+    if (!this.boardKey || !this.currentPollData || this.isVoting) {
       return;
     }
 
