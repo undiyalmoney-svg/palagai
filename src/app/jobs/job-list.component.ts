@@ -45,6 +45,39 @@ export class JobListComponent implements OnInit, OnDestroy {
 
     this.isLoggedIn = !!this.authService.user;
     this.loadJobs();
+    this.loadAdSenseScript();
+  }
+
+  private loadAdSenseScript(): void {
+    // Check if script already exists
+    if (document.querySelector('script[src*="adsbygoogle.js"]')) {
+      // Script exists, push ads
+      setTimeout(() => {
+        try {
+          ((window as any).adsbygoogle = (window as any).adsbygoogle || []).push({});
+        } catch (e) {
+          console.error('AdSense push error:', e);
+        }
+      }, 100);
+      return;
+    }
+
+    // Create and load AdSense script
+    const script = document.createElement('script');
+    script.async = true;
+    script.src = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2739882000561401';
+    script.crossOrigin = 'anonymous';
+    script.onload = () => {
+      // Push ads after script loads
+      setTimeout(() => {
+        try {
+          ((window as any).adsbygoogle = (window as any).adsbygoogle || []).push({});
+        } catch (e) {
+          console.error('AdSense push error:', e);
+        }
+      }, 100);
+    };
+    document.head.appendChild(script);
   }
 
   ngOnDestroy(): void {

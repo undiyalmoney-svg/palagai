@@ -4,6 +4,8 @@
   padding: 24px;
   max-width: 1400px;
   margin: 0 auto;
+  box-sizing: border-box;
+  width: 100%;
 }
 
 .dashboard-header {
@@ -30,6 +32,8 @@
   display: flex;
   flex-direction: column;
   gap: 24px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 /* Profile Card */
@@ -154,13 +158,14 @@
 }
 
 .quick-actions-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 16px;
 }
 
-.action-btn {
-  display: flex;
+.action-btn,
+.post-job-action-btn {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
@@ -168,6 +173,13 @@
   font-size: 16px;
   height: auto;
   min-height: 48px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.post-job-action-btn {
+  width: auto;
+  max-width: 100%;
 }
 
 /* Boards Section */
@@ -445,6 +457,15 @@
 
   .no-boards-card {
     padding: 48px 24px;
+  }
+
+  .quick-actions-grid {
+    flex-direction: column;
+  }
+
+  .post-job-action-btn {
+    width: 100%;
+    white-space: normal;
   }
 }
 

@@ -1,8 +1,35 @@
 .job-list-container {
   min-height: 100vh;
   background: #f5f5f5;
+  background-image: url('/job-list-background.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
   display: flex;
   flex-direction: column;
+  position: relative;
+}
+
+.job-list-container::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.9);
+  z-index: 0;
+}
+
+.job-list-container > * {
+  position: relative;
+  z-index: 1;
+}
+
+.job-header {
+  position: relative;
+  z-index: 2;
 }
 
 .job-header {
@@ -132,11 +159,12 @@
 }
 
 .job-card {
-  background: white;
+  background: white !important;
   border-radius: 8px;
   padding: 24px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   transition: box-shadow 0.2s;
+  border: 1px solid #e0e0e0;
 }
 
 .job-card:hover {
@@ -222,6 +250,26 @@
   align-items: center;
   gap: 8px;
   min-width: 120px;
+}
+
+/* AdSense Containers */
+.adsense-container {
+  width: 100%;
+  margin: 20px 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100px;
+}
+
+.adsense-top {
+  margin-top: 0;
+  margin-bottom: 24px;
+}
+
+.adsense-bottom {
+  margin-top: 24px;
+  margin-bottom: 0;
 }
 
 /* Mobile Responsive */

@@ -119,7 +119,7 @@ export class CreateBalloonSecretComponent implements OnInit, OnDestroy {
 
     // Check for emojis
     if (this.containsEmoji(message)) {
-      this.snackBar.open('⚠️ Only strings and numbers are allowed. Emojis are not allowed.', 'OK', {
+      this.snackBar.open('Only string and numbers are allowed', 'OK', {
         duration: 4000,
         panelClass: ['error-snackbar']
       });
