@@ -13,6 +13,8 @@ import { PollResultsComponent } from './poll-results/poll-results.component';
 import { UserDashboardComponent } from './user-dashboard/user-dashboard.component';
 import { CreateBalloonSecretComponent } from './balloon/create-balloon-secret.component';
 import { BalloonPunchRevealComponent } from './balloon/balloon-punch-reveal.component';
+import { PostJobComponent } from './jobs/post-job.component';
+import { JobListComponent } from './jobs/job-list.component';
 
 export const routes: Routes = [
   {
@@ -67,6 +69,14 @@ export const routes: Routes = [
   {
     path: 'poll/:boardKey/results',
     component: PollResultsComponent,
+  },
+  {
+    path: 'jobs',
+    component: JobListComponent,
+  },
+  {
+    path: 'jobs/post',
+    component: PostJobComponent,
   },
   {
     path: 'admin',

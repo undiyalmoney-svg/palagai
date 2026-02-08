@@ -1,0 +1,113 @@
+<div class="post-job-container">
+  <!-- Header -->
+  <mat-toolbar color="primary" class="job-header">
+    <button mat-icon-button routerLink="/dashboard" class="back-btn" aria-label="Back" title="Back">
+      <mat-icon>arrow_back</mat-icon>
+    </button>
+    <span class="header-title">Post a Job</span>
+    <span class="spacer"></span>
+  </mat-toolbar>
+
+  <div class="post-job-content">
+    <mat-card class="job-form-card">
+      <mat-card-header>
+        <mat-card-title>Job Details</mat-card-title>
+        <mat-card-subtitle>Fill in the job information below</mat-card-subtitle>
+      </mat-card-header>
+
+      <mat-card-content>
+        <form [formGroup]="jobForm" (ngSubmit)="onSubmit()">
+          <!-- Job Title -->
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Job Title *</mat-label>
+            <input matInput formControlName="title" placeholder="e.g., Software Developer" maxlength="100" />
+            <mat-hint>Maximum 100 characters</mat-hint>
+            <mat-error *ngIf="jobForm.get('title')?.hasError('required')">
+              Job title is required
+            </mat-error>
+            <mat-error *ngIf="jobForm.get('title')?.hasError('maxlength')">
+              Job title must be less than 100 characters
+            </mat-error>
+          </mat-form-field>
+
+          <!-- Company Name -->
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Company Name *</mat-label>
+            <input matInput formControlName="company" placeholder="e.g., Tech Solutions Inc." maxlength="100" />
+            <mat-hint>Maximum 100 characters</mat-hint>
+            <mat-error *ngIf="jobForm.get('company')?.hasError('required')">
+              Company name is required
+            </mat-error>
+            <mat-error *ngIf="jobForm.get('company')?.hasError('maxlength')">
+              Company name must be less than 100 characters
+            </mat-error>
+          </mat-form-field>
+
+          <!-- Location -->
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Location *</mat-label>
+            <input matInput formControlName="location" placeholder="e.g., Chennai, Tamil Nadu" maxlength="100" />
+            <mat-hint>Maximum 100 characters</mat-hint>
+            <mat-error *ngIf="jobForm.get('location')?.hasError('required')">
+              Location is required
+            </mat-error>
+            <mat-error *ngIf="jobForm.get('location')?.hasError('maxlength')">
+              Location must be less than 100 characters
+            </mat-error>
+          </mat-form-field>
+
+          <!-- Description -->
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Job Description *</mat-label>
+            <textarea
+              matInput
+              formControlName="description"
+              placeholder="Describe the job requirements, responsibilities, and qualifications..."
+              rows="6"
+              maxlength="1000"
+            ></textarea>
+            <mat-hint>{{ jobForm.get('description')?.value?.length || 0 }}/1000 characters</mat-hint>
+            <mat-error *ngIf="jobForm.get('description')?.hasError('required')">
+              Job description is required
+            </mat-error>
+            <mat-error *ngIf="jobForm.get('description')?.hasError('maxlength')">
+              Description must be less than 1000 characters
+            </mat-error>
+          </mat-form-field>
+
+          <!-- Contact Email -->
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Contact Email *</mat-label>
+            <input matInput type="email" formControlName="contactEmail" placeholder="contact@company.com" />
+            <mat-icon matPrefix>email</mat-icon>
+            <mat-error *ngIf="jobForm.get('contactEmail')?.hasError('required')">
+              Contact email is required
+            </mat-error>
+            <mat-error *ngIf="jobForm.get('contactEmail')?.hasError('email')">
+              Please enter a valid email address
+            </mat-error>
+          </mat-form-field>
+
+          <!-- Submit Button -->
+          <div class="form-actions">
+            <button
+              mat-raised-button
+              color="primary"
+              type="submit"
+              [disabled]="jobForm.invalid || submitting"
+              class="submit-btn"
+            >
+              <mat-icon *ngIf="!submitting">post_add</mat-icon>
+              <mat-icon *ngIf="submitting" class="spinning">hourglass_empty</mat-icon>
+              <span>{{ submitting ? 'Posting...' : 'Post Job' }}</span>
+            </button>
+            <button mat-stroked-button type="button" routerLink="/dashboard" class="cancel-btn">
+              Cancel
+            </button>
+          </div>
+        </form>
+      </mat-card-content>
+    </mat-card>
+  </div>
+</div>
+

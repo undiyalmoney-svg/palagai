@@ -125,6 +125,18 @@ export interface PunchUsageRecord {
   dataParam: string; // The encoded data parameter from URL (for tracking unique punches)
 }
 
+export interface Job {
+  id: string; // Unique job ID
+  title: string; // Job title
+  company: string; // Company name
+  description: string; // Job description
+  location: string; // Job location
+  contactEmail: string; // Contact email
+  createdBy: string; // User email who posted
+  createdAt: number; // Timestamp when job was created
+  status: 'active' | 'closed'; // Job status
+}
+
 @Injectable({
   providedIn: 'root',
 })
@@ -136,6 +148,7 @@ export class BoardService {
   private kavithaiRef: DatabaseReference;
   private pollVotesRef: DatabaseReference;
   private punchUsageRef: DatabaseReference;
+  private jobsRef: DatabaseReference;
   constructor() {
     this.usersRef = ref(db, 'users');
     this.boardsRef = ref(db, 'boards');
@@ -144,6 +157,7 @@ export class BoardService {
     this.kavithaiRef = ref(db, 'competition/kavithai');
     this.pollVotesRef = ref(db, 'pollVotes');
     this.punchUsageRef = ref(db, 'punchUsage');
+    this.jobsRef = ref(db, 'jobs');
   }
 
   /**
@@ -2370,6 +2384,93 @@ export class BoardService {
     } catch (err: any) {
       console.error('[BoardService] Error fetching punch usage stats:', err);
       throw new Error(`Failed to fetch punch usage stats: ${err?.message || 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Create a new job posting
+   */
+  async createJob(job: Omit<Job, 'id' | 'createdAt' | 'status'>): Promise<string> {
+    try {
+      const jobId = push(this.jobsRef).key;
+      if (!jobId) {
+        throw new Error('Failed to generate job ID');
+      }
+
+      const newJob: Job = {
+        ...job,
+        id: jobId,
+        createdAt: Date.now(),
+        status: 'active',
+      };
+
+      await set(child(this.jobsRef, jobId), newJob);
+      return jobId;
+    } catch (err: any) {
+      console.error('[BoardService] Error creating job:', err);
+      throw new Error(`Failed to create job: ${err?.message || 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Get all active jobs
+   */
+  async getAllJobs(): Promise<Job[]> {
+    try {
+      const snapshot = await get(this.jobsRef);
+      if (!snapshot.exists()) {
+        return [];
+      }
+
+      const data = snapshot.val();
+      const jobs: Job[] = Object.values(data) as Job[];
+      // Return only active jobs, sorted by newest first
+      return jobs
+        .filter(job => job.status === 'active')
+        .sort((a, b) => b.createdAt - a.createdAt);
+    } catch (err: any) {
+      console.error('[BoardService] Error fetching jobs:', err);
+      throw new Error(`Failed to fetch jobs: ${err?.message || 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Get job by ID
+   */
+  async getJob(jobId: string): Promise<Job | null> {
+    try {
+      const snapshot = await get(child(this.jobsRef, jobId));
+      if (!snapshot.exists()) {
+        return null;
+      }
+      return snapshot.val() as Job;
+    } catch (err: any) {
+      console.error('[BoardService] Error fetching job:', err);
+      throw new Error(`Failed to fetch job: ${err?.message || 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Update job status (e.g., close a job)
+   */
+  async updateJobStatus(jobId: string, status: 'active' | 'closed'): Promise<void> {
+    try {
+      await update(child(this.jobsRef, jobId), { status });
+    } catch (err: any) {
+      console.error('[BoardService] Error updating job status:', err);
+      throw new Error(`Failed to update job status: ${err?.message || 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Delete a job
+   */
+  async deleteJob(jobId: string): Promise<void> {
+    try {
+      await set(child(this.jobsRef, jobId), null);
+    } catch (err: any) {
+      console.error('[BoardService] Error deleting job:', err);
+      throw new Error(`Failed to delete job: ${err?.message || 'Unknown error'}`);
     }
   }
 }

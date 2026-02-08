@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
@@ -29,10 +29,11 @@ import { LinkGeneratedDialogComponent } from './link-generated-dialog.component'
   templateUrl: './create-balloon-secret.component.html',
   styleUrls: ['./create-balloon-secret.component.css']
 })
-export class CreateBalloonSecretComponent implements OnInit {
+export class CreateBalloonSecretComponent implements OnInit, OnDestroy {
   secretForm!: FormGroup;
   generatedUrl: string = '';
   isGenerating: boolean = false;
+  private adSenseScript: HTMLScriptElement | null = null;
 
   constructor(
     private fb: FormBuilder,
@@ -49,6 +50,30 @@ export class CreateBalloonSecretComponent implements OnInit {
       message: ['', [Validators.required, Validators.minLength(1)]],
       icon: [1, [Validators.required]]
     });
+
+    // Load Google AdSense script
+    this.loadAdSenseScript();
+  }
+
+  ngOnDestroy(): void {
+    // Clean up AdSense script if needed
+    if (this.adSenseScript && this.adSenseScript.parentNode) {
+      this.adSenseScript.parentNode.removeChild(this.adSenseScript);
+    }
+  }
+
+  private loadAdSenseScript(): void {
+    // Check if script already exists
+    if (document.querySelector('script[src*="adsbygoogle.js"]')) {
+      return;
+    }
+
+    // Create and load AdSense script
+    this.adSenseScript = document.createElement('script');
+    this.adSenseScript.async = true;
+    this.adSenseScript.src = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2739882000561401';
+    this.adSenseScript.crossOrigin = 'anonymous';
+    document.head.appendChild(this.adSenseScript);
   }
 
   selectIcon(iconNumber: number): void {
@@ -58,6 +83,16 @@ export class CreateBalloonSecretComponent implements OnInit {
 
   get selectedIconPath(): string {
     return `/assets/icon-${this.selectedIcon}.png`;
+  }
+
+  /**
+   * Check if string contains emojis
+   * Returns true if emojis are detected
+   */
+  private containsEmoji(str: string): boolean {
+    // Emoji regex pattern - matches most emoji ranges
+    const emojiRegex = /[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]|[\u{1F600}-\u{1F64F}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]|[\u{1F900}-\u{1F9FF}]|[\u{1FA00}-\u{1FA6F}]|[\u{1FA70}-\u{1FAFF}]|[\u{FE00}-\u{FE0F}]|[\u{200D}]|[\u{203C}-\u{3299}]/u;
+    return emojiRegex.test(str);
   }
 
   /**
@@ -79,8 +114,19 @@ export class CreateBalloonSecretComponent implements OnInit {
       return;
     }
 
-    this.isGenerating = true;
     const formValue = this.secretForm.value;
+    const message = formValue.message.trim();
+
+    // Check for emojis
+    if (this.containsEmoji(message)) {
+      this.snackBar.open('⚠️ Only strings and numbers are allowed. Emojis are not allowed.', 'OK', {
+        duration: 4000,
+        panelClass: ['error-snackbar']
+      });
+      return;
+    }
+
+    this.isGenerating = true;
 
     try {
       // Create payload
