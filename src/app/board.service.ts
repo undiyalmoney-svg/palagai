@@ -114,6 +114,16 @@ export interface PollVote {
   email?: string; // Optional email if board is protected
 }
 
+export interface PunchUsageRecord {
+  ip: string; // User IP address
+  message: string; // The secret message
+  messageHash?: string; // Optional hash of message for privacy
+  punchCount: number; // Total punches required
+  timestamp: number; // When the punch was accessed/completed
+  dateTime: string; // ISO date string
+  eventType: 'access' | 'completion'; // Type of event: initial access or completion
+  dataParam: string; // The encoded data parameter from URL (for tracking unique punches)
+}
 
 @Injectable({
   providedIn: 'root',
@@ -125,6 +135,7 @@ export class BoardService {
   private votesRef: DatabaseReference;
   private kavithaiRef: DatabaseReference;
   private pollVotesRef: DatabaseReference;
+  private punchUsageRef: DatabaseReference;
   constructor() {
     this.usersRef = ref(db, 'users');
     this.boardsRef = ref(db, 'boards');
@@ -132,6 +143,7 @@ export class BoardService {
     this.votesRef = ref(db, 'votes');
     this.kavithaiRef = ref(db, 'competition/kavithai');
     this.pollVotesRef = ref(db, 'pollVotes');
+    this.punchUsageRef = ref(db, 'punchUsage');
   }
 
   /**
@@ -2280,6 +2292,85 @@ export class BoardService {
    */
   async adminDeletePoll(boardKey: string): Promise<void> {
     return this.deletePoll(boardKey); // Same logic
+  }
+
+  /**
+   * Record punch usage for analytics
+   */
+  async recordPunchUsage(
+    dataParam: string,
+    message: string,
+    punchCount: number,
+    eventType: 'access' | 'completion',
+    ip?: string
+  ): Promise<void> {
+    try {
+      // Get IP if not provided
+      let userIP = ip;
+      if (!userIP) {
+        userIP = await this.getUserIP();
+      }
+
+      const now = Date.now();
+      const dateTime = new Date(now).toISOString();
+      const recordId = `punch_${now}_${Math.random().toString(36).substr(2, 9)}`;
+
+      // Create usage record
+      const usageRecord: PunchUsageRecord = {
+        ip: userIP,
+        message: message,
+        punchCount: punchCount,
+        timestamp: now,
+        dateTime: dateTime,
+        eventType: eventType,
+        dataParam: dataParam
+      };
+
+      // Store in Firebase
+      await set(child(this.punchUsageRef, recordId), usageRecord);
+    } catch (err: any) {
+      // Log error but don't throw - analytics shouldn't break the app
+      console.error('[BoardService] Error recording punch usage:', err);
+    }
+  }
+
+  /**
+   * Get punch usage statistics (for admin)
+   */
+  async getPunchUsageStats(): Promise<{
+    totalAccesses: number;
+    totalCompletions: number;
+    uniqueIPs: number;
+    records: PunchUsageRecord[];
+  }> {
+    try {
+      const snapshot = await get(this.punchUsageRef);
+      
+      if (!snapshot.exists()) {
+        return {
+          totalAccesses: 0,
+          totalCompletions: 0,
+          uniqueIPs: 0,
+          records: []
+        };
+      }
+
+      const data = snapshot.val();
+      const records: PunchUsageRecord[] = Object.values(data) as PunchUsageRecord[];
+      const uniqueIPs = new Set(records.map(r => r.ip)).size;
+      const totalAccesses = records.filter(r => r.eventType === 'access').length;
+      const totalCompletions = records.filter(r => r.eventType === 'completion').length;
+
+      return {
+        totalAccesses,
+        totalCompletions,
+        uniqueIPs,
+        records: records.sort((a, b) => b.timestamp - a.timestamp) // Sort by newest first
+      };
+    } catch (err: any) {
+      console.error('[BoardService] Error fetching punch usage stats:', err);
+      throw new Error(`Failed to fetch punch usage stats: ${err?.message || 'Unknown error'}`);
+    }
   }
 }
 

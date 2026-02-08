@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
+import { BoardService } from '../board.service';
 
 interface BalloonData {
   punchCount: number;
@@ -34,10 +35,14 @@ export class BalloonPunchRevealComponent implements OnInit, OnDestroy {
   isZooming: boolean = false;
   selectedIcon: number = 1; // Default to icon 1
 
+  private dataParam: string = '';
+  private hasRecordedAccess: boolean = false;
+
   constructor(
     private route: ActivatedRoute,
     private router: Router,
-    private cdr: ChangeDetectorRef
+    private cdr: ChangeDetectorRef,
+    private boards: BoardService
   ) {}
 
   ngOnInit(): void {
@@ -54,6 +59,7 @@ export class BalloonPunchRevealComponent implements OnInit, OnDestroy {
       return;
     }
 
+    this.dataParam = dataParam;
     this.storageKey = `balloon_${dataParam}`;
 
     try {
@@ -76,6 +82,9 @@ export class BalloonPunchRevealComponent implements OnInit, OnDestroy {
       this.totalPunchCount = data.punchCount;
       this.decodedMessage = data.message;
       this.selectedIcon = data.icon || 1; // Default to icon 1 if not provided
+
+      // Record initial access
+      this.recordPunchAccess();
 
       // Restore progress from sessionStorage
       this.restoreProgress();
@@ -164,6 +173,10 @@ export class BalloonPunchRevealComponent implements OnInit, OnDestroy {
     if (this.currentPunchCount >= this.totalPunchCount) {
       this.currentPunchCount = this.totalPunchCount;
       this.isBurst = true;
+      
+      // Record completion
+      this.recordPunchCompletion();
+      
       // Trigger burst animation
       setTimeout(() => {
         this.cdr.detectChanges();
@@ -171,6 +184,39 @@ export class BalloonPunchRevealComponent implements OnInit, OnDestroy {
     }
 
     this.cdr.detectChanges();
+  }
+
+  private async recordPunchAccess(): Promise<void> {
+    if (this.hasRecordedAccess) {
+      return; // Only record once per session
+    }
+
+    try {
+      await this.boards.recordPunchUsage(
+        this.dataParam,
+        this.decodedMessage,
+        this.totalPunchCount,
+        'access'
+      );
+      this.hasRecordedAccess = true;
+    } catch (error) {
+      console.error('Error recording punch access:', error);
+      // Don't show error to user - analytics shouldn't break the experience
+    }
+  }
+
+  private async recordPunchCompletion(): Promise<void> {
+    try {
+      await this.boards.recordPunchUsage(
+        this.dataParam,
+        this.decodedMessage,
+        this.totalPunchCount,
+        'completion'
+      );
+    } catch (error) {
+      console.error('Error recording punch completion:', error);
+      // Don't show error to user - analytics shouldn't break the experience
+    }
   }
 
   goHome(): void {
