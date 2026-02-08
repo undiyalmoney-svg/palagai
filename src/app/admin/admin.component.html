@@ -115,6 +115,20 @@
               </button>
               <button
                 mat-menu-item
+                (click)="toggleSuperBoard(row.boardKey, row.board.isSuperBoard || false)"
+              >
+                <mat-icon>{{ row.board.isSuperBoard ? 'star' : 'star_border' }}</mat-icon>
+                <span>{{ row.board.isSuperBoard ? 'Remove Super Board' : 'Make Super Board' }}</span>
+              </button>
+              <button
+                mat-menu-item
+                (click)="setGoldenSlateId(row.boardKey)"
+              >
+                <mat-icon>workspace_premium</mat-icon>
+                <span>Set Golden Slate ID</span>
+              </button>
+              <button
+                mat-menu-item
                 (click)="deleteBoard(row.boardKey)"
                 class="delete-action"
               >
@@ -298,6 +312,120 @@
 
               <tr mat-header-row *matHeaderRowDef="displayedKavithaiColumns"></tr>
               <tr mat-row *matRowDef="let row; columns: displayedKavithaiColumns"></tr>
+            </table>
+          </div>
+        </div>
+      </mat-tab>
+
+      <!-- Polls Tab -->
+      <mat-tab label="Polls">
+        <div class="tab-content">
+          <div class="header-section">
+            <h2>Poll Management</h2>
+            <button mat-raised-button color="primary" (click)="loadPollBoards()" [disabled]="loadingPolls">
+              <mat-icon>refresh</mat-icon>
+              Refresh
+            </button>
+          </div>
+
+          <!-- Loading State -->
+          <div *ngIf="loadingPolls" class="loading-container">
+            <mat-spinner diameter="50"></mat-spinner>
+            <p>Loading polls...</p>
+          </div>
+
+          <!-- Empty State -->
+          <div *ngIf="!loadingPolls && pollBoards.length === 0" class="empty-state">
+            <mat-icon>poll</mat-icon>
+            <p>No polls found</p>
+          </div>
+
+          <!-- Polls Table -->
+          <div *ngIf="!loadingPolls && pollBoards.length > 0" class="boards-table-container">
+            <div class="boards-count">
+              <strong>{{ pollBoards.length }}</strong> poll(s) found
+            </div>
+            <table mat-table [dataSource]="pollBoards" class="boards-table">
+              <!-- Board Key Column -->
+              <ng-container matColumnDef="boardKey">
+                <th mat-header-cell *matHeaderCellDef>Board ID</th>
+                <td mat-cell *matCellDef="let row">
+                  <code class="board-key">{{ row.boardKey }}</code>
+                </td>
+              </ng-container>
+
+              <!-- Owner Email Column -->
+              <ng-container matColumnDef="ownerEmail">
+                <th mat-header-cell *matHeaderCellDef>Owner Email</th>
+                <td mat-cell *matCellDef="let row">
+                  {{ row.ownerEmail || 'N/A' }}
+                </td>
+              </ng-container>
+
+              <!-- Question Column -->
+              <ng-container matColumnDef="question">
+                <th mat-header-cell *matHeaderCellDef>Poll Question</th>
+                <td mat-cell *matCellDef="let row">
+                  {{ row.board.pollData?.question || 'N/A' }}
+                </td>
+              </ng-container>
+
+              <!-- Votes Column -->
+              <ng-container matColumnDef="votes">
+                <th mat-header-cell *matHeaderCellDef>Total Votes</th>
+                <td mat-cell *matCellDef="let row">
+                  {{ row.board.pollData?.totalVotes || 0 }}
+                </td>
+              </ng-container>
+
+              <!-- Status Column -->
+              <ng-container matColumnDef="status">
+                <th mat-header-cell *matHeaderCellDef>Status</th>
+                <td mat-cell *matCellDef="let row">
+                  <mat-chip [class.active]="row.board.isPollActive !== false" [class.inactive]="row.board.isPollActive === false">
+                    {{ row.board.isPollActive !== false ? 'Active' : 'Inactive' }}
+                  </mat-chip>
+                </td>
+              </ng-container>
+
+              <!-- Actions Column -->
+              <ng-container matColumnDef="actions">
+                <th mat-header-cell *matHeaderCellDef>Actions</th>
+                <td mat-cell *matCellDef="let row">
+                  <button
+                    mat-icon-button
+                    [matMenuTriggerFor]="menu"
+                    matTooltip="Actions"
+                  >
+                    <mat-icon>more_vert</mat-icon>
+                  </button>
+                  <mat-menu #menu="matMenu">
+                    <button mat-menu-item (click)="viewBoard(row.boardKey)">
+                      <mat-icon>visibility</mat-icon>
+                      <span>View Poll</span>
+                    </button>
+                    <button mat-menu-item (click)="togglePollActiveStatus(row.boardKey)">
+                      <mat-icon>{{ row.board.isPollActive !== false ? 'block' : 'check_circle' }}</mat-icon>
+                      <span>{{ row.board.isPollActive !== false ? 'Deactivate' : 'Activate' }}</span>
+                    </button>
+                    <button mat-menu-item (click)="toggleSuperBoard(row.boardKey, row.board.isSuperBoard || false)">
+                      <mat-icon>{{ row.board.isSuperBoard ? 'star' : 'star_border' }}</mat-icon>
+                      <span>{{ row.board.isSuperBoard ? 'Remove Super Board' : 'Make Super Board' }}</span>
+                    </button>
+                    <button mat-menu-item (click)="setGoldenSlateId(row.boardKey)">
+                      <mat-icon>workspace_premium</mat-icon>
+                      <span>Set Golden Slate ID</span>
+                    </button>
+                    <button mat-menu-item (click)="deletePollBoard(row.boardKey)" class="delete-action">
+                      <mat-icon>delete</mat-icon>
+                      <span>Delete Poll</span>
+                    </button>
+                  </mat-menu>
+                </td>
+              </ng-container>
+
+              <tr mat-header-row *matHeaderRowDef="displayedPollColumns"></tr>
+              <tr mat-row *matRowDef="let row; columns: displayedPollColumns"></tr>
             </table>
           </div>
         </div>

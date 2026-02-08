@@ -39,10 +39,18 @@ export interface Board {
   voteCount?: number; // Vote count stored in board for UI
   boardSize?: 'min' | 'normal' | 'max';
   isBlocked?: boolean;
+  boardType?: 'standard' | 'poll'; // Board type: standard or poll
+  pollData?: PollData; // Poll-specific data (only present if boardType === 'poll')
+  pollCreatedAt?: number; // Timestamp when poll was created (to prevent modification)
+  isPollActive?: boolean; // Admin can make polls inactive
+  isPrimaryBoard?: boolean; // Primary board option - shown on view board page
+  isSuperBoard?: boolean; // Super board - allows extended poll expiry dates and other premium features
+  goldenSlateId?: string; // Golden slate ID - custom ID that can be any string/word/sentence
 }
 
 export interface UserRecord {
   email: string;
+  name?: string; // User's display name
   passwordHash?: string; // SHA-256 hash of the password
   boardKey?: string;
   createdAt: number;
@@ -80,6 +88,33 @@ export interface Kavithai {
   isInvalid?: boolean; // Flag to mark invalid entries
 }
 
+export interface PollOption {
+  id: string; // Unique ID for the option
+  text: string; // Option text
+  voteCount: number; // Number of votes for this option
+  color?: string; // Optional color for visual distinction
+}
+
+export interface PollData {
+  question: string; // The poll question
+  options: PollOption[]; // Array of poll options (max 5)
+  pollType: 'single' | 'multiple'; // Single choice or multiple choice
+  showResults: 'always' | 'after-vote' | 'never'; // When to show results
+  allowVoteChange: boolean; // Can users change their vote?
+  totalVotes: number; // Total number of votes cast
+  createdAt: number; // When poll was created
+  endDate?: number; // Optional end date for poll
+}
+
+export interface PollVote {
+  boardKey: string; // Board ID
+  optionIds: string[]; // Selected option IDs (array for multiple choice)
+  ip: string; // Voter IP (for tracking)
+  timestamp: number; // When vote was cast
+  email?: string; // Optional email if board is protected
+}
+
+
 @Injectable({
   providedIn: 'root',
 })
@@ -89,13 +124,14 @@ export class BoardService {
   private adminRef: DatabaseReference;
   private votesRef: DatabaseReference;
   private kavithaiRef: DatabaseReference;
-
+  private pollVotesRef: DatabaseReference;
   constructor() {
     this.usersRef = ref(db, 'users');
     this.boardsRef = ref(db, 'boards');
     this.adminRef = ref(db, 'admin');
     this.votesRef = ref(db, 'votes');
     this.kavithaiRef = ref(db, 'competition/kavithai');
+    this.pollVotesRef = ref(db, 'pollVotes');
   }
 
   /**
@@ -521,8 +557,53 @@ export class BoardService {
       if (err?.code === 'NETWORK_ERROR') {
         throw new Error('Network error. Please check your connection and try again.');
       }
-      throw new Error(`Failed to load board: ${err?.message || 'Unknown error'}`);
+      throw new Error(`Failed to get board: ${err?.message || 'Unknown error'}`);
     }
+  }
+
+  /**
+   * Resolve board ID - tries regular board key first, then golden slate ID
+   * Returns the board and the actual board key
+   */
+  async resolveBoardId(inputId: string): Promise<{ board: Board; actualBoardKey: string } | null> {
+    if (!inputId || !inputId.trim()) {
+      return null;
+    }
+
+    const trimmedId = inputId.trim();
+
+    // First, try as regular board key
+    const board = await this.getBoard(trimmedId);
+    if (board) {
+      return { board, actualBoardKey: trimmedId };
+    }
+
+    // If not found, try as golden slate ID
+    const boardByGoldenId = await this.getBoardByGoldenSlateId(trimmedId);
+    if (boardByGoldenId) {
+      // Need to find the actual board key for this board
+      // Since we have the board data, we need to search for it
+      try {
+        const snapshot = await get(this.boardsRef);
+        if (!snapshot.exists()) {
+          return null;
+        }
+
+        const boards = snapshot.val();
+        for (const [boardKey, boardData] of Object.entries(boards)) {
+          const b = boardData as Board;
+          if (b.goldenSlateId && b.goldenSlateId.trim() === trimmedId) {
+            return { board: boardByGoldenId, actualBoardKey: boardKey };
+          }
+        }
+        return null;
+      } catch (err: any) {
+        console.error('Error finding board key for golden slate ID:', err);
+        return null;
+      }
+    }
+
+    return null;
   }
 
   /**
@@ -605,6 +686,309 @@ export class BoardService {
         throw new Error('Network error. Please check your connection and try again.');
       }
       throw new Error(`Failed to update board size: ${err?.message || 'Unknown error'}`);
+    }
+  }
+
+  async toggleSuperBoard(boardKey: string, isSuper: boolean): Promise<void> {
+    if (!boardKey || !boardKey.trim()) {
+      throw new Error('Board ID is required');
+    }
+    
+    try {
+      await update(child(this.boardsRef, boardKey.trim()), {
+        isSuperBoard: isSuper
+      });
+    } catch (err: any) {
+      if (err?.code === 'PERMISSION_DENIED') {
+        throw new Error('Permission denied. Unable to update super board status.');
+      }
+      throw new Error(`Failed to update super board status: ${err?.message || 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Check if a golden slate ID already exists (excluding the current board)
+   * Returns true if duplicate exists, false otherwise
+   */
+  async goldenSlateIdExists(goldenSlateId: string, excludeBoardKey?: string): Promise<boolean> {
+    if (!goldenSlateId || !goldenSlateId.trim()) {
+      return false; // Empty ID doesn't count as duplicate
+    }
+
+    try {
+      const normalizedId = goldenSlateId.trim();
+      const snapshot = await get(this.boardsRef);
+      
+      if (!snapshot.exists()) {
+        return false;
+      }
+
+      const boards = snapshot.val();
+      for (const [boardKey, boardData] of Object.entries(boards)) {
+        const board = boardData as Board;
+        // Check if this board has the same golden slate ID
+        if (board.goldenSlateId && board.goldenSlateId.trim() === normalizedId) {
+          // If excludeBoardKey is provided and matches, skip it (for updates)
+          if (excludeBoardKey && boardKey === excludeBoardKey.trim()) {
+            continue;
+          }
+          return true; // Duplicate found
+        }
+      }
+      return false; // No duplicate found
+    } catch (err: any) {
+      console.error('Error checking golden slate ID:', err);
+      return false; // On error, assume no duplicate (fail open)
+    }
+  }
+
+  /**
+   * Set golden slate ID for a board
+   * Automatically checks for duplicates and prevents setting if duplicate exists
+   */
+  async setGoldenSlateId(boardKey: string, goldenSlateId: string | null): Promise<void> {
+    if (!boardKey || !boardKey.trim()) {
+      throw new Error('Board ID is required');
+    }
+
+    // If setting to null/empty, just remove it
+    if (!goldenSlateId || !goldenSlateId.trim()) {
+      try {
+        await update(child(this.boardsRef, boardKey.trim()), {
+          goldenSlateId: null
+        });
+        return;
+      } catch (err: any) {
+        if (err?.code === 'PERMISSION_DENIED') {
+          throw new Error('Permission denied. Unable to update golden slate ID.');
+        }
+        throw new Error(`Failed to remove golden slate ID: ${err?.message || 'Unknown error'}`);
+      }
+    }
+
+    // Check for duplicates (excluding current board)
+    const isDuplicate = await this.goldenSlateIdExists(goldenSlateId.trim(), boardKey);
+    if (isDuplicate) {
+      throw new Error('This golden slate ID is already in use by another board');
+    }
+
+    try {
+      await update(child(this.boardsRef, boardKey.trim()), {
+        goldenSlateId: goldenSlateId.trim()
+      });
+    } catch (err: any) {
+      if (err?.code === 'PERMISSION_DENIED') {
+        throw new Error('Permission denied. Unable to update golden slate ID.');
+      }
+      throw new Error(`Failed to update golden slate ID: ${err?.message || 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Get board by golden slate ID
+   */
+  async getBoardByGoldenSlateId(goldenSlateId: string): Promise<Board | null> {
+    if (!goldenSlateId || !goldenSlateId.trim()) {
+      return null;
+    }
+
+    try {
+      const normalizedId = goldenSlateId.trim();
+      const snapshot = await get(this.boardsRef);
+      
+      if (!snapshot.exists()) {
+        return null;
+      }
+
+      const boards = snapshot.val();
+      for (const [boardKey, boardData] of Object.entries(boards)) {
+        const board = boardData as Board;
+        if (board.goldenSlateId && board.goldenSlateId.trim() === normalizedId) {
+          return board;
+        }
+      }
+      return null; // Not found
+    } catch (err: any) {
+      console.error('Error getting board by golden slate ID:', err);
+      return null;
+    }
+  }
+
+  async updatePrimaryBoardStatus(boardKey: string, isPrimary: boolean): Promise<void> {
+    if (!boardKey || !boardKey.trim()) {
+      throw new Error('Board ID is required');
+    }
+    
+    try {
+      await update(child(this.boardsRef, boardKey.trim()), {
+        isPrimaryBoard: isPrimary,
+      });
+    } catch (err: any) {
+      if (err?.code === 'PERMISSION_DENIED') {
+        throw new Error('Permission denied. Unable to update primary board status.');
+      }
+      if (err?.code === 'NETWORK_ERROR') {
+        throw new Error('Network error. Please check your connection and try again.');
+      }
+      throw new Error(`Failed to update primary board status: ${err?.message || 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Get the list of job board IDs
+   */
+
+  /**
+   * Get user by UID
+   */
+  async getUserByUid(uid: string): Promise<{ uid: string; user: UserRecord } | null> {
+    if (!uid || !uid.trim()) {
+      return null;
+    }
+
+    try {
+      const userRef = child(this.usersRef, uid.trim());
+      const snapshot = await get(userRef);
+      
+      if (!snapshot.exists()) {
+        return null;
+      }
+
+      return {
+        uid: uid.trim(),
+        user: snapshot.val() as UserRecord,
+      };
+    } catch (err: any) {
+      console.error('[BoardService] Error fetching user by UID:', err);
+      throw new Error(`Failed to fetch user: ${err?.message || 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Update user profile (name, email, dateOfBirth)
+   */
+  async updateUserProfile(uid: string, updates: { name?: string; email?: string; dateOfBirth?: string }): Promise<void> {
+    if (!uid || !uid.trim()) {
+      throw new Error('User ID is required');
+    }
+
+    try {
+      const userRef = child(this.usersRef, uid.trim());
+      const updateData: Partial<UserRecord> = {};
+      
+      if (updates.name !== undefined) {
+        updateData.name = updates.name.trim();
+      }
+      if (updates.email !== undefined) {
+        updateData.email = updates.email.trim().toLowerCase();
+      }
+      if (updates.dateOfBirth !== undefined) {
+        updateData.dateOfBirth = updates.dateOfBirth;
+      }
+
+      await update(userRef, updateData);
+    } catch (err: any) {
+      console.error('[BoardService] Error updating user profile:', err);
+      throw new Error(`Failed to update user profile: ${err?.message || 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Get all boards for a specific user (by ownerUid)
+   */
+  async getUserBoards(ownerUid: string): Promise<Array<{ boardKey: string; board: Board }>> {
+    if (!ownerUid || !ownerUid.trim()) {
+      return [];
+    }
+
+    try {
+      const boardsSnapshot = await get(this.boardsRef);
+      
+      if (!boardsSnapshot.exists()) {
+        return [];
+      }
+
+      const boardsData = boardsSnapshot.val();
+      const userBoards: Array<{ boardKey: string; board: Board }> = [];
+
+      for (const [boardKey, boardData] of Object.entries(boardsData)) {
+        try {
+          const board = boardData as Board;
+          
+          // Only include boards owned by this user
+          if (board.ownerUid === ownerUid.trim()) {
+            userBoards.push({ boardKey, board });
+          }
+        } catch (e) {
+          console.error(`[BoardService] Error processing board ${boardKey}:`, e);
+          // Continue with other boards even if one fails
+        }
+      }
+
+      // Sort by creation date (newest first)
+      userBoards.sort((a, b) => (b.board.createdAt || 0) - (a.board.createdAt || 0));
+
+      return userBoards;
+    } catch (err: any) {
+      console.error('[BoardService] Error fetching user boards:', err);
+      throw new Error(`Failed to fetch user boards: ${err?.message || 'Unknown error'}`);
+    }
+  }
+
+
+  /**
+   * Get all primary boards (boards marked as primary)
+   */
+  async getPrimaryBoards(): Promise<Array<{ boardKey: string; board: Board; ownerEmail?: string }>> {
+    try {
+      const boardsSnapshot = await get(this.boardsRef);
+      
+      if (!boardsSnapshot.exists()) {
+        return [];
+      }
+
+      const boardsData = boardsSnapshot.val();
+      const usersSnapshot = await get(this.usersRef);
+      const usersData = usersSnapshot.exists() ? usersSnapshot.val() : {};
+
+      const primaryBoards: Array<{ boardKey: string; board: Board; ownerEmail?: string }> = [];
+
+      for (const [boardKey, boardData] of Object.entries(boardsData)) {
+        try {
+          const board = boardData as Board;
+          
+          // Only include boards marked as primary
+          if (board.isPrimaryBoard !== true) {
+            continue;
+          }
+
+          let ownerEmail: string | undefined;
+
+          // Find owner email
+          if (board.ownerUid) {
+            for (const [uid, userData] of Object.entries(usersData)) {
+              const user = userData as UserRecord;
+              if (uid === board.ownerUid) {
+                ownerEmail = user.email;
+                break;
+              }
+            }
+          }
+
+          primaryBoards.push({ boardKey, board, ownerEmail });
+        } catch (e) {
+          console.error(`[BoardService] Error processing board ${boardKey}:`, e);
+          // Continue with other boards even if one fails
+        }
+      }
+
+      // Sort by creation date (newest first)
+      primaryBoards.sort((a, b) => (b.board.createdAt || 0) - (a.board.createdAt || 0));
+
+      return primaryBoards;
+    } catch (err: any) {
+      console.error('[BoardService] Error fetching primary boards:', err);
+      throw new Error(`Failed to fetch primary boards: ${err?.message || 'Unknown error'}`);
     }
   }
 
@@ -1412,6 +1796,490 @@ export class BoardService {
       }
       throw new Error(`Failed to update vote count: ${err?.message || 'Unknown error'}`);
     }
+  }
+
+  // ==================== POLL METHODS ====================
+
+  /**
+   * Create or update a poll for a board
+   */
+  async createPoll(boardKey: string, pollData: PollData): Promise<void> {
+    if (!boardKey || !boardKey.trim()) {
+      throw new Error('Board ID is required');
+    }
+    if (!pollData || !pollData.question || !pollData.question.trim()) {
+      throw new Error('Poll question is required');
+    }
+    if (!pollData.options || pollData.options.length < 2) {
+      throw new Error('Poll must have at least 2 options');
+    }
+    if (pollData.options.length > 5) {
+      throw new Error('Poll cannot have more than 5 options');
+    }
+
+    try {
+      const now = Date.now();
+      await update(child(this.boardsRef, boardKey.trim()), {
+        boardType: 'poll',
+        pollData: pollData,
+        pollCreatedAt: now,
+        isPollActive: true, // Default to active
+      });
+    } catch (err: any) {
+      if (err?.code === 'PERMISSION_DENIED') {
+        throw new Error('Permission denied. Unable to create poll.');
+      }
+      if (err?.code === 'NETWORK_ERROR') {
+        throw new Error('Network error. Please check your connection and try again.');
+      }
+      throw new Error(`Failed to create poll: ${err?.message || 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Update poll data
+   */
+  async updatePoll(boardKey: string, pollData: PollData): Promise<void> {
+    return this.createPoll(boardKey, pollData); // Same logic
+  }
+
+  /**
+   * Get poll data for a board
+   */
+  async getPoll(boardKey: string): Promise<PollData | null> {
+    if (!boardKey || !boardKey.trim()) {
+      return null;
+    }
+
+    try {
+      const board = await this.getBoard(boardKey);
+      if (!board || board.boardType !== 'poll' || !board.pollData) {
+        return null;
+      }
+      return board.pollData;
+    } catch (err: any) {
+      console.error('Error getting poll:', err);
+      return null;
+    }
+  }
+
+  /**
+   * Check if user can vote on a poll (board protection check)
+   */
+  async canVoteOnPoll(boardKey: string, email?: string): Promise<boolean> {
+    if (!boardKey || !boardKey.trim()) {
+      return false;
+    }
+
+    try {
+      const board = await this.getBoard(boardKey);
+      if (!board || board.boardType !== 'poll') {
+        return false;
+      }
+
+      // Poll boards are open for everyone to vote - no restrictions
+      // Ignore boardProtection for poll boards
+      return true;
+    } catch (err: any) {
+      console.error('Error checking poll vote permission:', err);
+      return false;
+    }
+  }
+
+  /**
+   * Vote on a poll
+   */
+  async voteOnPoll(boardKey: string, optionIds: string[], ip: string, email?: string): Promise<void> {
+    if (!boardKey || !boardKey.trim()) {
+      throw new Error('Board ID is required');
+    }
+    if (!optionIds || optionIds.length === 0) {
+      throw new Error('At least one option must be selected');
+    }
+
+    try {
+      const poll = await this.getPoll(boardKey);
+      if (!poll) {
+        throw new Error('Poll not found');
+      }
+
+      // Check board protection
+      const canVote = await this.canVoteOnPoll(boardKey, email);
+      if (!canVote) {
+        throw new Error('You are not authorized to vote on this poll');
+      }
+
+      // Validate option IDs
+      const validOptionIds = poll.options.map((opt) => opt.id);
+      for (const optionId of optionIds) {
+        if (!validOptionIds.includes(optionId)) {
+          throw new Error(`Invalid option ID: ${optionId}`);
+        }
+      }
+
+      // If single choice poll, only allow one option
+      if (poll.pollType === 'single' && optionIds.length > 1) {
+        throw new Error('Single choice poll allows only one option');
+      }
+
+      // Create vote record
+      const voteId = `vote_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const voteRecord: PollVote = {
+        boardKey: boardKey.trim(),
+        optionIds: optionIds,
+        ip: ip,
+        timestamp: Date.now(),
+        ...(email && { email: email.trim().toLowerCase() }),
+      };
+
+      // Store vote
+      await set(child(this.pollVotesRef, voteId), voteRecord);
+
+      // Update poll vote counts
+      const updatedOptions = poll.options.map((option) => {
+        if (optionIds.includes(option.id)) {
+          return {
+            ...option,
+            voteCount: (option.voteCount || 0) + 1,
+          };
+        }
+        return option;
+      });
+
+      const totalVotes = updatedOptions.reduce((sum, opt) => sum + (opt.voteCount || 0), 0);
+
+      await update(child(this.boardsRef, boardKey.trim() + '/pollData'), {
+        options: updatedOptions,
+        totalVotes: totalVotes,
+      });
+    } catch (err: any) {
+      if (err?.code === 'PERMISSION_DENIED') {
+        throw new Error('Permission denied. Unable to vote.');
+      }
+      if (err?.code === 'NETWORK_ERROR') {
+        throw new Error('Network error. Please check your connection and try again.');
+      }
+      if (err?.message) {
+        throw err;
+      }
+      throw new Error(`Failed to vote on poll: ${err?.message || 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Check if user has voted on a poll (using localStorage key)
+   */
+  hasVotedOnPoll(boardKey: string): boolean {
+    if (typeof window === 'undefined') {
+      return false;
+    }
+
+    try {
+      const VOTED_POLLS_KEY = 'palagai_voted_polls';
+      const votedPolls = localStorage.getItem(VOTED_POLLS_KEY);
+      if (!votedPolls) {
+        return false;
+      }
+      const votedPollList = JSON.parse(votedPolls);
+      return Array.isArray(votedPollList) && votedPollList.includes(boardKey);
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /**
+   * Mark poll as voted (store in localStorage)
+   */
+  markPollAsVoted(boardKey: string): void {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    try {
+      const VOTED_POLLS_KEY = 'palagai_voted_polls';
+      const votedPolls = localStorage.getItem(VOTED_POLLS_KEY);
+      let votedPollList: string[] = [];
+      if (votedPolls) {
+        try {
+          votedPollList = JSON.parse(votedPolls);
+        } catch (e) {
+          votedPollList = [];
+        }
+      }
+      if (!votedPollList.includes(boardKey)) {
+        votedPollList.push(boardKey);
+        localStorage.setItem(VOTED_POLLS_KEY, JSON.stringify(votedPollList));
+      }
+    } catch (e) {
+      console.warn('Failed to save voted poll to localStorage:', e);
+    }
+  }
+
+  /**
+   * Get all votes for a poll (for analytics)
+   */
+  async getAllPollVotes(boardKey: string): Promise<PollVote[]> {
+    if (!boardKey || !boardKey.trim()) {
+      return [];
+    }
+
+    try {
+      const snapshot = await get(this.pollVotesRef);
+      if (!snapshot.exists()) {
+        return [];
+      }
+
+      const votesData = snapshot.val();
+      const votes: PollVote[] = [];
+
+      for (const [voteId, voteData] of Object.entries(votesData)) {
+        const vote = voteData as PollVote;
+        if (vote.boardKey === boardKey.trim()) {
+          votes.push(vote);
+        }
+      }
+
+      // Sort by timestamp (newest first)
+      votes.sort((a, b) => b.timestamp - a.timestamp);
+
+      return votes;
+    } catch (err: any) {
+      console.error('Error getting poll votes:', err);
+      return [];
+    }
+  }
+
+  /**
+   * Get poll vote statistics
+   */
+  async getPollVoteStats(boardKey: string): Promise<{
+    totalVotes: number;
+    votesByOption: { optionId: string; count: number; percentage: number }[];
+    votesOverTime: { date: string; count: number }[];
+  }> {
+    const poll = await this.getPoll(boardKey);
+    if (!poll) {
+      return {
+        totalVotes: 0,
+        votesByOption: [],
+        votesOverTime: [],
+      };
+    }
+
+    const votes = await this.getAllPollVotes(boardKey);
+    const totalVotes = poll.totalVotes || 0;
+
+    // Votes by option
+    const votesByOption = poll.options.map((option) => {
+      const count = option.voteCount || 0;
+      const percentage = totalVotes > 0 ? (count / totalVotes) * 100 : 0;
+      return {
+        optionId: option.id,
+        count: count,
+        percentage: Math.round(percentage * 100) / 100, // Round to 2 decimal places
+      };
+    });
+
+    // Votes over time (group by date)
+    const votesByDate: { [key: string]: number } = {};
+    votes.forEach((vote) => {
+      const date = new Date(vote.timestamp).toISOString().split('T')[0];
+      votesByDate[date] = (votesByDate[date] || 0) + 1;
+    });
+
+    const votesOverTime = Object.entries(votesByDate)
+      .map(([date, count]) => ({ date, count }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    return {
+      totalVotes,
+      votesByOption,
+      votesOverTime,
+    };
+  }
+
+  /**
+   * Subscribe to poll updates
+   */
+  subscribeToPollUpdates(boardKey: string, callback: (poll: PollData | null) => void): Unsubscribe {
+    if (!boardKey || !boardKey.trim()) {
+      throw new Error('Board ID is required');
+    }
+
+    const boardRef = child(this.boardsRef, boardKey.trim());
+
+    const unsubscribe = onValue(
+      boardRef,
+      (snapshot) => {
+        if (!snapshot.exists()) {
+          callback(null);
+          return;
+        }
+        const board = snapshot.val() as Board;
+        if (board.boardType === 'poll' && board.pollData) {
+          callback(board.pollData);
+        } else {
+          callback(null);
+        }
+      },
+      (error) => {
+        console.error('Error listening to poll updates:', error);
+        callback(null);
+      }
+    );
+
+    return unsubscribe;
+  }
+
+  /**
+   * Convert board back to standard (remove poll data)
+   */
+  async convertPollToStandard(boardKey: string): Promise<void> {
+    if (!boardKey || !boardKey.trim()) {
+      throw new Error('Board ID is required');
+    }
+
+    try {
+      await update(child(this.boardsRef, boardKey.trim()), {
+        boardType: 'standard',
+        pollData: null,
+        pollCreatedAt: null,
+        isPollActive: null,
+      });
+    } catch (err: any) {
+      if (err?.code === 'PERMISSION_DENIED') {
+        throw new Error('Permission denied. Unable to convert poll.');
+      }
+      throw new Error(`Failed to convert poll: ${err?.message || 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Update poll vote count for a specific option (admin only)
+   */
+  async updatePollVoteCount(boardKey: string, optionId: string, voteCount: number): Promise<void> {
+    if (!boardKey || !boardKey.trim() || !optionId) {
+      throw new Error('Board ID and option ID are required');
+    }
+
+    try {
+      const pollRef = child(this.boardsRef, `${boardKey.trim()}/pollData/options`);
+      const optionsSnapshot = await get(pollRef);
+      
+      if (!optionsSnapshot.exists()) {
+        throw new Error('Poll options not found');
+      }
+
+      const options = optionsSnapshot.val() as PollOption[];
+      const optionIndex = options.findIndex(opt => opt.id === optionId);
+      
+      if (optionIndex === -1) {
+        throw new Error('Option not found');
+      }
+
+      options[optionIndex].voteCount = voteCount;
+      
+      await update(pollRef, options);
+    } catch (err: any) {
+      if (err?.code === 'PERMISSION_DENIED') {
+        throw new Error('Permission denied. Unable to update vote count.');
+      }
+      throw new Error(`Failed to update vote count: ${err?.message || 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Update poll total votes (admin only)
+   */
+  async updatePollTotalVotes(boardKey: string, totalVotes: number): Promise<void> {
+    if (!boardKey || !boardKey.trim()) {
+      throw new Error('Board ID is required');
+    }
+
+    try {
+      await update(child(this.boardsRef, `${boardKey.trim()}/pollData`), {
+        totalVotes: totalVotes
+      });
+    } catch (err: any) {
+      if (err?.code === 'PERMISSION_DENIED') {
+        throw new Error('Permission denied. Unable to update total votes.');
+      }
+      throw new Error(`Failed to update total votes: ${err?.message || 'Unknown error'}`);
+    }
+  }
+
+
+  async deletePoll(boardKey: string): Promise<void> {
+    if (!boardKey || !boardKey.trim()) {
+      throw new Error('Board ID is required');
+    }
+
+    try {
+      // Delete all votes for this poll
+      const votes = await this.getAllPollVotes(boardKey);
+      for (const vote of votes) {
+        // Find vote ID by searching (we need to store vote IDs better, but for now this works)
+        const snapshot = await get(this.pollVotesRef);
+        if (snapshot.exists()) {
+          const votesData = snapshot.val();
+          for (const [voteId, voteData] of Object.entries(votesData)) {
+            const vote = voteData as PollVote;
+            if (vote.boardKey === boardKey.trim()) {
+              await set(child(this.pollVotesRef, voteId), null);
+            }
+          }
+        }
+      }
+
+      // Convert board back to standard
+      await this.convertPollToStandard(boardKey);
+    } catch (err: any) {
+      if (err?.code === 'PERMISSION_DENIED') {
+        throw new Error('Permission denied. Unable to delete poll.');
+      }
+      throw new Error(`Failed to delete poll: ${err?.message || 'Unknown error'}`);
+    }
+  }
+
+
+  /**
+   * Admin: Get all poll boards
+   */
+  async getAllPollBoards(): Promise<Array<{ boardKey: string; board: Board; ownerEmail?: string }>> {
+    try {
+      const allBoards = await this.getAllBoards();
+      return allBoards.filter((item) => item.board.boardType === 'poll');
+    } catch (err: any) {
+      console.error('Error fetching poll boards:', err);
+      throw new Error(`Failed to fetch poll boards: ${err?.message || 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Admin: Set poll active/inactive status
+   */
+  async setPollActiveStatus(boardKey: string, isActive: boolean): Promise<void> {
+    if (!boardKey || !boardKey.trim()) {
+      throw new Error('Board ID is required');
+    }
+
+    try {
+      await update(child(this.boardsRef, boardKey.trim()), {
+        isPollActive: isActive,
+      });
+    } catch (err: any) {
+      if (err?.code === 'PERMISSION_DENIED') {
+        throw new Error('Permission denied. Unable to update poll status.');
+      }
+      throw new Error(`Failed to update poll status: ${err?.message || 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Admin: Delete a poll board
+   */
+  async adminDeletePoll(boardKey: string): Promise<void> {
+    return this.deletePoll(boardKey); // Same logic
   }
 }
 

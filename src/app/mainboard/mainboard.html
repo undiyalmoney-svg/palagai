@@ -1,25 +1,52 @@
-<mat-toolbar color="primary" class="mainboard-toolbar">
-  <div class="toolbar-content">
-    <div class="toolbar-left">
-      <button mat-icon-button routerLink="/" class="home-btn" aria-label="Home" title="Home">
-        <mat-icon>home</mat-icon>
+<mat-toolbar color="primary" class="mainboard-toolbar figma-header">
+  <div class="header-content">
+    <div class="header-left">
+      <button mat-icon-button (click)="goBack()" class="back-btn" aria-label="Back" title="Back">
+        <mat-icon>arrow_back</mat-icon>
       </button>
-      <img src="/header-icon.png" alt="Palagai" class="toolbar-logo" />
-      <div class="toolbar-title-wrapper">
-        <span class="toolbar-title">My Palagai Board</span>
-        <span class="toolbar-subtitle mobile-only" *ngIf="lastUpdated">
-          Last updated: {{ lastUpdated | date: 'short' }}
-        </span>
-      </div>
+      <span class="header-title">{{ isPollBoard ? 'Poll Board' : 'Board Content' }}</span>
     </div>
-    <span class="toolbar-subtitle desktop-only" *ngIf="lastUpdated">
-      Last updated: {{ lastUpdated | date: 'short' }}
-    </span>
+    <div class="header-right">
+      <button 
+        mat-icon-button 
+        (click)="openPreview()" 
+        [disabled]="loading"
+        class="header-action-btn"
+        aria-label="Preview"
+        title="Preview"
+        *ngIf="!isPollBoard"
+      >
+        <mat-icon>visibility</mat-icon>
+      </button>
+      <!-- Save Button (works for both standard and poll) -->
+      <button 
+        mat-icon-button 
+        (click)="saveFromHeader()" 
+        [disabled]="loading || saving || (boardType === 'poll' && !canModifyPoll)"
+        class="header-action-btn save-btn"
+        matTooltip="Save"
+        [attr.aria-label]="saving ? 'Saving...' : 'Save'"
+        [title]="saving ? 'Saving...' : 'Save'"
+      >
+        <mat-icon>{{ saving ? 'hourglass_empty' : 'save' }}</mat-icon>
+      </button>
+      <!-- Poll Board Delete -->
+      <button 
+        mat-icon-button 
+        (click)="deletePoll()" 
+        [disabled]="loading || saving || !hasPollData || boardType !== 'poll'"
+        class="header-action-btn delete-btn"
+        aria-label="Delete Poll"
+        title="Delete Poll"
+        *ngIf="boardType === 'poll' && hasPollData"
+      >
+        <mat-icon>delete</mat-icon>
+      </button>
+    </div>
   </div>
 </mat-toolbar>
 
 <div class="mainboard-wrapper" [formGroup]="form">
-
   <!-- Blocked Status Banner -->
   <div class="blocked-banner" *ngIf="board?.isBlocked">
     <mat-icon>block</mat-icon>
@@ -29,88 +56,64 @@
     </div>
   </div>
 
-  <mat-card class="editor-section" [class.blocked]="board?.isBlocked">
-    <div class="board-header">
-      <div class="board-header-left">
-        <h2>Board Content</h2>
-        <div class="setting-item">
-          <div class="checkbox-with-icon">
-            <mat-checkbox
-              formControlName="boardProtection"
-              (change)="toggleBoardProtection($event)"
-            >
-              Board Protection
-            </mat-checkbox>
-            <button
-              mat-icon-button
-              (click)="openEmailDialog()"
-              [disabled]="loading || !boardProtectionControl.value"
-              class="email-icon-btn"
-              aria-label="Manage authorized emails"
-              title="Manage authorized emails"
-              *ngIf="boardProtectionControl.value"
-            >
-              <mat-icon>email</mat-icon>
-            </button>
-          </div>
-          <p class="setting-hint">Enable to restrict board access</p>
-        </div>
-      </div>
-      <div class="board-header-right">
-        <button 
-          mat-icon-button 
-          (click)="openPreview()" 
-          [disabled]="loading"
-          class="header-icon-btn"
-          aria-label="Preview"
-          title="Preview"
-        >
-          <mat-icon>visibility</mat-icon>
-        </button>
-        <button 
-          mat-icon-button 
-          (click)="openLinkDialog()" 
-          [disabled]="loading || !auth.user?.boardKey"
-          class="header-icon-btn"
-          aria-label="Get shareable link"
-          title="Get shareable link"
-        >
-          <mat-icon>link</mat-icon>
-        </button>
-      </div>
-    </div>
-    
+  <!-- Editor Card -->
+  <div class="editor-card" [class.blocked]="board?.isBlocked" [class.standard-board]="boardType === 'standard'">
+    <!-- Standard Board Editor -->
     <app-custom-editor
+      *ngIf="boardType === 'standard'"
       formControlName="content"
-      class="full-screen-editor"
+      class="figma-editor"
       [loading]="loading"
     ></app-custom-editor>
-  </mat-card>
 
-  <p class="status" *ngIf="message">{{ message }}</p>
+    <!-- Poll Board Editor -->
+    <app-poll-editor
+      *ngIf="boardType === 'poll'"
+      #pollEditor
+      [pollData]="pollData"
+      [canModify]="canModifyPoll"
+      (pollSave)="savePoll($event)"
+      (pollClear)="clearPoll()"
+    ></app-poll-editor>
+
+  </div>
+
+  <!-- Board Options (Sticky at bottom) -->
+  <div class="primary-board-section">
+    <div class="board-option-item">
+      <mat-checkbox formControlName="isPrimaryBoard" class="primary-board-checkbox" (change)="onPrimaryBoardChange($event)">
+        <span class="checkbox-label">Primary Board</span>
+      </mat-checkbox>
+    </div>
+    
+    <p class="board-options-hint">
+      <a href="javascript:void(0)" (click)="openPrimaryBoardInfo()" class="hint-link">Click to learn more</a>
+    </p>
+  </div>
+
 </div>
 
-<!-- Footer bar with action buttons -->
-<footer class="mainboard-footer">
-  <div class="footer-content">
-    <button 
-      mat-raised-button 
-      color="primary" 
-      (click)="saveEditorContent()" 
-      [disabled]="loading || saving"
-      class="footer-btn primary-btn"
-    >
-      {{ saving ? 'Saving...' : (board ? 'Update Board' : 'Create Board') }}
-    </button>
-    <button 
-      mat-stroked-button 
-      color="warn" 
-      (click)="clearBoard()" 
-      [disabled]="loading || clearing"
-      class="footer-btn clear-btn"
-    >
-      {{ clearing ? 'Clearing...' : 'Clear Board' }}
-    </button>
+<!-- Floating Action Button Menu -->
+<div class="fab-menu-container" [class.menu-open]="fabMenuOpen">
+  <!-- Board Type Navigation -->
+  <div class="fab-menu">
+    <div class="fab-menu-item" (click)="handleBoardTypeChange('poll'); fabMenuOpen = false" [class.disabled]="loading || saving || boardType === 'poll'">
+      <span class="fab-label">Poll Board</span>
+      <button mat-fab class="fab-circle-btn" [disabled]="loading || saving || boardType === 'poll'">
+        <mat-icon>poll</mat-icon>
+      </button>
+    </div>
+    <div class="fab-menu-item" (click)="handleBoardTypeChange('standard'); fabMenuOpen = false" [class.disabled]="loading || saving || boardType === 'standard'">
+      <span class="fab-label">Standard Board</span>
+      <button mat-fab class="fab-circle-btn" [disabled]="loading || saving || boardType === 'standard'">
+        <mat-icon>description</mat-icon>
+      </button>
+    </div>
   </div>
-</footer>
+
+  <!-- Close Button -->
+  <button mat-fab class="fab-close-btn" (click)="toggleFabMenu()">
+    <mat-icon>{{ fabMenuOpen ? 'close' : 'add' }}</mat-icon>
+  </button>
+</div>
 

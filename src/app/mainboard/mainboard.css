@@ -60,19 +60,55 @@
   pointer-events: none;
 }
 
+/* Figma-style Main Wrapper */
 .mainboard-wrapper {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 16px 32px;
+  padding: 24px;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
   background: #fafafa;
-  min-height: calc(100vh - 64px - 72px);
+  min-height: calc(100vh - 56px);
   position: relative;
   overflow-x: hidden;
-  overflow-y: auto;
+  overflow-y: hidden; /* No scrollbar on wrapper */
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
+  height: calc(100vh - 56px);
+  width: 100%;
+}
+
+/* Full page scroll for job boards - always show scrollbar */
+.mainboard-wrapper.job-board-scroll {
+  overflow-y: scroll !important; /* Always show scrollbar */
+  height: auto;
+  min-height: calc(100vh - 56px);
+}
+
+/* Custom scrollbar styling for job boards - override the hidden scrollbar rule */
+.mainboard-wrapper.job-board-scroll::-webkit-scrollbar {
+  width: 12px !important;
+  display: block !important; /* Override the display: none from parent */
+}
+
+.mainboard-wrapper.job-board-scroll::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 6px;
+}
+
+.mainboard-wrapper.job-board-scroll::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 6px;
+}
+
+.mainboard-wrapper.job-board-scroll::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+/* Firefox scrollbar - always visible */
+.mainboard-wrapper.job-board-scroll {
+  scrollbar-width: thin !important;
+  scrollbar-color: #c1c1c1 #f1f1f1;
 }
 
 /* Hide scrollbar but allow scrolling */
@@ -112,17 +148,99 @@
   z-index: 0;
 }
 
-.mainboard-toolbar {
+/* Figma-style Header */
+.mainboard-toolbar.figma-header {
   background: #ffffff !important;
   color: #111111 !important;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-  border-bottom: 1.5px solid #111111;
-  margin-bottom: 0;
-  position: relative;
-  z-index: 1;
-  flex-shrink: 0;
-  min-height: 64px;
-  height: auto;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.08);
+  border-bottom: 1px solid #e5e5e5;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  min-height: 56px;
+  height: 56px;
+  padding: 0;
+}
+
+.figma-header .header-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 100%;
+  width: 100%;
+}
+
+.figma-header .header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.figma-header .back-btn {
+  color: #111111;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+}
+
+.figma-header .title-bar-image {
+  height: 40px;
+  width: auto;
+  object-fit: contain;
+  display: block;
+  margin-right: 4px;
+}
+
+.figma-header .header-title {
+  font-size: 15px;
+  font-weight: 500;
+  color: #111111;
+  line-height: 1.5;
+}
+
+.figma-header .header-right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.figma-header .header-action-btn {
+  color: #666666;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.figma-header .header-action-btn:hover {
+  background-color: rgba(0, 0, 0, 0.04);
+  color: #111111;
+}
+
+.figma-header .header-action-btn:disabled {
+  color: #cccccc;
+  cursor: not-allowed;
+}
+
+.figma-header .save-btn {
+  color: #000000 !important;
+}
+
+.figma-header .save-btn:hover:not(:disabled) {
+  background-color: transparent !important;
+  color: #000000 !important;
+}
+
+.figma-header .delete-btn {
+  color: #f44336;
+}
+
+.figma-header .delete-btn:hover:not(:disabled) {
+  background-color: rgba(244, 67, 54, 0.08);
+  color: #d32f2f;
 }
 
 .toolbar-content {
@@ -198,26 +316,193 @@
   flex: 1 1 auto;
 }
 
-/* Card styling - clean and modern */
-.editor-section {
+.minimal-toolbar .toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.minimal-toolbar .sticky-icon {
+  position: relative;
+  z-index: 10;
+}
+
+.minimal-toolbar .save-icon {
+  color: #1976d2;
+}
+
+.minimal-toolbar .save-icon:hover {
+  background-color: rgba(25, 118, 210, 0.1);
+}
+
+/* Figma-style Editor Card */
+.editor-card {
   background: #ffffff;
-  border: 1.5px solid #111111;
-  border-radius: 16px;
-  padding: 24px;
-  margin-bottom: 0;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.03);
+  border: 1px solid #e5e5e5;
+  border-radius: 8px;
+  padding: 0;
+  margin: 0;
   position: relative;
   z-index: 1;
   display: flex;
   flex-direction: column;
-  overflow-x: hidden;
-  overflow-y: hidden;
+  overflow: hidden; /* Contain content for proper scrolling */
   box-sizing: border-box;
   width: 100%;
   max-width: 100%;
-  flex: 1 1 auto;
+  flex: 1;
   min-height: 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+/* Standard board editor card - add scroll to editor container (only for standard boards) */
+.editor-card.standard-board {
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* Poll board editor card - allow internal scrolling in options-section */
+.editor-card:not(.standard-board) {
+  overflow: hidden; /* Hide outer scrollbar, allow internal components to scroll */
+}
+
+/* Custom scrollbar for standard board editor */
+.editor-card.standard-board::-webkit-scrollbar {
+  width: 8px;
+}
+
+.editor-card.standard-board::-webkit-scrollbar-track {
+  background: #f5f5f5;
+  border-radius: 4px;
+}
+
+.editor-card.standard-board::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 4px;
+}
+
+.editor-card.standard-board::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+.editor-card.standard-board {
+  scrollbar-width: thin;
+  scrollbar-color: #c1c1c1 #f5f5f5;
+}
+
+/* Job board editor card - allow natural height */
+.mainboard-wrapper.job-board-scroll .editor-card {
+  flex: none;
+  min-height: auto;
+  overflow: visible;
+}
+
+.primary-board-section {
+  padding: 16px 24px;
+  border-top: 1px solid #e5e5e5;
+  background: #ffffff;
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
+  flex-shrink: 0;
+  margin-top: auto;
+}
+
+/* Remove sticky behavior for job boards */
+.primary-board-section.no-sticky-job {
+  position: relative;
+  /* Keep it visible but not sticky */
+}
+
+.board-option-item {
+  margin-bottom: 12px;
+}
+
+.board-option-item:last-of-type {
+  margin-bottom: 0;
+}
+
+.primary-board-checkbox,
+.job-board-checkbox {
+  margin: 0;
+}
+
+.primary-board-checkbox ::ng-deep .mdc-form-field,
+.job-board-checkbox ::ng-deep .mdc-form-field {
+  color: #000000 !important;
+}
+
+.primary-board-checkbox ::ng-deep .mdc-form-field label,
+.job-board-checkbox ::ng-deep .mdc-form-field label {
+  color: #000000 !important;
+  font-weight: 500;
+}
+
+.board-options-hint {
+  margin: 12px 0 0 0;
+  font-size: 13px;
+  color: #666;
+  line-height: 1.4;
+}
+
+/* Job Board Primary Option in Header */
+.job-board-primary-option {
+  display: flex;
+  align-items: center;
+  margin-right: 8px;
+}
+
+.primary-board-checkbox-inline {
+  margin: 0;
+}
+
+.primary-board-checkbox-inline ::ng-deep .mdc-form-field {
+  color: #ffffff !important;
+}
+
+.primary-board-checkbox-inline ::ng-deep .mdc-form-field label {
+  color: #ffffff !important;
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.board-options-hint .hint-link {
+  color: #1976d2;
+  text-decoration: none;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.board-options-hint .hint-link:hover {
+  text-decoration: underline;
+}
+
+.job-board-checkbox ::ng-deep .mdc-form-field {
+  color: #000000 !important;
+}
+
+.job-board-checkbox ::ng-deep .mdc-form-field label {
+  color: #000000 !important;
+  font-weight: 500;
+}
+
+.job-board-hint {
+  margin: 0;
+  font-size: 13px;
+  color: #666;
+  line-height: 1.4;
+}
+
+.editor-card.blocked {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.figma-editor {
+  width: 100%;
   height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 /* Board header with toggle and icons */
@@ -274,6 +559,12 @@
   display: block;
   visibility: visible;
   opacity: 1;
+}
+
+.board-type-select {
+  width: 100%;
+  max-width: 300px;
+  margin-bottom: 16px;
 }
 
 .setting-item {
@@ -438,9 +729,9 @@
 }
 
 .footer-content {
-  max-width: 1200px;
+  max-width: 900px;
   margin: 0 auto;
-  padding: 16px 32px;
+  padding: 16px 24px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -847,6 +1138,102 @@
   font-style: italic;
 }
 
+/* Floating Action Button Menu - Image Style */
+.fab-menu-container {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 16px;
+  pointer-events: auto;
+}
+
+.fab-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  align-items: flex-end;
+  margin-bottom: 16px;
+  opacity: 0;
+  transform: translateY(20px);
+  pointer-events: none;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.fab-menu-container.menu-open .fab-menu {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.fab-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+
+.fab-menu-item.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.fab-label {
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 500;
+  white-space: nowrap;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  user-select: none;
+  background: rgba(0, 0, 0, 0.4);
+  padding: 6px 12px;
+  border-radius: 20px;
+  backdrop-filter: blur(10px);
+}
+
+.fab-circle-btn {
+  width: 56px !important;
+  height: 56px !important;
+  min-width: 56px !important;
+  background-color: #111111 !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.fab-circle-btn:hover:not(:disabled) {
+  transform: scale(1.1);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5) !important;
+  background-color: #333333 !important;
+}
+
+.fab-circle-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background-color: #666666 !important;
+}
+
+.fab-close-btn {
+  width: 56px !important;
+  height: 56px !important;
+  min-width: 56px !important;
+  background-color: #111111 !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+  transition: transform 0.3s ease, box-shadow 0.2s ease;
+}
+
+.fab-close-btn:hover {
+  transform: rotate(90deg) scale(1.1);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5) !important;
+  background-color: #333333 !important;
+}
+
 /* Responsive design */
 @media (max-width: 768px) {
   .mainboard-toolbar {
@@ -884,6 +1271,11 @@
     width: 24px;
     height: 24px;
     flex-shrink: 0;
+  }
+
+  .figma-header .title-bar-image {
+    height: 32px;
+    width: auto;
   }
 
   .toolbar-title {
@@ -1106,5 +1498,119 @@
   .blocked-banner {
     margin: 8px 12px;
     padding: 10px 12px;
+  }
+
+  .fab-container {
+    bottom: 16px;
+    right: 16px;
+  }
+
+  .fab-button {
+    width: 56px;
+    height: 56px;
+  }
+
+  .editor-container {
+    min-height: auto;
+  }
+
+  .spacious-editor {
+    min-height: 300px;
+  }
+}
+
+/* Responsive styles */
+@media (max-width: 768px) {
+  .mainboard-wrapper {
+    padding: 16px;
+    max-width: 100%;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .figma-header .header-content {
+    padding: 0 16px;
+  }
+
+  .figma-header .header-title {
+    font-size: 14px;
+  }
+
+  .editor-card {
+    height: auto;
+    min-height: 400px;
+    flex: 1;
+    min-height: 0;
+  }
+
+  .primary-board-section {
+    padding: 12px 16px;
+  }
+
+  .fab-menu-container {
+    bottom: 16px;
+    right: 16px;
+  }
+
+  .fab-circle-btn,
+  .fab-close-btn {
+    width: 48px !important;
+    height: 48px !important;
+    min-width: 48px !important;
+  }
+
+  .fab-label {
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 480px) {
+  .mainboard-wrapper {
+    padding: 12px;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .figma-header .header-content {
+    padding: 0 12px;
+  }
+
+  .figma-header .header-title {
+    font-size: 13px;
+  }
+
+  .editor-card {
+    height: auto;
+    min-height: 350px;
+    flex: 1;
+    min-height: 0;
+  }
+
+  .primary-board-section {
+    padding: 12px;
+  }
+
+  .board-options-hint {
+    font-size: 12px;
+  }
+  
+  .board-option-item {
+    margin-bottom: 10px;
+  }
+
+  .fab-menu-container {
+    bottom: 12px;
+    right: 12px;
+  }
+
+  .fab-circle-btn,
+  .fab-close-btn {
+    width: 44px !important;
+    height: 44px !important;
+    min-width: 44px !important;
+  }
+
+  .fab-label {
+    font-size: 13px;
   }
 }

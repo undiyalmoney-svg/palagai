@@ -9,6 +9,10 @@ import { AdminLoginComponent } from './admin/admin-login.component';
 import { FullScreenBoardComponent } from './fullscreen-board/fullscreen-board.component';
 import { KavithaiSubmitComponent } from './kavithai/kavithai-submit.component';
 import { KavithaiListComponent } from './kavithai/kavithai-list.component';
+import { PollResultsComponent } from './poll-results/poll-results.component';
+import { UserDashboardComponent } from './user-dashboard/user-dashboard.component';
+import { CreateBalloonSecretComponent } from './balloon/create-balloon-secret.component';
+import { BalloonPunchRevealComponent } from './balloon/balloon-punch-reveal.component';
 
 export const routes: Routes = [
   {
@@ -23,6 +27,10 @@ export const routes: Routes = [
   {
     path: 'signup',
     component: Signup,
+  },
+  {
+    path: 'dashboard',
+    component: UserDashboardComponent,
   },
   {
     path: 'mainboard',
@@ -47,6 +55,18 @@ export const routes: Routes = [
   {
     path: 'kavithai/list',
     component: KavithaiListComponent,
+  },
+  {
+    path: 'create-balloon',
+    component: CreateBalloonSecretComponent,
+  },
+  {
+    path: 'punch/:data',
+    component: BalloonPunchRevealComponent,
+  },
+  {
+    path: 'poll/:boardKey/results',
+    component: PollResultsComponent,
   },
   {
     path: 'admin',

@@ -1,0 +1,112 @@
+<div class="user-dashboard-wrapper">
+  <!-- Header -->
+  <div class="dashboard-header">
+    <h1 class="dashboard-title">My Dashboard</h1>
+    <button mat-stroked-button routerLink="/" class="home-btn">
+      <mat-icon>home</mat-icon>
+      Home
+    </button>
+  </div>
+
+  <div class="dashboard-content" *ngIf="!loading">
+    <!-- User Profile Section -->
+    <mat-card class="profile-card">
+      <div class="profile-header">
+        <div class="profile-info">
+          <div class="profile-avatar">
+            <mat-icon>account_circle</mat-icon>
+          </div>
+          <div class="profile-details">
+            <h2 class="profile-name">{{ displayName }}</h2>
+            <p class="profile-email">{{ userProfile?.email }}</p>
+            <p class="profile-dob" *ngIf="userProfile?.dateOfBirth">
+              Date of Birth: {{ userProfile?.dateOfBirth }}
+            </p>
+          </div>
+        </div>
+        <button 
+          mat-icon-button 
+          class="edit-profile-btn" 
+          (click)="editProfile()"
+        >
+          <mat-icon>edit</mat-icon>
+        </button>
+      </div>
+    </mat-card>
+
+    <!-- Boards Section -->
+    <div class="boards-section">
+      <div class="boards-header">
+        <h2 class="boards-title">My Boards ({{ boardCount }})</h2>
+      </div>
+
+      <!-- No Boards State -->
+      <div class="no-boards-card" *ngIf="!hasBoards">
+        <mat-icon class="no-boards-icon">dashboard</mat-icon>
+        <h3>No board created</h3>
+        <p>Get started by creating your first board</p>
+        <button mat-raised-button color="primary" (click)="createBoard()" class="create-board-btn">
+          <mat-icon>add</mat-icon>
+          Create my board
+        </button>
+      </div>
+
+      <!-- Boards Grid -->
+      <div class="boards-grid" *ngIf="hasBoards">
+        <mat-card class="board-card" *ngFor="let item of userBoards">
+          <div class="board-card-header">
+            <mat-chip class="board-type-chip" [class.poll-chip]="item.board.boardType === 'poll'">
+              {{ getBoardType(item.board) }}
+            </mat-chip>
+            <div class="board-actions">
+              <button 
+                mat-icon-button 
+                (click)="viewBoard(item.boardKey)"
+                matTooltip="View Board"
+                class="action-btn"
+              >
+                <mat-icon>visibility</mat-icon>
+              </button>
+              <button 
+                mat-icon-button 
+                (click)="editBoard(item.boardKey, item.board.boardType || 'standard')"
+                matTooltip="Edit Board"
+                class="action-btn"
+              >
+                <mat-icon>edit</mat-icon>
+              </button>
+            </div>
+          </div>
+          <div class="board-card-content">
+            <p class="board-preview">{{ getBoardPreview(item.board) }}</p>
+            <div class="board-meta">
+              <span class="board-date">
+                <mat-icon>calendar_today</mat-icon>
+                {{ item.board.createdAt | date:'short' }}
+              </span>
+              <span class="board-primary" *ngIf="item.board.isPrimaryBoard">
+                <mat-icon>star</mat-icon>
+                Primary
+              </span>
+            </div>
+          </div>
+        </mat-card>
+      </div>
+
+      <!-- Create Board Button (when boards exist) -->
+      <div class="create-board-section" *ngIf="hasBoards">
+        <button mat-raised-button color="primary" (click)="createBoard()" class="create-board-btn-large">
+          <mat-icon>add</mat-icon>
+          Create New Board
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loading State -->
+  <div class="loading-container" *ngIf="loading">
+    <mat-spinner diameter="50"></mat-spinner>
+    <p>Loading your dashboard...</p>
+  </div>
+</div>
+

@@ -109,7 +109,40 @@ export class CustomEditorComponent implements ControlValueAccessor, AfterViewIni
   }
 
   setFont(font: string) {
-    this.execCommand('fontName', font);
+    this.restoreSelection();
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
+      // No selection, apply to current position
+      this.execCommand('fontName', font);
+      return;
+    }
+    
+    const range = selection.getRangeAt(0);
+    if (range.collapsed) {
+      this.execCommand('fontName', font);
+      return;
+    }
+    
+    // Apply font to selected text only
+    try {
+      const selectedContents = range.extractContents();
+      const span = document.createElement('span');
+      span.style.fontFamily = font;
+      span.appendChild(selectedContents);
+      range.insertNode(span);
+      
+      // Move cursor after the span
+      range.setStartAfter(span);
+      range.collapse(true);
+      selection.removeAllRanges();
+      selection.addRange(range);
+      
+      this.onEditorInput();
+      this.saveSelection();
+    } catch (e) {
+      // Fallback to execCommand
+      this.execCommand('fontName', font);
+    }
   }
 
   onFontChange(font: string) {
@@ -149,7 +182,136 @@ export class CustomEditorComponent implements ControlValueAccessor, AfterViewIni
   }
 
   setHeader(header: string) {
-    this.execCommand('formatBlock', header);
+    this.restoreSelection();
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
+      // No selection, apply to current block (existing behavior)
+      this.execCommand('formatBlock', header);
+      return;
+    }
+    
+    const range = selection.getRangeAt(0);
+    if (range.collapsed) {
+      // No text selected, apply to current block
+      if (header === 'p') {
+        // For Normal, find the current block and reset its styles
+        let container = range.commonAncestorContainer;
+        if (container.nodeType === Node.TEXT_NODE) {
+          container = container.parentElement!;
+        }
+        
+        const blockTags = ['p', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'];
+        while (container && container !== this.editorRef.nativeElement) {
+          const tagName = (container as HTMLElement).tagName?.toLowerCase();
+          if (blockTags.includes(tagName)) {
+            const htmlEl = container as HTMLElement;
+            // Reset to normal text
+            htmlEl.style.fontSize = '';
+            htmlEl.style.fontWeight = '';
+            htmlEl.style.margin = '';
+            htmlEl.style.lineHeight = '';
+            // Convert heading to paragraph if needed
+            if (tagName.startsWith('h')) {
+              const p = document.createElement('p');
+              p.innerHTML = htmlEl.innerHTML;
+              htmlEl.parentNode?.replaceChild(p, htmlEl);
+            }
+            this.onEditorInput();
+            this.saveSelection();
+            return;
+          }
+          container = container.parentElement!;
+        }
+      } else {
+        this.execCommand('formatBlock', header);
+      }
+      return;
+    }
+    
+    // Apply header style to selected text only
+    try {
+      const selectedContents = range.extractContents();
+      
+      if (header === 'p') {
+        // Normal text - remove all heading styles from selected content
+        // First, create a temporary container to process the content
+        const tempDiv = document.createElement('div');
+        tempDiv.appendChild(selectedContents);
+        
+        // Remove heading tags and reset styles
+        const headingElements = tempDiv.querySelectorAll('h1, h2, h3, h4, h5, h6');
+        headingElements.forEach(heading => {
+          const span = document.createElement('span');
+          span.innerHTML = heading.innerHTML;
+          // Reset all heading styles
+          span.style.fontSize = '';
+          span.style.fontWeight = '';
+          span.style.margin = '';
+          span.style.lineHeight = '';
+          heading.parentNode?.replaceChild(span, heading);
+        });
+        
+        // Reset styles on all elements in the selection
+        const allElements = tempDiv.querySelectorAll('*');
+        allElements.forEach(el => {
+          const htmlEl = el as HTMLElement;
+          // Remove heading-specific styles
+          htmlEl.style.fontSize = '';
+          htmlEl.style.fontWeight = '';
+          htmlEl.style.margin = '';
+          htmlEl.style.lineHeight = '';
+        });
+        
+        // Insert the processed content
+        const fragment = document.createDocumentFragment();
+        while (tempDiv.firstChild) {
+          fragment.appendChild(tempDiv.firstChild);
+        }
+        range.insertNode(fragment);
+        
+        // Move cursor to end of inserted content
+        range.setStartAfter(fragment.lastChild || range.startContainer);
+        range.collapse(true);
+        selection.removeAllRanges();
+        selection.addRange(range);
+      } else {
+        // Create heading element
+        const headerElement = document.createElement(header);
+        
+        // Apply header styles inline
+        if (header === 'h1') {
+          headerElement.style.fontSize = '2em';
+          headerElement.style.fontWeight = '600';
+          headerElement.style.margin = '16px 0 8px 0';
+          headerElement.style.display = 'block';
+        } else if (header === 'h2') {
+          headerElement.style.fontSize = '1.5em';
+          headerElement.style.fontWeight = '600';
+          headerElement.style.margin = '16px 0 8px 0';
+          headerElement.style.display = 'block';
+        } else if (header === 'h3') {
+          headerElement.style.fontSize = '1.17em';
+          headerElement.style.fontWeight = '600';
+          headerElement.style.margin = '16px 0 8px 0';
+          headerElement.style.display = 'block';
+        }
+        
+        headerElement.appendChild(selectedContents);
+        range.insertNode(headerElement);
+        
+        // Move cursor after the header element
+        range.setStartAfter(headerElement);
+        range.collapse(true);
+        selection.removeAllRanges();
+        selection.addRange(range);
+      }
+      
+      this.onEditorInput();
+      this.saveSelection();
+    } catch (e) {
+      // Fallback to execCommand
+      this.execCommand('formatBlock', header);
+    }
   }
 
   onHeaderChange(header: string) {
@@ -201,9 +363,15 @@ export class CustomEditorComponent implements ControlValueAccessor, AfterViewIni
     return this.selectedColor;
   }
 
-  toggleBold() { this.execCommand('bold'); this.isBold = document.queryCommandState('bold'); }
-  toggleItalic() { this.execCommand('italic'); this.isItalic = document.queryCommandState('italic'); }
-  toggleUnderline() { this.execCommand('underline'); this.isUnderline = document.queryCommandState('underline'); }
+  toggleBold() { 
+    this.execCommand('bold'); 
+  }
+  toggleItalic() { 
+    this.execCommand('italic'); 
+  }
+  toggleUnderline() { 
+    this.execCommand('underline'); 
+  }
 
   setAlignment(align: string) {
     if (typeof document === 'undefined' || !this.editorRef) return;

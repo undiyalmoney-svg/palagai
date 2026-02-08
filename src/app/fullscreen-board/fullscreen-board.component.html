@@ -36,16 +36,30 @@
     #kioskMessageContent
     class="kiosk-message-content palagai-display-container"
   >
-    <!-- Show board message if loaded, otherwise show Tamil verse -->
-    <div class="palagai-message-renderer" *ngIf="hasBoardMessage">
-      <div [innerHTML]="boardMessageHtml"></div>
+    <!-- Poll Board Display -->
+    <app-poll-display
+      *ngIf="isPollBoard && board"
+      [boardKey]="currentBoardKey || ''"
+      [pollData]="board.pollData || null"
+      [canVote]="true"
+      [canViewResults]="canViewPollResults"
+      [userEmail]="undefined"
+    ></app-poll-display>
+
+    <!-- Standard Board Display -->
+    <div *ngIf="!isPollBoard">
+      <!-- Show board message if loaded, otherwise show Tamil verse -->
+      <div class="palagai-message-renderer" *ngIf="hasBoardMessage">
+        <div [innerHTML]="boardMessageHtml"></div>
+      </div>
+      <div class="palagai-message-renderer verse-display" *ngIf="!hasBoardMessage">
+        <p class="tamil-verse">
+          முயற்சி திருவினை ஆக்கும்; முயற்றின்மை<br>
+          இன்மை புகுத்தி விடும்.
+        </p>
+      </div>
     </div>
-    <div class="palagai-message-renderer verse-display" *ngIf="!hasBoardMessage">
-      <p class="tamil-verse">
-        முயற்சி திருவினை ஆக்கும்; முயற்றின்மை<br>
-        இன்மை புகுத்தி விடும்.
-      </p>
-    </div>
+    
     <!-- Powered by Palagai -->
     <div class="powered-by-palagai">
       <div class="powered-by-line"></div>

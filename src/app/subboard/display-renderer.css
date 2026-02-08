@@ -82,9 +82,7 @@
 
 /* CRITICAL: Preserve text-align from inline styles (for custom editor alignment) */
 /* Use attribute selectors to match any element with text-align in style attribute */
-.palagai-message-renderer [style*="text-align"] {
-  /* Let the inline style take precedence - don't override it */
-}
+/* Note: Empty ruleset intentionally left for future overrides if needed */
 
 /* Specific overrides for common cases to ensure they work */
 .palagai-message-renderer [style*="text-align: center"],
@@ -281,7 +279,7 @@
 /* Full Screen Mode */
 .kiosk-message-content.palagai-display-container {
   min-height: 300px;
-  background: #f8f8f8 !important; /* Very light grey */
+  background: #ffffff !important; /* White background */
   border: 2px solid #ffffff !important; /* White border */
   border-radius: 20px;
   display: flex;

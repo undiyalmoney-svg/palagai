@@ -10,13 +10,13 @@
   "orientation": "any",
   "icons": [
     {
-      "src": "/header-icon.png",
+      "src": "/icon-192x192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/header-icon.png",
+      "src": "/icon-512x512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
@@ -32,8 +32,8 @@
       "url": "/mainboard",
       "icons": [
         {
-          "src": "/header-icon.png",
-          "sizes": "64x64",
+          "src": "/icon-192x192.png",
+          "sizes": "192x192",
           "type": "image/png"
         }
       ]
@@ -45,8 +45,8 @@
       "url": "/subboard",
       "icons": [
         {
-          "src": "/header-icon.png",
-          "sizes": "64x64",
+          "src": "/icon-192x192.png",
+          "sizes": "192x192",
           "type": "image/png"
         }
       ]

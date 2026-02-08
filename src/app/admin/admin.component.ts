@@ -21,6 +21,7 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
 import { FormsModule } from '@angular/forms';
 import { Subscription } from 'rxjs';
 import { Kavithai } from '../board.service';
+import { GoldenSlateIdDialogComponent } from './golden-slate-id-dialog.component';
 
 interface BoardRow {
   boardKey: string;
@@ -55,11 +56,14 @@ interface BoardRow {
 })
 export class AdminComponent implements OnInit, OnDestroy, AfterViewInit {
   boards: BoardRow[] = [];
+  pollBoards: BoardRow[] = [];
   kavithaiList: Kavithai[] = [];
   loading = true;
   loadingKavithai = false;
+  loadingPolls = false;
   selectedTabIndex = 0;
   displayedColumns: string[] = ['boardKey', 'ownerEmail', 'status', 'competition', 'actions'];
+  displayedPollColumns: string[] = ['boardKey', 'ownerEmail', 'question', 'votes', 'status', 'actions'];
   displayedKavithaiColumns: string[] = ['select', 'id', 'email', 'content', 'votes', 'duplicate', 'invalid', 'actions'];
   selectedKavithai = new Set<string>();
   private boardsSubscription?: Subscription;
@@ -87,6 +91,7 @@ export class AdminComponent implements OnInit, OnDestroy, AfterViewInit {
     if (this.admin.isAdminLoggedIn()) {
       this.loadBoards();
       this.loadKavithai();
+      this.loadPollBoards();
     }
   }
 
@@ -194,6 +199,68 @@ export class AdminComponent implements OnInit, OnDestroy, AfterViewInit {
     }
   }
 
+  async toggleSuperBoard(boardKey: string, currentStatus: boolean) {
+    try {
+      await this.boardsService.toggleSuperBoard(boardKey, !currentStatus);
+      this.snackBar.open(currentStatus ? 'Super board removed' : 'Board set as super board', 'OK', {
+        duration: 2000,
+        panelClass: ['success-snackbar'],
+      });
+      await this.loadBoards();
+    } catch (err: any) {
+      this.snackBar.open(err?.message || 'Failed to update super board status', 'OK', {
+        duration: 4000,
+        panelClass: ['error-snackbar'],
+      });
+    }
+  }
+
+  async setGoldenSlateId(boardKey: string) {
+    // Find the board to get current golden slate ID
+    const boardRow = this.boards.find(b => b.boardKey === boardKey) || 
+                     this.pollBoards.find(b => b.boardKey === boardKey);
+    
+    if (!boardRow) {
+      this.snackBar.open('Board not found', 'OK', {
+        duration: 2000,
+        panelClass: ['error-snackbar'],
+      });
+      return;
+    }
+
+    const dialogRef = this.dialog.open(GoldenSlateIdDialogComponent, {
+      width: '90%',
+      maxWidth: '600px',
+      data: {
+        boardKey: boardKey,
+        currentGoldenSlateId: boardRow.board.goldenSlateId
+      }
+    });
+
+    dialogRef.afterClosed().subscribe(async (result) => {
+      if (result?.success) {
+        if (result.goldenSlateId) {
+          this.snackBar.open('Golden slate ID set successfully', 'OK', {
+            duration: 2000,
+            panelClass: ['success-snackbar'],
+          });
+        } else {
+          this.snackBar.open('Golden slate ID removed successfully', 'OK', {
+            duration: 2000,
+            panelClass: ['success-snackbar'],
+          });
+        }
+        await this.loadBoards();
+      } else if (result?.error) {
+        // Show error message (duplicate ID or other error)
+        this.snackBar.open(result.error, 'OK', {
+          duration: 4000,
+          panelClass: ['error-snackbar'],
+        });
+      }
+    });
+  }
+
   async deleteBoard(boardKey: string) {
     // Find the board row to get ownerUid
     const boardRow = this.boards.find(b => b.boardKey === boardKey);
@@ -263,6 +330,81 @@ export class AdminComponent implements OnInit, OnDestroy, AfterViewInit {
       this.kavithaiList = [];
       this.loadingKavithai = false;
       this.cdr.markForCheck();
+    }
+  }
+
+  async loadPollBoards() {
+    this.loadingPolls = true;
+    try {
+      this.pollBoards = await this.boardsService.getAllPollBoards();
+      this.loadingPolls = false;
+      this.cdr.markForCheck();
+    } catch (err: any) {
+      console.error('[Admin] Error loading poll boards:', err);
+      this.snackBar.open(
+        err?.message || 'Failed to load poll boards.',
+        'OK',
+        {
+          duration: 5000,
+          panelClass: ['error-snackbar'],
+        }
+      );
+      this.pollBoards = [];
+      this.loadingPolls = false;
+      this.cdr.markForCheck();
+    }
+  }
+
+  async togglePollActiveStatus(boardKey: string) {
+    const boardRow = this.pollBoards.find(b => b.boardKey === boardKey);
+    if (!boardRow) return;
+
+    const currentStatus = boardRow.board.isPollActive !== false;
+    const newStatus = !currentStatus;
+
+    try {
+      await this.boardsService.setPollActiveStatus(boardKey, newStatus);
+      this.snackBar.open(
+        `Poll ${newStatus ? 'activated' : 'deactivated'} successfully`,
+        'OK',
+        {
+          duration: 3000,
+          panelClass: ['success-snackbar'],
+        }
+      );
+      await this.loadPollBoards();
+    } catch (err: any) {
+      this.snackBar.open(
+        err?.message || 'Failed to update poll status',
+        'OK',
+        {
+          duration: 4000,
+          panelClass: ['error-snackbar'],
+        }
+      );
+    }
+  }
+
+  async deletePollBoard(boardKey: string) {
+    const confirmed = confirm('Are you sure you want to delete this poll? This action cannot be undone.');
+    if (!confirmed) return;
+
+    try {
+      await this.boardsService.adminDeletePoll(boardKey);
+      this.snackBar.open('Poll deleted successfully', 'OK', {
+        duration: 3000,
+        panelClass: ['success-snackbar'],
+      });
+      await this.loadPollBoards();
+    } catch (err: any) {
+      this.snackBar.open(
+        err?.message || 'Failed to delete poll',
+        'OK',
+        {
+          duration: 4000,
+          panelClass: ['error-snackbar'],
+        }
+      );
     }
   }
 

@@ -249,6 +249,8 @@ body {
   display: flex;
   flex-direction: column;
   transition: all 0.3s ease;
+  align-items: center;
+  justify-content: center;
   background: #f8f8f8;
   border: 2px solid #ffffff;
   border-radius: 20px;
@@ -258,6 +260,15 @@ body {
 .kiosk-message-content.palagai-display-container {
   background: #f8f8f8 !important;
   border: 2px solid #ffffff !important;
+}
+
+/* Poll display specific styles */
+.kiosk-message-content app-poll-display {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 /* Powered by Palagai */

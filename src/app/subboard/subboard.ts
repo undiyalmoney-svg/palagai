@@ -3,8 +3,10 @@ import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators, FormControl } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Subscription } from 'rxjs';
-import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
-import { Board, BoardService } from '../board.service';
+import { debounceTime, distinctUntilChanged, skip } from 'rxjs/operators';
+import { Board, BoardService, PollData } from '../board.service';
+import { AuthService } from '../auth.service';
+import { AdminService } from '../admin.service';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -17,6 +19,8 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { BoardIdDialogComponent, BoardIdDialogData } from './board-id-dialog.component';
 import { SaveConfirmationDialogComponent } from '../mainboard/save-confirmation-dialog.component';
+import { PollDisplayComponent } from './poll-display/poll-display.component';
+import { AlertService } from '../shared/alert.service';
 const SESSION_BOARD_KEY = 'palagai_session_board_id';
 
 // Obfuscated localStorage keys (made to look like app preferences/analytics)
@@ -65,6 +69,7 @@ function initializeDummyLocalStorage() {
     MatIconModule,
     MatDialogModule,
     MatProgressSpinnerModule,
+    PollDisplayComponent,
   ],
   templateUrl: './subboard.html',
   styleUrls: ['./subboard.css', './display-renderer.css'],
@@ -98,6 +103,7 @@ export class Subboard implements OnInit, AfterViewInit, OnDestroy {
   isInCompetition: boolean = false; // Property instead of getter to avoid NG0100
   hasVotedInSession: boolean = false; // Track if user voted in current session
   cameFromCompetition: boolean = false; // Track if user came from competition page
+  primaryBoards: Array<{ boardKey: string; board: Board; ownerEmail?: string }> = []; // Primary boards to display
 
   readonly defaultHtml = '<p>Enter a board ID and load a Palagai board.</p>';
   readonly backgroundImageUrl = '/doodle-background.png';
@@ -111,6 +117,9 @@ export class Subboard implements OnInit, AfterViewInit, OnDestroy {
     private readonly router: Router,
     private readonly sanitizer: DomSanitizer,
     private readonly dialog: MatDialog,
+    private readonly alertService: AlertService,
+    private readonly auth: AuthService,
+    private readonly admin: AdminService,
   ) {
     // Initialize form - use try-catch for SSR safety
     // FormBuilder should always be available via DI, but add safety for edge cases
@@ -137,9 +146,11 @@ export class Subboard implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
-  ngOnInit() {
-    // Initialize dummy localStorage keys
-    initializeDummyLocalStorage();
+  async ngOnInit() {
+    // Initialize dummy localStorage keys asynchronously (non-blocking)
+    if (typeof window !== 'undefined') {
+      setTimeout(() => initializeDummyLocalStorage(), 0);
+    }
     
     // Check query params synchronously first (before subscription) to prevent landing page flash
     const snapshotParams = this.route.snapshot.queryParams;
@@ -147,37 +158,114 @@ export class Subboard implements OnInit, AfterViewInit, OnDestroy {
     const fromCompetitionSnapshot = snapshotParams['from'] === 'competition';
     const isPreviewSnapshot = snapshotParams['preview'] === 'true';
     const previewContentSnapshot = snapshotParams['content'];
+    const isPollPreviewSnapshot = snapshotParams['pollPreview'] === 'true';
+    const previewPollDataSnapshot = snapshotParams['pollData'];
     
     // Handle preview mode synchronously (no landing page flash)
-    if (isPreviewSnapshot && previewContentSnapshot) {
+    if (isPreviewSnapshot && (previewContentSnapshot || (isPollPreviewSnapshot && previewPollDataSnapshot))) {
       this.showLandingPage = false;
       this.isPreviewMode = true;
-      // Preview mode will be handled in subscription, but we prevent landing page flash
+      // Process preview immediately from snapshot params
+      await this.processQueryParams(snapshotParams);
+      return; // Early return since preview is handled
     }
     // If board ID exists in URL, redirect to new fullscreen route
     else if (boardIdFromSnapshot && typeof boardIdFromSnapshot === 'string' && boardIdFromSnapshot.trim()) {
       const trimmedId = boardIdFromSnapshot.trim();
       // Redirect to new fullscreen board route
       this.router.navigate(['/board', trimmedId]);
+      return; // Early return to prevent subscription setup
+    }
+    
+    // Process initial params immediately (no debounce) for faster page load
+    // Only process if not already handled above (preview/redirect cases)
+    if (!isPreviewSnapshot && !boardIdFromSnapshot) {
+      await this.processQueryParams(snapshotParams);
     }
     
     // Check for preview mode first
     // Use debounce to prevent multiple rapid fires (only for subsequent changes)
+    let isFirstEmission = true;
     this.queryParamsSubscription = this.route.queryParams.pipe(
-      debounceTime(150)
-    ).subscribe(params => {
-      const isPreview = params['preview'] === 'true';
-      const previewContent = params['content'];
-      
-      if (isPreview && previewContent) {
-        // Preview mode - show content directly
-        this.isPreviewMode = true;
-        const decodedContent = decodeURIComponent(previewContent);
-        const sizeFromQuery = params['size'] as 'min' | 'normal' | 'max' | undefined;
+      debounceTime(150),
+      skip(1) // Skip first emission since we already processed snapshot params
+    ).subscribe(async params => {
+      // For subsequent changes, process normally
+      await this.processQueryParams(params);
+    });
+  }
+
+  private async processQueryParams(params: any) {
+    const isPreview = params['preview'] === 'true';
+    const isPollPreview = params['pollPreview'] === 'true';
+    const previewContent = params['content'];
+    const previewPollData = params['pollData'];
+    
+    if (isPreview && isPollPreview && previewPollData) {
+      // Poll preview mode
+      this.isPreviewMode = true;
+      this.showLandingPage = false; // Hide landing page for preview
+      try {
+        // Angular Router automatically decodes query params once
+        // Try parsing directly first (normal case - router decoded it)
+        let decodedPollData: any;
+        try {
+          decodedPollData = JSON.parse(previewPollData);
+        } catch (e) {
+          // If direct parse fails, it might be double-encoded (legacy URLs)
+          // Try decoding once more
+          try {
+            const decoded = decodeURIComponent(previewPollData);
+            decodedPollData = JSON.parse(decoded);
+          } catch (e2) {
+            // Still failed - might be triple encoded or invalid
+            throw new Error('Failed to decode poll data: ' + (e2 instanceof Error ? e2.message : 'Unknown error'));
+          }
+        }
+        
+        // Validate decoded poll data
+        if (!decodedPollData || typeof decodedPollData !== 'object') {
+          throw new Error('Invalid poll data structure');
+        }
+        if (!decodedPollData.question || typeof decodedPollData.question !== 'string') {
+          throw new Error('Poll question is missing or invalid');
+        }
+        if (!decodedPollData.options || !Array.isArray(decodedPollData.options) || decodedPollData.options.length < 2) {
+          throw new Error('Poll must have at least 2 options');
+        }
+        
+        // Ensure all options have required fields
+        decodedPollData.options = decodedPollData.options.map((opt: any, index: number) => ({
+          id: opt.id || `option-${index}-${Date.now()}`,
+          text: opt.text || '',
+          voteCount: opt.voteCount || 0
+        }));
+        
         const now = Date.now();
+        
+        // For preview, use empty boardKey to prevent Firebase loading
+        this.currentBoardKey = '';
+        
+        // Get board size from params or default to 'normal'
+        const sizeParam = params['size'] as 'min' | 'normal' | 'max' | undefined;
+        const boardSizeValue: 'min' | 'normal' | 'max' = sizeParam || 'normal';
+        
+        // Create poll data object with proper typing
+        const pollData: PollData = {
+          question: decodedPollData.question,
+          options: decodedPollData.options,
+          pollType: decodedPollData.pollType || 'single',
+          showResults: decodedPollData.showResults || 'after-vote',
+          allowVoteChange: decodedPollData.allowVoteChange || false,
+          totalVotes: decodedPollData.totalVotes || 0,
+          createdAt: decodedPollData.createdAt || now,
+          endDate: decodedPollData.endDate
+        };
+        
+        // Create board object for preview
         this.board = {
           message: {
-            html: decodedContent,
+            html: '',
             updatedAt: now,
             status: 'active'
           },
@@ -188,18 +276,13 @@ export class Subboard implements OnInit, AfterViewInit, OnDestroy {
           planType: 'free',
           createdAt: now,
           activeDate: new Date(now).toISOString(),
-          boardSize: (sizeFromQuery && ['min', 'normal', 'max'].includes(sizeFromQuery)) ? sizeFromQuery : 'normal'
+          boardSize: boardSizeValue,
+          boardType: 'poll',
+          isPollActive: true, // Ensure poll is active for preview
+          pollData: pollData
         };
         this._lastUpdated = Date.now();
-        // Set board size from query param or default to normal
-        this.boardSize = this.board.boardSize || 'normal';
-        this.savedBoardSize = this.boardSize; // Track saved board size
-        
-        // Store boardKey from query params for size updates
-        const boardKeyFromQuery = params['boardKey'] as string | undefined;
-        if (boardKeyFromQuery) {
-          (this as any).previewBoardKey = boardKeyFromQuery;
-        }
+        this.boardSize = boardSizeValue;
         
         // Auto-enter full page mode for preview immediately
         this.isFullPage = true;
@@ -210,41 +293,136 @@ export class Subboard implements OnInit, AfterViewInit, OnDestroy {
           document.documentElement.style.overflow = 'hidden';
         }
         this.cdr.detectChanges();
-        
-        // Start auto-scroll immediately
-        this.startAutoScroll();
+        return;
+      } catch (e) {
+        console.error('Error parsing poll preview data:', e);
+        this.alertService.error('Invalid poll preview data');
         return;
       }
-
-      // Normal mode - check for board ID
-      const boardIdFromQuery = params['id'];
-      const fromCompetition = params['from'] === 'competition';
-      
-      // Check if user came from competition page (via query param or referrer)
-      if (typeof window !== 'undefined') {
-        const referrer = document.referrer || '';
-        this.cameFromCompetition = fromCompetition || referrer.includes('/competition');
-      }
-      
-      if (boardIdFromQuery && typeof boardIdFromQuery === 'string' && boardIdFromQuery.trim()) {
-        const trimmedId = boardIdFromQuery.trim();
-        // Redirect to new fullscreen board route
-        this.router.navigate(['/board', trimmedId]);
-      } else {
-        // No query param, show landing page
-        this.loadingFromQueryParam = false;
-        this.showLandingPage = true;
-        this.boardSize = 'normal'; // Default size
-        // Ensure body overflow is hidden when showing landing page
-        if (typeof window !== 'undefined') {
-          document.body.style.overflow = 'hidden';
-          document.body.style.margin = '0';
-          document.body.style.padding = '0';
-          document.documentElement.style.overflow = 'hidden';
+    }
+    
+    if (isPreview && previewContent) {
+      // Standard board preview mode - show content directly
+      this.isPreviewMode = true;
+      this.showLandingPage = false; // Hide landing page for preview
+      // Handle double-encoding: try decoding once, if it still looks encoded, decode again
+      // Note: Angular Router automatically decodes query params once, so previewContent might already be partially decoded
+      let decodedContent = previewContent;
+      try {
+        // Angular Router decodes once, but content might still be encoded
+        // Try decoding multiple times until no more % encoding remains
+        let previousContent = '';
+        let decodeAttempts = 0;
+        while (decodedContent.includes('%') && decodeAttempts < 3 && decodedContent !== previousContent) {
+          previousContent = decodedContent;
+          decodedContent = decodeURIComponent(decodedContent);
+          decodeAttempts++;
         }
-        this.initializeFromSessionStorage();
+        // If decoded content is empty or just whitespace, try using original
+        if (!decodedContent || decodedContent.trim().length === 0) {
+          console.warn('Decoded content is empty, using original');
+          decodedContent = previewContent;
+        }
+        console.log('Preview content - original:', previewContent);
+        console.log('Preview content - decoded:', decodedContent);
+        console.log('Decode attempts:', decodeAttempts);
+      } catch (e) {
+        // If decoding fails, use original content
+        console.warn('Error decoding preview content:', e);
+        decodedContent = previewContent;
       }
-    });
+      
+      // Ensure we have content
+      if (!decodedContent || decodedContent.trim().length === 0) {
+        console.error('Preview content is empty after decoding!');
+        this.alertService.error('Preview content is empty. Please check your content.');
+        return;
+      }
+      const sizeFromQuery = params['size'] as 'min' | 'normal' | 'max' | undefined;
+      const now = Date.now();
+      this.board = {
+        message: {
+          html: decodedContent,
+          updatedAt: now,
+          status: 'active'
+        },
+        boardProtection: false,
+        authorizedMailList: [],
+        ownerUid: 'preview',
+        userType: 'preview',
+        planType: 'free',
+        createdAt: now,
+        activeDate: new Date(now).toISOString(),
+        boardSize: (sizeFromQuery && ['min', 'normal', 'max'].includes(sizeFromQuery)) ? sizeFromQuery : 'normal',
+        boardType: 'standard' // Explicitly set board type
+      };
+      this._lastUpdated = Date.now();
+      // Set board size from query param or default to normal
+      this.boardSize = this.board.boardSize || 'normal';
+      this.savedBoardSize = this.boardSize; // Track saved board size
+      
+      // Store boardKey from query params for size updates
+      const boardKeyFromQuery = params['boardKey'] as string | undefined;
+      if (boardKeyFromQuery) {
+        (this as any).previewBoardKey = boardKeyFromQuery;
+      }
+      
+      // Auto-enter full page mode for preview immediately
+      this.isFullPage = true;
+      this.showLandingPage = false; // Ensure landing page is hidden
+      if (typeof window !== 'undefined') {
+        document.body.style.overflow = 'hidden';
+        document.body.style.margin = '0';
+        document.body.style.padding = '0';
+        document.documentElement.style.overflow = 'hidden';
+      }
+      console.log('Preview board set:', this.board);
+      console.log('hasBoardMessage:', this.hasBoardMessage);
+      console.log('isFullPage:', this.isFullPage);
+      console.log('showLandingPage:', this.showLandingPage);
+      console.log('isPollBoard:', this.isPollBoard);
+      
+      // Force change detection to ensure template updates
+      this.cdr.detectChanges();
+      
+      // Use setTimeout to ensure DOM is ready
+      setTimeout(() => {
+        this.cdr.detectChanges();
+        // Start auto-scroll after a brief delay
+        this.startAutoScroll();
+      }, 0);
+      
+      return;
+    }
+
+    // Normal mode - check for board ID
+    const boardIdFromQuery = params['id'];
+    const fromCompetition = params['from'] === 'competition';
+    
+    // Check if user came from competition page (via query param or referrer)
+    if (typeof window !== 'undefined') {
+      const referrer = document.referrer || '';
+      this.cameFromCompetition = fromCompetition || referrer.includes('/competition');
+    }
+    
+    if (boardIdFromQuery && typeof boardIdFromQuery === 'string' && boardIdFromQuery.trim()) {
+      const trimmedId = boardIdFromQuery.trim();
+      // Redirect to new fullscreen board route
+      this.router.navigate(['/board', trimmedId]);
+    } else {
+      // No query param, show landing page
+      this.loadingFromQueryParam = false;
+      this.showLandingPage = true;
+      this.boardSize = 'normal'; // Default size
+      // Ensure body overflow is hidden when showing landing page
+      if (typeof window !== 'undefined') {
+        document.body.style.overflow = 'hidden';
+        document.body.style.margin = '0';
+        document.body.style.padding = '0';
+        document.documentElement.style.overflow = 'hidden';
+      }
+      this.initializeFromSessionStorage();
+    }
   }
 
   private async loadBoardFromQuery(boardId: string) {
@@ -267,10 +445,11 @@ export class Subboard implements OnInit, AfterViewInit, OnDestroy {
     this.emailControl.disable();
 
     try {
-      const result = await this.boards.getBoard(boardId);
-
-      if (!result) {
-        const errorMsg = 'Board not found. Please check the board ID and try again.';
+      // Try to resolve board ID (regular board key or golden slate ID)
+      const resolved = await this.boards.resolveBoardId(boardId);
+      
+      if (!resolved) {
+        const errorMsg = 'Board not found. Please check the board ID or golden slate ID and try again.';
         this.error = errorMsg;
         this.board = null;
         this._lastUpdated = null;
@@ -286,6 +465,9 @@ export class Subboard implements OnInit, AfterViewInit, OnDestroy {
         });
         return;
       }
+
+      const result = resolved.board;
+      const actualBoardKey = resolved.actualBoardKey;
 
       // Check if board is protected - show email input if needed
       this.showEmailInput = result.boardProtection === true;
@@ -307,15 +489,35 @@ export class Subboard implements OnInit, AfterViewInit, OnDestroy {
 
       // Board is not protected - load it directly
       this.board = result;
-      this.currentBoardKey = boardId;
+      this.currentBoardKey = actualBoardKey; // Use actual board key
       this._lastUpdated = result.message?.updatedAt ?? null;
       // Load board size from database
       this.boardSize = result.boardSize || 'normal';
       this.savedBoardSize = this.boardSize; // Track saved board size
-      this.saveToSessionStorage(boardId);
+      this.saveToSessionStorage(actualBoardKey); // Save actual board key
       this.error = '';
       this.loading = false;
       this.showLandingPage = false; // Hide landing page when board is loaded
+      
+      // For poll boards, ensure pollData is loaded and isPollActive is set
+      if (result.boardType === 'poll') {
+        // Ensure isPollActive is set (default to true if not set)
+        if (result.isPollActive === undefined) {
+          result.isPollActive = true;
+        }
+        // If pollData is missing, try to load it
+        if (!result.pollData && actualBoardKey) {
+          try {
+            const pollData = await this.boards.getPoll(actualBoardKey);
+            if (pollData) {
+              result.pollData = pollData;
+              this.board.pollData = pollData;
+            }
+          } catch (e) {
+            console.error('Error loading poll data:', e);
+          }
+        }
+      }
       
       // Set competition status immediately
       this.isInCompetition = !!(result.isSubmittedForCompetition);
@@ -332,7 +534,7 @@ export class Subboard implements OnInit, AfterViewInit, OnDestroy {
       this.cdr.markForCheck();
       
       // Set up real-time listener for board updates (non-blocking)
-      this.setupRealtimeListener(boardId);
+      this.setupRealtimeListener(actualBoardKey);
       
       // Auto-enter full page mode immediately when loading from query param
       this.isFullPage = true;
@@ -390,6 +592,44 @@ export class Subboard implements OnInit, AfterViewInit, OnDestroy {
 
   get hasBoardMessage(): boolean {
     return !!(this.board && this.board.message && this.board.message.html);
+  }
+
+  get isPollBoard(): boolean {
+    return this.board?.boardType === 'poll' && (this.board.isPollActive !== false);
+  }
+
+
+  get canVoteOnPoll(): boolean {
+    // Poll boards are open for everyone to vote - no restrictions
+    if (!this.isPollBoard || !this.board) {
+      return false;
+    }
+    // Always allow voting on poll boards (ignore boardProtection)
+    return true;
+  }
+
+  get canViewPollResults(): boolean {
+    // Only creator and admin can view results
+    if (!this.isPollBoard || !this.board) {
+      return false;
+    }
+    const currentUser = this.auth.user;
+    if (!currentUser) {
+      return false;
+    }
+    // Check if user is the board owner
+    if (currentUser.uid === this.board.ownerUid) {
+      return true;
+    }
+    // Check if user is admin
+    if (this.admin.isAdminLoggedIn()) {
+      return true;
+    }
+    return false;
+  }
+
+  get userEmailForPoll(): string | undefined {
+    return this.emailControl?.value || undefined;
   }
 
 
@@ -523,9 +763,9 @@ export class Subboard implements OnInit, AfterViewInit, OnDestroy {
       const result = await this.showSaveConfirmation('You have unsaved board size changes. Would you like to save before leaving?');
       if (result === 'save') {
         await this.saveBoardSize();
-        this.router.navigate(['/mainboard']);
+        this.navigateBackFromPreview();
       } else if (result === 'discard') {
-        this.router.navigate(['/mainboard']);
+        this.navigateBackFromPreview();
       }
       // If 'cancel', stay on page
     } else {
@@ -533,8 +773,40 @@ export class Subboard implements OnInit, AfterViewInit, OnDestroy {
       if (this.isPreviewMode && typeof window !== 'undefined') {
         localStorage.setItem('palagai_preview_board_size', this.boardSize);
       }
-      this.router.navigate(['/mainboard']);
+      this.navigateBackFromPreview();
     }
+  }
+
+  navigateBackFromPreview() {
+    // Check returnTo param from query string
+    const queryParams = this.route.snapshot.queryParams;
+    const returnTo = queryParams['returnTo'];
+    const boardKey = queryParams['boardKey'];
+    
+    if (returnTo === 'mainboard') {
+      // Came from mainboard, go back there with boardKey if available
+      const navParams: any = {};
+      if (boardKey) {
+        navParams['boardKey'] = boardKey;
+      }
+      this.router.navigate(['/mainboard'], { queryParams: navParams });
+      return;
+    }
+    
+    // If user is logged in, go to dashboard, otherwise go to home
+    if (typeof window !== 'undefined') {
+      try {
+        const authData = localStorage.getItem('palagai_auth');
+        if (authData) {
+          this.router.navigate(['/dashboard']);
+          return;
+        }
+      } catch (e) {
+        // Ignore errors
+      }
+    }
+    // Not logged in, go to home
+    this.router.navigate(['/']);
   }
 
   async showSaveConfirmation(message: string): Promise<'save' | 'discard' | 'cancel'> {
@@ -733,9 +1005,9 @@ export class Subboard implements OnInit, AfterViewInit, OnDestroy {
         return;
       }
 
-      // Success - redirect to fullscreen board component
+      // Success - navigate to home page with board ID (home page will load the board)
       // (Protected boards with email are already authorized at this point)
-      this.router.navigate(['/board', trimmedId]);
+      this.router.navigate(['/'], { queryParams: { id: trimmedId } });
     } catch (e: any) {
       const errorMsg = e?.message || 'Error loading board. Please check the board ID and try again.';
       this.error = errorMsg;
@@ -819,22 +1091,24 @@ export class Subboard implements OnInit, AfterViewInit, OnDestroy {
   openBoardIdDialog() {
     const dialogRef = this.dialog.open(BoardIdDialogComponent, {
       width: '90%',
-      maxWidth: '450px',
+      maxWidth: '500px',
+      disableClose: false,
+      autoFocus: true,
       data: {
-        boardId: this.boardIdControl.value || '',
-        email: this.emailControl.value || ''
+        boardId: this.boardIdControl?.value || '',
+        email: this.emailControl?.value || ''
       } as BoardIdDialogData
     });
 
     dialogRef.afterClosed().subscribe(result => {
       if (result && result.boardId) {
-        this.form.patchValue({ boardId: result.boardId });
-        if (result.email) {
-          this.form.patchValue({ email: result.email });
+        const boardId = result.boardId.trim();
+        if (boardId) {
+          // Navigate directly to the board route
+          this.router.navigate(['/board', boardId], {
+            queryParams: result.email ? { email: result.email } : {}
+          });
         }
-        this.showEmailInput = result.showEmailInput || false;
-        // Load board and go directly to full view
-        this.loadBoardDirectlyToFullView();
       }
     });
   }
@@ -945,6 +1219,28 @@ export class Subboard implements OnInit, AfterViewInit, OnDestroy {
               }
             }
 
+            // For poll boards, ensure pollData is loaded
+            if (updatedBoard.boardType === 'poll') {
+              // Ensure isPollActive is set
+              if (updatedBoard.isPollActive === undefined) {
+                updatedBoard.isPollActive = true;
+              }
+              // If pollData is missing, try to load it
+              if (!updatedBoard.pollData && this.currentBoardKey) {
+                this.boards.getPoll(this.currentBoardKey).then(pollData => {
+                  if (pollData && this.board) {
+                    updatedBoard.pollData = pollData;
+                    this.board.pollData = pollData;
+                    this.board = updatedBoard;
+                    this.cdr.detectChanges();
+                  }
+                }).catch(e => console.error('Error loading poll data:', e));
+              } else if (updatedBoard.pollData) {
+                // Ensure pollData is set on the board
+                updatedBoard.pollData = updatedBoard.pollData;
+              }
+            }
+
             // Prevent duplicate updates - only update if content actually changed
             const previousUpdatedAt = this._lastUpdated;
             const newUpdatedAt = updatedBoard.message?.updatedAt ?? null;
@@ -991,5 +1287,44 @@ export class Subboard implements OnInit, AfterViewInit, OnDestroy {
       // Don't show error to user - just log it
       // The board will still work, just without real-time updates
     }
+  }
+
+  async loadPrimaryBoards() {
+    try {
+      this.primaryBoards = await this.boards.getPrimaryBoards();
+      this.cdr.detectChanges();
+    } catch (e: any) {
+      console.error('Error loading primary boards:', e);
+      // Don't show error to user, just log it
+    }
+  }
+
+  viewPrimaryBoard(boardKey: string) {
+    this.router.navigate(['/board', boardKey]);
+  }
+
+  goToHome() {
+    // If in preview mode, check if we should return to previous page
+    if (this.isPreviewMode) {
+      const queryParams = this.route.snapshot.queryParams;
+      const returnTo = queryParams['returnTo'];
+      
+      if (returnTo === 'mainboard') {
+        // Navigate back to mainboard
+        this.navigateBackFromPreview();
+        return;
+      }
+    }
+    // Otherwise, navigate to home
+    this.router.navigate(['/']);
+  }
+
+  getBoardPreview(board: Board): string {
+    if (board.boardType === 'poll' && board.pollData) {
+      return board.pollData.question || 'Poll';
+    }
+    // Strip HTML tags and get first 100 characters
+    const text = (board.message?.html || '').replace(/<[^>]*>/g, '').trim();
+    return text.substring(0, 100) + (text.length > 100 ? '...' : '');
   }
 }

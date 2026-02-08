@@ -402,3 +402,29 @@
 ::ng-deep .mat-mdc-snack-bar-container + .mat-mdc-snack-bar-container {
   margin-top: 12px !important;
 }
+
+/* ============================================
+   LINK GENERATED DIALOG - MOBILE FIXES
+   ============================================ */
+
+/* Override global dialog styles for link-generated-dialog on mobile */
+@media (max-width: 600px) {
+  ::ng-deep .link-generated-dialog-panel .mat-mdc-dialog-surface {
+    width: 95vw !important;
+    max-width: 95vw !important;
+    min-width: 0 !important;
+    max-height: 95vh !important;
+  }
+
+  ::ng-deep .link-generated-dialog-panel .cdk-overlay-pane {
+    width: 95vw !important;
+    max-width: 95vw !important;
+    min-width: 0 !important;
+  }
+
+  ::ng-deep .link-generated-dialog-panel .mat-mdc-dialog-container {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 0 !important;
+  }
+}

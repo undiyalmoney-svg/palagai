@@ -15,13 +15,13 @@
 
     <div class="toolbar-divider"></div>
 
-    <button mat-icon-button type="button" (mousedown)="saveSelection()" (click)="toggleBold()" [class.active]="isBold">
+    <button mat-icon-button type="button" (mousedown)="saveSelection()" (click)="toggleBold()">
       <mat-icon>format_bold</mat-icon>
     </button>
-    <button mat-icon-button type="button" (mousedown)="saveSelection()" (click)="toggleItalic()" [class.active]="isItalic">
+    <button mat-icon-button type="button" (mousedown)="saveSelection()" (click)="toggleItalic()">
       <mat-icon>format_italic</mat-icon>
     </button>
-    <button mat-icon-button type="button" (mousedown)="saveSelection()" (click)="toggleUnderline()" [class.active]="isUnderline">
+    <button mat-icon-button type="button" (mousedown)="saveSelection()" (click)="toggleUnderline()">
       <mat-icon>format_underlined</mat-icon>
     </button>
 
@@ -51,7 +51,7 @@
     <div class="toolbar-divider"></div>
 
     <div class="color-picker-wrapper" (mouseleave)="showColorPresets = false">
-      <input #colorInput type="color" [(ngModel)]="selectedColor" (input)="onColorChange(selectedColor)" class="color-picker-input" />
+      <input #colorInput type="color" [(ngModel)]="selectedColor" name="colorPicker" (input)="onColorChange(selectedColor)" class="color-picker-input" />
       <button 
         mat-icon-button 
         type="button" 

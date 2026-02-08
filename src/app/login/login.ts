@@ -84,8 +84,8 @@ export class Login {
       // Success logic
       this.auth.setUser({ uid: record.uid, email: record.user.email, boardKey: record.user.boardKey });
       localStorage.setItem('palagai_last_email', email);
-      this.alertService.success('Login successful. Redirecting…');
-      await this.router.navigate(['/mainboard']);
+      this.alertService.success('Login successful.');
+      await this.router.navigate(['/dashboard']);
 
     } catch (err) {
       this.showAlert('Something went wrong. Please try again.');

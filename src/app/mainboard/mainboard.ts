@@ -2,7 +2,7 @@ import { Component, OnInit, ChangeDetectorRef, AfterViewInit, ViewChild, Element
 import { CommonModule } from '@angular/common';
 import { FormArray, FormBuilder, FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { FormsModule } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { Router, ActivatedRoute } from '@angular/router';
 import { AuthService } from '../auth.service';
 import { Board, BoardService } from '../board.service';
 import { MatToolbarModule } from '@angular/material/toolbar';
@@ -14,10 +14,20 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
+import { MatSelectModule } from '@angular/material/select';
+import { MatMenuModule } from '@angular/material/menu';
+import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatDividerModule } from '@angular/material/divider';
 import { LinkDialogComponent } from './link-dialog.component';
 import { EmailDialogComponent } from './email-dialog.component';
 import { SaveConfirmationDialogComponent } from './save-confirmation-dialog.component';
 import { CustomEditorComponent } from './custom-editor/custom-editor.component';
+import { PollPaymentDialogComponent } from './poll-payment-dialog.component';
+import { PollEditorComponent } from './poll-editor/poll-editor.component';
+import { PollSaveDialogComponent, PollSaveDialogData, PollSaveDialogResult } from './poll-save-dialog.component';
+import { PrimaryBoardInfoDialogComponent } from './primary-board-info-dialog.component';
+import { AlertService } from '../shared/alert.service';
+import { PollData } from '../board.service';
 
 @Component({
   selector: 'app-mainboard',
@@ -26,8 +36,8 @@ import { CustomEditorComponent } from './custom-editor/custom-editor.component';
     CommonModule,
     ReactiveFormsModule,
     FormsModule,
-    RouterLink,
     CustomEditorComponent,
+    PollEditorComponent,
     MatToolbarModule,
     MatButtonModule,
     MatFormFieldModule,
@@ -37,36 +47,48 @@ import { CustomEditorComponent } from './custom-editor/custom-editor.component';
     MatIconModule,
     MatSnackBarModule,
     MatDialogModule,
+    MatSelectModule,
+    MatMenuModule,
+    MatTooltipModule,
+    MatDividerModule,
   ],
   templateUrl: './mainboard.html',
   styleUrl: './mainboard.css',
 })
 export class Mainboard implements OnInit, AfterViewInit {
+  @ViewChild('pollEditor', { static: false }) pollEditor?: PollEditorComponent;
+  
   loading = false;
   saving = false;
   clearing = false;
-  message = '';
   board: Board | null = null;
+  fabMenuOpen = false;
   boardSize: 'min' | 'normal' | 'max' = 'normal'; // Board size control
   private savedContent = ''; // Track saved content for unsaved changes detection
+  boardType: 'standard' | 'poll' = 'standard'; // Board type
+  pollData: PollData | null = null; // Current poll data
 
   form: FormGroup;
   emailControl = new FormControl<string | null>('', [Validators.email]);
   addingEmail = false;
+  isPrimaryBoard = false; // Primary board option
 
   constructor(
     private readonly router: Router,
+    private readonly route: ActivatedRoute,
     public readonly auth: AuthService,
     private readonly boards: BoardService,
     private readonly fb: FormBuilder,
     private readonly snackBar: MatSnackBar,
     private readonly dialog: MatDialog,
+    private readonly alertService: AlertService,
     private readonly cdr: ChangeDetectorRef,
   ) {
     this.form = this.fb.group({
       content: [''],
       boardProtection: [false],
       emails: this.fb.array<FormControl<string | null>>([]),
+      isPrimaryBoard: [false],
     });
   }
 
@@ -83,6 +105,11 @@ export class Mainboard implements OnInit, AfterViewInit {
     return this.form.get('emails') as FormArray<FormControl<string | null>>;
   }
 
+  get isPrimaryBoardControl(): FormControl<boolean> {
+    return this.form.get('isPrimaryBoard') as FormControl<boolean>;
+  }
+
+
   get lastUpdated(): number | null {
     return this.board?.message?.updatedAt ?? null;
   }
@@ -96,6 +123,33 @@ export class Mainboard implements OnInit, AfterViewInit {
     return `${baseUrl}/board/${this.auth.user.boardKey}`;
   }
 
+  get isPollBoard(): boolean {
+    return this.boardType === 'poll' || this.board?.boardType === 'poll';
+  }
+
+  get hasPollData(): boolean {
+    return this.isPollBoard && this.pollData !== null;
+  }
+
+  toggleFabMenu(): void {
+    this.fabMenuOpen = !this.fabMenuOpen;
+  }
+
+  openPrimaryBoardInfo(): void {
+    this.dialog.open(PrimaryBoardInfoDialogComponent, {
+      width: '90%',
+      maxWidth: '450px',
+    });
+  }
+
+  get canModifyPoll(): boolean {
+    // Poll can only be modified if it hasn't been created yet (no pollCreatedAt)
+    if (!this.board || !this.isPollBoard) {
+      return true;
+    }
+    return !this.board.pollCreatedAt;
+  }
+
   private updateFormControlsDisabledState() {
     if (this.loading) {
       this.boardProtectionControl.disable({ emitEvent: false });
@@ -107,19 +161,13 @@ export class Mainboard implements OnInit, AfterViewInit {
   copyBoardId() {
     const boardId = this.auth.user?.boardKey;
     if (!boardId) {
-      this.snackBar.open('Board ID not available', 'OK', {
-        duration: 3000,
-        panelClass: ['error-snackbar'],
-      });
+      this.alertService.error('Board ID not available');
       return;
     }
 
     if (typeof window !== 'undefined' && navigator.clipboard) {
       navigator.clipboard.writeText(boardId).then(() => {
-        this.snackBar.open('Board ID copied to clipboard!', 'OK', {
-          duration: 3000,
-          panelClass: ['success-snackbar'],
-        });
+        this.alertService.success('Board ID copied to clipboard!');
       }).catch(() => {
         // Fallback for older browsers
         this.fallbackCopyToClipboard(boardId);
@@ -132,19 +180,13 @@ export class Mainboard implements OnInit, AfterViewInit {
 
   copyLinkToClipboard() {
     if (!this.shareableLink) {
-      this.snackBar.open('Board ID not available', 'OK', {
-        duration: 3000,
-        panelClass: ['error-snackbar'],
-      });
+      this.alertService.error('Board ID not available');
       return;
     }
 
     if (typeof window !== 'undefined' && navigator.clipboard) {
       navigator.clipboard.writeText(this.shareableLink).then(() => {
-        this.snackBar.open('Link copied to clipboard!', 'OK', {
-          duration: 3000,
-          panelClass: ['success-snackbar'],
-        });
+        this.alertService.success('Link copied to clipboard!');
       }).catch(() => {
         // Fallback for older browsers
         this.fallbackCopyToClipboard(this.shareableLink);
@@ -155,8 +197,84 @@ export class Mainboard implements OnInit, AfterViewInit {
     }
   }
 
+  goBack() {
+    // Check if we came from dashboard (via query params)
+    const queryParams = this.route.snapshot.queryParams;
+    if (queryParams['boardKey']) {
+      // Came from dashboard, go back to dashboard
+      this.router.navigate(['/dashboard']);
+    } else {
+      // Check if user is logged in
+      if (this.auth.user) {
+        // User is logged in, go to dashboard
+        this.router.navigate(['/dashboard']);
+      } else {
+        // Not logged in, go to home
+        this.router.navigate(['/']);
+      }
+    }
+  }
+
   async openPreview() {
-    // Check for unsaved changes
+    // For poll boards, check if poll data exists
+    if (this.boardType === 'poll') {
+      if (!this.pollEditor) {
+        this.alertService.error('Please fill in the poll details first');
+        return;
+      }
+      
+      const pollForm = this.pollEditor.pollForm;
+      if (!pollForm.valid) {
+        this.alertService.error('Please complete the poll question and at least 2 options');
+        return;
+      }
+
+      // Get poll data from editor
+      const question = pollForm.get('question')?.value || '';
+      const optionsArray = pollForm.get('options') as FormArray;
+      const options = optionsArray.controls
+        .map(control => control.value)
+        .filter(text => text && text.trim());
+
+      if (options.length < 2) {
+        this.alertService.error('Poll must have at least 2 options');
+        return;
+      }
+
+      // Create poll data for preview
+      const previewPollData: PollData = {
+        question: question,
+        options: options.map((text, index) => ({ 
+          id: `option-${index}-${Date.now()}`,
+          text: text.trim(),
+          voteCount: 0
+        })),
+        pollType: 'single', // Default for preview
+        showResults: 'after-vote', // Default value
+        allowVoteChange: false, // Default value
+        totalVotes: 0,
+        endDate: undefined,
+        createdAt: Date.now()
+      };
+
+      // Navigate to preview with poll data
+      // Don't manually encode - Angular Router will handle encoding
+      const queryParams: any = {
+        preview: 'true',
+        pollPreview: 'true',
+        pollData: JSON.stringify(previewPollData),
+        returnTo: 'mainboard'
+      };
+
+      if (this.auth.user?.boardKey) {
+        queryParams.boardKey = this.auth.user.boardKey;
+      }
+
+      this.router.navigate(['/preview'], { queryParams });
+      return;
+    }
+
+    // For standard boards, check for unsaved changes
     if (this.hasUnsavedChanges()) {
       const result = await this.showSaveConfirmation('You have unsaved changes. Would you like to save before previewing?');
       if (result === 'save') {
@@ -169,10 +287,7 @@ export class Mainboard implements OnInit, AfterViewInit {
 
     const content = this.contentControl.value;
     if (!content) {
-      this.snackBar.open('No content to preview', 'OK', {
-        duration: 3000,
-        panelClass: ['error-snackbar'],
-      });
+      this.alertService.error('No content to preview');
       return;
     }
 
@@ -181,7 +296,8 @@ export class Mainboard implements OnInit, AfterViewInit {
     const queryParams: any = { 
       preview: 'true',
       content: encodedContent,
-      size: this.boardSize // Pass board size to preview (from DB)
+      size: this.boardSize, // Pass board size to preview (from DB)
+      returnTo: 'mainboard' // Track that we came from mainboard for back navigation
     };
     
     // Add boardKey if available so preview can save size to RTDB
@@ -252,10 +368,7 @@ export class Mainboard implements OnInit, AfterViewInit {
     }
 
     if (!this.shareableLink) {
-      this.snackBar.open('Board ID not available', 'OK', {
-        duration: 3000,
-        panelClass: ['error-snackbar'],
-      });
+      this.alertService.error('Board ID not available');
       return;
     }
 
@@ -274,18 +387,12 @@ export class Mainboard implements OnInit, AfterViewInit {
     }
 
     if (!this.auth.user?.boardKey) {
-      this.snackBar.open('User not authenticated', 'OK', {
-        duration: 3000,
-        panelClass: ['error-snackbar'],
-      });
+      this.alertService.error('User not authenticated');
       return;
     }
 
     if (!this.boardProtectionControl.value) {
-      this.snackBar.open('Board protection must be enabled', 'OK', {
-        duration: 3000,
-        panelClass: ['error-snackbar'],
-      });
+      this.alertService.error('Board protection must be enabled');
       return;
     }
 
@@ -381,15 +488,9 @@ export class Mainboard implements OnInit, AfterViewInit {
     textArea.select();
     try {
       document.execCommand('copy');
-      this.snackBar.open('Link copied to clipboard!', 'OK', {
-        duration: 3000,
-        panelClass: ['success-snackbar'],
-      });
+      this.alertService.success('Link copied to clipboard!');
     } catch (err) {
-      this.snackBar.open('Failed to copy link', 'OK', {
-        duration: 3000,
-        panelClass: ['error-snackbar'],
-      });
+      this.alertService.error('Failed to copy link');
     } finally {
       document.body.removeChild(textArea);
     }
@@ -414,7 +515,6 @@ export class Mainboard implements OnInit, AfterViewInit {
 
     this.loading = true;
     this.updateFormControlsDisabledState();
-    this.message = '';
     this.emailControl.disable();
     this.cdr.detectChanges();
 
@@ -432,9 +532,68 @@ export class Mainboard implements OnInit, AfterViewInit {
         }
       }
 
+      // Check for query params (boardKey and type from dashboard)
+      const queryParams = this.route.snapshot.queryParams;
+      const boardKeyFromQuery = queryParams['boardKey'] as string | undefined;
+      const boardTypeFromQuery = queryParams['type'] as 'standard' | 'poll' | undefined;
+      
       // User should already have a board from login flow
       // But handle edge case where board might not exist
-      let boardKey = user.boardKey ?? undefined;
+      let boardKey = boardKeyFromQuery || (user.boardKey ?? undefined);
+      
+      // If editing a specific board from query params, load it first
+      if (boardKeyFromQuery) {
+        try {
+          const targetBoard = await this.boards.getBoard(boardKeyFromQuery);
+          if (!targetBoard) {
+            this.alertService.error('Board not found');
+            await this.router.navigate(['/dashboard']);
+            this.loading = false;
+            this.cdr.detectChanges();
+            return;
+          }
+          
+          if (targetBoard.ownerUid !== user.uid) {
+            this.alertService.error('You do not have permission to edit this board');
+            await this.router.navigate(['/dashboard']);
+            this.loading = false;
+            this.cdr.detectChanges();
+            return;
+          }
+          
+          // User owns this board, use it
+          this.board = targetBoard;
+          boardKey = boardKeyFromQuery;
+          // Set board type - use query param if valid, otherwise use board's type, default to 'standard'
+          if (boardTypeFromQuery === 'poll' || boardTypeFromQuery === 'standard') {
+            this.boardType = boardTypeFromQuery;
+          } else if (targetBoard.boardType === 'poll') {
+            this.boardType = 'poll';
+          } else {
+            this.boardType = 'standard';
+          }
+          if (this.boardType === 'poll' && targetBoard.pollData) {
+            this.pollData = targetBoard.pollData;
+          } else {
+            this.pollData = null;
+          }
+          
+          // Store boardKey in sessionStorage for subboard access
+          if (typeof window !== 'undefined') {
+            sessionStorage.setItem('palagai_session_board_id', boardKey);
+          }
+          
+          // Skip the rest of the board loading logic since we already have the board
+          // Continue to form initialization below
+        } catch (e: any) {
+          this.alertService.error('Board not found');
+          await this.router.navigate(['/dashboard']);
+          this.loading = false;
+          this.cdr.detectChanges();
+          return;
+        }
+      }
+      
       if (!boardKey) {
         // Edge case: user exists but board not created (shouldn't happen after login fix)
         try {
@@ -449,7 +608,7 @@ export class Mainboard implements OnInit, AfterViewInit {
         } catch (e: any) {
           throw new Error(`Failed to create board: ${e?.message || 'Unknown error'}`);
         }
-      } else {
+      } else if (!this.board) {
         // User has boardKey - load the board
         try {
           const existing = await this.boards.getBoard(boardKey);
@@ -475,16 +634,25 @@ export class Mainboard implements OnInit, AfterViewInit {
         }
       }
 
+      // Load board type and poll data (only if not already set from query params)
+      if (!boardKeyFromQuery) {
+        // Not editing a specific board - use default board type
+        this.boardType = this.board?.boardType || 'standard';
+        if (this.board?.boardType === 'poll' && this.board.pollData) {
+          this.pollData = this.board.pollData;
+        } else {
+          this.pollData = null;
+        }
+      }
+      // If boardKeyFromQuery exists, board type and poll data are already set above
+
       // Prioritize RTDB content over localStorage
       const dbContent = this.board?.message?.html || '';
       const content = dbContent || localContent || '';
       const protection = this.board?.boardProtection ?? false;
       // Check if board is blocked
       if (this.board?.isBlocked) {
-        this.snackBar.open('Your board has been blocked. Please contact the ADMIN for retrieving your account.', 'OK', {
-          duration: 5000,
-          panelClass: ['error-snackbar'],
-        });
+        this.alertService.error('Your board has been blocked. Please contact the ADMIN for retrieving your account.');
       }
       const list = this.board?.authorizedMailList ?? [];
       const boardSize = this.board?.boardSize ?? 'normal';
@@ -493,17 +661,15 @@ export class Mainboard implements OnInit, AfterViewInit {
       this.savedContent = content; // Track saved content
       this.boardProtectionControl.setValue(protection);
       this.boardSize = boardSize;
+      this.isPrimaryBoard = this.board?.isPrimaryBoard ?? false;
+      this.isPrimaryBoardControl.setValue(this.isPrimaryBoard, { emitEvent: false });
       this.emails.clear();
       list.forEach((email) => {
         this.emails.push(new FormControl<string | null>(email));
       });
     } catch (e: any) {
       const errorMsg = e?.message || 'Error loading board';
-      this.message = errorMsg;
-      this.snackBar.open(errorMsg, 'OK', {
-        duration: 4000,
-        panelClass: ['error-snackbar'],
-      });
+      this.alertService.error(errorMsg);
     } finally {
       this.loading = false;
       this.updateFormControlsDisabledState();
@@ -546,10 +712,7 @@ export class Mainboard implements OnInit, AfterViewInit {
 
   async saveEditorContent() {
     if (!this.auth.user?.boardKey) {
-      this.snackBar.open('User not authenticated', 'OK', {
-        duration: 3000,
-        panelClass: ['error-snackbar'],
-      });
+      this.alertService.error('User not authenticated');
       return;
     }
     
@@ -569,18 +732,23 @@ export class Mainboard implements OnInit, AfterViewInit {
 
   private async saveBoardContent(content: string) {
     this.saving = true;
-    this.message = '';
     this.updateEmailControlState();
 
     try {
       await this.boards.updateBoardMessage(this.auth.user!.boardKey!, content);
       // Save board size to database
       await this.boards.updateBoardSize(this.auth.user!.boardKey!, this.boardSize);
+      // Save primary board status (only if changed)
+      const isPrimary = this.isPrimaryBoardControl.value ?? false;
+      if (isPrimary !== (this.board?.isPrimaryBoard ?? false)) {
+        await this.boards.updatePrimaryBoardStatus(this.auth.user!.boardKey!, isPrimary);
+      }
       this.savedContent = content; // Update saved content
       if (this.board) {
         this.board.message.updatedAt = Date.now();
         this.board.message.html = content;
         this.board.boardSize = this.boardSize;
+        this.board.isPrimaryBoard = isPrimary;
       } else {
         // If board doesn't exist, create it
         this.board = {
@@ -595,21 +763,14 @@ export class Mainboard implements OnInit, AfterViewInit {
           userType: 'user',
           planType: 'free',
           createdAt: Date.now(),
-          activeDate: new Date().toISOString()
+          activeDate: new Date().toISOString(),
+          isPrimaryBoard: isPrimary
         };
       }
-      this.message = 'Board updated successfully';
-      this.snackBar.open('Board updated successfully!', 'OK', {
-        duration: 3000,
-        panelClass: ['success-snackbar'],
-      });
+      this.alertService.success('Board updated successfully!');
     } catch (e: any) {
       const errorMsg = e?.message || 'Error saving board';
-      this.message = errorMsg;
-      this.snackBar.open(errorMsg, 'OK', {
-        duration: 4000,
-        panelClass: ['error-snackbar'],
-      });
+      this.alertService.error(errorMsg);
     } finally {
       this.saving = false;
       this.updateEmailControlState();
@@ -620,43 +781,244 @@ export class Mainboard implements OnInit, AfterViewInit {
 
   async clearBoard() {
     if (!this.auth.user?.boardKey) {
-      this.snackBar.open('User not authenticated', 'OK', {
-        duration: 3000,
-        panelClass: ['error-snackbar'],
-      });
+      this.alertService.error('User not authenticated');
       return;
     }
     
     this.clearing = true;
-    this.message = '';
 
     try {
-      await this.boards.clearBoardMessage(this.auth.user.boardKey);
-      this.contentControl.setValue('');
-      this.message = 'Board cleared successfully';
-      this.snackBar.open('Board cleared successfully!', 'OK', {
-        duration: 3000,
-        panelClass: ['success-snackbar'],
-      });
+      if (this.isPollBoard) {
+        // Clear poll
+        await this.boards.convertPollToStandard(this.auth.user.boardKey);
+        this.boardType = 'standard';
+        this.pollData = null;
+        if (this.board) {
+          this.board.boardType = 'standard';
+          this.board.pollData = undefined;
+        }
+      } else {
+        // Clear standard board
+        await this.boards.clearBoardMessage(this.auth.user.boardKey);
+        this.contentControl.setValue('');
+      }
+      this.alertService.success('Board cleared successfully!');
     } catch (e: any) {
       const errorMsg = e?.message || 'Error clearing board';
-      this.message = errorMsg;
-      this.snackBar.open(errorMsg, 'OK', {
-        duration: 4000,
-        panelClass: ['error-snackbar'],
-      });
+      this.alertService.error(errorMsg);
     } finally {
       this.clearing = false;
       this.cdr.detectChanges();
     }
   }
 
+  async savePoll(pollData: Partial<PollData>) {
+    if (!this.auth.user?.boardKey) {
+      this.alertService.error('User not authenticated');
+      return;
+    }
+
+    // Check if poll already exists and can't be modified
+    if (this.board?.pollCreatedAt) {
+      this.alertService.error('Poll cannot be modified after creation. You can only delete it.');
+      return;
+    }
+
+    // Validate that we have question and options
+    if (!pollData.question || !pollData.options || pollData.options.length < 2) {
+      this.alertService.error('Poll must have a question and at least 2 options');
+      return;
+    }
+
+    // Show save dialog to get settings
+    const dialogData: PollSaveDialogData = {
+      question: pollData.question,
+      options: pollData.options.map(opt => opt.text),
+    };
+
+    const dialogRef = this.dialog.open(PollSaveDialogComponent, {
+      width: '90%',
+      maxWidth: '500px',
+      disableClose: true,
+      data: dialogData,
+    });
+
+    dialogRef.afterClosed().subscribe(async (result: PollSaveDialogResult | null) => {
+      if (!result) {
+        // User cancelled
+        return;
+      }
+
+      // Now save with settings
+      this.saving = true;
+
+      try {
+        const completePollData: PollData = {
+          question: pollData.question!,
+          options: pollData.options!,
+          pollType: result.allowMultiple ? 'multiple' : 'single',
+          showResults: 'after-vote', // Default value
+          allowVoteChange: false, // Default value
+          totalVotes: 0,
+          createdAt: pollData.createdAt || Date.now(),
+          endDate: result.endDate.getTime(),
+        };
+
+        const boardKey = this.auth.user?.boardKey;
+        if (!boardKey) {
+          this.alertService.error('User not authenticated');
+          this.saving = false;
+          this.cdr.detectChanges();
+          return;
+        }
+
+        await this.boards.createPoll(boardKey, completePollData);
+        // Save primary board status for poll boards too (only if changed)
+        const isPrimary = this.isPrimaryBoardControl.value ?? false;
+        if (isPrimary !== (this.board?.isPrimaryBoard ?? false)) {
+          await this.boards.updatePrimaryBoardStatus(boardKey, isPrimary);
+        }
+        this.pollData = completePollData;
+        this.boardType = 'poll';
+        if (this.board) {
+          this.board.boardType = 'poll';
+          this.board.pollData = completePollData;
+          this.board.pollCreatedAt = Date.now();
+          this.board.isPrimaryBoard = isPrimary;
+        }
+        this.alertService.success('Poll saved successfully! You cannot modify it after creation.');
+      } catch (e: any) {
+        const errorMsg = e?.message || 'Error saving poll';
+        this.alertService.error(errorMsg);
+      } finally {
+        this.saving = false;
+        this.cdr.detectChanges();
+      }
+    });
+  }
+
+  async deletePoll() {
+    if (!this.auth.user?.boardKey) {
+      return;
+    }
+
+    const confirmed = confirm('Are you sure you want to delete this poll? This action cannot be undone.');
+    if (!confirmed) {
+      return;
+    }
+
+    this.saving = true;
+    try {
+      await this.boards.deletePoll(this.auth.user.boardKey);
+      this.pollData = null;
+      this.boardType = 'standard';
+      if (this.board) {
+        this.board.boardType = 'standard';
+        this.board.pollData = undefined;
+        this.board.pollCreatedAt = undefined;
+      }
+      this.alertService.success('Poll deleted successfully');
+    } catch (e: any) {
+      this.alertService.error(e?.message || 'Failed to delete poll');
+    } finally {
+      this.saving = false;
+      this.cdr.detectChanges();
+    }
+  }
+
+  async handleBoardTypeChange(newType: 'standard' | 'poll') {
+    // If switching from poll to standard, show payment dialog
+    if (this.boardType === 'poll' && newType === 'standard' && this.board?.pollCreatedAt) {
+      const dialogRef = this.dialog.open(PollPaymentDialogComponent, {
+        width: '90%',
+        maxWidth: '450px',
+        disableClose: true,
+        data: {
+          onCancel: () => {
+            // Revert to poll
+            this.boardType = 'poll';
+            this.cdr.detectChanges();
+          },
+          onContact: () => {
+            // Open email client
+            window.location.href = 'mailto:palagaiofficial@gmail.com?subject=Multiple Board Request';
+          }
+        }
+      });
+
+      dialogRef.afterClosed().subscribe((result) => {
+        // If user didn't cancel, they can proceed (but we'll still show the message)
+        // Actually, we should prevent the switch
+        if (this.boardType === 'poll') {
+          // User cancelled, keep poll
+        }
+      });
+    } else {
+      // Allow the switch
+      this.boardType = newType;
+      this.cdr.detectChanges();
+    }
+  }
+
+  clearPoll() {
+    this.pollData = null;
+    this.cdr.detectChanges();
+  }
+
+
+  async saveFromHeader() {
+    // Unified save method for poll and standard board
+    if (this.boardType === 'poll') {
+      // Save poll
+      if (this.pollEditor && this.canModifyPoll) {
+        this.pollEditor.savePollFromParent();
+      } else if (!this.canModifyPoll) {
+        this.alertService.info('Poll cannot be modified after creation');
+      } else {
+        this.alertService.info('Please fill in the poll details first');
+      }
+    } else {
+      // Save standard board
+      await this.saveEditorContent();
+    }
+  }
+
+  async savePollFromFooter() {
+    // Trigger save from poll editor component
+    if (this.pollEditor && this.canModifyPoll) {
+      this.pollEditor.savePollFromParent();
+    } else if (!this.canModifyPoll) {
+      this.alertService.info('Poll cannot be modified after creation');
+    } else {
+      this.alertService.info('Please fill in the poll details first');
+    }
+  }
+
+  toggleBoardType() {
+    if (this.boardType === 'standard') {
+      this.boardType = 'poll';
+    } else {
+      this.boardType = 'standard';
+    }
+    this.cdr.detectChanges();
+  }
+
+  viewPollResults() {
+    if (!this.auth.user?.boardKey) {
+      return;
+    }
+    this.router.navigate(['/poll', this.auth.user.boardKey, 'results']);
+  }
+
+  toggleBoardProtectionManual() {
+    const currentValue = this.boardProtectionControl.value;
+    this.boardProtectionControl.setValue(!currentValue);
+    this.toggleBoardProtection();
+  }
+
   async toggleBoardProtection(event?: any) {
     if (!this.auth.user?.boardKey) {
-      this.snackBar.open('User not authenticated', 'OK', {
-        duration: 3000,
-        panelClass: ['error-snackbar'],
-      });
+      this.alertService.error('User not authenticated');
       // Revert checkbox if auth fails
       if (event) {
         this.boardProtectionControl.setValue(!event.checked, { emitEvent: false });
@@ -668,7 +1030,6 @@ export class Mainboard implements OnInit, AfterViewInit {
     const newValue = event?.checked ?? this.boardProtectionControl.value ?? false;
     this.loading = true;
     this.updateFormControlsDisabledState();
-    this.message = '';
 
     try {
       
@@ -689,25 +1050,17 @@ export class Mainboard implements OnInit, AfterViewInit {
         this.board.boardProtection = newValue;
       }
       const successMsg = `Board protection ${newValue ? 'enabled' : 'disabled'} successfully`;
-      this.message = successMsg;
-      this.snackBar.open(successMsg, 'OK', {
-        duration: 3000,
-        panelClass: ['success-snackbar'],
-      });
+      this.alertService.success(successMsg);
       this.updateEmailControlState();
     } catch (e: any) {
       const errorMsg = e?.message || 'Error updating board protection';
-      this.message = errorMsg;
       // Revert checkbox state on error
       const previousValue = !newValue;
       this.boardProtectionControl.setValue(previousValue, { emitEvent: false });
       if (this.board) {
         this.board.boardProtection = previousValue;
       }
-      this.snackBar.open(errorMsg, 'OK', {
-        duration: 4000,
-        panelClass: ['error-snackbar'],
-      });
+      this.alertService.error(errorMsg);
     } finally {
       this.loading = false;
       this.updateFormControlsDisabledState();
@@ -720,48 +1073,33 @@ export class Mainboard implements OnInit, AfterViewInit {
 
   async addEmail() {
     if (!this.auth.user?.boardKey) {
-      this.snackBar.open('User not authenticated', 'OK', {
-        duration: 3000,
-        panelClass: ['error-snackbar'],
-      });
+      this.alertService.error('User not authenticated');
       return;
     }
     
     const raw = this.emailControl.value?.trim();
     if (!raw) {
-      this.snackBar.open('Please enter an email address', 'OK', {
-        duration: 3000,
-        panelClass: ['error-snackbar'],
-      });
+      this.alertService.error('Please enter an email address');
       return;
     }
 
     const currentList = (this.emails.value as string[]) || [];
     if (currentList.length >= 50) {
       const errorMsg = 'Maximum 50 emails allowed';
-      this.message = errorMsg;
-      this.snackBar.open(errorMsg, 'OK', {
-        duration: 3000,
-        panelClass: ['error-snackbar'],
-      });
+      this.alertService.error(errorMsg);
       return;
     }
 
     this.addingEmail = true;
-    this.message = '';
     this.updateEmailControlState();
 
     try {
       const email = raw.toLowerCase();
       if (currentList.includes(email)) {
         const errorMsg = 'Email already exists';
-        this.message = errorMsg;
+        this.alertService.error(errorMsg);
         this.addingEmail = false;
         this.updateEmailControlState();
-        this.snackBar.open(errorMsg, 'OK', {
-          duration: 3000,
-          panelClass: ['error-snackbar'],
-        });
         return;
       }
 
@@ -771,18 +1109,10 @@ export class Mainboard implements OnInit, AfterViewInit {
         this.board.authorizedMailList = this.emails.value as string[];
       }
       this.emailControl.setValue('');
-      this.message = 'Email added successfully';
-      this.snackBar.open('Email added successfully!', 'OK', {
-        duration: 3000,
-        panelClass: ['success-snackbar'],
-      });
+      this.alertService.success('Email added successfully!');
     } catch (e: any) {
       const errorMsg = e?.message || 'Error adding email';
-      this.message = errorMsg;
-      this.snackBar.open(errorMsg, 'OK', {
-        duration: 4000,
-        panelClass: ['error-snackbar'],
-      });
+      this.alertService.error(errorMsg);
     } finally {
       this.addingEmail = false;
       this.updateEmailControlState();
@@ -792,25 +1122,18 @@ export class Mainboard implements OnInit, AfterViewInit {
 
   async removeEmailAt(index: number) {
     if (!this.auth.user?.boardKey) {
-      this.snackBar.open('User not authenticated', 'OK', {
-        duration: 3000,
-        panelClass: ['error-snackbar'],
-      });
+      this.alertService.error('User not authenticated');
       return;
     }
     
     const email = this.emails.at(index)?.value;
     if (!email) {
-      this.snackBar.open('Email not found', 'OK', {
-        duration: 3000,
-        panelClass: ['error-snackbar'],
-      });
+      this.alertService.error('Email not found');
       return;
     }
 
     this.loading = true;
     this.updateFormControlsDisabledState();
-    this.message = '';
     this.updateEmailControlState();
 
     try {
@@ -819,23 +1142,79 @@ export class Mainboard implements OnInit, AfterViewInit {
       if (this.board) {
         this.board.authorizedMailList = this.emails.value as string[];
       }
-      this.message = 'Email removed successfully';
-      this.snackBar.open('Email removed successfully!', 'OK', {
-        duration: 3000,
-        panelClass: ['success-snackbar'],
-      });
+      this.alertService.success('Email removed successfully!');
     } catch (e: any) {
       const errorMsg = e?.message || 'Error removing email';
-      this.message = errorMsg;
-      this.snackBar.open(errorMsg, 'OK', {
-        duration: 4000,
-        panelClass: ['error-snackbar'],
-      });
+      this.alertService.error(errorMsg);
     } finally {
       this.loading = false;
       this.updateFormControlsDisabledState();
       this.updateEmailControlState();
       this.cdr.detectChanges();
+    }
+  }
+
+  async onPrimaryBoardChange(event: any) {
+    const isChecked = (event?.target as any)?.checked ?? event?.checked ?? false;
+    
+    // If unchecking, just update the form value (no action needed)
+    if (!isChecked) {
+      return;
+    }
+    
+    // If checking, check if user already has a primary board
+    try {
+      const user = this.auth.user;
+      if (!user?.uid) {
+        return;
+      }
+      
+      // Get all user boards to check for existing primary board
+      const userBoards = await this.boards.getUserBoards(user.uid);
+      const existingPrimaryBoard = userBoards.find(
+        item => item.board.isPrimaryBoard && 
+                item.boardKey !== user.boardKey
+      );
+      
+      if (existingPrimaryBoard) {
+        // User already has a primary board
+        const existingBoardType = existingPrimaryBoard.board.boardType === 'poll' ? 'poll board' : 'standard board';
+        const currentBoardType = this.boardType === 'poll' ? 'poll board' : 'standard board';
+        
+        // Special message for poll board when standard board is primary
+        if (this.boardType === 'poll' && existingPrimaryBoard.board.boardType === 'standard') {
+          const confirmed = confirm(
+            'You already have a standard board selected as primary. Are you sure you want to change the poll board as primary?'
+          );
+          
+          if (!confirmed) {
+            // Revert the checkbox
+            this.isPrimaryBoardControl.setValue(false, { emitEvent: false });
+            return;
+          }
+        } else {
+          // General confirmation for other cases
+          const confirmed = confirm(
+            `You already have a ${existingBoardType} selected as primary. Are you sure you want to change this ${currentBoardType} as primary?`
+          );
+          
+          if (!confirmed) {
+            this.isPrimaryBoardControl.setValue(false, { emitEvent: false });
+            return;
+          }
+        }
+        
+        // User confirmed - unset the other primary board
+        await this.boards.updatePrimaryBoardStatus(existingPrimaryBoard.boardKey, false);
+      }
+    } catch (e: any) {
+      console.error('Error checking primary board:', e);
+      // Revert the checkbox on error
+      const primaryControl = this.form.get('isPrimaryBoard');
+      if (primaryControl) {
+        (primaryControl as FormControl<boolean>).setValue(false, { emitEvent: false });
+      }
+      this.alertService.error('Error checking primary board status');
     }
   }
 }

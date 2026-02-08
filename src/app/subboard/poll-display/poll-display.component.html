@@ -1,0 +1,94 @@
+<div class="poll-display" *ngIf="currentPollData">
+  <div class="poll-question">
+    <h2>{{ currentPollData.question }}</h2>
+  </div>
+
+  <!-- Voting Interface with Form Controls -->
+  <div class="poll-voting" *ngIf="currentPollData && currentPollData.options && currentPollData.options.length > 0 && formReady">
+    <form [formGroup]="pollForm">
+      <!-- Single Choice (Radio Group) -->
+      <mat-radio-group
+        *ngIf="currentPollData.pollType === 'single'"
+        formControlName="selectedOption"
+        class="poll-options"
+        [disabled]="isVoting"
+      >
+        <div
+          class="poll-option"
+          *ngFor="let option of currentPollData.options; let i = index"
+        >
+          <mat-radio-button
+            [value]="i"
+            class="option-radio"
+            [disabled]="isVoting"
+          >
+            <span class="option-text">{{ option.text }}</span>
+          </mat-radio-button>
+        </div>
+      </mat-radio-group>
+
+      <!-- Multiple Choice (Checkboxes with FormArray) -->
+      <div
+        *ngIf="currentPollData.pollType === 'multiple'"
+        class="poll-options"
+        formArrayName="selectedOptions"
+      >
+        <div
+          class="poll-option"
+          *ngFor="let option of currentPollData.options; let i = index"
+        >
+          <mat-checkbox
+            [formControlName]="i"
+            class="option-checkbox"
+            [disabled]="isVoting"
+          >
+            <span class="option-text">{{ option.text }}</span>
+          </mat-checkbox>
+        </div>
+      </div>
+      
+      <!-- Submit Button -->
+      <div class="submit-button-container">
+        <button
+          mat-raised-button
+          color="primary"
+          type="button"
+          (click)="submitVote()"
+          [disabled]="isVoting || !canVote"
+          class="submit-vote-btn"
+        >
+          <mat-icon *ngIf="!isVoting">how_to_vote</mat-icon>
+          <mat-icon *ngIf="isVoting" class="spinning">hourglass_empty</mat-icon>
+          <span>{{ isVoting ? 'Submitting...' : 'Submit Vote' }}</span>
+        </button>
+      </div>
+    </form>
+  </div>
+  
+  <!-- View Results Button (shown after voting) -->
+  <div class="poll-results-section" *ngIf="currentPollData && currentPollData.totalVotes > 0">
+    <div class="results-content">
+      <button
+        mat-raised-button
+        color="primary"
+        type="button"
+        (click)="onViewResults()"
+        class="view-results-btn"
+      >
+        <mat-icon>poll</mat-icon>
+        <span>View Results</span>
+      </button>
+      <p class="results-hint">You can vote again to change your choice</p>
+    </div>
+  </div>
+
+  <!-- Loading State -->
+  <div class="poll-loading" *ngIf="loading">
+    <p>Loading poll...</p>
+  </div>
+
+  <!-- Error State -->
+  <div class="poll-error" *ngIf="error">
+    <p>{{ error }}</p>
+  </div>
+</div>
