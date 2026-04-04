@@ -148,6 +148,11 @@
   color: #065f46;
 }
 
+.shift-btn-minus {
+  background: #ffedd5;
+  color: #9a3412;
+}
+
 .set-label {
   font-size: 0.8rem;
   font-weight: 700;

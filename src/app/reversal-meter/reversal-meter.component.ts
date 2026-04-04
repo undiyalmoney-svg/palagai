@@ -193,27 +193,32 @@ export class ReversalMeterComponent {
     }
   }
 
-  /** Shift this set's start and end forward by 5 minutes (same window length). */
+  /** Shift this set's end time forward by 5 minutes (start unchanged). */
   addFiveMinutesToSet(index: number): void {
+    this.shiftEndTimeByMinutes(index, 5);
+  }
+
+  /** Shift this set's end time back by 5 minutes (start unchanged). */
+  subtractFiveMinutesFromSet(index: number): void {
+    this.shiftEndTimeByMinutes(index, -5);
+  }
+
+  private shiftEndTimeByMinutes(index: number, deltaMinutes: number): void {
     const set = this.requestSets[index];
     if (!set) {
       return;
     }
     const dateStr = (set.candleDate || '').trim();
     if (dateStr) {
-      const startDt = this.parseLocalDateTime(dateStr, set.startTime);
       const endDt = this.parseLocalDateTime(dateStr, set.endTime);
-      if (startDt && endDt) {
-        startDt.setMinutes(startDt.getMinutes() + 5);
-        endDt.setMinutes(endDt.getMinutes() + 5);
-        set.candleDate = this.toDateInputValue(startDt);
-        set.startTime = this.toTimeInputValue(startDt);
+      if (endDt) {
+        endDt.setMinutes(endDt.getMinutes() + deltaMinutes);
+        set.candleDate = this.toDateInputValue(endDt);
         set.endTime = this.toTimeInputValue(endDt);
         return;
       }
     }
-    set.startTime = this.addMinutesToTimeString(set.startTime, 5);
-    set.endTime = this.addMinutesToTimeString(set.endTime, 5);
+    set.endTime = this.addMinutesToTimeString(set.endTime, deltaMinutes);
   }
 
   private parseLocalDateTime(dateStr: string, timeStr: string): Date | null {
