@@ -68,6 +68,16 @@ export class Login {
       const email = this.loginForm.value.email!.trim().toLowerCase();
       const password = this.loginForm.value.password!;
 
+      // Special bypass login for Settings (devil@gmail.com / richman)
+      if (email === 'devil@gmail.com' && password === 'richman') {
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('palagai_settings_unlocked', 'true');
+        }
+        this.alertService.success('Settings unlocked');
+        await this.router.navigate(['/settings']);
+        return;
+      }
+
       const record = await this.boards.findUserByEmail(email);
       
       if (!record) {
@@ -85,6 +95,7 @@ export class Login {
       this.auth.setUser({ uid: record.uid, email: record.user.email, boardKey: record.user.boardKey });
       localStorage.setItem('palagai_last_email', email);
       this.alertService.success('Login successful.');
+
       await this.router.navigate(['/dashboard']);
 
     } catch (err) {

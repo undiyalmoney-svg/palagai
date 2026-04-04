@@ -49,6 +49,11 @@ export class JobListComponent implements OnInit, OnDestroy {
   }
 
   private loadAdSenseScript(): void {
+    // SSR/prerender safety: `document` does not exist on the server.
+    if (typeof document === 'undefined' || typeof window === 'undefined') {
+      return;
+    }
+
     // Check if script already exists
     if (document.querySelector('script[src*="adsbygoogle.js"]')) {
       // Script exists, push ads

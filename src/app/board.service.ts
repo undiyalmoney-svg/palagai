@@ -149,6 +149,7 @@ export class BoardService {
   private pollVotesRef: DatabaseReference;
   private punchUsageRef: DatabaseReference;
   private jobsRef: DatabaseReference;
+  private richmanRef: DatabaseReference;
   constructor() {
     this.usersRef = ref(db, 'users');
     this.boardsRef = ref(db, 'boards');
@@ -158,6 +159,7 @@ export class BoardService {
     this.pollVotesRef = ref(db, 'pollVotes');
     this.punchUsageRef = ref(db, 'punchUsage');
     this.jobsRef = ref(db, 'jobs');
+    this.richmanRef = ref(db, 'richman');
   }
 
   /**
@@ -1365,6 +1367,56 @@ export class BoardService {
     } catch (err: any) {
       console.error('Error setting admin credentials:', err);
       throw new Error(`Failed to set admin credentials: ${err?.message || 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Groww / settings: read `richman` node ({ secret, key } strings).
+   */
+  async getRichmanConfig(): Promise<{ secret: string; key: string } | null> {
+    try {
+      const snapshot = await get(this.richmanRef);
+      if (!snapshot.exists()) {
+        return null;
+      }
+      const v = snapshot.val() as { secret?: string; key?: string };
+      if (!v || typeof v !== 'object') {
+        return null;
+      }
+      return {
+        secret: typeof v.secret === 'string' ? v.secret : '',
+        key: typeof v.key === 'string' ? v.key : '',
+      };
+    } catch (err: any) {
+      console.error('Error fetching richman config:', err);
+      throw new Error(`Failed to fetch richman config: ${err?.message || 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Groww / settings: save `richman` node as plain strings.
+   */
+  async setRichmanConfig(secret: string, key: string): Promise<void> {
+    try {
+      await set(this.richmanRef, {
+        secret,
+        key,
+      });
+    } catch (err: any) {
+      console.error('Error saving richman config:', err);
+      throw new Error(`Failed to save richman config: ${err?.message || 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Groww / settings: remove `richman` node.
+   */
+  async deleteRichmanConfig(): Promise<void> {
+    try {
+      await set(this.richmanRef, null);
+    } catch (err: any) {
+      console.error('Error deleting richman config:', err);
+      throw new Error(`Failed to delete richman config: ${err?.message || 'Unknown error'}`);
     }
   }
 

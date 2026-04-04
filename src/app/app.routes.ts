@@ -15,6 +15,8 @@ import { CreateBalloonSecretComponent } from './balloon/create-balloon-secret.co
 import { BalloonPunchRevealComponent } from './balloon/balloon-punch-reveal.component';
 import { PostJobComponent } from './jobs/post-job.component';
 import { JobListComponent } from './jobs/job-list.component';
+import { SettingsComponent } from './settings/settings.component';
+import { ReversalMeterComponent } from './reversal-meter/reversal-meter.component';
 
 export const routes: Routes = [
   {
@@ -77,6 +79,14 @@ export const routes: Routes = [
   {
     path: 'jobs/post',
     component: PostJobComponent,
+  },
+  {
+    path: 'settings',
+    component: SettingsComponent,
+  },
+  {
+    path: 'reversal-meter',
+    component: ReversalMeterComponent,
   },
   {
     path: 'admin',

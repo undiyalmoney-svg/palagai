@@ -1,5 +1,6 @@
 export const environment = {
   production: false,
+  backendBaseUrl: 'https://palagai-backend.vercel.app',
   firebase: {
     apiKey: 'AIzaSyBUDsUXw67UTfDV-SzzF-gCIj67LfWwVIw',
     authDomain: 'palagai-444f2.firebaseapp.com',
