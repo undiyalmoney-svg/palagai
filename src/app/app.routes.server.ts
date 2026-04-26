@@ -18,6 +18,10 @@ export const serverRoutes: ServerRoute[] = [
     path: 'poll/:boardKey/results',
     renderMode: RenderMode.Server
   },
+  {
+    path: 'share/image',
+    renderMode: RenderMode.Server,
+  },
   // Static routes can be prerendered
   {
     path: '**',

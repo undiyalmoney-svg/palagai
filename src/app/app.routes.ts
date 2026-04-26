@@ -17,6 +17,7 @@ import { PostJobComponent } from './jobs/post-job.component';
 import { JobListComponent } from './jobs/job-list.component';
 import { SettingsComponent } from './settings/settings.component';
 import { ReversalMeterComponent } from './reversal-meter/reversal-meter.component';
+import { SubscriberImageShareComponent } from './share/subscriber-image-share.component';
 
 export const routes: Routes = [
   {
@@ -87,6 +88,10 @@ export const routes: Routes = [
   {
     path: 'reversal-meter',
     component: ReversalMeterComponent,
+  },
+  {
+    path: 'share/image',
+    component: SubscriberImageShareComponent,
   },
   {
     path: 'admin',
