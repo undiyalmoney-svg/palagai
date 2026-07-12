@@ -13,6 +13,12 @@ import {
   assertKiteHistoricalSuccess,
   extractKiteApiError,
 } from '../utils/kite-error.util';
+import {
+  calendarDaysInclusive,
+  chunkInclusiveDateRange,
+  datePart,
+  kiteMaxDaysForInterval,
+} from '../kite/kite-historical-limits';
 import { extractTradeDate } from '../utils/trade-date.util';
 import { Instrument } from '../models/instrument.model';
 import {
@@ -54,20 +60,46 @@ export class PaperTradeDeskService {
   private liveTimer: ReturnType<typeof setInterval> | null = null;
   private liveLegs: LiveLeg[] = [];
   private liveTrades: PaperTrade[] = [];
+  private historicalCalls = 0;
+  private lastRangeDays = 0;
+  private readonly maxDaysPerCall = kiteMaxDaysForInterval('5minute');
 
   readonly snapshot = signal<PaperDeskSnapshot>(emptySnapshot('testing'));
   readonly busy = signal(false);
 
+  private resetKiteStats(): void {
+    this.historicalCalls = 0;
+    this.lastRangeDays = 0;
+  }
+
+  private kiteStats(): PaperDeskSnapshot['kiteStats'] {
+    return {
+      historicalCalls: this.historicalCalls,
+      lastRangeDays: this.lastRangeDays,
+      maxDaysPerCall: this.maxDaysPerCall,
+    };
+  }
+
+  private kiteStatsLabel(): string {
+    return `Kite 5m calls ${this.historicalCalls} · last span ${this.lastRangeDays}d (max ${this.maxDaysPerCall}d/call)`;
+  }
+
   async runTesting(fromDate: string, toDate: string): Promise<void> {
     this.stopLive();
+    this.resetKiteStats();
     this.busy.set(true);
+    const spanDays = calendarDaysInclusive(shiftDate(fromDate, -12), toDate);
     this.snapshot.set({
       ...emptySnapshot('testing'),
       running: true,
       fromDate,
       toDate,
-      message: 'Fetching index candles…',
+      message:
+        spanDays > this.maxDaysPerCall
+          ? `Fetching index candles in chunks (${spanDays}d span, max ${this.maxDaysPerCall}d/call)…`
+          : 'Fetching index candles…',
       marketOpen: true,
+      kiteStats: this.kiteStats(),
     });
 
     try {
@@ -157,10 +189,11 @@ export class PaperTradeDeskService {
         fromDate,
         toDate,
         marketOpen: true,
-        message: `Testing complete · ${enriched.length} paper trade(s)`,
+        message: `Testing complete · ${enriched.length} paper trade(s) · ${this.kiteStatsLabel()}`,
         statuses,
         trades: enriched.sort((a, b) => a.entryTime.localeCompare(b.entryTime)),
         totals: summarize(enriched),
+        kiteStats: this.kiteStats(),
       });
     } catch (err) {
       this.snapshot.set({
@@ -168,6 +201,7 @@ export class PaperTradeDeskService {
         fromDate,
         toDate,
         message: err instanceof Error ? err.message : String(err),
+        kiteStats: this.kiteStats(),
       });
       throw err;
     } finally {
@@ -177,6 +211,7 @@ export class PaperTradeDeskService {
 
   async startLive(): Promise<void> {
     this.stopLive();
+    this.resetKiteStats();
     const today = todayIso();
     const now = istNowHhMm();
 
@@ -197,6 +232,7 @@ export class PaperTradeDeskService {
           marketOpen: false,
           message: `Live paper only 09:15–15:30 IST (now ${now}). Showing today’s ATM picks below — use Testing to run after hours.`,
           statuses,
+          kiteStats: this.kiteStats(),
         });
       } catch (err) {
         this.snapshot.set({
@@ -205,6 +241,7 @@ export class PaperTradeDeskService {
           toDate: today,
           marketOpen: false,
           message: `Live paper only 09:15–15:30 IST (now ${now}). ${err instanceof Error ? err.message : ''}`,
+          kiteStats: this.kiteStats(),
         });
       }
       return;
@@ -218,6 +255,7 @@ export class PaperTradeDeskService {
       toDate: today,
       marketOpen: true,
       message: 'Starting live paper…',
+      kiteStats: this.kiteStats(),
     });
 
     try {
@@ -265,6 +303,7 @@ export class PaperTradeDeskService {
         fromDate: today,
         toDate: today,
         message: err instanceof Error ? err.message : String(err),
+        kiteStats: this.kiteStats(),
       });
       this.stopLive();
       throw err;
@@ -319,13 +358,27 @@ export class PaperTradeDeskService {
         await delay(1200);
       }
       try {
-        const fresh = await this.fetch5m({
-          instrumentToken: leg.instrument.instrumentToken,
-          from: `${shiftDate(today, -12)} 09:00:00`,
-          to: `${today} 15:30:00`,
-          authorization,
-        });
-        leg.candles = fresh;
+        // Warm-up (~12d) is loaded in startLive; later ticks only refresh today and merge
+        // so we never approach Kite's 100-day 5m cap during live polling.
+        if (initial && leg.candles.length) {
+          // already warm
+        } else if (initial) {
+          leg.candles = await this.fetch5m({
+            instrumentToken: leg.instrument.instrumentToken,
+            from: `${shiftDate(today, -12)} 09:00:00`,
+            to: `${today} 15:30:00`,
+            authorization,
+          });
+        } else {
+          const todayBars = await this.fetch5m({
+            instrumentToken: leg.instrument.instrumentToken,
+            from: `${today} 09:00:00`,
+            to: `${today} 15:30:00`,
+            authorization,
+          });
+          const prior = leg.candles.filter((c) => datePart(c.date) !== today);
+          leg.candles = [...prior, ...todayBars];
+        }
       } catch {
         // keep previous candles
       }
@@ -397,10 +450,11 @@ export class PaperTradeDeskService {
       fromDate: today,
       toDate: today,
       marketOpen: true,
-      message: `Live paper · last tick ${now} · ${enriched.length} closed`,
+      message: `Live paper · last tick ${now} · ${enriched.length} closed · ${this.kiteStatsLabel()}`,
       statuses,
       trades: enriched.sort((a, b) => b.entryTime.localeCompare(a.entryTime)),
       totals: summarize(enriched),
+      kiteStats: this.kiteStats(),
     });
   }
 
@@ -507,27 +561,54 @@ export class PaperTradeDeskService {
     to: string;
     authorization: string;
   }): Promise<Candle[]> {
+    const maxDays = this.maxDaysPerCall;
+    const fromDate = datePart(params.from);
+    const toDate = datePart(params.to);
+    this.lastRangeDays = calendarDaysInclusive(fromDate, toDate);
+    const chunks = chunkInclusiveDateRange(fromDate, toDate, maxDays);
+    if (!chunks.length) {
+      throw new Error(`Invalid 5m range ${params.from} → ${params.to}`);
+    }
+
+    const fromTime = params.from.includes(' ') ? params.from.slice(11) : '09:00:00';
+    const toTime = params.to.includes(' ') ? params.to.slice(11) : '15:30:00';
+    const merged: Candle[] = [];
+
     try {
-      const response = await firstValueFrom(
-        this.kiteApi.getHistoricalData({
-          instrumentToken: String(params.instrumentToken),
-          interval: '5minute',
-          from: params.from,
-          to: params.to,
-          authorization: params.authorization,
-        }),
-      );
-      assertKiteHistoricalSuccess(response, '5minute');
-      const parsed = response as KiteHistoricalResponse;
-      const candles =
-        parsed.data?.candles?.map((row: [string, number, number, number, number, number]) => ({
-          date: row[0],
-          open: row[1],
-          high: row[2],
-          low: row[3],
-          close: row[4],
-          volume: row[5],
-        })) ?? [];
+      for (let i = 0; i < chunks.length; i += 1) {
+        const chunk = chunks[i]!;
+        if (i > 0) {
+          await delay(400);
+        }
+        this.historicalCalls += 1;
+        const response = await firstValueFrom(
+          this.kiteApi.getHistoricalData({
+            instrumentToken: String(params.instrumentToken),
+            interval: '5minute',
+            from: `${chunk.fromDate} ${fromTime}`,
+            to: `${chunk.toDate} ${toTime}`,
+            authorization: params.authorization,
+          }),
+        );
+        assertKiteHistoricalSuccess(response, '5minute');
+        const parsed = response as KiteHistoricalResponse;
+        const candles =
+          parsed.data?.candles?.map((row: [string, number, number, number, number, number]) => ({
+            date: row[0],
+            open: row[1],
+            high: row[2],
+            low: row[3],
+            close: row[4],
+            volume: row[5],
+          })) ?? [];
+        merged.push(...candles);
+      }
+
+      const byDate = new Map<string, Candle>();
+      for (const c of merged) {
+        byDate.set(c.date, c);
+      }
+      const candles = [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date));
       if (!candles.length) {
         throw new Error(`No 5m candles for token ${params.instrumentToken}`);
       }
@@ -546,7 +627,11 @@ export class PaperTradeDeskService {
   }
 
   private patchMessage(message: string): void {
-    this.snapshot.update((s) => ({ ...s, message }));
+    this.snapshot.update((s) => ({
+      ...s,
+      message,
+      kiteStats: this.kiteStats(),
+    }));
   }
 }
 
@@ -561,6 +646,11 @@ function emptySnapshot(mode: PaperDeskMode): PaperDeskSnapshot {
     statuses: [],
     trades: [],
     totals: { trades: 0, wins: 0, losses: 0, indexNetPts: 0, optionNetRs: 0 },
+    kiteStats: {
+      historicalCalls: 0,
+      lastRangeDays: 0,
+      maxDaysPerCall: kiteMaxDaysForInterval('5minute'),
+    },
   };
 }
 

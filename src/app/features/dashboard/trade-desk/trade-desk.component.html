@@ -102,6 +102,14 @@
         <span>Option ₹ (1 lot)</span>
         <strong>{{ snapshot().totals.optionNetRs > 0 ? '+' : '' }}{{ snapshot().totals.optionNetRs | number: '1.0-0' }}</strong>
       </div>
+      <div class="stat">
+        <span>Kite 5m calls</span>
+        <strong>{{ snapshot().kiteStats.historicalCalls }}</strong>
+      </div>
+      <div class="stat">
+        <span>Last span / max</span>
+        <strong>{{ snapshot().kiteStats.lastRangeDays }}d / {{ snapshot().kiteStats.maxDaysPerCall }}d</strong>
+      </div>
     </div>
 
     <div class="status-grid">
@@ -255,6 +263,7 @@
     <ul>
       <li><strong>Testing</strong> — pick dates, Start loads full candles once, paper-replays both indices.</li>
       <li><strong>Live</strong> — Start auto-polls; works only 09:15–15:30; after hours use Testing.</li>
+      <li><strong>Kite 5m limit</strong> — max {{ snapshot().kiteStats.maxDaysPerCall }} calendar days per historical call; Trade Desk auto-chunks longer Testing ranges and only refreshes today during Live polls.</li>
       <li>ATM weekly CE on BUY / PE on SELL · 1 lot · exits follow Historical Tester (SL cap 20, 1.5R, EMA-20, 15:15).</li>
       <li>Both indices may hold a paper trade at once · real Kite orders later.</li>
     </ul>

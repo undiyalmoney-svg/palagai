@@ -74,4 +74,10 @@ export interface PaperDeskSnapshot {
     indexNetPts: number;
     optionNetRs: number;
   };
+  /** Kite historical usage for this desk session (5m capped at 100 days/call). */
+  kiteStats: {
+    historicalCalls: number;
+    lastRangeDays: number;
+    maxDaysPerCall: number;
+  };
 }
