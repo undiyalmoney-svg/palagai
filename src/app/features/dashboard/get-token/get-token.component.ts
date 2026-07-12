@@ -1,4 +1,5 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnInit, PLATFORM_ID, afterNextRender, computed, inject, signal } from '@angular/core';
+import { isPlatformBrowser } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
@@ -6,7 +7,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { buildKiteChecksum } from '../../../core/utils/sha256.util';
+import { buildKiteChecksum, sanitizeKiteCredential } from '../../../core/utils/sha256.util';
 import { extractKiteApiError } from '../../../core/utils/kite-error.util';
 import { KiteCredentialsService } from '../../../core/kite/kite-credentials.service';
 import { KiteApiService } from '../../../core/kite/kite-api.service';
@@ -37,6 +38,7 @@ export class GetTokenComponent implements OnInit {
   private readonly formBuilder = inject(FormBuilder);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly platformId = inject(PLATFORM_ID);
   private readonly kiteApiService = inject(KiteApiService);
   private readonly kiteCredentialsService = inject(KiteCredentialsService);
   private readonly kiteSessionService = inject(KiteSessionService);
@@ -85,6 +87,13 @@ export class GetTokenComponent implements OnInit {
     checksum: ['', [Validators.required, Validators.pattern(/\S+/)]],
   });
 
+  constructor() {
+    afterNextRender(() => {
+      const stored = this.kiteCredentialsService.getCredentials();
+      void this.bootstrapFromKiteRedirect(stored?.apiKey, stored?.apiSecret);
+    });
+  }
+
   ngOnInit(): void {
     const stored = this.kiteCredentialsService.getCredentials();
     this.hasStoredCredentials.set(stored !== null);
@@ -98,8 +107,6 @@ export class GetTokenComponent implements OnInit {
       this.setCredentialsFormEditable(true);
       this.isEditingCredentials.set(true);
     }
-
-    void this.bootstrapFromKiteRedirect(stored?.apiKey, stored?.apiSecret);
   }
 
   protected onEditCredentials(): void {
@@ -145,7 +152,7 @@ export class GetTokenComponent implements OnInit {
       return;
     }
 
-    const apiKey = this.step1Form.controls.apiKey.value.trim();
+    const apiKey = sanitizeKiteCredential(this.step1Form.controls.apiKey.value);
     this.isRedirecting.set(true);
     window.location.href = `${KITE_LOGIN_URL}${encodeURIComponent(apiKey)}`;
   }
@@ -157,9 +164,9 @@ export class GetTokenComponent implements OnInit {
     }
 
     const { apiKey, requestToken, apiSecret } = this.step2Form.getRawValue();
-    const trimmedApiKey = apiKey.trim();
-    const trimmedRequestToken = requestToken.trim();
-    const trimmedApiSecret = apiSecret.trim();
+    const trimmedApiKey = sanitizeKiteCredential(apiKey);
+    const trimmedRequestToken = sanitizeKiteCredential(requestToken);
+    const trimmedApiSecret = sanitizeKiteCredential(apiSecret);
 
     this.isGeneratingChecksum.set(true);
     this.tokenExchangeResult.set('');
@@ -192,13 +199,26 @@ export class GetTokenComponent implements OnInit {
     }
 
     const { apiKey, requestToken, checksum } = this.step3Form.getRawValue();
-    this.exchangeToken(apiKey.trim(), requestToken.trim(), checksum.trim());
+    const apiSecret =
+      sanitizeKiteCredential(this.step2Form.controls.apiSecret.value) ||
+      this.kiteCredentialsService.getCredentials()?.apiSecret ||
+      '';
+    this.exchangeToken(
+      sanitizeKiteCredential(apiKey),
+      sanitizeKiteCredential(requestToken),
+      sanitizeKiteCredential(checksum),
+      apiSecret,
+    );
   }
 
   private async bootstrapFromKiteRedirect(
     apiKey?: string,
     apiSecret?: string,
   ): Promise<void> {
+    if (!isPlatformBrowser(this.platformId)) {
+      return;
+    }
+
     captureKiteRequestTokenFromLocation();
     const queryToken = this.route.snapshot.queryParamMap.get('request_token')?.trim();
     if (queryToken) {
@@ -222,7 +242,9 @@ export class GetTokenComponent implements OnInit {
       replaceUrl: true,
     });
 
-    if (!apiKey?.trim() || !apiSecret?.trim()) {
+    const key = sanitizeKiteCredential(apiKey ?? '');
+    const secret = sanitizeKiteCredential(apiSecret ?? '');
+    if (!key || !secret) {
       this.tokenExchangeError.set(
         'Request token captured, but API Key/Secret are not saved yet. Save credentials above, then generate checksum and exchange.',
       );
@@ -232,20 +254,20 @@ export class GetTokenComponent implements OnInit {
 
     try {
       this.isGeneratingChecksum.set(true);
-      const checksum = await buildKiteChecksum(apiKey.trim(), requestToken, apiSecret.trim());
+      const checksum = await buildKiteChecksum(key, requestToken, secret);
       this.checksumResult.set(checksum);
       this.step2Form.patchValue({
-        apiKey: apiKey.trim(),
-        apiSecret: apiSecret.trim(),
+        apiKey: key,
+        apiSecret: secret,
         requestToken,
       });
       this.step3Form.patchValue({
-        apiKey: apiKey.trim(),
+        apiKey: key,
         requestToken,
         checksum,
       });
       this.isGeneratingChecksum.set(false);
-      this.exchangeToken(apiKey.trim(), requestToken, checksum);
+      this.exchangeToken(key, requestToken, checksum, secret);
     } catch {
       this.isGeneratingChecksum.set(false);
       this.autoExchangeNote.set('');
@@ -253,7 +275,12 @@ export class GetTokenComponent implements OnInit {
     }
   }
 
-  private exchangeToken(apiKey: string, requestToken: string, checksum: string): void {
+  private exchangeToken(
+    apiKey: string,
+    requestToken: string,
+    checksum: string,
+    apiSecret: string,
+  ): void {
     this.isExchangingToken.set(true);
     this.tokenExchangeResult.set('');
     this.tokenExchangeError.set('');
@@ -264,6 +291,7 @@ export class GetTokenComponent implements OnInit {
         apiKey,
         requestToken,
         checksum,
+        apiSecret,
       })
       .subscribe({
         next: (response) => {
@@ -284,9 +312,14 @@ export class GetTokenComponent implements OnInit {
         },
         error: (error) => {
           const kiteMessage = extractKiteApiError(error, 'session/token');
-          const hint = /invalid or has expired|TokenException/i.test(kiteMessage)
-            ? ' Request tokens are one-time and expire in a few minutes — click Step 1 Login again for a fresh token.'
-            : '';
+          let hint = '';
+          if (/invalid or has expired|TokenException/i.test(kiteMessage)) {
+            hint =
+              ' Request tokens are one-time and expire in a few minutes — click Step 1 Login again for a fresh token.';
+          } else if (/checksum/i.test(kiteMessage)) {
+            hint =
+              ' Re-save your API Key and API Secret from the Kite developer console (must be the matching pair), then login again.';
+          }
           this.tokenExchangeError.set(`${kiteMessage}.${hint}`.replace(/\.\./g, '.'));
           this.autoExchangeNote.set('');
           this.isExchangingToken.set(false);

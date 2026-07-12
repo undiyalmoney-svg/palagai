@@ -25,8 +25,8 @@ export class KiteCredentialsService {
 
   saveCredentials(credentials: KiteCredentials): void {
     const trimmed: KiteCredentials = {
-      apiKey: credentials.apiKey.trim(),
-      apiSecret: credentials.apiSecret.trim(),
+      apiKey: credentials.apiKey.replace(/^\uFEFF/, '').replace(/[\u200B-\u200D\uFEFF]/g, '').trim(),
+      apiSecret: credentials.apiSecret.replace(/^\uFEFF/, '').replace(/[\u200B-\u200D\uFEFF]/g, '').trim(),
     };
     this.persistToStorage(trimmed);
     this.credentials.set(trimmed);

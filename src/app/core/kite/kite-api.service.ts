@@ -6,7 +6,8 @@ import { mergeMap } from 'rxjs/operators';
 export interface KiteSessionTokenRequest {
   apiKey: string;
   requestToken: string;
-  checksum: string;
+  checksum?: string;
+  apiSecret?: string;
 }
 
 export interface KiteHistoricalRequest {
@@ -23,18 +24,25 @@ export class KiteApiService {
   private readonly kiteApiBaseUrl = '/api/kite';
 
   exchangeSessionToken(payload: KiteSessionTokenRequest): Observable<unknown> {
-    const body = new URLSearchParams({
-      api_key: payload.apiKey.trim(),
-      request_token: payload.requestToken.trim(),
-      checksum: payload.checksum.trim(),
-    }).toString();
+    const params = new URLSearchParams();
+    params.set('api_key', payload.apiKey.trim());
+    params.set('request_token', payload.requestToken.trim());
+    if (payload.checksum?.trim()) {
+      params.set('checksum', payload.checksum.trim());
+    }
+    // Sent only to our SSR proxy (stripped before Kite). Skip on local ng-serve proxy.
+    const host = typeof window !== 'undefined' ? window.location.hostname : '';
+    const isLocalHost = host === 'localhost' || host === '127.0.0.1';
+    if (!isLocalHost && payload.apiSecret?.trim()) {
+      params.set('api_secret', payload.apiSecret.trim());
+    }
 
     const headers = new HttpHeaders({
       'X-Kite-Version': '3',
       'Content-Type': 'application/x-www-form-urlencoded',
     });
 
-    return this.http.post(`${this.kiteApiBaseUrl}/session/token`, body, { headers });
+    return this.http.post(`${this.kiteApiBaseUrl}/session/token`, params.toString(), { headers });
   }
 
   getHistoricalData(payload: KiteHistoricalRequest): Observable<unknown> {

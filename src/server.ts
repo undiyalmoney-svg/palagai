@@ -16,6 +16,7 @@ import {
   isMainModule,
   writeResponseToNodeResponse,
 } from '@angular/ssr/node';
+import { createHash } from 'node:crypto';
 import express from 'express';
 import { gunzipSync } from 'node:zlib';
 import { join } from 'node:path';
@@ -27,8 +28,49 @@ const browserDistFolder = join(import.meta.dirname, '../browser');
 const app = express();
 const angularApp = new AngularNodeAppEngine();
 
+function asFormRecord(body: unknown): Record<string, string> {
+  if (!body || typeof body !== 'object' || Buffer.isBuffer(body)) {
+    return {};
+  }
+  const out: Record<string, string> = {};
+  for (const [key, value] of Object.entries(body as Record<string, unknown>)) {
+    if (value == null) {
+      continue;
+    }
+    out[key] = Array.isArray(value) ? String(value[0] ?? '') : String(value);
+  }
+  return out;
+}
+
+function buildSessionTokenBody(fields: Record<string, string>): string {
+  const apiKey = fields['api_key']?.trim() ?? '';
+  const requestToken = fields['request_token']?.trim() ?? '';
+  const apiSecret = fields['api_secret']?.trim() ?? '';
+  let checksum = fields['checksum']?.trim() ?? '';
+
+  // Prefer server-side checksum whenever api_secret is present (avoids client/proxy mismatches).
+  if (apiKey && requestToken && apiSecret) {
+    checksum = createHash('sha256')
+      .update(`${apiKey}${requestToken}${apiSecret}`, 'utf8')
+      .digest('hex');
+  }
+
+  const params = new URLSearchParams();
+  params.set('api_key', apiKey);
+  params.set('request_token', requestToken);
+  params.set('checksum', checksum);
+  return params.toString();
+}
+
 const kiteApiRouter = express.Router();
 kiteApiRouter.use(express.urlencoded({ extended: false }));
+kiteApiRouter.use((req, _res, next) => {
+  // Vercel sometimes leaves a raw querystring on req.body.
+  if (typeof req.body === 'string' && req.body.includes('=')) {
+    req.body = Object.fromEntries(new URLSearchParams(req.body));
+  }
+  next();
+});
 
 kiteApiRouter.use(async (req, res) => {
   const targetUrl = `${KITE_API_BASE_URL}${req.url}`;
@@ -47,7 +89,13 @@ kiteApiRouter.use(async (req, res) => {
 
   if (req.method !== 'GET' && req.method !== 'HEAD') {
     headers['Content-Type'] = 'application/x-www-form-urlencoded';
-    init.body = new URLSearchParams(req.body as Record<string, string>).toString();
+    const fields = asFormRecord(req.body);
+    const isSessionToken =
+      req.url === '/session/token' || req.url.startsWith('/session/token?');
+
+    init.body = isSessionToken
+      ? buildSessionTokenBody(fields)
+      : new URLSearchParams(fields).toString();
   }
 
   try {

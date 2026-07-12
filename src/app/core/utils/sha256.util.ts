@@ -6,10 +6,20 @@ export async function sha256Hex(value: string): Promise<string> {
     .join('');
 }
 
+/** Strip BOM / zero-width chars that break Kite checksums when pasted. */
+export function sanitizeKiteCredential(value: string): string {
+  return value
+    .replace(/^\uFEFF/, '')
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .trim();
+}
+
 export function buildKiteChecksum(
   apiKey: string,
   requestToken: string,
   apiSecret: string,
 ): Promise<string> {
-  return sha256Hex(`${apiKey}${requestToken}${apiSecret}`);
+  return sha256Hex(
+    `${sanitizeKiteCredential(apiKey)}${sanitizeKiteCredential(requestToken)}${sanitizeKiteCredential(apiSecret)}`,
+  );
 }
