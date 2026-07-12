@@ -1,0 +1,24 @@
+<section class="strategies-page">
+  <header>
+    <h2>OR Swing Breakout</h2>
+    <p>2020–2026 hunt winner for <strong>Nifty 50</strong> and <strong>Bank Nifty</strong> Historical Tester.</p>
+  </header>
+
+  <article class="strategy-card">
+    <div class="card-header">
+      <div>
+        <h3>{{ strategy()?.name ?? 'OR Swing Breakout' }}</h3>
+        <small>{{ strategy()?.id }}</small>
+      </div>
+      <span class="active-badge">Active</span>
+    </div>
+    <p>{{ strategy()?.description }}</p>
+
+    <ul class="rule-list">
+      <li><strong>1 point = ₹65</strong> · SL candle H/L capped at <strong>20</strong></li>
+      <li>Target <strong>1.5R</strong> · exit on target, <strong>EMA-20</strong>, or 15:15</li>
+      <li>Entry: <strong>OR bias</strong> + <strong>swing breakout</strong> · whole day (after 10:15 OR)</li>
+      <li>Unlimited entries until day lock <strong>+30</strong> or day stop <strong>−45</strong></li>
+    </ul>
+  </article>
+</section>

@@ -1,0 +1,427 @@
+<div class="strategy-research">
+  <header class="page-header">
+    <div>
+      <h1>Strategy Research &amp; Debugging</h1>
+      <p class="subtitle">
+        Observation-only analysis. Does not modify strategy behaviour, entries, exits, or backtesting.
+      </p>
+    </div>
+    <div class="export-bar">
+      <button mat-stroked-button type="button" (click)="exportJson()" [disabled]="!lastRun()">JSON</button>
+      <button mat-stroked-button type="button" (click)="exportDailyCsv()" [disabled]="!lastRun()">CSV Daily</button>
+      <button mat-stroked-button type="button" (click)="exportStatsCsv()" [disabled]="!lastRun()">CSV Stats</button>
+      <button mat-stroked-button type="button" (click)="exportBottleneckCsv()" [disabled]="!lastRun()">CSV Bottleneck</button>
+      <button mat-stroked-button type="button" (click)="exportTradesCsv()" [disabled]="!lastRun()">CSV Trades</button>
+      <button mat-stroked-button type="button" (click)="exportComparisonExcel()" [disabled]="!lastRun()">Excel</button>
+      <button mat-stroked-button type="button" (click)="exportPdf()" [disabled]="!lastRun()">PDF</button>
+    </div>
+  </header>
+
+  @if (isRunning()) {
+    <div class="running-banner" role="status" aria-live="polite">
+      <mat-spinner diameter="28"></mat-spinner>
+      <div class="banner-text">
+        <strong>Debug analysis running</strong>
+        <p class="banner-message">{{ progress().message }}</p>
+        @if (progress().total > 0) {
+          <div class="progress-track">
+            <div
+              class="progress-fill"
+              [style.width.%]="(progress().current / progress().total) * 100"
+            ></div>
+          </div>
+          <p class="banner-count">
+            {{ progress().current }} / {{ progress().total }} steps completed
+          </p>
+        }
+      </div>
+    </div>
+  }
+
+  <form class="config-form" [formGroup]="form" (ngSubmit)="runAnalysis()">
+    <div class="field-row">
+      <div class="field">
+        <label>From</label>
+        <div class="datetime">
+          <input type="date" formControlName="fromDate" [disabled]="isRunning()" />
+          <input type="time" formControlName="fromTime" [disabled]="isRunning()" />
+        </div>
+      </div>
+      <div class="field">
+        <label>To</label>
+        <div class="datetime">
+          <input type="date" formControlName="toDate" [disabled]="isRunning()" />
+          <input type="time" formControlName="toTime" [disabled]="isRunning()" />
+        </div>
+      </div>
+    </div>
+    <button
+      mat-flat-button
+      color="primary"
+      type="submit"
+      class="run-btn"
+      [disabled]="isRunning() || form.invalid"
+    >
+      @if (isRunning()) {
+        <mat-spinner diameter="18"></mat-spinner>
+        <span>Running…</span>
+      } @else {
+        <span>Run Debug Analysis</span>
+      }
+    </button>
+  </form>
+
+  @if (!lastRun()) {
+    <p class="empty">Run a debug analysis to generate per-day, per-strategy reports.</p>
+  } @else {
+    <nav class="dashboard-tabs" role="tablist" aria-label="Research sections">
+      @for (label of tabLabels; track label; let i = $index) {
+        <button
+          type="button"
+          role="tab"
+          class="dashboard-tab"
+          [class.active]="selectedTab() === i"
+          [attr.aria-selected]="selectedTab() === i"
+          (click)="selectedTab.set(i)"
+        >
+          {{ label }}
+        </button>
+      }
+    </nav>
+
+    <div class="tab-content">
+      @if (selectedTab() === 0) {
+        <div class="tab-panel">
+          @if (lastRun(); as run) {
+            <div class="overview-grid">
+              <div class="card">
+                <h3>Run Summary</h3>
+                <p>{{ run.instrumentSymbol }} · {{ run.tradingDays.length }} trading days</p>
+                <p>{{ run.candleRecords.length }} candle observations · {{ run.durationMs / 1000 | number: '1.1-1' }}s</p>
+              </div>
+              @for (s of run.strategySummaries; track s.strategyId) {
+                <div class="card">
+                  <h3>{{ s.strategyName }}</h3>
+                  <p>Trades: {{ s.performance.totalTrades }} · Win Rate: {{ s.performance.winRate | number: '1.1-1' }}%</p>
+                  <p>Net: {{ s.performance.netProfit | number: '1.2-2' }} pts</p>
+                  @if (s.bottlenecks[0]; as top) {
+                    <p class="bottleneck-hint">Top blocker: <strong>{{ top.ruleName }}</strong> ({{ top.rejectionPercent }}%)</p>
+                  }
+                </div>
+              }
+            </div>
+            <h3>Trading Days</h3>
+            <div class="day-chips">
+              @for (day of run.tradingDays; track day) {
+                <button type="button" class="day-chip" (click)="selectDay(day)">{{ day }}</button>
+              }
+            </div>
+
+            @if (run.implementationAudit.length) {
+              <h3>Implementation Audit</h3>
+              <div class="audit-list">
+                @for (issue of run.implementationAudit; track issue.rule + issue.message) {
+                  <div class="audit-issue" [class.never-true]="issue.neverTrueInBacktest">
+                    <strong>{{ issue.strategyName }} — {{ issue.rule }}</strong>
+                    <p>{{ issue.message }}</p>
+                    <span class="audit-meta">{{ issue.passCount }} / {{ issue.totalCandles }} candles passed</span>
+                  </div>
+                }
+              </div>
+            }
+          }
+        </div>
+      }
+
+      @if (selectedTab() === 1) {
+        <div class="tab-panel">
+          @if (strategy1Summary(); as s) {
+            <ng-container *ngTemplateOutlet="strategyDetail; context: { summary: s, strategyId: strategy1Id }"></ng-container>
+          }
+        </div>
+      }
+
+      @if (selectedTab() === 2) {
+        <div class="tab-panel">
+          @if (strategy2Summary(); as s) {
+            <ng-container *ngTemplateOutlet="strategyDetail; context: { summary: s, strategyId: strategy2Id }"></ng-container>
+          }
+        </div>
+      }
+
+      @if (selectedTab() === 3) {
+        <div class="tab-panel">
+          @if (strategy3Summary(); as s) {
+            <ng-container *ngTemplateOutlet="strategyDetail; context: { summary: s, strategyId: strategy3Id }"></ng-container>
+          }
+        </div>
+      }
+
+      @if (selectedTab() === 4) {
+        <div class="tab-panel">
+          <div class="filter-row">
+            <label>Strategy filter</label>
+            <select [value]="selectedStrategyFilter()" (change)="selectedStrategyFilter.set($any($event.target).value)">
+              <option value="all">All Strategies</option>
+              <option [value]="strategy1Id">Strategy 1</option>
+              <option [value]="strategy2Id">Strategy 2</option>
+              <option [value]="strategy3Id">Strategy 3</option>
+            </select>
+          </div>
+          <table mat-table [dataSource]="filteredDaily()" class="data-table">
+            <ng-container matColumnDef="date">
+              <th mat-header-cell *matHeaderCellDef>Date</th>
+              <td mat-cell *matCellDef="let d">
+                <button type="button" class="link-btn" (click)="selectDay(d.date)">{{ d.displayDate }}</button>
+              </td>
+            </ng-container>
+            <ng-container matColumnDef="strategy"><th mat-header-cell *matHeaderCellDef>Strategy</th><td mat-cell *matCellDef="let d">{{ d.strategyName }}</td></ng-container>
+            <ng-container matColumnDef="trend"><th mat-header-cell *matHeaderCellDef>Trend</th><td mat-cell *matCellDef="let d" [class.pass]="d.trend==='PASS'" [class.fail]="d.trend==='FAIL'">{{ d.trend }}</td></ng-container>
+            <ng-container matColumnDef="structure"><th mat-header-cell *matHeaderCellDef>Structure</th><td mat-cell *matCellDef="let d" [class.pass]="d.structure==='PASS'" [class.fail]="d.structure==='FAIL'">{{ d.structure }}</td></ng-container>
+            <ng-container matColumnDef="pullback"><th mat-header-cell *matHeaderCellDef>Pullback</th><td mat-cell *matCellDef="let d">{{ d.pullback }}</td></ng-container>
+            <ng-container matColumnDef="breakout"><th mat-header-cell *matHeaderCellDef>Breakout</th><td mat-cell *matCellDef="let d">{{ d.breakout }}</td></ng-container>
+            <ng-container matColumnDef="retest"><th mat-header-cell *matHeaderCellDef>Retest</th><td mat-cell *matCellDef="let d">{{ d.retest }}</td></ng-container>
+            <ng-container matColumnDef="confirmation"><th mat-header-cell *matHeaderCellDef>Confirm</th><td mat-cell *matCellDef="let d">{{ d.confirmation }}</td></ng-container>
+            <ng-container matColumnDef="entry"><th mat-header-cell *matHeaderCellDef>Entry</th><td mat-cell *matCellDef="let d">{{ d.entry }}</td></ng-container>
+            <ng-container matColumnDef="decision"><th mat-header-cell *matHeaderCellDef>Decision</th><td mat-cell *matCellDef="let d">{{ d.finalDecision }}</td></ng-container>
+            <ng-container matColumnDef="reason"><th mat-header-cell *matHeaderCellDef>Reason</th><td mat-cell *matCellDef="let d">{{ d.reason }}</td></ng-container>
+            <tr mat-header-row *matHeaderRowDef="dailyColumns"></tr>
+            <tr mat-row *matRowDef="let row; columns: dailyColumns"></tr>
+          </table>
+        </div>
+      }
+
+      @if (selectedTab() === 5) {
+        <div class="tab-panel">
+          @if (lastRun(); as run) {
+            @for (s of run.strategySummaries; track s.strategyId) {
+              <h3>{{ s.strategyName }}</h3>
+              @if (s.trades.length) {
+                <table mat-table [dataSource]="s.trades" class="data-table">
+                  <ng-container matColumnDef="entry"><th mat-header-cell *matHeaderCellDef>Entry</th><td mat-cell *matCellDef="let t">{{ t.entryTime }}</td></ng-container>
+                  <ng-container matColumnDef="exit"><th mat-header-cell *matHeaderCellDef>Exit</th><td mat-cell *matCellDef="let t">{{ t.exitTime }}</td></ng-container>
+                  <ng-container matColumnDef="dir"><th mat-header-cell *matHeaderCellDef>Dir</th><td mat-cell *matCellDef="let t">{{ t.direction }}</td></ng-container>
+                  <ng-container matColumnDef="pts"><th mat-header-cell *matHeaderCellDef>Pts</th><td mat-cell *matCellDef="let t">{{ t.points | number: '1.2-2' }}</td></ng-container>
+                  <ng-container matColumnDef="outcome"><th mat-header-cell *matHeaderCellDef>Result</th><td mat-cell *matCellDef="let t">{{ t.outcome }}</td></ng-container>
+                  <tr mat-header-row *matHeaderRowDef="['entry','exit','dir','pts','outcome']"></tr>
+                  <tr mat-row *matRowDef="let row; columns: ['entry','exit','dir','pts','outcome']"></tr>
+                </table>
+              } @else {
+                <p class="empty">No shadow trades recorded.</p>
+              }
+            }
+          }
+        </div>
+      }
+
+      @if (selectedTab() === 6) {
+        <div class="tab-panel">
+          @if (lastRun(); as run) {
+            @for (s of run.strategySummaries; track s.strategyId) {
+              <h3>{{ s.strategyName }}</h3>
+              <table class="stats-table">
+                <thead><tr><th>Module</th><th>Passed</th><th>Failed</th><th>Pass Rate</th></tr></thead>
+                <tbody>
+                  @for (row of [
+                    { name: 'Trend', p: s.statistics.trendPassed, f: s.statistics.trendFailed },
+                    { name: 'Structure', p: s.statistics.structurePassed, f: s.statistics.structureFailed },
+                    { name: 'Pullback', p: s.statistics.pullbackPassed, f: s.statistics.pullbackFailed },
+                    { name: 'Breakout', p: s.statistics.breakoutPassed, f: s.statistics.breakoutFailed },
+                    { name: 'Retest', p: s.statistics.retestPassed, f: s.statistics.retestFailed },
+                    { name: 'Confirmation', p: s.statistics.confirmationPassed, f: s.statistics.confirmationFailed },
+                    { name: 'Entry', p: s.statistics.entryPassed, f: s.statistics.entryFailed }
+                  ]; track row.name) {
+                    <tr>
+                      <td>{{ row.name }}</td>
+                      <td class="pass">{{ row.p }}</td>
+                      <td class="fail">{{ row.f }}</td>
+                      <td>{{ row.p + row.f ? (row.p / (row.p + row.f) * 100 | number: '1.1-1') : 0 }}%</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+              <h4>Failure Counter</h4>
+              <ul class="failure-list">
+                <li>Trend Failed: {{ s.failureCounts.trendFailed }}</li>
+                <li>Structure Failed: {{ s.failureCounts.structureFailed }}</li>
+                <li>Pullback Failed: {{ s.failureCounts.pullbackFailed }}</li>
+                <li>Breakout Failed: {{ s.failureCounts.breakoutFailed }}</li>
+                <li>Retest Failed: {{ s.failureCounts.retestFailed }}</li>
+                <li>Confirmation Failed: {{ s.failureCounts.confirmationFailed }}</li>
+                <li>Entry Failed: {{ s.failureCounts.entryFailed }}</li>
+              </ul>
+            }
+          }
+        </div>
+      }
+
+      @if (selectedTab() === 7) {
+        <div class="tab-panel">
+          @if (lastRun(); as run) {
+            @for (s of run.strategySummaries; track s.strategyId) {
+              <h3>{{ s.strategyName }}</h3>
+              <table class="stats-table">
+                <thead><tr><th>Rank</th><th>Rule</th><th>Rejections</th><th>% of NO TRADE</th></tr></thead>
+                <tbody>
+                  @for (b of s.bottlenecks; track b.ruleName) {
+                    <tr [class.top-blocker]="b.rank === 1">
+                      <td>#{{ b.rank }}</td>
+                      <td><strong>{{ b.ruleName }}</strong></td>
+                      <td>{{ b.rejectionCount }}</td>
+                      <td>{{ b.rejectionPercent }}%</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            }
+          }
+        </div>
+      }
+
+      @if (selectedTab() === 8) {
+        <div class="tab-panel">
+          @if (lastRun(); as run) {
+            <table mat-table [dataSource]="run.strategySummaries" class="data-table">
+              <ng-container matColumnDef="strategy"><th mat-header-cell *matHeaderCellDef>Strategy</th><td mat-cell *matCellDef="let s">{{ s.strategyName }}</td></ng-container>
+              <ng-container matColumnDef="trades"><th mat-header-cell *matHeaderCellDef>Trades</th><td mat-cell *matCellDef="let s">{{ s.performance.totalTrades }}</td></ng-container>
+              <ng-container matColumnDef="wins"><th mat-header-cell *matHeaderCellDef>Wins</th><td mat-cell *matCellDef="let s">{{ s.performance.winningTrades }}</td></ng-container>
+              <ng-container matColumnDef="losses"><th mat-header-cell *matHeaderCellDef>Losses</th><td mat-cell *matCellDef="let s">{{ s.performance.losingTrades }}</td></ng-container>
+              <ng-container matColumnDef="winRate"><th mat-header-cell *matHeaderCellDef>Win Rate</th><td mat-cell *matCellDef="let s">{{ s.performance.winRate | number: '1.1-1' }}%</td></ng-container>
+              <ng-container matColumnDef="netProfit"><th mat-header-cell *matHeaderCellDef>Net Profit</th><td mat-cell *matCellDef="let s">{{ s.performance.netProfit | number: '1.2-2' }}</td></ng-container>
+              <ng-container matColumnDef="profitFactor"><th mat-header-cell *matHeaderCellDef>PF</th><td mat-cell *matCellDef="let s">{{ s.performance.profitFactor | number: '1.2-2' }}</td></ng-container>
+              <ng-container matColumnDef="maxDrawdown"><th mat-header-cell *matHeaderCellDef>Max DD</th><td mat-cell *matCellDef="let s">{{ s.performance.maxDrawdown | number: '1.2-2' }}</td></ng-container>
+              <tr mat-header-row *matHeaderRowDef="comparisonColumns"></tr>
+              <tr mat-row *matRowDef="let row; columns: comparisonColumns"></tr>
+            </table>
+          }
+        </div>
+      }
+    </div>
+  }
+</div>
+
+<ng-template #strategyDetail let-summary="summary" let-strategyId="strategyId">
+  <h3>{{ summary.strategyName }}</h3>
+
+  @if (selectedDay(); as day) {
+    <h4>Day Detail: {{ day }}</h4>
+    @for (rec of recordsForStrategy(strategyId); track rec.timestamp) {
+      <details class="candle-detail">
+        <summary>{{ rec.timestamp }} — {{ rec.finalDecision }} @if (rec.waitingState !== 'None') { ({{ rec.waitingState }}) }</summary>
+
+        <div class="module-block">
+          <h5>Trend Module</h5>
+          <p>Detected: <strong>{{ rec.trend.detectedTrend }}</strong> · {{ passFail(rec.trend.passed) }}</p>
+          <p>Required: {{ rec.trend.requiredCondition }}</p>
+          <p>Actual: {{ rec.trend.actualResult }}</p>
+          <p>HH={{ rec.trend.higherHighCount }} HL={{ rec.trend.higherLowCount }} LH={{ rec.trend.lowerHighCount }} LL={{ rec.trend.lowerLowCount }}</p>
+          <p>Swing Highs: {{ rec.trend.latestSwingHighs.join(', ') || '--' }}</p>
+          <p>Swing Lows: {{ rec.trend.latestSwingLows.join(', ') || '--' }}</p>
+          <p>Reason: {{ rec.trend.reason }}</p>
+        </div>
+
+        <div class="module-block">
+          <h5>Structure Module</h5>
+          <p>{{ passFail(rec.structure.passed) }} · Support: {{ formatVal(rec.structure.support) }} · Resistance: {{ formatVal(rec.structure.resistance) }}</p>
+          <p>Expected: {{ rec.structure.expectedCondition }}</p>
+          <p>Actual: {{ rec.structure.actualCondition }}</p>
+          @if (rec.structure.trendline) { <p>Trendline: {{ rec.structure.trendline }}</p> }
+          @for (c of rec.structure.checks; track c.name) {
+            <div class="check-row" [class.pass]="c.passed" [class.fail]="!c.passed">{{ c.name }}: {{ c.passed ? 'PASS' : 'FAIL' }} — {{ c.reason }}</div>
+          }
+        </div>
+
+        <div class="module-block">
+          <h5>Entry Module</h5>
+          @for (c of rec.entry.checks; track c.name) {
+            <div class="check-row" [class.pass]="c.passed" [class.fail]="!c.passed">{{ c.name }}: {{ c.passed ? 'PASS' : 'FAIL' }} — {{ c.reason }}</div>
+          }
+          <p>Entry Trigger: <strong>{{ rec.entry.entryTrigger }}</strong></p>
+          <p>Pullback: {{ passFail(rec.pullback.passed) }} · Breakout: {{ passFail(rec.breakout.passed) }} · Retest: {{ passFail(rec.retest.passed) }} · Confirm: {{ passFail(rec.confirmation.passed) }}</p>
+        </div>
+
+        @if (rec.strategy2Audit; as a2) {
+          <div class="module-block audit-block">
+            <h5>Strategy 2 Implementation Audit</h5>
+            <p>60m Trend: <strong>{{ a2.trend60 }}</strong> · 30m: <strong>{{ a2.trend30 }}</strong> ({{ a2.trend30Reason }})</p>
+            <p>Support30: {{ formatVal(a2.support30) }} · Resistance30: {{ formatVal(a2.resistance30) }}</p>
+            @if (a2.trend30Current && a2.trend30Previous) {
+              <p>30m current H/L/C: {{ a2.trend30Current.high }}/{{ a2.trend30Current.low }}/{{ a2.trend30Current.close }}</p>
+              <p>30m previous H/L/C: {{ a2.trend30Previous.high }}/{{ a2.trend30Previous.low }}/{{ a2.trend30Previous.close }}</p>
+            }
+            <p>15m Pullback: {{ a2.pullbackDetected ? 'PASS' : 'FAIL' }} @if (a2.pullbackLevel) { (level {{ a2.pullbackLevel | number: '1.2-2' }}) }</p>
+            <table class="mini-table">
+              <thead><tr><th>15m Time</th><th>Low</th><th>High</th><th>Dist %</th><th>Touch</th></tr></thead>
+              <tbody>
+                @for (w of a2.pullbackWindow; track w.date) {
+                  <tr [class.pass-row]="w.touchesLevel"><td>{{ w.date.slice(11, 16) }}</td><td>{{ w.low | number: '1.2-2' }}</td><td>{{ w.high | number: '1.2-2' }}</td><td>{{ w.distancePct | number: '1.3-3' }}%</td><td>{{ w.touchesLevel ? 'YES' : 'NO' }}</td></tr>
+                }
+              </tbody>
+            </table>
+            @if (a2.confirmation5m) {
+              <p>5m Confirm: bullish={{ a2.confirmation5m.isBullish }} body={{ a2.confirmation5m.bodySize | number: '1.2-2' }} prevBody={{ a2.confirmation5m.prevBodySize | number: '1.2-2' }}</p>
+            }
+            <p>Evaluator: <strong>{{ a2.evaluatorAction }}</strong> — {{ a2.evaluatorReason }}</p>
+            @if (a2.mismatchNote) {
+              <p class="audit-warn">{{ a2.mismatchNote }}</p>
+            }
+          </div>
+        }
+
+        @if (rec.strategy3Audit; as a3) {
+          <div class="module-block audit-block">
+            <h5>Strategy 3 Implementation Audit</h5>
+            <p class="audit-verify" [class.pass]="a3.usesCompletedHourVerified">{{ a3.hourBarIndexNote }}</p>
+            @if (a3.previousCompletedHourCandle; as h) {
+              <p><strong>Previous COMPLETED 1H:</strong> {{ h.date }} O={{ h.open }} H={{ h.high }} L={{ h.low }} C={{ h.close }}</p>
+            }
+            @if (a3.formingHourCandle; as f) {
+              <p><em>Forming 1H (NOT used):</em> {{ f.date }} O={{ f.open }} H={{ f.high }} L={{ f.low }} C={{ f.close }}</p>
+            }
+            <p>prev5.close={{ formatVal(a3.previous5Close) }} · current5.close={{ a3.current5Close | number: '1.2-2' }} · 1H H={{ formatVal(a3.hourHigh) }} L={{ formatVal(a3.hourLow) }}</p>
+            <p>Bullish close-cross: {{ a3.bullishBreakoutCloseCondition ? 'YES' : 'NO' }} · Bearish: {{ a3.bearishBreakoutCloseCondition ? 'YES' : 'NO' }}</p>
+            <p>High cross 1H high: {{ a3.highCrossedHourHigh ? 'YES' : 'NO' }} · Low cross 1H low: {{ a3.lowCrossedHourLow ? 'YES' : 'NO' }}</p>
+            @if (a3.storedBreakoutCandle; as sb) {
+              <p><strong>Stored Breakout Candle:</strong> {{ sb.date }} H={{ sb.high }} L={{ sb.low }} · Direction: {{ a3.pendingDirection }}</p>
+            } @else {
+              <p>Stored Breakout Candle: <strong>none</strong></p>
+            }
+            <p>Follow-through BUY: {{ a3.followThroughBuy ? 'YES' : 'NO' }} · SELL: {{ a3.followThroughSell ? 'YES' : 'NO' }}</p>
+            <p>Phase: <strong>{{ a3.evaluatorPhase }}</strong></p>
+            <p class="block-reason"><strong>Exact block:</strong> {{ a3.exactBlockReason }}</p>
+            <p>Evaluator: <strong>{{ a3.evaluatorAction }}</strong> — {{ a3.evaluatorReason }}</p>
+          </div>
+        }
+
+        @if (rec.strategy3Details) {
+          <div class="module-block">
+            <h5>Strategy 3 Hour Breakout Detail</h5>
+            @if (rec.strategy3Details.previousHourCandle; as h) {
+              <p>1H: O={{ h.open }} H={{ h.high }} L={{ h.low }} C={{ h.close }}</p>
+            }
+            <p>5m: O={{ rec.strategy3Details.current5mCandle.open }} H={{ rec.strategy3Details.current5mCandle.high }} L={{ rec.strategy3Details.current5mCandle.low }} C={{ rec.strategy3Details.current5mCandle.close }}</p>
+            <p>High Cross 1H High: {{ rec.strategy3Details.highCrossedPreviousHourHigh ? 'YES' : 'NO' }}</p>
+            <p>Low Cross 1H Low: {{ rec.strategy3Details.lowCrossedPreviousHourLow ? 'YES' : 'NO' }}</p>
+            <p>Breakout: {{ rec.strategy3Details.breakoutDetected ? 'YES' : 'NO' }} · Waiting: {{ rec.strategy3Details.waitingForNextCandle ? 'YES' : 'NO' }} · Entry Trigger: {{ rec.strategy3Details.entryTriggerHit ? 'YES' : 'NO' }}</p>
+          </div>
+        }
+
+        <div class="module-block trade-block">
+          <h5>Trade Details</h5>
+          <p>Entry: {{ formatVal(rec.tradeDetails.entry) }} · SL: {{ formatVal(rec.tradeDetails.stopLoss) }} · Target: {{ formatVal(rec.tradeDetails.target) }} · R:R: {{ formatVal(rec.tradeDetails.riskReward) }} · P/L: {{ formatVal(rec.tradeDetails.profitLoss) }}</p>
+        </div>
+
+        <p class="rejection"><strong>Final:</strong> {{ rec.finalDecision }} — {{ rec.rejectionReason }}</p>
+      </details>
+    }
+  } @else {
+    <p class="hint">Select a trading day from Overview or Daily Debug to see candle-level detail.</p>
+  }
+
+  <h4>Rule Bottleneck</h4>
+  <ul>
+    @for (b of summary.bottlenecks.slice(0, 5); track b.ruleName) {
+      <li>{{ b.ruleName }} rejected {{ b.rejectionPercent }}% of setups</li>
+    }
+  </ul>
+</ng-template>

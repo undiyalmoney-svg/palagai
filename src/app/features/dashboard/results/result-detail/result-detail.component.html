@@ -1,0 +1,98 @@
+@if (test(); as t) {
+  <section class="detail-page">
+    <a routerLink="/dashboard/results" class="back">← Back to Results</a>
+
+    <header>
+      <h2>{{ t.instrumentSymbol }} — {{ t.replayDate }}</h2>
+      <p>{{ t.fromDateTime }} to {{ t.toDateTime }}</p>
+    </header>
+
+    <div class="meta-grid">
+      <div><span>Test ID</span><strong>{{ t.id }}</strong></div>
+      <div><span>Candles</span><strong>{{ t.totalCandlesProcessed }}</strong></div>
+      <div><span>Replay Duration</span><strong>{{ t.replayDurationMs / 1000 | number: '1.0-0' }}s</strong></div>
+      <div><span>Timeframes</span><strong>{{ t.timeframesUsed.join(', ') }}</strong></div>
+      <div><span>Best Strategy</span><strong>{{ t.bestStrategyName }}</strong></div>
+      <div><span>Created</span><strong>{{ t.createdAt | date: 'medium' }}</strong></div>
+    </div>
+
+    <button mat-stroked-button type="button" (click)="exportTrades()">Export Trades CSV</button>
+
+    <h3>Strategy Summary</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Strategy</th>
+            <th>Trades</th>
+            <th>Wins</th>
+            <th>Losses</th>
+            <th>Accuracy</th>
+            <th>Net Points</th>
+            <th>Net P/L</th>
+            <th>Version</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (r of t.strategyResults; track r.strategyId) {
+            <tr>
+              <td>{{ r.strategyName }}</td>
+              <td>{{ r.totalTrades }}</td>
+              <td>{{ r.winningTrades }}</td>
+              <td>{{ r.losingTrades }}</td>
+              <td>{{ r.winPercentage | number: '1.0-0' }}%</td>
+              <td>{{ r.netPoints | number: '1.2-2' }}</td>
+              <td>{{ r.netProfit | number: '1.2-2' }}</td>
+              <td>v{{ r.strategyVersion }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Trade History</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Strategy</th>
+            <th>Entry</th>
+            <th>Exit</th>
+            <th>Entry Price</th>
+            <th>Exit Price</th>
+            <th>SL</th>
+            <th>Target</th>
+            <th>Points</th>
+            <th>Result</th>
+            <th>Duration (min)</th>
+            <th>Confidence</th>
+            <th>Entry Reason</th>
+            <th>Exit Reason</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (trade of t.trades; track trade.id) {
+            <tr>
+              <td>{{ trade.strategyName }}</td>
+              <td>{{ trade.entryTime }}</td>
+              <td>{{ trade.exitTime }}</td>
+              <td>{{ trade.entryPrice }}</td>
+              <td>{{ trade.exitPrice }}</td>
+              <td>{{ trade.stopLoss }}</td>
+              <td>{{ trade.targetPrice }}</td>
+              <td>{{ trade.points | number: '1.2-2' }}</td>
+              <td>{{ trade.outcome ?? (trade.profitLoss > 0 ? 'WIN' : 'LOSS') }}</td>
+              <td>{{ trade.holdingMinutes }}</td>
+              <td>{{ trade.confidence }}%</td>
+              <td>{{ trade.entryReason }}</td>
+              <td>{{ trade.exitReason }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </section>
+} @else {
+  <p class="empty">Result not found.</p>
+  <a routerLink="/dashboard/results">Back to Results</a>
+}

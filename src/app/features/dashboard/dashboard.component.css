@@ -1,0 +1,131 @@
+.dashboard-container {
+  height: 100vh;
+  background: #f1f5f9;
+}
+
+.dashboard-sidenav {
+  width: 260px;
+  border-right: 1px solid #e2e8f0;
+  background: #ffffff;
+}
+
+.sidenav-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1.5rem 1.25rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.brand-mark {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: #0f172a;
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.brand-name {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.nav-list {
+  padding: 1rem 0.75rem;
+}
+
+.nav-list a {
+  border-radius: 10px;
+  margin-bottom: 0.25rem;
+  color: #475569;
+}
+
+.nav-list a.active-link {
+  background: #e2e8f0;
+  color: #0f172a;
+  font-weight: 600;
+}
+
+.dashboard-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.dashboard-toolbar {
+  background: #ffffff;
+  border-bottom: 1px solid #e2e8f0;
+  color: #0f172a;
+}
+
+.toolbar-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.toolbar-spacer {
+  flex: 1;
+}
+
+.top-tabs {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.75rem 2rem 0;
+  background: #ffffff;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.top-tabs a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1rem;
+  border-radius: 8px 8px 0 0;
+  text-decoration: none;
+  color: #64748b;
+  font-size: 0.9rem;
+  font-weight: 500;
+  border: 1px solid transparent;
+  border-bottom: none;
+  margin-bottom: -1px;
+}
+
+.top-tabs a mat-icon {
+  font-size: 1.125rem;
+  width: 1.125rem;
+  height: 1.125rem;
+}
+
+.top-tabs a.active-tab {
+  color: #0f172a;
+  font-weight: 600;
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+}
+
+.page-content {
+  flex: 1;
+  padding: 2rem;
+  overflow-y: auto;
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+@media (max-width: 768px) {
+  .top-tabs {
+    padding: 0.75rem 1.25rem 0;
+    overflow-x: auto;
+  }
+
+  .page-content {
+    padding: 1.25rem;
+  }
+
+  .dashboard-toolbar button span {
+    display: none;
+  }
+}

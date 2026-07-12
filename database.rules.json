@@ -1,0 +1,12 @@
+{
+  "rules": {
+    ".read": "now < 1770834600000",
+    ".write": "now < 1770834600000",
+    "users": {
+      ".indexOn": ["email"]
+    },
+    "votes": {
+      ".indexOn": ["boardId"]
+    }
+  }
+}

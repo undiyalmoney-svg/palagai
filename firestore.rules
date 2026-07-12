@@ -1,0 +1,12 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Groww automation config stored by the Settings page.
+    match /config/{docId} {
+      // Dev-friendly: allow public read/write.
+      // If you later enable Firebase Auth, we can tighten this.
+      allow read, write: if true;
+    }
+  }
+}
+

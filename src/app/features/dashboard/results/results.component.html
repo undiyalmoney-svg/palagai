@@ -1,0 +1,37 @@
+<section class="results-page">
+  <header>
+    <h2>Results</h2>
+    <p>All completed historical backtests are stored here permanently.</p>
+  </header>
+
+  <form class="filters" [formGroup]="filters" (ngSubmit)="applyFilters()">
+    <mat-form-field appearance="outline">
+      <mat-label>Date</mat-label>
+      <input matInput type="date" formControlName="date" />
+    </mat-form-field>
+    <mat-form-field appearance="outline">
+      <mat-label>Instrument</mat-label>
+      <input matInput formControlName="instrument" />
+    </mat-form-field>
+    <mat-form-field appearance="outline">
+      <mat-label>Strategy</mat-label>
+      <input matInput formControlName="strategy" />
+    </mat-form-field>
+    <button mat-flat-button color="primary" type="submit">Filter</button>
+  </form>
+
+  <div class="list">
+    @for (test of filteredTests(); track test.id) {
+      <a class="card" [routerLink]="['/dashboard/results', test.id]">
+        <div class="card-top">
+          <strong>{{ test.instrumentSymbol }}</strong>
+          <span>{{ test.replayDate }}</span>
+        </div>
+        <p>{{ test.fromDateTime }} → {{ test.toDateTime }}</p>
+        <p>Best: {{ test.bestStrategyName }} · {{ test.totalCandlesProcessed }} candles</p>
+      </a>
+    } @empty {
+      <p class="empty">No saved results yet. Run a backtest from Historical Tester.</p>
+    }
+  </div>
+</section>

@@ -1,0 +1,33 @@
+<section class="settings-page">
+  <header>
+    <h2>Settings</h2>
+    <p>Data management and instrument repository status.</p>
+  </header>
+
+  <div class="status-card">
+    <h3>Instrument Repository</h3>
+    <p><strong>Last Refresh:</strong> {{ metadata().lastRefreshAt || 'Never' }}</p>
+    <p><strong>Total Instruments:</strong> {{ metadata().totalInstruments }}</p>
+    <p><strong>File Status:</strong> {{ metadata().status }}</p>
+    <p><strong>File Size:</strong> {{ metadata().fileSizeBytes | number }} bytes</p>
+  </div>
+
+  <div class="actions-card">
+    <h3>Data Management</h3>
+    <div class="actions">
+      <button mat-flat-button color="primary" (click)="refreshInstruments()" [disabled]="isLoading()">
+        Refresh Instruments
+      </button>
+      <button mat-stroked-button (click)="clearResults()">Clear Historical Results</button>
+      <button mat-stroked-button (click)="clearTrades()">Clear Trade History</button>
+      <button mat-stroked-button (click)="clearCandles()">Clear Candle Cache</button>
+      <button mat-stroked-button (click)="clearInstruments()">Clear Instrument Cache</button>
+      <button mat-stroked-button color="warn" (click)="clearAll()">Clear All Data</button>
+      <button mat-stroked-button color="warn" (click)="factoryReset()">Factory Reset</button>
+    </div>
+  </div>
+
+  @if (message()) {
+    <p class="message">{{ message() }}</p>
+  }
+</section>

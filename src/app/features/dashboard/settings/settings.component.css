@@ -1,0 +1,46 @@
+.settings-page {
+  max-width: 720px;
+  color: #e2e8f0;
+}
+
+header h2 {
+  margin: 0 0 0.25rem;
+  color: #f8fafc;
+}
+
+header p {
+  margin: 0 0 1.25rem;
+  color: #94a3b8;
+}
+
+.status-card,
+.actions-card {
+  padding: 1.25rem;
+  margin-bottom: 1rem;
+  border: 1px solid #334155;
+  border-radius: 12px;
+  background: #0f172a;
+}
+
+.status-card h3,
+.actions-card h3 {
+  margin: 0 0 0.75rem;
+  color: #f8fafc;
+}
+
+.status-card p {
+  margin: 0.35rem 0;
+  color: #cbd5e1;
+  font-size: 0.9rem;
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.message {
+  color: #86efac;
+  font-size: 0.9rem;
+}

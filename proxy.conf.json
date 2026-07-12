@@ -1,0 +1,11 @@
+{
+  "/api/kite": {
+    "target": "https://api.kite.trade",
+    "secure": true,
+    "changeOrigin": true,
+    "pathRewrite": {
+      "^/api/kite": ""
+    },
+    "logLevel": "debug"
+  }
+}

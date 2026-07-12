@@ -1,0 +1,311 @@
+<section class="tab-panel">
+  <h2>Get Token</h2>
+  <p class="tab-description">
+    Save your API credentials locally, then complete the three-step Kite Connect flow.
+  </p>
+
+  @if (todaySession(); as session) {
+    <article class="step-card session-card">
+      <div class="step-header">
+        <span class="step-badge ready">Active</span>
+        <h3>Today's Session</h3>
+      </div>
+      <p class="step-description">
+        Access token saved for today. Use this for historical data and backtests.
+      </p>
+
+      <div class="session-fields">
+        <div class="result-block session-field">
+          <span class="result-label">API Key</span>
+          <pre class="result-output">{{ session.data.api_key }}</pre>
+        </div>
+
+        <div class="result-block session-field">
+          <span class="result-label">Access Token</span>
+          <div class="token-row">
+            <pre class="result-output token-value">{{
+              hideAccessToken() ? '••••••••••••••••••••••••••••' : session.data.access_token
+            }}</pre>
+            <button
+              mat-stroked-button
+              type="button"
+              class="token-toggle-btn"
+              (click)="hideAccessToken.set(!hideAccessToken())"
+            >
+              <mat-icon>{{ hideAccessToken() ? 'visibility' : 'visibility_off' }}</mat-icon>
+              <span>{{ hideAccessToken() ? 'Show' : 'Hide' }}</span>
+            </button>
+          </div>
+        </div>
+
+        @if (session.data.user_id) {
+          <div class="result-block session-field compact">
+            <span class="result-label">User ID</span>
+            <pre class="result-output inline">{{ session.data.user_id }}</pre>
+          </div>
+        }
+
+        <div class="result-block session-field compact">
+          <span class="result-label">Saved At</span>
+          <pre class="result-output inline">{{ formatSessionTime(session) }}</pre>
+        </div>
+      </div>
+    </article>
+  }
+
+  <div class="steps">
+    <article class="step-card credentials-card">
+      <div class="step-header">
+        <span class="step-badge">Setup</span>
+        <h3>Saved API Credentials</h3>
+      </div>
+      <p class="step-description">
+        @if (hasStoredCredentials() && !isEditingCredentials()) {
+          Credentials are stored in your browser. Click Edit to update them.
+        } @else {
+          Enter and save your API Key and API Secret. They will be prefilled in the steps below.
+        }
+      </p>
+
+      <form class="step-form" [formGroup]="credentialsForm" (ngSubmit)="onSaveCredentials()">
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>API Key</mat-label>
+          <input matInput formControlName="apiKey" autocomplete="off" />
+          @if (
+            credentialsForm.controls.apiKey.touched &&
+            credentialsForm.controls.apiKey.hasError('required')
+          ) {
+            <mat-error>API Key is required</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>API Secret</mat-label>
+          <input
+            matInput
+            formControlName="apiSecret"
+            [type]="hideApiSecret() ? 'password' : 'text'"
+            autocomplete="off"
+          />
+          <button
+            mat-icon-button
+            matSuffix
+            type="button"
+            (click)="hideApiSecret.set(!hideApiSecret())"
+            [attr.aria-label]="hideApiSecret() ? 'Show API secret' : 'Hide API secret'"
+          >
+            <mat-icon>{{ hideApiSecret() ? 'visibility' : 'visibility_off' }}</mat-icon>
+          </button>
+          @if (
+            credentialsForm.controls.apiSecret.touched &&
+            credentialsForm.controls.apiSecret.hasError('required')
+          ) {
+            <mat-error>API Secret is required</mat-error>
+          }
+        </mat-form-field>
+
+        <div class="button-row">
+          @if (isEditingCredentials()) {
+            <button
+              mat-flat-button
+              color="primary"
+              type="submit"
+              class="action-button"
+              [disabled]="isSavingCredentials()"
+            >
+              <mat-icon>save</mat-icon>
+              <span>{{ hasStoredCredentials() ? 'Update' : 'Save' }}</span>
+            </button>
+
+            @if (hasStoredCredentials()) {
+              <button mat-stroked-button type="button" class="action-button" (click)="onCancelEditCredentials()">
+                Cancel
+              </button>
+            }
+          } @else {
+            <button mat-flat-button color="primary" type="button" class="action-button" (click)="onEditCredentials()">
+              <mat-icon>edit</mat-icon>
+              <span>Edit</span>
+            </button>
+          }
+        </div>
+      </form>
+
+      @if (credentialsSaveMessage()) {
+        <div class="result-block success inline-message">
+          <span>{{ credentialsSaveMessage() }}</span>
+        </div>
+      }
+    </article>
+
+    <article class="step-card">
+      <div class="step-header">
+        <span class="step-badge">Step 1</span>
+        <h3>Redirect to Kite Login</h3>
+      </div>
+      <p class="step-description">Enter your API key and redirect to the Zerodha login page.</p>
+
+      <form class="step-form" [formGroup]="step1Form" (ngSubmit)="onRedirect()">
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>API Key</mat-label>
+          <input matInput formControlName="apiKey" autocomplete="off" />
+          @if (step1Form.controls.apiKey.touched && step1Form.controls.apiKey.hasError('required')) {
+            <mat-error>API Key is required</mat-error>
+          }
+        </mat-form-field>
+
+        <button
+          mat-flat-button
+          color="primary"
+          type="submit"
+          class="action-button"
+          [disabled]="isRedirecting()"
+        >
+          <mat-icon>open_in_new</mat-icon>
+          <span>Redirect</span>
+        </button>
+      </form>
+    </article>
+
+    <article class="step-card">
+      <div class="step-header">
+        <span class="step-badge">Step 2</span>
+        <h3>Generate Checksum</h3>
+      </div>
+      <p class="step-description">
+        SHA-256 of <code>api_key + request_token + api_secret</code> (concatenated, no separators).
+      </p>
+
+      <form class="step-form" [formGroup]="step2Form" (ngSubmit)="onGenerateChecksum()">
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>API Key</mat-label>
+          <input matInput formControlName="apiKey" autocomplete="off" />
+          @if (step2Form.controls.apiKey.touched && step2Form.controls.apiKey.hasError('required')) {
+            <mat-error>API Key is required</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Request Token</mat-label>
+          <input matInput formControlName="requestToken" autocomplete="off" />
+          @if (
+            step2Form.controls.requestToken.touched &&
+            step2Form.controls.requestToken.hasError('required')
+          ) {
+            <mat-error>Request Token is required</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>API Secret</mat-label>
+          <input matInput formControlName="apiSecret" type="password" autocomplete="off" />
+          @if (step2Form.controls.apiSecret.touched && step2Form.controls.apiSecret.hasError('required')) {
+            <mat-error>API Secret is required</mat-error>
+          }
+        </mat-form-field>
+
+        <button
+          mat-flat-button
+          color="primary"
+          type="submit"
+          class="action-button"
+          [disabled]="isGeneratingChecksum()"
+        >
+          @if (isGeneratingChecksum()) {
+            <mat-spinner diameter="20"></mat-spinner>
+            <span>Generating...</span>
+          } @else {
+            <ng-container>
+              <mat-icon>fingerprint</mat-icon>
+              <span>Generate Checksum</span>
+            </ng-container>
+          }
+        </button>
+      </form>
+
+      @if (checksumResult()) {
+        <div class="result-block">
+          <span class="result-label">Checksum</span>
+          <pre class="result-output">{{ checksumResult() }}</pre>
+        </div>
+      }
+    </article>
+
+    <article class="step-card">
+      <div class="step-header">
+        <span class="step-badge">Step 3</span>
+        <h3>Exchange Session Token</h3>
+      </div>
+      <p class="step-description">
+        Call the Kite session token API with your checksum and credentials.
+      </p>
+
+      <form class="step-form" [formGroup]="step3Form" (ngSubmit)="onExchangeToken()">
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Checksum</mat-label>
+          <input matInput formControlName="checksum" autocomplete="off" />
+          @if (step3Form.controls.checksum.touched && step3Form.controls.checksum.hasError('required')) {
+            <mat-error>Checksum is required</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>API Key</mat-label>
+          <input matInput formControlName="apiKey" autocomplete="off" />
+          @if (step3Form.controls.apiKey.touched && step3Form.controls.apiKey.hasError('required')) {
+            <mat-error>API Key is required</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Request Token</mat-label>
+          <input matInput formControlName="requestToken" autocomplete="off" />
+          @if (
+            step3Form.controls.requestToken.touched &&
+            step3Form.controls.requestToken.hasError('required')
+          ) {
+            <mat-error>Request Token is required</mat-error>
+          }
+        </mat-form-field>
+
+        <button
+          mat-flat-button
+          color="primary"
+          type="submit"
+          class="action-button"
+          [disabled]="isExchangingToken()"
+        >
+          @if (isExchangingToken()) {
+            <mat-spinner diameter="20"></mat-spinner>
+            <span>Calling API...</span>
+          } @else {
+            <ng-container>
+              <mat-icon>sync</mat-icon>
+              <span>Get Session Token</span>
+            </ng-container>
+          }
+        </button>
+      </form>
+
+      @if (sessionSavedMessage()) {
+        <div class="result-block success inline-message">
+          <span>{{ sessionSavedMessage() }}</span>
+        </div>
+      }
+
+      @if (tokenExchangeResult()) {
+        <div class="result-block success">
+          <span class="result-label">API Response</span>
+          <pre class="result-output">{{ tokenExchangeResult() }}</pre>
+        </div>
+      }
+
+      @if (tokenExchangeError()) {
+        <div class="result-block error">
+          <span class="result-label">Error</span>
+          <pre class="result-output">{{ tokenExchangeError() }}</pre>
+        </div>
+      }
+    </article>
+  </div>
+</section>

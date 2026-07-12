@@ -1,0 +1,385 @@
+<div class="research-dashboard">
+  <header class="page-header">
+    <div>
+      <h1>Price Action Research Platform</h1>
+      <p class="subtitle">
+        Experiment with rule combinations on completed OHLC data. Existing strategies remain unchanged.
+      </p>
+    </div>
+    <div class="header-meta">
+      <span>{{ combinationPreviewCount() }} combinations will be tested</span>
+    </div>
+  </header>
+
+  @if (isRunning()) {
+    <div class="running-banner" role="status" aria-live="polite">
+      <mat-spinner diameter="28"></mat-spinner>
+      <div class="banner-text">
+        <strong>Rule combination backtest running</strong>
+        <p class="banner-message">{{ progress().message }}</p>
+        @if (progress().total > 0) {
+          <div class="progress-track">
+            <div
+              class="progress-fill"
+              [style.width.%]="(progress().current / progress().total) * 100"
+            ></div>
+          </div>
+          <p class="banner-count">
+            {{ progress().current }} / {{ progress().total }} combinations tested
+          </p>
+        }
+      </div>
+    </div>
+  }
+
+  <nav class="dashboard-tabs" role="tablist" aria-label="Research sections">
+    @for (label of tabLabels; track label; let i = $index) {
+      <button
+        type="button"
+        role="tab"
+        class="dashboard-tab"
+        [class.active]="selectedTab() === i"
+        [attr.aria-selected]="selectedTab() === i"
+        (click)="selectedTab.set(i)"
+      >
+        {{ label }}
+      </button>
+    }
+  </nav>
+
+  <div class="tab-content">
+    @if (selectedTab() === 0) {
+      <div class="tab-panel">
+        <form [formGroup]="form" class="config-form" (ngSubmit)="runOptimization()">
+          <div class="field-row">
+            <div class="field">
+              <label>From</label>
+              <div class="datetime">
+                <input type="date" formControlName="fromDate" [disabled]="isRunning()" />
+                <input type="time" formControlName="fromTime" [disabled]="isRunning()" />
+              </div>
+            </div>
+            <div class="field">
+              <label>To</label>
+              <div class="datetime">
+                <input type="date" formControlName="toDate" [disabled]="isRunning()" />
+                <input type="time" formControlName="toTime" [disabled]="isRunning()" />
+              </div>
+            </div>
+          </div>
+
+          <div class="field">
+            <label>Base Strategy</label>
+            <select formControlName="baseStrategyId" [disabled]="isRunning()">
+              @for (s of strategyOptions; track s.id) {
+                <option [value]="s.id">{{ s.label }}</option>
+              }
+            </select>
+          </div>
+
+          <button
+            mat-flat-button
+            color="primary"
+            type="submit"
+            class="run-btn"
+            [disabled]="isRunning() || form.invalid"
+          >
+            @if (isRunning()) {
+              <mat-spinner diameter="18"></mat-spinner>
+              <span>Running…</span>
+            } @else {
+              <span>Run Rule Combination Backtest</span>
+            }
+          </button>
+        </form>
+
+        @if (lastRun(); as run) {
+          <div class="run-summary">
+            <h3>Last Run</h3>
+            <p>
+              {{ run.baseStrategyName }} · {{ run.instrumentSymbol }} ·
+              {{ run.combinationsTested }} combinations ·
+              {{ run.durationMs / 1000 | number: '1.0-1' }}s
+            </p>
+          </div>
+        }
+      </div>
+    }
+
+    @if (selectedTab() === 1) {
+      <div class="tab-panel">
+        <div class="rule-toolbar">
+          <button mat-stroked-button type="button" (click)="selectAllRules()">Select All</button>
+          <button mat-stroked-button type="button" (click)="clearAllRules()">Clear All</button>
+          <span class="hint">{{ selectedRules().length }} rules selected</span>
+        </div>
+
+        <div class="rule-grid">
+          @for (rule of ruleRegistry.allRules; track rule.id) {
+            <label class="rule-card">
+              <mat-checkbox
+                [checked]="isRuleSelected(rule.id)"
+                (change)="toggleRule(rule.id, $event.checked)"
+              ></mat-checkbox>
+              <div class="rule-info">
+                <strong>{{ rule.name }}</strong>
+                <span class="category">{{ rule.category }}</span>
+                <p>{{ rule.description }}</p>
+              </div>
+            </label>
+          }
+        </div>
+      </div>
+    }
+
+    @if (selectedTab() === 2) {
+      <div class="tab-panel">
+        @if (!lastRun()) {
+          <p class="empty">Run an optimization from Strategy Selection to see results.</p>
+        } @else {
+          <div class="stats-grid">
+            @for (combo of sortedResults(); track combo.combinationId) {
+              <button
+                type="button"
+                class="stat-card"
+                [class.top]="combo.rank <= 10"
+                (click)="selectCombination(combo)"
+              >
+                <span class="rank">#{{ combo.rank }}</span>
+                <span class="rules">{{ combo.ruleLabels.join(' · ') || 'No rules' }}</span>
+                <span class="metric">Trades: {{ combo.totalTrades }}</span>
+                <span class="metric">Win Rate: {{ combo.winRate | number: '1.1-1' }}%</span>
+                <span class="metric" [class.positive]="combo.netProfit > 0" [class.negative]="combo.netProfit < 0">
+                  Net: {{ combo.netProfit | number: '1.2-2' }}
+                </span>
+              </button>
+            }
+          </div>
+        }
+      </div>
+    }
+
+    @if (selectedTab() === 3) {
+      <div class="tab-panel">
+        @if (selectedCombination(); as combo) {
+          <h3>{{ combo.ruleLabels.join(' + ') || 'No rules' }}</h3>
+          <table mat-table [dataSource]="combo.trades" class="data-table">
+            <ng-container matColumnDef="entryTime">
+              <th mat-header-cell *matHeaderCellDef>Entry</th>
+              <td mat-cell *matCellDef="let t">{{ t.entryTime }}</td>
+            </ng-container>
+            <ng-container matColumnDef="direction">
+              <th mat-header-cell *matHeaderCellDef>Dir</th>
+              <td mat-cell *matCellDef="let t">{{ t.direction }}</td>
+            </ng-container>
+            <ng-container matColumnDef="entryPrice">
+              <th mat-header-cell *matHeaderCellDef>Entry ₹</th>
+              <td mat-cell *matCellDef="let t">{{ t.entryPrice | number: '1.2-2' }}</td>
+            </ng-container>
+            <ng-container matColumnDef="exitPrice">
+              <th mat-header-cell *matHeaderCellDef>Exit ₹</th>
+              <td mat-cell *matCellDef="let t">{{ t.exitPrice | number: '1.2-2' }}</td>
+            </ng-container>
+            <ng-container matColumnDef="points">
+              <th mat-header-cell *matHeaderCellDef>Pts</th>
+              <td mat-cell *matCellDef="let t">{{ t.points | number: '1.2-2' }}</td>
+            </ng-container>
+            <ng-container matColumnDef="outcome">
+              <th mat-header-cell *matHeaderCellDef>Outcome</th>
+              <td mat-cell *matCellDef="let t">{{ t.outcome }}</td>
+            </ng-container>
+            <ng-container matColumnDef="holdingMinutes">
+              <th mat-header-cell *matHeaderCellDef>Hold (min)</th>
+              <td mat-cell *matCellDef="let t">{{ t.holdingMinutes | number: '1.0-0' }}</td>
+            </ng-container>
+            <tr mat-header-row *matHeaderRowDef="tradeColumns"></tr>
+            <tr mat-row *matRowDef="let row; columns: tradeColumns"></tr>
+          </table>
+
+          <div class="summary-sections">
+            <div>
+              <h4>Daily Summary</h4>
+              <ul>
+                @for (d of dailySummary(combo.trades); track d.date) {
+                  <li>{{ d.date }} — {{ d.trades }} trades, {{ d.wins }} wins, {{ d.pnl | number: '1.2-2' }} pts</li>
+                }
+              </ul>
+            </div>
+            <div>
+              <h4>Monthly Summary</h4>
+              <ul>
+                @for (m of monthlySummary(combo.trades); track m.month) {
+                  <li>{{ m.month }} — {{ m.trades }} trades, {{ m.wins }} wins, {{ m.pnl | number: '1.2-2' }} pts</li>
+                }
+              </ul>
+            </div>
+          </div>
+        } @else {
+          <p class="empty">Select a combination from Backtest Results.</p>
+        }
+      </div>
+    }
+
+    @if (selectedTab() === 4) {
+      <div class="tab-panel">
+        @if (lastRun(); as run) {
+          <h3>Top 10 Combinations</h3>
+          <table mat-table [dataSource]="run.analysis.topCombinations" class="data-table">
+            <ng-container matColumnDef="rank">
+              <th mat-header-cell *matHeaderCellDef>#</th>
+              <td mat-cell *matCellDef="let c">{{ c.rank }}</td>
+            </ng-container>
+            <ng-container matColumnDef="rules">
+              <th mat-header-cell *matHeaderCellDef>Rules</th>
+              <td mat-cell *matCellDef="let c">{{ c.ruleLabels.join(' + ') || 'None' }}</td>
+            </ng-container>
+            <ng-container matColumnDef="totalTrades">
+              <th mat-header-cell *matHeaderCellDef>Trades</th>
+              <td mat-cell *matCellDef="let c">{{ c.totalTrades }}</td>
+            </ng-container>
+            <ng-container matColumnDef="winRate">
+              <th mat-header-cell *matHeaderCellDef>Win %</th>
+              <td mat-cell *matCellDef="let c">{{ c.winRate | number: '1.1-1' }}</td>
+            </ng-container>
+            <ng-container matColumnDef="netProfit">
+              <th mat-header-cell *matHeaderCellDef>Net</th>
+              <td mat-cell *matCellDef="let c">{{ c.netProfit | number: '1.2-2' }}</td>
+            </ng-container>
+            <ng-container matColumnDef="profitFactor">
+              <th mat-header-cell *matHeaderCellDef>PF</th>
+              <td mat-cell *matCellDef="let c">{{ c.profitFactor | number: '1.2-2' }}</td>
+            </ng-container>
+            <ng-container matColumnDef="maxDrawdown">
+              <th mat-header-cell *matHeaderCellDef>Max DD</th>
+              <td mat-cell *matCellDef="let c">{{ c.maxDrawdown | number: '1.2-2' }}</td>
+            </ng-container>
+            <ng-container matColumnDef="avgHolding">
+              <th mat-header-cell *matHeaderCellDef>Avg Hold</th>
+              <td mat-cell *matCellDef="let c">{{ c.averageHoldingMinutes | number: '1.0-0' }}m</td>
+            </ng-container>
+            <tr mat-header-row *matHeaderRowDef="comparisonColumns"></tr>
+            <tr mat-row *matRowDef="let row; columns: comparisonColumns"></tr>
+          </table>
+
+          <h3>Recommendations</h3>
+          <ul class="recommendations">
+            @for (rec of run.analysis.recommendations; track rec) {
+              <li>{{ rec }}</li>
+            }
+          </ul>
+        } @else {
+          <p class="empty">No analysis yet.</p>
+        }
+      </div>
+    }
+
+    @if (selectedTab() === 5) {
+      <div class="tab-panel">
+        @if (lastRun(); as run) {
+          <ul class="freq-list">
+            @for (item of run.analysis.winningRuleFrequency; track item.ruleId) {
+              <li>
+                <strong>{{ item.ruleName }}</strong>
+                <span>{{ item.count }} combos ({{ item.percentage }}%)</span>
+              </li>
+            }
+          </ul>
+        } @else {
+          <p class="empty">No data.</p>
+        }
+      </div>
+    }
+
+    @if (selectedTab() === 6) {
+      <div class="tab-panel">
+        @if (lastRun(); as run) {
+          <ul class="freq-list">
+            @for (item of run.analysis.losingRuleFrequency; track item.ruleId) {
+              <li>
+                <strong>{{ item.ruleName }}</strong>
+                <span>{{ item.count }} combos ({{ item.percentage }}%)</span>
+              </li>
+            }
+          </ul>
+        } @else {
+          <p class="empty">No data.</p>
+        }
+      </div>
+    }
+
+    @if (selectedTab() === 7) {
+      <div class="tab-panel">
+        @if (lastRun(); as run) {
+          <table mat-table [dataSource]="sortedResults()" class="data-table">
+            <ng-container matColumnDef="rank">
+              <th mat-header-cell *matHeaderCellDef>Rank</th>
+              <td mat-cell *matCellDef="let c">{{ c.rank }}</td>
+            </ng-container>
+            <ng-container matColumnDef="rules">
+              <th mat-header-cell *matHeaderCellDef>Combination</th>
+              <td mat-cell *matCellDef="let c">{{ c.ruleLabels.join(' + ') || 'Baseline' }}</td>
+            </ng-container>
+            <ng-container matColumnDef="totalTrades">
+              <th mat-header-cell *matHeaderCellDef>Trades</th>
+              <td mat-cell *matCellDef="let c">{{ c.totalTrades }}</td>
+            </ng-container>
+            <ng-container matColumnDef="winRate">
+              <th mat-header-cell *matHeaderCellDef>Win Rate</th>
+              <td mat-cell *matCellDef="let c">{{ c.winRate | number: '1.1-1' }}%</td>
+            </ng-container>
+            <ng-container matColumnDef="netProfit">
+              <th mat-header-cell *matHeaderCellDef>Net Profit</th>
+              <td mat-cell *matCellDef="let c">{{ c.netProfit | number: '1.2-2' }}</td>
+            </ng-container>
+            <ng-container matColumnDef="profitFactor">
+              <th mat-header-cell *matHeaderCellDef>Profit Factor</th>
+              <td mat-cell *matCellDef="let c">{{ c.profitFactor | number: '1.2-2' }}</td>
+            </ng-container>
+            <ng-container matColumnDef="maxDrawdown">
+              <th mat-header-cell *matHeaderCellDef>Max DD</th>
+              <td mat-cell *matCellDef="let c">{{ c.maxDrawdown | number: '1.2-2' }}</td>
+            </ng-container>
+            <ng-container matColumnDef="avgHolding">
+              <th mat-header-cell *matHeaderCellDef>Avg Hold</th>
+              <td mat-cell *matCellDef="let c">{{ c.averageHoldingMinutes | number: '1.0-0' }} min</td>
+            </ng-container>
+            <tr mat-header-row *matHeaderRowDef="comparisonColumns"></tr>
+            <tr mat-row *matRowDef="let row; columns: comparisonColumns"></tr>
+          </table>
+        } @else {
+          <p class="empty">Run a backtest to compare combinations.</p>
+        }
+      </div>
+    }
+  </div>
+
+  @if (lastSignalDebug(); as debug) {
+    <section class="signal-debug">
+      <h3>Latest Signal Rule Debug</h3>
+      <p>
+        <strong>{{ debug.timestamp }}</strong> — {{ debug.action }}
+        @if (!debug.allowed && debug.blockingRules.length) {
+          <span class="blocked">Blocked by: {{ debug.blockingRules.join(', ') }}</span>
+        }
+      </p>
+      <table mat-table [dataSource]="ruleEvaluationsForSignal(debug)" class="data-table compact">
+        <ng-container matColumnDef="ruleName">
+          <th mat-header-cell *matHeaderCellDef>Rule</th>
+          <td mat-cell *matCellDef="let r">{{ r.ruleName }}</td>
+        </ng-container>
+        <ng-container matColumnDef="status">
+          <th mat-header-cell *matHeaderCellDef>Status</th>
+          <td mat-cell *matCellDef="let r">
+            <span [class.pass]="r.passed" [class.fail]="!r.passed">{{ r.passed ? 'PASS' : 'FAIL' }}</span>
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="reason">
+          <th mat-header-cell *matHeaderCellDef>Reason</th>
+          <td mat-cell *matCellDef="let r">{{ r.reason }}</td>
+        </ng-container>
+        <tr mat-header-row *matHeaderRowDef="ruleDebugColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: ruleDebugColumns"></tr>
+      </table>
+    </section>
+  }
+</div>

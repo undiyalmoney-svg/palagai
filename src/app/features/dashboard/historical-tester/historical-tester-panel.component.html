@@ -1,0 +1,559 @@
+<div class="tester-panel">
+  @if (instrument(); as inst) {
+    <div class="instrument-banner">
+      <strong>{{ inst.name }}</strong>
+      @if (resolvedContract(); as contract) {
+        <span>{{ contract.tradingSymbol }} · Token {{ contract.instrumentToken }}</span>
+        <span class="contract-note">Using nearest futures contract (fallback: index)</span>
+      } @else {
+        <span>{{ inst.tradingSymbol }} · {{ inst.exchange }} · Token {{ inst.instrumentToken }}</span>
+      }
+    </div>
+  }
+
+  <div class="active-strategies-banner">
+    <strong>Backtest runs exactly {{ activeStrategies().length }} strategies:</strong>
+    @for (s of activeStrategies(); track s.id) {
+      <span class="strategy-chip" [class.off]="!s.enabled">{{ s.name }}</span>
+    }
+  </div>
+
+  <form class="tester-form" [formGroup]="form" (ngSubmit)="runBacktest()">
+    <div class="field-row">
+      <div class="field">
+        <label>From Date & Time</label>
+        <div class="datetime">
+          <input type="date" formControlName="fromDate" [disabled]="isRunning()" />
+          <input type="time" formControlName="fromTime" [disabled]="isRunning()" />
+        </div>
+      </div>
+
+      <div class="field">
+        <label>To Date & Time</label>
+        <div class="datetime">
+          <input type="date" formControlName="toDate" [disabled]="isRunning()" />
+          <input type="time" formControlName="toTime" [disabled]="isRunning()" />
+        </div>
+      </div>
+    </div>
+
+    <button mat-flat-button color="primary" type="submit" class="run-backtest-btn" [disabled]="isRunning()">
+      @if (isRunning() && showLiveOutput()) {
+        <mat-spinner diameter="18"></mat-spinner>
+        <span>Running…</span>
+      } @else {
+        <span>Run Backtest</span>
+      }
+    </button>
+  </form>
+
+  @if (showLiveOutput() && isRunning()) {
+    <div class="status-panel">
+      <mat-spinner diameter="28"></mat-spinner>
+      <div class="status-text">
+        <strong>{{ status().message }}</strong>
+        @if (status().phase === 'loading_candles') {
+          <span>API {{ status().loadStep }} / {{ status().loadTotalSteps }}</span>
+        }
+        @if (status().phase === 'calculating' && progress().total > 0) {
+          <span>Calculating candle {{ progress().current }} / {{ progress().total }}</span>
+        }
+      </div>
+    </div>
+  }
+
+  @if (showLiveOutput() && backtestCompleted() && !isRunning()) {
+    <div class="completion-banner">
+      Backtest finished — {{ progress().total }} candles processed across {{ comparisonResults().length }} strategies.
+    </div>
+  }
+
+  @if (showLiveOutput() && debugSnapshot(); as debug) {
+    <div class="debug-panel">
+      <h3>Live Debug (latest candle)</h3>
+
+      <div class="timeline">
+        @for (phase of timelinePhases; track phase) {
+          <div
+            class="timeline-step"
+            [class.active]="isTimelineActive(debug.timelinePhase, phase)"
+            [class.past]="isTimelinePast(timelinePhases, debug.timelinePhase, phase)"
+          >
+            {{ phase }}
+          </div>
+        }
+      </div>
+
+      <div class="debug-meta">
+        <div><span>Replay Time</span><strong>{{ debug.replayTime }}</strong></div>
+        <div><span>Candle</span><strong>{{ debug.candleNumber }} / {{ debug.totalCandles }}</strong></div>
+        @if (debug.marketRegime) {
+          <div><span>Market Regime</span><strong>{{ debug.marketRegime }}</strong></div>
+        }
+        <div><span>O</span><strong>{{ debug.ohlc.open | number: '1.2-2' }}</strong></div>
+        <div><span>H</span><strong>{{ debug.ohlc.high | number: '1.2-2' }}</strong></div>
+        <div><span>L</span><strong>{{ debug.ohlc.low | number: '1.2-2' }}</strong></div>
+        <div><span>C</span><strong>{{ debug.ohlc.close | number: '1.2-2' }}</strong></div>
+        <div><span>Volume</span><strong>{{ debug.ohlc.volume | number: '1.0-0' }}</strong></div>
+      </div>
+
+      @for (snap of debug.strategies; track snap.strategyId) {
+        @if (snap.signal; as signal) {
+          <div class="strategy-debug">
+            <h4>{{ snap.strategyName }}</h4>
+
+            <div class="module-grid">
+              <div [class.pass]="signal.trend.passed" [class.fail]="!signal.trend.passed">
+                Trend {{ signal.trend.passed ? 'PASS' : 'FAIL' }}
+              </div>
+              <div [class.pass]="signal.structure.passed" [class.fail]="!signal.structure.passed">
+                Structure {{ signal.structure.passed ? 'PASS' : 'FAIL' }}
+              </div>
+              <div [class.pass]="signal.entry.passed" [class.fail]="!signal.entry.passed">
+                Entry {{ signal.entry.passed ? 'PASS' : 'FAIL' }}
+              </div>
+              <div class="decision">Final: {{ signal.signalType }}</div>
+            </div>
+
+            <div class="signal-row">
+              <span
+                class="signal-badge"
+                [class.buy]="isBuySignal(signal.signalType)"
+                [class.sell]="isSellSignal(signal.signalType)"
+              >
+                {{ signal.signalType }}
+              </span>
+              <span>Entry: {{ signal.entryPrice | number: '1.2-2' }}</span>
+              <span>SL: {{ signal.stopLoss | number: '1.2-2' }}</span>
+              <span>Risk: {{ riskPts(signal.entryPrice, signal.stopLoss) | number: '1.1-1' }} pts</span>
+              <span>Target: {{ signal.targetPrice | number: '1.2-2' }}</span>
+              <span>RR: {{ signal.riskRewardRatio | number: '1.1-1' }}</span>
+              <span>Status: {{ snap.tradeStatus }}</span>
+              <span>P/L: {{ snap.currentProfitLoss > 0 ? '+' : '' }}{{ snap.currentProfitLoss | number: '1.2-2' }}</span>
+            </div>
+
+            @if (signalDebug(signal); as dbg) {
+              <div class="momentum-filter-panel price-action-panel">
+                <h5>Signal Decision Debug</h5>
+                <div class="filter-grid">
+                  <div><span>Market Regime</span><strong>{{ dbg.marketRegime ?? '—' }}</strong></div>
+                  <div><span>Strategy Status</span><strong>{{ dbg.strategyStatus ?? '—' }}</strong></div>
+                  <div><span>Current Step</span><strong>{{ dbg.currentStep ?? '—' }}</strong></div>
+                  <div><span>Blocking Rule</span><strong>{{ dbg.blockingRule ?? '—' }}</strong></div>
+                  <div><span>Expected Value</span><strong>{{ dbg.expectedValue ?? '—' }}</strong></div>
+                  <div><span>Actual Value</span><strong>{{ dbg.actualValue ?? '—' }}</strong></div>
+                  <div class="filter-reason"><span>Next Condition</span><strong>{{ dbg.nextConditionRequired ?? '—' }}</strong></div>
+                </div>
+                @if (dbg.steps?.length) {
+                  <ul class="check-list">
+                    @for (step of dbg.steps; track step.name) {
+                      <li [class.pass]="step.status === 'PASS'" [class.fail]="step.status === 'FAIL' || step.status === 'SKIPPED'" [class.wait]="step.status === 'WAITING'">
+                        {{ step.name }}: {{ step.status }}
+                        @if (step.expectedValue || step.actualValue) {
+                          (expected {{ step.expectedValue ?? '—' }}, actual {{ step.actualValue ?? '—' }})
+                        }
+                      </li>
+                    }
+                  </ul>
+                }
+                @if (dbg.entryQuality) {
+                  <div class="filter-grid">
+                    <div><span>Quality Score</span><strong>{{ dbg.entryQuality.total }}/100</strong></div>
+                    <div><span>Trend</span><strong>{{ dbg.entryQuality.trendAlignment }}/20</strong></div>
+                    <div><span>Breakout</span><strong>{{ dbg.entryQuality.breakoutStrength }}/20</strong></div>
+                    <div><span>Structure</span><strong>{{ dbg.entryQuality.structureQuality }}/20</strong></div>
+                    <div><span>Confirmation</span><strong>{{ dbg.entryQuality.confirmationCandle }}/20</strong></div>
+                    <div><span>Risk Reward</span><strong>{{ dbg.entryQuality.riskReward }}/20</strong></div>
+                  </div>
+                }
+              </div>
+            }
+
+            @if (snap.strategyId === strategyIds.PDHL_OPENING_RANGE) {
+              @if (pdhlOpeningRangeOutput(signal); as pdhl) {
+              <div class="momentum-filter-panel price-action-panel">
+                <h5>OR Swing Breakout</h5>
+                <div class="filter-grid">
+                  <div><span>OR Bias</span><strong>{{ pdhl.bias ?? '—' }}</strong></div>
+                  <div><span>OR High</span><strong>{{ pdhl.orHigh != null ? (pdhl.orHigh | number: '1.2-2') : '—' }}</strong></div>
+                  <div><span>OR Low</span><strong>{{ pdhl.orLow != null ? (pdhl.orLow | number: '1.2-2') : '—' }}</strong></div>
+                  <div><span>Swing High</span><strong>{{ pdhl.swingHigh != null ? (pdhl.swingHigh | number: '1.2-2') : '—' }}</strong></div>
+                  <div><span>Swing Low</span><strong>{{ pdhl.swingLow != null ? (pdhl.swingLow | number: '1.2-2') : '—' }}</strong></div>
+                  <div><span>Day Net</span><strong>{{ pdhl.dayNetPts != null ? (pdhl.dayNetPts | number: '1.1-1') : '—' }}</strong></div>
+                  <div><span>Risk / Tgt</span><strong>{{ pdhl.riskPts != null ? (pdhl.riskPts | number: '1.1-1') : '—' }} / {{ pdhl.targetPts != null ? (pdhl.targetPts | number: '1.1-1') : '—' }}</strong></div>
+                  <div><span>Decision</span><strong>{{ pdhl.finalDecision ?? signal.signalType }}</strong></div>
+                  <div class="filter-reason"><span>Reason</span><strong>{{ signal.reasons[0] }}</strong></div>
+                </div>
+              </div>
+              }
+            }
+
+            <details>
+              <summary>Module details</summary>
+              <ul class="check-list">
+                @for (check of signal.trend.checks; track check.name) {
+                  <li [class.pass]="check.passed" [class.fail]="!check.passed">
+                    {{ check.name }}: {{ check.reason }}
+                  </li>
+                }
+                @for (check of signal.structure.checks; track check.name) {
+                  <li [class.pass]="check.passed" [class.fail]="!check.passed">
+                    {{ check.name }}: {{ check.reason }}
+                  </li>
+                }
+                @for (check of signal.entry.checks; track check.name) {
+                  <li [class.pass]="check.passed" [class.fail]="!check.passed">
+                    {{ check.name }}: {{ check.reason }}
+                  </li>
+                }
+              </ul>
+              <pre class="analysis-json">{{ signal.analysis | json }}</pre>
+            </details>
+          </div>
+        }
+      }
+
+      <div class="event-log">
+        <h4>Event Log</h4>
+        @if (debug.eventLog.length) {
+          <ul>
+            @for (event of debug.eventLog; track event.timestamp + event.message) {
+              <li>
+                <span class="event-time">{{ event.timestamp }}</span>
+                <span class="event-strategy">{{ event.strategyName }}</span>
+                <span class="event-type">{{ event.eventType }}</span>
+                <span class="event-msg">{{ event.message }}</span>
+              </li>
+            }
+          </ul>
+        } @else {
+          <p class="empty-trades">No events logged for this candle.</p>
+        }
+      </div>
+    </div>
+  }
+
+  @if (errorMessage()) {
+    <p class="error">{{ errorMessage() }}</p>
+  }
+
+  @if (backtestCompleted()) {
+    @if (overallTradeSummary().totalTrades) {
+      <div
+        class="overall-summary-banner"
+        [class.profit]="overallTradeSummary().netPoints > 0"
+        [class.loss]="overallTradeSummary().netPoints < 0"
+      >
+        <div class="overall-summary-grid">
+          <div>
+            <span>Total Trades</span>
+            <strong>{{ overallTradeSummary().totalTrades }}</strong>
+          </div>
+          <div>
+            <span>Wins / Losses</span>
+            <strong>{{ overallTradeSummary().wins }} / {{ overallTradeSummary().losses }}</strong>
+          </div>
+          <div>
+            <span>Total Profit (pts)</span>
+            <strong class="pass-cell">+{{ overallTradeSummary().grossProfit | number: '1.2-2' }}</strong>
+          </div>
+          <div>
+            <span>Total Loss (pts)</span>
+            <strong class="fail-cell">{{ overallTradeSummary().grossLoss | number: '1.2-2' }}</strong>
+          </div>
+          <div class="overall-net">
+            <span>Overall Net (pts)</span>
+            <strong>
+              {{ overallTradeSummary().netPoints > 0 ? '+' : '' }}{{ overallTradeSummary().netPoints | number: '1.2-2' }}
+            </strong>
+          </div>
+          @if (overallTradeSummary().rupeesPerPoint > 1) {
+            <div class="overall-net">
+              <span>Overall Net (₹ / lot)</span>
+              <strong>
+                {{ overallTradeSummary().netRupees > 0 ? '+' : '' }}{{ overallTradeSummary().netRupees | number: '1.0-0' }}
+              </strong>
+            </div>
+          }
+        </div>
+      </div>
+    }
+
+    <div class="results-section">
+      <h3>Strategy Comparison</h3>
+      <p class="section-hint">OR Swing Breakout — index OHLC (not futures) · SL cap 20 · 1.5R · EMA-20 · day +30/−45. Test full months; a 1-week window can be red even when the month is green. 1 pt = ₹65.</p>
+      @if (comparisonResults().length) {
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Strategy</th>
+                <th>Trades</th>
+                <th>Wins</th>
+                <th>Losses</th>
+                <th>Win %</th>
+                <th>Gross Profit</th>
+                <th>Gross Loss</th>
+                <th>Net Profit</th>
+                <th>Net Points</th>
+                <th>Profit Factor</th>
+                <th>Max DD</th>
+                <th>Winner</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (row of comparisonResults(); track row.strategyId) {
+                <tr [class.best]="row.strategyId === bestStrategyId()">
+                  <td><strong>{{ row.strategyName }}</strong></td>
+                  <td>{{ row.totalTrades }}</td>
+                  <td>{{ row.winningTrades }}</td>
+                  <td>{{ row.losingTrades }}</td>
+                  <td>{{ row.winPercentage | number: '1.0-0' }}%</td>
+                  <td class="pass-cell">{{ row.grossProfit | number: '1.2-2' }}</td>
+                  <td class="fail-cell">{{ row.grossLoss | number: '1.2-2' }}</td>
+                  <td>{{ row.netProfit | number: '1.2-2' }}</td>
+                  <td>{{ row.netPoints > 0 ? '+' : '' }}{{ row.netPoints | number: '1.2-2' }}</td>
+                  <td>{{ row.profitFactor | number: '1.2-2' }}</td>
+                  <td>{{ row.maxDrawdown | number: '1.2-2' }}</td>
+                  <td>
+                    @if (row.strategyId === bestStrategyId()) {
+                      <span class="badge profit">Winner</span>
+                    }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      } @else {
+        <p class="empty-trades">No strategy statistics were produced. Check that strategies are enabled.</p>
+      }
+    </div>
+
+    @if (marketRegimeSummary(); as regimeReport) {
+      <div class="results-section">
+        <h3>Market Regime Summary</h3>
+        <div class="filter-grid regime-summary-grid">
+          <div><span>Trending Days</span><strong>{{ regimeReport.trendingDays }}</strong></div>
+          <div><span>Ranging Days</span><strong>{{ regimeReport.rangingDays }}</strong></div>
+          <div><span>High Volatility Days</span><strong>{{ regimeReport.highVolatilityDays }}</strong></div>
+          <div><span>Low Volatility Days</span><strong>{{ regimeReport.lowVolatilityDays }}</strong></div>
+          <div><span>Unknown Days</span><strong>{{ regimeReport.unknownDays }}</strong></div>
+        </div>
+
+        @if (regimeReport.performanceByRegime.length) {
+          <h4>Strategy Performance by Market Regime</h4>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Strategy</th>
+                  <th>Regime</th>
+                  <th>Trades</th>
+                  <th>Wins</th>
+                  <th>Losses</th>
+                  <th>Net Profit</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (row of regimeReport.performanceByRegime; track row.strategyId + row.regime) {
+                  <tr>
+                    <td><strong>{{ row.strategyName }}</strong></td>
+                    <td>{{ row.regime }}</td>
+                    <td>{{ row.trades }}</td>
+                    <td>{{ row.wins }}</td>
+                    <td>{{ row.losses }}</td>
+                    <td [class.pass-cell]="row.netProfit > 0" [class.fail-cell]="row.netProfit < 0">
+                      {{ row.netProfit > 0 ? '+' : '' }}{{ row.netProfit | number: '1.2-2' }}
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </div>
+    }
+
+    <div class="results-section">
+      <h3>Daily Trade Report</h3>
+      <p class="section-hint">
+        Each date in your range — which strategy entered, entry/exit time, and profit or loss in points.
+      </p>
+
+      @for (day of dailyTradeGroups(); track day.date) {
+        <div class="daily-card" [class.no-trades]="!day.trades.length">
+          <div class="daily-card-header">
+            <h4>{{ day.displayDate }}</h4>
+            @if (day.trades.length) {
+              <div class="daily-summary">
+                <span>{{ day.trades.length }} trade{{ day.trades.length === 1 ? '' : 's' }}</span>
+                <span>{{ day.wins }} win{{ day.wins === 1 ? '' : 's' }} / {{ day.losses }} loss{{ day.losses === 1 ? '' : 'es' }}</span>
+                <span [class.pass-cell]="day.netPoints > 0" [class.fail-cell]="day.netPoints < 0">
+                  Net: {{ day.netPoints > 0 ? '+' : '' }}{{ day.netPoints | number: '1.2-2' }} pts
+                </span>
+              </div>
+            } @else {
+              <span class="no-entry-badge">No strategy entry</span>
+            }
+          </div>
+
+          @if (day.trades.length) {
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Strategy</th>
+                    <th>Direction</th>
+                    <th>Entry Time</th>
+                    <th>Exit Time</th>
+                    <th>Entry Price</th>
+                    <th>Exit Price</th>
+                    <th>Points</th>
+                    <th>P/L</th>
+                    <th>Result</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (trade of day.trades; track trade.id) {
+                    <tr>
+                      <td><strong>{{ trade.strategyName }}</strong></td>
+                      <td>{{ trade.direction }}</td>
+                      <td>{{ formatTime(trade.entryTime) }}</td>
+                      <td>{{ formatTime(trade.exitTime) }}</td>
+                      <td>{{ trade.entryPrice | number: '1.2-2' }}</td>
+                      <td>{{ trade.exitPrice | number: '1.2-2' }}</td>
+                      <td [class.pass-cell]="trade.points > 0" [class.fail-cell]="trade.points < 0">
+                        {{ trade.points > 0 ? '+' : '' }}{{ trade.points | number: '1.2-2' }}
+                      </td>
+                      <td [class.pass-cell]="trade.profitLoss > 0" [class.fail-cell]="trade.profitLoss < 0">
+                        {{ trade.profitLoss > 0 ? '+' : '' }}{{ trade.profitLoss | number: '1.2-2' }}
+                      </td>
+                      <td>
+                        <span class="badge" [class.profit]="trade.outcome === 'WIN'" [class.loss]="trade.outcome === 'LOSS'">
+                          {{ trade.outcome === 'WIN' ? 'Profit' : 'Loss' }}
+                        </span>
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+        </div>
+      }
+    </div>
+
+    <div class="results-section">
+      <h3>Profit List</h3>
+      <p class="section-hint">Winning trades only — day, date, exit time, and net profit in points.</p>
+
+      @if (profitOnlyList().length) {
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Day</th>
+                <th>Date</th>
+                <th>Time</th>
+                <th>Net Profit</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (row of profitOnlyList(); track row.date + row.time + row.netProfit) {
+                <tr>
+                  <td>{{ row.day }}</td>
+                  <td>{{ row.displayDate }}</td>
+                  <td>{{ row.time }}</td>
+                  <td class="pass-cell">+{{ row.netProfit | number: '1.2-2' }}</td>
+                </tr>
+              }
+            </tbody>
+            <tfoot>
+              <tr class="profit-total-row">
+                <td colspan="3"><strong>Winning Trades Total</strong></td>
+                <td class="pass-cell">
+                  <strong>+{{ totalWinningPoints() | number: '1.2-2' }}</strong>
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      } @else {
+        <p class="empty-trades">No profitable trades in this backtest.</p>
+      }
+    </div>
+
+    <div class="results-section">
+      <h3>Monthly Summary</h3>
+      @if (monthlyTradeGroups().length) {
+        @for (month of monthlyTradeGroups(); track month.month) {
+          <div class="daily-card">
+            <div class="daily-card-header">
+              <h4>{{ month.month }}</h4>
+              <div class="daily-summary">
+                <span>{{ month.trades.length }} trade{{ month.trades.length === 1 ? '' : 's' }}</span>
+                <span [class.pass-cell]="month.netPoints > 0" [class.fail-cell]="month.netPoints < 0">
+                  Net: {{ month.netPoints > 0 ? '+' : '' }}{{ month.netPoints | number: '1.2-2' }} pts
+                </span>
+              </div>
+            </div>
+          </div>
+        }
+      } @else {
+        <p class="empty-trades">No trades to summarize by month.</p>
+      }
+    </div>
+
+    <div class="results-section">
+      <h3>Trade History (by Strategy)</h3>
+      @for (strategy of comparisonResults(); track strategy.strategyId) {
+        <h4>{{ strategy.strategyName }}</h4>
+        @if (tradesForStrategy(strategy.strategyId).length) {
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Entry</th>
+                  <th>Exit</th>
+                  <th>Dir</th>
+                  <th>Entry Price</th>
+                  <th>Exit Price</th>
+                  <th>Stop Loss</th>
+                  <th>Risk pts</th>
+                  <th>Target</th>
+                  <th>Points</th>
+                  <th>Result</th>
+                  <th>Hold (min)</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (trade of tradesForStrategy(strategy.strategyId); track trade.id) {
+                  <tr>
+                    <td>{{ trade.entryTime }}</td>
+                    <td>{{ trade.exitTime }}</td>
+                    <td>{{ trade.direction }}</td>
+                    <td>{{ trade.entryPrice | number: '1.2-2' }}</td>
+                    <td>{{ trade.exitPrice | number: '1.2-2' }}</td>
+                    <td>{{ trade.stopLoss | number: '1.2-2' }}</td>
+                    <td>{{ riskPts(trade.entryPrice, trade.stopLoss) | number: '1.1-1' }}</td>
+                    <td>{{ trade.targetPrice | number: '1.2-2' }}</td>
+                    <td>{{ trade.points > 0 ? '+' : '' }}{{ trade.points | number: '1.2-2' }}</td>
+                    <td>
+                      <span class="badge" [class.profit]="trade.outcome === 'WIN'" [class.loss]="trade.outcome === 'LOSS'">
+                        {{ trade.outcome }}
+                      </span>
+                    </td>
+                    <td>{{ trade.holdingMinutes }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        } @else {
+          <p class="empty-trades">No trades for this strategy.</p>
+        }
+      }
+    </div>
+  }
+</div>

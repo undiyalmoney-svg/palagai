@@ -1,0 +1,63 @@
+{
+  "name": "palagai",
+  "version": "0.0.0",
+  "scripts": {
+    "ng": "cross-env NODE_OPTIONS=\"--no-deprecation --no-warnings\" ng",
+    "clean": "if exist .angular rmdir /s /q .angular && if exist node_modules\\.vite rmdir /s /q node_modules\\.vite && if exist .vite rmdir /s /q .vite && if exist dist rmdir /s /q dist && if exist .angular\\cache rmdir /s /q .angular\\cache && echo Cache cleared",
+    "start": "cross-env NODE_OPTIONS=\"--no-deprecation --no-warnings\" ng serve",
+    "build": "cross-env NODE_OPTIONS=\"--no-deprecation --no-warnings\" ng build",
+    "watch": "cross-env NODE_OPTIONS=\"--no-deprecation --no-warnings\" ng build --watch --configuration development",
+    "test": "cross-env NODE_OPTIONS=\"--no-deprecation\" ng test",
+    "test:backtest-smoke": "node scripts/backtest-smoke.mjs",
+    "analyze:trades": "npx tsx scripts/trade-characteristics-analysis.ts",
+    "analyze:trades:synthetic": "npx tsx scripts/trade-characteristics-analysis.ts --synthetic",
+    "analyze:crude-patterns": "npx tsx scripts/crude-monthly-pattern-research.ts",
+    "analyze:monthly-strategies": "npx tsx scripts/monthly-strategy-finder.ts",
+    "discover:strategies": "npx tsx scripts/strategy-discovery/run.ts",
+    "analyze:stocks-daily": "npx tsx scripts/stock-daily-profit-study.ts",
+    "serve:ssr:palagai": "cross-env NODE_OPTIONS=\"--no-deprecation --no-warnings\" node dist/palagai/server/server.mjs"
+  },
+  "prettier": {
+    "printWidth": 100,
+    "singleQuote": true,
+    "overrides": [
+      {
+        "files": "*.html",
+        "options": {
+          "parser": "angular"
+        }
+      }
+    ]
+  },
+  "private": true,
+  "packageManager": "npm@10.8.2",
+  "dependencies": {
+    "@angular/animations": "^21.1.0",
+    "@angular/cdk": "^21.1.0",
+    "@angular/common": "^21.1.0",
+    "@angular/compiler": "^21.1.0",
+    "@angular/core": "^21.1.0",
+    "@angular/forms": "^21.1.0",
+    "@angular/material": "^21.1.0",
+    "@angular/platform-browser": "^21.1.0",
+    "@angular/platform-server": "^21.1.0",
+    "@angular/router": "^21.1.0",
+    "@angular/ssr": "^21.1.0",
+    "better-sqlite3": "^12.11.1",
+    "express": "^5.1.0",
+    "rxjs": "~7.8.0",
+    "tslib": "^2.3.0"
+  },
+  "devDependencies": {
+    "@angular/build": "^21.1.0",
+    "@angular/cli": "^21.1.0",
+    "@angular/compiler-cli": "^21.1.0",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/express": "^5.0.1",
+    "@types/node": "^20.17.19",
+    "cross-env": "^10.1.0",
+    "jsdom": "^27.1.0",
+    "typescript": "~5.9.2",
+    "vitest": "^4.0.8"
+  }
+}

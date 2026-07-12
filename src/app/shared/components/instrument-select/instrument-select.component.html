@@ -1,0 +1,38 @@
+<div class="instrument-select">
+  <mat-form-field appearance="outline" class="full-width">
+    <mat-label>{{ label() }}</mat-label>
+    <input
+      matInput
+      [value]="searchQuery()"
+      (input)="onSearch($event)"
+      (focus)="onFocus()"
+      (blur)="onBlur()"
+      placeholder="Type to search symbol, name, or token"
+      autocomplete="off"
+    />
+  </mat-form-field>
+
+  @if (open()) {
+  <div class="dropdown-panel">
+    @if (!instruments().length) {
+      <p class="empty-hint">
+        No instruments loaded. Go to <strong>Settings → Refresh Instruments</strong> (requires Kite token).
+      </p>
+    } @else if (!filtered().length) {
+      <p class="empty-hint">No matches. Try a different search term.</p>
+    } @else {
+      <cdk-virtual-scroll-viewport itemSize="44" class="instrument-viewport">
+        <button
+          type="button"
+          class="instrument-option"
+          *cdkVirtualFor="let item of filtered()"
+          (mousedown)="select(item, $event)"
+        >
+          <span class="symbol">{{ item.tradingSymbol }}</span>
+          <span class="meta">{{ item.name }} · {{ item.exchange }} · {{ item.instrumentToken }}</span>
+        </button>
+      </cdk-virtual-scroll-viewport>
+    }
+  </div>
+  }
+</div>

@@ -1,0 +1,31 @@
+<section class="tester-page">
+  <header>
+    <h2>Historical Tester</h2>
+    <p>Select an instrument and date range. Data loads once, then strategy calculations run instantly.</p>
+  </header>
+
+  <nav class="tester-tabs" aria-label="Historical tester instruments">
+    @for (tab of tabs; track tab.id) {
+      <button
+        type="button"
+        class="tester-tab"
+        [class.active]="isActiveTab(tab.id)"
+        (click)="selectTab(tab.id)"
+      >
+        {{ tab.label }}
+      </button>
+    }
+  </nav>
+
+  @if (isActiveTab(niftyId)) {
+    <div class="tab-panel active">
+      <app-historical-tester-panel [instrumentId]="niftyId" />
+    </div>
+  }
+
+  @if (isActiveTab(bankNiftyId)) {
+    <div class="tab-panel active">
+      <app-historical-tester-panel [instrumentId]="bankNiftyId" />
+    </div>
+  }
+</section>

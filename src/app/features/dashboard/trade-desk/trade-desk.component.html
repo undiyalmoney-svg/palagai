@@ -1,0 +1,262 @@
+<section class="desk">
+  <header class="hero">
+    <div class="hero-copy">
+      <p class="eyebrow">Paper desk · OR Swing Breakout</p>
+      <h1>Trade Desk</h1>
+      <p class="lede">
+        Index signals on Nifty &amp; Bank Nifty · fills on ATM weekly options · 1 lot each · same rules as Historical Tester.
+      </p>
+    </div>
+    <div class="hero-meta">
+      <span class="badge" [class.live]="mode() === 'live'">{{ mode() === 'live' ? 'Live paper' : 'Testing' }}</span>
+      <span class="badge soft">No real orders</span>
+    </div>
+  </header>
+
+  <div class="mode-switch" role="tablist" aria-label="Desk mode">
+    <button
+      type="button"
+      role="tab"
+      class="mode-btn"
+      [class.active]="mode() === 'testing'"
+      (click)="setMode('testing')"
+    >
+      <span class="mode-title">Testing</span>
+      <span class="mode-sub">From → To · one-shot fetch · anytime</span>
+    </button>
+    <button
+      type="button"
+      role="tab"
+      class="mode-btn"
+      [class.active]="mode() === 'live'"
+      (click)="setMode('live')"
+    >
+      <span class="mode-title">Live</span>
+      <span class="mode-sub">Today · auto each 5m · 09:15–15:30</span>
+    </button>
+  </div>
+
+  <div class="control-bar">
+    @if (mode() === 'testing') {
+      <label class="field">
+        <span>From</span>
+        <input type="date" [(ngModel)]="fromDate" [disabled]="busy() || snapshot().running" />
+      </label>
+      <label class="field">
+        <span>To</span>
+        <input type="date" [(ngModel)]="toDate" [disabled]="busy() || snapshot().running" />
+      </label>
+    } @else {
+      <div class="live-hint">
+        <strong>Today</strong>
+        <span>Auto paper on both indices · market hours only</span>
+      </div>
+    }
+
+    <div class="actions">
+      @if (mode() === 'live' && snapshot().running) {
+        <button mat-stroked-button type="button" class="stop-btn" (click)="onStop()">Stop</button>
+      }
+      <button
+        mat-flat-button
+        type="button"
+        class="start-btn"
+        [disabled]="busy() || (mode() === 'live' && snapshot().running)"
+        (click)="onStart()"
+      >
+        @if (busy()) {
+          <mat-spinner diameter="18" />
+          <span>Running…</span>
+        } @else if (mode() === 'live' && snapshot().running) {
+          <span>Live running</span>
+        } @else {
+          <span>Start</span>
+        }
+      </button>
+    </div>
+  </div>
+
+  @if (error()) {
+    <p class="banner err" role="alert">{{ error() }}</p>
+  } @else if (snapshot().message) {
+    <p class="banner info" [class.warn]="!snapshot().marketOpen && mode() === 'live'">
+      {{ snapshot().message }}
+    </p>
+  }
+
+  @if (snapshot().totals.trades || snapshot().statuses.length) {
+    <div class="totals">
+      <div class="stat">
+        <span>Trades</span>
+        <strong>{{ snapshot().totals.trades }}</strong>
+      </div>
+      <div class="stat">
+        <span>W / L</span>
+        <strong>{{ snapshot().totals.wins }} / {{ snapshot().totals.losses }}</strong>
+      </div>
+      <div class="stat" [class.up]="snapshot().totals.indexNetPts > 0" [class.down]="snapshot().totals.indexNetPts < 0">
+        <span>Index pts</span>
+        <strong>{{ snapshot().totals.indexNetPts > 0 ? '+' : '' }}{{ snapshot().totals.indexNetPts | number: '1.1-1' }}</strong>
+      </div>
+      <div class="stat primary" [class.up]="snapshot().totals.optionNetRs > 0" [class.down]="snapshot().totals.optionNetRs < 0">
+        <span>Option ₹ (1 lot)</span>
+        <strong>{{ snapshot().totals.optionNetRs > 0 ? '+' : '' }}{{ snapshot().totals.optionNetRs | number: '1.0-0' }}</strong>
+      </div>
+    </div>
+
+    <div class="status-grid">
+      @for (s of snapshot().statuses; track s.instrumentId) {
+        <article class="status-card" [class.has-open]="!!s.openTrade">
+          <header>
+            <h2>{{ s.instrumentName }}</h2>
+            <p>{{ s.lastSignal }}</p>
+          </header>
+
+          <div class="chosen-option" [class.missing]="!s.chosenOption" [class.synthetic]="s.chosenOption?.source === 'synthetic'">
+            <span class="chosen-label">Chosen instrument</span>
+            @if (s.chosenOption; as opt) {
+              <strong class="chosen-symbol">{{ opt.tradingSymbol }}</strong>
+              <div class="chosen-meta">
+                @if (s.chosenBias) {
+                  <span class="dir" [attr.data-dir]="s.chosenBias">{{ s.chosenBias }} → {{ opt.optionType }}</span>
+                }
+                <span>Strike {{ opt.strike | number: '1.0-0' }}</span>
+                <span>Exp {{ opt.expiry || '—' }}</span>
+                @if (opt.instrumentToken > 0) {
+                  <span>Token {{ opt.instrumentToken }}</span>
+                }
+                <span>Lot {{ opt.lotSize }}</span>
+                @if (opt.source === 'synthetic') {
+                  <span class="est">synthetic (not in today’s chain)</span>
+                } @else {
+                  <span class="ok">from Kite chain</span>
+                }
+              </div>
+              @if (s.indexSpot != null) {
+                <small>ATM vs spot {{ s.indexSpot | number: '1.1-1' }} · as of {{ fmtTime(s.chosenAsOf) }}</small>
+              }
+            } @else {
+              <strong class="chosen-symbol muted">No option resolved yet</strong>
+              <small>Press Start · needs index candles + instruments (Settings → Refresh if empty)</small>
+            }
+          </div>
+
+          <div class="status-metrics">
+            <div>
+              <span>Day index</span>
+              <strong [class.up]="s.dayNetIndexPts > 0" [class.down]="s.dayNetIndexPts < 0">
+                {{ s.dayNetIndexPts > 0 ? '+' : '' }}{{ s.dayNetIndexPts | number: '1.1-1' }}
+              </strong>
+            </div>
+            <div>
+              <span>Day option ₹</span>
+              <strong [class.up]="s.dayNetOptionRs > 0" [class.down]="s.dayNetOptionRs < 0">
+                {{ s.dayNetOptionRs > 0 ? '+' : '' }}{{ s.dayNetOptionRs | number: '1.0-0' }}
+              </strong>
+            </div>
+            <div>
+              <span>Closed</span>
+              <strong>{{ s.tradesToday }}</strong>
+            </div>
+          </div>
+          @if (s.openTrade; as o) {
+            <div class="open-strip">
+              <span class="dir" [attr.data-dir]="o.direction">{{ o.direction }}</span>
+              <span>{{ o.option?.tradingSymbol ?? 'ATM option pending' }}</span>
+              <span>SL {{ o.indexStop | number: '1.1-1' }} · Tgt {{ o.indexTarget | number: '1.1-1' }}</span>
+            </div>
+          }
+        </article>
+      }
+    </div>
+  }
+
+  @if (snapshot().trades.length) {
+    <div class="trades-block">
+      <div class="trades-head">
+        <h3>Paper trades</h3>
+        <p>Option ₹ is primary · index pts mirror Historical Tester</p>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>When</th>
+              <th>Index</th>
+              <th>Dir</th>
+              <th>Chosen instrument</th>
+              <th>Prem in/out</th>
+              <th>Option ₹</th>
+              <th>Idx pts</th>
+              <th>Exit</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (t of snapshot().trades; track t.id) {
+              <tr [class.win]="t.outcome === 'WIN'" [class.loss]="t.outcome === 'LOSS'">
+                <td>
+                  <div class="stack">
+                    <strong>{{ fmtTime(t.entryTime) }}</strong>
+                    <small>{{ fmtTime(t.exitTime) }}</small>
+                  </div>
+                </td>
+                <td>{{ t.instrumentName }}</td>
+                <td>
+                  <span class="dir" [attr.data-dir]="t.direction">{{ t.direction }}</span>
+                </td>
+                <td>
+                  @if (t.option; as opt) {
+                    <div class="stack">
+                      <strong>{{ opt.tradingSymbol }}</strong>
+                      <small>
+                        {{ opt.optionType }} · Strike {{ opt.strike | number: '1.0-0' }} · Exp {{ opt.expiry || '—' }}
+                      </small>
+                      <small>
+                        @if (opt.instrumentToken > 0) {
+                          Token {{ opt.instrumentToken }} ·
+                        }
+                        Lot {{ opt.lotSize }}
+                        @if (opt.source === 'synthetic') {
+                          · <span class="est">synthetic</span>
+                        }
+                      </small>
+                      @if (t.premiumEstimated) {
+                        <small class="est">est. premium</small>
+                      }
+                    </div>
+                  } @else {
+                    <span class="muted">—</span>
+                  }
+                </td>
+                <td>
+                  @if (t.optionEntryPremium != null && t.optionExitPremium != null) {
+                    {{ t.optionEntryPremium | number: '1.1-1' }} → {{ t.optionExitPremium | number: '1.1-1' }}
+                  } @else {
+                    —
+                  }
+                </td>
+                <td class="num" [class.up]="(t.optionPnlRs ?? 0) > 0" [class.down]="(t.optionPnlRs ?? 0) < 0">
+                  {{ t.optionPnlRs != null ? ((t.optionPnlRs > 0 ? '+' : '') + (t.optionPnlRs | number: '1.0-0')) : '—' }}
+                </td>
+                <td class="num" [class.up]="t.indexPoints > 0" [class.down]="t.indexPoints < 0">
+                  {{ t.indexPoints > 0 ? '+' : '' }}{{ t.indexPoints | number: '1.1-1' }}
+                </td>
+                <td><small>{{ t.exitReason }}</small></td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+  }
+
+  <aside class="rules">
+    <h4>How it runs</h4>
+    <ul>
+      <li><strong>Testing</strong> — pick dates, Start loads full candles once, paper-replays both indices.</li>
+      <li><strong>Live</strong> — Start auto-polls; works only 09:15–15:30; after hours use Testing.</li>
+      <li>ATM weekly CE on BUY / PE on SELL · 1 lot · exits follow Historical Tester (SL cap 20, 1.5R, EMA-20, 15:15).</li>
+      <li>Both indices may hold a paper trade at once · real Kite orders later.</li>
+    </ul>
+  </aside>
+</section>

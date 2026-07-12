@@ -1,0 +1,248 @@
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { MatButtonModule } from '@angular/material/button';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
+import { MatIconModule } from '@angular/material/icon';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { buildKiteChecksum } from '../../../core/utils/sha256.util';
+import { KiteCredentialsService } from '../../../core/kite/kite-credentials.service';
+import { KiteApiService } from '../../../core/kite/kite-api.service';
+import { KiteSessionService, KiteSession } from '../../../core/kite/kite-session.service';
+
+const KITE_LOGIN_URL = 'https://kite.zerodha.com/connect/login?v=3&api_key=';
+
+@Component({
+  selector: 'app-get-token',
+  standalone: true,
+  imports: [
+    ReactiveFormsModule,
+    MatButtonModule,
+    MatFormFieldModule,
+    MatInputModule,
+    MatIconModule,
+    MatProgressSpinnerModule,
+  ],
+  templateUrl: './get-token.component.html',
+  styleUrl: './get-token.component.css',
+})
+export class GetTokenComponent implements OnInit {
+  private readonly formBuilder = inject(FormBuilder);
+  private readonly kiteApiService = inject(KiteApiService);
+  private readonly kiteCredentialsService = inject(KiteCredentialsService);
+  private readonly kiteSessionService = inject(KiteSessionService);
+
+  protected readonly isRedirecting = signal(false);
+  protected readonly isGeneratingChecksum = signal(false);
+  protected readonly isExchangingToken = signal(false);
+  protected readonly isSavingCredentials = signal(false);
+  protected readonly isEditingCredentials = signal(false);
+  protected readonly hasStoredCredentials = signal(false);
+  protected readonly hideApiSecret = signal(true);
+  protected readonly credentialsSaveMessage = signal('');
+  protected readonly checksumResult = signal('');
+  protected readonly tokenExchangeResult = signal('');
+  protected readonly tokenExchangeError = signal('');
+  protected readonly sessionSavedMessage = signal('');
+  protected readonly hideAccessToken = signal(true);
+
+  protected readonly todaySession = computed(() => {
+    const session = this.kiteSessionService.storedSession();
+    if (!session || !this.isSessionFromToday(session)) {
+      return null;
+    }
+    return session;
+  });
+
+  protected readonly credentialsForm = this.formBuilder.nonNullable.group({
+    apiKey: ['', [Validators.required, Validators.pattern(/\S+/)]],
+    apiSecret: ['', [Validators.required, Validators.pattern(/\S+/)]],
+  });
+
+  protected readonly step1Form = this.formBuilder.nonNullable.group({
+    apiKey: ['', [Validators.required, Validators.pattern(/\S+/)]],
+  });
+
+  protected readonly step2Form = this.formBuilder.nonNullable.group({
+    apiKey: ['', [Validators.required, Validators.pattern(/\S+/)]],
+    requestToken: ['', [Validators.required, Validators.pattern(/\S+/)]],
+    apiSecret: ['', [Validators.required, Validators.pattern(/\S+/)]],
+  });
+
+  protected readonly step3Form = this.formBuilder.nonNullable.group({
+    apiKey: ['', [Validators.required, Validators.pattern(/\S+/)]],
+    requestToken: ['', [Validators.required, Validators.pattern(/\S+/)]],
+    checksum: ['', [Validators.required, Validators.pattern(/\S+/)]],
+  });
+
+  ngOnInit(): void {
+    const stored = this.kiteCredentialsService.getCredentials();
+    this.hasStoredCredentials.set(stored !== null);
+
+    if (stored) {
+      this.credentialsForm.patchValue(stored);
+      this.prefillStepForms(stored.apiKey, stored.apiSecret);
+      this.setCredentialsFormEditable(false);
+      this.isEditingCredentials.set(false);
+    } else {
+      this.setCredentialsFormEditable(true);
+      this.isEditingCredentials.set(true);
+    }
+  }
+
+  protected onEditCredentials(): void {
+    this.isEditingCredentials.set(true);
+    this.credentialsSaveMessage.set('');
+    this.setCredentialsFormEditable(true);
+  }
+
+  protected onCancelEditCredentials(): void {
+    const stored = this.kiteCredentialsService.getCredentials();
+    if (!stored) {
+      return;
+    }
+
+    this.credentialsForm.patchValue(stored);
+    this.credentialsSaveMessage.set('');
+    this.isEditingCredentials.set(false);
+    this.setCredentialsFormEditable(false);
+  }
+
+  protected onSaveCredentials(): void {
+    if (this.credentialsForm.invalid) {
+      this.credentialsForm.markAllAsTouched();
+      return;
+    }
+
+    const { apiKey, apiSecret } = this.credentialsForm.getRawValue();
+    this.isSavingCredentials.set(true);
+    this.credentialsSaveMessage.set('');
+
+    this.kiteCredentialsService.saveCredentials({ apiKey, apiSecret });
+    this.hasStoredCredentials.set(true);
+    this.prefillStepForms(apiKey.trim(), apiSecret.trim());
+    this.isEditingCredentials.set(false);
+    this.setCredentialsFormEditable(false);
+    this.credentialsSaveMessage.set('API credentials saved locally.');
+    this.isSavingCredentials.set(false);
+  }
+
+  protected onRedirect(): void {
+    if (this.step1Form.invalid) {
+      this.step1Form.markAllAsTouched();
+      return;
+    }
+
+    const apiKey = this.step1Form.controls.apiKey.value.trim();
+    this.isRedirecting.set(true);
+    window.location.href = `${KITE_LOGIN_URL}${encodeURIComponent(apiKey)}`;
+  }
+
+  protected async onGenerateChecksum(): Promise<void> {
+    if (this.step2Form.invalid) {
+      this.step2Form.markAllAsTouched();
+      return;
+    }
+
+    const { apiKey, requestToken, apiSecret } = this.step2Form.getRawValue();
+    const trimmedApiKey = apiKey.trim();
+    const trimmedRequestToken = requestToken.trim();
+    const trimmedApiSecret = apiSecret.trim();
+
+    this.isGeneratingChecksum.set(true);
+    this.tokenExchangeResult.set('');
+    this.tokenExchangeError.set('');
+
+    try {
+      const checksum = await buildKiteChecksum(
+        trimmedApiKey,
+        trimmedRequestToken,
+        trimmedApiSecret,
+      );
+      this.checksumResult.set(checksum);
+      this.step3Form.patchValue({
+        apiKey: trimmedApiKey,
+        requestToken: trimmedRequestToken,
+        checksum,
+      });
+    } catch {
+      this.checksumResult.set('');
+      this.tokenExchangeError.set('Failed to generate checksum. Please try again.');
+    } finally {
+      this.isGeneratingChecksum.set(false);
+    }
+  }
+
+  protected onExchangeToken(): void {
+    if (this.step3Form.invalid) {
+      this.step3Form.markAllAsTouched();
+      return;
+    }
+
+    const { apiKey, requestToken, checksum } = this.step3Form.getRawValue();
+
+    this.isExchangingToken.set(true);
+    this.tokenExchangeResult.set('');
+    this.tokenExchangeError.set('');
+    this.sessionSavedMessage.set('');
+
+    this.kiteApiService
+      .exchangeSessionToken({
+        apiKey,
+        requestToken,
+        checksum,
+      })
+      .subscribe({
+        next: (response) => {
+          this.tokenExchangeResult.set(JSON.stringify(response, null, 2));
+          const saved = this.kiteSessionService.saveFromTokenResponse(response);
+          if (saved) {
+            this.sessionSavedMessage.set(
+              'Access token saved locally. Use the Strategy tab to fetch historical data.',
+            );
+          }
+          this.isExchangingToken.set(false);
+        },
+        error: (error) => {
+          const message =
+            error?.error != null
+              ? JSON.stringify(error.error, null, 2)
+              : error?.message ?? 'Failed to exchange token.';
+          this.tokenExchangeError.set(message);
+          this.isExchangingToken.set(false);
+        },
+      });
+  }
+
+  private prefillStepForms(apiKey: string, apiSecret: string): void {
+    this.step1Form.patchValue({ apiKey });
+    this.step2Form.patchValue({ apiKey, apiSecret });
+    this.step3Form.patchValue({ apiKey });
+  }
+
+  private setCredentialsFormEditable(editable: boolean): void {
+    if (editable) {
+      this.credentialsForm.enable({ emitEvent: false });
+    } else {
+      this.credentialsForm.disable({ emitEvent: false });
+    }
+  }
+
+  protected formatSessionTime(session: KiteSession): string {
+    const raw = session.data.login_time ?? session.savedAt;
+    const date = new Date(raw);
+    if (Number.isNaN(date.getTime())) {
+      return raw;
+    }
+    return date.toLocaleString();
+  }
+
+  private isSessionFromToday(session: KiteSession): boolean {
+    const raw = session.data.login_time ?? session.savedAt;
+    const sessionDate = new Date(raw);
+    if (Number.isNaN(sessionDate.getTime())) {
+      return true;
+    }
+    return sessionDate.toDateString() === new Date().toDateString();
+  }
+}
