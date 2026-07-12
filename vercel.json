@@ -1,0 +1,14 @@
+{
+  "version": 2,
+  "buildCommand": "npm run build",
+  "rewrites": [
+    { "source": "/", "destination": "/api" },
+    { "source": "/(.*)", "destination": "/api" }
+  ],
+  "functions": {
+    "api/index.js": {
+      "includeFiles": "dist/palagai/**",
+      "maxDuration": 60
+    }
+  }
+}
