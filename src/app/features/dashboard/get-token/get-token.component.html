@@ -1,8 +1,15 @@
 <section class="tab-panel">
   <h2>Get Token</h2>
   <p class="tab-description">
-    Save your API credentials locally, then complete the three-step Kite Connect flow.
+    Save your API credentials, then complete the Kite Connect login.
+    For live, set the Kite app Redirect URL to
+    <code>https://palagai.app/dashboard/get-token</code>.
+    Locally you can use <code>http://localhost:4200/</code>.
   </p>
+
+  @if (autoExchangeNote()) {
+    <p class="banner info" role="status">{{ autoExchangeNote() }}</p>
+  }
 
   @if (todaySession(); as session) {
     <article class="step-card session-card">

@@ -1,14 +1,21 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { ActivatedRoute, Router } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { buildKiteChecksum } from '../../../core/utils/sha256.util';
+import { extractKiteApiError } from '../../../core/utils/kite-error.util';
 import { KiteCredentialsService } from '../../../core/kite/kite-credentials.service';
 import { KiteApiService } from '../../../core/kite/kite-api.service';
 import { KiteSessionService, KiteSession } from '../../../core/kite/kite-session.service';
+import {
+  captureKiteRequestTokenFromLocation,
+  consumeKiteRequestToken,
+  stashKiteRequestToken,
+} from '../../../core/kite/kite-request-token.util';
 
 const KITE_LOGIN_URL = 'https://kite.zerodha.com/connect/login?v=3&api_key=';
 
@@ -28,6 +35,8 @@ const KITE_LOGIN_URL = 'https://kite.zerodha.com/connect/login?v=3&api_key=';
 })
 export class GetTokenComponent implements OnInit {
   private readonly formBuilder = inject(FormBuilder);
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   private readonly kiteApiService = inject(KiteApiService);
   private readonly kiteCredentialsService = inject(KiteCredentialsService);
   private readonly kiteSessionService = inject(KiteSessionService);
@@ -45,6 +54,7 @@ export class GetTokenComponent implements OnInit {
   protected readonly tokenExchangeError = signal('');
   protected readonly sessionSavedMessage = signal('');
   protected readonly hideAccessToken = signal(true);
+  protected readonly autoExchangeNote = signal('');
 
   protected readonly todaySession = computed(() => {
     const session = this.kiteSessionService.storedSession();
@@ -88,6 +98,8 @@ export class GetTokenComponent implements OnInit {
       this.setCredentialsFormEditable(true);
       this.isEditingCredentials.set(true);
     }
+
+    void this.bootstrapFromKiteRedirect(stored?.apiKey, stored?.apiSecret);
   }
 
   protected onEditCredentials(): void {
@@ -180,7 +192,68 @@ export class GetTokenComponent implements OnInit {
     }
 
     const { apiKey, requestToken, checksum } = this.step3Form.getRawValue();
+    this.exchangeToken(apiKey.trim(), requestToken.trim(), checksum.trim());
+  }
 
+  private async bootstrapFromKiteRedirect(
+    apiKey?: string,
+    apiSecret?: string,
+  ): Promise<void> {
+    captureKiteRequestTokenFromLocation();
+    const queryToken = this.route.snapshot.queryParamMap.get('request_token')?.trim();
+    if (queryToken) {
+      stashKiteRequestToken(queryToken);
+    }
+
+    const requestToken = consumeKiteRequestToken();
+    if (!requestToken) {
+      return;
+    }
+
+    this.step2Form.patchValue({ requestToken });
+    this.step3Form.patchValue({ requestToken });
+    this.autoExchangeNote.set(
+      'Captured request_token from Kite redirect. Exchanging for access token…',
+    );
+
+    await this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: {},
+      replaceUrl: true,
+    });
+
+    if (!apiKey?.trim() || !apiSecret?.trim()) {
+      this.tokenExchangeError.set(
+        'Request token captured, but API Key/Secret are not saved yet. Save credentials above, then generate checksum and exchange.',
+      );
+      this.autoExchangeNote.set('');
+      return;
+    }
+
+    try {
+      this.isGeneratingChecksum.set(true);
+      const checksum = await buildKiteChecksum(apiKey.trim(), requestToken, apiSecret.trim());
+      this.checksumResult.set(checksum);
+      this.step2Form.patchValue({
+        apiKey: apiKey.trim(),
+        apiSecret: apiSecret.trim(),
+        requestToken,
+      });
+      this.step3Form.patchValue({
+        apiKey: apiKey.trim(),
+        requestToken,
+        checksum,
+      });
+      this.isGeneratingChecksum.set(false);
+      this.exchangeToken(apiKey.trim(), requestToken, checksum);
+    } catch {
+      this.isGeneratingChecksum.set(false);
+      this.autoExchangeNote.set('');
+      this.tokenExchangeError.set('Failed to generate checksum from redirect token.');
+    }
+  }
+
+  private exchangeToken(apiKey: string, requestToken: string, checksum: string): void {
     this.isExchangingToken.set(true);
     this.tokenExchangeResult.set('');
     this.tokenExchangeError.set('');
@@ -198,17 +271,24 @@ export class GetTokenComponent implements OnInit {
           const saved = this.kiteSessionService.saveFromTokenResponse(response);
           if (saved) {
             this.sessionSavedMessage.set(
-              'Access token saved locally. Use the Strategy tab to fetch historical data.',
+              'Access token saved locally. Trade Desk / Historical Tester are ready.',
             );
+            this.autoExchangeNote.set('Kite login complete.');
+          } else {
+            this.tokenExchangeError.set(
+              'Kite responded but no access_token was found. Check the JSON below.',
+            );
+            this.autoExchangeNote.set('');
           }
           this.isExchangingToken.set(false);
         },
         error: (error) => {
-          const message =
-            error?.error != null
-              ? JSON.stringify(error.error, null, 2)
-              : error?.message ?? 'Failed to exchange token.';
-          this.tokenExchangeError.set(message);
+          const kiteMessage = extractKiteApiError(error, 'session/token');
+          const hint = /invalid or has expired|TokenException/i.test(kiteMessage)
+            ? ' Request tokens are one-time and expire in a few minutes — click Step 1 Login again for a fresh token.'
+            : '';
+          this.tokenExchangeError.set(`${kiteMessage}.${hint}`.replace(/\.\./g, '.'));
+          this.autoExchangeNote.set('');
           this.isExchangingToken.set(false);
         },
       });

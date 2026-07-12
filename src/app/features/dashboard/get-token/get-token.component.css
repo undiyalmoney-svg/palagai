@@ -11,6 +11,23 @@
   font-size: 0.95rem;
 }
 
+.tab-description code {
+  font-size: 0.85em;
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+  background: #f1f5f9;
+}
+
+.banner.info {
+  margin: 0 0 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  border: 1px solid #93c5fd;
+  background: #eff6ff;
+  color: #1e3a8a;
+  font-size: 0.92rem;
+}
+
 .steps {
   display: flex;
   flex-direction: column;

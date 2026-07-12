@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
 import { authGuard, guestGuard } from './core/auth/auth.guard';
 import { kiteSessionGuard } from './core/auth/kite-session.guard';
+import { stashKiteRequestToken } from './core/kite/kite-request-token.util';
 import { LoginComponent } from './features/login/login.component';
 import { DashboardComponent } from './features/dashboard/dashboard.component';
 import { HistoricalTesterComponent } from './features/dashboard/historical-tester/historical-tester.component';
@@ -14,8 +15,15 @@ import { SettingsComponent } from './features/dashboard/settings/settings.compon
 export const routes: Routes = [
   {
     path: '',
-    redirectTo: 'login',
     pathMatch: 'full',
+    redirectTo: ({ queryParams }) => {
+      const requestToken = queryParams['request_token'];
+      if (typeof requestToken === 'string' && requestToken.trim()) {
+        stashKiteRequestToken(requestToken);
+        return '/dashboard/get-token';
+      }
+      return '/login';
+    },
   },
   {
     path: 'login',

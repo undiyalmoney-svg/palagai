@@ -7,6 +7,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { AuthService } from '../../core/auth/auth.service';
+import { peekKiteRequestToken } from '../../core/kite/kite-request-token.util';
 
 @Component({
   selector: 'app-login',
@@ -52,7 +53,10 @@ export class LoginComponent {
     const isValid = this.authService.login(username, password);
 
     if (isValid) {
-      await this.router.navigate(['/dashboard/historical-tester']);
+      const next = peekKiteRequestToken()
+        ? ['/dashboard/get-token']
+        : ['/dashboard/trade-desk'];
+      await this.router.navigate(next);
     } else {
       this.errorMessage.set('Invalid username or password');
     }
