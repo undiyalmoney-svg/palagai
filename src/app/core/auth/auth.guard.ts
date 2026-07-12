@@ -7,14 +7,23 @@ import {
   stashKiteRequestToken,
 } from '../kite/kite-request-token.util';
 
-export const authGuard: CanActivateFn = (route) => {
-  const authService = inject(AuthService);
-  const router = inject(Router);
+function stashTokenFromRoute(route: { queryParamMap: { get(name: string): string | null } }): void {
   const queryToken = route.queryParamMap.get('request_token');
   if (queryToken) {
     stashKiteRequestToken(queryToken);
   } else {
     captureKiteRequestTokenFromLocation();
+  }
+}
+
+export const authGuard: CanActivateFn = (route, state) => {
+  const authService = inject(AuthService);
+  const router = inject(Router);
+  stashTokenFromRoute(route);
+
+  // Allow Kite OAuth return URL without app login so live redirect works.
+  if (state.url.startsWith('/dashboard/get-token')) {
+    return true;
   }
 
   if (authService.isAuthenticated()) {
@@ -27,12 +36,7 @@ export const authGuard: CanActivateFn = (route) => {
 export const guestGuard: CanActivateFn = (route) => {
   const authService = inject(AuthService);
   const router = inject(Router);
-  const queryToken = route.queryParamMap.get('request_token');
-  if (queryToken) {
-    stashKiteRequestToken(queryToken);
-  } else {
-    captureKiteRequestTokenFromLocation();
-  }
+  stashTokenFromRoute(route);
 
   if (!authService.isAuthenticated()) {
     return true;
