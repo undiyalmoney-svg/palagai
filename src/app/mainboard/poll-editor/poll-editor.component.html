@@ -1,0 +1,118 @@
+<div class="poll-editor" [formGroup]="pollForm">
+  <div class="poll-editor-header">
+    <div class="poll-editor-header-content">
+      <h3>Poll Editor</h3>
+      <div class="primary-board-checkbox-container">
+        <mat-checkbox 
+          [checked]="isPrimaryBoard" 
+          (change)="onPrimaryBoardToggle($event)"
+          class="primary-board-checkbox-poll"
+        >
+          <span class="checkbox-label-poll">Primary Board</span>
+        </mat-checkbox>
+      </div>
+    </div>
+    <div class="readonly-notice" *ngIf="!canModify && pollData">
+      <mat-icon>lock</mat-icon>
+      <span>Poll cannot be modified after creation. You can only delete it.</span>
+    </div>
+  </div>
+
+  <!-- Poll Question -->
+  <div class="question-section">
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>Poll Question</mat-label>
+      <textarea
+        matInput
+        formControlName="question"
+        placeholder="What's your favorite color?"
+        rows="2"
+        maxlength="200"
+        [readonly]="!canModify"
+      ></textarea>
+      <mat-hint>{{ pollForm.get('question')?.value?.length || 0 }}/200</mat-hint>
+      <mat-error *ngIf="pollForm.get('question')?.hasError('required') && pollForm.get('question')?.touched">
+        Poll question is required
+      </mat-error>
+      <mat-error *ngIf="pollForm.get('question')?.hasError('maxlength')">
+        Question cannot exceed 200 characters
+      </mat-error>
+    </mat-form-field>
+    <div class="question-actions" *ngIf="canModify">
+      <button
+        mat-stroked-button
+        type="button"
+        (click)="addOption()"
+        [disabled]="!canAddOption()"
+        class="add-option-btn"
+      >
+        <mat-icon>add</mat-icon>
+        Add Option
+      </button>
+      <button
+        mat-stroked-button
+        color="warn"
+        type="button"
+        (click)="clearPoll()"
+        class="clear-btn"
+      >
+        <mat-icon>clear</mat-icon>
+        Clear Poll
+      </button>
+    </div>
+  </div>
+
+  <!-- Options -->
+  <div class="options-section">
+    <h4>Options ({{ optionsArray.length }}/{{ maxOptions }})</h4>
+    <div class="options-list">
+      <div class="option-item" *ngFor="let optionControl of optionsArray.controls; let i = index">
+        <mat-form-field appearance="outline" class="option-input">
+          <mat-label>Option {{ i + 1 }}</mat-label>
+          <input
+            matInput
+            [formControl]="getOptionControl(i)"
+            [placeholder]="'Option ' + (i + 1)"
+            maxlength="100"
+            [readonly]="!canModify"
+          />
+          <mat-hint>{{ getOptionControl(i).value?.length || 0 }}/100</mat-hint>
+          <mat-error *ngIf="getOptionControl(i).hasError('required') && getOptionControl(i).touched">
+            Option text is required
+          </mat-error>
+          <mat-error *ngIf="getOptionControl(i).hasError('maxlength')">
+            Option cannot exceed 100 characters
+          </mat-error>
+        </mat-form-field>
+        <button
+          mat-icon-button
+          type="button"
+          (click)="removeOption(i)"
+          [disabled]="!canRemoveOption() || !canModify"
+          class="remove-option-btn"
+          aria-label="Remove option"
+          title="Remove option"
+        >
+          <mat-icon>delete</mat-icon>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Save Button Section -->
+  <div class="poll-actions" *ngIf="canModify">
+    <button
+      mat-raised-button
+      color="primary"
+      type="button"
+      (click)="savePoll()"
+      [disabled]="pollForm.invalid"
+      class="save-poll-btn"
+    >
+      <mat-icon>save</mat-icon>
+      <span>Save Poll</span>
+    </button>
+  </div>
+
+</div>
+

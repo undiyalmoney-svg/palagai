@@ -1,0 +1,99 @@
+<div class="job-list-container">
+  <!-- Header -->
+  <mat-toolbar color="primary" class="job-header">
+    <button mat-icon-button routerLink="/" class="home-btn" aria-label="Home" title="Home">
+      <mat-icon>home</mat-icon>
+    </button>
+    <span class="header-title">Palagai Jobs</span>
+    <span class="spacer"></span>
+    <button mat-raised-button color="accent" (click)="postJob()" class="post-job-btn">
+      <mat-icon>post_add</mat-icon>
+      <span class="post-job-text">Post Job</span>
+    </button>
+  </mat-toolbar>
+
+  <div class="job-list-content">
+    <!-- Google AdSense - Top -->
+    <div class="adsense-container adsense-top">
+      <ins class="adsbygoogle"
+           style="display:block"
+           data-ad-client="ca-pub-2739882000561401"
+           data-ad-slot=""
+           data-ad-format="auto"
+           data-full-width-responsive="true"></ins>
+    </div>
+
+    <!-- Loading State -->
+    <div class="loading-container" *ngIf="loading">
+      <mat-spinner diameter="50"></mat-spinner>
+      <p>Loading jobs...</p>
+    </div>
+
+    <!-- Error State -->
+    <div class="error-container" *ngIf="error && !loading">
+      <mat-icon class="error-icon">error_outline</mat-icon>
+      <p>{{ error }}</p>
+      <button mat-raised-button color="primary" (click)="loadJobs()">Retry</button>
+    </div>
+
+    <!-- Empty State -->
+    <div class="empty-state" *ngIf="!loading && !error && jobs.length === 0">
+      <mat-icon class="empty-icon">work_off</mat-icon>
+      <h2>No jobs yet posted</h2>
+      <p>Be the first to post a job opportunity!</p>
+      <button mat-raised-button color="primary" (click)="postJob()">
+        <mat-icon>post_add</mat-icon>
+        Post a Job
+      </button>
+    </div>
+
+    <!-- Jobs List -->
+    <div class="jobs-list" *ngIf="!loading && !error && jobs.length > 0">
+      <div class="jobs-header">
+        <h2>{{ jobs.length }} Job{{ jobs.length === 1 ? '' : 's' }} Available</h2>
+      </div>
+
+      <div class="job-card" *ngFor="let job of jobs">
+        <div class="job-card-header">
+          <div class="job-title-section">
+            <h3 class="job-title">{{ job.title }}</h3>
+            <p class="job-company">{{ job.company }}</p>
+          </div>
+          <div class="job-date">
+            <mat-icon>schedule</mat-icon>
+            <span>{{ formatDate(job.createdAt) }}</span>
+          </div>
+        </div>
+
+        <div class="job-details">
+          <div class="job-location">
+            <mat-icon>location_on</mat-icon>
+            <span>{{ job.location }}</span>
+          </div>
+        </div>
+
+        <div class="job-description">
+          <p>{{ job.description }}</p>
+        </div>
+
+        <div class="job-actions">
+          <button mat-raised-button color="primary" (click)="contactJob(job)" class="contact-btn">
+            <mat-icon>email</mat-icon>
+            <span>Contact</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Google AdSense - Bottom -->
+    <div class="adsense-container adsense-bottom" *ngIf="!loading && !error && jobs.length > 0">
+      <ins class="adsbygoogle"
+           style="display:block"
+           data-ad-client="ca-pub-2739882000561401"
+           data-ad-slot=""
+           data-ad-format="auto"
+           data-full-width-responsive="true"></ins>
+    </div>
+  </div>
+</div>
+

@@ -1,0 +1,85 @@
+<!-- Loading Spinner -->
+<div class="loading-container" *ngIf="loading">
+  <mat-spinner diameter="50"></mat-spinner>
+  <p>Loading board...</p>
+</div>
+
+<!-- Error Message -->
+<div class="error-container" *ngIf="error && !loading">
+  <mat-icon>error_outline</mat-icon>
+  <p>{{ error }}</p>
+</div>
+
+<!-- Full page kiosk mode - Two Layer Structure -->
+<div class="kiosk-container" *ngIf="!loading && !error && board" 
+     [class.board-size-min]="boardSize === 'min'" 
+     [class.board-size-normal]="boardSize === 'normal'" 
+     [class.board-size-max]="boardSize === 'max'" 
+     [class.blocked]="board && board.isBlocked === true" 
+   >
+  
+  <!-- Home Icon (Top Left) -->
+  <div class="home-icon-top-left">
+    <button
+      mat-icon-button
+      class="home-top-btn"
+      (click)="goToHome()"
+      aria-label="Back to home"
+      title="Back to home"
+    >
+      <mat-icon>home</mat-icon>
+    </button>
+  </div>
+  
+  <!-- Message Content directly in container -->
+  <div
+    #kioskMessageContent
+    class="kiosk-message-content palagai-display-container"
+  >
+    <!-- Poll Board Display -->
+    <app-poll-display
+      *ngIf="isPollBoard && board"
+      [boardKey]="currentBoardKey || ''"
+      [pollData]="board.pollData || null"
+      [canVote]="true"
+      [canViewResults]="canViewPollResults"
+      [userEmail]="undefined"
+    ></app-poll-display>
+
+    <!-- Standard Board Display -->
+    <div *ngIf="!isPollBoard">
+      <!-- Show board message if loaded, otherwise show Tamil verse -->
+      <div class="palagai-message-renderer" *ngIf="hasBoardMessage">
+        <div [innerHTML]="boardMessageHtml"></div>
+      </div>
+      <div class="palagai-message-renderer verse-display" *ngIf="!hasBoardMessage">
+        <p class="tamil-verse">
+          முயற்சி திருவினை ஆக்கும்; முயற்றின்மை<br>
+          இன்மை புகுத்தி விடும்.
+        </p>
+      </div>
+    </div>
+    
+    <!-- Powered by Palagai -->
+    <div class="powered-by-palagai">
+      <div class="powered-by-line"></div>
+      <div class="powered-by-content">
+        <mat-icon class="heart-icon">favorite</mat-icon>
+        <span class="powered-by-text">Powered by Palagai</span>
+      </div>
+      <div class="powered-by-line"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Blocked Banner (if board is blocked) -->
+<div class="blocked-banner" *ngIf="board && board.isBlocked === true">
+  <mat-icon>block</mat-icon>
+  <div class="blocked-message">
+    <strong>This board has been blocked</strong>
+    <p>This board has been blocked by the administrator and cannot be displayed.</p>
+  </div>
+</div>
+
+
+

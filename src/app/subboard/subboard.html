@@ -1,0 +1,275 @@
+<!-- Landing Page -->
+<div class="landing-page" *ngIf="showLandingPage && !isFullPage">
+  <mat-toolbar color="primary" class="landing-toolbar">
+    <div class="logo-container">
+      <img src="/toolbar-icon.png" alt="Palagai" class="logo-icon" />
+    </div>
+    <span class="spacer"></span>
+    <button mat-stroked-button routerLink="/login" class="load-my-board-btn">Load my board</button>
+  </mat-toolbar>
+
+  <div class="landing-content">
+    <h1 class="landing-headline">Let your thoughts fly</h1>
+    <p class="landing-subheadline">Share notes, ideas, and inspirations – where everyone can see...</p>
+    
+    <!-- Primary Boards Section -->
+    <div class="primary-boards-section" *ngIf="primaryBoards.length > 0">
+      <h2 class="primary-boards-title">Featured Boards</h2>
+      <div class="primary-boards-grid">
+        <div class="primary-board-card" *ngFor="let item of primaryBoards" (click)="viewPrimaryBoard(item.boardKey)">
+          <div class="primary-board-content">
+            <div class="primary-board-preview" [innerHTML]="getBoardPreview(item.board)"></div>
+            <!-- Poll Board Badge -->
+            <div class="poll-badge" *ngIf="item.board.boardType === 'poll'">
+              <mat-icon>poll</mat-icon>
+              <span>Poll</span>
+            </div>
+          </div>
+          <div class="primary-board-footer">
+            <span class="primary-board-label">{{ item.board.boardType === 'poll' ? 'View Poll' : 'View Board' }}</span>
+            <mat-icon>arrow_forward</mat-icon>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="landing-actions">
+      <button mat-raised-button class="create-btn" (click)="createBoard()">
+        Create your board
+      </button>
+      <button mat-raised-button class="view-btn" (click)="openBoardIdDialog()">
+        View a board
+      </button>
+      <button mat-raised-button class="competition-btn" routerLink="/kavithai/list">
+        <mat-icon>edit</mat-icon>
+        Kavithai Competition
+      </button>
+      <button mat-raised-button class="punch-btn" routerLink="/create-balloon">
+        <mat-icon>celebration</mat-icon>
+        Palagai Punch 🎈
+      </button>
+      <!-- Temporarily hidden - will test later -->
+      <!-- <button mat-raised-button class="jobs-btn" routerLink="/jobs">
+        <mat-icon>work</mat-icon>
+        Palagai Jobs
+      </button> -->
+    </div>
+
+    <!-- Footer with Terms and Conditions Link -->
+    <div class="landing-footer">
+      <a (click)="openTermsAndConditions()" class="terms-link">Terms and Conditions</a>
+    </div>
+  </div>
+</div>
+
+<div class="subboard-wrapper" [class.full-page]="isFullPage">
+  <!-- Blocked Status Banner -->
+  <div class="blocked-banner" *ngIf="board?.isBlocked && isFullPage">
+    <mat-icon>block</mat-icon>
+    <div class="blocked-message">
+      <strong>This board has been blocked</strong>
+      <p>Please contact the ADMIN for retrieving your account.</p>
+    </div>
+  </div>
+
+  <!-- Full page kiosk mode - Two Layer Structure -->
+  <div class="kiosk-container" *ngIf="isFullPage && board" [class.board-size-min]="boardSize === 'min'" [class.board-size-normal]="boardSize === 'normal'" [class.board-size-max]="boardSize === 'max'" [class.blocked]="board && board.isBlocked === true" [class.competition-board]="isInCompetition">
+    <!-- Home/Back Icon (Bottom Left - Only in Full Screen, Not Preview) -->
+    <div class="home-icon-bottom-right" *ngIf="isFullPage && !isPreviewMode">
+      <!-- Show back icon if came from competition, otherwise show home icon -->
+      <button
+        mat-icon-button
+        class="home-bottom-btn"
+        *ngIf="cameFromCompetition"
+        routerLink="/competition"
+        aria-label="Back to competition"
+        title="Back to competition"
+      >
+        <mat-icon>arrow_back</mat-icon>
+      </button>
+      <button
+        mat-icon-button
+        class="home-bottom-btn"
+        *ngIf="!cameFromCompetition"
+        (click)="toggleFullPage()"
+        aria-label="Back to home"
+        title="Back to home"
+      >
+        <mat-icon>home</mat-icon>
+      </button>
+    </div>
+    
+    <!-- Home Icon (Top Left - Preview Mode) -->
+    <div class="home-icon-top-left" *ngIf="isPreviewMode">
+      <button
+        mat-icon-button
+        class="home-top-btn"
+        (click)="goToHome()"
+        aria-label="Back to home"
+        title="Back to home"
+      >
+        <mat-icon>home</mat-icon>
+      </button>
+    </div>
+
+    <!-- Vote Section (Top Left for Web, Top Center for Mobile) - Always Visible for Competition -->
+    <div class="kiosk-vote-section" *ngIf="isInCompetition && isFullPage">
+      <div class="vote-info-display">
+        <span class="vote-count-text">{{ voteCount }} votes</span>
+      </div>
+      <button
+        mat-raised-button
+        (click)="voteForBoard()"
+        [disabled]="isVoting || hasVotedInSession"
+        *ngIf="!hasVotedInSession"
+        class="kiosk-vote-button can-vote"
+      >
+        <mat-icon>star_border</mat-icon>
+        <span>{{ isVoting ? 'Voting...' : 'Vote' }}</span>
+      </button>
+    </div>
+
+    <!-- Exit/Back button (Desktop only) -->
+    <div class="kiosk-exit-btn desktop-only">
+      <button
+        mat-icon-button
+        class="exit-fullscreen-btn"
+        *ngIf="!isPreviewMode"
+        (click)="toggleFullPage()"
+        aria-label="Back to home"
+        title="Back to home"
+      >
+        <mat-icon>home</mat-icon>
+      </button>
+      <button
+        mat-icon-button
+        class="back-to-mainboard-btn"
+        *ngIf="isPreviewMode"
+        (click)="goToMainboard()"
+        aria-label="Back to main board"
+      >
+        <mat-icon>arrow_back</mat-icon>
+      </button>
+    </div>
+    
+    <!-- Board Size Controls - Centered on board (only in preview mode) -->
+    <div class="board-size-controls-center" *ngIf="isPreviewMode">
+      <button
+        mat-icon-button
+        class="size-btn"
+        [class.active]="boardSize === 'min'"
+        (click)="setBoardSize('min')"
+        aria-label="Minimize board"
+        title="Minimize"
+      >
+        <mat-icon>remove</mat-icon>
+      </button>
+      <button
+        mat-icon-button
+        class="size-btn"
+        [class.active]="boardSize === 'normal'"
+        (click)="setBoardSize('normal')"
+        aria-label="Normal board size"
+        title="Normal"
+      >
+        <mat-icon>crop_free</mat-icon>
+      </button>
+      <button
+        mat-icon-button
+        class="size-btn"
+        [class.active]="boardSize === 'max'"
+        (click)="setBoardSize('max')"
+        aria-label="Maximize board"
+        title="Maximize"
+      >
+        <mat-icon>add</mat-icon>
+      </button>
+      <button
+        mat-icon-button
+        class="save-size-btn"
+        [class.has-changes]="hasUnsavedSizeChanges()"
+        (click)="saveBoardSize()"
+        aria-label="Save board size"
+        title="Save board size"
+      >
+        <mat-icon>save</mat-icon>
+      </button>
+    </div>
+    
+    <!-- Message Content directly in container -->
+    <div
+      #kioskMessageContent
+      class="kiosk-message-content palagai-display-container"
+    >
+      <!-- Poll Board Display -->
+      <app-poll-display
+        *ngIf="isPollBoard && board && board.pollData"
+        [boardKey]="isPreviewMode ? '' : (currentBoardKey || '')"
+        [pollData]="board.pollData"
+        [canVote]="canVoteOnPoll"
+        [canViewResults]="canViewPollResults"
+        [userEmail]="userEmailForPoll"
+      ></app-poll-display>
+
+      <!-- Standard Board Display -->
+      <div *ngIf="!isPollBoard">
+        <!-- Show board message if loaded, otherwise show Tamil verse -->
+        <div class="palagai-message-renderer" *ngIf="hasBoardMessage">
+          <div [innerHTML]="boardMessageHtml"></div>
+        </div>
+        <div class="palagai-message-renderer verse-display" *ngIf="!hasBoardMessage">
+          <p class="tamil-verse">
+            முயற்சி திருவினை ஆக்கும்; முயற்றின்மை<br>
+            இன்மை புகுத்தி விடும்.
+          </p>
+        </div>
+      </div>
+
+      <!-- Powered by Palagai -->
+      <div class="powered-by-palagai">
+        <div class="powered-by-line"></div>
+        <div class="powered-by-content">
+          <mat-icon class="heart-icon">favorite</mat-icon>
+          <span>powered by palagai</span>
+        </div>
+      </div>
+      
+    </div>
+  </div>
+
+  <!-- Full page loading state -->
+  <div class="kiosk-container" *ngIf="isFullPage && !board && loading">
+    <div class="loading-indicator-kiosk">
+      <mat-spinner diameter="50"></mat-spinner>
+      <p>Loading board...</p>
+    </div>
+  </div>
+
+  <!-- Full page empty state (no board loaded) -->
+  <div class="kiosk-container" *ngIf="isFullPage && !board && !loading">
+    <div class="kiosk-exit-btn">
+      <button
+        mat-icon-button
+        class="exit-fullscreen-btn"
+        *ngIf="!isPreviewMode"
+        (click)="toggleFullPage()"
+        aria-label="Back to home"
+        title="Back to home"
+      >
+        <mat-icon>home</mat-icon>
+      </button>
+      <button
+        mat-icon-button
+        class="back-to-mainboard-btn"
+        *ngIf="isPreviewMode"
+        (click)="goToMainboard()"
+        aria-label="Back to main board"
+      >
+        <mat-icon>arrow_back</mat-icon>
+      </button>
+    </div>
+    <div class="loading-indicator-kiosk">
+      <p>Please load a board first</p>
+    </div>
+  </div>
+</div>

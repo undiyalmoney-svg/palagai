@@ -1,0 +1,108 @@
+<mat-toolbar color="primary" class="results-toolbar">
+  <button mat-icon-button routerLink="/mainboard" class="back-btn" aria-label="Back to mainboard" title="Back to mainboard">
+    <mat-icon>arrow_back</mat-icon>
+  </button>
+  <span class="toolbar-title">Poll Results</span>
+  <span class="spacer"></span>
+</mat-toolbar>
+
+<div class="poll-results-container">
+  <!-- Loading State -->
+  <div class="loading-container" *ngIf="loading">
+    <mat-spinner diameter="50"></mat-spinner>
+    <p>Loading poll results...</p>
+  </div>
+
+  <!-- Error State -->
+  <div class="error-container" *ngIf="!loading && error">
+    <mat-icon class="error-icon">error</mat-icon>
+    <h2>Error</h2>
+    <p>{{ error }}</p>
+    <button mat-raised-button color="primary" routerLink="/mainboard">
+      <mat-icon>home</mat-icon>
+      Back to Mainboard
+    </button>
+  </div>
+
+  <!-- Results Content -->
+  <div class="results-content" *ngIf="!loading && !error && pollData && voteStats">
+    <div class="poll-header">
+      <h1>{{ pollData.question }}</h1>
+      <div class="poll-meta">
+        <span class="meta-item">
+          <mat-icon>how_to_vote</mat-icon>
+          <strong>{{ voteStats.totalVotes }}</strong> total votes
+        </span>
+        <span class="meta-item">
+          <mat-icon>poll</mat-icon>
+          {{ pollData.pollType === 'single' ? 'Single Choice' : 'Multiple Choice' }}
+        </span>
+      </div>
+    </div>
+
+    <mat-card class="results-card">
+      <mat-card-header>
+        <mat-card-title>Vote Breakdown</mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+        <div class="results-list">
+          <div
+            class="result-item"
+            *ngFor="let option of pollData.options"
+          >
+            <div class="result-header">
+              <div class="result-info">
+                <span class="result-label">{{ option.text }}</span>
+                <span class="result-stats">
+                  {{ getOptionCount(option.id) }} vote{{ getOptionCount(option.id) !== 1 ? 's' : '' }}
+                  ({{ getOptionPercentage(option.id) | number: '1.1-1' }}%)
+                </span>
+              </div>
+            </div>
+            <mat-progress-bar
+              mode="determinate"
+              [value]="getOptionPercentage(option.id)"
+              class="result-progress"
+            ></mat-progress-bar>
+          </div>
+        </div>
+      </mat-card-content>
+    </mat-card>
+
+    <!-- Votes Over Time (if available) -->
+    <mat-card class="timeline-card" *ngIf="voteStats.votesOverTime.length > 0">
+      <mat-card-header>
+        <mat-card-title>Votes Over Time</mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+        <div class="timeline">
+          <div
+            class="timeline-item"
+            *ngFor="let item of voteStats.votesOverTime"
+          >
+            <span class="timeline-date">{{ item.date }}</span>
+            <span class="timeline-count">{{ item.count }} vote{{ item.count !== 1 ? 's' : '' }}</span>
+          </div>
+        </div>
+      </mat-card-content>
+    </mat-card>
+
+    <!-- Action Buttons -->
+    <div class="action-buttons">
+      <button mat-raised-button color="primary" routerLink="/mainboard">
+        <mat-icon>edit</mat-icon>
+        Edit Poll
+      </button>
+      <button mat-stroked-button routerLink="/board/{{ boardKey }}">
+        <mat-icon>visibility</mat-icon>
+        View Poll
+      </button>
+    </div>
+  </div>
+</div>
+
+
+
+
+
+

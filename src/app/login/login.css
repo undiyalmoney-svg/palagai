@@ -1,0 +1,217 @@
+.login-wrapper {
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: #fafafa;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+  position: relative;
+  overflow: hidden;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+/* Card Container */
+.login-card {
+  position: relative;
+  width: 100%;
+  max-width: 480px;
+  padding: 32px 40px;
+  margin-top: 0;
+  border: 1px solid #e5e5e5;
+  border-radius: 20px;
+  background: #ffffff;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+  overflow: visible;
+  z-index: 1;
+}
+
+.title {
+  font-size: 32px;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin: 0 0 8px 0;
+  text-align: center;
+  position: relative;
+  z-index: 1;
+}
+
+.subtitle {
+  font-size: 16px;
+  color: #666;
+  margin: 0 0 32px 0;
+  text-align: center;
+  position: relative;
+  z-index: 1;
+}
+
+.form-group {
+  margin-bottom: 20px;
+  position: relative;
+  z-index: 1;
+}
+
+.input-label {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+  margin-bottom: 8px;
+}
+
+.full-width {
+  width: 100%;
+}
+
+.forgot-password-wrapper {
+  text-align: right;
+  margin-bottom: 20px;
+  position: relative;
+  z-index: 1;
+}
+
+.forgot-link {
+  font-size: 14px;
+  color: #4285f4;
+  text-decoration: none;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.forgot-link:hover {
+  color: #1a73e8;
+  text-decoration: underline;
+}
+
+.micro-line {
+  text-align: center;
+  font-size: 14px;
+  color: #666;
+  margin-top: 24px;
+  position: relative;
+  z-index: 1;
+}
+
+.micro-link {
+  color: #4285f4;
+  text-decoration: none;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.micro-link:hover {
+  color: #1a73e8;
+  text-decoration: underline;
+}
+
+.home-link-wrapper {
+  margin-top: 24px;
+  text-align: center;
+  position: relative;
+  z-index: 1;
+  padding-top: 20px;
+  border-top: 1px solid #e5e5e5;
+}
+
+.home-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #666;
+  text-decoration: none;
+  font-size: 14px;
+  transition: color 0.2s;
+  cursor: pointer;
+}
+
+.home-link:hover {
+  color: #111111;
+}
+
+.home-link mat-icon {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+}
+
+/* Material Form Field Overrides */
+::ng-deep .mat-mdc-form-field {
+  width: 100%;
+}
+
+::ng-deep .mat-mdc-text-field-wrapper {
+  background-color: #fff;
+}
+
+::ng-deep .mat-mdc-form-field-subscript-wrapper {
+  height: 0;
+  display: none;
+  margin-top: 4px;
+}
+
+::ng-deep .mat-mdc-form-field.mat-form-field-invalid .mat-mdc-form-field-subscript-wrapper {
+  height: auto;
+  display: block;
+  position: relative;
+}
+
+/* Button styles */
+button.full-width {
+  width: 100%;
+  margin-top: 0;
+  padding: 16px 24px;
+  background: #111111;
+  color: #ffffff;
+  border: none;
+  border-radius: 10px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  letter-spacing: 0;
+  line-height: 1.5;
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+button.full-width:hover:not(:disabled) {
+  background: #222222;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+button.full-width:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+button.full-width:disabled {
+  opacity: 0.6;
+  cursor: not-allowed !important;
+  background: #e5e5e5 !important;
+  color: #999999 !important;
+  pointer-events: all !important;
+  transform: none;
+  box-shadow: none;
+}
+
+/* Responsive Design */
+@media (max-width: 600px) {
+  .login-card {
+    padding: 24px 20px;
+    max-width: 100%;
+  }
+
+  .title {
+    font-size: 28px;
+  }
+
+  .subtitle {
+    font-size: 14px;
+  }
+}
