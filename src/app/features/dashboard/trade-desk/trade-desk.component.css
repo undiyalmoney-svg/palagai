@@ -78,6 +78,374 @@
   border: 1px solid var(--line);
 }
 
+.badge.soft {
+  background: rgba(255, 255, 255, 0.75);
+  color: var(--muted);
+  border: 1px solid var(--line);
+}
+
+.badge.soft.danger {
+  background: rgba(185, 28, 28, 0.12);
+  color: #991b1b;
+  border-color: #fecaca;
+}
+
+.alive-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem 0.65rem;
+  margin: 0 0 0.85rem;
+  padding: 0.7rem 0.95rem;
+  border-radius: 12px;
+  border: 1px solid #a7f3d0;
+  background: linear-gradient(90deg, #ecfdf5, #f0fdf4);
+  font-size: 0.88rem;
+  color: #065f46;
+}
+
+.alive-bar .pulse {
+  width: 0.65rem;
+  height: 0.65rem;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.55);
+  animation: pulse 1.6s ease-in-out infinite;
+}
+
+.alive-bar .sep {
+  opacity: 0.5;
+}
+
+.real-orders {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  width: 100%;
+  margin: 0.15rem 0 0;
+  padding: 0.65rem 0.75rem;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: #fff;
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+
+.real-orders.ack {
+  border-color: #fecaca;
+  background: #fef2f2;
+}
+
+.phase-pill {
+  display: inline-flex;
+  margin: 0 0 0.65rem;
+  padding: 0.28rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  background: #e2e8f0;
+  color: #334155;
+}
+
+.phase-pill[data-phase='waiting'] {
+  background: #e0f2fe;
+  color: #075985;
+}
+
+.phase-pill[data-phase='in_trade'] {
+  background: #ccfbf1;
+  color: #115e59;
+}
+
+.phase-pill[data-phase='target_hit'] {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.phase-pill[data-phase='sl_hit'] {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.target-banner {
+  display: grid;
+  gap: 0.15rem;
+  margin: 0 0 0.75rem;
+  padding: 0.7rem 0.8rem;
+  border-radius: 10px;
+  border: 1px solid #86efac;
+  background: #f0fdf4;
+  color: #14532d;
+}
+
+.market-live-bar {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin: 0 0 1rem;
+  padding: 0.85rem 1rem;
+  border-radius: 12px;
+  border: 1px solid #5eead4;
+  background: linear-gradient(135deg, #f0fdfa 0%, #ecfeff 100%);
+  color: #115e59;
+}
+
+.market-live-bar.money {
+  border-color: #fca5a5;
+  background: linear-gradient(135deg, #fff1f2 0%, #fff7ed 100%);
+  color: #9f1239;
+}
+
+.market-live-copy {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.market-live-copy strong {
+  font-size: 0.92rem;
+  letter-spacing: 0.02em;
+}
+
+.market-live-copy span {
+  font-size: 0.82rem;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.market-pulse {
+  flex: 0 0 auto;
+  width: 0.7rem;
+  height: 0.7rem;
+  margin-top: 0.3rem;
+  border-radius: 50%;
+  background: #0d9488;
+  box-shadow: 0 0 0 0 rgba(13, 148, 136, 0.55);
+  animation: market-pulse 1.6s ease-out infinite;
+}
+
+.market-live-bar.money .market-pulse {
+  background: #e11d48;
+  box-shadow: 0 0 0 0 rgba(225, 29, 72, 0.45);
+}
+
+@keyframes market-pulse {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(13, 148, 136, 0.5);
+  }
+  70% {
+    transform: scale(1.15);
+    box-shadow: 0 0 0 10px rgba(13, 148, 136, 0);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(13, 148, 136, 0);
+  }
+}
+
+.trade-live-panel {
+  display: grid;
+  gap: 0.65rem;
+  margin: 0 0 0.85rem;
+  padding: 0.85rem 0.9rem;
+  border-radius: 12px;
+  border: 1px solid #5eead4;
+  background: #f0fdfa;
+}
+
+.status-card.phase-trade .trade-live-panel {
+  position: sticky;
+  top: 0.5rem;
+  z-index: 2;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+}
+
+.status-card.has-open.phase-trade {
+  border-color: #2dd4bf;
+  box-shadow: 0 0 0 1px rgba(13, 148, 136, 0.18);
+}
+
+.trade-live-head {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.trade-live-head strong {
+  font-size: 0.95rem;
+  color: #0f766e;
+}
+
+.trade-live-head span {
+  font-size: 0.8rem;
+  color: #115e59;
+  line-height: 1.35;
+}
+
+.levels-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+  margin: 0;
+}
+
+.levels-row-live div {
+  background: #fff;
+  border-color: #99f6e4;
+}
+
+.levels-row div {
+  padding: 0.55rem 0.6rem;
+  border-radius: 10px;
+  background: #f8fafc;
+  border: 1px solid var(--line);
+}
+
+.levels-row span {
+  display: block;
+  font-size: 0.68rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.levels-row strong {
+  font-size: 1.05rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.levels-row .sl {
+  color: var(--sell);
+}
+
+.levels-row .tgt {
+  color: var(--buy);
+}
+
+.broker-live-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.85rem;
+  font-size: 0.78rem;
+  color: #0f766e;
+}
+
+.waiting-copy {
+  display: block;
+  margin: 0 0 0.65rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.status-card.phase-target {
+  border-color: #86efac;
+  box-shadow: 0 0 0 1px rgba(22, 163, 74, 0.12);
+}
+
+.status-card.phase-waiting {
+  border-color: #7dd3fc;
+}
+
+.order-log {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.order-summary-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.84rem;
+}
+
+.order-summary-table th,
+.order-summary-table td {
+  padding: 0.55rem 0.65rem;
+  text-align: left;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+
+.order-summary-table th {
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.order-summary-table .mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.8rem;
+}
+
+.leg-pill,
+.status-pill {
+  display: inline-block;
+  padding: 0.12rem 0.45rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: #f1f5f9;
+  color: #334155;
+}
+
+.status-pill[data-status='COMPLETE'] {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.status-pill[data-status='REJECTED'],
+.status-pill[data-status='CANCELLED'] {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.status-pill[data-status*='PENDING'],
+.status-pill[data-status='OPEN'],
+.status-pill[data-status='TRIGGER PENDING'] {
+  background: #e0f2fe;
+  color: #075985;
+}
+
+.order-log-details {
+  margin-top: 1rem;
+}
+
+.order-log-details summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin-bottom: 0.5rem;
+}
+
+.order-log li {
+  display: grid;
+  gap: 0.15rem;
+  padding: 0.65rem 0.8rem;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: #fff;
+  font-size: 0.86rem;
+}
+
+.order-log li[data-action='ERROR'],
+.order-log li[data-action='SKIP'] {
+  border-color: #fecaca;
+  background: #fff7f7;
+}
+
+.order-log li[data-action='ENTRY'],
+.order-log li[data-action='EXIT'],
+.order-log li[data-action='SL'],
+.order-log li[data-action='CANCEL_SL'] {
+  border-color: #a7f3d0;
+  background: #f0fdf4;
+}
+
 .badge.live {
   background: #0f766e;
   box-shadow: 0 0 0 0 rgba(15, 118, 110, 0.5);

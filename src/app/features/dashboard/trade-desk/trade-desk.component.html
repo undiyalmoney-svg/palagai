@@ -8,8 +8,12 @@
       </p>
     </div>
     <div class="hero-meta">
-      <span class="badge" [class.live]="mode() === 'live'">{{ mode() === 'live' ? 'Live paper' : 'Testing' }}</span>
-      <span class="badge soft">No real orders</span>
+      <span class="badge" [class.live]="mode() === 'live'">{{
+        mode() === 'live' ? (realOrders ? 'Live money' : 'Live paper') : 'Testing'
+      }}</span>
+      <span class="badge soft" [class.danger]="realOrders && mode() === 'live'">{{
+        realOrders && mode() === 'live' ? 'REAL KITE ORDERS' : 'No real orders'
+      }}</span>
     </div>
   </header>
 
@@ -49,8 +53,29 @@
     } @else {
       <div class="live-hint">
         <strong>Today</strong>
-        <span>Auto paper on both indices · market hours only</span>
+        <span>{{ realOrders ? 'Real MIS orders on signals' : 'Auto paper on both indices' }} · market hours only</span>
       </div>
+    }
+
+    @if (mode() === 'live') {
+      <label class="real-orders">
+        <input
+          type="checkbox"
+          [(ngModel)]="realOrders"
+          [disabled]="busy() || snapshot().running"
+        />
+        <span>Live money — place real Kite MIS orders (1 lot)</span>
+      </label>
+      @if (realOrders) {
+        <label class="real-orders ack">
+          <input
+            type="checkbox"
+            [(ngModel)]="realOrdersAck"
+            [disabled]="busy() || snapshot().running"
+          />
+          <span>I understand this uses real money</span>
+        </label>
+      }
     }
 
     <div class="actions">
@@ -75,6 +100,26 @@
       </button>
     </div>
   </div>
+
+  @if (mode() === 'live' && snapshot().running) {
+    <div class="alive-bar" role="status">
+      <span class="pulse" aria-hidden="true"></span>
+      <strong>I'm alive</strong>
+      <span>Last tick {{ fmtTime(snapshot().lastTickAt) }} IST</span>
+      <span class="sep">·</span>
+      <span>{{ snapshot().realOrders ? 'Live money' : 'Live paper' }}</span>
+    </div>
+  }
+
+  @if (mode() === 'live' && snapshot().running && hasOpenTrade()) {
+    <div class="market-live-bar" role="status" [class.money]="snapshot().realOrders">
+      <span class="market-pulse" aria-hidden="true"></span>
+      <div class="market-live-copy">
+        <strong>{{ snapshot().realOrders ? 'ON MARKET · TRADE LIVE' : 'PAPER TRADE LIVE' }}</strong>
+        <span>{{ marketLiveSummary() }}</span>
+      </div>
+    </div>
+  }
 
   @if (error()) {
     <p class="banner err" role="alert">{{ error() }}</p>
@@ -114,11 +159,81 @@
 
     <div class="status-grid">
       @for (s of snapshot().statuses; track s.instrumentId) {
-        <article class="status-card" [class.has-open]="!!s.openTrade">
+        <article
+          class="status-card"
+          [class.has-open]="!!s.openTrade"
+          [class.phase-waiting]="s.livePhase === 'waiting'"
+          [class.phase-trade]="s.livePhase === 'in_trade'"
+          [class.phase-target]="s.livePhase === 'target_hit'"
+          [class.phase-sl]="s.livePhase === 'sl_hit'"
+        >
           <header>
             <h2>{{ s.instrumentName }}</h2>
             <p>{{ s.lastSignal }}</p>
           </header>
+
+          <div class="phase-pill" [attr.data-phase]="s.livePhase">
+            {{ s.livePhaseLabel }}
+          </div>
+
+          @if (s.livePhase === 'target_hit') {
+            <div class="target-banner" role="status">
+              <strong>Target achieved</strong>
+              <span>{{ s.lastExitReason }} · {{ fmtTime(s.lastExitTime) }}</span>
+            </div>
+          }
+
+          @if (s.openTrade; as o) {
+            <div class="trade-live-panel" role="status">
+              <div class="trade-live-head">
+                <strong>
+                  {{ snapshot().realOrders && s.brokerEntryOrderId ? 'Live on market' : 'Trade open' }}
+                </strong>
+                <span>
+                  {{ o.direction }} {{ o.option?.tradingSymbol ?? 'ATM option' }}
+                  @if (snapshot().realOrders && s.brokerEntryOrderId) {
+                    · Kite order active · waiting for target / SL / EMA / 15:15
+                  } @else {
+                    · levels locked until exit
+                  }
+                </span>
+              </div>
+
+              <div class="levels-row levels-row-live">
+                <div>
+                  <span>Entry</span>
+                  <strong>{{ o.indexEntry | number: '1.1-1' }}</strong>
+                </div>
+                <div>
+                  <span>SL</span>
+                  <strong class="sl">{{ o.indexStop | number: '1.1-1' }}</strong>
+                </div>
+                <div>
+                  <span>Target</span>
+                  <strong class="tgt">{{ o.indexTarget | number: '1.1-1' }}</strong>
+                </div>
+              </div>
+
+              @if (s.brokerEntryOrderId || s.brokerSlTrigger != null) {
+                <div class="broker-live-meta">
+                  @if (s.brokerEntryOrderId) {
+                    <span>Entry order {{ s.brokerEntryOrderId }}</span>
+                  }
+                  @if (s.brokerSlTrigger != null) {
+                    <span>Option SL-M {{ s.brokerSlTrigger | number: '1.2-2' }}
+                      @if (s.brokerSlOrderId) {
+                        · {{ s.brokerSlOrderId }}
+                      }
+                    </span>
+                  }
+                </div>
+              }
+            </div>
+          } @else if (s.livePhase === 'waiting') {
+            <p class="waiting-copy">Scanning for OR Swing Breakout entry…</p>
+          } @else if (s.lastExitReason) {
+            <p class="waiting-copy">Last exit: {{ s.lastExitReason }} · {{ fmtTime(s.lastExitTime) }}</p>
+          }
 
           <div class="chosen-option" [class.missing]="!s.chosenOption" [class.synthetic]="s.chosenOption?.source === 'synthetic'">
             <span class="chosen-label">Chosen instrument</span>
@@ -171,10 +286,75 @@
             <div class="open-strip">
               <span class="dir" [attr.data-dir]="o.direction">{{ o.direction }}</span>
               <span>{{ o.option?.tradingSymbol ?? 'ATM option pending' }}</span>
-              <span>SL {{ o.indexStop | number: '1.1-1' }} · Tgt {{ o.indexTarget | number: '1.1-1' }}</span>
+              <span>Entry {{ o.indexEntry | number: '1.1-1' }} · SL {{ o.indexStop | number: '1.1-1' }} · Tgt {{ o.indexTarget | number: '1.1-1' }}</span>
             </div>
           }
         </article>
+      }
+    </div>
+  }
+
+  @if (snapshot().orderSummary.length || snapshot().orderEvents.length) {
+    <div class="trades-block orders-block">
+      <div class="trades-head">
+        <h3>Live order summary</h3>
+        <p>
+          Full Kite session book — Nifty 50 &amp; Bank Nifty · 1 lot each · statuses refresh every tick
+        </p>
+      </div>
+      @if (snapshot().orderSummary.length) {
+        <div class="table-scroll">
+          <table class="order-summary-table">
+            <thead>
+              <tr>
+                <th>When</th>
+                <th>Index</th>
+                <th>Symbol</th>
+                <th>Qty</th>
+                <th>Leg</th>
+                <th>Side</th>
+                <th>Order ID</th>
+                <th>Status</th>
+                <th>Avg</th>
+                <th>Trigger</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (r of snapshot().orderSummary; track r.orderId) {
+                <tr [attr.data-leg]="r.leg" [attr.data-status]="r.status">
+                  <td>{{ fmtTime(r.at) }}</td>
+                  <td>{{ r.instrumentName }}</td>
+                  <td class="mono">{{ r.tradingSymbol }}</td>
+                  <td>{{ r.quantity }}</td>
+                  <td><span class="leg-pill">{{ r.leg }}</span></td>
+                  <td>{{ r.side }}</td>
+                  <td class="mono">{{ r.orderId }}</td>
+                  <td>
+                    <span class="status-pill" [attr.data-status]="r.status">{{ r.status }}</span>
+                  </td>
+                  <td>{{ r.averagePrice != null ? (r.averagePrice | number: '1.2-2') : '—' }}</td>
+                  <td>{{ r.triggerPrice != null ? (r.triggerPrice | number: '1.2-2') : '—' }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+      @if (snapshot().orderEvents.length) {
+        <details class="order-log-details">
+          <summary>Event log ({{ snapshot().orderEvents.length }})</summary>
+          <ul class="order-log">
+            @for (e of snapshot().orderEvents; track e.at + e.detail) {
+              <li [attr.data-action]="e.action">
+                <strong>{{ e.action }}</strong>
+                <span>{{ e.instrumentName || e.instrumentId }} · {{ e.detail }}</span>
+                @if (e.orderId) {
+                  <small>Order {{ e.orderId }}</small>
+                }
+              </li>
+            }
+          </ul>
+        </details>
       }
     </div>
   }
@@ -263,9 +443,10 @@
     <ul>
       <li><strong>Testing</strong> — pick dates, Start loads full candles once, paper-replays both indices.</li>
       <li><strong>Live</strong> — Start auto-polls; works only 09:15–15:30; after hours use Testing.</li>
+      <li><strong>Live money</strong> — MARKET entry + protective SL-M; strategy exit cancels SL then MARKET sell (if SL already filled, no second exit).</li>
       <li><strong>Kite 5m limit</strong> — max {{ snapshot().kiteStats.maxDaysPerCall }} calendar days per historical call; Trade Desk auto-chunks longer Testing ranges and only refreshes today during Live polls.</li>
       <li>ATM weekly CE on BUY / PE on SELL · 1 lot · exits follow Historical Tester (SL cap 20, 1.5R, EMA-20, 15:15).</li>
-      <li>Both indices may hold a paper trade at once · real Kite orders later.</li>
+      <li>Both indices may hold a trade at once · Testing / Live paper stay available unchanged.</li>
     </ul>
   </aside>
 </section>

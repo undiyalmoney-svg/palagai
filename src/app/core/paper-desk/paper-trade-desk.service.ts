@@ -37,6 +37,7 @@ import {
   PaperOptionContract,
   PaperTrade,
 } from './paper-desk.models';
+import { LiveOrderExecutorService } from '../live-desk/live-order-executor.service';
 
 interface LiveLeg {
   instrument: TesterInstrument;
@@ -62,7 +63,9 @@ export class PaperTradeDeskService {
   private liveTrades: PaperTrade[] = [];
   private historicalCalls = 0;
   private lastRangeDays = 0;
+  private realOrders = false;
   private readonly maxDaysPerCall = kiteMaxDaysForInterval('5minute');
+  private readonly liveOrders = inject(LiveOrderExecutorService);
 
   readonly snapshot = signal<PaperDeskSnapshot>(emptySnapshot('testing'));
   readonly busy = signal(false);
@@ -152,20 +155,22 @@ export class PaperTradeDeskService {
           neededOptionTokens: needed,
         });
         firstPassTrades.push(...replay.trades);
-        statuses.push({
-          instrumentId: instrument.id,
-          instrumentName: instrument.name,
-          lastBarTime: candles.at(-1)?.date ?? null,
-          dayNetIndexPts: Object.values(replay.dayNetByDate).reduce((a, b) => a + b, 0),
-          dayNetOptionRs: 0,
-          openTrade: null,
-          chosenOption: replay.chosenOption,
-          chosenBias: replay.chosenBias,
-          indexSpot: replay.indexSpot,
-          chosenAsOf: replay.chosenAsOf,
-          lastSignal: replay.lastSignal,
-          tradesToday: replay.trades.length,
-        });
+        statuses.push(
+          withLiveFields({
+            instrumentId: instrument.id,
+            instrumentName: instrument.name,
+            lastBarTime: candles.at(-1)?.date ?? null,
+            dayNetIndexPts: Object.values(replay.dayNetByDate).reduce((a, b) => a + b, 0),
+            dayNetOptionRs: 0,
+            openTrade: null,
+            chosenOption: replay.chosenOption,
+            chosenBias: replay.chosenBias,
+            indexSpot: replay.indexSpot,
+            chosenAsOf: replay.chosenAsOf,
+            lastSignal: replay.lastSignal,
+            tradesToday: replay.trades.length,
+          }),
+        );
       }
 
       this.patchMessage(`Loading ${needed.size} option contract(s)…`);
@@ -181,6 +186,7 @@ export class PaperTradeDeskService {
         const mine = enriched.filter((t) => t.instrumentId === s.instrumentId);
         s.dayNetOptionRs = mine.reduce((a, t) => a + (t.optionPnlRs ?? 0), 0);
         s.tradesToday = mine.length;
+        applyLivePhase(s, mine, false);
       }
 
       this.snapshot.set({
@@ -189,11 +195,15 @@ export class PaperTradeDeskService {
         fromDate,
         toDate,
         marketOpen: true,
+        realOrders: false,
+        lastTickAt: null,
         message: `Testing complete · ${enriched.length} paper trade(s) · ${this.kiteStatsLabel()}`,
         statuses,
         trades: enriched.sort((a, b) => a.entryTime.localeCompare(b.entryTime)),
         totals: summarize(enriched),
         kiteStats: this.kiteStats(),
+        orderEvents: [],
+        orderSummary: [],
       });
     } catch (err) {
       this.snapshot.set({
@@ -209,9 +219,11 @@ export class PaperTradeDeskService {
     }
   }
 
-  async startLive(): Promise<void> {
+  async startLive(options?: { realOrders?: boolean }): Promise<void> {
     this.stopLive();
     this.resetKiteStats();
+    this.realOrders = !!options?.realOrders;
+    this.liveOrders.reset();
     const today = todayIso();
     const now = istNowHhMm();
 
@@ -254,7 +266,10 @@ export class PaperTradeDeskService {
       fromDate: today,
       toDate: today,
       marketOpen: true,
-      message: 'Starting live paper…',
+      realOrders: this.realOrders,
+      message: this.realOrders
+        ? 'Starting LIVE MONEY desk (real Kite MIS orders)…'
+        : 'Starting live paper…',
       kiteStats: this.kiteStats(),
     });
 
@@ -322,7 +337,13 @@ export class PaperTradeDeskService {
       this.snapshot.set({
         ...cur,
         running: false,
-        message: cur.message.includes('complete') ? cur.message : 'Live paper stopped',
+        message: cur.message.includes('complete')
+          ? cur.message
+          : cur.realOrders
+            ? 'Live money stopped — check Kite for open MIS positions'
+            : 'Live paper stopped',
+        orderEvents: this.liveOrders.getEvents(),
+        orderSummary: this.liveOrders.getOrderSummary(),
       });
     }
   }
@@ -403,30 +424,32 @@ export class PaperTradeDeskService {
         forceCloseOpen: now >= '15:15',
       });
       allTrades.push(...replay.trades);
-      statuses.push({
-        instrumentId: leg.instrument.id,
-        instrumentName: leg.instrument.name,
-        lastBarTime: leg.candles.at(-1)?.date ?? null,
-        dayNetIndexPts: replay.trades.reduce((a, t) => a + t.indexPoints, 0),
-        dayNetOptionRs: 0,
-        openTrade: replay.open
-          ? {
-              direction: replay.open.direction,
-              indexEntry: replay.open.entry,
-              indexStop: replay.open.stop,
-              indexTarget: replay.open.target,
-              entryTime: replay.open.entryTime,
-              option: replay.open.option,
-              optionEntryPremium: replay.open.optionEntryPremium,
-            }
-          : null,
-        chosenOption: replay.chosenOption,
-        chosenBias: replay.chosenBias,
-        indexSpot: replay.indexSpot,
-        chosenAsOf: replay.chosenAsOf,
-        lastSignal: replay.lastSignal,
-        tradesToday: replay.trades.length,
-      });
+      statuses.push(
+        withLiveFields({
+          instrumentId: leg.instrument.id,
+          instrumentName: leg.instrument.name,
+          lastBarTime: leg.candles.at(-1)?.date ?? null,
+          dayNetIndexPts: replay.trades.reduce((a, t) => a + t.indexPoints, 0),
+          dayNetOptionRs: 0,
+          openTrade: replay.open
+            ? {
+                direction: replay.open.direction,
+                indexEntry: replay.open.entry,
+                indexStop: replay.open.stop,
+                indexTarget: replay.open.target,
+                entryTime: replay.open.entryTime,
+                option: replay.open.option,
+                optionEntryPremium: replay.open.optionEntryPremium,
+              }
+            : null,
+          chosenOption: replay.chosenOption,
+          chosenBias: replay.chosenBias,
+          indexSpot: replay.indexSpot,
+          chosenAsOf: replay.chosenAsOf,
+          lastSignal: replay.lastSignal,
+          tradesToday: replay.trades.length,
+        }),
+      );
     }
 
     const optionCandles = await this.fetchOptionHistories(
@@ -441,20 +464,72 @@ export class PaperTradeDeskService {
       const mine = enriched.filter((t) => t.instrumentId === s.instrumentId);
       s.dayNetOptionRs = mine.reduce((a, t) => a + (t.optionPnlRs ?? 0), 0);
       s.tradesToday = mine.length;
+      applyLivePhase(s, mine, true);
+    }
+
+    if (this.realOrders) {
+      for (const s of statuses) {
+        await this.liveOrders.syncInstrument({
+          authorization,
+          instrumentId: s.instrumentId,
+          instrumentName: s.instrumentName,
+          open: s.openTrade
+            ? {
+                direction: s.openTrade.direction,
+                entryTime: s.openTrade.entryTime,
+                indexEntry: s.openTrade.indexEntry,
+                indexStop: s.openTrade.indexStop,
+                option: s.openTrade.option,
+                optionEntryPremium: s.openTrade.optionEntryPremium,
+              }
+            : null,
+        });
+        await delay(350);
+      }
+      for (const s of statuses) {
+        const pos = this.liveOrders.getPositions().find((p) => p.instrumentId === s.instrumentId);
+        s.brokerSlTrigger = pos?.slTrigger ?? null;
+        s.brokerSlOrderId = pos?.slOrderId ?? null;
+        s.brokerEntryOrderId = pos?.entryOrderId ?? null;
+        if (pos?.status === 'open' && s.livePhase === 'waiting') {
+          // broker still open while paper flat — rare race; keep in_trade label
+        }
+        if (pos?.status === 'flat' && s.lastExitReason?.toLowerCase().includes('target')) {
+          s.livePhase = 'target_hit';
+          s.livePhaseLabel = 'Target achieved';
+        }
+      }
     }
 
     this.liveTrades = enriched;
+    const moneyTag = this.realOrders ? 'LIVE MONEY' : 'Live paper';
+    const waiting = statuses.filter((s) => s.livePhase === 'waiting').length;
+    const inTrade = statuses.filter((s) => s.livePhase === 'in_trade').length;
+    const targets = statuses.filter((s) => s.livePhase === 'target_hit').length;
+    const openBits = statuses
+      .filter((s) => s.openTrade)
+      .map((s) => {
+        const o = s.openTrade!;
+        return `${s.instrumentName} ${o.direction} E${o.indexEntry.toFixed(0)}/SL${o.indexStop.toFixed(0)}/T${o.indexTarget.toFixed(0)}`;
+      });
+    const openMsg = openBits.length
+      ? ` · ON MARKET: ${openBits.join(' · ')}`
+      : '';
     this.snapshot.set({
       mode: 'live',
       running: true,
       fromDate: today,
       toDate: today,
       marketOpen: true,
-      message: `Live paper · last tick ${now} · ${enriched.length} closed · ${this.kiteStatsLabel()}`,
+      realOrders: this.realOrders,
+      lastTickAt: new Date().toISOString(),
+      message: `${moneyTag} · alive ${now} · waiting ${waiting} · in trade ${inTrade}${targets ? ` · target hit ${targets}` : ''}${openMsg} · ${this.kiteStatsLabel()}`,
       statuses,
       trades: enriched.sort((a, b) => b.entryTime.localeCompare(a.entryTime)),
       totals: summarize(enriched),
       kiteStats: this.kiteStats(),
+      orderEvents: this.liveOrders.getEvents(),
+      orderSummary: this.liveOrders.getOrderSummary(),
     });
   }
 
@@ -508,20 +583,22 @@ export class PaperTradeDeskService {
         source: resolved.source,
       };
 
-      statuses.push({
-        instrumentId: instrument.id,
-        instrumentName: instrument.name,
-        lastBarTime: asOf,
-        dayNetIndexPts: 0,
-        dayNetOptionRs: 0,
-        openTrade: null,
-        chosenOption,
-        chosenBias: bias,
-        indexSpot: spot ?? chosenOption.strike,
-        chosenAsOf: asOf,
-        lastSignal: spot != null ? `Preview ATM @ ${spot.toFixed(1)}` : 'Preview ATM (spot fallback)',
-        tradesToday: 0,
-      });
+      statuses.push(
+        withLiveFields({
+          instrumentId: instrument.id,
+          instrumentName: instrument.name,
+          lastBarTime: asOf,
+          dayNetIndexPts: 0,
+          dayNetOptionRs: 0,
+          openTrade: null,
+          chosenOption,
+          chosenBias: bias,
+          indexSpot: spot ?? chosenOption.strike,
+          chosenAsOf: asOf,
+          lastSignal: spot != null ? `Preview ATM @ ${spot.toFixed(1)}` : 'Preview ATM (spot fallback)',
+          tradesToday: 0,
+        }),
+      );
     }
 
     return statuses;
@@ -643,6 +720,8 @@ function emptySnapshot(mode: PaperDeskMode): PaperDeskSnapshot {
     toDate: '',
     marketOpen: mode === 'testing',
     message: '',
+    realOrders: false,
+    lastTickAt: null,
     statuses: [],
     trades: [],
     totals: { trades: 0, wins: 0, losses: 0, indexNetPts: 0, optionNetRs: 0 },
@@ -651,7 +730,73 @@ function emptySnapshot(mode: PaperDeskMode): PaperDeskSnapshot {
       lastRangeDays: 0,
       maxDaysPerCall: kiteMaxDaysForInterval('5minute'),
     },
+    orderEvents: [],
+    orderSummary: [],
   };
+}
+
+function withLiveFields(
+  partial: Omit<
+    PaperInstrumentStatus,
+    | 'livePhase'
+    | 'livePhaseLabel'
+    | 'lastExitReason'
+    | 'lastExitTime'
+    | 'brokerSlTrigger'
+    | 'brokerSlOrderId'
+    | 'brokerEntryOrderId'
+  >,
+): PaperInstrumentStatus {
+  return {
+    ...partial,
+    livePhase: 'idle',
+    livePhaseLabel: 'Idle',
+    lastExitReason: null,
+    lastExitTime: null,
+    brokerSlTrigger: null,
+    brokerSlOrderId: null,
+    brokerEntryOrderId: null,
+  };
+}
+
+function applyLivePhase(
+  status: PaperInstrumentStatus,
+  trades: PaperTrade[],
+  liveRunning: boolean,
+): void {
+  const last = [...trades].sort((a, b) => b.exitTime.localeCompare(a.exitTime))[0] ?? null;
+  status.lastExitReason = last?.exitReason ?? null;
+  status.lastExitTime = last?.exitTime ?? null;
+
+  if (status.openTrade) {
+    status.livePhase = 'in_trade';
+    status.livePhaseLabel = `In trade · SL ${status.openTrade.indexStop.toFixed(1)} · Tgt ${status.openTrade.indexTarget.toFixed(1)}`;
+    return;
+  }
+
+  const reason = (last?.exitReason ?? '').toLowerCase();
+  if (reason.includes('target')) {
+    status.livePhase = 'target_hit';
+    status.livePhaseLabel = 'Target achieved';
+    return;
+  }
+  if (reason.includes('stop')) {
+    status.livePhase = 'sl_hit';
+    status.livePhaseLabel = 'Stop loss hit';
+    return;
+  }
+  if (last) {
+    status.livePhase = 'exited';
+    status.livePhaseLabel = last.exitReason || 'Exited';
+    return;
+  }
+  if (liveRunning) {
+    status.livePhase = 'waiting';
+    status.livePhaseLabel = 'Waiting for entry';
+    return;
+  }
+  status.livePhase = 'idle';
+  status.livePhaseLabel = 'Idle';
 }
 
 function summarize(trades: PaperTrade[]): PaperDeskSnapshot['totals'] {

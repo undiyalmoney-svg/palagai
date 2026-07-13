@@ -85,6 +85,133 @@ export class KiteApiService {
     return this.http.get(`${this.kiteApiBaseUrl}/quote?${params.toString()}`, { headers });
   }
 
+  // --- Orders (https://kite.trade/docs/connect/v3/orders) ---
+
+  /** POST /orders/:variety — place order (regular | amo | co | iceberg | auction). */
+  placeOrder(
+    authorization: string,
+    variety: 'regular' | 'amo' | 'co' | 'iceberg' | 'auction',
+    fields: Record<string, string>,
+  ): Observable<unknown> {
+    return this.postForm(authorization, `/orders/${variety}`, fields);
+  }
+
+  /** Convenience: POST /orders/regular */
+  placeRegularOrder(
+    authorization: string,
+    fields: Record<string, string>,
+  ): Observable<unknown> {
+    return this.placeOrder(authorization, 'regular', fields);
+  }
+
+  /** PUT /orders/:variety/:order_id — modify open/pending order. */
+  modifyOrder(
+    authorization: string,
+    variety: 'regular' | 'amo' | 'co' | 'iceberg' | 'auction',
+    orderId: string,
+    fields: Record<string, string>,
+  ): Observable<unknown> {
+    return this.putForm(
+      authorization,
+      `/orders/${variety}/${encodeURIComponent(orderId)}`,
+      fields,
+    );
+  }
+
+  /** DELETE /orders/:variety/:order_id */
+  cancelOrder(
+    authorization: string,
+    variety: 'regular' | 'amo' | 'co' | 'iceberg' | 'auction',
+    orderId: string,
+  ): Observable<unknown> {
+    const headers = this.authHeaders(authorization);
+    return this.http.delete(
+      `${this.kiteApiBaseUrl}/orders/${variety}/${encodeURIComponent(orderId)}`,
+      { headers },
+    );
+  }
+
+  cancelRegularOrder(authorization: string, orderId: string): Observable<unknown> {
+    return this.cancelOrder(authorization, 'regular', orderId);
+  }
+
+  /** GET /orders — day order book */
+  getOrders(authorization: string): Observable<unknown> {
+    return this.http.get(`${this.kiteApiBaseUrl}/orders`, {
+      headers: this.authHeaders(authorization),
+    });
+  }
+
+  /** GET /orders/:order_id — status history for one order */
+  getOrderHistory(authorization: string, orderId: string): Observable<unknown> {
+    return this.http.get(`${this.kiteApiBaseUrl}/orders/${encodeURIComponent(orderId)}`, {
+      headers: this.authHeaders(authorization),
+    });
+  }
+
+  /** GET /trades — all executed trades for the day */
+  getTrades(authorization: string): Observable<unknown> {
+    return this.http.get(`${this.kiteApiBaseUrl}/trades`, {
+      headers: this.authHeaders(authorization),
+    });
+  }
+
+  /** GET /orders/:order_id/trades */
+  getOrderTrades(authorization: string, orderId: string): Observable<unknown> {
+    return this.http.get(
+      `${this.kiteApiBaseUrl}/orders/${encodeURIComponent(orderId)}/trades`,
+      { headers: this.authHeaders(authorization) },
+    );
+  }
+
+  /** GET /portfolio/positions */
+  getPositions(authorization: string): Observable<unknown> {
+    return this.http.get(`${this.kiteApiBaseUrl}/portfolio/positions`, {
+      headers: this.authHeaders(authorization),
+    });
+  }
+
+  private authHeaders(authorization: string, withForm = false): HttpHeaders {
+    let headers = new HttpHeaders({
+      'X-Kite-Version': '3',
+      Authorization: authorization,
+    });
+    if (withForm) {
+      headers = headers.set('Content-Type', 'application/x-www-form-urlencoded');
+    }
+    return headers;
+  }
+
+  private toFormBody(fields: Record<string, string>): string {
+    const body = new URLSearchParams();
+    for (const [key, value] of Object.entries(fields)) {
+      if (value != null && String(value).length) {
+        body.set(key, String(value));
+      }
+    }
+    return body.toString();
+  }
+
+  private postForm(
+    authorization: string,
+    path: string,
+    fields: Record<string, string>,
+  ): Observable<unknown> {
+    return this.http.post(`${this.kiteApiBaseUrl}${path}`, this.toFormBody(fields), {
+      headers: this.authHeaders(authorization, true),
+    });
+  }
+
+  private putForm(
+    authorization: string,
+    path: string,
+    fields: Record<string, string>,
+  ): Observable<unknown> {
+    return this.http.put(`${this.kiteApiBaseUrl}${path}`, this.toFormBody(fields), {
+      headers: this.authHeaders(authorization, true),
+    });
+  }
+
   private async decompressIfGzip(buffer: ArrayBuffer): Promise<string> {
     const bytes = new Uint8Array(buffer);
     if (bytes.length >= 2 && bytes[0] === 0x1f && bytes[1] === 0x8b) {

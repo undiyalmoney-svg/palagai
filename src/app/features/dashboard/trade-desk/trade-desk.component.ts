@@ -19,6 +19,9 @@ export class TradeDeskComponent implements OnDestroy {
   protected readonly mode = signal<PaperDeskMode>('testing');
   protected fromDate = shiftDays(-5);
   protected toDate = todayIso();
+  /** Addon: when Live + this checked, places real Kite MIS orders. */
+  protected realOrders = false;
+  protected realOrdersAck = false;
 
   protected readonly snapshot = this.desk.snapshot;
   protected readonly busy = this.desk.busy;
@@ -34,6 +37,10 @@ export class TradeDeskComponent implements OnDestroy {
     }
     this.mode.set(mode);
     this.error.set('');
+    if (mode === 'testing') {
+      this.realOrders = false;
+      this.realOrdersAck = false;
+    }
   }
 
   protected async onStart(): Promise<void> {
@@ -46,7 +53,19 @@ export class TradeDeskComponent implements OnDestroy {
         }
         await this.desk.runTesting(this.fromDate, this.toDate);
       } else {
-        await this.desk.startLive();
+        if (this.realOrders && !this.realOrdersAck) {
+          this.error.set('Tick the confirmation box before starting Live money.');
+          return;
+        }
+        if (this.realOrders) {
+          const ok = window.confirm(
+            'Start LIVE MONEY?\n\nReal Kite MIS MARKET orders will be placed on ATM weekly options (1 lot) for Nifty & Bank Nifty when signals fire.\n\nPaper Testing mode is unchanged.',
+          );
+          if (!ok) {
+            return;
+          }
+        }
+        await this.desk.startLive({ realOrders: this.realOrders });
       }
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : String(err));
@@ -55,6 +74,24 @@ export class TradeDeskComponent implements OnDestroy {
 
   protected onStop(): void {
     this.desk.stopLive();
+  }
+
+  protected hasOpenTrade(): boolean {
+    return this.snapshot().statuses.some((s) => !!s.openTrade);
+  }
+
+  protected marketLiveSummary(): string {
+    const open = this.snapshot().statuses.filter((s) => s.openTrade);
+    if (!open.length) {
+      return '';
+    }
+    return open
+      .map((s) => {
+        const o = s.openTrade!;
+        const money = this.snapshot().realOrders && s.brokerEntryOrderId ? ' · Kite live' : '';
+        return `${s.instrumentName}: ${o.direction} · Entry ${o.indexEntry.toFixed(1)} · SL ${o.indexStop.toFixed(1)} · Tgt ${o.indexTarget.toFixed(1)}${money}`;
+      })
+      .join('  |  ');
   }
 
   protected fmtTime(ts: string | null | undefined): string {

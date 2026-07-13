@@ -56,6 +56,16 @@ export interface PaperInstrumentStatus {
   chosenAsOf: string | null;
   lastSignal: string;
   tradesToday: number;
+  /** Live desk phase for UI. */
+  livePhase: 'idle' | 'waiting' | 'in_trade' | 'target_hit' | 'sl_hit' | 'exited';
+  livePhaseLabel: string;
+  /** Last closed trade exit reason (for target/SL banners). */
+  lastExitReason: string | null;
+  lastExitTime: string | null;
+  /** Protective SL-M trigger on option premium (live money). */
+  brokerSlTrigger: number | null;
+  brokerSlOrderId: string | null;
+  brokerEntryOrderId: string | null;
 }
 
 export interface PaperDeskSnapshot {
@@ -65,6 +75,10 @@ export interface PaperDeskSnapshot {
   toDate: string;
   marketOpen: boolean;
   message: string;
+  /** When true, Live mode places real Kite MIS orders (addon). */
+  realOrders: boolean;
+  /** ISO timestamp of last successful live tick (heartbeat). */
+  lastTickAt: string | null;
   statuses: PaperInstrumentStatus[];
   trades: PaperTrade[];
   totals: {
@@ -80,4 +94,29 @@ export interface PaperDeskSnapshot {
     lastRangeDays: number;
     maxDaysPerCall: number;
   };
+  orderEvents: Array<{
+    at: string;
+    instrumentId: string;
+    instrumentName?: string;
+    action: string;
+    detail: string;
+    orderId?: string;
+    tradingSymbol?: string;
+    quantity?: number;
+  }>;
+  /** Live money: full Kite order book for this session (refreshed each tick). */
+  orderSummary: Array<{
+    id: string;
+    at: string;
+    instrumentId: string;
+    instrumentName: string;
+    tradingSymbol: string;
+    quantity: number;
+    leg: string;
+    side: string;
+    orderId: string;
+    status: string;
+    triggerPrice: number | null;
+    averagePrice: number | null;
+  }>;
 }
