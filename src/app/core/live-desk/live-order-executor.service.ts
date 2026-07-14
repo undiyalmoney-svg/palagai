@@ -99,11 +99,17 @@ export class LiveOrderExecutorService {
   private readonly events: LiveOrderEvent[] = [];
   private readonly summary = new Map<string, LiveOrderSummaryRow>();
   private readonly instrumentNames = new Map<string, string>();
+  /** Number of lots (exchange lot size × this). Testing never uses this. */
+  private lotsMultiplier = 1;
 
   reset(): void {
     this.positions.clear();
     this.events.length = 0;
     this.summary.clear();
+  }
+
+  setLotsMultiplier(lots: number): void {
+    this.lotsMultiplier = Math.max(1, Math.floor(lots) || 1);
   }
 
   getPositions(): LiveBrokerPosition[] {
@@ -169,8 +175,9 @@ export class LiveOrderExecutorService {
       return;
     }
 
-    // 1 lot = exchange lot size for that contract (Nifty / Bank Nifty).
-    const quantity = Math.max(1, option.lotSize || 1);
+    // qty = exchange lot size × configured lots (Live money only).
+    const lotSize = Math.max(1, option.lotSize || 1);
+    const quantity = lotSize * this.lotsMultiplier;
     try {
       const response = await firstValueFrom(
         this.kiteApi.placeRegularOrder(authorization, {
@@ -194,7 +201,7 @@ export class LiveOrderExecutorService {
         at: new Date().toISOString(),
         instrumentId,
         action: 'ENTRY',
-        detail: `BUY ${quantity} ${option.tradingSymbol} MIS MARKET (1 lot)`,
+        detail: `BUY ${quantity} ${option.tradingSymbol} MIS MARKET (${this.lotsMultiplier} lot × ${lotSize})`,
         orderId: entryOrderId,
         tradingSymbol: option.tradingSymbol,
         quantity,

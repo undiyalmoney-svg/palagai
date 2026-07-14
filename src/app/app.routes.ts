@@ -9,6 +9,7 @@ import { ResultsComponent } from './features/dashboard/results/results.component
 import { ResultDetailComponent } from './features/dashboard/results/result-detail/result-detail.component';
 import { StrategiesComponent } from './features/dashboard/strategies/strategies.component';
 import { TradeDeskComponent } from './features/dashboard/trade-desk/trade-desk.component';
+import { OrderTestComponent } from './features/dashboard/order-test/order-test.component';
 import { GetTokenComponent } from './features/dashboard/get-token/get-token.component';
 import { SettingsComponent } from './features/dashboard/settings/settings.component';
 
@@ -44,6 +45,11 @@ export const routes: Routes = [
         path: 'trade-desk',
         canActivate: [kiteSessionGuard],
         component: TradeDeskComponent,
+      },
+      {
+        path: 'order-test',
+        canActivate: [kiteSessionGuard],
+        component: OrderTestComponent,
       },
       {
         path: 'historical-tester',

@@ -22,6 +22,8 @@ export class TradeDeskComponent implements OnDestroy {
   /** Addon: when Live + this checked, places real Kite MIS orders. */
   protected realOrders = false;
   protected realOrdersAck = false;
+  /** Live money lots (exchange lot size × this). Testing ignores this. */
+  protected lots = 1;
 
   protected readonly snapshot = this.desk.snapshot;
   protected readonly busy = this.desk.busy;
@@ -58,14 +60,19 @@ export class TradeDeskComponent implements OnDestroy {
           return;
         }
         if (this.realOrders) {
+          const lots = Math.max(1, Math.floor(Number(this.lots)) || 1);
+          this.lots = lots;
           const ok = window.confirm(
-            'Start LIVE MONEY?\n\nReal Kite MIS MARKET orders will be placed on ATM weekly options (1 lot) for Nifty & Bank Nifty when signals fire.\n\nPaper Testing mode is unchanged.',
+            `Start LIVE MONEY?\n\nReal Kite MIS MARKET orders will be placed on ATM options (${lots} lot each) for Nifty & Bank Nifty when signals fire.\n\nOrders go via DigitalOcean fixed IP.\nPaper Testing mode is unchanged.`,
           );
           if (!ok) {
             return;
           }
         }
-        await this.desk.startLive({ realOrders: this.realOrders });
+        await this.desk.startLive({
+          realOrders: this.realOrders,
+          lots: Math.max(1, Math.floor(Number(this.lots)) || 1),
+        });
       }
     } catch (err) {
       this.error.set(err instanceof Error ? err.message : String(err));

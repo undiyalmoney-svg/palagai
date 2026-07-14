@@ -40,6 +40,7 @@ export class DashboardComponent {
 
   protected readonly navItems = [
     { label: 'Trade Desk', route: '/dashboard/trade-desk', icon: 'calculate' },
+    { label: 'Order Test', route: '/dashboard/order-test', icon: 'bolt' },
     { label: 'Historical Tester', route: '/dashboard/historical-tester', icon: 'play_circle' },
     { label: 'Results', route: '/dashboard/results', icon: 'assessment' },
     { label: 'Strategy', route: '/dashboard/strategies', icon: 'insights' },

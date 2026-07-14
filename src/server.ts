@@ -134,6 +134,65 @@ kiteApiRouter.use(async (req, res) => {
 app.use('/api/kite', kiteApiRouter);
 
 /**
+ * Forward order APIs to DigitalOcean Palagai-Order-API (static egress IP).
+ * Browser stays same-origin HTTPS; Kite sees the droplet IP.
+ */
+const ORDER_BACKEND_BASE = (
+  process.env['ORDER_BACKEND_URL'] || 'http://168.144.28.89:3000'
+).replace(/\/$/, '');
+
+const orderKiteRouter = express.Router();
+orderKiteRouter.use(express.urlencoded({ extended: false }));
+orderKiteRouter.use(express.json());
+orderKiteRouter.use((req, _res, next) => {
+  if (typeof req.body === 'string' && req.body.includes('=')) {
+    req.body = Object.fromEntries(new URLSearchParams(req.body));
+  }
+  next();
+});
+
+orderKiteRouter.use(async (req, res) => {
+  const targetUrl = `${ORDER_BACKEND_BASE}/api/kite${req.url}`;
+  const headers: Record<string, string> = {
+    'X-Kite-Version': '3',
+  };
+  if (typeof req.headers.authorization === 'string') {
+    headers['Authorization'] = req.headers.authorization;
+  }
+
+  const init: RequestInit = {
+    method: req.method,
+    headers,
+  };
+
+  if (req.method !== 'GET' && req.method !== 'HEAD') {
+    headers['Content-Type'] = 'application/x-www-form-urlencoded';
+    const fields = asFormRecord(req.body);
+    init.body = new URLSearchParams(fields).toString();
+  }
+
+  try {
+    const upstream = await fetch(targetUrl, init);
+    const responseText = await upstream.text();
+    let responseBody: unknown = responseText;
+    try {
+      responseBody = JSON.parse(responseText);
+    } catch {
+      // keep text
+    }
+    res.status(upstream.status).send(responseBody);
+  } catch (err) {
+    console.error('[order-kite proxy]', err);
+    res.status(502).json({
+      status: 'error',
+      message: `Failed to reach order backend at ${ORDER_BACKEND_BASE}`,
+    });
+  }
+});
+
+app.use('/api/order-kite', orderKiteRouter);
+
+/**
  * Serve static files from /browser
  */
 app.use(

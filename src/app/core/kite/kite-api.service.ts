@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Observable, from } from 'rxjs';
 import { mergeMap } from 'rxjs/operators';
+import { environment } from '../../../environments/environment';
 
 export interface KiteSessionTokenRequest {
   apiKey: string;
@@ -21,7 +22,14 @@ export interface KiteHistoricalRequest {
 @Injectable({ providedIn: 'root' })
 export class KiteApiService {
   private readonly http = inject(HttpClient);
+  /** Candles, quotes, instruments, token — Vercel / local proxy. */
   private readonly kiteApiBaseUrl = '/api/kite';
+  /**
+   * Order APIs only — DigitalOcean fixed-IP backend
+   * (or same-origin `/api/order-kite` forwarder in production).
+   */
+  private readonly orderApiBaseUrl =
+    (environment as { orderApiBaseUrl?: string }).orderApiBaseUrl || '/api/kite';
 
   exchangeSessionToken(payload: KiteSessionTokenRequest): Observable<unknown> {
     const params = new URLSearchParams();
@@ -126,7 +134,7 @@ export class KiteApiService {
   ): Observable<unknown> {
     const headers = this.authHeaders(authorization);
     return this.http.delete(
-      `${this.kiteApiBaseUrl}/orders/${variety}/${encodeURIComponent(orderId)}`,
+      `${this.orderApiBaseUrl}/orders/${variety}/${encodeURIComponent(orderId)}`,
       { headers },
     );
   }
@@ -137,21 +145,21 @@ export class KiteApiService {
 
   /** GET /orders — day order book */
   getOrders(authorization: string): Observable<unknown> {
-    return this.http.get(`${this.kiteApiBaseUrl}/orders`, {
+    return this.http.get(`${this.orderApiBaseUrl}/orders`, {
       headers: this.authHeaders(authorization),
     });
   }
 
   /** GET /orders/:order_id — status history for one order */
   getOrderHistory(authorization: string, orderId: string): Observable<unknown> {
-    return this.http.get(`${this.kiteApiBaseUrl}/orders/${encodeURIComponent(orderId)}`, {
+    return this.http.get(`${this.orderApiBaseUrl}/orders/${encodeURIComponent(orderId)}`, {
       headers: this.authHeaders(authorization),
     });
   }
 
   /** GET /trades — all executed trades for the day */
   getTrades(authorization: string): Observable<unknown> {
-    return this.http.get(`${this.kiteApiBaseUrl}/trades`, {
+    return this.http.get(`${this.orderApiBaseUrl}/trades`, {
       headers: this.authHeaders(authorization),
     });
   }
@@ -159,16 +167,21 @@ export class KiteApiService {
   /** GET /orders/:order_id/trades */
   getOrderTrades(authorization: string, orderId: string): Observable<unknown> {
     return this.http.get(
-      `${this.kiteApiBaseUrl}/orders/${encodeURIComponent(orderId)}/trades`,
+      `${this.orderApiBaseUrl}/orders/${encodeURIComponent(orderId)}/trades`,
       { headers: this.authHeaders(authorization) },
     );
   }
 
   /** GET /portfolio/positions */
   getPositions(authorization: string): Observable<unknown> {
-    return this.http.get(`${this.kiteApiBaseUrl}/portfolio/positions`, {
+    return this.http.get(`${this.orderApiBaseUrl}/portfolio/positions`, {
       headers: this.authHeaders(authorization),
     });
+  }
+
+  /** Order-backend health (droplet or `/api/order-kite` proxy). */
+  pingOrderBackend(): Observable<unknown> {
+    return this.http.get(`${this.orderApiBaseUrl}/health`);
   }
 
   private authHeaders(authorization: string, withForm = false): HttpHeaders {
@@ -197,7 +210,7 @@ export class KiteApiService {
     path: string,
     fields: Record<string, string>,
   ): Observable<unknown> {
-    return this.http.post(`${this.kiteApiBaseUrl}${path}`, this.toFormBody(fields), {
+    return this.http.post(`${this.orderApiBaseUrl}${path}`, this.toFormBody(fields), {
       headers: this.authHeaders(authorization, true),
     });
   }
@@ -207,7 +220,7 @@ export class KiteApiService {
     path: string,
     fields: Record<string, string>,
   ): Observable<unknown> {
-    return this.http.put(`${this.kiteApiBaseUrl}${path}`, this.toFormBody(fields), {
+    return this.http.put(`${this.orderApiBaseUrl}${path}`, this.toFormBody(fields), {
       headers: this.authHeaders(authorization, true),
     });
   }

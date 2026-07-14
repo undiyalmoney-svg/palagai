@@ -136,6 +136,14 @@
   background: #fef2f2;
 }
 
+.lots-field {
+  min-width: 5.5rem;
+}
+
+.lots-field input {
+  width: 4.5rem;
+}
+
 .phase-pill {
   display: inline-flex;
   margin: 0 0 0.65rem;

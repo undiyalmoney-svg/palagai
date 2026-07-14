@@ -67,6 +67,16 @@
         <span>Live money — place real Kite MIS orders (1 lot)</span>
       </label>
       @if (realOrders) {
+        <label class="field lots-field">
+          <span>Lots</span>
+          <input
+            type="number"
+            min="1"
+            step="1"
+            [(ngModel)]="lots"
+            [disabled]="busy() || snapshot().running"
+          />
+        </label>
         <label class="real-orders ack">
           <input
             type="checkbox"

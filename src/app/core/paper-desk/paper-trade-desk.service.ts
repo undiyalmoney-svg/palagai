@@ -219,11 +219,12 @@ export class PaperTradeDeskService {
     }
   }
 
-  async startLive(options?: { realOrders?: boolean }): Promise<void> {
+  async startLive(options?: { realOrders?: boolean; lots?: number }): Promise<void> {
     this.stopLive();
     this.resetKiteStats();
     this.realOrders = !!options?.realOrders;
     this.liveOrders.reset();
+    this.liveOrders.setLotsMultiplier(options?.lots ?? 1);
     const today = todayIso();
     const now = istNowHhMm();
 

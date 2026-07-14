@@ -1,0 +1,80 @@
+<section class="order-test">
+  <header class="hero">
+    <div class="hero-copy">
+      <p class="eyebrow">IP whitelist smoke test</p>
+      <h1>Order Test</h1>
+      <p class="lede">
+        Places a tiny <strong>RELIANCE</strong> equity order via the DigitalOcean Order API so you can
+        confirm Kite accepts this server IP. Does not run the strategy — Testing / Trade Desk paper stay unchanged.
+      </p>
+    </div>
+    <div class="hero-meta">
+      <span class="badge danger">REAL MONEY</span>
+      <span class="badge soft">{{ orderApiBase }}</span>
+    </div>
+  </header>
+
+  <div class="panel">
+    <div class="row">
+      <label class="field">
+        <span>Symbol</span>
+        <input type="text" [value]="symbol" disabled />
+      </label>
+      <label class="field">
+        <span>Exchange</span>
+        <input type="text" [value]="exchange" disabled />
+      </label>
+      <label class="field">
+        <span>Qty</span>
+        <input type="number" min="1" step="1" [(ngModel)]="quantity" [disabled]="busy()" />
+      </label>
+      <label class="field">
+        <span>Product</span>
+        <select [(ngModel)]="product" [disabled]="busy()">
+          <option value="MIS">MIS</option>
+          <option value="CNC">CNC</option>
+        </select>
+      </label>
+    </div>
+
+    <div class="actions">
+      <button mat-stroked-button type="button" [disabled]="busy()" (click)="pingHealth()">
+        Ping health
+      </button>
+      <button mat-flat-button color="primary" type="button" [disabled]="busy()" (click)="placeBuy()">
+        @if (busy()) {
+          <mat-spinner diameter="18" />
+        }
+        Buy RELIANCE (MARKET)
+      </button>
+      <button mat-stroked-button type="button" [disabled]="busy()" (click)="placeSell()">
+        Sell RELIANCE (MARKET)
+      </button>
+      <button mat-stroked-button type="button" [disabled]="busy()" (click)="refreshOrders()">
+        Refresh orders
+      </button>
+      <button mat-button type="button" [disabled]="busy()" (click)="clearLogs()">Clear logs</button>
+    </div>
+
+    @if (lastOrderId()) {
+      <p class="last-id">Last order id: <code>{{ lastOrderId() }}</code></p>
+    }
+  </div>
+
+  <div class="logs-block">
+    <div class="logs-head">
+      <h3>Logs</h3>
+      <p>Request / response from the fixed-IP order backend</p>
+    </div>
+    <ul class="log-list">
+      @for (line of logs(); track line.at + line.message) {
+        <li [attr.data-level]="line.level">
+          <time>{{ line.at }}</time>
+          <span>{{ line.message }}</span>
+        </li>
+      } @empty {
+        <li class="empty">No logs yet — ping health, then place a 1-qty RELIANCE buy.</li>
+      }
+    </ul>
+  </div>
+</section>
