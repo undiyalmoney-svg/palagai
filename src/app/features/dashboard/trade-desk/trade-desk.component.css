@@ -481,7 +481,9 @@
 
 .field input {
   min-width: 10.5rem;
-  padding: 0.55rem 0.7rem;
+  height: 44px;
+  box-sizing: border-box;
+  padding: 0 0.7rem;
   border: 1px solid var(--line);
   border-radius: 10px;
   font: inherit;
@@ -508,29 +510,85 @@
 
 .actions {
   display: flex;
-  gap: 0.5rem;
+  align-items: center;
+  align-self: flex-end;
+  gap: 0.6rem;
   margin-left: auto;
+  flex-shrink: 0;
 }
 
 .start-btn,
 .stop-btn {
-  min-height: 42px;
+  box-sizing: border-box !important;
+  height: 44px !important;
+  min-height: 44px !important;
+  max-height: 44px !important;
+  margin: 0 !important;
+  padding: 0 !important;
   border-radius: 11px !important;
   font-weight: 700 !important;
+  line-height: 1 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
 }
 
 .start-btn {
   background: var(--accent-deep) !important;
   color: #fff !important;
-  display: inline-flex !important;
-  align-items: center;
-  gap: 0.45rem;
-  padding-inline: 1.25rem !important;
+  min-width: 9.5rem;
+  --mdc-circular-progress-active-indicator-color: #ffffff;
 }
 
 .stop-btn {
   border-color: #fecaca !important;
   color: var(--sell) !important;
+  min-width: 5.5rem;
+  padding: 0 1.1rem !important;
+}
+
+.start-btn-inner {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 1.1rem;
+  line-height: 1;
+  text-align: center;
+}
+
+.start-btn-inner mat-spinner,
+.start-btn-inner .mat-mdc-progress-spinner {
+  flex-shrink: 0;
+  width: 16px !important;
+  height: 16px !important;
+}
+
+:host ::ng-deep .start-btn .mat-mdc-progress-spinner circle,
+:host ::ng-deep .start-btn-inner .mat-mdc-progress-spinner circle {
+  stroke: #ffffff !important;
+}
+
+:host ::ng-deep .start-btn .mdc-circular-progress__indeterminate-circle-graphic,
+:host ::ng-deep .start-btn-inner .mdc-circular-progress__indeterminate-circle-graphic {
+  stroke: #ffffff !important;
+}
+
+:host ::ng-deep .start-btn .mdc-button__label,
+:host ::ng-deep .stop-btn .mdc-button__label {
+  width: 100%;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center;
+}
+
+:host ::ng-deep .start-btn .mat-mdc-button-touch-target,
+:host ::ng-deep .stop-btn .mat-mdc-button-touch-target {
+  height: 100%;
 }
 
 .banner {

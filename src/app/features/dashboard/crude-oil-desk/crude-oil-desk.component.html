@@ -103,12 +103,14 @@
         (click)="onStart()"
       >
         @if (busy()) {
-          <mat-spinner diameter="18" />
-          <span>Running…</span>
+          <span class="start-btn-inner">
+            <mat-spinner diameter="16" />
+            <span>Running…</span>
+          </span>
         } @else if (mode() === 'live' && snapshot().running) {
-          <span>Live running</span>
+          <span class="start-btn-inner">Live running</span>
         } @else {
-          <span>Start</span>
+          <span class="start-btn-inner">Start</span>
         }
       </button>
     </div>
