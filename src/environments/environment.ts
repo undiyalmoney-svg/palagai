@@ -12,4 +12,6 @@ export const environment = {
    * When true, Live money checkboxes on Trade Desk / Crude Desk can place real Kite orders.
    */
   allowLiveMoney: true,
+  /** DigitalOcean order-backend static egress IP (whitelist in Kite). */
+  orderEgressIp: '168.144.28.89',
 };

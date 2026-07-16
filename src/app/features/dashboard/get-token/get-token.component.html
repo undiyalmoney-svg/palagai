@@ -9,6 +9,47 @@
     </p>
   </header>
 
+  <article class="step-card whitelist-card">
+    <div class="step-header">
+      <span class="step-badge">Kite</span>
+      <h3>Public IP &amp; Redirect URLs</h3>
+    </div>
+    <p class="step-description">
+      Pick a value to copy into the Kite developer console (IP whitelist or Redirect URL).
+    </p>
+
+    <div class="copy-row">
+      <mat-form-field appearance="outline" class="copy-select">
+        <mat-label>Select</mat-label>
+        <mat-select
+          [ngModel]="selectedCopyId()"
+          (ngModelChange)="selectedCopyId.set($event); copyMessage.set('')"
+        >
+          @for (opt of copyOptions; track opt.id) {
+            <mat-option [value]="opt.id">{{ opt.label }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+
+      <button mat-flat-button color="primary" type="button" class="action-button copy-btn" (click)="onCopySelected()">
+        <mat-icon>content_copy</mat-icon>
+        <span>Copy</span>
+      </button>
+    </div>
+
+    <div class="result-block session-field">
+      <span class="result-label">Value</span>
+      <pre class="result-output">{{ selectedCopyOption().value }}</pre>
+      <small class="copy-hint">{{ selectedCopyOption().hint }}</small>
+    </div>
+
+    @if (copyMessage()) {
+      <div class="result-block success inline-message">
+        <span>{{ copyMessage() }}</span>
+      </div>
+    }
+  </article>
+
   @if (autoExchangeNote()) {
     <p class="banner info" role="status">{{ autoExchangeNote() }}</p>
   }

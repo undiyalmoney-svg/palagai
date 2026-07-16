@@ -1,10 +1,11 @@
 import { Component, OnInit, PLATFORM_ID, afterNextRender, computed, inject, signal } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { buildKiteChecksum, sanitizeKiteCredential } from '../../../core/utils/sha256.util';
@@ -17,17 +18,27 @@ import {
   consumeKiteRequestToken,
   stashKiteRequestToken,
 } from '../../../core/kite/kite-request-token.util';
+import { environment } from '../../../../environments/environment';
 
 const KITE_LOGIN_URL = 'https://kite.zerodha.com/connect/login?v=3&api_key=';
+
+interface CopyOption {
+  id: string;
+  label: string;
+  value: string;
+  hint: string;
+}
 
 @Component({
   selector: 'app-get-token',
   standalone: true,
   imports: [
+    FormsModule,
     ReactiveFormsModule,
     MatButtonModule,
     MatFormFieldModule,
     MatInputModule,
+    MatSelectModule,
     MatIconModule,
     MatProgressSpinnerModule,
   ],
@@ -57,6 +68,48 @@ export class GetTokenComponent implements OnInit {
   protected readonly sessionSavedMessage = signal('');
   protected readonly hideAccessToken = signal(true);
   protected readonly autoExchangeNote = signal('');
+  protected readonly copyMessage = signal('');
+  protected readonly selectedCopyId = signal('public-ip');
+
+  protected readonly copyOptions: CopyOption[] = [
+    {
+      id: 'public-ip',
+      label: 'Public IP (order backend)',
+      value: environment.orderEgressIp || '168.144.28.89',
+      hint: 'Whitelist this IP in Kite Connect → API → IP whitelist',
+    },
+    {
+      id: 'redirect-prod',
+      label: 'Redirect URL (production)',
+      value: 'https://palagai.app/dashboard/get-token',
+      hint: 'Add as Redirect URL in Kite developer app',
+    },
+    {
+      id: 'redirect-local',
+      label: 'Redirect URL (local)',
+      value: 'http://localhost:4200/',
+      hint: 'Local ng serve redirect for Kite login',
+    },
+    {
+      id: 'page-url',
+      label: 'This page URL',
+      value: '',
+      hint: 'Current browser address (filled on load)',
+    },
+  ];
+
+  protected readonly selectedCopyOption = computed(() => {
+    const id = this.selectedCopyId();
+    const opt = this.copyOptions.find((o) => o.id === id) ?? this.copyOptions[0]!;
+    if (opt.id === 'page-url') {
+      const href =
+        isPlatformBrowser(this.platformId) && typeof window !== 'undefined'
+          ? (window.location.href.split('?')[0] ?? window.location.origin)
+          : 'https://palagai.app/dashboard/get-token';
+      return { ...opt, value: href };
+    }
+    return opt;
+  });
 
   protected readonly todaySession = computed(() => {
     const session = this.kiteSessionService.storedSession();
@@ -117,6 +170,20 @@ export class GetTokenComponent implements OnInit {
     } else {
       this.setCredentialsFormEditable(true);
       this.isEditingCredentials.set(true);
+    }
+  }
+
+  protected async onCopySelected(): Promise<void> {
+    const value = this.selectedCopyOption().value?.trim();
+    if (!value || !isPlatformBrowser(this.platformId)) {
+      this.copyMessage.set('Nothing to copy.');
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(value);
+      this.copyMessage.set(`Copied: ${value}`);
+    } catch {
+      this.copyMessage.set('Copy failed — select the value and copy manually.');
     }
   }
 

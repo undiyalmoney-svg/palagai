@@ -32,6 +32,35 @@
   background: linear-gradient(180deg, #fff 0%, #fffbeb 100%) !important;
 }
 
+.whitelist-card {
+  margin-bottom: 1.25rem;
+  border-color: var(--pg-line-strong);
+}
+
+.copy-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.copy-select {
+  flex: 1;
+  min-width: 220px;
+}
+
+.copy-btn {
+  margin-top: 0.35rem;
+  height: 48px;
+}
+
+.copy-hint {
+  display: block;
+  margin-top: 0.4rem;
+  color: var(--pg-muted);
+  font-size: 0.85rem;
+}
+
 .session-fields {
   display: flex;
   flex-direction: column;
