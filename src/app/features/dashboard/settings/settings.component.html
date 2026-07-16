@@ -1,8 +1,24 @@
-<section class="settings-page">
-  <header>
-    <h2>Settings</h2>
-    <p>Data management and instrument repository status.</p>
+<section class="settings-page pg-page">
+  <header class="pg-page-hero">
+    <p class="pg-eyebrow">Data &amp; cache</p>
+    <h1>Settings</h1>
+    <p class="pg-lede">Refresh the instrument master from Kite and clear local caches when something looks stale.</p>
   </header>
+
+  <div class="status-card">
+    <h3>Trading defaults</h3>
+    <label class="lots-setting">
+      <span>Default lots (exchange lot × this)</span>
+      <input
+        type="number"
+        min="1"
+        step="1"
+        [(ngModel)]="lots"
+        (ngModelChange)="onLotsChange()"
+      />
+    </label>
+    <p class="lots-hint">Used across Trade Desk, Order Test, and Crude Oil Mini. Default is 1.</p>
+  </div>
 
   <div class="status-card">
     <h3>Instrument Repository</h3>

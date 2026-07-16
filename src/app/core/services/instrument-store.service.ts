@@ -4,6 +4,7 @@ import { Instrument, InstrumentMetadata } from '../models/instrument.model';
 import { KiteApiService } from '../kite/kite-api.service';
 import { KiteSessionService } from '../kite/kite-session.service';
 import { parseKiteInstrumentsCsv } from '../utils/csv.util';
+import { formatUnknownError } from '../utils/kite-error.util';
 
 const STORAGE_KEY = 'palagai_instruments';
 const META_KEY = 'palagai_instruments_meta';
@@ -42,7 +43,29 @@ export class InstrumentStoreService {
     if (this.instruments().length > 0 && this.isRefreshedToday()) {
       return;
     }
+
+    // Use stale cache when offline — only hard-fail if we have nothing at all.
+    if (this.instruments().length > 0) {
+      try {
+        await this.refresh(false);
+      } catch {
+        // refresh() keeps stale rows when cache exists
+      }
+      return;
+    }
+
     await this.refresh(false);
+  }
+
+  /** Refresh from Kite; never throws if a cached instrument file already exists. */
+  async refreshBestEffort(force: boolean): Promise<boolean> {
+    const hadCache = this.instruments().length > 0;
+    try {
+      await this.refresh(force);
+      return this.metadata().status === 'ready';
+    } catch {
+      return hadCache && this.instruments().length > 0;
+    }
   }
 
   async refresh(force: boolean): Promise<void> {
@@ -70,7 +93,7 @@ export class InstrumentStoreService {
         });
         return;
       }
-      throw error;
+      throw new Error(formatUnknownError(error, 'Instruments'));
     }
   }
 

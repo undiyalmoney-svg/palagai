@@ -51,6 +51,7 @@ export function resolveSessionConfig(params?: {
   const { instrumentId, exchange, instrumentToken } = params ?? {};
   if (
     instrumentId === 'crude-oil' ||
+    instrumentId === 'crude-oil-mini' ||
     exchange === 'MCX' ||
     instrumentToken === 520702
   ) {

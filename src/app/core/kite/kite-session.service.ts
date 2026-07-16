@@ -65,6 +65,33 @@ export class KiteSessionService {
     return true;
   }
 
+  /** Manual paste (local/dev) — skips Kite redirect exchange. */
+  saveManualAccessToken(params: {
+    apiKey: string;
+    accessToken: string;
+    userId?: string;
+  }): boolean {
+    const apiKey = params.apiKey.trim();
+    const accessToken = params.accessToken.trim();
+    if (!apiKey || !accessToken) {
+      return false;
+    }
+
+    const session: KiteSession = {
+      data: {
+        user_id: params.userId?.trim() || 'manual',
+        api_key: apiKey,
+        access_token: accessToken,
+        login_time: new Date().toISOString(),
+      },
+      savedAt: new Date().toISOString(),
+    };
+
+    this.persistToStorage(session);
+    this.session.set(session);
+    return true;
+  }
+
   clearSession(): void {
     if (isPlatformBrowser(this.platformId)) {
       localStorage.removeItem(STORAGE_KEY);

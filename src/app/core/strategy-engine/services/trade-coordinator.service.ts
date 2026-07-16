@@ -92,6 +92,7 @@ export class TradeCoordinatorService {
         signal.entryPrice,
         direction,
         signal.stopLoss,
+        Number(signal.analysis?.['maxStopPts']),
       );
       state.openTrade = this.tradeManager.createOpenTrade({
         entryTime: candle.date,
@@ -344,9 +345,14 @@ function clampStopForStrategy(
   entry: number,
   direction: TradeDirection,
   proposedStop: number,
+  maxStopPts?: number,
 ): number {
   if (strategyId !== STRATEGY_IDS.PDHL_OPENING_RANGE) {
     return proposedStop;
   }
-  return clampStopLoss(entry, direction, proposedStop, PDHL_MAX_STOP_LOSS_PTS);
+  const cap =
+    Number.isFinite(maxStopPts) && (maxStopPts as number) > 0
+      ? (maxStopPts as number)
+      : PDHL_MAX_STOP_LOSS_PTS;
+  return clampStopLoss(entry, direction, proposedStop, cap);
 }

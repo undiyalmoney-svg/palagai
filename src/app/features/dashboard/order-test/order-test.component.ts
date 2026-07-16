@@ -1,10 +1,12 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { firstValueFrom } from 'rxjs';
 import { KiteApiService } from '../../../core/kite/kite-api.service';
 import { KiteSessionService } from '../../../core/kite/kite-session.service';
+import { LotsPreferenceService } from '../../../core/services/lots-preference.service';
+import { formatUnknownError } from '../../../core/utils/kite-error.util';
 import { environment } from '../../../../environments/environment';
 
 interface LogLine {
@@ -20,9 +22,10 @@ interface LogLine {
   templateUrl: './order-test.component.html',
   styleUrl: './order-test.component.css',
 })
-export class OrderTestComponent {
+export class OrderTestComponent implements OnInit {
   private readonly kiteApi = inject(KiteApiService);
   private readonly kiteSession = inject(KiteSessionService);
+  private readonly lotsPreference = inject(LotsPreferenceService);
 
   protected readonly busy = signal(false);
   protected readonly logs = signal<LogLine[]>([]);
@@ -33,8 +36,18 @@ export class OrderTestComponent {
   protected quantity = 1;
   protected product: 'MIS' | 'CNC' = 'MIS';
 
+  ngOnInit(): void {
+    this.quantity = this.lotsPreference.get();
+  }
+
+  protected onQuantityChange(): void {
+    const normalized = Math.max(1, Math.floor(Number(this.quantity)) || 1);
+    this.quantity = normalized;
+    this.lotsPreference.set(normalized);
+  }
+
   protected readonly orderApiBase =
-    (environment as { orderApiBaseUrl?: string }).orderApiBaseUrl || '/api/kite';
+    (environment as { orderApiBaseUrl?: string }).orderApiBaseUrl || '/api/order-kite';
 
   protected clearLogs(): void {
     this.logs.set([]);
@@ -181,13 +194,10 @@ export class OrderTestComponent {
   }
 
   private fmtErr(err: unknown): string {
-    if (err && typeof err === 'object' && 'error' in err) {
-      const httpErr = err as { status?: number; error?: unknown; message?: string };
-      return `HTTP ${httpErr.status ?? '?'} · ${JSON.stringify(httpErr.error ?? httpErr.message)}`;
+    const msg = formatUnknownError(err, 'Order test');
+    if (/Failed to fetch|NetworkError|ERR_CONNECTION|mixed content/i.test(msg)) {
+      return `${msg} · Check /api/order-kite reaches the droplet (not blocked by browser).`;
     }
-    if (err instanceof Error) {
-      return err.message;
-    }
-    return String(err);
+    return msg;
   }
 }

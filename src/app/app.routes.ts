@@ -4,14 +4,11 @@ import { kiteSessionGuard } from './core/auth/kite-session.guard';
 import { stashKiteRequestToken } from './core/kite/kite-request-token.util';
 import { LoginComponent } from './features/login/login.component';
 import { DashboardComponent } from './features/dashboard/dashboard.component';
-import { HistoricalTesterComponent } from './features/dashboard/historical-tester/historical-tester.component';
-import { ResultsComponent } from './features/dashboard/results/results.component';
-import { ResultDetailComponent } from './features/dashboard/results/result-detail/result-detail.component';
-import { StrategiesComponent } from './features/dashboard/strategies/strategies.component';
 import { TradeDeskComponent } from './features/dashboard/trade-desk/trade-desk.component';
 import { OrderTestComponent } from './features/dashboard/order-test/order-test.component';
 import { GetTokenComponent } from './features/dashboard/get-token/get-token.component';
 import { SettingsComponent } from './features/dashboard/settings/settings.component';
+import { CrudeOilDeskComponent } from './features/dashboard/crude-oil-desk/crude-oil-desk.component';
 
 export const routes: Routes = [
   {
@@ -52,29 +49,9 @@ export const routes: Routes = [
         component: OrderTestComponent,
       },
       {
-        path: 'historical-tester',
+        path: 'crude-oil',
         canActivate: [kiteSessionGuard],
-        component: HistoricalTesterComponent,
-      },
-      {
-        path: 'strategy',
-        redirectTo: 'trade-desk',
-        pathMatch: 'full',
-      },
-      {
-        path: 'results',
-        canActivate: [kiteSessionGuard],
-        component: ResultsComponent,
-      },
-      {
-        path: 'results/:id',
-        canActivate: [kiteSessionGuard],
-        component: ResultDetailComponent,
-      },
-      {
-        path: 'strategies',
-        canActivate: [kiteSessionGuard],
-        component: StrategiesComponent,
+        component: CrudeOilDeskComponent,
       },
       {
         path: 'get-token',
@@ -85,6 +62,12 @@ export const routes: Routes = [
         canActivate: [kiteSessionGuard],
         component: SettingsComponent,
       },
+      // Removed tabs — keep old URLs from breaking
+      { path: 'historical-tester', redirectTo: 'trade-desk', pathMatch: 'full' },
+      { path: 'strategy', redirectTo: 'trade-desk', pathMatch: 'full' },
+      { path: 'strategies', redirectTo: 'trade-desk', pathMatch: 'full' },
+      { path: 'results', redirectTo: 'trade-desk', pathMatch: 'full' },
+      { path: 'results/:id', redirectTo: 'trade-desk' },
     ],
   },
   {

@@ -9,6 +9,10 @@ export interface PaperOptionContract {
   lotSize: number;
   /** chain = from Kite instruments; synthetic = computed label when chain miss */
   source: 'chain' | 'synthetic';
+  /** Defaults to NFO when omitted (Nifty / Bank Nifty). */
+  exchange?: 'NFO' | 'MCX';
+  /** Defaults to MIS when omitted. MCX crude uses NRML. */
+  product?: 'MIS' | 'NRML';
 }
 
 export interface PaperTrade {
@@ -28,7 +32,7 @@ export interface PaperTrade {
   option: PaperOptionContract | null;
   optionEntryPremium: number | null;
   optionExitPremium: number | null;
-  /** Main P&L: (exit − entry) × lotSize for long CE/PE. */
+  /** Main P&L: (exit − entry) × lotSize × lots multiplier for long CE/PE. */
   optionPnlRs: number | null;
   premiumEstimated: boolean;
   outcome: 'WIN' | 'LOSS' | 'FLAT';

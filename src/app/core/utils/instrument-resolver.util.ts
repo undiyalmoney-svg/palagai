@@ -2,6 +2,7 @@ import { Instrument } from '../models/instrument.model';
 import {
   BANK_NIFTY_INSTRUMENT,
   CRUDE_OIL_INSTRUMENT,
+  CRUDE_OIL_MINI_INSTRUMENT,
   NIFTY_50_INSTRUMENT,
 } from '../constants/instruments.const';
 
@@ -17,6 +18,29 @@ export function resolveCrudeOilFuturesToken(
         item.instrumentType === 'FUT' &&
         item.tradingSymbol.startsWith('CRUDEOIL') &&
         !item.tradingSymbol.startsWith('CRUDEOILM'),
+    )
+    .filter((item) => {
+      if (!item.expiry) {
+        return true;
+      }
+      const expiry = startOfDay(new Date(item.expiry));
+      return expiry >= today;
+    })
+    .sort((left, right) => expiryTime(left) - expiryTime(right))[0];
+}
+
+/** Nearest MCX CRUDEOILM (mini) futures contract. */
+export function resolveCrudeOilMiniFuturesToken(
+  instruments: Instrument[],
+): Instrument | undefined {
+  const today = startOfDay(new Date());
+
+  return instruments
+    .filter(
+      (item) =>
+        item.exchange === 'MCX' &&
+        item.instrumentType === 'FUT' &&
+        item.tradingSymbol.startsWith('CRUDEOILM'),
     )
     .filter((item) => {
       if (!item.expiry) {
@@ -59,6 +83,10 @@ export function resolveNseIndexFuturesToken(
 
 export function isCrudeOilInstrumentId(id: string): boolean {
   return id === CRUDE_OIL_INSTRUMENT.id;
+}
+
+export function isCrudeOilMiniInstrumentId(id: string): boolean {
+  return id === CRUDE_OIL_MINI_INSTRUMENT.id;
 }
 
 export function isBankNiftyInstrumentId(id: string): boolean {

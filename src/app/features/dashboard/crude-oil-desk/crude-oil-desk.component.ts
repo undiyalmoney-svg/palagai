@@ -3,31 +3,32 @@ import { DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { PaperTradeDeskService } from '../../../core/paper-desk/paper-trade-desk.service';
+import { CrudePaperDeskService } from '../../../core/paper-desk/crude-paper-desk.service';
 import { PaperDeskMode } from '../../../core/paper-desk/paper-desk.models';
 import { KiteSessionService } from '../../../core/kite/kite-session.service';
 import { LotsPreferenceService } from '../../../core/services/lots-preference.service';
+import { MCX_CRUDE_SESSION } from '../../../core/config/session.config';
 import { formatUnknownError } from '../../../core/utils/kite-error.util';
 
 @Component({
-  selector: 'app-trade-desk',
+  selector: 'app-crude-oil-desk',
   standalone: true,
   imports: [FormsModule, DecimalPipe, MatButtonModule, MatProgressSpinnerModule],
-  templateUrl: './trade-desk.component.html',
-  styleUrl: './trade-desk.component.css',
+  templateUrl: './crude-oil-desk.component.html',
+  styleUrl: './crude-oil-desk.component.css',
 })
-export class TradeDeskComponent implements OnInit, OnDestroy {
-  private readonly desk = inject(PaperTradeDeskService);
+export class CrudeOilDeskComponent implements OnInit, OnDestroy {
+  private readonly desk = inject(CrudePaperDeskService);
   private readonly kiteSession = inject(KiteSessionService);
   private readonly lotsPreference = inject(LotsPreferenceService);
 
+  protected readonly session = MCX_CRUDE_SESSION;
   protected readonly mode = signal<PaperDeskMode>('testing');
   protected fromDate = shiftDays(-14);
   protected toDate = todayIso();
-  /** When Live + checked, places real Kite MIS orders. */
+  /** When Live + checked, places real Kite MCX NRML orders. */
   protected realOrders = false;
   protected realOrdersAck = false;
-  /** Exchange lot × this — Testing / Live paper Option ₹ and Live money qty. */
   protected lots = 1;
 
   protected readonly snapshot = this.desk.snapshot;
@@ -87,7 +88,7 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
         }
         if (this.realOrders) {
           const ok = window.confirm(
-            `Start LIVE MONEY?\n\nReal Kite MIS MARKET orders will be placed on ATM options (${lots} lot each) for Nifty & Bank Nifty when signals fire.\n\nOrders go via DigitalOcean fixed IP.`,
+            `Start LIVE MONEY on Crude Oil Mini?\n\nReal Kite MCX NRML MARKET orders will be placed on ATM CRUDEOILM options (${lots} lot each) when signals fire.\n\nOrders go via DigitalOcean fixed IP.`,
           );
           if (!ok) {
             return;
@@ -99,7 +100,7 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
         });
       }
     } catch (err) {
-      this.error.set(formatUnknownError(err, 'Trade desk'));
+      this.error.set(formatUnknownError(err, 'Crude desk'));
     }
   }
 

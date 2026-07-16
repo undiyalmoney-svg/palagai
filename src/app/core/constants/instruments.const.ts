@@ -31,6 +31,15 @@ export const CRUDE_OIL_INSTRUMENT: TesterInstrument = {
   exchange: 'MCX',
 };
 
+/** MCX Crude Oil Mini — separate desk (not Nifty / Bank Nifty). */
+export const CRUDE_OIL_MINI_INSTRUMENT: TesterInstrument = {
+  id: 'crude-oil-mini',
+  instrumentToken: 0,
+  tradingSymbol: 'CRUDEOILM',
+  name: 'Crude Oil Mini',
+  exchange: 'MCX',
+};
+
 /** Placeholder — reserved for a future stocks experience. */
 export const STOCKS_TAB_ID = 'stocks';
 
@@ -45,6 +54,9 @@ export function getTesterInstrument(id: string): TesterInstrument | undefined {
   }
   if (id === CRUDE_OIL_INSTRUMENT.id) {
     return CRUDE_OIL_INSTRUMENT;
+  }
+  if (id === CRUDE_OIL_MINI_INSTRUMENT.id) {
+    return CRUDE_OIL_MINI_INSTRUMENT;
   }
   return undefined;
 }

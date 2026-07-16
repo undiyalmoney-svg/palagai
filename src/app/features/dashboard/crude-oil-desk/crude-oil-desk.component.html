@@ -1,10 +1,12 @@
 <section class="desk pg-page">
   <header class="hero pg-page-hero">
     <div class="hero-copy">
-      <p class="pg-eyebrow">OR Swing Breakout</p>
-      <h1>Trade Desk</h1>
+      <p class="pg-eyebrow">MCX · Crude Oil Mini</p>
+      <h1>Crude Oil Desk</h1>
       <p class="pg-lede">
-        Champion DNA on Nifty &amp; Bank Nifty ATM options — Testing, Live paper, or Live money. Same rules every day.
+        Champion evening PDHL on <strong>CRUDEOILM</strong>: entries
+        <strong>19:00–21:00</strong> IST · SL 80 · TP 200 · exit by 23:10 · ≤2/day · ≤8/month.
+        Testing, Live paper, or Live money — your call.
       </p>
     </div>
     <div class="hero-meta">
@@ -18,6 +20,7 @@
       >
         {{ realOrders && mode() === 'live' ? 'REAL ORDERS' : 'Paper only' }}
       </span>
+      <span class="pg-badge pg-badge-neutral">{{ session.marketOpen }}–{{ session.marketClose }} IST</span>
     </div>
   </header>
 
@@ -40,7 +43,7 @@
       (click)="setMode('live')"
     >
       <span class="mode-title">Live</span>
-      <span class="mode-sub">Today · auto each 5m · 09:15–15:30</span>
+      <span class="mode-sub">Today · auto each 5m · {{ session.marketOpen }}–{{ session.marketClose }}</span>
     </button>
   </div>
 
@@ -57,7 +60,7 @@
     } @else {
       <div class="live-hint">
         <strong>Today</strong>
-        <span>{{ realOrders ? 'Real MIS orders on signals' : 'Auto paper on both indices' }} · market hours only</span>
+        <span>{{ realOrders ? 'Real MCX NRML orders on signals' : 'Auto paper on CRUDEOILM' }} · entries 19:00–21:00</span>
       </div>
     }
 
@@ -75,20 +78,12 @@
 
     @if (mode() === 'live') {
       <label class="real-orders">
-        <input
-          type="checkbox"
-          [(ngModel)]="realOrders"
-          [disabled]="busy() || snapshot().running"
-        />
-        <span>Live money — place real Kite MIS orders ({{ lots }} lot{{ lots > 1 ? 's' : '' }})</span>
+        <input type="checkbox" [(ngModel)]="realOrders" [disabled]="busy() || snapshot().running" />
+        <span>Live money — place real Kite MCX orders ({{ lots }} lot{{ lots > 1 ? 's' : '' }})</span>
       </label>
       @if (realOrders) {
         <label class="real-orders ack">
-          <input
-            type="checkbox"
-            [(ngModel)]="realOrdersAck"
-            [disabled]="busy() || snapshot().running"
-          />
+          <input type="checkbox" [(ngModel)]="realOrdersAck" [disabled]="busy() || snapshot().running" />
           <span>I understand this uses real money</span>
         </label>
       }
@@ -159,7 +154,7 @@
         <strong>{{ snapshot().totals.wins }} / {{ snapshot().totals.losses }}</strong>
       </div>
       <div class="stat" [class.up]="snapshot().totals.indexNetPts > 0" [class.down]="snapshot().totals.indexNetPts < 0">
-        <span>Index pts</span>
+        <span>Futures pts</span>
         <strong>{{ snapshot().totals.indexNetPts > 0 ? '+' : '' }}{{ snapshot().totals.indexNetPts | number: '1.1-1' }}</strong>
       </div>
       <div class="stat primary" [class.up]="snapshot().totals.optionNetRs > 0" [class.down]="snapshot().totals.optionNetRs < 0">
@@ -169,10 +164,6 @@
       <div class="stat">
         <span>Kite 5m calls</span>
         <strong>{{ snapshot().kiteStats.historicalCalls }}</strong>
-      </div>
-      <div class="stat">
-        <span>Last span / max</span>
-        <strong>{{ snapshot().kiteStats.lastRangeDays }}d / {{ snapshot().kiteStats.maxDaysPerCall }}d</strong>
       </div>
     </div>
 
@@ -191,33 +182,14 @@
             <p>{{ s.lastSignal }}</p>
           </header>
 
-          <div class="phase-pill" [attr.data-phase]="s.livePhase">
-            {{ s.livePhaseLabel }}
-          </div>
-
-          @if (s.livePhase === 'target_hit') {
-            <div class="target-banner" role="status">
-              <strong>Target achieved</strong>
-              <span>{{ s.lastExitReason }} · {{ fmtTime(s.lastExitTime) }}</span>
-            </div>
-          }
+          <div class="phase-pill" [attr.data-phase]="s.livePhase">{{ s.livePhaseLabel }}</div>
 
           @if (s.openTrade; as o) {
             <div class="trade-live-panel" role="status">
               <div class="trade-live-head">
-                <strong>
-                  {{ snapshot().realOrders && s.brokerEntryOrderId ? 'Live on market' : 'Trade open' }}
-                </strong>
-                <span>
-                  {{ o.direction }} {{ o.option?.tradingSymbol ?? 'ATM option' }}
-                  @if (snapshot().realOrders && s.brokerEntryOrderId) {
-                    · Kite order active · waiting for target / SL / EMA / 15:15
-                  } @else {
-                    · levels locked until exit
-                  }
-                </span>
+                <strong>{{ snapshot().realOrders && s.brokerEntryOrderId ? 'Live on market' : 'Trade open' }}</strong>
+                <span>{{ o.direction }} {{ o.option?.tradingSymbol ?? 'ATM option' }}</span>
               </div>
-
               <div class="levels-row levels-row-live">
                 <div>
                   <span>Entry</span>
@@ -232,30 +204,13 @@
                   <strong class="tgt">{{ o.indexTarget | number: '1.1-1' }}</strong>
                 </div>
               </div>
-
-              @if (s.brokerEntryOrderId || s.brokerSlTrigger != null) {
-                <div class="broker-live-meta">
-                  @if (s.brokerEntryOrderId) {
-                    <span>Entry order {{ s.brokerEntryOrderId }}</span>
-                  }
-                  @if (s.brokerSlTrigger != null) {
-                    <span>Option SL-M {{ s.brokerSlTrigger | number: '1.2-2' }}
-                      @if (s.brokerSlOrderId) {
-                        · {{ s.brokerSlOrderId }}
-                      }
-                    </span>
-                  }
-                </div>
-              }
             </div>
           } @else if (s.livePhase === 'waiting') {
-            <p class="waiting-copy">Scanning for OR Swing Breakout entry…</p>
-          } @else if (s.lastExitReason) {
-            <p class="waiting-copy">Last exit: {{ s.lastExitReason }} · {{ fmtTime(s.lastExitTime) }}</p>
+            <p class="waiting-copy">Waiting PDHL break · entries 19:00–21:00 IST…</p>
           }
 
           <div class="chosen-option" [class.missing]="!s.chosenOption" [class.synthetic]="s.chosenOption?.source === 'synthetic'">
-            <span class="chosen-label">Chosen instrument</span>
+            <span class="chosen-label">Chosen option</span>
             @if (s.chosenOption; as opt) {
               <strong class="chosen-symbol">{{ opt.tradingSymbol }}</strong>
               <div class="chosen-meta">
@@ -264,28 +219,21 @@
                 }
                 <span>Strike {{ opt.strike | number: '1.0-0' }}</span>
                 <span>Exp {{ opt.expiry || '—' }}</span>
-                @if (opt.instrumentToken > 0) {
-                  <span>Token {{ opt.instrumentToken }}</span>
-                }
                 <span>Lot {{ opt.lotSize }}</span>
-                @if (opt.source === 'synthetic') {
-                  <span class="est">synthetic (not in today’s chain)</span>
-                } @else {
-                  <span class="ok">from Kite chain</span>
-                }
+                <span>MCX · {{ opt.product || 'NRML' }}</span>
               </div>
               @if (s.indexSpot != null) {
-                <small>ATM vs spot {{ s.indexSpot | number: '1.1-1' }} · as of {{ fmtTime(s.chosenAsOf) }}</small>
+                <small>ATM vs futures {{ s.indexSpot | number: '1.1-1' }} · as of {{ fmtTime(s.chosenAsOf) }}</small>
               }
             } @else {
               <strong class="chosen-symbol muted">No option resolved yet</strong>
-              <small>Press Start · needs index candles + instruments (Settings → Refresh if empty)</small>
+              <small>Press Start · needs futures candles + instruments</small>
             }
           </div>
 
           <div class="status-metrics">
             <div>
-              <span>Day index</span>
+              <span>Day futures</span>
               <strong [class.up]="s.dayNetIndexPts > 0" [class.down]="s.dayNetIndexPts < 0">
                 {{ s.dayNetIndexPts > 0 ? '+' : '' }}{{ s.dayNetIndexPts | number: '1.1-1' }}
               </strong>
@@ -301,13 +249,6 @@
               <strong>{{ s.tradesToday }}</strong>
             </div>
           </div>
-          @if (s.openTrade; as o) {
-            <div class="open-strip">
-              <span class="dir" [attr.data-dir]="o.direction">{{ o.direction }}</span>
-              <span>{{ o.option?.tradingSymbol ?? 'ATM option pending' }}</span>
-              <span>Entry {{ o.indexEntry | number: '1.1-1' }} · SL {{ o.indexStop | number: '1.1-1' }} · Tgt {{ o.indexTarget | number: '1.1-1' }}</span>
-            </div>
-          }
         </article>
       }
     </div>
@@ -317,9 +258,7 @@
     <div class="trades-block orders-block">
       <div class="trades-head">
         <h3>Live order summary</h3>
-        <p>
-          Full Kite session book — Nifty 50 &amp; Bank Nifty · {{ lots }} lot each · statuses refresh every tick
-        </p>
+        <p>MCX CRUDEOILM · {{ lots }} lot · statuses refresh every tick</p>
       </div>
       @if (snapshot().orderSummary.length) {
         <div class="table-scroll">
@@ -327,53 +266,29 @@
             <thead>
               <tr>
                 <th>When</th>
-                <th>Index</th>
                 <th>Symbol</th>
                 <th>Qty</th>
                 <th>Leg</th>
                 <th>Side</th>
                 <th>Order ID</th>
                 <th>Status</th>
-                <th>Avg</th>
-                <th>Trigger</th>
               </tr>
             </thead>
             <tbody>
               @for (r of snapshot().orderSummary; track r.orderId) {
-                <tr [attr.data-leg]="r.leg" [attr.data-status]="r.status">
+                <tr>
                   <td>{{ fmtTime(r.at) }}</td>
-                  <td>{{ r.instrumentName }}</td>
                   <td class="mono">{{ r.tradingSymbol }}</td>
                   <td>{{ r.quantity }}</td>
                   <td><span class="leg-pill">{{ r.leg }}</span></td>
                   <td>{{ r.side }}</td>
                   <td class="mono">{{ r.orderId }}</td>
-                  <td>
-                    <span class="status-pill" [attr.data-status]="r.status">{{ r.status }}</span>
-                  </td>
-                  <td>{{ r.averagePrice != null ? (r.averagePrice | number: '1.2-2') : '—' }}</td>
-                  <td>{{ r.triggerPrice != null ? (r.triggerPrice | number: '1.2-2') : '—' }}</td>
+                  <td><span class="status-pill" [attr.data-status]="r.status">{{ r.status }}</span></td>
                 </tr>
               }
             </tbody>
           </table>
         </div>
-      }
-      @if (snapshot().orderEvents.length) {
-        <details class="order-log-details">
-          <summary>Event log ({{ snapshot().orderEvents.length }})</summary>
-          <ul class="order-log">
-            @for (e of snapshot().orderEvents; track e.at + e.detail) {
-              <li [attr.data-action]="e.action">
-                <strong>{{ e.action }}</strong>
-                <span>{{ e.instrumentName || e.instrumentId }} · {{ e.detail }}</span>
-                @if (e.orderId) {
-                  <small>Order {{ e.orderId }}</small>
-                }
-              </li>
-            }
-          </ul>
-        </details>
       }
     </div>
   }
@@ -382,19 +297,18 @@
     <div class="trades-block">
       <div class="trades-head">
         <h3>Paper trades</h3>
-        <p>Option ₹ is primary · index pts mirror Historical Tester</p>
+        <p>Option ₹ primary · futures pts from evening PDHL champion</p>
       </div>
       <div class="table-scroll">
         <table>
           <thead>
             <tr>
               <th>When</th>
-              <th>Index</th>
               <th>Dir</th>
-              <th>Chosen instrument</th>
+              <th>Chosen option</th>
               <th>Prem in/out</th>
               <th>Option ₹</th>
-              <th>Idx pts</th>
+              <th>Fut pts</th>
               <th>Exit</th>
             </tr>
           </thead>
@@ -407,29 +321,12 @@
                     <small>{{ fmtTime(t.exitTime) }}</small>
                   </div>
                 </td>
-                <td>{{ t.instrumentName }}</td>
-                <td>
-                  <span class="dir" [attr.data-dir]="t.direction">{{ t.direction }}</span>
-                </td>
+                <td><span class="dir" [attr.data-dir]="t.direction">{{ t.direction }}</span></td>
                 <td>
                   @if (t.option; as opt) {
                     <div class="stack">
                       <strong>{{ opt.tradingSymbol }}</strong>
-                      <small>
-                        {{ opt.optionType }} · Strike {{ opt.strike | number: '1.0-0' }} · Exp {{ opt.expiry || '—' }}
-                      </small>
-                      <small>
-                        @if (opt.instrumentToken > 0) {
-                          Token {{ opt.instrumentToken }} ·
-                        }
-                        Lot {{ opt.lotSize }}
-                        @if (opt.source === 'synthetic') {
-                          · <span class="est">synthetic</span>
-                        }
-                      </small>
-                      @if (t.premiumEstimated) {
-                        <small class="est">est. premium</small>
-                      }
+                      <small>{{ opt.optionType }} · Strike {{ opt.strike | number: '1.0-0' }} · Lot {{ opt.lotSize }}</small>
                     </div>
                   } @else {
                     <span class="muted">—</span>
@@ -460,11 +357,12 @@
   <aside class="rules">
     <h4>How it runs</h4>
     <ul>
-      <li><strong>Testing</strong> — pick dates, Start loads candles once and paper-replays both indices.</li>
-      <li><strong>Live paper</strong> — Start auto-polls during 09:15–15:30; after hours use Testing.</li>
-      <li><strong>Live money</strong> — tick the box + confirm; MARKET entry + protective SL-M; strategy exit cancels SL then MARKET sell.</li>
-      <li><strong>Kite 5m limit</strong> — max {{ snapshot().kiteStats.maxDaysPerCall }} calendar days per historical call; longer ranges auto-chunk.</li>
-      <li>ATM weekly CE on BUY / PE on SELL · {{ lots }} lot · champion DNA: 1R · EMA-20 · day stop −60 · no day profit lock · Nifty SL cap 30 / Bank 45.</li>
+      <li><strong>Strategy</strong> — previous-day high/low break 19:00–21:00 IST; SL 80 · TP 200; exit by 23:10; ≤2/day · ≤8/month.</li>
+      <li><strong>Hold</strong> — until TP/SL, or up to ~4 hours (19:00 → 23:10).</li>
+      <li><strong>Testing</strong> — default last 14 days; Start paper-replays anytime.</li>
+      <li><strong>Live paper</strong> — auto-poll during MCX hours; after hours use Testing.</li>
+      <li><strong>Live money</strong> — tick the box + confirm; MCX NRML MARKET entry + protective SL-M.</li>
+      <li>ATM CRUDEOILM CE on BUY / PE on SELL · Option ₹ / order qty scales with Lots · Nifty/Bank desk separate.</li>
     </ul>
   </aside>
 </section>

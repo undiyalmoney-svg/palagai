@@ -1,5 +1,6 @@
 import { Injectable, inject, signal } from '@angular/core';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, timeout, TimeoutError } from 'rxjs';
+import { environment } from '../../../environments/environment';
 import { Candle, KiteHistoricalResponse } from '../models/candle.model';
 import { KiteApiService } from '../kite/kite-api.service';
 import { KiteSessionService } from '../kite/kite-session.service';
@@ -12,6 +13,7 @@ import {
 import {
   assertKiteHistoricalSuccess,
   extractKiteApiError,
+  formatUnknownError,
 } from '../utils/kite-error.util';
 import {
   calendarDaysInclusive,
@@ -64,11 +66,34 @@ export class PaperTradeDeskService {
   private historicalCalls = 0;
   private lastRangeDays = 0;
   private realOrders = false;
+  /** Exchange lot × this — applies to Testing + Live paper option ₹ and Live money qty. */
+  private lotsMultiplier = 1;
+  private runGeneration = 0;
   private readonly maxDaysPerCall = kiteMaxDaysForInterval('5minute');
   private readonly liveOrders = inject(LiveOrderExecutorService);
+  private readonly historicalTimeoutMs = 45_000;
 
   readonly snapshot = signal<PaperDeskSnapshot>(emptySnapshot('testing'));
   readonly busy = signal(false);
+
+  /** Cancel in-flight Testing fetch or stop Live so the UI leaves "Running…". */
+  cancelRun(options?: { silent?: boolean }): void {
+    const wasBusy = this.busy();
+    this.runGeneration += 1;
+    this.stopLive();
+    this.busy.set(false);
+    if (options?.silent) {
+      return;
+    }
+    const cur = this.snapshot();
+    if (wasBusy || cur.running) {
+      this.snapshot.set({
+        ...cur,
+        running: false,
+        message: 'Cancelled — press Start to try again.',
+      });
+    }
+  }
 
   private resetKiteStats(): void {
     this.historicalCalls = 0;
@@ -87,9 +112,17 @@ export class PaperTradeDeskService {
     return `Kite 5m calls ${this.historicalCalls} · last span ${this.lastRangeDays}d (max ${this.maxDaysPerCall}d/call)`;
   }
 
-  async runTesting(fromDate: string, toDate: string): Promise<void> {
-    this.stopLive();
+  private assertActive(runId: number): void {
+    if (runId !== this.runGeneration) {
+      throw new CancelledError();
+    }
+  }
+
+  async runTesting(fromDate: string, toDate: string, lots: number = 1): Promise<void> {
+    this.cancelRun({ silent: true });
+    const runId = this.runGeneration;
     this.resetKiteStats();
+    this.lotsMultiplier = Math.max(1, Math.floor(lots) || 1);
     this.busy.set(true);
     const spanDays = calendarDaysInclusive(shiftDate(fromDate, -12), toDate);
     this.snapshot.set({
@@ -106,22 +139,16 @@ export class PaperTradeDeskService {
     });
 
     try {
+      this.assertActive(runId);
       const authorization = this.requireAuth();
-      await this.instrumentStore.ensureLoaded();
-      let allInstruments = this.instrumentStore.allInstruments();
-      if (countIndexOptions(allInstruments) < 100) {
-        this.patchMessage('Refreshing NFO option instruments…');
-        await this.instrumentStore.refresh(true);
-        allInstruments = this.instrumentStore.allInstruments();
-      }
-      this.patchMessage(
-        `Instruments ready · ${countIndexOptions(allInstruments)} index options in cache`,
-      );
+      const allInstruments = await this.loadOptionInstruments();
+      this.assertActive(runId);
 
       const lookbackFrom = shiftDate(fromDate, -12);
       const candleMap = new Map<string, Candle[]>();
 
       for (let i = 0; i < this.instruments.length; i += 1) {
+        this.assertActive(runId);
         const { instrument } = this.instruments[i]!;
         if (i > 0) {
           await delay(1500);
@@ -132,6 +159,7 @@ export class PaperTradeDeskService {
           from: `${lookbackFrom} 09:00:00`,
           to: `${toDate} 15:30:00`,
           authorization,
+          runId,
         });
         candleMap.set(instrument.id, candles);
       }
@@ -153,6 +181,7 @@ export class PaperTradeDeskService {
           instruments: allInstruments,
           optionCandlesByToken: emptyOpt,
           neededOptionTokens: needed,
+          lotsMultiplier: this.lotsMultiplier,
         });
         firstPassTrades.push(...replay.trades);
         statuses.push(
@@ -173,15 +202,22 @@ export class PaperTradeDeskService {
         );
       }
 
+      this.assertActive(runId);
       this.patchMessage(`Loading ${needed.size} option contract(s)…`);
       const optionCandles = await this.fetchOptionHistories(
         [...needed],
         lookbackFrom,
         toDate,
         authorization,
+        runId,
       );
+      this.assertActive(runId);
 
-      const enriched = enrichTradesWithOptionPremiums(firstPassTrades, optionCandles);
+      const enriched = enrichTradesWithOptionPremiums(
+        firstPassTrades,
+        optionCandles,
+        this.lotsMultiplier,
+      );
       for (const s of statuses) {
         const mine = enriched.filter((t) => t.instrumentId === s.instrumentId);
         s.dayNetOptionRs = mine.reduce((a, t) => a + (t.optionPnlRs ?? 0), 0);
@@ -197,7 +233,7 @@ export class PaperTradeDeskService {
         marketOpen: true,
         realOrders: false,
         lastTickAt: null,
-        message: `Testing complete · ${enriched.length} paper trade(s) · ${this.kiteStatsLabel()}`,
+        message: `Testing complete · ${enriched.length} paper trade(s) · ${this.lotsMultiplier} lot(s) · ${this.kiteStatsLabel()}`,
         statuses,
         trades: enriched.sort((a, b) => a.entryTime.localeCompare(b.entryTime)),
         totals: summarize(enriched),
@@ -206,36 +242,41 @@ export class PaperTradeDeskService {
         orderSummary: [],
       });
     } catch (err) {
+      if (isCancelledError(err)) {
+        return;
+      }
       this.snapshot.set({
         ...emptySnapshot('testing'),
         fromDate,
         toDate,
-        message: err instanceof Error ? err.message : String(err),
+        message: formatUnknownError(err, 'Testing'),
         kiteStats: this.kiteStats(),
       });
       throw err;
     } finally {
-      this.busy.set(false);
+      if (runId === this.runGeneration) {
+        this.busy.set(false);
+      }
     }
   }
 
   async startLive(options?: { realOrders?: boolean; lots?: number }): Promise<void> {
-    this.stopLive();
+    this.cancelRun({ silent: true });
+    const runId = this.runGeneration;
     this.resetKiteStats();
-    this.realOrders = !!options?.realOrders;
+    this.realOrders = !!environment.allowLiveMoney && !!options?.realOrders;
+    this.lotsMultiplier = Math.max(1, Math.floor(options?.lots ?? 1) || 1);
     this.liveOrders.reset();
-    this.liveOrders.setLotsMultiplier(options?.lots ?? 1);
+    this.liveOrders.setLotsMultiplier(this.lotsMultiplier);
     const today = todayIso();
     const now = istNowHhMm();
 
     if (now < '09:15' || now > '15:30') {
       try {
-        await this.instrumentStore.ensureLoaded();
-        let allInstruments = this.instrumentStore.allInstruments();
-        if (countIndexOptions(allInstruments) < 100) {
-          await this.instrumentStore.refresh(true);
-          allInstruments = this.instrumentStore.allInstruments();
-        }
+        const allInstruments = await this.loadOptionInstruments({
+          patchStatus: false,
+          requireMinimum: false,
+        });
         // Show what ATM contracts would be (using last index close if available)
         const statuses = await this.previewChosenInstruments(today, allInstruments);
         this.snapshot.set({
@@ -253,7 +294,7 @@ export class PaperTradeDeskService {
           fromDate: today,
           toDate: today,
           marketOpen: false,
-          message: `Live paper only 09:15–15:30 IST (now ${now}). ${err instanceof Error ? err.message : ''}`,
+          message: `Live paper only 09:15–15:30 IST (now ${now}). ${formatUnknownError(err, 'Preview')}`,
           kiteStats: this.kiteStats(),
         });
       }
@@ -275,20 +316,17 @@ export class PaperTradeDeskService {
     });
 
     try {
+      this.assertActive(runId);
       const authorization = this.requireAuth();
-      await this.instrumentStore.ensureLoaded();
-      let allInstruments = this.instrumentStore.allInstruments();
-      if (countIndexOptions(allInstruments) < 100) {
-        this.patchMessage('Refreshing NFO option instruments…');
-        await this.instrumentStore.refresh(true);
-        allInstruments = this.instrumentStore.allInstruments();
-      }
+      await this.loadOptionInstruments({ patchStatus: false });
+      this.assertActive(runId);
       const lookbackFrom = shiftDate(today, -12);
 
       this.liveLegs = [];
       this.liveTrades = [];
 
       for (let i = 0; i < this.instruments.length; i += 1) {
+        this.assertActive(runId);
         const row = this.instruments[i]!;
         if (i > 0) {
           await delay(1500);
@@ -298,6 +336,7 @@ export class PaperTradeDeskService {
           from: `${lookbackFrom} 09:00:00`,
           to: `${today} 15:30:00`,
           authorization,
+          runId,
         });
         this.liveLegs.push({
           instrument: row.instrument,
@@ -309,22 +348,28 @@ export class PaperTradeDeskService {
       }
 
       await this.tickLive(true);
+      this.assertActive(runId);
 
       this.liveTimer = setInterval(() => {
         void this.tickLive(false);
       }, 60_000);
     } catch (err) {
+      if (isCancelledError(err)) {
+        return;
+      }
       this.snapshot.set({
         ...emptySnapshot('live'),
         fromDate: today,
         toDate: today,
-        message: err instanceof Error ? err.message : String(err),
+        message: formatUnknownError(err, 'Testing'),
         kiteStats: this.kiteStats(),
       });
       this.stopLive();
       throw err;
     } finally {
-      this.busy.set(false);
+      if (runId === this.runGeneration) {
+        this.busy.set(false);
+      }
     }
   }
 
@@ -423,6 +468,7 @@ export class PaperTradeDeskService {
         optionCandlesByToken: emptyOpt,
         neededOptionTokens: needed,
         forceCloseOpen: now >= '15:15',
+        lotsMultiplier: this.lotsMultiplier,
       });
       allTrades.push(...replay.trades);
       statuses.push(
@@ -459,7 +505,7 @@ export class PaperTradeDeskService {
       today,
       authorization,
     );
-    const enriched = enrichTradesWithOptionPremiums(allTrades, optionCandles);
+    const enriched = enrichTradesWithOptionPremiums(allTrades, optionCandles, this.lotsMultiplier);
 
     for (const s of statuses) {
       const mine = enriched.filter((t) => t.instrumentId === s.instrumentId);
@@ -610,13 +656,17 @@ export class PaperTradeDeskService {
     fromDate: string,
     toDate: string,
     authorization: string,
+    runId?: number,
   ): Promise<Map<number, Candle[]>> {
     const map = new Map<number, Candle[]>();
-    const unique = [...new Set(tokens)].slice(0, 40);
+    const unique = [...new Set(tokens)].slice(0, 24);
     for (let i = 0; i < unique.length; i += 1) {
+      if (runId != null) {
+        this.assertActive(runId);
+      }
       const token = unique[i]!;
       if (i > 0) {
-        await delay(1200);
+        await delay(800);
       }
       try {
         const candles = await this.fetch5m({
@@ -624,9 +674,13 @@ export class PaperTradeDeskService {
           from: `${fromDate} 09:00:00`,
           to: `${toDate} 15:30:00`,
           authorization,
+          runId,
         });
         map.set(token, candles);
-      } catch {
+      } catch (err) {
+        if (isCancelledError(err)) {
+          throw err;
+        }
         // premium will be estimated
       }
     }
@@ -638,6 +692,7 @@ export class PaperTradeDeskService {
     from: string;
     to: string;
     authorization: string;
+    runId?: number;
   }): Promise<Candle[]> {
     const maxDays = this.maxDaysPerCall;
     const fromDate = datePart(params.from);
@@ -654,19 +709,24 @@ export class PaperTradeDeskService {
 
     try {
       for (let i = 0; i < chunks.length; i += 1) {
+        if (params.runId != null) {
+          this.assertActive(params.runId);
+        }
         const chunk = chunks[i]!;
         if (i > 0) {
           await delay(400);
         }
         this.historicalCalls += 1;
         const response = await firstValueFrom(
-          this.kiteApi.getHistoricalData({
-            instrumentToken: String(params.instrumentToken),
-            interval: '5minute',
-            from: `${chunk.fromDate} ${fromTime}`,
-            to: `${chunk.toDate} ${toTime}`,
-            authorization: params.authorization,
-          }),
+          this.kiteApi
+            .getHistoricalData({
+              instrumentToken: String(params.instrumentToken),
+              interval: '5minute',
+              from: `${chunk.fromDate} ${fromTime}`,
+              to: `${chunk.toDate} ${toTime}`,
+              authorization: params.authorization,
+            })
+            .pipe(timeout(this.historicalTimeoutMs)),
         );
         assertKiteHistoricalSuccess(response, '5minute');
         const parsed = response as KiteHistoricalResponse;
@@ -692,6 +752,18 @@ export class PaperTradeDeskService {
       }
       return candles;
     } catch (error) {
+      if (isCancelledError(error)) {
+        throw error;
+      }
+      if (error instanceof TimeoutError) {
+        throw new Error(
+          `Kite historical timed out after ${this.historicalTimeoutMs / 1000}s — check token/proxy, then Cancel and retry.`,
+        );
+      }
+      // Preserve already-formatted Errors; never wrap objects into "[object Object]".
+      if (error instanceof Error && error.message && error.message !== '[object Object]') {
+        throw error;
+      }
       throw new Error(extractKiteApiError(error, '5minute'));
     }
   }
@@ -702,6 +774,44 @@ export class PaperTradeDeskService {
       throw new Error('Kite access token required. Go to Get Token.');
     }
     return authorization;
+  }
+
+  private async loadOptionInstruments(options?: {
+    patchStatus?: boolean;
+    requireMinimum?: boolean;
+  }): Promise<Instrument[]> {
+    const patchStatus = options?.patchStatus !== false;
+    const requireMinimum = options?.requireMinimum !== false;
+
+    await this.instrumentStore.ensureLoaded();
+    let allInstruments = this.instrumentStore.allInstruments();
+
+    if (countIndexOptions(allInstruments) < 100) {
+      if (patchStatus) {
+        this.patchMessage('Refreshing NFO option instruments…');
+      }
+      const refreshed = await this.instrumentStore.refreshBestEffort(true);
+      allInstruments = this.instrumentStore.allInstruments();
+
+      if (!refreshed && requireMinimum && countIndexOptions(allInstruments) < 10) {
+        throw new Error(
+          'Could not load NFO instruments from Kite. Check internet, then Settings → Refresh Instruments. If token expired, update it in Get Token.',
+        );
+      }
+      if (!refreshed && patchStatus) {
+        this.patchMessage(
+          `Using cached instruments (${countIndexOptions(allInstruments)} index options) — live refresh failed, continuing…`,
+        );
+      }
+    }
+
+    if (patchStatus) {
+      this.patchMessage(
+        `Instruments ready · ${countIndexOptions(allInstruments)} index options in cache`,
+      );
+    }
+
+    return allInstruments;
   }
 
   private patchMessage(message: string): void {
@@ -798,6 +908,17 @@ function applyLivePhase(
   }
   status.livePhase = 'idle';
   status.livePhaseLabel = 'Idle';
+}
+
+class CancelledError extends Error {
+  constructor() {
+    super('CANCELLED');
+    this.name = 'CancelledError';
+  }
+}
+
+function isCancelledError(err: unknown): boolean {
+  return err instanceof CancelledError || (err instanceof Error && err.message === 'CANCELLED');
 }
 
 function summarize(trades: PaperTrade[]): PaperDeskSnapshot['totals'] {

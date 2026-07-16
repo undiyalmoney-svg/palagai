@@ -1,61 +1,41 @@
-<mat-sidenav-container class="dashboard-container">
-  <mat-sidenav
-    #drawer
-    class="dashboard-sidenav"
-    [mode]="isHandset() ? 'over' : 'side'"
-    [opened]="!isHandset()"
-  >
-    <div class="sidenav-brand">
-      <div class="brand-mark">P</div>
-      <span class="brand-name">Palagai</span>
-    </div>
+<div class="palagai-shell">
+  <header class="palagai-header">
+    <div class="palagai-header-inner">
+      <a class="brand" routerLink="/dashboard/trade-desk">
+        <span class="brand-mark" aria-hidden="true">P</span>
+        <span class="brand-text">
+          <strong>Palagai</strong>
+          <small>Trade with clarity</small>
+        </span>
+      </a>
 
-    <mat-nav-list class="nav-list">
-      @for (item of navItems; track item.route) {
-        <a
-          mat-list-item
-          [routerLink]="item.route"
-          routerLinkActive="active-link"
-          [routerLinkActiveOptions]="{ exact: item.route === '/dashboard/results' ? false : true }"
-          (click)="closeSidenavOnNavigate()"
-        >
-          <mat-icon matListItemIcon>{{ item.icon }}</mat-icon>
-          <span matListItemTitle>{{ item.label }}</span>
-        </a>
-      }
-    </mat-nav-list>
-  </mat-sidenav>
+      <nav class="palagai-nav" aria-label="Main">
+        @for (item of navItems; track item.route) {
+          <a
+            [routerLink]="item.route"
+            routerLinkActive="active"
+            [routerLinkActiveOptions]="{ exact: true }"
+          >
+            <mat-icon>{{ item.icon }}</mat-icon>
+            <span>{{ item.label }}</span>
+          </a>
+        }
+      </nav>
 
-  <mat-sidenav-content class="dashboard-content">
-    <mat-toolbar class="dashboard-toolbar">
-      @if (isHandset()) {
-        <button mat-icon-button type="button" aria-label="Open menu" (click)="toggleSidenav()">
-          <mat-icon>menu</mat-icon>
-        </button>
-      }
-      <span class="toolbar-title">Dashboard</span>
-      <span class="toolbar-spacer"></span>
-      <button mat-stroked-button type="button" (click)="logout()">
+      <button mat-stroked-button type="button" class="logout-btn" (click)="logout()">
         <mat-icon>logout</mat-icon>
         <span>Logout</span>
       </button>
-    </mat-toolbar>
+    </div>
+  </header>
 
-    <nav class="top-tabs" aria-label="Dashboard sections">
-      @for (item of navItems; track item.route) {
-        <a
-          [routerLink]="item.route"
-          routerLinkActive="active-tab"
-          [routerLinkActiveOptions]="{ exact: item.route === '/dashboard/results' ? false : true }"
-        >
-          <mat-icon>{{ item.icon }}</mat-icon>
-          <span>{{ item.label }}</span>
-        </a>
-      }
-    </nav>
+  <main class="palagai-main">
+    <router-outlet />
+  </main>
 
-    <main class="page-content">
-      <router-outlet />
-    </main>
-  </mat-sidenav-content>
-</mat-sidenav-container>
+  <footer class="palagai-footer">
+    <span class="bull-dot" aria-hidden="true"></span>
+    <span>Bull · Bear · Same rules every session</span>
+    <span class="bear-dot" aria-hidden="true"></span>
+  </footer>
+</div>

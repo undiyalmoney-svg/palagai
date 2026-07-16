@@ -10,6 +10,7 @@ import {
   PDHL_EMA_EXIT_PERIOD,
   PdhlOrState,
   recordPdhlTradeClosed,
+  resolvePdhlOrParams,
   runPdhlOpeningRange,
 } from '../strategy-engine/strategies/pdhl-opening-range/pdhl-opening-range.evaluator';
 import {
@@ -163,8 +164,11 @@ function closePaperTrade(params: {
   exitTime: string;
   exitReason: string;
   optionCandlesByToken: Map<number, Candle[]>;
+  /** Exchange lot × this (Testing + Live paper + Live money P&L). */
+  lotsMultiplier?: number;
 }): PaperTrade {
   const { open } = params;
+  const lots = Math.max(1, Math.floor(params.lotsMultiplier ?? 1) || 1);
   const indexPoints =
     open.direction === 'BUY'
       ? params.exitPrice - open.entry
@@ -181,13 +185,13 @@ function closePaperTrade(params: {
     );
     if (open.optionEntryPremium != null && optionExitPremium != null) {
       optionPnlRs =
-        (optionExitPremium - open.optionEntryPremium) * open.option.lotSize;
+        (optionExitPremium - open.optionEntryPremium) * open.option.lotSize * lots;
       premiumEstimated = false;
     } else {
       const estMove = estimatePremiumMove(indexPoints);
       const entryPx = open.optionEntryPremium ?? Math.max(10, Math.abs(estMove) + 20);
       optionExitPremium = entryPx + estMove;
-      optionPnlRs = estMove * open.option.lotSize;
+      optionPnlRs = estMove * open.option.lotSize * lots;
       premiumEstimated = true;
     }
   }
@@ -232,6 +236,8 @@ export function replayPaperOnIndex(params: {
   neededOptionTokens: Set<number>;
   /** When false (live mid-session), leave open trades open. */
   forceCloseOpen?: boolean;
+  /** Exchange lot × this for option ₹ P&L. */
+  lotsMultiplier?: number;
 }): ReplayInstrumentResult {
   const {
     instrumentId,
@@ -245,6 +251,7 @@ export function replayPaperOnIndex(params: {
     neededOptionTokens,
   } = params;
   const forceCloseOpen = params.forceCloseOpen !== false;
+  const lotsMultiplier = Math.max(1, Math.floor(params.lotsMultiplier ?? 1) || 1);
 
   const state = createPdhlOrState();
   const trades: PaperTrade[] = [];
@@ -276,9 +283,10 @@ export function replayPaperOnIndex(params: {
           exitTime: candle.date,
           exitReason: exit.reason,
           optionCandlesByToken,
+          lotsMultiplier,
         });
         trades.push(closed);
-        recordPdhlTradeClosed(state, closed.indexPoints);
+        recordPdhlTradeClosed(state, closed.indexPoints, resolvePdhlOrParams(instrumentId));
         dayNetByDate[day] = (dayNetByDate[day] ?? 0) + closed.indexPoints;
         open = null;
         lastSignal = `Closed: ${exit.reason}`;
@@ -357,9 +365,10 @@ export function replayPaperOnIndex(params: {
         exitTime: candle.date,
         exitReason: 'End of range',
         optionCandlesByToken,
+        lotsMultiplier,
       });
       trades.push(closed);
-      recordPdhlTradeClosed(state, closed.indexPoints);
+      recordPdhlTradeClosed(state, closed.indexPoints, resolvePdhlOrParams(instrumentId));
       dayNetByDate[day] = (dayNetByDate[day] ?? 0) + closed.indexPoints;
       if (closed.option) {
         chosenOption = closed.option;
@@ -446,7 +455,9 @@ export function replayPaperOnIndex(params: {
 export function enrichTradesWithOptionPremiums(
   trades: PaperTrade[],
   optionCandlesByToken: Map<number, Candle[]>,
+  lotsMultiplier: number = 1,
 ): PaperTrade[] {
+  const lots = Math.max(1, Math.floor(lotsMultiplier) || 1);
   return trades.map((t) => {
     if (!t.option) {
       return t;
@@ -459,7 +470,7 @@ export function enrichTradesWithOptionPremiums(
       t.optionExitPremium;
 
     if (entry != null && exit != null) {
-      const optionPnlRs = (exit - entry) * t.option.lotSize;
+      const optionPnlRs = (exit - entry) * t.option.lotSize * lots;
       return {
         ...t,
         optionEntryPremium: entry,
@@ -476,7 +487,7 @@ export function enrichTradesWithOptionPremiums(
       ...t,
       optionEntryPremium: entryPx,
       optionExitPremium: exitPx,
-      optionPnlRs: (exitPx - entryPx) * t.option.lotSize,
+      optionPnlRs: (exitPx - entryPx) * t.option.lotSize * lots,
       premiumEstimated: true,
     };
   });

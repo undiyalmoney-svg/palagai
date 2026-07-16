@@ -1,11 +1,13 @@
-<section class="tab-panel">
-  <h2>Get Token</h2>
-  <p class="tab-description">
-    Save your API credentials, then complete the Kite Connect login.
-    For live, set the Kite app Redirect URL to
-    <code>https://palagai.app/dashboard/get-token</code>.
-    Locally you can use <code>http://localhost:4200/</code>.
-  </p>
+<section class="tab-panel pg-page">
+  <header class="pg-page-hero">
+    <p class="pg-eyebrow">Kite Connect</p>
+    <h1>Get Token</h1>
+    <p class="tab-description pg-lede">
+      Link your Zerodha session once each morning. Live redirect:
+      <code>https://palagai.app/dashboard/get-token</code>
+      · Local: <code>http://localhost:4200/</code>
+    </p>
+  </header>
 
   @if (autoExchangeNote()) {
     <p class="banner info" role="status">{{ autoExchangeNote() }}</p>
@@ -141,6 +143,68 @@
       @if (credentialsSaveMessage()) {
         <div class="result-block success inline-message">
           <span>{{ credentialsSaveMessage() }}</span>
+        </div>
+      }
+    </article>
+
+    <article class="step-card manual-token-card">
+      <div class="step-header">
+        <span class="step-badge local">Local</span>
+        <h3>Paste Access Token</h3>
+      </div>
+      <p class="step-description">
+        For local testing: paste an access token from Kite (or a previous session) so you skip the redirect login.
+        API Key + Access Token are enough for Trade Desk / Order Test.
+      </p>
+
+      <form class="step-form" [formGroup]="manualTokenForm" (ngSubmit)="onSaveManualAccessToken()">
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>API Key</mat-label>
+          <input matInput formControlName="apiKey" autocomplete="off" />
+          @if (manualTokenForm.controls.apiKey.touched && manualTokenForm.controls.apiKey.hasError('required')) {
+            <mat-error>API Key is required</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Access Token</mat-label>
+          <input
+            matInput
+            formControlName="accessToken"
+            [type]="hideManualAccessToken() ? 'password' : 'text'"
+            autocomplete="off"
+          />
+          <button
+            mat-icon-button
+            matSuffix
+            type="button"
+            (click)="hideManualAccessToken.set(!hideManualAccessToken())"
+            [attr.aria-label]="hideManualAccessToken() ? 'Show access token' : 'Hide access token'"
+          >
+            <mat-icon>{{ hideManualAccessToken() ? 'visibility' : 'visibility_off' }}</mat-icon>
+          </button>
+          @if (
+            manualTokenForm.controls.accessToken.touched &&
+            manualTokenForm.controls.accessToken.hasError('required')
+          ) {
+            <mat-error>Access Token is required</mat-error>
+          }
+        </mat-form-field>
+
+        <button mat-flat-button color="primary" type="submit" class="action-button">
+          <mat-icon>vpn_key</mat-icon>
+          <span>Save Access Token</span>
+        </button>
+      </form>
+
+      @if (manualTokenMessage()) {
+        <div class="result-block success inline-message">
+          <span>{{ manualTokenMessage() }}</span>
+        </div>
+      }
+      @if (manualTokenError()) {
+        <div class="result-block error inline-message">
+          <span>{{ manualTokenError() }}</span>
         </div>
       }
     </article>

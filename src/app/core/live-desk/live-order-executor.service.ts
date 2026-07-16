@@ -19,6 +19,8 @@ export interface LiveBrokerPosition {
   entryTime: string;
   status: 'open' | 'flat' | 'error';
   lastError: string | null;
+  exchange: 'NFO' | 'MCX';
+  product: 'MIS' | 'NRML';
 }
 
 export interface LiveOrderEvent {
@@ -178,15 +180,17 @@ export class LiveOrderExecutorService {
     // qty = exchange lot size × configured lots (Live money only).
     const lotSize = Math.max(1, option.lotSize || 1);
     const quantity = lotSize * this.lotsMultiplier;
+    const exchange = option.exchange ?? 'NFO';
+    const product = option.product ?? 'MIS';
     try {
       const response = await firstValueFrom(
         this.kiteApi.placeRegularOrder(authorization, {
-          exchange: 'NFO',
+          exchange,
           tradingsymbol: option.tradingSymbol,
           transaction_type: 'BUY',
           order_type: 'MARKET',
           quantity: String(quantity),
-          product: 'MIS',
+          product,
           validity: 'DAY',
           market_protection: '-1',
           tag: 'PALAGAI',
@@ -201,7 +205,7 @@ export class LiveOrderExecutorService {
         at: new Date().toISOString(),
         instrumentId,
         action: 'ENTRY',
-        detail: `BUY ${quantity} ${option.tradingSymbol} MIS MARKET (${this.lotsMultiplier} lot × ${lotSize})`,
+        detail: `BUY ${quantity} ${option.tradingSymbol} ${product} MARKET (${this.lotsMultiplier} lot × ${lotSize})`,
         orderId: entryOrderId,
         tradingSymbol: option.tradingSymbol,
         quantity,
@@ -213,6 +217,7 @@ export class LiveOrderExecutorService {
         entryOrderId,
         option.tradingSymbol,
         open.optionEntryPremium,
+        exchange,
       );
       const indexRisk = Math.abs(open.indexEntry - open.indexStop);
       const slTrigger = roundOptionTick(Math.max(0.05, fillPremium - indexRisk * 0.5));
@@ -221,12 +226,12 @@ export class LiveOrderExecutorService {
       try {
         const slRes = await firstValueFrom(
           this.kiteApi.placeRegularOrder(authorization, {
-            exchange: 'NFO',
+            exchange,
             tradingsymbol: option.tradingSymbol,
             transaction_type: 'SELL',
             order_type: 'SL-M',
             quantity: String(quantity),
-            product: 'MIS',
+            product,
             validity: 'DAY',
             trigger_price: String(slTrigger),
             market_protection: '-1',
@@ -272,6 +277,8 @@ export class LiveOrderExecutorService {
         entryTime: open.entryTime,
         status: 'open',
         lastError: slOrderId ? null : 'SL-M not placed',
+        exchange,
+        product,
       });
     } catch (err) {
       const message = this.formatErr(err);
@@ -330,12 +337,12 @@ export class LiveOrderExecutorService {
 
       const response = await firstValueFrom(
         this.kiteApi.placeRegularOrder(authorization, {
-          exchange: 'NFO',
+          exchange: pos.exchange ?? 'NFO',
           tradingsymbol: pos.tradingSymbol,
           transaction_type: 'SELL',
           order_type: 'MARKET',
           quantity: String(pos.quantity),
-          product: 'MIS',
+          product: pos.product ?? 'MIS',
           validity: 'DAY',
           market_protection: '-1',
           tag: 'PALAGAI',
@@ -356,7 +363,7 @@ export class LiveOrderExecutorService {
         at: new Date().toISOString(),
         instrumentId: pos.instrumentId,
         action: 'EXIT',
-        detail: `SELL ${pos.quantity} ${pos.tradingSymbol} MIS MARKET (strategy exit)`,
+        detail: `SELL ${pos.quantity} ${pos.tradingSymbol} ${pos.product ?? 'MIS'} MARKET (strategy exit)`,
         orderId,
         tradingSymbol: pos.tradingSymbol,
         quantity: pos.quantity,
@@ -443,6 +450,7 @@ export class LiveOrderExecutorService {
     entryOrderId: string,
     tradingSymbol: string,
     fallback: number | null,
+    exchange: 'NFO' | 'MCX' = 'NFO',
   ): Promise<number> {
     try {
       const book = (await firstValueFrom(this.kiteApi.getOrders(authorization))) as KiteOrdersBook;
@@ -455,7 +463,7 @@ export class LiveOrderExecutorService {
     }
 
     try {
-      const key = `NFO:${tradingSymbol}`;
+      const key = `${exchange}:${tradingSymbol}`;
       const quote = (await firstValueFrom(
         this.kiteApi.getQuotes(authorization, [key]),
       )) as KiteQuoteBook;
@@ -506,6 +514,8 @@ export class LiveOrderExecutorService {
       entryTime: open.entryTime,
       status: 'error',
       lastError: message,
+      exchange: option?.exchange ?? 'NFO',
+      product: option?.product ?? 'MIS',
     };
   }
 

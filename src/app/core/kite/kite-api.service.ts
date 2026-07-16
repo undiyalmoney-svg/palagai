@@ -29,7 +29,7 @@ export class KiteApiService {
    * (or same-origin `/api/order-kite` forwarder in production).
    */
   private readonly orderApiBaseUrl =
-    (environment as { orderApiBaseUrl?: string }).orderApiBaseUrl || '/api/kite';
+    (environment as { orderApiBaseUrl?: string }).orderApiBaseUrl || '/api/order-kite';
 
   exchangeSessionToken(payload: KiteSessionTokenRequest): Observable<unknown> {
     const params = new URLSearchParams();

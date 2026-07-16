@@ -1,16 +1,15 @@
-<section class="order-test">
-  <header class="hero">
+<section class="order-test pg-page">
+  <header class="hero pg-page-hero">
     <div class="hero-copy">
-      <p class="eyebrow">IP whitelist smoke test</p>
+      <p class="pg-eyebrow">IP whitelist smoke test</p>
       <h1>Order Test</h1>
-      <p class="lede">
-        Places a tiny <strong>RELIANCE</strong> equity order via the DigitalOcean Order API so you can
-        confirm Kite accepts this server IP. Does not run the strategy — Testing / Trade Desk paper stay unchanged.
+      <p class="lede pg-lede">
+        Fire a tiny <strong>RELIANCE</strong> order through the DigitalOcean fixed IP — confirm Kite accepts your whitelisted server before going live.
       </p>
     </div>
     <div class="hero-meta">
-      <span class="badge danger">REAL MONEY</span>
-      <span class="badge soft">{{ orderApiBase }}</span>
+      <span class="pg-badge pg-badge-bear">REAL MONEY</span>
+      <span class="pg-badge pg-badge-neutral mono">{{ orderApiBase }}</span>
     </div>
   </header>
 
@@ -25,8 +24,15 @@
         <input type="text" [value]="exchange" disabled />
       </label>
       <label class="field">
-        <span>Qty</span>
-        <input type="number" min="1" step="1" [(ngModel)]="quantity" [disabled]="busy()" />
+        <span>Qty / Lots</span>
+        <input
+          type="number"
+          min="1"
+          step="1"
+          [(ngModel)]="quantity"
+          (ngModelChange)="onQuantityChange()"
+          [disabled]="busy()"
+        />
       </label>
       <label class="field">
         <span>Product</span>

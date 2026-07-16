@@ -87,6 +87,16 @@ export class GetTokenComponent implements OnInit {
     checksum: ['', [Validators.required, Validators.pattern(/\S+/)]],
   });
 
+  /** Local/dev: paste access token without Kite redirect. */
+  protected readonly manualTokenForm = this.formBuilder.nonNullable.group({
+    apiKey: ['', [Validators.required, Validators.pattern(/\S+/)]],
+    accessToken: ['', [Validators.required, Validators.pattern(/\S+/)]],
+  });
+
+  protected readonly manualTokenMessage = signal('');
+  protected readonly manualTokenError = signal('');
+  protected readonly hideManualAccessToken = signal(true);
+
   constructor() {
     afterNextRender(() => {
       const stored = this.kiteCredentialsService.getCredentials();
@@ -101,6 +111,7 @@ export class GetTokenComponent implements OnInit {
     if (stored) {
       this.credentialsForm.patchValue(stored);
       this.prefillStepForms(stored.apiKey, stored.apiSecret);
+      this.manualTokenForm.patchValue({ apiKey: stored.apiKey });
       this.setCredentialsFormEditable(false);
       this.isEditingCredentials.set(false);
     } else {
@@ -140,6 +151,7 @@ export class GetTokenComponent implements OnInit {
     this.kiteCredentialsService.saveCredentials({ apiKey, apiSecret });
     this.hasStoredCredentials.set(true);
     this.prefillStepForms(apiKey.trim(), apiSecret.trim());
+    this.manualTokenForm.patchValue({ apiKey: apiKey.trim() });
     this.isEditingCredentials.set(false);
     this.setCredentialsFormEditable(false);
     this.credentialsSaveMessage.set('API credentials saved locally.');
@@ -208,6 +220,31 @@ export class GetTokenComponent implements OnInit {
       sanitizeKiteCredential(requestToken),
       sanitizeKiteCredential(checksum),
       apiSecret,
+    );
+  }
+
+  protected onSaveManualAccessToken(): void {
+    if (this.manualTokenForm.invalid) {
+      this.manualTokenForm.markAllAsTouched();
+      return;
+    }
+
+    const { apiKey, accessToken } = this.manualTokenForm.getRawValue();
+    this.manualTokenMessage.set('');
+    this.manualTokenError.set('');
+
+    const saved = this.kiteSessionService.saveManualAccessToken({
+      apiKey: sanitizeKiteCredential(apiKey),
+      accessToken: sanitizeKiteCredential(accessToken),
+    });
+
+    if (!saved) {
+      this.manualTokenError.set('Could not save — check API key and access token.');
+      return;
+    }
+
+    this.manualTokenMessage.set(
+      'Access token saved locally. Trade Desk and Order Test are ready — no redirect needed.',
     );
   }
 
@@ -331,6 +368,7 @@ export class GetTokenComponent implements OnInit {
     this.step1Form.patchValue({ apiKey });
     this.step2Form.patchValue({ apiKey, apiSecret });
     this.step3Form.patchValue({ apiKey });
+    this.manualTokenForm.patchValue({ apiKey });
   }
 
   private setCredentialsFormEditable(editable: boolean): void {

@@ -41,21 +41,71 @@ export function createPdhlOrState(): PdhlOrState {
 export const PDHL_RUPEES_PER_POINT = 65;
 
 /**
- * Analyst hunt winner (2020–2026 Nifty):
- * opening_range + swing breakout | candle_hl capped 20 | 1.5R | whole day | EMA exit
- * day lock +30 / day stop −45
+ * Per-index risk profile (champion pair, 2020–2026 hunt):
+ * same DNA on both — 1R target, no day profit lock, day stop −60, EMA exit.
+ * Nifty SL cap 30; Bank SL cap 45 (wider for volatility).
  */
-export const PDHL_MAX_STOP_LOSS_PTS = 20;
-export const PDHL_MIN_STOP_LOSS_PTS = 3;
-export const PDHL_TARGET_R_MULTIPLE = 1.5;
-export const PDHL_DAILY_PROFIT_LOCK_PTS = 30;
-export const PDHL_DAILY_MAX_LOSS_PTS = 45;
+export interface PdhlOrParams {
+  maxStopPts: number;
+  minStopPts: number;
+  targetRMultiple: number;
+  /** 0 = disabled (no day profit lock). */
+  dailyProfitLockPts: number;
+  /** 0 = disabled. */
+  dailyMaxLossPts: number;
+  earliestEntry: string;
+  lastEntry: string;
+  dna: string;
+}
+
+/** Nifty champion: cap30 | r_1 | whole_day | ema_exit | L0 | S60 */
+export const PDHL_NIFTY_PARAMS: PdhlOrParams = {
+  maxStopPts: 30,
+  minStopPts: 3,
+  targetRMultiple: 1,
+  dailyProfitLockPts: 0,
+  dailyMaxLossPts: 60,
+  earliestEntry: '09:20',
+  lastEntry: '15:10',
+  dna: 'opening_range|swing|breakout|cap30|r_1|whole_day|ema_exit|L0|S60',
+};
+
+/** Bank champion: cap45 | r_1 | whole_day | ema_exit | L0 | S60 */
+export const PDHL_BANK_PARAMS: PdhlOrParams = {
+  maxStopPts: 45,
+  minStopPts: 3,
+  targetRMultiple: 1,
+  dailyProfitLockPts: 0,
+  dailyMaxLossPts: 60,
+  earliestEntry: '09:20',
+  lastEntry: '15:10',
+  dna: 'opening_range|swing|breakout|cap45|r_1|whole_day|ema_exit|L0|S60',
+};
+
+/** @deprecated Use PDHL_NIFTY_PARAMS.maxStopPts — kept for callers */
+export const PDHL_MAX_STOP_LOSS_PTS = PDHL_NIFTY_PARAMS.maxStopPts;
+export const PDHL_MIN_STOP_LOSS_PTS = PDHL_NIFTY_PARAMS.minStopPts;
+export const PDHL_TARGET_R_MULTIPLE = PDHL_NIFTY_PARAMS.targetRMultiple;
+export const PDHL_DAILY_PROFIT_LOCK_PTS = PDHL_NIFTY_PARAMS.dailyProfitLockPts;
+export const PDHL_DAILY_MAX_LOSS_PTS = PDHL_NIFTY_PARAMS.dailyMaxLossPts;
 /** Matches hunt whole_day window upper bound */
-export const PDHL_LAST_ENTRY_TIME = '15:10';
+export const PDHL_LAST_ENTRY_TIME = PDHL_NIFTY_PARAMS.lastEntry;
 export const PDHL_SWING_LOOKBACK = 3;
 export const PDHL_EMA_EXIT_PERIOD = 20;
 
-export function recordPdhlTradeClosed(state: PdhlOrState, points: number): void {
+export function resolvePdhlOrParams(instrumentId?: string | null): PdhlOrParams {
+  const id = (instrumentId ?? '').toLowerCase();
+  if (id === 'bank-nifty' || id.includes('banknifty') || id.includes('bank-nifty')) {
+    return PDHL_BANK_PARAMS;
+  }
+  return PDHL_NIFTY_PARAMS;
+}
+
+export function recordPdhlTradeClosed(
+  state: PdhlOrState,
+  points: number,
+  params: PdhlOrParams = PDHL_NIFTY_PARAMS,
+): void {
   state.dayNetPts += points;
   state.tradesToday += 1;
   if (points < 0) {
@@ -64,9 +114,9 @@ export function recordPdhlTradeClosed(state: PdhlOrState, points: number): void 
     state.winsToday += 1;
   }
 
-  if (state.dayNetPts >= PDHL_DAILY_PROFIT_LOCK_PTS) {
+  if (params.dailyProfitLockPts > 0 && state.dayNetPts >= params.dailyProfitLockPts) {
     state.dayStoppedReason = `Day profit lock +${state.dayNetPts.toFixed(1)} pts`;
-  } else if (state.dayNetPts <= -PDHL_DAILY_MAX_LOSS_PTS) {
+  } else if (params.dailyMaxLossPts > 0 && state.dayNetPts <= -params.dailyMaxLossPts) {
     state.dayStoppedReason = `Day max loss ${state.dayNetPts.toFixed(1)} pts`;
   }
 }
@@ -154,9 +204,11 @@ export function emaLast(closes: number[], period: number = PDHL_EMA_EXIT_PERIOD)
 }
 
 /**
- * OR bias + swing breakout, tight SL cap, 1.5R, multi-entry until day lock/stop.
+ * OR bias + swing breakout, SL cap + 1.5R, multi-entry until day lock/stop.
+ * Params resolve from ctx.instrumentId (Bank vs Nifty).
  */
 export function runPdhlOpeningRange(ctx: StrategyContext, state: PdhlOrState): PdhlOrResult {
+  const p = resolvePdhlOrParams(ctx.instrumentId);
   const session = resolveSessionFromContext(ctx);
   const current = ctx.candle5m;
   const tradingDate = extractTradeDate(current.date);
@@ -179,15 +231,17 @@ export function runPdhlOpeningRange(ctx: StrategyContext, state: PdhlOrState): P
     tradingDate,
     time,
     strategy: 'OR Swing Breakout',
-    dna: 'opening_range|swing|breakout|cap20|r_1_5|whole_day|ema_exit|L30|S45',
+    dna: p.dna,
+    instrumentId: ctx.instrumentId ?? null,
     rupeesPerPoint: PDHL_RUPEES_PER_POINT,
     dayNetPts: state.dayNetPts,
     dayNetRs: state.dayNetPts * PDHL_RUPEES_PER_POINT,
     tradesToday: state.tradesToday,
     lossesToday: state.lossesToday,
-    dailyProfitLock: PDHL_DAILY_PROFIT_LOCK_PTS,
-    dailyMaxLoss: PDHL_DAILY_MAX_LOSS_PTS,
-    maxStopPts: PDHL_MAX_STOP_LOSS_PTS,
+    dailyProfitLock: p.dailyProfitLockPts,
+    dailyMaxLoss: p.dailyMaxLossPts,
+    maxStopPts: p.maxStopPts,
+    earliestEntry: p.earliestEntry,
   };
 
   if (time < session.marketOpen) {
@@ -206,17 +260,21 @@ export function runPdhlOpeningRange(ctx: StrategyContext, state: PdhlOrState): P
     return noTrade(current, state.dayStoppedReason, base);
   }
 
-  if (state.dayNetPts >= PDHL_DAILY_PROFIT_LOCK_PTS) {
+  if (p.dailyProfitLockPts > 0 && state.dayNetPts >= p.dailyProfitLockPts) {
     state.dayStoppedReason = `Day profit lock +${state.dayNetPts.toFixed(1)} pts`;
     return noTrade(current, state.dayStoppedReason, base);
   }
-  if (state.dayNetPts <= -PDHL_DAILY_MAX_LOSS_PTS) {
+  if (p.dailyMaxLossPts > 0 && state.dayNetPts <= -p.dailyMaxLossPts) {
     state.dayStoppedReason = `Day max loss ${state.dayNetPts.toFixed(1)} pts`;
     return noTrade(current, state.dayStoppedReason, base);
   }
 
-  if (time < '09:20' || time > PDHL_LAST_ENTRY_TIME) {
-    return waiting(current, `Outside entry window (09:20–${PDHL_LAST_ENTRY_TIME})`, base);
+  if (time < p.earliestEntry || time > p.lastEntry) {
+    return waiting(
+      current,
+      `Outside entry window (${p.earliestEntry}–${p.lastEntry})`,
+      base,
+    );
   }
 
   const or = openingRange(dayBars, session.marketOpen, session.firstHourEnd);
@@ -256,20 +314,20 @@ export function runPdhlOpeningRange(ctx: StrategyContext, state: PdhlOrState): P
   const entry = current.close;
   let stopLoss = action === 'BUY' ? current.low : current.high;
   let risk = Math.abs(entry - stopLoss);
-  if (risk < PDHL_MIN_STOP_LOSS_PTS) {
-    return waiting(current, `Risk ${risk.toFixed(1)} < min ${PDHL_MIN_STOP_LOSS_PTS}`, {
+  if (risk < p.minStopPts) {
+    return waiting(current, `Risk ${risk.toFixed(1)} < min ${p.minStopPts}`, {
       ...base,
       bias,
       swingHigh: swing.high,
       swingLow: swing.low,
     });
   }
-  if (risk > PDHL_MAX_STOP_LOSS_PTS) {
-    stopLoss = action === 'BUY' ? entry - PDHL_MAX_STOP_LOSS_PTS : entry + PDHL_MAX_STOP_LOSS_PTS;
-    risk = PDHL_MAX_STOP_LOSS_PTS;
+  if (risk > p.maxStopPts) {
+    stopLoss = action === 'BUY' ? entry - p.maxStopPts : entry + p.maxStopPts;
+    risk = p.maxStopPts;
   }
 
-  if (state.dayNetPts - risk < -PDHL_DAILY_MAX_LOSS_PTS) {
+  if (p.dailyMaxLossPts > 0 && state.dayNetPts - risk < -p.dailyMaxLossPts) {
     return noTrade(
       current,
       `Next SL would breach day max loss (day ${state.dayNetPts.toFixed(1)}, risk ${risk.toFixed(1)})`,
@@ -277,9 +335,9 @@ export function runPdhlOpeningRange(ctx: StrategyContext, state: PdhlOrState): P
     );
   }
 
-  const targetPts = risk * PDHL_TARGET_R_MULTIPLE;
+  const targetPts = risk * p.targetRMultiple;
   const target = action === 'BUY' ? entry + targetPts : entry - targetPts;
-  const rr = PDHL_TARGET_R_MULTIPLE;
+  const rr = p.targetRMultiple;
   const targetRs = targetPts * PDHL_RUPEES_PER_POINT;
 
   const debug = buildSignalDebug({
@@ -294,7 +352,7 @@ export function runPdhlOpeningRange(ctx: StrategyContext, state: PdhlOrState): P
       { name: 'Day Budget', status: 'PASS', actualValue: `${state.dayNetPts.toFixed(1)} pts` },
       { name: 'OR Bias', status: 'PASS', actualValue: bias },
       { name: 'Swing Breakout', status: 'PASS', actualValue: `${swing.low.toFixed(1)}–${swing.high.toFixed(1)}` },
-      { name: 'Target', status: 'PASS', actualValue: `${targetPts.toFixed(1)} pts (1.5R)` },
+      { name: 'Target', status: 'PASS', actualValue: `${targetPts.toFixed(1)} pts (${rr}R)` },
     ],
   });
 

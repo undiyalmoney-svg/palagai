@@ -11,13 +11,14 @@ import { HistoricalTrade } from '../../../models/historical-test.model';
 import { OpenTrade } from '../../models/open-trade.model';
 import { STRATEGY_IDS } from '../../../config/strategy-ids.config';
 import {
-  PDHL_DAILY_MAX_LOSS_PTS,
-  PDHL_DAILY_PROFIT_LOCK_PTS,
   PDHL_EMA_EXIT_PERIOD,
+  PDHL_NIFTY_PARAMS,
   PDHL_RUPEES_PER_POINT,
+  PdhlOrParams,
   createPdhlOrState,
   emaLast,
   recordPdhlTradeClosed,
+  resolvePdhlOrParams,
   runPdhlOpeningRange,
 } from './pdhl-opening-range.evaluator';
 
@@ -28,13 +29,21 @@ export class PdhlOpeningRangeStrategy implements TradingStrategy {
   enabled = true;
 
   private readonly state = createPdhlOrState();
+  private lastParams: PdhlOrParams = PDHL_NIFTY_PARAMS;
 
   evaluate(ctx: StrategyContext): StrategySignal {
+    this.lastParams = resolvePdhlOrParams(ctx.instrumentId);
     const result = runPdhlOpeningRange(ctx, this.state);
     const tradeable = result.action === 'BUY' || result.action === 'SELL';
     const debug = result.analysis['debug'] as Record<string, unknown> | undefined;
     const targetRs = Number(result.analysis['targetRs'] ?? 0);
     const confidence = tradeable ? 88 : 0;
+    const lock = Number(result.analysis['dailyProfitLock'] ?? this.lastParams.dailyProfitLockPts);
+    const dayStop = Number(result.analysis['dailyMaxLoss'] ?? this.lastParams.dailyMaxLossPts);
+    const budgetLabel =
+      lock > 0
+        ? `Net ${Number(result.analysis['dayNetPts'] ?? 0).toFixed(1)} pts (lock +${lock} / stop -${dayStop})`
+        : `Net ${Number(result.analysis['dayNetPts'] ?? 0).toFixed(1)} pts (no day lock / stop -${dayStop})`;
 
     return {
       strategyId: this.id,
@@ -45,11 +54,7 @@ export class PdhlOpeningRangeStrategy implements TradingStrategy {
       stopLoss: tradeable ? result.stopLoss : ctx.candle5m.close,
       targetPrice: tradeable ? result.target : ctx.candle5m.close,
       riskRewardRatio: result.riskRewardRatio,
-      trend: moduleFromCheck(
-        'Day Budget',
-        true,
-        `Net ${Number(result.analysis['dayNetPts'] ?? 0).toFixed(1)} pts (lock +${PDHL_DAILY_PROFIT_LOCK_PTS} / stop -${PDHL_DAILY_MAX_LOSS_PTS})`,
-      ),
+      trend: moduleFromCheck('Day Budget', true, budgetLabel),
       structure: moduleFromCheck(
         'OR + Swing',
         result.analysis['orHigh'] != null,
@@ -110,10 +115,11 @@ export class PdhlOpeningRangeStrategy implements TradingStrategy {
   }
 
   onTradeClosed(trade: HistoricalTrade): void {
-    recordPdhlTradeClosed(this.state, trade.points);
+    recordPdhlTradeClosed(this.state, trade.points, this.lastParams);
   }
 
   reset(): void {
     Object.assign(this.state, createPdhlOrState());
+    this.lastParams = PDHL_NIFTY_PARAMS;
   }
 }

@@ -7,5 +7,14 @@
       "^/api/kite": ""
     },
     "logLevel": "debug"
+  },
+  "/api/order-kite": {
+    "target": "http://168.144.28.89:3000",
+    "secure": false,
+    "changeOrigin": true,
+    "pathRewrite": {
+      "^/api/order-kite": "/api/kite"
+    },
+    "logLevel": "debug"
   }
 }

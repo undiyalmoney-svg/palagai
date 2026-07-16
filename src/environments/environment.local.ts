@@ -1,5 +1,10 @@
 export const environment = {
   production: false,
-  orderApiBaseUrl: 'http://168.144.28.89:3000/api/kite',
-  orderApiOrigin: 'http://168.144.28.89:3000',
+  orderApiBaseUrl: '/api/order-kite',
+  defaultLots: 1,
+  allowLiveMoney: true,
+  /**
+   * Optional local-only session bootstrap. Fill via Get Token — do not commit real tokens.
+   */
+  // devKiteSession: { apiKey: '', accessToken: '' },
 };
