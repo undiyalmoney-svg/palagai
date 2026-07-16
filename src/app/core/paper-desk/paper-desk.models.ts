@@ -91,6 +91,14 @@ export interface PaperDeskSnapshot {
     losses: number;
     indexNetPts: number;
     optionNetRs: number;
+    /** Lots multiplier used for this run (Testing / Live paper Option ₹ and Live money qty). */
+    lotsUsed: number;
+    /**
+     * Lot-scaled money from index/futures points:
+     * Nifty/Bank ≈ pts × 65 × lots · Crude ≈ pts × 10 × lots.
+     * Use this to verify lots — raw indexNetPts does NOT scale with lots.
+     */
+    pointsMoneyRs: number;
   };
   /** Kite historical usage for this desk session (5m capped at 100 days/call). */
   kiteStats: {

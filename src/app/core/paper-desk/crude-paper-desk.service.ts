@@ -28,7 +28,7 @@ import {
   enrichCrudeTradesWithOptionPremiums,
   replayPaperOnCrude,
 } from './crude-paper-engine';
-import { CRUDE_EXIT_BY } from '../strategy-engine/strategies/crude-pdhl-evening/crude-pdhl-evening.evaluator';
+import { CRUDE_EXIT_BY, CRUDE_RUPEES_PER_POINT } from '../strategy-engine/strategies/crude-pdhl-evening/crude-pdhl-evening.evaluator';
 import {
   PaperDeskMode,
   PaperDeskSnapshot,
@@ -174,7 +174,7 @@ export class CrudePaperDeskService {
         message: `Testing complete · ${enriched.length} paper trade(s) · ${this.lotsMultiplier} lot(s) · PDHL 19:00–21:00 · ${this.kiteStatsLabel()}`,
         statuses: [status],
         trades: enriched.sort((a, b) => a.entryTime.localeCompare(b.entryTime)),
-        totals: summarize(enriched),
+        totals: summarize(enriched, this.lotsMultiplier, CRUDE_RUPEES_PER_POINT),
         kiteStats: this.kiteStats(),
         orderEvents: [],
         orderSummary: [],
@@ -357,6 +357,7 @@ export class CrudePaperDeskService {
       optionCandlesByToken: emptyOpt,
       neededOptionTokens: needed,
       forceCloseOpen: now >= CRUDE_EXIT_BY,
+      lotsMultiplier: this.lotsMultiplier,
     });
 
     const optionCandles = await this.fetchOptionHistories(
@@ -365,7 +366,11 @@ export class CrudePaperDeskService {
       today,
       authorization,
     );
-    const enriched = enrichCrudeTradesWithOptionPremiums(replay.trades, optionCandles);
+    const enriched = enrichCrudeTradesWithOptionPremiums(
+      replay.trades,
+      optionCandles,
+      this.lotsMultiplier,
+    );
     this.liveTrades = enriched;
 
     const status = withLiveFields({
@@ -428,7 +433,7 @@ export class CrudePaperDeskService {
       message: `${moneyTag} · alive ${now} · ${status.livePhaseLabel} · ${this.kiteStatsLabel()}`,
       statuses: [status],
       trades: enriched.sort((a, b) => a.entryTime.localeCompare(b.entryTime)),
-      totals: summarize(enriched),
+      totals: summarize(enriched, this.lotsMultiplier, CRUDE_RUPEES_PER_POINT),
       kiteStats: this.kiteStats(),
       orderEvents: this.realOrders ? this.liveOrders.getEvents() : [],
       orderSummary: this.realOrders ? this.liveOrders.getOrderSummary() : [],
@@ -682,7 +687,7 @@ function emptySnapshot(mode: PaperDeskMode): PaperDeskSnapshot {
     lastTickAt: null,
     statuses: [],
     trades: [],
-    totals: { trades: 0, wins: 0, losses: 0, indexNetPts: 0, optionNetRs: 0 },
+    totals: { trades: 0, wins: 0, losses: 0, indexNetPts: 0, optionNetRs: 0, lotsUsed: 1, pointsMoneyRs: 0 },
     kiteStats: {
       historicalCalls: 0,
       lastRangeDays: 0,
@@ -756,13 +761,21 @@ function applyLivePhase(
   status.livePhaseLabel = 'Idle';
 }
 
-function summarize(trades: PaperTrade[]): PaperDeskSnapshot['totals'] {
+function summarize(
+  trades: PaperTrade[],
+  lotsUsed: number = 1,
+  rupeesPerPoint: number = CRUDE_RUPEES_PER_POINT,
+): PaperDeskSnapshot['totals'] {
+  const lots = Math.max(1, Math.floor(lotsUsed) || 1);
+  const indexNetPts = trades.reduce((a, t) => a + t.indexPoints, 0);
   return {
     trades: trades.length,
     wins: trades.filter((t) => t.outcome === 'WIN').length,
     losses: trades.filter((t) => t.outcome === 'LOSS').length,
-    indexNetPts: trades.reduce((a, t) => a + t.indexPoints, 0),
+    indexNetPts,
     optionNetRs: trades.reduce((a, t) => a + (t.optionPnlRs ?? 0), 0),
+    lotsUsed: lots,
+    pointsMoneyRs: indexNetPts * rupeesPerPoint * lots,
   };
 }
 

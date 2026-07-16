@@ -52,10 +52,12 @@
         [disabled]="isLoading()"
       >
         @if (isLoading()) {
-          <mat-spinner diameter="20"></mat-spinner>
-          <span>Signing in...</span>
+          <span class="submit-inner">
+            <mat-spinner diameter="18"></mat-spinner>
+            <span>Signing in...</span>
+          </span>
         } @else {
-          <span>Sign in</span>
+          <span class="submit-inner">Sign in</span>
         }
       </button>
     </form>

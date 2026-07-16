@@ -32,6 +32,7 @@ import {
   enrichTradesWithOptionPremiums,
   replayPaperOnIndex,
 } from './paper-desk-engine';
+import { PDHL_RUPEES_PER_POINT } from '../strategy-engine/strategies/pdhl-opening-range/pdhl-opening-range.evaluator';
 import {
   PaperDeskMode,
   PaperDeskSnapshot,
@@ -236,7 +237,7 @@ export class PaperTradeDeskService {
         message: `Testing complete · ${enriched.length} paper trade(s) · ${this.lotsMultiplier} lot(s) · ${this.kiteStatsLabel()}`,
         statuses,
         trades: enriched.sort((a, b) => a.entryTime.localeCompare(b.entryTime)),
-        totals: summarize(enriched),
+        totals: summarize(enriched, this.lotsMultiplier, PDHL_RUPEES_PER_POINT),
         kiteStats: this.kiteStats(),
         orderEvents: [],
         orderSummary: [],
@@ -573,7 +574,7 @@ export class PaperTradeDeskService {
       message: `${moneyTag} · alive ${now} · waiting ${waiting} · in trade ${inTrade}${targets ? ` · target hit ${targets}` : ''}${openMsg} · ${this.kiteStatsLabel()}`,
       statuses,
       trades: enriched.sort((a, b) => b.entryTime.localeCompare(a.entryTime)),
-      totals: summarize(enriched),
+      totals: summarize(enriched, this.lotsMultiplier, PDHL_RUPEES_PER_POINT),
       kiteStats: this.kiteStats(),
       orderEvents: this.liveOrders.getEvents(),
       orderSummary: this.liveOrders.getOrderSummary(),
@@ -835,7 +836,7 @@ function emptySnapshot(mode: PaperDeskMode): PaperDeskSnapshot {
     lastTickAt: null,
     statuses: [],
     trades: [],
-    totals: { trades: 0, wins: 0, losses: 0, indexNetPts: 0, optionNetRs: 0 },
+    totals: { trades: 0, wins: 0, losses: 0, indexNetPts: 0, optionNetRs: 0, lotsUsed: 1, pointsMoneyRs: 0 },
     kiteStats: {
       historicalCalls: 0,
       lastRangeDays: 0,
@@ -921,13 +922,21 @@ function isCancelledError(err: unknown): boolean {
   return err instanceof CancelledError || (err instanceof Error && err.message === 'CANCELLED');
 }
 
-function summarize(trades: PaperTrade[]): PaperDeskSnapshot['totals'] {
+function summarize(
+  trades: PaperTrade[],
+  lotsUsed: number = 1,
+  rupeesPerPoint: number = PDHL_RUPEES_PER_POINT,
+): PaperDeskSnapshot['totals'] {
+  const lots = Math.max(1, Math.floor(lotsUsed) || 1);
+  const indexNetPts = trades.reduce((a, t) => a + t.indexPoints, 0);
   return {
     trades: trades.length,
     wins: trades.filter((t) => t.outcome === 'WIN').length,
     losses: trades.filter((t) => t.outcome === 'LOSS').length,
-    indexNetPts: trades.reduce((a, t) => a + t.indexPoints, 0),
+    indexNetPts,
     optionNetRs: trades.reduce((a, t) => a + (t.optionPnlRs ?? 0), 0),
+    lotsUsed: lots,
+    pointsMoneyRs: indexNetPts * rupeesPerPoint * lots,
   };
 }
 
