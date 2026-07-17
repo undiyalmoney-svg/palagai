@@ -7,10 +7,11 @@ import { StrategyContext } from '../strategy-engine/models/strategy-context.mode
 import {
   createPdhlOrState,
   emaLast,
+  mergePdhlOrParams,
   PDHL_EMA_EXIT_PERIOD,
+  PdhlOrParams,
   PdhlOrState,
   recordPdhlTradeClosed,
-  resolvePdhlOrParams,
   runPdhlOpeningRange,
 } from '../strategy-engine/strategies/pdhl-opening-range/pdhl-opening-range.evaluator';
 import {
@@ -238,6 +239,8 @@ export function replayPaperOnIndex(params: {
   forceCloseOpen?: boolean;
   /** Exchange lot × this for option ₹ P&L. */
   lotsMultiplier?: number;
+  /** Optional Trade Desk day loss / profit lock overrides. */
+  pdhlOverrides?: Partial<PdhlOrParams> | null;
 }): ReplayInstrumentResult {
   const {
     instrumentId,
@@ -252,6 +255,7 @@ export function replayPaperOnIndex(params: {
   } = params;
   const forceCloseOpen = params.forceCloseOpen !== false;
   const lotsMultiplier = Math.max(1, Math.floor(params.lotsMultiplier ?? 1) || 1);
+  const pdhlParams = mergePdhlOrParams(instrumentId, params.pdhlOverrides);
 
   const state = createPdhlOrState();
   const trades: PaperTrade[] = [];
@@ -286,7 +290,7 @@ export function replayPaperOnIndex(params: {
           lotsMultiplier,
         });
         trades.push(closed);
-        recordPdhlTradeClosed(state, closed.indexPoints, resolvePdhlOrParams(instrumentId));
+        recordPdhlTradeClosed(state, closed.indexPoints, pdhlParams);
         dayNetByDate[day] = (dayNetByDate[day] ?? 0) + closed.indexPoints;
         open = null;
         lastSignal = `Closed: ${exit.reason}`;
@@ -295,7 +299,7 @@ export function replayPaperOnIndex(params: {
     }
 
     const ctx = buildContext(candles, i, instrumentId);
-    const signal = runPdhlOpeningRange(ctx, state);
+    const signal = runPdhlOpeningRange(ctx, state, pdhlParams);
     lastSignal = signal.reason;
 
     if (signal.action !== 'BUY' && signal.action !== 'SELL') {
@@ -368,7 +372,7 @@ export function replayPaperOnIndex(params: {
         lotsMultiplier,
       });
       trades.push(closed);
-      recordPdhlTradeClosed(state, closed.indexPoints, resolvePdhlOrParams(instrumentId));
+      recordPdhlTradeClosed(state, closed.indexPoints, pdhlParams);
       dayNetByDate[day] = (dayNetByDate[day] ?? 0) + closed.indexPoints;
       if (closed.option) {
         chosenOption = closed.option;

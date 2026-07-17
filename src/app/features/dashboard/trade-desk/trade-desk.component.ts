@@ -3,7 +3,10 @@ import { DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { PaperTradeDeskService } from '../../../core/paper-desk/paper-trade-desk.service';
+import {
+  PaperTradeDeskService,
+  TradeDeskRunOptions,
+} from '../../../core/paper-desk/paper-trade-desk.service';
 import { PaperDeskMode } from '../../../core/paper-desk/paper-desk.models';
 import { KiteSessionService } from '../../../core/kite/kite-session.service';
 import { LotsPreferenceService } from '../../../core/services/lots-preference.service';
@@ -29,6 +32,14 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
   protected realOrdersAck = false;
   /** Exchange lot × this — Testing / Live paper Option ₹ and Live money qty. */
   protected lots = 1;
+
+  /** Trade Desk book + risk checkboxes (Testing + Live). */
+  protected enableNifty = true;
+  protected enableBank = true;
+  /** Combined strict day loss ≈ −₹2,950 (safer than default ~−₹8k days). */
+  protected strictDayStop = false;
+  /** Combined day profit lock ≈ +₹5,000. */
+  protected dayProfitLock = false;
 
   protected readonly snapshot = this.desk.snapshot;
   protected readonly busy = this.desk.busy;
@@ -62,16 +73,39 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
     }
   }
 
+  private buildRunOptions(lots: number): TradeDeskRunOptions {
+    return {
+      lots,
+      enableNifty: this.enableNifty,
+      enableBank: this.enableBank,
+      strictDayStop: this.strictDayStop,
+      dayProfitLock: this.dayProfitLock,
+    };
+  }
+
+  private selectedBooksLabel(): string {
+    const parts = [
+      this.enableNifty ? 'Nifty 50' : null,
+      this.enableBank ? 'Bank Nifty' : null,
+    ].filter(Boolean);
+    return parts.join(' + ') || 'none';
+  }
+
   protected async onStart(): Promise<void> {
     this.error.set('');
     if (!this.kiteSession.getAuthorizationHeader()) {
       this.error.set('No Kite session. Open Get Token and paste your access token, then try again.');
       return;
     }
+    if (!this.enableNifty && !this.enableBank) {
+      this.error.set('Select at least one: Nifty 50 or Bank Nifty.');
+      return;
+    }
 
     const lots = Math.max(1, Math.floor(Number(this.lots)) || 1);
     this.lots = lots;
     this.lotsPreference.set(lots);
+    const runOpts = this.buildRunOptions(lots);
 
     try {
       if (this.mode() === 'testing') {
@@ -79,23 +113,29 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
           this.error.set('Pick a valid From → To date range.');
           return;
         }
-        await this.desk.runTesting(this.fromDate, this.toDate, lots);
+        await this.desk.runTesting(this.fromDate, this.toDate, runOpts);
       } else {
         if (this.realOrders && !this.realOrdersAck) {
           this.error.set('Tick the confirmation box before starting Live money.');
           return;
         }
         if (this.realOrders) {
+          const riskBits = [
+            this.strictDayStop ? 'strict day stop −₹2,950' : null,
+            this.dayProfitLock ? 'day profit lock +₹5,000' : null,
+          ]
+            .filter(Boolean)
+            .join(', ');
           const ok = window.confirm(
-            `Start LIVE MONEY?\n\nReal Kite MIS MARKET orders will be placed on ATM options (${lots} lot each) for Nifty & Bank Nifty when signals fire.\n\nOrders go via DigitalOcean fixed IP.`,
+            `Start LIVE MONEY?\n\nReal Kite MIS MARKET orders on ATM options (${lots} lot each) for: ${this.selectedBooksLabel()}.\n${riskBits ? `Risk: ${riskBits}.\n` : ''}\nOrders go via DigitalOcean fixed IP.`,
           );
           if (!ok) {
             return;
           }
         }
         await this.desk.startLive({
+          ...runOpts,
           realOrders: this.realOrders,
-          lots,
         });
       }
     } catch (err) {

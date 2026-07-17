@@ -32,7 +32,7 @@ import {
   enrichTradesWithOptionPremiums,
   replayPaperOnIndex,
 } from './paper-desk-engine';
-import { PDHL_RUPEES_PER_POINT } from '../strategy-engine/strategies/pdhl-opening-range/pdhl-opening-range.evaluator';
+import { PDHL_RUPEES_PER_POINT, buildDeskRiskOverrides } from '../strategy-engine/strategies/pdhl-opening-range/pdhl-opening-range.evaluator';
 import {
   PaperDeskMode,
   PaperDeskSnapshot,
@@ -41,6 +41,17 @@ import {
   PaperTrade,
 } from './paper-desk.models';
 import { LiveOrderExecutorService } from '../live-desk/live-order-executor.service';
+
+export interface TradeDeskRunOptions {
+  lots?: number;
+  realOrders?: boolean;
+  enableNifty?: boolean;
+  enableBank?: boolean;
+  /** Combined strict day loss ≈ −₹2,950 (split if both books on). */
+  strictDayStop?: boolean;
+  /** Combined day profit lock ≈ +₹5,000 (split if both books on). */
+  dayProfitLock?: boolean;
+}
 
 interface LiveLeg {
   instrument: TesterInstrument;
@@ -69,6 +80,14 @@ export class PaperTradeDeskService {
   private realOrders = false;
   /** Exchange lot × this — applies to Testing + Live paper option ₹ and Live money qty. */
   private lotsMultiplier = 1;
+  private deskRunOptions: Required<
+    Pick<TradeDeskRunOptions, 'enableNifty' | 'enableBank' | 'strictDayStop' | 'dayProfitLock'>
+  > = {
+    enableNifty: true,
+    enableBank: true,
+    strictDayStop: false,
+    dayProfitLock: false,
+  };
   private runGeneration = 0;
   private readonly maxDaysPerCall = kiteMaxDaysForInterval('5minute');
   private readonly liveOrders = inject(LiveOrderExecutorService);
@@ -119,11 +138,67 @@ export class PaperTradeDeskService {
     }
   }
 
-  async runTesting(fromDate: string, toDate: string, lots: number = 1): Promise<void> {
+  private normalizeDeskOptions(options?: TradeDeskRunOptions): void {
+    const enableNifty = options?.enableNifty !== false;
+    const enableBank = options?.enableBank !== false;
+    if (!enableNifty && !enableBank) {
+      throw new Error('Select at least one index: Nifty 50 or Bank Nifty.');
+    }
+    this.deskRunOptions = {
+      enableNifty,
+      enableBank,
+      strictDayStop: !!options?.strictDayStop,
+      dayProfitLock: !!options?.dayProfitLock,
+    };
+  }
+
+  private activeInstruments(): Array<{ instrument: TesterInstrument; kind: IndexOptionKind }> {
+    return this.instruments.filter((row) => {
+      if (row.kind === 'nifty') {
+        return this.deskRunOptions.enableNifty;
+      }
+      return this.deskRunOptions.enableBank;
+    });
+  }
+
+  private pdhlOverridesFor(instrumentId: string) {
+    return buildDeskRiskOverrides({
+      instrumentId,
+      enableNifty: this.deskRunOptions.enableNifty,
+      enableBank: this.deskRunOptions.enableBank,
+      strictDayStop: this.deskRunOptions.strictDayStop,
+      dayProfitLock: this.deskRunOptions.dayProfitLock,
+    });
+  }
+
+  private deskOptionsLabel(): string {
+    const books = [
+      this.deskRunOptions.enableNifty ? 'Nifty' : null,
+      this.deskRunOptions.enableBank ? 'Bank' : null,
+    ]
+      .filter(Boolean)
+      .join('+');
+    const risk = [
+      this.deskRunOptions.strictDayStop ? 'strict −₹2950' : null,
+      this.deskRunOptions.dayProfitLock ? 'profit lock +₹5000' : null,
+    ]
+      .filter(Boolean)
+      .join(', ');
+    return risk ? `${books} · ${risk}` : books;
+  }
+
+  async runTesting(
+    fromDate: string,
+    toDate: string,
+    lotsOrOptions: number | TradeDeskRunOptions = 1,
+  ): Promise<void> {
     this.cancelRun({ silent: true });
     const runId = this.runGeneration;
     this.resetKiteStats();
-    this.lotsMultiplier = Math.max(1, Math.floor(lots) || 1);
+    const options: TradeDeskRunOptions =
+      typeof lotsOrOptions === 'number' ? { lots: lotsOrOptions } : lotsOrOptions;
+    this.normalizeDeskOptions(options);
+    this.lotsMultiplier = Math.max(1, Math.floor(options.lots ?? 1) || 1);
     this.busy.set(true);
     const spanDays = calendarDaysInclusive(shiftDate(fromDate, -12), toDate);
     this.snapshot.set({
@@ -147,10 +222,11 @@ export class PaperTradeDeskService {
 
       const lookbackFrom = shiftDate(fromDate, -12);
       const candleMap = new Map<string, Candle[]>();
+      const active = this.activeInstruments();
 
-      for (let i = 0; i < this.instruments.length; i += 1) {
+      for (let i = 0; i < active.length; i += 1) {
         this.assertActive(runId);
-        const { instrument } = this.instruments[i]!;
+        const { instrument } = active[i]!;
         if (i > 0) {
           await delay(1500);
         }
@@ -170,7 +246,7 @@ export class PaperTradeDeskService {
       const firstPassTrades: PaperTrade[] = [];
       const statuses: PaperInstrumentStatus[] = [];
 
-      for (const { instrument, kind } of this.instruments) {
+      for (const { instrument, kind } of active) {
         const candles = candleMap.get(instrument.id) ?? [];
         const replay = replayPaperOnIndex({
           instrumentId: instrument.id,
@@ -183,6 +259,7 @@ export class PaperTradeDeskService {
           optionCandlesByToken: emptyOpt,
           neededOptionTokens: needed,
           lotsMultiplier: this.lotsMultiplier,
+          pdhlOverrides: this.pdhlOverridesFor(instrument.id),
         });
         firstPassTrades.push(...replay.trades);
         statuses.push(
@@ -234,7 +311,7 @@ export class PaperTradeDeskService {
         marketOpen: true,
         realOrders: false,
         lastTickAt: null,
-        message: `Testing complete · ${enriched.length} paper trade(s) · ${this.lotsMultiplier} lot(s) · ${this.kiteStatsLabel()}`,
+        message: `Testing complete · ${enriched.length} paper trade(s) · ${this.lotsMultiplier} lot(s) · ${this.deskOptionsLabel()} · ${this.kiteStatsLabel()}`,
         statuses,
         trades: enriched.sort((a, b) => a.entryTime.localeCompare(b.entryTime)),
         totals: summarize(enriched, this.lotsMultiplier, PDHL_RUPEES_PER_POINT),
@@ -261,16 +338,18 @@ export class PaperTradeDeskService {
     }
   }
 
-  async startLive(options?: { realOrders?: boolean; lots?: number }): Promise<void> {
+  async startLive(options?: TradeDeskRunOptions): Promise<void> {
     this.cancelRun({ silent: true });
     const runId = this.runGeneration;
     this.resetKiteStats();
+    this.normalizeDeskOptions(options);
     this.realOrders = !!environment.allowLiveMoney && !!options?.realOrders;
     this.lotsMultiplier = Math.max(1, Math.floor(options?.lots ?? 1) || 1);
     this.liveOrders.reset();
     this.liveOrders.setLotsMultiplier(this.lotsMultiplier);
     const today = todayIso();
     const now = istNowHhMm();
+    const active = this.activeInstruments();
 
     if (now < '09:15' || now > '15:30') {
       try {
@@ -279,7 +358,7 @@ export class PaperTradeDeskService {
           requireMinimum: false,
         });
         // Show what ATM contracts would be (using last index close if available)
-        const statuses = await this.previewChosenInstruments(today, allInstruments);
+        const statuses = await this.previewChosenInstruments(today, allInstruments, active);
         this.snapshot.set({
           ...emptySnapshot('live'),
           fromDate: today,
@@ -311,8 +390,8 @@ export class PaperTradeDeskService {
       marketOpen: true,
       realOrders: this.realOrders,
       message: this.realOrders
-        ? 'Starting LIVE MONEY desk (real Kite MIS orders)…'
-        : 'Starting live paper…',
+        ? `Starting LIVE MONEY desk (${this.deskOptionsLabel()})…`
+        : `Starting live paper (${this.deskOptionsLabel()})…`,
       kiteStats: this.kiteStats(),
     });
 
@@ -326,9 +405,9 @@ export class PaperTradeDeskService {
       this.liveLegs = [];
       this.liveTrades = [];
 
-      for (let i = 0; i < this.instruments.length; i += 1) {
+      for (let i = 0; i < active.length; i += 1) {
         this.assertActive(runId);
-        const row = this.instruments[i]!;
+        const row = active[i]!;
         if (i > 0) {
           await delay(1500);
         }
@@ -470,6 +549,7 @@ export class PaperTradeDeskService {
         neededOptionTokens: needed,
         forceCloseOpen: now >= '15:15',
         lotsMultiplier: this.lotsMultiplier,
+        pdhlOverrides: this.pdhlOverridesFor(leg.instrument.id),
       });
       allTrades.push(...replay.trades);
       statuses.push(
@@ -584,12 +664,13 @@ export class PaperTradeDeskService {
   private async previewChosenInstruments(
     today: string,
     allInstruments: Instrument[],
+    activeRows: Array<{ instrument: TesterInstrument; kind: IndexOptionKind }> = this.instruments,
   ): Promise<PaperInstrumentStatus[]> {
     const authorization = this.kiteSession.getAuthorizationHeader();
     const statuses: PaperInstrumentStatus[] = [];
 
-    for (let i = 0; i < this.instruments.length; i += 1) {
-      const { instrument, kind } = this.instruments[i]!;
+    for (let i = 0; i < activeRows.length; i += 1) {
+      const { instrument, kind } = activeRows[i]!;
       let spot: number | null = null;
       let asOf = `${today} 15:15:00`;
       if (authorization) {

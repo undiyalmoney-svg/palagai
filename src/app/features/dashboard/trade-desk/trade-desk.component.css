@@ -84,6 +84,32 @@
   width: 4.5rem;
 }
 
+.desk-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem 0.75rem;
+  align-items: center;
+  width: 100%;
+  margin: 0.1rem 0 0;
+}
+
+.desk-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.65rem;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: #fff;
+  font-size: 0.84rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.desk-check input {
+  margin: 0;
+}
+
 .phase-pill {
   display: inline-flex;
   margin: 0 0 0.65rem;

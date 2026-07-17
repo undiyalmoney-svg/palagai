@@ -37,8 +37,14 @@ export function createPdhlOrState(): PdhlOrState {
   };
 }
 
-/** User capital plan: 1 point = ₹65 */
+/** User capital plan: Nifty 1 point = ₹65 */
 export const PDHL_RUPEES_PER_POINT = 65;
+/** Bank Nifty plan: 1 point = ₹30 */
+export const PDHL_BANK_RUPEES_PER_POINT = 30;
+/** Desk checkbox: combined strict day loss (₹) — split across selected books. */
+export const DESK_STRICT_DAY_LOSS_RS = 2950;
+/** Desk checkbox: combined day profit lock (₹) — split across selected books. */
+export const DESK_DAY_PROFIT_LOCK_RS = 5000;
 
 /**
  * Per-index risk profile (champion pair, 2020–2026 hunt):
@@ -99,6 +105,54 @@ export function resolvePdhlOrParams(instrumentId?: string | null): PdhlOrParams 
     return PDHL_BANK_PARAMS;
   }
   return PDHL_NIFTY_PARAMS;
+}
+
+export function isBankPdhlInstrument(instrumentId?: string | null): boolean {
+  const id = (instrumentId ?? '').toLowerCase();
+  return id === 'bank-nifty' || id.includes('banknifty') || id.includes('bank-nifty');
+}
+
+export function rupeesPerPointForInstrument(instrumentId?: string | null): number {
+  return isBankPdhlInstrument(instrumentId) ? PDHL_BANK_RUPEES_PER_POINT : PDHL_RUPEES_PER_POINT;
+}
+
+/** Merge champion DNA with optional Trade Desk risk checkboxes. */
+export function mergePdhlOrParams(
+  instrumentId: string | null | undefined,
+  overrides?: Partial<PdhlOrParams> | null,
+): PdhlOrParams {
+  const base = resolvePdhlOrParams(instrumentId);
+  if (!overrides) {
+    return base;
+  }
+  return { ...base, ...overrides };
+}
+
+/**
+ * Build per-book day loss / profit overrides from Trade Desk checkboxes.
+ * Strict −₹2950 and profit lock +₹5000 are split evenly when both books are on.
+ */
+export function buildDeskRiskOverrides(options: {
+  instrumentId: string;
+  enableNifty: boolean;
+  enableBank: boolean;
+  strictDayStop: boolean;
+  dayProfitLock: boolean;
+}): Partial<PdhlOrParams> | undefined {
+  if (!options.strictDayStop && !options.dayProfitLock) {
+    return undefined;
+  }
+  const both = options.enableNifty && options.enableBank;
+  const share = both ? 0.5 : 1;
+  const rs = rupeesPerPointForInstrument(options.instrumentId);
+  const overrides: Partial<PdhlOrParams> = {};
+  if (options.strictDayStop) {
+    overrides.dailyMaxLossPts = Math.max(1, Math.round((DESK_STRICT_DAY_LOSS_RS * share) / rs));
+  }
+  if (options.dayProfitLock) {
+    overrides.dailyProfitLockPts = Math.max(1, Math.round((DESK_DAY_PROFIT_LOCK_RS * share) / rs));
+  }
+  return overrides;
 }
 
 export function recordPdhlTradeClosed(
@@ -204,11 +258,15 @@ export function emaLast(closes: number[], period: number = PDHL_EMA_EXIT_PERIOD)
 }
 
 /**
- * OR bias + swing breakout, SL cap + 1.5R, multi-entry until day lock/stop.
- * Params resolve from ctx.instrumentId (Bank vs Nifty).
+ * OR bias + swing breakout, SL cap + 1R, multi-entry until day lock/stop.
+ * Params resolve from ctx.instrumentId (Bank vs Nifty), optional desk overrides.
  */
-export function runPdhlOpeningRange(ctx: StrategyContext, state: PdhlOrState): PdhlOrResult {
-  const p = resolvePdhlOrParams(ctx.instrumentId);
+export function runPdhlOpeningRange(
+  ctx: StrategyContext,
+  state: PdhlOrState,
+  paramsOverride?: Partial<PdhlOrParams> | null,
+): PdhlOrResult {
+  const p = mergePdhlOrParams(ctx.instrumentId, paramsOverride);
   const session = resolveSessionFromContext(ctx);
   const current = ctx.candle5m;
   const tradingDate = extractTradeDate(current.date);
@@ -233,9 +291,9 @@ export function runPdhlOpeningRange(ctx: StrategyContext, state: PdhlOrState): P
     strategy: 'OR Swing Breakout',
     dna: p.dna,
     instrumentId: ctx.instrumentId ?? null,
-    rupeesPerPoint: PDHL_RUPEES_PER_POINT,
+    rupeesPerPoint: rupeesPerPointForInstrument(ctx.instrumentId),
     dayNetPts: state.dayNetPts,
-    dayNetRs: state.dayNetPts * PDHL_RUPEES_PER_POINT,
+    dayNetRs: state.dayNetPts * rupeesPerPointForInstrument(ctx.instrumentId),
     tradesToday: state.tradesToday,
     lossesToday: state.lossesToday,
     dailyProfitLock: p.dailyProfitLockPts,
