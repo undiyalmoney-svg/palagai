@@ -33,6 +33,20 @@
     <router-outlet />
   </main>
 
+  <nav class="mobile-tabbar" aria-label="Mobile menu">
+    @for (item of navItems; track item.route) {
+      <a
+        class="tab-item"
+        [routerLink]="item.route"
+        routerLinkActive="active"
+        [routerLinkActiveOptions]="{ exact: true }"
+      >
+        <mat-icon>{{ item.icon }}</mat-icon>
+        <span class="tab-label">{{ item.shortLabel }}</span>
+      </a>
+    }
+  </nav>
+
   <footer class="palagai-footer">
     <span class="bull-dot" aria-hidden="true"></span>
     <span>Bull · Bear · Same rules every session</span>

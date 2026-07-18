@@ -1,16 +1,23 @@
-import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import {
-  PaperTradeDeskService,
-  TradeDeskRunOptions,
-} from '../../../core/paper-desk/paper-trade-desk.service';
+import { PaperTradeDeskService, TradeDeskRunOptions } from '../../../core/paper-desk/paper-trade-desk.service';
+import { PaperDeskExportService } from '../../../core/paper-desk/paper-desk-export.service';
 import { PaperDeskMode } from '../../../core/paper-desk/paper-desk.models';
+import {
+  PAPER_WEEKDAY_OPTIONS,
+  PaperWeekdayKey,
+  PaperWeekdaySelection,
+  buildWeekdayFilteredView,
+  defaultPaperWeekdaySelection,
+} from '../../../core/paper-desk/paper-desk-weekday-filter';
+import { PDHL_RUPEES_PER_POINT } from '../../../core/strategy-engine/strategies/pdhl-opening-range/pdhl-opening-range.evaluator';
 import { KiteSessionService } from '../../../core/kite/kite-session.service';
 import { LotsPreferenceService } from '../../../core/services/lots-preference.service';
 import { formatUnknownError } from '../../../core/utils/kite-error.util';
+import { extractTradeDate, formatDayOfWeek, formatDisplayDate } from '../../../core/utils/trade-date.util';
 
 @Component({
   selector: 'app-trade-desk',
@@ -21,6 +28,7 @@ import { formatUnknownError } from '../../../core/utils/kite-error.util';
 })
 export class TradeDeskComponent implements OnInit, OnDestroy {
   private readonly desk = inject(PaperTradeDeskService);
+  private readonly deskExport = inject(PaperDeskExportService);
   private readonly kiteSession = inject(KiteSessionService);
   private readonly lotsPreference = inject(LotsPreferenceService);
 
@@ -41,9 +49,34 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
   /** Combined day profit lock ≈ +₹5,000. */
   protected dayProfitLock = false;
 
+  /** Testing result filter: Mon–Fri (fetch all, show selected weekdays). */
+  protected readonly weekdayOptions = PAPER_WEEKDAY_OPTIONS;
+  protected readonly weekdayOn = signal<PaperWeekdaySelection>(defaultPaperWeekdaySelection());
+
   protected readonly snapshot = this.desk.snapshot;
   protected readonly busy = this.desk.busy;
   protected readonly error = signal('');
+
+  /** Filtered Testing view; Live uses full snapshot. */
+  protected readonly resultView = computed(() => {
+    const snap = this.snapshot();
+    if (this.mode() !== 'testing' || !snap.trades.length) {
+      return {
+        trades: snap.trades,
+        totals: snap.totals,
+        dayStats: snap.dayStats,
+        weekdayLabel: 'all',
+        filtered: false,
+      };
+    }
+    const view = buildWeekdayFilteredView(
+      snap.trades,
+      this.weekdayOn(),
+      snap.totals.lotsUsed || this.lots,
+      PDHL_RUPEES_PER_POINT,
+    );
+    return { ...view, filtered: true };
+  });
 
   ngOnInit(): void {
     this.lots = this.lotsPreference.get();
@@ -53,6 +86,14 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
     const normalized = Math.max(1, Math.floor(Number(this.lots)) || 1);
     this.lots = normalized;
     this.lotsPreference.set(normalized);
+  }
+
+  protected toggleWeekday(key: PaperWeekdayKey): void {
+    this.weekdayOn.update((cur) => ({ ...cur, [key]: !cur[key] }));
+  }
+
+  protected isWeekdayOn(key: PaperWeekdayKey): boolean {
+    return this.weekdayOn()[key];
   }
 
   ngOnDestroy(): void {
@@ -174,6 +215,40 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
       return '—';
     }
     return ts.replace('T', ' ').slice(0, 16);
+  }
+
+  protected fmtWeekday(ts: string | null | undefined): string {
+    if (!ts) {
+      return '—';
+    }
+    return formatDayOfWeek(extractTradeDate(ts));
+  }
+
+  protected fmtDisplayDate(ts: string | null | undefined): string {
+    if (!ts) {
+      return '—';
+    }
+    return formatDisplayDate(extractTradeDate(ts));
+  }
+
+  protected downloadPdf(): void {
+    const snap = this.snapshot();
+    const view = this.resultView();
+    if (!view.trades.length) {
+      return;
+    }
+    this.deskExport.exportPdf(
+      {
+        ...snap,
+        trades: view.trades,
+        totals: view.totals,
+        dayStats: view.dayStats,
+      },
+      {
+        title: 'Trade Desk Results',
+        subtitle: `Nifty 50 / Bank Nifty paper · days ${view.weekdayLabel}`,
+      },
+    );
   }
 }
 

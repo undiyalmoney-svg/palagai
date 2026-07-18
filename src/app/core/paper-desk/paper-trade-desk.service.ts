@@ -19,9 +19,8 @@ import {
   calendarDaysInclusive,
   chunkInclusiveDateRange,
   datePart,
-  kiteMaxDaysForInterval,
+  DESK_HISTORICAL_CHUNK_DAYS,
 } from '../kite/kite-historical-limits';
-import { extractTradeDate } from '../utils/trade-date.util';
 import { Instrument } from '../models/instrument.model';
 import {
   IndexOptionKind,
@@ -32,6 +31,7 @@ import {
   enrichTradesWithOptionPremiums,
   replayPaperOnIndex,
 } from './paper-desk-engine';
+import { buildPaperDeskDayStats, emptyPaperDeskDayStats } from './paper-desk-day-stats';
 import { PDHL_RUPEES_PER_POINT, buildDeskRiskOverrides } from '../strategy-engine/strategies/pdhl-opening-range/pdhl-opening-range.evaluator';
 import {
   PaperDeskMode,
@@ -89,7 +89,7 @@ export class PaperTradeDeskService {
     dayProfitLock: false,
   };
   private runGeneration = 0;
-  private readonly maxDaysPerCall = kiteMaxDaysForInterval('5minute');
+  private readonly maxDaysPerCall = DESK_HISTORICAL_CHUNK_DAYS;
   private readonly liveOrders = inject(LiveOrderExecutorService);
   private readonly historicalTimeoutMs = 45_000;
 
@@ -200,15 +200,15 @@ export class PaperTradeDeskService {
     this.normalizeDeskOptions(options);
     this.lotsMultiplier = Math.max(1, Math.floor(options.lots ?? 1) || 1);
     this.busy.set(true);
-    const spanDays = calendarDaysInclusive(shiftDate(fromDate, -12), toDate);
+    const batches = chunkInclusiveDateRange(fromDate, toDate, DESK_HISTORICAL_CHUNK_DAYS);
     this.snapshot.set({
       ...emptySnapshot('testing'),
       running: true,
       fromDate,
       toDate,
       message:
-        spanDays > this.maxDaysPerCall
-          ? `Fetching index candles in chunks (${spanDays}d span, max ${this.maxDaysPerCall}d/call)…`
+        batches.length > 1
+          ? `Testing in ${batches.length} × ~3-month batches…`
           : 'Fetching index candles…',
       marketOpen: true,
       kiteStats: this.kiteStats(),
@@ -220,88 +220,139 @@ export class PaperTradeDeskService {
       const allInstruments = await this.loadOptionInstruments();
       this.assertActive(runId);
 
-      const lookbackFrom = shiftDate(fromDate, -12);
-      const candleMap = new Map<string, Candle[]>();
       const active = this.activeInstruments();
-
-      for (let i = 0; i < active.length; i += 1) {
-        this.assertActive(runId);
-        const { instrument } = active[i]!;
-        if (i > 0) {
-          await delay(1500);
+      const allEnriched: PaperTrade[] = [];
+      const statusAcc = new Map<
+        string,
+        {
+          instrumentId: string;
+          instrumentName: string;
+          lastBarTime: string | null;
+          dayNetIndexPts: number;
+          dayNetOptionRs: number;
+          chosenOption: PaperInstrumentStatus['chosenOption'];
+          chosenBias: PaperInstrumentStatus['chosenBias'];
+          indexSpot: number | null;
+          chosenAsOf: string | null;
+          lastSignal: string;
         }
-        this.patchMessage(`Loading ${instrument.name} 5m…`);
-        const candles = await this.fetch5m({
-          instrumentToken: instrument.instrumentToken,
-          from: `${lookbackFrom} 09:00:00`,
-          to: `${toDate} 15:30:00`,
-          authorization,
-          runId,
-        });
-        candleMap.set(instrument.id, candles);
-      }
+      >();
 
-      const needed = new Set<number>();
-      const emptyOpt = new Map<number, Candle[]>();
-      const firstPassTrades: PaperTrade[] = [];
-      const statuses: PaperInstrumentStatus[] = [];
+      for (let b = 0; b < batches.length; b += 1) {
+        this.assertActive(runId);
+        const batch = batches[b]!;
+        this.patchMessage(
+          `Batch ${b + 1}/${batches.length}: ${batch.fromDate} → ${batch.toDate} · loading indices…`,
+        );
+        const lookbackFrom = shiftDate(batch.fromDate, -12);
+        const candleMap = new Map<string, Candle[]>();
 
-      for (const { instrument, kind } of active) {
-        const candles = candleMap.get(instrument.id) ?? [];
-        const replay = replayPaperOnIndex({
-          instrumentId: instrument.id,
-          instrumentName: instrument.name,
-          kind,
-          candles,
-          fromDate,
-          toDate,
-          instruments: allInstruments,
-          optionCandlesByToken: emptyOpt,
-          neededOptionTokens: needed,
-          lotsMultiplier: this.lotsMultiplier,
-          pdhlOverrides: this.pdhlOverridesFor(instrument.id),
-        });
-        firstPassTrades.push(...replay.trades);
-        statuses.push(
-          withLiveFields({
+        for (let i = 0; i < active.length; i += 1) {
+          this.assertActive(runId);
+          const { instrument } = active[i]!;
+          if (i > 0 || b > 0) {
+            await delay(i > 0 ? 1500 : 400);
+          }
+          this.patchMessage(
+            `Batch ${b + 1}/${batches.length}: loading ${instrument.name} 5m…`,
+          );
+          const candles = await this.fetch5m({
+            instrumentToken: instrument.instrumentToken,
+            from: `${lookbackFrom} 09:00:00`,
+            to: `${batch.toDate} 15:30:00`,
+            authorization,
+            runId,
+          });
+          candleMap.set(instrument.id, candles);
+        }
+
+        const needed = new Set<number>();
+        const emptyOpt = new Map<number, Candle[]>();
+        const batchTrades: PaperTrade[] = [];
+
+        for (const { instrument, kind } of active) {
+          const candles = candleMap.get(instrument.id) ?? [];
+          const replay = replayPaperOnIndex({
             instrumentId: instrument.id,
             instrumentName: instrument.name,
-            lastBarTime: candles.at(-1)?.date ?? null,
-            dayNetIndexPts: Object.values(replay.dayNetByDate).reduce((a, b) => a + b, 0),
-            dayNetOptionRs: 0,
-            openTrade: null,
-            chosenOption: replay.chosenOption,
-            chosenBias: replay.chosenBias,
-            indexSpot: replay.indexSpot,
-            chosenAsOf: replay.chosenAsOf,
-            lastSignal: replay.lastSignal,
-            tradesToday: replay.trades.length,
-          }),
+            kind,
+            candles,
+            fromDate: batch.fromDate,
+            toDate: batch.toDate,
+            instruments: allInstruments,
+            optionCandlesByToken: emptyOpt,
+            neededOptionTokens: needed,
+            lotsMultiplier: this.lotsMultiplier,
+            pdhlOverrides: this.pdhlOverridesFor(instrument.id),
+          });
+          batchTrades.push(...replay.trades);
+
+          const prev = statusAcc.get(instrument.id);
+          const batchIndexNet = Object.values(replay.dayNetByDate).reduce((a, v) => a + v, 0);
+          statusAcc.set(instrument.id, {
+            instrumentId: instrument.id,
+            instrumentName: instrument.name,
+            lastBarTime: candles.at(-1)?.date ?? prev?.lastBarTime ?? null,
+            dayNetIndexPts: (prev?.dayNetIndexPts ?? 0) + batchIndexNet,
+            dayNetOptionRs: prev?.dayNetOptionRs ?? 0,
+            chosenOption: replay.chosenOption ?? prev?.chosenOption ?? null,
+            chosenBias: replay.chosenBias ?? prev?.chosenBias ?? null,
+            indexSpot: replay.indexSpot ?? prev?.indexSpot ?? null,
+            chosenAsOf: replay.chosenAsOf ?? prev?.chosenAsOf ?? null,
+            lastSignal: replay.lastSignal || prev?.lastSignal || 'Waiting',
+          });
+        }
+
+        this.assertActive(runId);
+        if (needed.size) {
+          this.patchMessage(
+            `Batch ${b + 1}/${batches.length}: loading ${needed.size} option contract(s)…`,
+          );
+        }
+        const optionCandles = await this.fetchOptionHistories(
+          [...needed],
+          lookbackFrom,
+          batch.toDate,
+          authorization,
+          runId,
         );
+        this.assertActive(runId);
+
+        const enriched = enrichTradesWithOptionPremiums(
+          batchTrades,
+          optionCandles,
+          this.lotsMultiplier,
+        );
+        allEnriched.push(...enriched);
+
+        for (const [id, acc] of statusAcc) {
+          const mine = enriched.filter((t) => t.instrumentId === id);
+          acc.dayNetOptionRs += mine.reduce((a, t) => a + (t.optionPnlRs ?? 0), 0);
+        }
       }
 
-      this.assertActive(runId);
-      this.patchMessage(`Loading ${needed.size} option contract(s)…`);
-      const optionCandles = await this.fetchOptionHistories(
-        [...needed],
-        lookbackFrom,
-        toDate,
-        authorization,
-        runId,
-      );
-      this.assertActive(runId);
+      const statuses: PaperInstrumentStatus[] = [...statusAcc.values()].map((acc) => {
+        const mine = allEnriched.filter((t) => t.instrumentId === acc.instrumentId);
+        const status = withLiveFields({
+          instrumentId: acc.instrumentId,
+          instrumentName: acc.instrumentName,
+          lastBarTime: acc.lastBarTime,
+          dayNetIndexPts: acc.dayNetIndexPts,
+          dayNetOptionRs: acc.dayNetOptionRs,
+          openTrade: null,
+          chosenOption: acc.chosenOption,
+          chosenBias: acc.chosenBias,
+          indexSpot: acc.indexSpot,
+          chosenAsOf: acc.chosenAsOf,
+          lastSignal: acc.lastSignal,
+          tradesToday: mine.length,
+        });
+        applyLivePhase(status, mine, false);
+        return status;
+      });
 
-      const enriched = enrichTradesWithOptionPremiums(
-        firstPassTrades,
-        optionCandles,
-        this.lotsMultiplier,
-      );
-      for (const s of statuses) {
-        const mine = enriched.filter((t) => t.instrumentId === s.instrumentId);
-        s.dayNetOptionRs = mine.reduce((a, t) => a + (t.optionPnlRs ?? 0), 0);
-        s.tradesToday = mine.length;
-        applyLivePhase(s, mine, false);
-      }
+      const sorted = allEnriched.sort((a, b) => a.entryTime.localeCompare(b.entryTime));
+      const dayStats = buildPaperDeskDayStats(sorted);
 
       this.snapshot.set({
         mode: 'testing',
@@ -311,10 +362,11 @@ export class PaperTradeDeskService {
         marketOpen: true,
         realOrders: false,
         lastTickAt: null,
-        message: `Testing complete · ${enriched.length} paper trade(s) · ${this.lotsMultiplier} lot(s) · ${this.deskOptionsLabel()} · ${this.kiteStatsLabel()}`,
+        message: `Testing complete · ${sorted.length} paper trade(s) · ${batches.length} batch(es) · ${this.lotsMultiplier} lot(s) · ${this.deskOptionsLabel()} · ${this.kiteStatsLabel()}`,
         statuses,
-        trades: enriched.sort((a, b) => a.entryTime.localeCompare(b.entryTime)),
-        totals: summarize(enriched, this.lotsMultiplier, PDHL_RUPEES_PER_POINT),
+        trades: sorted,
+        totals: summarize(sorted, this.lotsMultiplier, PDHL_RUPEES_PER_POINT),
+        dayStats,
         kiteStats: this.kiteStats(),
         orderEvents: [],
         orderSummary: [],
@@ -655,6 +707,7 @@ export class PaperTradeDeskService {
       statuses,
       trades: enriched.sort((a, b) => b.entryTime.localeCompare(a.entryTime)),
       totals: summarize(enriched, this.lotsMultiplier, PDHL_RUPEES_PER_POINT),
+      dayStats: buildPaperDeskDayStats(enriched),
       kiteStats: this.kiteStats(),
       orderEvents: this.liveOrders.getEvents(),
       orderSummary: this.liveOrders.getOrderSummary(),
@@ -918,10 +971,11 @@ function emptySnapshot(mode: PaperDeskMode): PaperDeskSnapshot {
     statuses: [],
     trades: [],
     totals: { trades: 0, wins: 0, losses: 0, indexNetPts: 0, optionNetRs: 0, lotsUsed: 1, pointsMoneyRs: 0 },
+    dayStats: emptyPaperDeskDayStats(),
     kiteStats: {
       historicalCalls: 0,
       lastRangeDays: 0,
-      maxDaysPerCall: kiteMaxDaysForInterval('5minute'),
+      maxDaysPerCall: DESK_HISTORICAL_CHUNK_DAYS,
     },
     orderEvents: [],
     orderSummary: [],

@@ -76,6 +76,37 @@
       />
     </label>
 
+    <div class="desk-toggles" role="group" aria-label="Day risk">
+      <label
+        class="desk-check"
+        title="Off: champion day stop −₹2,400 (−240 pts). On: stricter −₹2,950 (−295 pts)."
+      >
+        <input
+          type="checkbox"
+          [(ngModel)]="strictDayStop"
+          [disabled]="busy() || snapshot().running"
+        />
+        <span>Strict day stop (−₹2,950)</span>
+      </label>
+    </div>
+
+    @if (mode() === 'testing') {
+      <div class="weekday-filter" role="group" aria-label="Result weekdays">
+        <span class="weekday-filter-label">Result days</span>
+        @for (d of weekdayOptions; track d.key) {
+          <button
+            type="button"
+            class="weekday-chip"
+            [class.on]="isWeekdayOn(d.key)"
+            (click)="toggleWeekday(d.key)"
+          >
+            {{ d.short }}
+          </button>
+        }
+        <small>Fetch all · show selected Mon–Fri only</small>
+      </div>
+    }
+
     @if (mode() === 'live') {
       <label class="real-orders">
         <input type="checkbox" [(ngModel)]="realOrders" [disabled]="busy() || snapshot().running" />
@@ -145,33 +176,168 @@
     </p>
   }
 
-  @if (snapshot().totals.trades || snapshot().statuses.length) {
+  @if (resultView().totals.trades || snapshot().statuses.length) {
     <div class="totals">
       <div class="stat">
         <span>Trades</span>
-        <strong>{{ snapshot().totals.trades }}</strong>
+        <strong>{{ resultView().totals.trades }}</strong>
       </div>
       <div class="stat">
         <span>W / L</span>
-        <strong>{{ snapshot().totals.wins }} / {{ snapshot().totals.losses }}</strong>
+        <strong>{{ resultView().totals.wins }} / {{ resultView().totals.losses }}</strong>
       </div>
-      <div class="stat" [class.up]="snapshot().totals.indexNetPts > 0" [class.down]="snapshot().totals.indexNetPts < 0">
+      <div class="stat" [class.up]="resultView().totals.indexNetPts > 0" [class.down]="resultView().totals.indexNetPts < 0">
         <span>Futures pts</span>
-        <strong>{{ snapshot().totals.indexNetPts > 0 ? '+' : '' }}{{ snapshot().totals.indexNetPts | number: '1.1-1' }}</strong>
+        <strong>{{ resultView().totals.indexNetPts > 0 ? '+' : '' }}{{ resultView().totals.indexNetPts | number: '1.1-1' }}</strong>
       </div>
-      <div class="stat primary" [class.up]="snapshot().totals.pointsMoneyRs > 0" [class.down]="snapshot().totals.pointsMoneyRs < 0">
-        <span>P&amp;L ₹ ({{ snapshot().totals.lotsUsed }} lot{{ snapshot().totals.lotsUsed > 1 ? 's' : '' }} × ₹10/pt)</span>
-        <strong>{{ snapshot().totals.pointsMoneyRs > 0 ? '+' : '' }}{{ snapshot().totals.pointsMoneyRs | number: '1.0-0' }}</strong>
+      <div class="stat primary" [class.up]="resultView().totals.pointsMoneyRs > 0" [class.down]="resultView().totals.pointsMoneyRs < 0">
+        <span>P&amp;L ₹ ({{ resultView().totals.lotsUsed }} lot{{ resultView().totals.lotsUsed > 1 ? 's' : '' }} × ₹10/pt)</span>
+        <strong>{{ resultView().totals.pointsMoneyRs > 0 ? '+' : '' }}{{ resultView().totals.pointsMoneyRs | number: '1.0-0' }}</strong>
       </div>
-      <div class="stat" [class.up]="snapshot().totals.optionNetRs > 0" [class.down]="snapshot().totals.optionNetRs < 0">
-        <span>Option ₹ ({{ snapshot().totals.lotsUsed }} lot{{ snapshot().totals.lotsUsed > 1 ? 's' : '' }})</span>
-        <strong>{{ snapshot().totals.optionNetRs > 0 ? '+' : '' }}{{ snapshot().totals.optionNetRs | number: '1.0-0' }}</strong>
+      <div class="stat" [class.up]="resultView().totals.optionNetRs > 0" [class.down]="resultView().totals.optionNetRs < 0">
+        <span>Option ₹ ({{ resultView().totals.lotsUsed }} lot{{ resultView().totals.lotsUsed > 1 ? 's' : '' }})</span>
+        <strong>{{ resultView().totals.optionNetRs > 0 ? '+' : '' }}{{ resultView().totals.optionNetRs | number: '1.0-0' }}</strong>
       </div>
       <div class="stat">
         <span>Kite 5m calls</span>
         <strong>{{ snapshot().kiteStats.historicalCalls }}</strong>
       </div>
     </div>
+
+    @if (resultView().dayStats.tradingDays) {
+      <div class="day-stats">
+        <div class="day-stats-head">
+          <div>
+            <h3>Day breakdown</h3>
+            <p>{{ resultView().dayStats.tradingDays }} trading day(s) · ranked by Option ₹
+              @if (resultView().filtered) {
+                · {{ resultView().weekdayLabel }}
+              }</p>
+          </div>
+          <button
+            mat-stroked-button
+            type="button"
+            class="pdf-btn"
+            [disabled]="!resultView().trades.length || busy() || snapshot().running"
+            (click)="downloadPdf()"
+          >
+            Download PDF
+          </button>
+        </div>
+
+        <div class="day-highlights">
+          @if (resultView().dayStats.bestDay; as best) {
+            <div class="day-card up">
+              <span>Most profitable day</span>
+              <strong>{{ best.displayDate }}</strong>
+              <em>{{ best.optionNetRs > 0 ? '+' : '' }}{{ best.optionNetRs | number: '1.0-0' }} · {{ best.trades }} trade(s)</em>
+            </div>
+          }
+          @if (resultView().dayStats.worstDay; as worst) {
+            <div class="day-card down">
+              <span>Most loss day</span>
+              <strong>{{ worst.displayDate }}</strong>
+              <em>{{ worst.optionNetRs > 0 ? '+' : '' }}{{ worst.optionNetRs | number: '1.0-0' }} · {{ worst.trades }} trade(s)</em>
+            </div>
+          }
+        </div>
+
+        <div class="day-tables">
+          <div class="day-table-block">
+            <h4>Top profitable days</h4>
+            <div class="table-scroll">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Day</th>
+                    <th>Trades</th>
+                    <th>Option ₹</th>
+                    <th>Pts</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (d of resultView().dayStats.topProfitDays; track d.date) {
+                    <tr>
+                      <td>{{ d.displayDate }}</td>
+                      <td>{{ d.weekday }}</td>
+                      <td>{{ d.trades }}</td>
+                      <td class="num up">{{ d.optionNetRs > 0 ? '+' : '' }}{{ d.optionNetRs | number: '1.0-0' }}</td>
+                      <td class="num">{{ d.indexNetPts > 0 ? '+' : '' }}{{ d.indexNetPts | number: '1.1-1' }}</td>
+                    </tr>
+                  } @empty {
+                    <tr><td colspan="5" class="muted">No profit days</td></tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="day-table-block">
+            <h4>Most loss days</h4>
+            <div class="table-scroll">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Day</th>
+                    <th>Trades</th>
+                    <th>Option ₹</th>
+                    <th>Pts</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (d of resultView().dayStats.topLossDays; track d.date) {
+                    <tr>
+                      <td>{{ d.displayDate }}</td>
+                      <td>{{ d.weekday }}</td>
+                      <td>{{ d.trades }}</td>
+                      <td class="num down">{{ d.optionNetRs | number: '1.0-0' }}</td>
+                      <td class="num">{{ d.indexNetPts > 0 ? '+' : '' }}{{ d.indexNetPts | number: '1.1-1' }}</td>
+                    </tr>
+                  } @empty {
+                    <tr><td colspan="5" class="muted">No loss days</td></tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        @if (resultView().dayStats.byWeekday.length) {
+          <div class="day-table-block weekday-block">
+            <h4>By weekday</h4>
+            <div class="table-scroll">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Day</th>
+                    <th>Trades</th>
+                    <th>W / L</th>
+                    <th>Option ₹</th>
+                    <th>Pts</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (w of resultView().dayStats.byWeekday; track w.weekday) {
+                    <tr>
+                      <td>{{ w.weekday }}</td>
+                      <td>{{ w.trades }}</td>
+                      <td>{{ w.wins }} / {{ w.losses }}</td>
+                      <td class="num" [class.up]="w.optionNetRs > 0" [class.down]="w.optionNetRs < 0">
+                        {{ w.optionNetRs > 0 ? '+' : '' }}{{ w.optionNetRs | number: '1.0-0' }}
+                      </td>
+                      <td class="num" [class.up]="w.indexNetPts > 0" [class.down]="w.indexNetPts < 0">
+                        {{ w.indexNetPts > 0 ? '+' : '' }}{{ w.indexNetPts | number: '1.1-1' }}
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </div>
+        }
+      </div>
+    }
 
     <div class="status-grid">
       @for (s of snapshot().statuses; track s.instrumentId) {
@@ -299,16 +465,26 @@
     </div>
   }
 
-  @if (snapshot().trades.length) {
+  @if (resultView().trades.length) {
     <div class="trades-block">
       <div class="trades-head">
         <h3>Paper trades</h3>
         <p>Option ₹ primary · futures pts from evening PDHL champion</p>
+        <button
+          mat-stroked-button
+          type="button"
+          class="pdf-btn"
+          [disabled]="busy() || snapshot().running"
+          (click)="downloadPdf()"
+        >
+          Download PDF
+        </button>
       </div>
       <div class="table-scroll">
         <table>
           <thead>
             <tr>
+              <th>Day</th>
               <th>When</th>
               <th>Dir</th>
               <th>Chosen option</th>
@@ -319,8 +495,14 @@
             </tr>
           </thead>
           <tbody>
-            @for (t of snapshot().trades; track t.id) {
+            @for (t of resultView().trades; track t.id) {
               <tr [class.win]="t.outcome === 'WIN'" [class.loss]="t.outcome === 'LOSS'">
+                <td>
+                  <div class="stack">
+                    <strong>{{ fmtWeekday(t.entryTime) }}</strong>
+                    <small>{{ fmtDisplayDate(t.entryTime) }}</small>
+                  </div>
+                </td>
                 <td>
                   <div class="stack">
                     <strong>{{ fmtTime(t.entryTime) }}</strong>
@@ -363,11 +545,12 @@
   <aside class="rules">
     <h4>How it runs</h4>
     <ul>
-      <li><strong>Strategy</strong> — previous-day high/low break 19:00–21:00 IST; SL 80 · TP 200; exit by 23:10; ≤2/day · ≤8/month.</li>
+      <li><strong>Strategy</strong> — previous-day high/low break 19:00–21:00 IST; SL 80 · TP 200; exit by 23:10; ≤2/day · ≤8/month; day stop −₹2,400 (optional strict −₹2,950).</li>
       <li><strong>Hold</strong> — until TP/SL, or up to ~4 hours (19:00 → 23:10).</li>
-      <li><strong>Testing</strong> — default last 14 days; Start paper-replays anytime.</li>
+      <li><strong>Testing</strong> — long ranges fetch in ~3-month batches and combine; default last 14 days.</li>
       <li><strong>Live paper</strong> — auto-poll during MCX hours; after hours use Testing.</li>
       <li><strong>Live money</strong> — tick the box + confirm; MCX NRML MARKET entry + protective SL-M.</li>
+      <li><strong>PDF</strong> — Download PDF for totals, best/worst days, weekday rollup, and trades.</li>
       <li>ATM CRUDEOILM CE on BUY / PE on SELL · Option ₹ / order qty scales with Lots · Nifty/Bank desk separate.</li>
     </ul>
   </aside>

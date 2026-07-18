@@ -165,6 +165,8 @@ export function replayPaperOnCrude(params: {
   neededOptionTokens: Set<number>;
   forceCloseOpen?: boolean;
   lotsMultiplier?: number;
+  /** Day max loss in futures pts (default champion −240). */
+  dayLossStopPts?: number;
 }): CrudeReplayResult {
   const {
     instrumentId,
@@ -178,6 +180,7 @@ export function replayPaperOnCrude(params: {
   } = params;
   const forceCloseOpen = params.forceCloseOpen !== false;
   const lotsMultiplier = Math.max(1, Math.floor(params.lotsMultiplier ?? 1) || 1);
+  const dayLossStopPts = params.dayLossStopPts;
 
   const state = createCrudePdhlState();
   const trades: PaperTrade[] = [];
@@ -210,7 +213,7 @@ export function replayPaperOnCrude(params: {
           lotsMultiplier,
         });
         trades.push(closed);
-        recordCrudeTradeClosed(state, closed.indexPoints);
+        recordCrudeTradeClosed(state, closed.indexPoints, dayLossStopPts);
         dayNetByDate[day] = (dayNetByDate[day] ?? 0) + closed.indexPoints;
         open = null;
         lastSignal = `Closed: ${exit.reason}`;
@@ -223,6 +226,7 @@ export function replayPaperOnCrude(params: {
       series: candles,
       index: i,
       state,
+      dayLossStopPts,
     });
     lastSignal = signal.reason;
 
@@ -277,7 +281,7 @@ export function replayPaperOnCrude(params: {
       lotsMultiplier,
     });
     trades.push(closed);
-    recordCrudeTradeClosed(state, closed.indexPoints);
+    recordCrudeTradeClosed(state, closed.indexPoints, dayLossStopPts);
     dayNetByDate[extractTradeDate(last.date)] =
       (dayNetByDate[extractTradeDate(last.date)] ?? 0) + closed.indexPoints;
     open = null;

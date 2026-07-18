@@ -100,6 +100,23 @@
       </label>
     </div>
 
+    @if (mode() === 'testing') {
+      <div class="weekday-filter" role="group" aria-label="Result weekdays">
+        <span class="weekday-filter-label">Result days</span>
+        @for (d of weekdayOptions; track d.key) {
+          <button
+            type="button"
+            class="weekday-chip"
+            [class.on]="isWeekdayOn(d.key)"
+            (click)="toggleWeekday(d.key)"
+          >
+            {{ d.short }}
+          </button>
+        }
+        <small>Fetch all · show selected Mon–Fri only</small>
+      </div>
+    }
+
     @if (mode() === 'live') {
       <label class="real-orders">
         <input
@@ -177,23 +194,23 @@
     </p>
   }
 
-  @if (snapshot().totals.trades || snapshot().statuses.length) {
+  @if (resultView().totals.trades || snapshot().statuses.length) {
     <div class="totals">
       <div class="stat">
         <span>Trades</span>
-        <strong>{{ snapshot().totals.trades }}</strong>
+        <strong>{{ resultView().totals.trades }}</strong>
       </div>
       <div class="stat">
         <span>W / L</span>
-        <strong>{{ snapshot().totals.wins }} / {{ snapshot().totals.losses }}</strong>
+        <strong>{{ resultView().totals.wins }} / {{ resultView().totals.losses }}</strong>
       </div>
-      <div class="stat" [class.up]="snapshot().totals.indexNetPts > 0" [class.down]="snapshot().totals.indexNetPts < 0">
+      <div class="stat" [class.up]="resultView().totals.indexNetPts > 0" [class.down]="resultView().totals.indexNetPts < 0">
         <span>Index pts</span>
-        <strong>{{ snapshot().totals.indexNetPts > 0 ? '+' : '' }}{{ snapshot().totals.indexNetPts | number: '1.1-1' }}</strong>
+        <strong>{{ resultView().totals.indexNetPts > 0 ? '+' : '' }}{{ resultView().totals.indexNetPts | number: '1.1-1' }}</strong>
       </div>
-      <div class="stat primary" [class.up]="snapshot().totals.optionNetRs > 0" [class.down]="snapshot().totals.optionNetRs < 0">
-        <span>P&amp;L ₹ ({{ snapshot().totals.lotsUsed }} lot{{ snapshot().totals.lotsUsed > 1 ? 's' : '' }} · options)</span>
-        <strong>{{ snapshot().totals.optionNetRs > 0 ? '+' : '' }}{{ snapshot().totals.optionNetRs | number: '1.0-0' }}</strong>
+      <div class="stat primary" [class.up]="resultView().totals.optionNetRs > 0" [class.down]="resultView().totals.optionNetRs < 0">
+        <span>P&amp;L ₹ ({{ resultView().totals.lotsUsed }} lot{{ resultView().totals.lotsUsed > 1 ? 's' : '' }} · options)</span>
+        <strong>{{ resultView().totals.optionNetRs > 0 ? '+' : '' }}{{ resultView().totals.optionNetRs | number: '1.0-0' }}</strong>
       </div>
       <div class="stat">
         <span>Kite 5m calls</span>
@@ -204,6 +221,143 @@
         <strong>{{ snapshot().kiteStats.lastRangeDays }}d / {{ snapshot().kiteStats.maxDaysPerCall }}d</strong>
       </div>
     </div>
+
+    @if (resultView().dayStats.tradingDays) {
+      <div class="day-stats">
+        <div class="day-stats-head">
+          <div>
+            <h3>Day breakdown</h3>
+            <p>
+              {{ resultView().dayStats.tradingDays }} trading day(s) · ranked by Option ₹
+              @if (resultView().filtered) {
+                · {{ resultView().weekdayLabel }}
+              }
+            </p>
+          </div>
+          <button
+            mat-stroked-button
+            type="button"
+            class="pdf-btn"
+            [disabled]="!resultView().trades.length || busy() || snapshot().running"
+            (click)="downloadPdf()"
+          >
+            Download PDF
+          </button>
+        </div>
+
+        <div class="day-highlights">
+          @if (resultView().dayStats.bestDay; as best) {
+            <div class="day-card up">
+              <span>Most profitable day</span>
+              <strong>{{ best.displayDate }}</strong>
+              <em>{{ best.optionNetRs > 0 ? '+' : '' }}{{ best.optionNetRs | number: '1.0-0' }} · {{ best.trades }} trade(s)</em>
+            </div>
+          }
+          @if (resultView().dayStats.worstDay; as worst) {
+            <div class="day-card down">
+              <span>Most loss day</span>
+              <strong>{{ worst.displayDate }}</strong>
+              <em>{{ worst.optionNetRs > 0 ? '+' : '' }}{{ worst.optionNetRs | number: '1.0-0' }} · {{ worst.trades }} trade(s)</em>
+            </div>
+          }
+        </div>
+
+        <div class="day-tables">
+          <div class="day-table-block">
+            <h4>Top profitable days</h4>
+            <div class="table-scroll">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Day</th>
+                    <th>Trades</th>
+                    <th>Option ₹</th>
+                    <th>Pts</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (d of resultView().dayStats.topProfitDays; track d.date) {
+                    <tr>
+                      <td>{{ d.displayDate }}</td>
+                      <td>{{ d.weekday }}</td>
+                      <td>{{ d.trades }}</td>
+                      <td class="num up">{{ d.optionNetRs > 0 ? '+' : '' }}{{ d.optionNetRs | number: '1.0-0' }}</td>
+                      <td class="num">{{ d.indexNetPts > 0 ? '+' : '' }}{{ d.indexNetPts | number: '1.1-1' }}</td>
+                    </tr>
+                  } @empty {
+                    <tr><td colspan="5" class="muted">No profit days</td></tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="day-table-block">
+            <h4>Most loss days</h4>
+            <div class="table-scroll">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Day</th>
+                    <th>Trades</th>
+                    <th>Option ₹</th>
+                    <th>Pts</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (d of resultView().dayStats.topLossDays; track d.date) {
+                    <tr>
+                      <td>{{ d.displayDate }}</td>
+                      <td>{{ d.weekday }}</td>
+                      <td>{{ d.trades }}</td>
+                      <td class="num down">{{ d.optionNetRs | number: '1.0-0' }}</td>
+                      <td class="num">{{ d.indexNetPts > 0 ? '+' : '' }}{{ d.indexNetPts | number: '1.1-1' }}</td>
+                    </tr>
+                  } @empty {
+                    <tr><td colspan="5" class="muted">No loss days</td></tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        @if (resultView().dayStats.byWeekday.length) {
+          <div class="day-table-block weekday-block">
+            <h4>By weekday</h4>
+            <div class="table-scroll">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Day</th>
+                    <th>Trades</th>
+                    <th>W / L</th>
+                    <th>Option ₹</th>
+                    <th>Pts</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (w of resultView().dayStats.byWeekday; track w.weekday) {
+                    <tr>
+                      <td>{{ w.weekday }}</td>
+                      <td>{{ w.trades }}</td>
+                      <td>{{ w.wins }} / {{ w.losses }}</td>
+                      <td class="num" [class.up]="w.optionNetRs > 0" [class.down]="w.optionNetRs < 0">
+                        {{ w.optionNetRs > 0 ? '+' : '' }}{{ w.optionNetRs | number: '1.0-0' }}
+                      </td>
+                      <td class="num" [class.up]="w.indexNetPts > 0" [class.down]="w.indexNetPts < 0">
+                        {{ w.indexNetPts > 0 ? '+' : '' }}{{ w.indexNetPts | number: '1.1-1' }}
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </div>
+        }
+      </div>
+    }
 
     <div class="status-grid">
       @for (s of snapshot().statuses; track s.instrumentId) {
@@ -407,16 +561,26 @@
     </div>
   }
 
-  @if (snapshot().trades.length) {
+  @if (resultView().trades.length) {
     <div class="trades-block">
       <div class="trades-head">
         <h3>Paper trades</h3>
         <p>Option ₹ is primary · index pts mirror Historical Tester</p>
+        <button
+          mat-stroked-button
+          type="button"
+          class="pdf-btn"
+          [disabled]="busy() || snapshot().running"
+          (click)="downloadPdf()"
+        >
+          Download PDF
+        </button>
       </div>
       <div class="table-scroll">
         <table>
           <thead>
             <tr>
+              <th>Day</th>
               <th>When</th>
               <th>Index</th>
               <th>Dir</th>
@@ -428,8 +592,14 @@
             </tr>
           </thead>
           <tbody>
-            @for (t of snapshot().trades; track t.id) {
+            @for (t of resultView().trades; track t.id) {
               <tr [class.win]="t.outcome === 'WIN'" [class.loss]="t.outcome === 'LOSS'">
+                <td>
+                  <div class="stack">
+                    <strong>{{ fmtWeekday(t.entryTime) }}</strong>
+                    <small>{{ fmtDisplayDate(t.entryTime) }}</small>
+                  </div>
+                </td>
                 <td>
                   <div class="stack">
                     <strong>{{ fmtTime(t.entryTime) }}</strong>
@@ -489,15 +659,16 @@
   <aside class="rules">
     <h4>How it runs</h4>
     <ul>
-      <li><strong>Testing</strong> — pick dates, Start loads candles once and paper-replays both indices.</li>
+      <li><strong>Testing</strong> — pick dates, Start loads candles in ~3-month batches and combines results (works for 1–5 year ranges).</li>
       <li><strong>Live paper</strong> — Start auto-polls during 09:15–15:30; after hours use Testing.</li>
       <li><strong>Live money</strong> — tick the box + confirm; MARKET entry + protective SL-M; strategy exit cancels SL then MARKET sell.</li>
-      <li><strong>Kite 5m limit</strong> — max {{ snapshot().kiteStats.maxDaysPerCall }} calendar days per historical call; longer ranges auto-chunk.</li>
+      <li><strong>Kite 5m limit</strong> — max {{ snapshot().kiteStats.maxDaysPerCall }} calendar days (~3 months) per historical call; longer ranges auto-chunk.</li>
       <li>
         ATM weekly CE on BUY / PE on SELL · {{ lots }} lot · champion DNA: 1R · EMA-20 · default day stop −60 · no day
         profit lock · Nifty SL cap 30 / Bank 45. Optional: Strict day stop (−₹2,950) · Day profit lock (+₹5,000) · pick
         Nifty and/or Bank.
       </li>
+      <li><strong>PDF</strong> — Download PDF after Testing for totals, best/worst days, weekday rollup, and trades.</li>
     </ul>
   </aside>
 </section>

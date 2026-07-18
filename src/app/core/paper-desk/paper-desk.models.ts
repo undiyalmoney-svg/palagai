@@ -1,3 +1,5 @@
+import type { PaperDeskDayStats } from './paper-desk-day-stats';
+
 export type PaperDeskMode = 'testing' | 'live';
 
 export interface PaperOptionContract {
@@ -100,6 +102,8 @@ export interface PaperDeskSnapshot {
      */
     pointsMoneyRs: number;
   };
+  /** Testing day breakdown: best/worst days, weekday rollup. */
+  dayStats: PaperDeskDayStats;
   /** Kite historical usage for this desk session (5m capped at 100 days/call). */
   kiteStats: {
     historicalCalls: number;

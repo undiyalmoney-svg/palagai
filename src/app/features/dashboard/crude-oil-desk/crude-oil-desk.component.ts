@@ -1,14 +1,24 @@
-import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { CrudePaperDeskService } from '../../../core/paper-desk/crude-paper-desk.service';
+import { CrudePaperDeskService, CrudeDeskRunOptions } from '../../../core/paper-desk/crude-paper-desk.service';
+import { PaperDeskExportService } from '../../../core/paper-desk/paper-desk-export.service';
 import { PaperDeskMode } from '../../../core/paper-desk/paper-desk.models';
+import {
+  PAPER_WEEKDAY_OPTIONS,
+  PaperWeekdayKey,
+  PaperWeekdaySelection,
+  buildWeekdayFilteredView,
+  defaultPaperWeekdaySelection,
+} from '../../../core/paper-desk/paper-desk-weekday-filter';
+import { CRUDE_RUPEES_PER_POINT } from '../../../core/strategy-engine/strategies/crude-pdhl-evening/crude-pdhl-evening.evaluator';
 import { KiteSessionService } from '../../../core/kite/kite-session.service';
 import { LotsPreferenceService } from '../../../core/services/lots-preference.service';
 import { MCX_CRUDE_SESSION } from '../../../core/config/session.config';
 import { formatUnknownError } from '../../../core/utils/kite-error.util';
+import { extractTradeDate, formatDayOfWeek, formatDisplayDate } from '../../../core/utils/trade-date.util';
 
 @Component({
   selector: 'app-crude-oil-desk',
@@ -19,6 +29,7 @@ import { formatUnknownError } from '../../../core/utils/kite-error.util';
 })
 export class CrudeOilDeskComponent implements OnInit, OnDestroy {
   private readonly desk = inject(CrudePaperDeskService);
+  private readonly deskExport = inject(PaperDeskExportService);
   private readonly kiteSession = inject(KiteSessionService);
   private readonly lotsPreference = inject(LotsPreferenceService);
 
@@ -30,10 +41,36 @@ export class CrudeOilDeskComponent implements OnInit, OnDestroy {
   protected realOrders = false;
   protected realOrdersAck = false;
   protected lots = 1;
+  /** Stricter day loss ≈ −₹2,950 (off = champion −₹2,400). */
+  protected strictDayStop = false;
+
+  /** Testing result filter: Mon–Fri. */
+  protected readonly weekdayOptions = PAPER_WEEKDAY_OPTIONS;
+  protected readonly weekdayOn = signal<PaperWeekdaySelection>(defaultPaperWeekdaySelection());
 
   protected readonly snapshot = this.desk.snapshot;
   protected readonly busy = this.desk.busy;
   protected readonly error = signal('');
+
+  protected readonly resultView = computed(() => {
+    const snap = this.snapshot();
+    if (this.mode() !== 'testing' || !snap.trades.length) {
+      return {
+        trades: snap.trades,
+        totals: snap.totals,
+        dayStats: snap.dayStats,
+        weekdayLabel: 'all',
+        filtered: false,
+      };
+    }
+    const view = buildWeekdayFilteredView(
+      snap.trades,
+      this.weekdayOn(),
+      snap.totals.lotsUsed || this.lots,
+      CRUDE_RUPEES_PER_POINT,
+    );
+    return { ...view, filtered: true };
+  });
 
   ngOnInit(): void {
     this.lots = this.lotsPreference.get();
@@ -43,6 +80,14 @@ export class CrudeOilDeskComponent implements OnInit, OnDestroy {
     const normalized = Math.max(1, Math.floor(Number(this.lots)) || 1);
     this.lots = normalized;
     this.lotsPreference.set(normalized);
+  }
+
+  protected toggleWeekday(key: PaperWeekdayKey): void {
+    this.weekdayOn.update((cur) => ({ ...cur, [key]: !cur[key] }));
+  }
+
+  protected isWeekdayOn(key: PaperWeekdayKey): boolean {
+    return this.weekdayOn()[key];
   }
 
   ngOnDestroy(): void {
@@ -63,6 +108,13 @@ export class CrudeOilDeskComponent implements OnInit, OnDestroy {
     }
   }
 
+  private buildRunOptions(lots: number): CrudeDeskRunOptions {
+    return {
+      lots,
+      strictDayStop: this.strictDayStop,
+    };
+  }
+
   protected async onStart(): Promise<void> {
     this.error.set('');
     if (!this.kiteSession.getAuthorizationHeader()) {
@@ -73,6 +125,7 @@ export class CrudeOilDeskComponent implements OnInit, OnDestroy {
     const lots = Math.max(1, Math.floor(Number(this.lots)) || 1);
     this.lots = lots;
     this.lotsPreference.set(lots);
+    const runOpts = this.buildRunOptions(lots);
 
     try {
       if (this.mode() === 'testing') {
@@ -80,23 +133,26 @@ export class CrudeOilDeskComponent implements OnInit, OnDestroy {
           this.error.set('Pick a valid From → To date range.');
           return;
         }
-        await this.desk.runTesting(this.fromDate, this.toDate, lots);
+        await this.desk.runTesting(this.fromDate, this.toDate, runOpts);
       } else {
         if (this.realOrders && !this.realOrdersAck) {
           this.error.set('Tick the confirmation box before starting Live money.');
           return;
         }
         if (this.realOrders) {
+          const risk = this.strictDayStop
+            ? '\nStrict day stop −₹2,950 enabled.'
+            : '\nDay stop −₹2,400 (champion default).';
           const ok = window.confirm(
-            `Start LIVE MONEY on Crude Oil Mini?\n\nReal Kite MCX NRML MARKET orders will be placed on ATM CRUDEOILM options (${lots} lot each) when signals fire.\n\nOrders go via DigitalOcean fixed IP.`,
+            `Start LIVE MONEY on Crude Oil Mini?\n\nReal Kite MCX NRML MARKET orders will be placed on ATM CRUDEOILM options (${lots} lot each) when signals fire.${risk}\n\nOrders go via DigitalOcean fixed IP.`,
           );
           if (!ok) {
             return;
           }
         }
         await this.desk.startLive({
+          ...runOpts,
           realOrders: this.realOrders,
-          lots,
         });
       }
     } catch (err) {
@@ -135,6 +191,40 @@ export class CrudeOilDeskComponent implements OnInit, OnDestroy {
       return '—';
     }
     return ts.replace('T', ' ').slice(0, 16);
+  }
+
+  protected fmtWeekday(ts: string | null | undefined): string {
+    if (!ts) {
+      return '—';
+    }
+    return formatDayOfWeek(extractTradeDate(ts));
+  }
+
+  protected fmtDisplayDate(ts: string | null | undefined): string {
+    if (!ts) {
+      return '—';
+    }
+    return formatDisplayDate(extractTradeDate(ts));
+  }
+
+  protected downloadPdf(): void {
+    const snap = this.snapshot();
+    const view = this.resultView();
+    if (!view.trades.length) {
+      return;
+    }
+    this.deskExport.exportPdf(
+      {
+        ...snap,
+        trades: view.trades,
+        totals: view.totals,
+        dayStats: view.dayStats,
+      },
+      {
+        title: 'Crude Oil Desk Results',
+        subtitle: `CRUDEOILM evening PDHL paper · days ${view.weekdayLabel}`,
+      },
+    );
   }
 }
 

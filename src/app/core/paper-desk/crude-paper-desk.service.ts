@@ -16,7 +16,7 @@ import {
   calendarDaysInclusive,
   chunkInclusiveDateRange,
   datePart,
-  kiteMaxDaysForInterval,
+  DESK_HISTORICAL_CHUNK_DAYS,
 } from '../kite/kite-historical-limits';
 import { resolveCrudeOilMiniFuturesToken } from '../utils/instrument-resolver.util';
 import {
@@ -28,7 +28,8 @@ import {
   enrichCrudeTradesWithOptionPremiums,
   replayPaperOnCrude,
 } from './crude-paper-engine';
-import { CRUDE_EXIT_BY, CRUDE_RUPEES_PER_POINT } from '../strategy-engine/strategies/crude-pdhl-evening/crude-pdhl-evening.evaluator';
+import { buildPaperDeskDayStats, emptyPaperDeskDayStats } from './paper-desk-day-stats';
+import { CRUDE_EXIT_BY, CRUDE_RUPEES_PER_POINT, resolveCrudeDayLossStopPts } from '../strategy-engine/strategies/crude-pdhl-evening/crude-pdhl-evening.evaluator';
 import {
   PaperDeskMode,
   PaperDeskSnapshot,
@@ -38,6 +39,13 @@ import {
 import { LiveOrderExecutorService } from '../live-desk/live-order-executor.service';
 
 const HISTORICAL_TIMEOUT_MS = 45_000;
+
+export interface CrudeDeskRunOptions {
+  lots?: number;
+  realOrders?: boolean;
+  /** Stricter day loss ≈ −₹2,950 (295 pts). Off = champion −240 pts. */
+  strictDayStop?: boolean;
+}
 
 @Injectable({ providedIn: 'root' })
 export class CrudePaperDeskService {
@@ -55,8 +63,10 @@ export class CrudePaperDeskService {
   private lastRangeDays = 0;
   private realOrders = false;
   private lotsMultiplier = 1;
+  private strictDayStop = false;
+  private dayLossStopPts = resolveCrudeDayLossStopPts(false);
   private runGeneration = 0;
-  private readonly maxDaysPerCall = kiteMaxDaysForInterval('5minute');
+  private readonly maxDaysPerCall = DESK_HISTORICAL_CHUNK_DAYS;
 
   readonly snapshot = signal<PaperDeskSnapshot>(emptySnapshot('testing'));
   readonly busy = signal(false);
@@ -80,18 +90,30 @@ export class CrudePaperDeskService {
     }
   }
 
-  async runTesting(fromDate: string, toDate: string, lots: number = 1): Promise<void> {
+  async runTesting(
+    fromDate: string,
+    toDate: string,
+    lotsOrOptions: number | CrudeDeskRunOptions = 1,
+  ): Promise<void> {
     this.cancelRun({ silent: true });
     const runId = this.runGeneration;
     this.resetKiteStats();
-    this.lotsMultiplier = Math.max(1, Math.floor(lots) || 1);
+    const options: CrudeDeskRunOptions =
+      typeof lotsOrOptions === 'number' ? { lots: lotsOrOptions } : lotsOrOptions;
+    this.lotsMultiplier = Math.max(1, Math.floor(options.lots ?? 1) || 1);
+    this.strictDayStop = !!options.strictDayStop;
+    this.dayLossStopPts = resolveCrudeDayLossStopPts(this.strictDayStop);
     this.busy.set(true);
+    const batches = chunkInclusiveDateRange(fromDate, toDate, DESK_HISTORICAL_CHUNK_DAYS);
     this.snapshot.set({
       ...emptySnapshot('testing'),
       running: true,
       fromDate,
       toDate,
-      message: 'Fetching CRUDEOILM candles…',
+      message:
+        batches.length > 1
+          ? `Testing in ${batches.length} × ~3-month batches…`
+          : 'Fetching CRUDEOILM candles…',
       marketOpen: true,
       kiteStats: this.kiteStats(),
     });
@@ -108,60 +130,93 @@ export class CrudePaperDeskService {
       this.futuresToken = future.instrumentToken;
       this.futuresSymbol = future.tradingSymbol;
 
-      const lookbackFrom = shiftDate(fromDate, -12);
-      this.patchMessage(`Loading ${future.tradingSymbol} 5m…`);
-      const candles = await this.fetch5m({
-        instrumentToken: future.instrumentToken,
-        from: `${lookbackFrom} 09:00:00`,
-        to: `${toDate} 23:30:00`,
-        authorization,
-        runId,
-      });
+      const allEnriched: PaperTrade[] = [];
+      let lastSignal = 'Waiting';
+      let lastBarTime: string | null = null;
+      let chosenOption: PaperInstrumentStatus['chosenOption'] = null;
+      let chosenBias: PaperInstrumentStatus['chosenBias'] = null;
+      let indexSpot: number | null = null;
+      let chosenAsOf: string | null = null;
+      let dayNetIndexPts = 0;
 
-      const needed = new Set<number>();
-      const emptyOpt = new Map<number, Candle[]>();
-      const replay = replayPaperOnCrude({
-        instrumentId: CRUDE_OIL_MINI_INSTRUMENT.id,
-        instrumentName: `${CRUDE_OIL_MINI_INSTRUMENT.name} (${future.tradingSymbol})`,
-        candles,
-        fromDate,
-        toDate,
-        instruments: allInstruments,
-        optionCandlesByToken: emptyOpt,
-        neededOptionTokens: needed,
-        lotsMultiplier: this.lotsMultiplier,
-      });
+      for (let b = 0; b < batches.length; b += 1) {
+        this.assertActive(runId);
+        const batch = batches[b]!;
+        const lookbackFrom = shiftDate(batch.fromDate, -12);
+        this.patchMessage(
+          `Batch ${b + 1}/${batches.length}: ${batch.fromDate} → ${batch.toDate} · loading ${future.tradingSymbol}…`,
+        );
+        if (b > 0) {
+          await delay(400);
+        }
+        const candles = await this.fetch5m({
+          instrumentToken: future.instrumentToken,
+          from: `${lookbackFrom} 09:00:00`,
+          to: `${batch.toDate} 23:30:00`,
+          authorization,
+          runId,
+        });
+        lastBarTime = candles.at(-1)?.date ?? lastBarTime;
 
-      this.assertActive(runId);
-      this.patchMessage(`Loading ${needed.size} option contract(s)…`);
-      const optionCandles = await this.fetchOptionHistories(
-        [...needed],
-        lookbackFrom,
-        toDate,
-        authorization,
-        runId,
-      );
-      this.assertActive(runId);
-      const enriched = enrichCrudeTradesWithOptionPremiums(
-        replay.trades,
-        optionCandles,
-        this.lotsMultiplier,
-      );
+        const needed = new Set<number>();
+        const emptyOpt = new Map<number, Candle[]>();
+        const replay = replayPaperOnCrude({
+          instrumentId: CRUDE_OIL_MINI_INSTRUMENT.id,
+          instrumentName: `${CRUDE_OIL_MINI_INSTRUMENT.name} (${future.tradingSymbol})`,
+          candles,
+          fromDate: batch.fromDate,
+          toDate: batch.toDate,
+          instruments: allInstruments,
+          optionCandlesByToken: emptyOpt,
+          neededOptionTokens: needed,
+          lotsMultiplier: this.lotsMultiplier,
+          dayLossStopPts: this.dayLossStopPts,
+        });
+        dayNetIndexPts += Object.values(replay.dayNetByDate).reduce((a, v) => a + v, 0);
+        lastSignal = replay.lastSignal || lastSignal;
+        chosenOption = replay.chosenOption ?? chosenOption;
+        chosenBias = replay.chosenBias ?? chosenBias;
+        indexSpot = replay.indexSpot ?? indexSpot;
+        chosenAsOf = replay.chosenAsOf ?? chosenAsOf;
+
+        this.assertActive(runId);
+        if (needed.size) {
+          this.patchMessage(
+            `Batch ${b + 1}/${batches.length}: loading ${needed.size} option contract(s)…`,
+          );
+        }
+        const optionCandles = await this.fetchOptionHistories(
+          [...needed],
+          lookbackFrom,
+          batch.toDate,
+          authorization,
+          runId,
+        );
+        this.assertActive(runId);
+        const enriched = enrichCrudeTradesWithOptionPremiums(
+          replay.trades,
+          optionCandles,
+          this.lotsMultiplier,
+        );
+        allEnriched.push(...enriched);
+      }
+
+      const sorted = allEnriched.sort((a, b) => a.entryTime.localeCompare(b.entryTime));
       const status = withLiveFields({
         instrumentId: CRUDE_OIL_MINI_INSTRUMENT.id,
         instrumentName: `${CRUDE_OIL_MINI_INSTRUMENT.name} (${future.tradingSymbol})`,
-        lastBarTime: candles.at(-1)?.date ?? null,
-        dayNetIndexPts: Object.values(replay.dayNetByDate).reduce((a, b) => a + b, 0),
-        dayNetOptionRs: enriched.reduce((a, t) => a + (t.optionPnlRs ?? 0), 0),
+        lastBarTime,
+        dayNetIndexPts,
+        dayNetOptionRs: sorted.reduce((a, t) => a + (t.optionPnlRs ?? 0), 0),
         openTrade: null,
-        chosenOption: replay.chosenOption,
-        chosenBias: replay.chosenBias,
-        indexSpot: replay.indexSpot,
-        chosenAsOf: replay.chosenAsOf,
-        lastSignal: replay.lastSignal,
-        tradesToday: enriched.length,
+        chosenOption,
+        chosenBias,
+        indexSpot,
+        chosenAsOf,
+        lastSignal,
+        tradesToday: sorted.length,
       });
-      applyLivePhase(status, enriched, false);
+      applyLivePhase(status, sorted, false);
 
       this.snapshot.set({
         mode: 'testing',
@@ -171,10 +226,11 @@ export class CrudePaperDeskService {
         marketOpen: true,
         realOrders: false,
         lastTickAt: null,
-        message: `Testing complete · ${enriched.length} paper trade(s) · ${this.lotsMultiplier} lot(s) · PDHL 19:00–21:00 · ${this.kiteStatsLabel()}`,
+        message: `Testing complete · ${sorted.length} paper trade(s) · ${batches.length} batch(es) · ${this.lotsMultiplier} lot(s) · PDHL 19:00–21:00 · day stop −${this.dayLossStopPts} · ${this.kiteStatsLabel()}`,
         statuses: [status],
-        trades: enriched.sort((a, b) => a.entryTime.localeCompare(b.entryTime)),
-        totals: summarize(enriched, this.lotsMultiplier, CRUDE_RUPEES_PER_POINT),
+        trades: sorted,
+        totals: summarize(sorted, this.lotsMultiplier, CRUDE_RUPEES_PER_POINT),
+        dayStats: buildPaperDeskDayStats(sorted),
         kiteStats: this.kiteStats(),
         orderEvents: [],
         orderSummary: [],
@@ -198,12 +254,14 @@ export class CrudePaperDeskService {
     }
   }
 
-  async startLive(options?: { realOrders?: boolean; lots?: number }): Promise<void> {
+  async startLive(options?: CrudeDeskRunOptions): Promise<void> {
     this.cancelRun({ silent: true });
     const runId = this.runGeneration;
     this.resetKiteStats();
     this.realOrders = !!environment.allowLiveMoney && !!options?.realOrders;
     this.lotsMultiplier = Math.max(1, Math.floor(options?.lots ?? 1) || 1);
+    this.strictDayStop = !!options?.strictDayStop;
+    this.dayLossStopPts = resolveCrudeDayLossStopPts(this.strictDayStop);
     this.liveOrders.reset();
     this.liveOrders.setLotsMultiplier(this.lotsMultiplier);
     const today = todayIso();
@@ -244,8 +302,8 @@ export class CrudePaperDeskService {
       marketOpen: true,
       realOrders: this.realOrders,
       message: this.realOrders
-        ? 'Starting LIVE MONEY crude desk…'
-        : 'Starting live paper crude desk…',
+        ? `Starting LIVE MONEY crude desk (day stop −${this.dayLossStopPts})…`
+        : `Starting live paper crude desk (day stop −${this.dayLossStopPts})…`,
       kiteStats: this.kiteStats(),
     });
 
@@ -358,6 +416,7 @@ export class CrudePaperDeskService {
       neededOptionTokens: needed,
       forceCloseOpen: now >= CRUDE_EXIT_BY,
       lotsMultiplier: this.lotsMultiplier,
+      dayLossStopPts: this.dayLossStopPts,
     });
 
     const optionCandles = await this.fetchOptionHistories(
@@ -434,6 +493,7 @@ export class CrudePaperDeskService {
       statuses: [status],
       trades: enriched.sort((a, b) => a.entryTime.localeCompare(b.entryTime)),
       totals: summarize(enriched, this.lotsMultiplier, CRUDE_RUPEES_PER_POINT),
+      dayStats: buildPaperDeskDayStats(enriched),
       kiteStats: this.kiteStats(),
       orderEvents: this.realOrders ? this.liveOrders.getEvents() : [],
       orderSummary: this.realOrders ? this.liveOrders.getOrderSummary() : [],
@@ -688,10 +748,11 @@ function emptySnapshot(mode: PaperDeskMode): PaperDeskSnapshot {
     statuses: [],
     trades: [],
     totals: { trades: 0, wins: 0, losses: 0, indexNetPts: 0, optionNetRs: 0, lotsUsed: 1, pointsMoneyRs: 0 },
+    dayStats: emptyPaperDeskDayStats(),
     kiteStats: {
       historicalCalls: 0,
       lastRangeDays: 0,
-      maxDaysPerCall: kiteMaxDaysForInterval('5minute'),
+      maxDaysPerCall: DESK_HISTORICAL_CHUNK_DAYS,
     },
     orderEvents: [],
     orderSummary: [],

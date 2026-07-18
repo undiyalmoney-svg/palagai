@@ -16,7 +16,18 @@ export const CRUDE_ENTRY_END = '21:00';
 export const CRUDE_EXIT_BY = '23:10';
 export const CRUDE_MAX_TRADES_DAY = 2;
 export const CRUDE_MAX_TRADES_MONTH = 8;
+/** Champion default day max loss (pts) ≈ −₹2,400 at ₹10/pt. */
 export const CRUDE_DAY_LOSS_STOP_PTS = 240;
+/** Desk checkbox: stricter day loss ≈ −₹2,950 → 295 pts at ₹10/pt. */
+export const CRUDE_STRICT_DAY_LOSS_RS = 2950;
+export const CRUDE_STRICT_DAY_LOSS_PTS = Math.max(
+  1,
+  Math.round(CRUDE_STRICT_DAY_LOSS_RS / CRUDE_RUPEES_PER_POINT),
+);
+
+export function resolveCrudeDayLossStopPts(strictDayStop?: boolean): number {
+  return strictDayStop ? CRUDE_STRICT_DAY_LOSS_PTS : CRUDE_DAY_LOSS_STOP_PTS;
+}
 
 export interface CrudePdhlState {
   tradingDate: string | null;
@@ -38,11 +49,15 @@ export function createCrudePdhlState(): CrudePdhlState {
   };
 }
 
-export function recordCrudeTradeClosed(state: CrudePdhlState, points: number): void {
+export function recordCrudeTradeClosed(
+  state: CrudePdhlState,
+  points: number,
+  dayLossStopPts: number = CRUDE_DAY_LOSS_STOP_PTS,
+): void {
   state.dayNetPts += points;
   state.tradesToday += 1;
   state.tradesThisMonth += 1;
-  if (state.dayNetPts <= -CRUDE_DAY_LOSS_STOP_PTS) {
+  if (state.dayNetPts <= -dayLossStopPts) {
     state.dayStoppedReason = `Day max loss ${state.dayNetPts.toFixed(1)} pts`;
   }
 }
@@ -94,8 +109,11 @@ export function runCrudePdhlEvening(params: {
   series: Candle[];
   index: number;
   state: CrudePdhlState;
+  /** Override champion day loss stop (pts). Default −240. */
+  dayLossStopPts?: number;
 }): CrudePdhlSignal {
   const { candle, series, index, state } = params;
+  const dayLossStopPts = params.dayLossStopPts ?? CRUDE_DAY_LOSS_STOP_PTS;
   const tradingDate = extractTradeDate(candle.date);
   const month = tradingDate.slice(0, 7);
   const time = extractHhMm(candle.date);
@@ -114,7 +132,7 @@ export function runCrudePdhlEvening(params: {
   if (state.dayStoppedReason) {
     return wait(candle, state.dayStoppedReason);
   }
-  if (state.dayNetPts <= -CRUDE_DAY_LOSS_STOP_PTS) {
+  if (state.dayNetPts <= -dayLossStopPts) {
     state.dayStoppedReason = `Day max loss ${state.dayNetPts.toFixed(1)} pts`;
     return wait(candle, state.dayStoppedReason);
   }
@@ -150,7 +168,7 @@ export function runCrudePdhlEvening(params: {
   const stopLoss = action === 'BUY' ? entry - CRUDE_STOP_PTS : entry + CRUDE_STOP_PTS;
   const target = action === 'BUY' ? entry + CRUDE_TARGET_PTS : entry - CRUDE_TARGET_PTS;
 
-  if (state.dayNetPts - CRUDE_STOP_PTS < -CRUDE_DAY_LOSS_STOP_PTS) {
+  if (state.dayNetPts - CRUDE_STOP_PTS < -dayLossStopPts) {
     return {
       action: 'NO_TRADE',
       entryPrice: entry,

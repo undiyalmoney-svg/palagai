@@ -1,3 +1,6 @@
+/** Desk Testing: ~3 calendar months per Kite historical batch (combine for longer ranges). */
+export const DESK_HISTORICAL_CHUNK_DAYS = 90;
+
 /** Kite historical API max calendar days per request (official limits). */
 export const KITE_HISTORICAL_MAX_DAYS: Record<string, number> = {
   minute: 60,

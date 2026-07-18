@@ -24,11 +24,11 @@ export class DashboardComponent {
   private readonly router = inject(Router);
 
   protected readonly navItems = [
-    { label: 'Trade Desk', route: '/dashboard/trade-desk', icon: 'calculate' },
-    { label: 'Crude Oil Mini', route: '/dashboard/crude-oil', icon: 'oil_barrel' },
-    { label: 'Order Test', route: '/dashboard/order-test', icon: 'bolt' },
-    { label: 'Get Token', route: '/dashboard/get-token', icon: 'vpn_key' },
-    { label: 'Settings', route: '/dashboard/settings', icon: 'settings' },
+    { label: 'Trade Desk', shortLabel: 'Trade', route: '/dashboard/trade-desk', icon: 'calculate' },
+    { label: 'Crude Oil Mini', shortLabel: 'Crude', route: '/dashboard/crude-oil', icon: 'water_drop' },
+    { label: 'Order Test', shortLabel: 'Orders', route: '/dashboard/order-test', icon: 'bolt' },
+    { label: 'Get Token', shortLabel: 'Token', route: '/dashboard/get-token', icon: 'vpn_key' },
+    { label: 'Settings', shortLabel: 'Setup', route: '/dashboard/settings', icon: 'settings' },
   ];
 
   protected logout(): void {

@@ -37,7 +37,8 @@ export function formatDayOfWeek(date: string): string {
   if (Number.isNaN(parsed.getTime())) {
     return date;
   }
-  return parsed.toLocaleDateString('en-IN', { weekday: 'long' });
+  // Fixed English names so Mon–Fri filters stay stable across locales.
+  return parsed.toLocaleDateString('en-US', { weekday: 'long' });
 }
 
 export function listDatesInRange(fromDate: string, toDate: string): string[] {
