@@ -45,6 +45,10 @@ export interface CrudeDeskRunOptions {
   realOrders?: boolean;
   /** Stricter day loss ≈ −₹2,950 (295 pts). Off = champion −240 pts. */
   strictDayStop?: boolean;
+  /** Morning ORB entries 10:30–12:00 (all-months-green on Mar–Jul sample). */
+  enableMorning?: boolean;
+  /** Evening PDHL entries 19:00–21:00 (optional; not all-months-green). */
+  enableEvening?: boolean;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -64,6 +68,8 @@ export class CrudePaperDeskService {
   private realOrders = false;
   private lotsMultiplier = 1;
   private strictDayStop = false;
+  private enableMorning = true;
+  private enableEvening = true;
   private dayLossStopPts = resolveCrudeDayLossStopPts(false);
   private runGeneration = 0;
   private readonly maxDaysPerCall = DESK_HISTORICAL_CHUNK_DAYS;
@@ -102,7 +108,17 @@ export class CrudePaperDeskService {
       typeof lotsOrOptions === 'number' ? { lots: lotsOrOptions } : lotsOrOptions;
     this.lotsMultiplier = Math.max(1, Math.floor(options.lots ?? 1) || 1);
     this.strictDayStop = !!options.strictDayStop;
+    this.enableMorning = options.enableMorning !== false;
+    this.enableEvening = options.enableEvening !== false;
     this.dayLossStopPts = resolveCrudeDayLossStopPts(this.strictDayStop);
+    if (!this.enableMorning && !this.enableEvening) {
+      this.busy.set(false);
+      this.snapshot.set({
+        ...emptySnapshot('testing'),
+        message: 'Turn on Morning and/or Evening session.',
+      });
+      return;
+    }
     this.busy.set(true);
     const batches = chunkInclusiveDateRange(fromDate, toDate, DESK_HISTORICAL_CHUNK_DAYS);
     this.snapshot.set({
@@ -171,6 +187,8 @@ export class CrudePaperDeskService {
           neededOptionTokens: needed,
           lotsMultiplier: this.lotsMultiplier,
           dayLossStopPts: this.dayLossStopPts,
+          enableMorning: this.enableMorning,
+          enableEvening: this.enableEvening,
         });
         dayNetIndexPts += Object.values(replay.dayNetByDate).reduce((a, v) => a + v, 0);
         lastSignal = replay.lastSignal || lastSignal;
@@ -226,7 +244,7 @@ export class CrudePaperDeskService {
         marketOpen: true,
         realOrders: false,
         lastTickAt: null,
-        message: `Testing complete · ${sorted.length} paper trade(s) · ${batches.length} batch(es) · ${this.lotsMultiplier} lot(s) · PDHL 19:00–21:00 · day stop −${this.dayLossStopPts} · ${this.kiteStatsLabel()}`,
+        message: `Testing complete · ${sorted.length} paper trade(s) · ${batches.length} batch(es) · ${this.lotsMultiplier} lot(s) · ${this.windowsLabel()} · day stop −${this.dayLossStopPts} · ${this.kiteStatsLabel()}`,
         statuses: [status],
         trades: sorted,
         totals: summarize(sorted, this.lotsMultiplier, CRUDE_RUPEES_PER_POINT),
@@ -261,11 +279,23 @@ export class CrudePaperDeskService {
     this.realOrders = !!environment.allowLiveMoney && !!options?.realOrders;
     this.lotsMultiplier = Math.max(1, Math.floor(options?.lots ?? 1) || 1);
     this.strictDayStop = !!options?.strictDayStop;
+    this.enableMorning = options?.enableMorning !== false;
+    this.enableEvening = options?.enableEvening !== false;
     this.dayLossStopPts = resolveCrudeDayLossStopPts(this.strictDayStop);
     this.liveOrders.reset();
     this.liveOrders.setLotsMultiplier(this.lotsMultiplier);
     const today = todayIso();
     const now = istNowHhMm();
+
+    if (!this.enableMorning && !this.enableEvening) {
+      this.snapshot.set({
+        ...emptySnapshot('live'),
+        fromDate: today,
+        toDate: today,
+        message: 'Turn on Morning and/or Evening session.',
+      });
+      return;
+    }
 
     if (now < MCX_CRUDE_SESSION.marketOpen || now > MCX_CRUDE_SESSION.marketClose) {
       try {
@@ -276,7 +306,7 @@ export class CrudePaperDeskService {
           fromDate: today,
           toDate: today,
           marketOpen: false,
-          message: `Live paper only ${MCX_CRUDE_SESSION.marketOpen}–${MCX_CRUDE_SESSION.marketClose} IST (now ${now}). Champion entries 19:00–21:00 — use Testing after hours.`,
+          message: `Live paper only ${MCX_CRUDE_SESSION.marketOpen}–${MCX_CRUDE_SESSION.marketClose} IST (now ${now}). Entries ${this.windowsLabel()} — use Testing after hours.`,
           statuses,
           kiteStats: this.kiteStats(),
         });
@@ -417,6 +447,8 @@ export class CrudePaperDeskService {
       forceCloseOpen: now >= CRUDE_EXIT_BY,
       lotsMultiplier: this.lotsMultiplier,
       dayLossStopPts: this.dayLossStopPts,
+      enableMorning: this.enableMorning,
+      enableEvening: this.enableEvening,
     });
 
     const optionCandles = await this.fetchOptionHistories(
@@ -713,6 +745,17 @@ export class CrudePaperDeskService {
       lastRangeDays: this.lastRangeDays,
       maxDaysPerCall: this.maxDaysPerCall,
     };
+  }
+
+  private windowsLabel(): string {
+    const parts: string[] = [];
+    if (this.enableMorning) {
+      parts.push('morning ORB 10:30–12:00');
+    }
+    if (this.enableEvening) {
+      parts.push('evening PDHL 19:00–21:00');
+    }
+    return parts.length ? parts.join(' + ') : 'no window';
   }
 
   private kiteStatsLabel(): string {

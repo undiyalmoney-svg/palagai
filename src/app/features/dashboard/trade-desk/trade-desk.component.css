@@ -1,9 +1,13 @@
 .desk {
   font-family: var(--pg-font);
   color: var(--pg-ink);
+  box-sizing: border-box;
+  width: 100%;
   max-width: 1120px;
+  min-width: 0;
   margin: 0 auto;
   padding: 0 0 2.5rem;
+  overflow-x: clip;
 }
 
 .desk .hero.pg-page-hero {
@@ -932,6 +936,9 @@
   border-radius: 14px;
   border: 1px solid var(--line);
   background: var(--card);
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: clip;
 }
 
 .day-stats-head {
@@ -1021,6 +1028,8 @@
 
 .table-scroll {
   overflow-x: auto;
+  max-width: 100%;
+  min-width: 0;
   border: 1px solid var(--line);
   border-radius: 14px;
   background: var(--card);
@@ -1142,6 +1151,44 @@ td small {
     flex: 1;
     justify-content: center;
   }
+
+  .day-stats-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .day-stats-head .pdf-btn {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .trades-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .trades-head .pdf-btn {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  table {
+    min-width: 560px;
+    font-size: 0.8rem;
+  }
+
+  th,
+  td {
+    padding: 0.55rem 0.5rem;
+  }
+
+  .chosen-symbol,
+  .chosen-meta,
+  .open-strip {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
 }
 
 @media (max-width: 520px) {
@@ -1159,5 +1206,20 @@ td small {
 
   .desk {
     padding-bottom: 1.5rem;
+  }
+
+  .desk-toggles,
+  .weekday-filter {
+    gap: 0.35rem;
+  }
+
+  .desk-check,
+  .weekday-chip {
+    font-size: 0.75rem;
+    padding: 0.35rem 0.55rem;
+  }
+
+  table {
+    min-width: 520px;
   }
 }

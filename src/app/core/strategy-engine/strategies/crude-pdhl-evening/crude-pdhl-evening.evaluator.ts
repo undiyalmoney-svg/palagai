@@ -29,11 +29,15 @@ export function resolveCrudeDayLossStopPts(strictDayStop?: boolean): number {
   return strictDayStop ? CRUDE_STRICT_DAY_LOSS_PTS : CRUDE_DAY_LOSS_STOP_PTS;
 }
 
+export type CrudeSessionBook = 'morning' | 'evening';
+
 export interface CrudePdhlState {
   tradingDate: string | null;
   tradingMonth: string | null;
   dayNetPts: number;
   tradesToday: number;
+  morningTradesToday: number;
+  eveningTradesToday: number;
   tradesThisMonth: number;
   dayStoppedReason: string | null;
 }
@@ -44,6 +48,8 @@ export function createCrudePdhlState(): CrudePdhlState {
     tradingMonth: null,
     dayNetPts: 0,
     tradesToday: 0,
+    morningTradesToday: 0,
+    eveningTradesToday: 0,
     tradesThisMonth: 0,
     dayStoppedReason: null,
   };
@@ -53,10 +59,16 @@ export function recordCrudeTradeClosed(
   state: CrudePdhlState,
   points: number,
   dayLossStopPts: number = CRUDE_DAY_LOSS_STOP_PTS,
+  book: CrudeSessionBook = 'evening',
 ): void {
   state.dayNetPts += points;
   state.tradesToday += 1;
   state.tradesThisMonth += 1;
+  if (book === 'morning') {
+    state.morningTradesToday += 1;
+  } else {
+    state.eveningTradesToday += 1;
+  }
   if (state.dayNetPts <= -dayLossStopPts) {
     state.dayStoppedReason = `Day max loss ${state.dayNetPts.toFixed(1)} pts`;
   }
@@ -122,6 +134,8 @@ export function runCrudePdhlEvening(params: {
     state.tradingDate = tradingDate;
     state.dayNetPts = 0;
     state.tradesToday = 0;
+    state.morningTradesToday = 0;
+    state.eveningTradesToday = 0;
     state.dayStoppedReason = null;
   }
   if (state.tradingMonth !== month) {
@@ -136,8 +150,8 @@ export function runCrudePdhlEvening(params: {
     state.dayStoppedReason = `Day max loss ${state.dayNetPts.toFixed(1)} pts`;
     return wait(candle, state.dayStoppedReason);
   }
-  if (state.tradesToday >= CRUDE_MAX_TRADES_DAY) {
-    return wait(candle, `Max ${CRUDE_MAX_TRADES_DAY} trades/day`);
+  if (state.eveningTradesToday >= CRUDE_MAX_TRADES_DAY) {
+    return wait(candle, `Max ${CRUDE_MAX_TRADES_DAY} evening trades/day`);
   }
   if (state.tradesThisMonth >= CRUDE_MAX_TRADES_MONTH) {
     return wait(candle, `Max ${CRUDE_MAX_TRADES_MONTH} trades/month`);

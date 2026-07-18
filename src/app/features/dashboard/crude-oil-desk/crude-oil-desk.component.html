@@ -4,9 +4,10 @@
       <p class="pg-eyebrow">MCX · Crude Oil Mini</p>
       <h1>Crude Oil Desk</h1>
       <p class="pg-lede">
-        Champion evening PDHL on <strong>CRUDEOILM</strong>: entries
-        <strong>19:00–21:00</strong> IST · SL 80 · TP 200 · exit by 23:10 · ≤2/day · ≤8/month.
-        Testing, Live paper, or Live money — your call.
+        Paper Testing &amp; Live: trades only in
+        <strong>Morning 10:30–12:00</strong> (ORB) and/or
+        <strong>Evening 19:00–21:00</strong> (PDHL) on <strong>CRUDEOILM</strong>.
+        SL 80 · TP 200 · hold to 23:10. Use Result days + Download PDF for profits.
       </p>
     </div>
     <div class="hero-meta">
@@ -60,7 +61,16 @@
     } @else {
       <div class="live-hint">
         <strong>Today</strong>
-        <span>{{ realOrders ? 'Real MCX NRML orders on signals' : 'Auto paper on CRUDEOILM' }} · entries 19:00–21:00</span>
+        <span>{{ realOrders ? 'Real MCX NRML orders on signals' : 'Auto paper on CRUDEOILM' }} ·
+          {{
+            enableMorning && enableEvening
+              ? '10:30–12:00 + 19:00–21:00'
+              : enableMorning
+                ? '10:30–12:00'
+                : enableEvening
+                  ? '19:00–21:00'
+                  : 'no window'
+          }}</span>
       </div>
     }
 
@@ -75,6 +85,31 @@
         [disabled]="busy() || snapshot().running"
       />
     </label>
+
+    <div class="desk-toggles" role="group" aria-label="Session windows">
+      <label
+        class="desk-check"
+        title="ORB · OR 09:00–10:00 · entries 10:30–12:00 · ≤1/day · paper + live. Hold to TP/SL/23:10."
+      >
+        <input
+          type="checkbox"
+          [(ngModel)]="enableMorning"
+          [disabled]="busy() || snapshot().running"
+        />
+        <span>Morning 10:30–12:00</span>
+      </label>
+      <label
+        class="desk-check"
+        title="PDHL · entries 19:00–21:00 · ≤2/day · paper + live. Hold to TP/SL/23:10."
+      >
+        <input
+          type="checkbox"
+          [(ngModel)]="enableEvening"
+          [disabled]="busy() || snapshot().running"
+        />
+        <span>Evening 19:00–21:00</span>
+      </label>
+    </div>
 
     <div class="desk-toggles" role="group" aria-label="Day risk">
       <label
@@ -545,9 +580,9 @@
   <aside class="rules">
     <h4>How it runs</h4>
     <ul>
-      <li><strong>Strategy</strong> — previous-day high/low break 19:00–21:00 IST; SL 80 · TP 200; exit by 23:10; ≤2/day · ≤8/month; day stop −₹2,400 (optional strict −₹2,950).</li>
-      <li><strong>Hold</strong> — until TP/SL, or up to ~4 hours (19:00 → 23:10).</li>
-      <li><strong>Testing</strong> — long ranges fetch in ~3-month batches and combine; default last 14 days.</li>
+      <li><strong>Sessions</strong> — Morning 10:30–12:00 ORB (≤1/day) and Evening 19:00–21:00 PDHL (≤2/day). Both on by default for Testing &amp; Live. No entries outside these windows. SL 80 · TP 200 · day stop shared.</li>
+      <li><strong>Hold</strong> — until TP/SL, or force-flat at 23:10. Window end only stops new entries.</li>
+      <li><strong>Testing</strong> — From/To dates + Result days (Mon–Fri) filter · Download PDF for profits.</li>
       <li><strong>Live paper</strong> — auto-poll during MCX hours; after hours use Testing.</li>
       <li><strong>Live money</strong> — tick the box + confirm; MCX NRML MARKET entry + protective SL-M.</li>
       <li><strong>PDF</strong> — Download PDF for totals, best/worst days, weekday rollup, and trades.</li>

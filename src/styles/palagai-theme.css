@@ -89,11 +89,15 @@ body {
 .tab-panel,
 .settings-page,
 .order-test {
+  box-sizing: border-box;
+  width: 100%;
   max-width: 1120px;
+  min-width: 0;
   margin: 0 auto;
   padding: 0 0 2.5rem;
   color: var(--pg-ink);
   font-family: var(--pg-font);
+  overflow-x: clip;
 }
 
 .pg-page-hero,

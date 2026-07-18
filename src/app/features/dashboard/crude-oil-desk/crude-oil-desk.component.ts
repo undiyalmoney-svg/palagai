@@ -41,6 +41,10 @@ export class CrudeOilDeskComponent implements OnInit, OnDestroy {
   protected realOrders = false;
   protected realOrdersAck = false;
   protected lots = 1;
+  /** Morning ORB 10:30–12:00 (default on for paper + live). */
+  protected enableMorning = true;
+  /** Evening PDHL 19:00–21:00 (default on — both windows). */
+  protected enableEvening = true;
   /** Stricter day loss ≈ −₹2,950 (off = champion −₹2,400). */
   protected strictDayStop = false;
 
@@ -112,6 +116,8 @@ export class CrudeOilDeskComponent implements OnInit, OnDestroy {
     return {
       lots,
       strictDayStop: this.strictDayStop,
+      enableMorning: this.enableMorning,
+      enableEvening: this.enableEvening,
     };
   }
 
@@ -119,6 +125,10 @@ export class CrudeOilDeskComponent implements OnInit, OnDestroy {
     this.error.set('');
     if (!this.kiteSession.getAuthorizationHeader()) {
       this.error.set('No Kite session. Open Get Token and paste your access token, then try again.');
+      return;
+    }
+    if (!this.enableMorning && !this.enableEvening) {
+      this.error.set('Turn on Morning and/or Evening session.');
       return;
     }
 
@@ -222,7 +232,12 @@ export class CrudeOilDeskComponent implements OnInit, OnDestroy {
       },
       {
         title: 'Crude Oil Desk Results',
-        subtitle: `CRUDEOILM evening PDHL paper · days ${view.weekdayLabel}`,
+        subtitle: `CRUDEOILM ${[
+          this.enableMorning ? 'morning 10:30–12:00' : null,
+          this.enableEvening ? 'evening 19:00–21:00' : null,
+        ]
+          .filter(Boolean)
+          .join(' + ')} · days ${view.weekdayLabel}`,
       },
     );
   }

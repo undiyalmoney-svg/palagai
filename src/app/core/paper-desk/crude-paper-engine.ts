@@ -5,11 +5,13 @@ import { extractTradeDate } from '../utils/trade-date.util';
 import { extractHhMm } from '../strategy-engine/utils/market-session.util';
 import {
   CRUDE_EXIT_BY,
+  CrudeSessionBook,
   createCrudePdhlState,
   CrudePdhlState,
   recordCrudeTradeClosed,
   runCrudePdhlEvening,
 } from '../strategy-engine/strategies/crude-pdhl-evening/crude-pdhl-evening.evaluator';
+import { runCrudeMorningOrb } from '../strategy-engine/strategies/crude-orb-morning/crude-orb-morning.evaluator';
 import {
   resolveAtmCrudeMiniOption,
   toCrudePaperOption,
@@ -25,6 +27,7 @@ export interface CrudeOpenPaper {
   stop: number;
   target: number;
   entryTime: string;
+  book: CrudeSessionBook;
   option: PaperOptionContract | null;
   optionEntryPremium: number | null;
   premiumEstimated: boolean;
@@ -153,7 +156,7 @@ function closePaperTrade(params: {
   };
 }
 
-/** Replay champion PDHL evening strategy on CRUDEOILM + ATM mini options. */
+/** Replay Crude windows (morning ORB and/or evening PDHL) on CRUDEOILM + ATM mini options. */
 export function replayPaperOnCrude(params: {
   instrumentId: string;
   instrumentName: string;
@@ -167,6 +170,10 @@ export function replayPaperOnCrude(params: {
   lotsMultiplier?: number;
   /** Day max loss in futures pts (default champion −240). */
   dayLossStopPts?: number;
+  /** Morning ORB 10:30–12:00. Default true. */
+  enableMorning?: boolean;
+  /** Evening PDHL 19:00–21:00. Default true. */
+  enableEvening?: boolean;
 }): CrudeReplayResult {
   const {
     instrumentId,
@@ -181,6 +188,8 @@ export function replayPaperOnCrude(params: {
   const forceCloseOpen = params.forceCloseOpen !== false;
   const lotsMultiplier = Math.max(1, Math.floor(params.lotsMultiplier ?? 1) || 1);
   const dayLossStopPts = params.dayLossStopPts;
+  const enableMorning = params.enableMorning !== false;
+  const enableEvening = params.enableEvening !== false;
 
   const state = createCrudePdhlState();
   const trades: PaperTrade[] = [];
@@ -208,12 +217,12 @@ export function replayPaperOnCrude(params: {
           open,
           exitPrice: exit.exitPrice,
           exitTime: candle.date,
-          exitReason: exit.reason,
+          exitReason: `${exit.reason} · ${open.book === 'morning' ? 'Morning 10:30–12:00' : 'Evening 19:00–21:00'}`,
           optionCandlesByToken,
           lotsMultiplier,
         });
         trades.push(closed);
-        recordCrudeTradeClosed(state, closed.indexPoints, dayLossStopPts);
+        recordCrudeTradeClosed(state, closed.indexPoints, dayLossStopPts, open.book);
         dayNetByDate[day] = (dayNetByDate[day] ?? 0) + closed.indexPoints;
         open = null;
         lastSignal = `Closed: ${exit.reason}`;
@@ -221,16 +230,45 @@ export function replayPaperOnCrude(params: {
       continue;
     }
 
-    const signal = runCrudePdhlEvening({
-      candle,
-      series: candles,
-      index: i,
-      state,
-      dayLossStopPts,
-    });
-    lastSignal = signal.reason;
+    let signal: ReturnType<typeof runCrudeMorningOrb> | null = null;
+    let book: CrudeSessionBook = 'morning';
 
-    if (signal.action !== 'BUY' && signal.action !== 'SELL') {
+    if (enableMorning) {
+      const morning = runCrudeMorningOrb({
+        candle,
+        series: candles,
+        state,
+        dayLossStopPts,
+      });
+      if (morning.action === 'BUY' || morning.action === 'SELL') {
+        signal = morning;
+        book = 'morning';
+      } else {
+        lastSignal = morning.reason;
+      }
+    }
+
+    if (!signal && enableEvening) {
+      const evening = runCrudePdhlEvening({
+        candle,
+        series: candles,
+        index: i,
+        state,
+        dayLossStopPts,
+      });
+      if (evening.action === 'BUY' || evening.action === 'SELL') {
+        signal = evening;
+        book = 'evening';
+      } else {
+        lastSignal = evening.reason;
+      }
+    }
+
+    if (!enableMorning && !enableEvening) {
+      lastSignal = 'No session window on';
+    }
+
+    if (!signal || (signal.action !== 'BUY' && signal.action !== 'SELL')) {
       continue;
     }
 
@@ -261,6 +299,7 @@ export function replayPaperOnCrude(params: {
       stop: signal.stopLoss,
       target: signal.target,
       entryTime: candle.date,
+      book,
       option,
       optionEntryPremium: entryPremium,
       premiumEstimated: entryPremium == null,
@@ -276,12 +315,12 @@ export function replayPaperOnCrude(params: {
       open,
       exitPrice: last.close,
       exitTime: last.date,
-      exitReason: MCX_CRUDE_SESSION.sessionCloseLabel,
+      exitReason: `${MCX_CRUDE_SESSION.sessionCloseLabel} · ${open.book === 'morning' ? 'Morning 10:30–12:00' : 'Evening 19:00–21:00'}`,
       optionCandlesByToken,
       lotsMultiplier,
     });
     trades.push(closed);
-    recordCrudeTradeClosed(state, closed.indexPoints, dayLossStopPts);
+    recordCrudeTradeClosed(state, closed.indexPoints, dayLossStopPts, open.book);
     dayNetByDate[extractTradeDate(last.date)] =
       (dayNetByDate[extractTradeDate(last.date)] ?? 0) + closed.indexPoints;
     open = null;
