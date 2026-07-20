@@ -4,7 +4,9 @@
       <p class="pg-eyebrow">OR Swing Breakout</p>
       <h1>Trade Desk</h1>
       <p class="pg-lede">
-        Champion DNA on Nifty &amp; Bank Nifty ATM options — Testing, Live paper, or Live money. Same rules every day.
+        Champion DNA on Nifty &amp; Bank Nifty ATM options — Testing, Live paper, or Live money.
+        Mon/Thu use the full day window; <strong>Tue / Wed / Fri</strong> use weekday filters from
+        the 2020–2026 research (see below).
       </p>
     </div>
     <div class="hero-meta">
@@ -43,6 +45,32 @@
       <span class="mode-sub">Today · auto each 5m · 09:15–15:30</span>
     </button>
   </div>
+
+  <aside class="trading-basis" aria-label="How the desk decides trades">
+    <h2 class="trading-basis-title">What the app trades on</h2>
+    <ul class="trading-basis-list">
+      <li>
+        <strong>Setup</strong> — Opening range (09:15–10:15) bias + swing breakout (lookback 3)
+      </li>
+      <li>
+        <strong>Target / stop</strong> — 1R target · SL capped (Nifty 30 pts · Bank 45 pts) · EMA-20 exit
+      </li>
+      <li>
+        <strong>Day risk</strong> — Default day stop −60 pts · optional Strict −₹2,950 / Profit lock +₹5,000
+      </li>
+      <li>
+        <strong>Tue &amp; Fri</strong> — No entry before <em>11:30</em> · max
+        <em>3</em> Nifty / <em>2</em> Bank trades
+      </li>
+      <li>
+        <strong>Wednesday</strong> — Nifty: after <em>11:00</em> and only if OR width
+        <em>&lt; 90</em> pts · Bank: same as Tue/Fri (<em>11:30</em>, max <em>2</em>)
+      </li>
+      <li>
+        <strong>Instrument</strong> — ATM options on the selected index · lots from the Lots control
+      </li>
+    </ul>
+  </aside>
 
   <div class="control-bar">
     @if (mode() === 'testing') {

@@ -18,7 +18,7 @@ export interface ActiveStrategyInfo {
 
 const STRATEGY_DESCRIPTIONS: Record<string, string> = {
   [STRATEGY_IDS.PDHL_OPENING_RANGE]:
-    '2020–2026 hunt winner: OR bias + swing breakout · SL cap 20 · 1.5R · EMA-20 exit · day lock +30 / stop −45 · whole day. Nifty + Bank Nifty.',
+    'OR bias + swing breakout · SL Nifty 30 / Bank 45 · 1R · EMA-20 · day −60 · Tue/Fri 11:30 caps · Wed Nifty OR<90 / Bank 11:30×2.',
 };
 
 /**

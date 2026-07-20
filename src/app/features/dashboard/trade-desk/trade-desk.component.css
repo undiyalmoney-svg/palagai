@@ -522,6 +522,43 @@
   color: var(--muted);
 }
 
+.trading-basis {
+  margin: 0 0 1rem;
+  padding: 0.9rem 1rem;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--card) 92%, #0f766e 8%);
+}
+
+.trading-basis-title {
+  margin: 0 0 0.45rem;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.trading-basis-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.88rem;
+  line-height: 1.35;
+  color: var(--ink);
+}
+
+.trading-basis-list strong {
+  font-weight: 700;
+}
+
+.trading-basis-list em {
+  font-style: normal;
+  font-weight: 700;
+  color: #0f766e;
+}
+
 .control-bar {
   display: flex;
   flex-wrap: wrap;

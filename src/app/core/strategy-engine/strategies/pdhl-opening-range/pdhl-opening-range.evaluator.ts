@@ -50,7 +50,17 @@ export const DESK_DAY_PROFIT_LOCK_RS = 5000;
  * Per-index risk profile (champion pair, 2020–2026 hunt):
  * same DNA on both — 1R target, no day profit lock, day stop −60, EMA exit.
  * Nifty SL cap 30; Bank SL cap 45 (wider for volatility).
+ * Weekday overlays: Tue/Fri delay+cap; Wed Nifty OR-width filter; Wed Bank same as Tue/Fri.
  */
+export interface PdhlWeekdayRule {
+  /** Raise earliest entry for this weekday (HH:mm). */
+  earliestEntry?: string;
+  /** Cap closed trades before NO_TRADE. Omit / 0 = unlimited. */
+  maxTrades?: number;
+  /** Skip new entries when opening-range width ≥ this (pts). Omit / 0 = off. */
+  maxOrWidth?: number;
+}
+
 export interface PdhlOrParams {
   maxStopPts: number;
   minStopPts: number;
@@ -61,10 +71,12 @@ export interface PdhlOrParams {
   dailyMaxLossPts: number;
   earliestEntry: string;
   lastEntry: string;
+  /** JS Date.getDay() keys: 0=Sun … 5=Fri. */
+  weekdayRules: Partial<Record<number, PdhlWeekdayRule>>;
   dna: string;
 }
 
-/** Nifty champion: cap30 | r_1 | whole_day | ema_exit | L0 | S60 */
+/** Nifty champion + Tue/Fri 11:30×3 + Wed OR&lt;90 from 11:00 */
 export const PDHL_NIFTY_PARAMS: PdhlOrParams = {
   maxStopPts: 30,
   minStopPts: 3,
@@ -73,10 +85,15 @@ export const PDHL_NIFTY_PARAMS: PdhlOrParams = {
   dailyMaxLossPts: 60,
   earliestEntry: '09:20',
   lastEntry: '15:10',
-  dna: 'opening_range|swing|breakout|cap30|r_1|whole_day|ema_exit|L0|S60',
+  weekdayRules: {
+    2: { earliestEntry: '11:30', maxTrades: 3 }, // Tue
+    3: { earliestEntry: '11:00', maxOrWidth: 90 }, // Wed — OR filter turns Wed green
+    5: { earliestEntry: '11:30', maxTrades: 3 }, // Fri
+  },
+  dna: 'opening_range|swing|breakout|cap30|r_1|whole_day|ema_exit|L0|S60|TueFri_1130_x3|Wed_OR90',
 };
 
-/** Bank champion: cap45 | r_1 | whole_day | ema_exit | L0 | S60 */
+/** Bank champion + Tue/Wed/Fri 11:30×2 */
 export const PDHL_BANK_PARAMS: PdhlOrParams = {
   maxStopPts: 45,
   minStopPts: 3,
@@ -85,8 +102,63 @@ export const PDHL_BANK_PARAMS: PdhlOrParams = {
   dailyMaxLossPts: 60,
   earliestEntry: '09:20',
   lastEntry: '15:10',
-  dna: 'opening_range|swing|breakout|cap45|r_1|whole_day|ema_exit|L0|S60',
+  weekdayRules: {
+    2: { earliestEntry: '11:30', maxTrades: 2 }, // Tue
+    3: { earliestEntry: '11:30', maxTrades: 2 }, // Wed
+    5: { earliestEntry: '11:30', maxTrades: 2 }, // Fri
+  },
+  dna: 'opening_range|swing|breakout|cap45|r_1|whole_day|ema_exit|L0|S60|TueWedFri_1130_x2',
 };
+
+const DOW_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
+
+export function pdhlWeekdayNumber(tradingDate: string): number {
+  return new Date(`${tradingDate}T12:00:00`).getDay();
+}
+
+export function pdhlWeekdayRule(
+  tradingDate: string,
+  p: PdhlOrParams,
+): PdhlWeekdayRule | null {
+  const rule = p.weekdayRules?.[pdhlWeekdayNumber(tradingDate)];
+  return rule ?? null;
+}
+
+export function isPdhlOptimizedWeekday(tradingDate: string, p?: PdhlOrParams): boolean {
+  if (p) {
+    return pdhlWeekdayRule(tradingDate, p) != null;
+  }
+  const dow = pdhlWeekdayNumber(tradingDate);
+  return dow === 2 || dow === 3 || dow === 5;
+}
+
+export function effectivePdhlEarliestEntry(tradingDate: string, p: PdhlOrParams): string {
+  const raised = pdhlWeekdayRule(tradingDate, p)?.earliestEntry;
+  if (!raised) {
+    return p.earliestEntry;
+  }
+  return raised > p.earliestEntry ? raised : p.earliestEntry;
+}
+
+export function effectivePdhlMaxTradesToday(tradingDate: string, p: PdhlOrParams): number | null {
+  const cap = pdhlWeekdayRule(tradingDate, p)?.maxTrades ?? 0;
+  if (cap <= 0) {
+    return null;
+  }
+  return cap;
+}
+
+export function effectivePdhlMaxOrWidth(tradingDate: string, p: PdhlOrParams): number | null {
+  const w = pdhlWeekdayRule(tradingDate, p)?.maxOrWidth ?? 0;
+  if (w <= 0) {
+    return null;
+  }
+  return w;
+}
+
+export function pdhlWeekdayLabel(tradingDate: string): string {
+  return DOW_SHORT[pdhlWeekdayNumber(tradingDate)] ?? 'Day';
+}
 
 /** @deprecated Use PDHL_NIFTY_PARAMS.maxStopPts — kept for callers */
 export const PDHL_MAX_STOP_LOSS_PTS = PDHL_NIFTY_PARAMS.maxStopPts;
@@ -285,6 +357,12 @@ export function runPdhlOpeningRange(
     state.dayStoppedReason = null;
   }
 
+  const earliest = effectivePdhlEarliestEntry(tradingDate, p);
+  const maxTradesToday = effectivePdhlMaxTradesToday(tradingDate, p);
+  const maxOrWidth = effectivePdhlMaxOrWidth(tradingDate, p);
+  const dayRule = pdhlWeekdayRule(tradingDate, p);
+  const dayLabel = pdhlWeekdayLabel(tradingDate);
+
   const base = {
     tradingDate,
     time,
@@ -299,7 +377,11 @@ export function runPdhlOpeningRange(
     dailyProfitLock: p.dailyProfitLockPts,
     dailyMaxLoss: p.dailyMaxLossPts,
     maxStopPts: p.maxStopPts,
-    earliestEntry: p.earliestEntry,
+    earliestEntry: earliest,
+    baseEarliestEntry: p.earliestEntry,
+    weekdayRule: dayRule,
+    weekdayLabel: dayLabel,
+    maxOrWidth,
   };
 
   if (time < session.marketOpen) {
@@ -327,10 +409,22 @@ export function runPdhlOpeningRange(
     return noTrade(current, state.dayStoppedReason, base);
   }
 
-  if (time < p.earliestEntry || time > p.lastEntry) {
+  if (maxTradesToday != null && state.tradesToday >= maxTradesToday) {
+    return noTrade(
+      current,
+      `${dayLabel} trade cap reached (${state.tradesToday}/${maxTradesToday})`,
+      base,
+    );
+  }
+
+  if (time < earliest || time > p.lastEntry) {
+    const delayHint =
+      dayRule?.earliestEntry && earliest !== p.earliestEntry
+        ? ` · ${dayLabel} delay until ${earliest}`
+        : '';
     return waiting(
       current,
-      `Outside entry window (${p.earliestEntry}–${p.lastEntry})`,
+      `Outside entry window (${earliest}–${p.lastEntry})${delayHint}`,
       base,
     );
   }
@@ -338,6 +432,14 @@ export function runPdhlOpeningRange(
   const or = openingRange(dayBars, session.marketOpen, session.firstHourEnd);
   if (!or) {
     return waiting(current, 'Opening range unavailable', base);
+  }
+
+  if (maxOrWidth != null && or.range >= maxOrWidth) {
+    return noTrade(
+      current,
+      `${dayLabel}: OR width ${or.range.toFixed(1)} ≥ ${maxOrWidth} — no trade`,
+      { ...base, orHigh: or.high, orLow: or.low, orWidth: or.range },
+    );
   }
 
   const bias: 'BUY' | 'SELL' = current.close >= or.mid ? 'BUY' : 'SELL';
