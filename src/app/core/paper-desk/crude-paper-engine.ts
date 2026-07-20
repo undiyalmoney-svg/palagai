@@ -327,6 +327,52 @@ export function replayPaperOnCrude(params: {
     lastSignal = `Closed: ${MCX_CRUDE_SESSION.sessionCloseLabel}`;
   }
 
+  // Still open → that contract is the live choice
+  if (open?.option) {
+    chosenOption = open.option;
+    chosenBias = open.direction;
+    indexSpot = open.entry;
+    chosenAsOf = open.entryTime;
+  } else if (!chosenOption) {
+    // No signal yet — preview ATM CE/PE from last in-range futures bar (same idea as Nifty desk)
+    let lastIdx = -1;
+    for (let i = candles.length - 1; i >= 0; i -= 1) {
+      const day = extractTradeDate(candles[i]!.date);
+      if (day >= fromDate && day <= toDate) {
+        lastIdx = i;
+        break;
+      }
+    }
+    if (lastIdx < 0 && candles.length) {
+      lastIdx = candles.length - 1;
+    }
+    if (lastIdx >= 0) {
+      const candle = candles[lastIdx]!;
+      const bias: 'BUY' | 'SELL' = 'BUY';
+      const resolved = resolveAtmCrudeMiniOption({
+        instruments,
+        direction: bias,
+        spot: candle.close,
+        asOfDateTime: candle.date,
+      });
+      chosenOption = toCrudePaperOption(resolved.instrument, resolved.source);
+      chosenBias = bias;
+      indexSpot = candle.close;
+      chosenAsOf = candle.date;
+      if (resolved.source === 'chain' && resolved.instrument.instrumentToken > 0) {
+        neededOptionTokens.add(resolved.instrument.instrumentToken);
+      }
+    }
+  } else if (trades.length) {
+    const last = trades.at(-1)!;
+    if (last.option) {
+      chosenOption = last.option;
+      chosenBias = last.direction;
+      indexSpot = last.indexEntry;
+      chosenAsOf = last.entryTime;
+    }
+  }
+
   return {
     instrumentId,
     instrumentName,
