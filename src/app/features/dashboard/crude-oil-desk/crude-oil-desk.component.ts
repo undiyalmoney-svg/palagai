@@ -41,9 +41,9 @@ export class CrudeOilDeskComponent implements OnInit, OnDestroy {
   protected realOrders = false;
   protected realOrdersAck = false;
   protected lots = 1;
-  /** Morning ORB 10:30–12:00 (default on for paper + live). */
+  /** Morning ORB 10:00–12:00 (default on for paper + live). */
   protected enableMorning = true;
-  /** Evening PDHL 19:00–21:00 (default on — both windows). */
+  /** Evening PDHL 18:30–20:30 (default on — both windows). */
   protected enableEvening = true;
   /** Stricter day loss ≈ −₹2,950 (off = champion −₹2,400). */
   protected strictDayStop = false;
@@ -233,8 +233,8 @@ export class CrudeOilDeskComponent implements OnInit, OnDestroy {
       {
         title: 'Crude Oil Desk Results',
         subtitle: `CRUDEOILM ${[
-          this.enableMorning ? 'morning 10:30–12:00' : null,
-          this.enableEvening ? 'evening 19:00–21:00' : null,
+          this.enableMorning ? 'morning 10:00–12:00' : null,
+          this.enableEvening ? 'evening 18:30–20:30' : null,
         ]
           .filter(Boolean)
           .join(' + ')} · days ${view.weekdayLabel}`,

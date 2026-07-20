@@ -1,8 +1,9 @@
 /**
- * CRUDEOILM champion (hunt May–Jul 2026):
- * PDHL break · entries 19:00–21:00 · SL 80 · TP 200 · ≤2/day · ≤8/month
- * Exit: target / stop / 23:10 session.
- * Does not change Nifty / Bank Nifty DNA.
+ * CRUDEOILM champion (all-day-green hunt Mar–Jul 2026, ~100 strategies):
+ * Evening PDHL · entries 18:30–20:30 · SL 80 · TP 150 · ≤1/day · ≤12/month
+ * Pair with morning ORB 10:00–12:00 SL80/TP250 (max OR width 120).
+ * Sample pair ≈ +₹27,480 · 5/5 months green · ~63% green days (1 lot × ₹10).
+ * Exit: target / stop / 23:10. Does not change Nifty / Bank Nifty DNA.
  */
 import { Candle } from '../../../models/candle.model';
 import { extractTradeDate } from '../../../utils/trade-date.util';
@@ -10,12 +11,15 @@ import { extractHhMm } from '../../utils/market-session.util';
 
 export const CRUDE_RUPEES_PER_POINT = 10;
 export const CRUDE_STOP_PTS = 80;
-export const CRUDE_TARGET_PTS = 200;
-export const CRUDE_ENTRY_START = '19:00';
-export const CRUDE_ENTRY_END = '21:00';
+/** @deprecated Prefer CRUDE_EVENING_TARGET_PTS / CRUDE_MORNING_TARGET_PTS */
+export const CRUDE_TARGET_PTS = 150;
+export const CRUDE_EVENING_TARGET_PTS = 150;
+export const CRUDE_MORNING_TARGET_PTS = 250;
+export const CRUDE_ENTRY_START = '18:30';
+export const CRUDE_ENTRY_END = '20:30';
 export const CRUDE_EXIT_BY = '23:10';
-export const CRUDE_MAX_TRADES_DAY = 2;
-export const CRUDE_MAX_TRADES_MONTH = 8;
+export const CRUDE_MAX_TRADES_DAY = 1;
+export const CRUDE_MAX_TRADES_MONTH = 12;
 /** Champion default day max loss (pts) ≈ −₹2,400 at ₹10/pt. */
 export const CRUDE_DAY_LOSS_STOP_PTS = 240;
 /** Desk checkbox: stricter day loss ≈ −₹2,950 → 295 pts at ₹10/pt. */
@@ -180,7 +184,8 @@ export function runCrudePdhlEvening(params: {
 
   const entry = candle.close;
   const stopLoss = action === 'BUY' ? entry - CRUDE_STOP_PTS : entry + CRUDE_STOP_PTS;
-  const target = action === 'BUY' ? entry + CRUDE_TARGET_PTS : entry - CRUDE_TARGET_PTS;
+  const target =
+    action === 'BUY' ? entry + CRUDE_EVENING_TARGET_PTS : entry - CRUDE_EVENING_TARGET_PTS;
 
   if (state.dayNetPts - CRUDE_STOP_PTS < -dayLossStopPts) {
     return {
@@ -197,7 +202,7 @@ export function runCrudePdhlEvening(params: {
     entryPrice: entry,
     stopLoss,
     target,
-    reason: `${action} PDHL · SL ${CRUDE_STOP_PTS} / TP ${CRUDE_TARGET_PTS} · day ${state.dayNetPts.toFixed(1)}`,
+    reason: `${action} PDHL · SL ${CRUDE_STOP_PTS} / TP ${CRUDE_EVENING_TARGET_PTS} · day ${state.dayNetPts.toFixed(1)}`,
   };
 }
 

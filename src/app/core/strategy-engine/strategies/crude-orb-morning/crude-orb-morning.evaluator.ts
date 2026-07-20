@@ -1,7 +1,7 @@
 /**
- * CRUDEOILM all-months-green ORB (Mar–Jul 2026 hunt):
- * Opening range 09:00–10:00 · entries 10:30–12:00 · SL 80 · TP 200 · ≤1/day
- * Sample: +₹14,220 · every month green · worst month +₹2,030 (1 lot × ₹10).
+ * CRUDEOILM morning ORB (all-day-green hunt Mar–Jul 2026):
+ * Opening range 09:00–10:00 · entries 10:00–12:00 · SL 80 · TP 250 · ≤1/day
+ * Skip if OR width > 120 pts. Pair with evening PDHL 18:30–20:30.
  * Hold until TP / SL / 23:10 — entry window end is not a force-flat.
  */
 import { Candle } from '../../../models/candle.model';
@@ -10,17 +10,19 @@ import { extractHhMm } from '../../utils/market-session.util';
 import {
   CRUDE_DAY_LOSS_STOP_PTS,
   CRUDE_MAX_TRADES_MONTH,
+  CRUDE_MORNING_TARGET_PTS,
   CRUDE_STOP_PTS,
-  CRUDE_TARGET_PTS,
   CrudePdhlSignal,
   CrudePdhlState,
 } from '../crude-pdhl-evening/crude-pdhl-evening.evaluator';
 
-export const CRUDE_MORNING_ENTRY_START = '10:30';
+export const CRUDE_MORNING_ENTRY_START = '10:00';
 export const CRUDE_MORNING_ENTRY_END = '12:00';
 export const CRUDE_MORNING_OR_START = '09:00';
 export const CRUDE_MORNING_OR_END = '10:00';
 export const CRUDE_MORNING_MAX_TRADES_DAY = 1;
+/** Skip wide opening ranges (noisy days). */
+export const CRUDE_MORNING_MAX_OR_WIDTH = 120;
 
 function orbRange(
   candles: Candle[],
@@ -106,6 +108,13 @@ export function runCrudeMorningOrb(params: {
   if (!orb) {
     return wait(candle, 'Opening range not ready');
   }
+  const orWidth = orb.high - orb.low;
+  if (orWidth > CRUDE_MORNING_MAX_OR_WIDTH) {
+    return wait(
+      candle,
+      `OR too wide (${orWidth.toFixed(0)} > ${CRUDE_MORNING_MAX_OR_WIDTH})`,
+    );
+  }
 
   let action: 'BUY' | 'SELL' | null = null;
   if (candle.close > orb.high && candle.close > candle.open) {
@@ -119,7 +128,8 @@ export function runCrudeMorningOrb(params: {
 
   const entry = candle.close;
   const stopLoss = action === 'BUY' ? entry - CRUDE_STOP_PTS : entry + CRUDE_STOP_PTS;
-  const target = action === 'BUY' ? entry + CRUDE_TARGET_PTS : entry - CRUDE_TARGET_PTS;
+  const target =
+    action === 'BUY' ? entry + CRUDE_MORNING_TARGET_PTS : entry - CRUDE_MORNING_TARGET_PTS;
 
   if (state.dayNetPts - CRUDE_STOP_PTS < -dayLossStopPts) {
     return {
@@ -136,6 +146,6 @@ export function runCrudeMorningOrb(params: {
     entryPrice: entry,
     stopLoss,
     target,
-    reason: `${action} morning ORB · SL ${CRUDE_STOP_PTS} / TP ${CRUDE_TARGET_PTS} · day ${state.dayNetPts.toFixed(1)}`,
+    reason: `${action} morning ORB · SL ${CRUDE_STOP_PTS} / TP ${CRUDE_MORNING_TARGET_PTS} · day ${state.dayNetPts.toFixed(1)}`,
   };
 }

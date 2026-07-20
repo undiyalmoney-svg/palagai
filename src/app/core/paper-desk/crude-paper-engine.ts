@@ -170,9 +170,9 @@ export function replayPaperOnCrude(params: {
   lotsMultiplier?: number;
   /** Day max loss in futures pts (default champion −240). */
   dayLossStopPts?: number;
-  /** Morning ORB 10:30–12:00. Default true. */
+  /** Morning ORB 10:00–12:00. Default true. */
   enableMorning?: boolean;
-  /** Evening PDHL 19:00–21:00. Default true. */
+  /** Evening PDHL 18:30–20:30. Default true. */
   enableEvening?: boolean;
 }): CrudeReplayResult {
   const {
@@ -217,7 +217,7 @@ export function replayPaperOnCrude(params: {
           open,
           exitPrice: exit.exitPrice,
           exitTime: candle.date,
-          exitReason: `${exit.reason} · ${open.book === 'morning' ? 'Morning 10:30–12:00' : 'Evening 19:00–21:00'}`,
+          exitReason: `${exit.reason} · ${open.book === 'morning' ? 'Morning 10:00–12:00' : 'Evening 18:30–20:30'}`,
           optionCandlesByToken,
           lotsMultiplier,
         });
@@ -315,7 +315,7 @@ export function replayPaperOnCrude(params: {
       open,
       exitPrice: last.close,
       exitTime: last.date,
-      exitReason: `${MCX_CRUDE_SESSION.sessionCloseLabel} · ${open.book === 'morning' ? 'Morning 10:30–12:00' : 'Evening 19:00–21:00'}`,
+      exitReason: `${MCX_CRUDE_SESSION.sessionCloseLabel} · ${open.book === 'morning' ? 'Morning 10:00–12:00' : 'Evening 18:30–20:30'}`,
       optionCandlesByToken,
       lotsMultiplier,
     });

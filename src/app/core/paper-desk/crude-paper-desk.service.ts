@@ -45,9 +45,9 @@ export interface CrudeDeskRunOptions {
   realOrders?: boolean;
   /** Stricter day loss ≈ −₹2,950 (295 pts). Off = champion −240 pts. */
   strictDayStop?: boolean;
-  /** Morning ORB entries 10:30–12:00 (all-months-green on Mar–Jul sample). */
+  /** Morning ORB entries 10:00–12:00 (all-months-green on Mar–Jul sample). */
   enableMorning?: boolean;
-  /** Evening PDHL entries 19:00–21:00 (optional; not all-months-green). */
+  /** Evening PDHL entries 18:30–20:30 (optional; not all-months-green). */
   enableEvening?: boolean;
 }
 
@@ -750,10 +750,10 @@ export class CrudePaperDeskService {
   private windowsLabel(): string {
     const parts: string[] = [];
     if (this.enableMorning) {
-      parts.push('morning ORB 10:30–12:00');
+      parts.push('morning ORB 10:00–12:00');
     }
     if (this.enableEvening) {
-      parts.push('evening PDHL 19:00–21:00');
+      parts.push('evening PDHL 18:30–20:30');
     }
     return parts.length ? parts.join(' + ') : 'no window';
   }
