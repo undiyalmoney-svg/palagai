@@ -101,7 +101,7 @@ export class KiteApiService {
     variety: 'regular' | 'amo' | 'co' | 'iceberg' | 'auction',
     fields: Record<string, string>,
   ): Observable<unknown> {
-    return this.postForm(authorization, `/orders/${variety}`, fields);
+    return this.postForm(authorization, `/orders/${variety}`, withMarketProtection(fields));
   }
 
   /** Convenience: POST /orders/regular */
@@ -122,7 +122,7 @@ export class KiteApiService {
     return this.putForm(
       authorization,
       `/orders/${variety}/${encodeURIComponent(orderId)}`,
-      fields,
+      withMarketProtection(fields),
     );
   }
 
@@ -233,4 +233,20 @@ export class KiteApiService {
     }
     return new TextDecoder().decode(bytes);
   }
+}
+
+/**
+ * Exchange/SEBI: API MARKET & SL-M require non-zero market_protection.
+ * Prefer -1 (broker auto band). Custom % is 1–100.
+ */
+function withMarketProtection(fields: Record<string, string>): Record<string, string> {
+  const orderType = (fields['order_type'] || '').toUpperCase();
+  if (orderType !== 'MARKET' && orderType !== 'SL-M') {
+    return fields;
+  }
+  const raw = fields['market_protection'];
+  if (raw != null && raw !== '' && raw !== '0') {
+    return fields;
+  }
+  return { ...fields, market_protection: '-1' };
 }

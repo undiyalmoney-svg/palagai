@@ -95,6 +95,9 @@ export class OrderTestComponent implements OnInit {
           quantity: String(qty),
           product: this.product,
           validity: 'DAY',
+          // Exchange/SEBI: API MARKET & SL-M must include protection (0 rejected).
+          // -1 = broker auto band; or 1–100 for custom %.
+          market_protection: '-1',
           tag: 'PALAGAI_IP',
         }),
       )) as { data?: { order_id?: string }; status?: string; message?: string };
@@ -141,6 +144,7 @@ export class OrderTestComponent implements OnInit {
           quantity: String(qty),
           product: this.product,
           validity: 'DAY',
+          market_protection: '-1',
           tag: 'PALAGAI_IP',
         }),
       )) as { data?: { order_id?: string } };
