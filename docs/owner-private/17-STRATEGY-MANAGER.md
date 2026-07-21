@@ -23,7 +23,7 @@
 | Stocks (Manager) | VolExpand Donch15 | VolExpand Donch15 | Off |
 | Stocks Desk | — | **GAP_FADE_500** | — |
 
-VolExpand: regime filter on · Nifty SL 30 · Bank SL 45.
+VolExpand: regime filter **off** by default (all morning signals). Enable in Settings for Mar-style chop stand-down. Nifty SL 30 · Bank SL 45.
 
 ## How to switch (no code)
 
