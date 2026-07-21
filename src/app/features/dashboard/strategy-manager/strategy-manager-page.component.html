@@ -174,96 +174,104 @@
       <div class="sm-tables">
         <div>
           <h3>Recent shadow signals</h3>
-          <table>
-            <thead>
-              <tr>
-                <th>Time</th><th>Action</th><th>Entry</th><th>Primary</th><th>Reason</th>
-              </tr>
-            </thead>
-            <tbody>
-              @for (s of shadowSignals().slice(0, 12); track s.id) {
-                @if (s.channel === selectedChannel()) {
-                  <tr>
-                    <td>{{ s.barTime }}</td>
-                    <td>{{ s.action }}</td>
-                    <td>{{ s.entryPrice | number: '1.1-1' }}</td>
-                    <td>{{ s.primaryAction || '—' }}</td>
-                    <td>{{ s.reason }}</td>
-                  </tr>
+          <div class="sm-table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Time</th><th>Action</th><th>Entry</th><th>Primary</th><th>Reason</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (s of shadowSignals().slice(0, 12); track s.id) {
+                  @if (s.channel === selectedChannel()) {
+                    <tr>
+                      <td>{{ s.barTime }}</td>
+                      <td>{{ s.action }}</td>
+                      <td>{{ s.entryPrice | number: '1.1-1' }}</td>
+                      <td>{{ s.primaryAction || '—' }}</td>
+                      <td>{{ s.reason }}</td>
+                    </tr>
+                  }
                 }
-              }
-            </tbody>
-          </table>
+              </tbody>
+            </table>
+          </div>
         </div>
         <div>
           <h3>Recent shadow trades</h3>
-          <table>
-            <thead>
-              <tr>
-                <th>Entry</th><th>Dir</th><th>Pts</th><th>Exit reason</th>
-              </tr>
-            </thead>
-            <tbody>
-              @for (t of shadowTrades().slice(0, 12); track t.id) {
-                @if (t.channel === selectedChannel()) {
-                  <tr>
-                    <td>{{ t.entryTime }}</td>
-                    <td>{{ t.direction }}</td>
-                    <td [class.win]="t.points > 0" [class.loss]="t.points < 0">{{ t.points | number: '1.1-1' }}</td>
-                    <td>{{ t.exitReason }}</td>
-                  </tr>
+          <div class="sm-table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Entry</th><th>Dir</th><th>Pts</th><th>Exit reason</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (t of shadowTrades().slice(0, 12); track t.id) {
+                  @if (t.channel === selectedChannel()) {
+                    <tr>
+                      <td>{{ t.entryTime }}</td>
+                      <td>{{ t.direction }}</td>
+                      <td [class.win]="t.points > 0" [class.loss]="t.points < 0">{{ t.points | number: '1.1-1' }}</td>
+                      <td>{{ t.exitReason }}</td>
+                    </tr>
+                  }
                 }
-              }
-            </tbody>
-          </table>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </article>
 
     <article class="sm-panel sm-wide">
       <h2>Strategy event log</h2>
-      <table>
-        <thead>
-          <tr>
-            <th>At</th><th>Type</th><th>Strategy</th><th>Mode</th><th>Message</th>
-          </tr>
-        </thead>
-        <tbody>
-          @for (e of eventLog().slice(0, 40); track e.at + e.message) {
+      <div class="sm-table-scroll">
+        <table>
+          <thead>
             <tr>
-              <td>{{ e.at }}</td>
-              <td>{{ e.type }}</td>
-              <td>{{ e.strategyName }}</td>
-              <td>{{ e.mode || '—' }}</td>
-              <td>{{ e.message }}</td>
+              <th>At</th><th>Type</th><th>Strategy</th><th>Mode</th><th>Message</th>
             </tr>
-          }
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            @for (e of eventLog().slice(0, 40); track e.at + e.message) {
+              <tr>
+                <td>{{ e.at }}</td>
+                <td>{{ e.type }}</td>
+                <td>{{ e.strategyName }}</td>
+                <td>{{ e.mode || '—' }}</td>
+                <td>{{ e.message }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
     </article>
 
     <article class="sm-panel sm-wide">
       <h2>Historical desk trades (current snapshot)</h2>
-      <table>
-        <thead>
-          <tr>
-            <th>Strategy</th><th>Instrument</th><th>Dir</th><th>Entry</th><th>Exit</th><th>Pts</th><th>Exit reason</th>
-          </tr>
-        </thead>
-        <tbody>
-          @for (t of deskSnap().trades.slice().reverse().slice(0, 30); track t.id) {
+      <div class="sm-table-scroll">
+        <table>
+          <thead>
             <tr>
-              <td>{{ t.strategyName || t.strategyId || '—' }}</td>
-              <td>{{ t.instrumentName }}</td>
-              <td>{{ t.direction }}</td>
-              <td>{{ t.entryTime }}</td>
-              <td>{{ t.exitTime }}</td>
-              <td [class.win]="t.indexPoints > 0" [class.loss]="t.indexPoints < 0">{{ t.indexPoints | number: '1.1-1' }}</td>
-              <td>{{ t.exitReason }}</td>
+              <th>Strategy</th><th>Instrument</th><th>Dir</th><th>Entry</th><th>Exit</th><th>Pts</th><th>Exit reason</th>
             </tr>
-          }
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            @for (t of deskSnap().trades.slice().reverse().slice(0, 30); track t.id) {
+              <tr>
+                <td>{{ t.strategyName || t.strategyId || '—' }}</td>
+                <td>{{ t.instrumentName }}</td>
+                <td>{{ t.direction }}</td>
+                <td>{{ t.entryTime }}</td>
+                <td>{{ t.exitTime }}</td>
+                <td [class.win]="t.indexPoints > 0" [class.loss]="t.indexPoints < 0">{{ t.indexPoints | number: '1.1-1' }}</td>
+                <td>{{ t.exitReason }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
     </article>
   </section>
 </div>

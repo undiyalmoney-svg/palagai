@@ -6,10 +6,14 @@
   --sm-accent: #0f6e56;
   --sm-wash: linear-gradient(160deg, #e8f0ec 0%, #f3efe6 45%, #dce6f0 100%);
   min-height: 100%;
-  padding: 1.25rem 1.25rem 3rem;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: 0 0 1.5rem;
   color: var(--sm-ink);
-  background: var(--sm-wash);
+  background: transparent;
   font-family: "Source Serif 4", "Iowan Old Style", "Palatino Linotype", Palatino, serif;
+  overflow-x: clip;
 }
 
 .sm-hero {
@@ -18,6 +22,12 @@
   gap: 1rem;
   align-items: flex-start;
   margin-bottom: 1.25rem;
+  min-width: 0;
+}
+
+.sm-hero > div {
+  min-width: 0;
+  flex: 1;
 }
 
 .sm-kicker {
@@ -31,8 +41,10 @@
 
 .sm-hero h1 {
   margin: 0.2rem 0;
-  font-size: clamp(1.6rem, 3vw, 2.2rem);
+  font-size: clamp(1.35rem, 5vw, 2.2rem);
   font-weight: 600;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
 }
 
 .sm-sub {
@@ -48,6 +60,7 @@
   display: flex;
   gap: 0.5rem;
   flex-wrap: wrap;
+  flex-shrink: 0;
 }
 
 .sm-channels {
@@ -67,6 +80,8 @@
   display: grid;
   gap: 0.2rem;
   font-family: "IBM Plex Sans", "Avenir Next", "Segoe UI", sans-serif;
+  min-width: 0;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .sm-channel strong {
@@ -77,6 +92,9 @@
 .sm-channel span {
   font-size: 0.8rem;
   color: var(--sm-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .sm-channel.active {
@@ -95,6 +113,8 @@
   border: 1px solid var(--sm-line);
   border-radius: 0.35rem;
   padding: 1rem;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .sm-panel.sm-wide {
@@ -104,6 +124,8 @@
 .sm-panel h2 {
   margin: 0 0 0.75rem;
   font-size: 1.15rem;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
 }
 
 .sm-panel h3 {
@@ -117,15 +139,20 @@
   margin-bottom: 0.65rem;
   font-family: "IBM Plex Sans", "Avenir Next", "Segoe UI", sans-serif;
   font-size: 0.85rem;
+  min-width: 0;
 }
 
 .sm-panel select,
 .sm-panel input {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
   border: 1px solid var(--sm-line);
   border-radius: 0.25rem;
-  padding: 0.4rem 0.5rem;
+  padding: 0.55rem 0.65rem;
   background: #fff;
   font: inherit;
+  min-height: 2.5rem;
 }
 
 .sm-status p,
@@ -133,6 +160,7 @@
   margin: 0.25rem 0;
   font-family: "IBM Plex Sans", "Avenir Next", "Segoe UI", sans-serif;
   font-size: 0.9rem;
+  overflow-wrap: anywhere;
 }
 
 .sm-status span {
@@ -149,6 +177,7 @@
   gap: 0.45rem;
   max-height: 22rem;
   overflow: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .sm-catalog button {
@@ -157,10 +186,11 @@
   border: 1px solid transparent;
   background: rgba(255, 255, 255, 0.55);
   border-radius: 0.3rem;
-  padding: 0.55rem 0.65rem;
+  padding: 0.65rem 0.75rem;
   cursor: pointer;
   display: grid;
   gap: 0.15rem;
+  min-width: 0;
 }
 
 .sm-catalog button.active {
@@ -174,6 +204,7 @@
   font-style: normal;
   color: var(--sm-muted);
   font-size: 0.78rem;
+  overflow-wrap: anywhere;
 }
 
 .sm-settings {
@@ -195,6 +226,7 @@
   justify-content: space-between;
   align-items: center;
   gap: 0.75rem;
+  flex-wrap: wrap;
 }
 
 .sm-tables {
@@ -203,8 +235,21 @@
   gap: 0.75rem;
 }
 
+.sm-table-scroll {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  margin: 0.35rem 0 0.75rem;
+  border: 1px solid var(--sm-line);
+  border-radius: 0.3rem;
+  background: rgba(255, 255, 255, 0.55);
+}
+
 table {
   width: 100%;
+  min-width: 32rem;
   border-collapse: collapse;
   font-family: "IBM Plex Sans", "Avenir Next", "Segoe UI", sans-serif;
   font-size: 0.8rem;
@@ -213,14 +258,24 @@ table {
 th,
 td {
   border-bottom: 1px solid var(--sm-line);
-  padding: 0.35rem 0.4rem;
+  padding: 0.45rem 0.5rem;
   text-align: left;
   vertical-align: top;
+  white-space: nowrap;
+}
+
+td:last-child,
+th:last-child {
+  white-space: normal;
+  min-width: 8rem;
 }
 
 th {
   color: var(--sm-muted);
   font-weight: 600;
+  position: sticky;
+  top: 0;
+  background: #f7faf8;
 }
 
 .win {
@@ -247,5 +302,58 @@ th {
 
   .sm-hero {
     flex-direction: column;
+  }
+
+  .sm-hero-actions {
+    width: 100%;
+  }
+
+  .sm-hero-actions button {
+    flex: 1 1 auto;
+  }
+
+  .sm-status span {
+    min-width: 5.5rem;
+  }
+}
+
+@media (max-width: 640px) {
+  .sm-channels {
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+  }
+
+  .sm-channel {
+    padding: 0.75rem 0.85rem;
+  }
+
+  .sm-channel span:last-child {
+    display: none;
+  }
+
+  .sm-panel {
+    padding: 0.85rem;
+  }
+
+  .sm-panel h2 {
+    font-size: 1.05rem;
+  }
+
+  .sm-sub {
+    font-size: 0.88rem;
+  }
+
+  .sm-catalog {
+    max-height: 16rem;
+  }
+
+  .sm-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+  }
+
+  table {
+    min-width: 28rem;
+    font-size: 0.75rem;
   }
 }
