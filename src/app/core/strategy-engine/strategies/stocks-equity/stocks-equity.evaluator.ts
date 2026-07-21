@@ -90,6 +90,45 @@ export function qtyForRisk(
   return Math.max(0, Math.min(q, maxQty));
 }
 
+/** Stop / target fractions for live MIS protection (mirrors day-bar DNA). */
+export function stockRiskParams(strategyId: StocksStrategyId): {
+  stopPct: number;
+  targetPct: number;
+  riskPct: number;
+} {
+  if (strategyId === 'GAP_FADE_500') {
+    return {
+      stopPct: GAP_FADE_500_STOP_PCT,
+      targetPct: 0,
+      riskPct: GAP_FADE_500_RISK_PCT,
+    };
+  }
+  if (strategyId === 'ALMOST_GREEN_MIX') {
+    return {
+      stopPct: ALMOST_GREEN_STOP_PCT,
+      targetPct: ALMOST_GREEN_TARGET_PCT,
+      riskPct: ALMOST_GREEN_RISK_PCT,
+    };
+  }
+  return { stopPct: STOCKS_STOP_PCT, targetPct: 0, riskPct: STOCKS_RISK_PCT };
+}
+
+export function stockLevelsFromEntry(
+  direction: 'BUY' | 'SELL',
+  entry: number,
+  strategyId: StocksStrategyId,
+): { stop: number; target: number | null; stopPct: number; targetPct: number } {
+  const { stopPct, targetPct } = stockRiskParams(strategyId);
+  const stop = direction === 'BUY' ? entry * (1 - stopPct) : entry * (1 + stopPct);
+  const target =
+    targetPct > 0
+      ? direction === 'BUY'
+        ? entry * (1 + targetPct)
+        : entry * (1 - targetPct)
+      : null;
+  return { stop, target, stopPct, targetPct };
+}
+
 function pushTrade(
   out: StocksDayTrade[],
   params: Omit<StocksDayTrade, 'points' | 'pnlRs'> & { points: number },

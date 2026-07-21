@@ -30,7 +30,9 @@ import {
   qtyForRisk,
   replayStocksDayStrategy,
   resizeTradesForCapitalSplit,
+  stockLevelsFromEntry,
 } from '../strategy-engine/strategies/stocks-equity/stocks-equity.evaluator';
+import { StocksLiveExecutorService } from '../live-desk/stocks-live-executor.service';
 import { PaperDeskMode } from './paper-desk.models';
 
 export interface StocksDeskTotals {
@@ -56,6 +58,8 @@ export interface StocksDeskSnapshot {
   symbols: string[];
   moversNote?: string;
   maxLegs?: number;
+  /** Live money: open legs with SL/TP */
+  brokerNote?: string;
 }
 
 export interface StocksLiveOptions {
@@ -74,10 +78,10 @@ export class StocksPaperDeskService {
   private readonly instrumentStore = inject(InstrumentStoreService);
   private readonly watchlist = inject(StocksWatchlistService);
   private readonly movers = inject(StocksMoversService);
+  private readonly liveExec = inject(StocksLiveExecutorService);
 
   private runGeneration = 0;
   private liveTimer: ReturnType<typeof setInterval> | null = null;
-  private readonly livePlacedKeys = new Set<string>();
 
   readonly snapshot = signal<StocksDeskSnapshot>(emptySnapshot('testing'));
   readonly busy = signal(false);
@@ -93,7 +97,15 @@ export class StocksPaperDeskService {
       clearInterval(this.liveTimer);
       this.liveTimer = null;
     }
-    this.snapshot.update((s) => ({ ...s, running: false, message: 'Live stopped' }));
+    const open = this.liveExec.getOpenLegs().length;
+    this.snapshot.update((s) => ({
+      ...s,
+      running: false,
+      message:
+        open > 0
+          ? `Live stopped · ${open} open MIS still on Kite (SL stays active — check Kite)`
+          : 'Live stopped',
+    }));
   }
 
   async runTesting(fromDate: string, toDate: string, strategyId: StocksStrategyId): Promise<void> {
@@ -175,11 +187,11 @@ export class StocksPaperDeskService {
 
   async startLive(options: StocksLiveOptions): Promise<void> {
     this.stopLive();
-    this.livePlacedKeys.clear();
     const auth = this.requireAuth();
     await this.instrumentStore.refreshBestEffort(false);
 
     const maxLegs = Math.max(1, Math.min(3, options.maxLegs || 3));
+    this.liveExec.reset();
 
     this.snapshot.set({
       ...emptySnapshot('live'),
@@ -189,9 +201,34 @@ export class StocksPaperDeskService {
       symbols: this.watchlist.enabledItems().map((x) => x.symbol),
       maxLegs,
       message: options.realOrders
-        ? `LIVE MONEY · MIS · max ${maxLegs} legs · ₹${STOCKS_CAPITAL_RS} split`
+        ? `LIVE MONEY · MIS · SL+TP monitor · max ${maxLegs} legs`
         : `Live paper · max ${maxLegs} legs · gainers=${options.includeTopGainers ? 'on' : 'off'}`,
     });
+
+    if (options.realOrders) {
+      try {
+        const interest = [
+          ...this.watchlist.enabledItems().map((x) => x.symbol),
+          ...this.movers.snapshot().gainers.map((g) => g.symbol),
+          ...this.movers.snapshot().losers.map((l) => l.symbol),
+        ];
+        const note = await this.liveExec.reconcileOnStart({
+          authorization: auth,
+          strategyId: options.strategyId,
+          interestSymbols: interest,
+        });
+        this.snapshot.update((s) => ({
+          ...s,
+          brokerNote: note,
+          message: `LIVE MONEY · ${note}`,
+        }));
+      } catch (e) {
+        this.snapshot.update((s) => ({
+          ...s,
+          message: `Reconcile failed: ${formatUnknownError(e)}`,
+        }));
+      }
+    }
 
     const tick = async () => {
       try {
@@ -209,7 +246,6 @@ export class StocksPaperDeskService {
         let capped: StocksDayTrade[] = [];
 
         if (options.strategyId === 'ALMOST_GREEN_MIX' && options.includeTopGainers) {
-          // Quote-based entry for movers + watchlist (fast path)
           capped = this.signalsFromMoversAndWatch(
             universe.movers,
             universe.watch,
@@ -238,7 +274,6 @@ export class StocksPaperDeskService {
             allTrades.push(...todayTrades);
             await sleep(400);
           }
-          // Merge mover symbols that aren't in watch — fetch day bars
           for (const m of universe.movers) {
             if (universe.watch.some((w) => w.symbol === m.symbol)) continue;
             const candles = await this.fetchDayRange(auth, m.instrumentToken, shiftDays(-10), today);
@@ -257,29 +292,67 @@ export class StocksPaperDeskService {
 
         const split = resizeTradesForCapitalSplit(capped, STOCKS_CAPITAL_RS);
 
+        // Attach DNA target onto trades for display / live sync
+        const withTargets = split.map((t) => {
+          const levels = stockLevelsFromEntry(t.direction, t.entry, options.strategyId);
+          return { ...t, stop: levels.stop, target: levels.target };
+        });
+
         if (options.realOrders) {
-          for (const t of split) {
-            const key = `${today}:${t.symbol}:${t.direction}`;
-            if (!this.livePlacedKeys.has(key)) {
-              await this.placeEquityMis(auth, t.symbol, t.direction, t.qty);
-              this.livePlacedKeys.add(key);
-            }
-          }
+          await this.liveExec.syncDesired({
+            authorization: auth,
+            strategyId: options.strategyId,
+            desired: withTargets.map((t) => {
+              const levels = stockLevelsFromEntry(t.direction, t.entry, options.strategyId);
+              return {
+                symbol: t.symbol,
+                direction: t.direction,
+                qty: t.qty,
+                entry: t.entry,
+                stop: t.stop || levels.stop,
+                target: levels.target,
+              };
+            }),
+          });
         }
 
-        const totals = summarize(split);
+        const openLegs = this.liveExec.getOpenLegs();
+        const brokerNote = options.realOrders
+          ? openLegs
+              .map(
+                (l) =>
+                  `${l.symbol} ${l.direction} E${l.entry.toFixed(1)}/SL${l.stop.toFixed(1)}${
+                    l.target != null ? `/T${l.target.toFixed(1)}` : ''
+                  }${l.slOrderId ? '' : ' (no SL yet)'}`,
+              )
+              .join(' · ') || 'no open broker legs'
+          : undefined;
+
+        const displayTrades = options.realOrders
+          ? this.mergeBrokerIntoTrades(withTargets, options.strategyId)
+          : withTargets;
+        const totals = summarize(displayTrades);
         const legHint =
-          split.length > 1
-            ? ` · split ₹${Math.round(STOCKS_CAPITAL_RS / split.length)}/leg × ${split.length}`
+          withTargets.length > 1
+            ? ` · split ₹${Math.round(STOCKS_CAPITAL_RS / withTargets.length)}/leg × ${withTargets.length}`
             : '';
         this.snapshot.update((s) => ({
           ...s,
-          trades: split,
+          trades: displayTrades,
           totals,
           maxLegs,
-          symbols: [...new Set([...universe.watch.map((w) => w.symbol), ...split.map((t) => t.symbol)])],
+          symbols: [
+            ...new Set([
+              ...universe.watch.map((w) => w.symbol),
+              ...withTargets.map((t) => t.symbol),
+              ...openLegs.map((l) => l.symbol),
+            ]),
+          ],
           moversNote,
-          message: `${options.realOrders ? 'LIVE MONEY' : 'Live paper'} · ${split.length} leg(s)${legHint} · ₹${totals.netRs}${moversNote ? ` · ${moversNote}` : ''}`,
+          brokerNote,
+          message: `${options.realOrders ? 'LIVE MONEY' : 'Live paper'} · signals ${withTargets.length}${legHint} · open ${openLegs.length} · ₹${totals.netRs}${
+            brokerNote ? ` · ${brokerNote}` : ''
+          }${moversNote ? ` · ${moversNote}` : ''}`,
         }));
       } catch (e) {
         this.snapshot.update((s) => ({
@@ -290,7 +363,9 @@ export class StocksPaperDeskService {
     };
 
     await tick();
-    this.liveTimer = setInterval(() => void tick(), 5 * 60 * 1000);
+    // Live money: poll often for TP/SL; paper can be slower
+    const intervalMs = options.realOrders ? 45_000 : 5 * 60 * 1000;
+    this.liveTimer = setInterval(() => void tick(), intervalMs);
   }
 
   strategyOptions() {
@@ -381,6 +456,61 @@ export class StocksPaperDeskService {
     return applyMaxTradesPerDayByGap(signals, maxLegs);
   }
 
+  /** Merge broker-managed legs into the trades table (exits + SL status). */
+  private mergeBrokerIntoTrades(
+    signals: StocksDayTrade[],
+    strategyId: StocksStrategyId,
+  ): StocksDayTrade[] {
+    const bySym = new Map(signals.map((t) => [t.symbol.toUpperCase(), { ...t }]));
+    for (const leg of this.liveExec.getLegs()) {
+      const levels = stockLevelsFromEntry(leg.direction, leg.entry, strategyId);
+      const prev = bySym.get(leg.symbol);
+      const base: StocksDayTrade = prev ?? {
+        symbol: leg.symbol,
+        date: todayIso(),
+        direction: leg.direction,
+        entry: leg.entry,
+        stop: leg.stop || levels.stop,
+        exit: leg.entry,
+        qty: leg.qty,
+        points: 0,
+        pnlRs: 0,
+        strategyId,
+        exitReason: 'OPEN',
+      };
+      if (leg.status === 'open') {
+        bySym.set(leg.symbol, {
+          ...base,
+          entry: leg.entry,
+          stop: leg.stop,
+          qty: leg.qty,
+          direction: leg.direction,
+          exitReason: leg.slOrderId ? 'OPEN+SL' : 'OPEN (placing SL)',
+        });
+      } else if (leg.status === 'flat') {
+        const exit = leg.exitReason?.toLowerCase().includes('target')
+          ? leg.target ?? leg.entry
+          : leg.exitReason?.toLowerCase().includes('stop') ||
+              leg.exitReason?.toLowerCase().includes('sl')
+            ? leg.stop
+            : leg.entry;
+        const points =
+          leg.direction === 'BUY' ? (exit as number) - leg.entry : leg.entry - (exit as number);
+        bySym.set(leg.symbol, {
+          ...base,
+          entry: leg.entry,
+          stop: leg.stop,
+          exit: exit as number,
+          qty: leg.qty,
+          points,
+          pnlRs: points * leg.qty,
+          exitReason: leg.exitReason ?? 'FLAT',
+        });
+      }
+    }
+    return [...bySym.values()];
+  }
+
   private async buildLiveUniverse(includeTopGainers: boolean): Promise<{
     watch: StocksWatchItem[];
     movers: StocksMover[];
@@ -393,31 +523,9 @@ export class StocksPaperDeskService {
       const merged = new Map<string, StocksMover>();
       for (const g of snap.gainers) merged.set(g.symbol, g);
       for (const l of snap.losers) merged.set(l.symbol, l);
-      // Also pull quotes for watchlist names missing from top 10
       movers = [...merged.values()];
     }
     return { watch, movers };
-  }
-
-  private async placeEquityMis(
-    authorization: string,
-    tradingSymbol: string,
-    transactionType: 'BUY' | 'SELL',
-    quantity: number,
-  ): Promise<void> {
-    if (quantity < 1) return;
-    await firstValueFrom(
-      this.kiteApi.placeRegularOrder(authorization, {
-        exchange: 'NSE',
-        tradingsymbol: tradingSymbol,
-        transaction_type: transactionType,
-        order_type: 'MARKET',
-        quantity: String(quantity),
-        product: 'MIS',
-        validity: 'DAY',
-        tag: 'PALAGAI_EQ',
-      }),
-    );
   }
 
   private requireAuth(): string {
