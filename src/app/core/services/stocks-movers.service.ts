@@ -185,20 +185,12 @@ export class StocksMoversService {
 
   resolveNseEq(symbol: string): { tradingSymbol: string; name: string; instrumentToken: number } | null {
     const q = symbol.trim().toUpperCase();
-    const hits = this.instruments
-      .search(q, 30)
-      .filter(
-        (i) =>
-          i.exchange === 'NSE' &&
-          i.instrumentType === 'EQ' &&
-          i.tradingSymbol.toUpperCase() === q,
-      );
-    const exact = hits[0];
-    if (!exact) return null;
+    const hit = this.instruments.findNseEquityExact(q);
+    if (!hit) return null;
     return {
-      tradingSymbol: exact.tradingSymbol,
-      name: exact.name || exact.tradingSymbol,
-      instrumentToken: exact.instrumentToken,
+      tradingSymbol: hit.tradingSymbol,
+      name: hit.name || hit.tradingSymbol,
+      instrumentToken: hit.instrumentToken,
     };
   }
 }

@@ -35,6 +35,31 @@ export class InstrumentStoreService {
       .slice(0, limit);
   }
 
+  /**
+   * Resolve NSE cash equity by exact tradingsymbol (e.g. CANBK, RELIANCE).
+   * Scans the full dump — not capped — so NFO options don't hide the EQ row.
+   */
+  findNseEquityExact(symbol: string): Instrument | undefined {
+    const q = symbol.trim().toUpperCase();
+    if (!q) return undefined;
+    const list = this.instruments();
+    return (
+      list.find(
+        (i) =>
+          i.exchange === 'NSE' &&
+          (i.instrumentType === 'EQ' || i.instrumentType === 'BE' || i.segment === 'NSE') &&
+          i.tradingSymbol.toUpperCase() === q &&
+          !i.expiry,
+      ) ??
+      list.find(
+        (i) =>
+          i.exchange === 'NSE' &&
+          i.tradingSymbol.toUpperCase() === q &&
+          (i.instrumentType === 'EQ' || !i.expiry),
+      )
+    );
+  }
+
   getByToken(token: number): Instrument | undefined {
     return this.instruments().find((item) => item.instrumentToken === token);
   }
