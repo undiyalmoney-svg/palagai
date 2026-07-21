@@ -11,6 +11,8 @@
     "test:backtest-smoke": "node scripts/backtest-smoke.mjs",
     "analyze:trades": "npx tsx scripts/trade-characteristics-analysis.ts",
     "analyze:trades:synthetic": "npx tsx scripts/trade-characteristics-analysis.ts --synthetic",
+    "analyze:rejections": "python3 scripts/fetch-yahoo-intraday.py > /tmp/market-today.json && npx tsx scripts/trade-rejection-analysis.ts /tmp/market-today.json",
+    "analyze:rejections:file": "npx tsx scripts/trade-rejection-analysis.ts",
     "analyze:crude-patterns": "npx tsx scripts/crude-monthly-pattern-research.ts",
     "analyze:monthly-strategies": "npx tsx scripts/monthly-strategy-finder.ts",
     "discover:strategies": "npx tsx scripts/strategy-discovery/run.ts",
