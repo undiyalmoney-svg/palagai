@@ -30,7 +30,7 @@ Market data → Strategy Manager → IManagedStrategy → Signal → Desk risk �
 | Stocks (Strategy Manager) | VolExpand Donch15 | VolExpand Donch15 | Off |
 | Stocks Desk UI | — | **GAP_FADE_500** | — |
 
-VolExpand ships with morning regime filter on (OR drive ≥ 0.30, gap ≤ 6×ATR). Nifty stop 30 / Bank stop 45.
+VolExpand: regime filter **off** by default (full morning trade count). Enable in Settings for chop stand-down. Nifty stop 30 / Bank stop 45.
 
 Trade Desk resolves strategies via `StrategyManagerService`. Champion DNA file is **unchanged**; desk risk checkboxes still apply through `setPdhlDeskOverrides`.
 

@@ -12,8 +12,11 @@ import {
 import { StrategySettings } from '../models/strategy-settings.model';
 import { StrategyRegistryService } from '../registry/strategy-registry.service';
 
-const STORAGE_KEY = 'palagai_strategy_assignments_v2';
-const LEGACY_STORAGE_KEY = 'palagai_strategy_assignments_v1';
+const STORAGE_KEY = 'palagai_strategy_assignments_v3';
+const LEGACY_STORAGE_KEYS = [
+  'palagai_strategy_assignments_v1',
+  'palagai_strategy_assignments_v2',
+] as const;
 
 export interface ChannelAssignment {
   paper: string;
@@ -147,8 +150,10 @@ export class StrategyAssignmentService {
       return;
     }
     try {
-      // Drop legacy v1 Champion-centric assignments so research defaults apply once.
-      localStorage.removeItem(LEGACY_STORAGE_KEY);
+      // Drop legacy assignment keys so research defaults + trade-count settings apply once.
+      for (const key of LEGACY_STORAGE_KEYS) {
+        localStorage.removeItem(key);
+      }
       const raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) {
         this.persist();
