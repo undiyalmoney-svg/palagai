@@ -5,14 +5,8 @@ import { extractTradeDate } from '../utils/trade-date.util';
 import { extractHhMm } from '../strategy-engine/utils/market-session.util';
 import { StrategyContext } from '../strategy-engine/models/strategy-context.model';
 import {
-  createPdhlOrState,
   emaLast,
-  mergePdhlOrParams,
   PDHL_EMA_EXIT_PERIOD,
-  PdhlOrParams,
-  PdhlOrState,
-  recordPdhlTradeClosed,
-  runPdhlOpeningRange,
 } from '../strategy-engine/strategies/pdhl-opening-range/pdhl-opening-range.evaluator';
 import {
   IndexOptionKind,
@@ -22,6 +16,11 @@ import {
   PaperOptionContract,
   PaperTrade,
 } from './paper-desk.models';
+import {
+  IManagedStrategy,
+  ManagedOpenPosition,
+} from '../strategy-manager/models/strategy-module.interface';
+import { ChampionPdhlManagedStrategy } from '../strategy-manager/modules/champion-pdhl.managed-strategy';
 
 export interface IndexOpenPaper {
   direction: 'BUY' | 'SELL';
@@ -42,7 +41,8 @@ export interface ReplayInstrumentResult {
   dayNetByDate: Record<string, number>;
   lastSignal: string;
   open: IndexOpenPaper | null;
-  state: PdhlOrState;
+  strategyId: string;
+  strategyName: string;
   chosenOption: PaperOptionContract | null;
   chosenBias: 'BUY' | 'SELL' | null;
   indexSpot: number | null;
@@ -167,6 +167,8 @@ function closePaperTrade(params: {
   optionCandlesByToken: Map<number, Candle[]>;
   /** Exchange lot × this (Testing + Live paper + Live money P&L). */
   lotsMultiplier?: number;
+  strategyId?: string;
+  strategyName?: string;
 }): PaperTrade {
   const { open } = params;
   const lots = Math.max(1, Math.floor(params.lotsMultiplier ?? 1) || 1);
@@ -217,11 +219,14 @@ function closePaperTrade(params: {
     optionPnlRs,
     premiumEstimated,
     outcome: indexPoints > 0 ? 'WIN' : indexPoints < 0 ? 'LOSS' : 'FLAT',
+    strategyId: params.strategyId,
+    strategyName: params.strategyName,
   };
 }
 
 /**
- * Replay OR Swing Breakout on index candles (HT-compatible), attach ATM weekly options.
+ * Replay selected managed strategy on index candles; attach ATM weekly options.
+ * Strategy modules own entry + exit logic — engine stays strategy-agnostic.
  */
 export function replayPaperOnIndex(params: {
   instrumentId: string;
@@ -239,8 +244,11 @@ export function replayPaperOnIndex(params: {
   forceCloseOpen?: boolean;
   /** Exchange lot × this for option ₹ P&L. */
   lotsMultiplier?: number;
-  /** Optional Trade Desk day loss / profit lock overrides. */
-  pdhlOverrides?: Partial<PdhlOrParams> | null;
+  /**
+   * Active strategy module (from Strategy Manager).
+   * When omitted, falls back to Champion PDHL so existing callers stay safe.
+   */
+  strategy?: IManagedStrategy;
 }): ReplayInstrumentResult {
   const {
     instrumentId,
@@ -255,9 +263,16 @@ export function replayPaperOnIndex(params: {
   } = params;
   const forceCloseOpen = params.forceCloseOpen !== false;
   const lotsMultiplier = Math.max(1, Math.floor(params.lotsMultiplier ?? 1) || 1);
-  const pdhlParams = mergePdhlOrParams(instrumentId, params.pdhlOverrides);
 
-  const state = createPdhlOrState();
+  const strategy =
+    params.strategy ??
+    (() => {
+      const fallback = new ChampionPdhlManagedStrategy();
+      fallback.initialize();
+      return fallback;
+    })();
+  strategy.reset();
+
   const trades: PaperTrade[] = [];
   const dayNetByDate: Record<string, number> = {};
   let open: IndexOpenPaper | null = null;
@@ -275,9 +290,17 @@ export function replayPaperOnIndex(params: {
     }
 
     const closes = candles.slice(0, i + 1).map((c) => c.close);
+    const ctx = buildContext(candles, i, instrumentId);
 
     if (open) {
-      const exit = checkIndexExit(candle, open, closes);
+      const managedOpen: ManagedOpenPosition = {
+        direction: open.direction,
+        entry: open.entry,
+        stop: open.stop,
+        target: open.target,
+        entryTime: open.entryTime,
+      };
+      const exit = strategy.exitLogic(candle, managedOpen, closes, ctx);
       if (exit) {
         const closed = closePaperTrade({
           instrumentId,
@@ -288,9 +311,11 @@ export function replayPaperOnIndex(params: {
           exitReason: exit.reason,
           optionCandlesByToken,
           lotsMultiplier,
+          strategyId: strategy.id,
+          strategyName: strategy.name,
         });
         trades.push(closed);
-        recordPdhlTradeClosed(state, closed.indexPoints, pdhlParams);
+        strategy.onTradeClosed?.(closed.indexPoints, day);
         dayNetByDate[day] = (dayNetByDate[day] ?? 0) + closed.indexPoints;
         open = null;
         lastSignal = `Closed: ${exit.reason}`;
@@ -298,8 +323,7 @@ export function replayPaperOnIndex(params: {
       continue;
     }
 
-    const ctx = buildContext(candles, i, instrumentId);
-    const signal = runPdhlOpeningRange(ctx, state, pdhlParams);
+    const signal = strategy.generateSignal(ctx);
     lastSignal = signal.reason;
 
     if (signal.action !== 'BUY' && signal.action !== 'SELL') {
@@ -345,7 +369,7 @@ export function replayPaperOnIndex(params: {
     chosenBias = signal.action;
     indexSpot = signal.entryPrice;
     chosenAsOf = candle.date;
-    lastSignal = `${signal.action} @ ${signal.entryPrice.toFixed(1)}`;
+    lastSignal = `${signal.action} @ ${signal.entryPrice.toFixed(1)} · ${strategy.name}`;
   }
 
   // Force close any open trade at last in-range bar (same as HT end-of-range)
@@ -370,9 +394,11 @@ export function replayPaperOnIndex(params: {
         exitReason: 'End of range',
         optionCandlesByToken,
         lotsMultiplier,
+        strategyId: strategy.id,
+        strategyName: strategy.name,
       });
       trades.push(closed);
-      recordPdhlTradeClosed(state, closed.indexPoints, pdhlParams);
+      strategy.onTradeClosed?.(closed.indexPoints, day);
       dayNetByDate[day] = (dayNetByDate[day] ?? 0) + closed.indexPoints;
       if (closed.option) {
         chosenOption = closed.option;
@@ -447,7 +473,8 @@ export function replayPaperOnIndex(params: {
     dayNetByDate,
     lastSignal,
     open,
-    state,
+    strategyId: strategy.id,
+    strategyName: strategy.name,
     chosenOption,
     chosenBias,
     indexSpot,

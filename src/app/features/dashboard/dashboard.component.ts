@@ -25,6 +25,7 @@ export class DashboardComponent {
 
   protected readonly navItems = [
     { label: 'Trade Desk', shortLabel: 'Trade', route: '/dashboard/trade-desk', icon: 'calculate' },
+    { label: 'Strategies', shortLabel: 'Strat', route: '/dashboard/strategy-manager', icon: 'tune' },
     { label: 'Crude Oil Mini', shortLabel: 'Crude', route: '/dashboard/crude-oil', icon: 'water_drop' },
     { label: 'Stocks Desk', shortLabel: 'Stocks', route: '/dashboard/stocks', icon: 'show_chart' },
     { label: 'Order Test', shortLabel: 'Orders', route: '/dashboard/order-test', icon: 'bolt' },
