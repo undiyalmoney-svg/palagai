@@ -17,7 +17,10 @@ Those two files are the product “secret sauce.” Docs 01–03 expand them **l
 2. Read **03** when exits or desk wiring confuse you.  
 3. Use **04** as a map when searching the repo.  
 4. Use **05** for login / Get Token / IP whitelist pointers.  
-5. Use **07** for Stocks Desk treasure watchlist (equity day strategies).
+5. Use **07** for Stocks Desk treasure watchlist (equity day strategies).  
+6. Use **13** for pre-filter entry expectancy discovery (what has a long-term edge before quality scoring).  
+7. Use **14** for multi-year strategy foundation ranking (base compare, exits, regimes, robustness) — **Swing5+prev→EOD** recommended foundation.  
+8. Use **15** for large strategy-universe search (~3k combos) — **VolExpand Donch15 + EMA50 + EOD (10:15–11:30, 1t)** as strongest discovered foundation.
 
 ## Not in the deploy
 Angular assets come from `src/` + `public/` only (`angular.json`).  

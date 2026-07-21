@@ -14,6 +14,10 @@
     "analyze:crude-patterns": "npx tsx scripts/crude-monthly-pattern-research.ts",
     "analyze:monthly-strategies": "npx tsx scripts/monthly-strategy-finder.ts",
     "discover:strategies": "npx tsx scripts/strategy-discovery/run.ts",
+    "discover:entry-expectancy": "python3 scripts/entry-expectancy-discovery.py",
+    "research:strategy-foundation": "python3 scripts/multi-year-strategy-foundation.py",
+    "research:universe-search": "python3 scripts/strategy-universe-search.py",
+    "research:vehicle-comparison": "python3 scripts/vehicle-comparison.py",
     "analyze:stocks-daily": "npx tsx scripts/stock-daily-profit-study.ts",
     "serve:ssr:palagai": "cross-env NODE_OPTIONS=\"--no-deprecation --no-warnings\" node dist/palagai/server/server.mjs"
   },
