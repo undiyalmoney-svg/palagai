@@ -159,3 +159,91 @@ python3 scripts/strategy-universe-search.py
 # optional: UNIVERSE_SIZE=3000
 # outputs → /tmp/strategy-universe/
 ```
+
+
+---
+
+## Stress test addendum (trade count, costs, sensitivity, regime filter)
+
+Base strategy tested: VolExpand Donch15 + EMA50 + EOD · 10:15–11:30 · 1 trade/day.
+
+### How many trades?
+
+| Split | Trades | Expectancy | PF | Net ₹ |
+|---|---:|---:|---:|---:|
+| Train 2020–2023 | **798** | +19.35 | 1.76 | +611k |
+| **OOS 2024–2026** | **569** | **+14.92** | 1.52 | +349k |
+| Full sample | **1,367** | +17.51 | 1.65 | +961k |
+
+OOS yearly: 2024 n≈ (exp 28.8) · 2025 (exp 4.0) · 2026 (exp 4.3) — all green.  
+**+14.92 is on 569 OOS trades (~190/year), not a tiny sample.** Full history is 1,367 trades.
+
+### Nifty vs Bank (independent)
+
+| | Train n / exp | OOS n / exp | OOS PF |
+|---|---|---|---|
+| **Nifty** | 394 / +10.75 | **282 / +9.59** | 1.48 |
+| **Bank** | 404 / +27.74 | **287 / +20.17** | 1.54 |
+
+Both are **independently positive** OOS. Bank has higher expectancy (and lower WR); Nifty is not a free-rider — it stands alone at +9.6 on 282 trades.
+
+### Transaction costs (round-turn points deducted from every OOS trade)
+
+| RT slip | Combined OOS exp | Nifty | Bank | Still +? |
+|---|---:|---:|---:|---|
+| 0 pt | +14.92 | +9.59 | +20.17 | yes |
+| 2 pt | +12.92 | +7.59 | +18.17 | yes |
+| 5 pt | +9.92 | +4.59 | +15.17 | yes |
+| 8 pt | +6.92 | +1.59 | +12.17 | yes |
+| 10 pt | +4.92 | **−0.41** | +10.17 | combined yes; Nifty fails |
+| 15 pt | **−0.08** | −5.41 | +5.17 | **no** |
+
+Futures-like 2–5 pts RT: edge remains strong.  
+Harsh ~10 pts (closer to poor options fills): combined still +, but **Nifty alone breaks**.  
+At ~15 pts RT the combined edge dies. Treat options execution as the main live risk.
+
+### Parameter sensitivity
+
+**Donchian lookback (EMA50, 11:30, 1t) — OOS exp**
+
+| n | 12 | 13 | 14 | **15** | 16 | 17 | 18 |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Exp | +11.8 | +11.5 | +14.3 | **+14.9** | +14.8 | +10.6 | +11.9 |
+| n trades | 610 | 598 | 586 | 569 | 547 | 534 | 515 |
+
+**12–18 all profitable.** Peak plateau ~14–16. Not a single-point spike.
+
+**Morning cutoff (Donch15, EMA50, 1t) — OOS exp**
+
+| Cutoff | 11:15 | **11:30** | 12:00 |
+|---|---:|---:|---:|
+| Exp | **+18.18** | +14.92 | +11.99 |
+| Trades | 452 | 569 | 736 |
+
+All three profitable. Earlier cutoff = higher exp, fewer trades. **Not fragile.**
+
+**EMA bias (Donch15, 11:30, 1t) — OOS exp**
+
+| Bias | none | EMA20 | **EMA50** | EMA100 |
+|---|---:|---:|---:|---:|
+| Exp | +12.82 | +13.17 | **+14.92** | +12.54 |
+| Trades | 630 | 625 | 569 | 520 |
+
+EMA20 / 50 / 100 all positive and similar. EMA50 is best, not uniquely magical.
+
+### Regime filter (can we cut sideways/low-vol damage?)
+
+Baseline OOS: n=569, exp=+14.92, DD=−36k.
+
+| Filter | Keep | OOS n | OOS exp | PF | MaxDD |
+|---|---:|---:|---:|---:|---:|
+| Skip sideways (trade only trending) | 50% | 286 | **+51.8** | 3.02 | −14k |
+| Skip low-vol | 87% | 496 | +19.3 | 1.67 | −30k |
+| **Trending OR high-vol** | **71%** | **402** | **+31.0** | **2.11** | −30k |
+| Only high-vol | 52% | 298 | +23.6 | 1.79 | −33k |
+
+**Yes — a simple filter helps.** Best practical candidate: **allow trades only on trending or high-vol days** (keep ~71% of signals, OOS exp rises to ~+31, DD similar/slightly better).  
+
+With that filter + 5 pts RT slip: still **~+26 exp** on 402 trades.
+
+Caveat: “trending/high-vol” here uses **same-day** features (known by close). For live use, define the filter with **prior-day / morning-only** info (e.g. OR width vs ATR, overnight gap, opening drive) so there is no look-ahead. That is the next research step before deployment.
