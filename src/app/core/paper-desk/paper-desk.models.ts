@@ -38,6 +38,9 @@ export interface PaperTrade {
   optionPnlRs: number | null;
   premiumEstimated: boolean;
   outcome: 'WIN' | 'LOSS' | 'FLAT';
+  /** Strategy Manager id that generated this trade. */
+  strategyId?: string;
+  strategyName?: string;
 }
 
 export interface PaperInstrumentStatus {

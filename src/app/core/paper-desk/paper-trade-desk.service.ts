@@ -28,11 +28,22 @@ import {
   resolveAtmWeeklyOption,
 } from '../utils/option-chain.util';
 import {
+  buildContext,
   enrichTradesWithOptionPremiums,
   replayPaperOnIndex,
 } from './paper-desk-engine';
 import { buildPaperDeskDayStats, emptyPaperDeskDayStats } from './paper-desk-day-stats';
 import { PDHL_RUPEES_PER_POINT, buildDeskRiskOverrides } from '../strategy-engine/strategies/pdhl-opening-range/pdhl-opening-range.evaluator';
+import { StrategyManagerService } from '../strategy-manager/runtime/strategy-manager.service';
+import { StrategyEventLogger } from '../strategy-manager/runtime/strategy-event-logger.service';
+import { ShadowBookService } from '../strategy-manager/runtime/shadow-book.service';
+import { StrategyPerformanceService } from '../strategy-manager/runtime/strategy-performance.service';
+import { DeskChannel } from '../strategy-manager/models/desk-channel.model';
+import {
+  IManagedStrategy,
+  ManagedOpenPosition,
+} from '../strategy-manager/models/strategy-module.interface';
+import { extractTradeDate } from '../utils/trade-date.util';
 import {
   PaperDeskMode,
   PaperDeskSnapshot,
@@ -66,6 +77,10 @@ export class PaperTradeDeskService {
   private readonly kiteApi = inject(KiteApiService);
   private readonly kiteSession = inject(KiteSessionService);
   private readonly instrumentStore = inject(InstrumentStoreService);
+  private readonly strategyManager = inject(StrategyManagerService);
+  private readonly strategyLog = inject(StrategyEventLogger);
+  private readonly shadowBook = inject(ShadowBookService);
+  private readonly strategyPerf = inject(StrategyPerformanceService);
 
   private readonly instruments: Array<{ instrument: TesterInstrument; kind: IndexOptionKind }> = [
     { instrument: NIFTY_50_INSTRUMENT, kind: 'nifty' },
@@ -171,6 +186,105 @@ export class PaperTradeDeskService {
     });
   }
 
+  private channelForKind(kind: IndexOptionKind): DeskChannel {
+    return kind === 'nifty' ? 'nifty' : 'bank';
+  }
+
+  /** Resolve Strategy Manager primary (+ hydrate Champion desk risk overrides). */
+  private resolveDeskStrategy(kind: IndexOptionKind, mode: 'paper' | 'live') {
+    const channel = this.channelForKind(kind);
+    this.strategyManager.applyChampionDeskOverrides(
+      this.pdhlOverridesFor(
+        kind === 'nifty' ? NIFTY_50_INSTRUMENT.id : BANK_NIFTY_INSTRUMENT.id,
+      ) ?? null,
+    );
+    const resolved = this.strategyManager.resolve(channel, mode);
+    return resolved;
+  }
+
+  /** Shadow-only replay: same modules, no option attach / no orders. */
+  private runShadowReplay(params: {
+    channel: DeskChannel;
+    mode: 'paper' | 'live';
+    shadow: IManagedStrategy;
+    primaryActions: Map<string, string>;
+    instrumentId: string;
+    candles: Candle[];
+    fromDate: string;
+    toDate: string;
+  }): void {
+    const { shadow, channel, mode, instrumentId, candles, fromDate, toDate } = params;
+    shadow.reset();
+    let open: ManagedOpenPosition | null = null;
+    for (let i = 40; i < candles.length; i += 1) {
+      const candle = candles[i]!;
+      const day = extractTradeDate(candle.date);
+      if (day < fromDate || day > toDate) {
+        continue;
+      }
+      const closes = candles.slice(0, i + 1).map((c) => c.close);
+      const ctx = buildContext(candles, i, instrumentId);
+      if (open) {
+        const exit = shadow.exitLogic(candle, open, closes, ctx);
+        if (exit) {
+          const points =
+            open.direction === 'BUY'
+              ? exit.exitPrice - open.entry
+              : open.entry - exit.exitPrice;
+          this.shadowBook.recordTrade({
+            channel,
+            strategyId: shadow.id,
+            strategyName: shadow.name,
+            direction: open.direction,
+            entryTime: open.entryTime,
+            exitTime: candle.date,
+            entryPrice: open.entry,
+            exitPrice: exit.exitPrice,
+            points,
+            exitReason: exit.reason,
+            instrumentId,
+          });
+          shadow.onTradeClosed?.(points, day);
+          open = null;
+        }
+        continue;
+      }
+      const signal = shadow.generateSignal(ctx);
+      if (signal.action === 'BUY' || signal.action === 'SELL') {
+        this.shadowBook.recordSignal({
+          channel,
+          mode,
+          strategyId: shadow.id,
+          strategyName: shadow.name,
+          action: signal.action,
+          entryPrice: signal.entryPrice,
+          stopLoss: signal.stopLoss,
+          target: signal.target,
+          reason: signal.reason,
+          primaryAction: params.primaryActions.get(candle.date),
+          instrumentId,
+          barTime: candle.date,
+        });
+        this.strategyLog.log({
+          type: 'shadow_signal',
+          strategyId: shadow.id,
+          strategyName: shadow.name,
+          channel,
+          mode: 'shadow',
+          message: `${signal.action} @ ${signal.entryPrice.toFixed(1)}`,
+          data: { reason: signal.reason },
+        });
+        open = {
+          direction: signal.action,
+          entry: signal.entryPrice,
+          stop: signal.stopLoss,
+          target: signal.target,
+          entryTime: candle.date,
+        };
+      }
+    }
+  }
+
   private deskOptionsLabel(): string {
     const books = [
       this.deskRunOptions.enableNifty ? 'Nifty' : null,
@@ -272,6 +386,8 @@ export class PaperTradeDeskService {
 
         for (const { instrument, kind } of active) {
           const candles = candleMap.get(instrument.id) ?? [];
+          const resolved = this.resolveDeskStrategy(kind, 'paper');
+          const primaryActions = new Map<string, string>();
           const replay = replayPaperOnIndex({
             instrumentId: instrument.id,
             instrumentName: instrument.name,
@@ -283,8 +399,32 @@ export class PaperTradeDeskService {
             optionCandlesByToken: emptyOpt,
             neededOptionTokens: needed,
             lotsMultiplier: this.lotsMultiplier,
-            pdhlOverrides: this.pdhlOverridesFor(instrument.id),
+            strategy: resolved.primary,
           });
+          for (const t of replay.trades) {
+            primaryActions.set(t.entryTime, t.direction);
+            this.strategyLog.log({
+              type: 'exit',
+              strategyId: replay.strategyId,
+              strategyName: replay.strategyName,
+              channel: resolved.channel,
+              mode: 'paper',
+              message: `${t.direction} ${t.indexPoints.toFixed(1)} pts · ${t.exitReason}`,
+              data: { entry: t.entryTime, exit: t.exitTime },
+            });
+          }
+          if (resolved.shadow) {
+            this.runShadowReplay({
+              channel: resolved.channel,
+              mode: 'paper',
+              shadow: resolved.shadow,
+              primaryActions,
+              instrumentId: instrument.id,
+              candles,
+              fromDate: batch.fromDate,
+              toDate: batch.toDate,
+            });
+          }
           batchTrades.push(...replay.trades);
 
           const prev = statusAcc.get(instrument.id);
@@ -352,6 +492,22 @@ export class PaperTradeDeskService {
       });
 
       const sorted = allEnriched.sort((a, b) => a.entryTime.localeCompare(b.entryTime));
+      this.strategyPerf.recordMany(
+        sorted.map((t) => ({
+          strategyId: t.strategyId ?? 'unknown',
+          channel:
+            t.instrumentId === NIFTY_50_INSTRUMENT.id
+              ? ('nifty' as DeskChannel)
+              : ('bank' as DeskChannel),
+          mode: 'paper' as const,
+          direction: t.direction,
+          entryTime: t.entryTime,
+          exitTime: t.exitTime,
+          points: t.indexPoints,
+          exitReason: t.exitReason,
+          instrumentId: t.instrumentId,
+        })),
+      );
       const dayStats = buildPaperDeskDayStats(sorted);
 
       this.snapshot.set({
@@ -589,6 +745,8 @@ export class PaperTradeDeskService {
     const statuses: PaperInstrumentStatus[] = [];
 
     for (const leg of this.liveLegs) {
+      const resolved = this.resolveDeskStrategy(leg.kind, 'live');
+      const primaryActions = new Map<string, string>();
       const replay = replayPaperOnIndex({
         instrumentId: leg.instrument.id,
         instrumentName: leg.instrument.name,
@@ -601,8 +759,23 @@ export class PaperTradeDeskService {
         neededOptionTokens: needed,
         forceCloseOpen: now >= '15:15',
         lotsMultiplier: this.lotsMultiplier,
-        pdhlOverrides: this.pdhlOverridesFor(leg.instrument.id),
+        strategy: resolved.primary,
       });
+      for (const t of replay.trades) {
+        primaryActions.set(t.entryTime, t.direction);
+      }
+      if (resolved.shadow) {
+        this.runShadowReplay({
+          channel: resolved.channel,
+          mode: 'live',
+          shadow: resolved.shadow,
+          primaryActions,
+          instrumentId: leg.instrument.id,
+          candles: leg.candles,
+          fromDate: today,
+          toDate: today,
+        });
+      }
       allTrades.push(...replay.trades);
       statuses.push(
         withLiveFields({

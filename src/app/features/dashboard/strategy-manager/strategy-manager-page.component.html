@@ -1,0 +1,269 @@
+<div class="sm-page">
+  <header class="sm-hero">
+    <div>
+      <p class="sm-kicker">Strategy Manager</p>
+      <h1>Multi-strategy control</h1>
+      <p class="sm-sub">
+        Switch Paper / Live / Shadow strategies per instrument without changing code.
+        Champion PDHL remains the default live path until you select otherwise.
+      </p>
+    </div>
+    <div class="sm-hero-actions">
+      <button mat-stroked-button type="button" (click)="resetAssignments()">Reset assignments</button>
+      <button mat-stroked-button type="button" (click)="clearLogs()">Clear logs</button>
+    </div>
+  </header>
+
+  <section class="sm-channels" aria-label="Instrument channels">
+    @for (ch of channels; track ch) {
+      <button
+        type="button"
+        class="sm-channel"
+        [class.active]="selectedChannel() === ch"
+        (click)="selectChannel(ch)"
+      >
+        <strong>{{ channelLabels[ch] }}</strong>
+        <span>Paper · {{ strategyName(assignmentMap()[ch].paper) }}</span>
+        <span>Live · {{ strategyName(assignmentMap()[ch].live) }}</span>
+        <span>Shadow · {{ strategyName(assignmentMap()[ch].shadow) }}</span>
+      </button>
+    }
+  </section>
+
+  <section class="sm-grid">
+    <article class="sm-panel">
+      <h2>Assignments · {{ channelLabels[selectedChannel()] }}</h2>
+      <label>
+        Paper strategy
+        <select
+          [ngModel]="assignmentMap()[selectedChannel()].paper"
+          (ngModelChange)="setAssignment('paper', $event)"
+        >
+          @for (s of channelStrategies(); track s.id) {
+            <option [value]="s.id">{{ s.name }}</option>
+          }
+        </select>
+      </label>
+      <label>
+        Live strategy
+        <select
+          [ngModel]="assignmentMap()[selectedChannel()].live"
+          (ngModelChange)="setAssignment('live', $event)"
+        >
+          @for (s of channelStrategies(); track s.id) {
+            <option [value]="s.id">{{ s.name }}</option>
+          }
+        </select>
+      </label>
+      <label>
+        Shadow strategy (signals only)
+        <select
+          [ngModel]="assignmentMap()[selectedChannel()].shadow ?? ''"
+          (ngModelChange)="setAssignment('shadow', $event)"
+        >
+          <option value="">— Off —</option>
+          @for (s of channelStrategies(); track s.id) {
+            <option [value]="s.id">{{ s.name }}</option>
+          }
+        </select>
+      </label>
+
+      <div class="sm-status">
+        <h3>Desk status</h3>
+        <p><span>Mode</span> {{ deskSnap().mode }} · {{ deskSnap().running ? 'Running' : 'Idle' }}</p>
+        <p><span>Open trade</span> {{ openTradeLabel() }}</p>
+        <p><span>Today’s trades</span> {{ todayTradeCount() }}</p>
+        <p><span>Last message</span> {{ deskSnap().message || '—' }}</p>
+      </div>
+    </article>
+
+    <article class="sm-panel">
+      <h2>Strategy catalog</h2>
+      <ul class="sm-catalog">
+        @for (s of strategies(); track s.id) {
+          <li>
+            <button
+              type="button"
+              [class.active]="selectedStrategyId() === s.id"
+              (click)="selectStrategy(s.id)"
+            >
+              <strong>{{ s.name }}</strong>
+              <small>{{ s.id }} · v{{ s.version }}</small>
+              <em>{{ s.description }}</em>
+            </button>
+          </li>
+        }
+      </ul>
+    </article>
+
+    <article class="sm-panel">
+      <h2>Settings · {{ selectedStrategy()?.name || '—' }}</h2>
+      @if (selectedSettings(); as st) {
+        <div class="sm-settings">
+          <label>Entry start <input [ngModel]="st.entryTimeStart" (ngModelChange)="patchSetting('entryTimeStart', $event)" /></label>
+          <label>Entry end <input [ngModel]="st.entryTimeEnd" (ngModelChange)="patchSetting('entryTimeEnd', $event)" /></label>
+          <label>Exit time <input [ngModel]="st.exitTime" (ngModelChange)="patchSetting('exitTime', $event)" /></label>
+          <label>OR end <input [ngModel]="st.orEnd" (ngModelChange)="patchSetting('orEnd', $event)" /></label>
+          <label>Stop loss pts <input type="number" [ngModel]="st.stopLossPts" (ngModelChange)="patchSetting('stopLossPts', $event)" /></label>
+          <label>EMA length <input type="number" [ngModel]="st.emaLength" (ngModelChange)="patchSetting('emaLength', $event)" /></label>
+          <label>Donchian length <input type="number" [ngModel]="st.donchianLength" (ngModelChange)="patchSetting('donchianLength', $event)" /></label>
+          <label>Swing lookback <input type="number" [ngModel]="st.swingLookback" (ngModelChange)="patchSetting('swingLookback', $event)" /></label>
+          <label>Vol expand ATR× <input type="number" step="0.1" [ngModel]="st.volExpandAtrMult" (ngModelChange)="patchSetting('volExpandAtrMult', $event)" /></label>
+          <label>Max trades/day <input type="number" [ngModel]="st.maxTradesPerDay" (ngModelChange)="patchSetting('maxTradesPerDay', $event)" /></label>
+          <label>Position lots <input type="number" [ngModel]="st.positionSizeLots" (ngModelChange)="patchSetting('positionSizeLots', $event)" /></label>
+          <label>Risk % <input type="number" step="0.1" [ngModel]="st.riskPercent" (ngModelChange)="patchSetting('riskPercent', $event)" /></label>
+          <label>Day stop pts <input type="number" [ngModel]="st.dayStopPts" (ngModelChange)="patchSetting('dayStopPts', $event)" /></label>
+          <label>Instrument type
+            <select [ngModel]="st.instrumentType" (ngModelChange)="patchSetting('instrumentType', $event)">
+              <option value="index">index</option>
+              <option value="futures">futures</option>
+              <option value="options">options</option>
+              <option value="equity">equity</option>
+            </select>
+          </label>
+        </div>
+        <button mat-stroked-button type="button" (click)="resetSettings()">Reset strategy settings</button>
+      }
+    </article>
+
+    <article class="sm-panel">
+      <h2>Performance</h2>
+      <div class="sm-metrics">
+        <div>
+          <h3>Selected strategy</h3>
+          <p>Trades {{ selectedPerf().trades }}</p>
+          <p>Win rate {{ selectedPerf().winRate ?? '—' }}%</p>
+          <p>PF {{ selectedPerf().profitFactor ?? '—' }}</p>
+          <p>Expectancy {{ selectedPerf().expectancy ?? '—' }}</p>
+          <p>Max DD {{ selectedPerf().maxDrawdown ?? '—' }}</p>
+          <p>Net pts {{ selectedPerf().netPoints }}</p>
+        </div>
+        <div>
+          <h3>Paper assignment</h3>
+          <p>{{ strategyName(assignmentMap()[selectedChannel()].paper) }}</p>
+          <p>WR {{ paperPerf().winRate ?? '—' }}% · Exp {{ paperPerf().expectancy ?? '—' }}</p>
+          <p>Net {{ paperPerf().netPoints }} · n={{ paperPerf().trades }}</p>
+        </div>
+        <div>
+          <h3>Live assignment</h3>
+          <p>{{ strategyName(assignmentMap()[selectedChannel()].live) }}</p>
+          <p>WR {{ livePerf().winRate ?? '—' }}% · Exp {{ livePerf().expectancy ?? '—' }}</p>
+          <p>Net {{ livePerf().netPoints }} · n={{ livePerf().trades }}</p>
+        </div>
+      </div>
+      <button mat-stroked-button type="button" (click)="clearPerf()">Clear selected perf history</button>
+    </article>
+
+    <article class="sm-panel sm-wide">
+      <div class="sm-row-head">
+        <h2>Shadow comparison</h2>
+        <button mat-stroked-button type="button" (click)="clearShadow()">Clear shadow book</button>
+      </div>
+      @if (shadowStats(); as ss) {
+        <div class="sm-metrics">
+          <p>Signals {{ ss.signals }}</p>
+          <p>Trades {{ ss.trades }}</p>
+          <p>Win rate {{ ss.winRate ?? '—' }}%</p>
+          <p>Expectancy {{ ss.expectancy ?? '—' }}</p>
+          <p>PF {{ ss.profitFactor ?? '—' }}</p>
+          <p>Net pts {{ ss.netPoints }}</p>
+        </div>
+      } @else {
+        <p class="sm-muted">No shadow strategy selected for this channel.</p>
+      }
+      <div class="sm-tables">
+        <div>
+          <h3>Recent shadow signals</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Time</th><th>Action</th><th>Entry</th><th>Primary</th><th>Reason</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (s of shadowSignals().slice(0, 12); track s.id) {
+                @if (s.channel === selectedChannel()) {
+                  <tr>
+                    <td>{{ s.barTime }}</td>
+                    <td>{{ s.action }}</td>
+                    <td>{{ s.entryPrice | number: '1.1-1' }}</td>
+                    <td>{{ s.primaryAction || '—' }}</td>
+                    <td>{{ s.reason }}</td>
+                  </tr>
+                }
+              }
+            </tbody>
+          </table>
+        </div>
+        <div>
+          <h3>Recent shadow trades</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Entry</th><th>Dir</th><th>Pts</th><th>Exit reason</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (t of shadowTrades().slice(0, 12); track t.id) {
+                @if (t.channel === selectedChannel()) {
+                  <tr>
+                    <td>{{ t.entryTime }}</td>
+                    <td>{{ t.direction }}</td>
+                    <td [class.win]="t.points > 0" [class.loss]="t.points < 0">{{ t.points | number: '1.1-1' }}</td>
+                    <td>{{ t.exitReason }}</td>
+                  </tr>
+                }
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </article>
+
+    <article class="sm-panel sm-wide">
+      <h2>Strategy event log</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>At</th><th>Type</th><th>Strategy</th><th>Mode</th><th>Message</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (e of eventLog().slice(0, 40); track e.at + e.message) {
+            <tr>
+              <td>{{ e.at }}</td>
+              <td>{{ e.type }}</td>
+              <td>{{ e.strategyName }}</td>
+              <td>{{ e.mode || '—' }}</td>
+              <td>{{ e.message }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </article>
+
+    <article class="sm-panel sm-wide">
+      <h2>Historical desk trades (current snapshot)</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Strategy</th><th>Instrument</th><th>Dir</th><th>Entry</th><th>Exit</th><th>Pts</th><th>Exit reason</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (t of deskSnap().trades.slice().reverse().slice(0, 30); track t.id) {
+            <tr>
+              <td>{{ t.strategyName || t.strategyId || '—' }}</td>
+              <td>{{ t.instrumentName }}</td>
+              <td>{{ t.direction }}</td>
+              <td>{{ t.entryTime }}</td>
+              <td>{{ t.exitTime }}</td>
+              <td [class.win]="t.indexPoints > 0" [class.loss]="t.indexPoints < 0">{{ t.indexPoints | number: '1.1-1' }}</td>
+              <td>{{ t.exitReason }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </article>
+  </section>
+</div>

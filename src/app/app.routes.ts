@@ -9,6 +9,7 @@ import { GetTokenComponent } from './features/dashboard/get-token/get-token.comp
 import { SettingsComponent } from './features/dashboard/settings/settings.component';
 import { CrudeOilDeskComponent } from './features/dashboard/crude-oil-desk/crude-oil-desk.component';
 import { StocksDeskComponent } from './features/dashboard/stocks-desk/stocks-desk.component';
+import { StrategyManagerPageComponent } from './features/dashboard/strategy-manager/strategy-manager-page.component';
 
 export const routes: Routes = [
   {
@@ -53,6 +54,10 @@ export const routes: Routes = [
       {
         path: 'stocks',
         component: StocksDeskComponent,
+      },
+      {
+        path: 'strategy-manager',
+        component: StrategyManagerPageComponent,
       },
       {
         path: 'get-token',

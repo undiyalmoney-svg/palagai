@@ -1,6 +1,10 @@
 /** Centralized strategy identifiers. */
 export const STRATEGY_IDS = {
   PDHL_OPENING_RANGE: 'pdhl-opening-range',
+  VOL_EXPAND_DONCH15: 'vol-expand-donch15-ema50-eod',
+  SWING5_PREV_DAY: 'swing5-prev-day-eod',
+  DONCHIAN_20: 'donchian-20-eod',
+  DONCHIAN_55_TURTLE: 'donchian-55-turtle',
   // Paused — removed from active registry
   FIRST_HOUR_BREAKOUT: 'first-hour-breakout',
   INTRADAY_REVERSAL: 'intraday-reversal',
@@ -30,8 +34,17 @@ export const PAUSED_STRATEGY_IDS = new Set<string>([
   STRATEGY_IDS.LEGACY_SMART_SPAR,
 ]);
 
-/** Only these strategies may run in backtests. */
-export const ACTIVE_STRATEGY_IDS = new Set<string>([STRATEGY_IDS.PDHL_OPENING_RANGE]);
+/**
+ * Strategies allowed in the backtest runner.
+ * Champion remains the only one enabled by default (see StrategyEngineService).
+ */
+export const ACTIVE_STRATEGY_IDS = new Set<string>([
+  STRATEGY_IDS.PDHL_OPENING_RANGE,
+  STRATEGY_IDS.VOL_EXPAND_DONCH15,
+  STRATEGY_IDS.SWING5_PREV_DAY,
+  STRATEGY_IDS.DONCHIAN_20,
+  STRATEGY_IDS.DONCHIAN_55_TURTLE,
+]);
 
 /** @deprecated Research platform removed — kept for type compatibility only. */
 export const RESEARCH_STRATEGY_IDS = {
