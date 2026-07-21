@@ -11,8 +11,10 @@ export interface StrategySettings {
   exitTime: string;
   /** Opening-range end (used by OR-aware strategies). */
   orEnd: string;
-  /** Max stop distance in index/price points. */
+  /** Max stop distance in index/price points (Nifty / default). */
   stopLossPts: number;
+  /** Bank Nifty stop cap (research: 45). Used when instrument is Bank. */
+  bankStopLossPts: number;
   /** Minimum stop distance. */
   minStopPts: number;
   /** EMA length for bias or exit. */
@@ -57,6 +59,7 @@ export function defaultStrategySettings(
     exitTime: '15:15',
     orEnd: '10:15',
     stopLossPts: 30,
+    bankStopLossPts: 45,
     minStopPts: 3,
     emaLength: 50,
     donchianLength: 20,
