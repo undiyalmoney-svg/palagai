@@ -60,6 +60,11 @@ export interface StocksDeskSnapshot {
   maxLegs?: number;
   /** Live money: open legs with SL/TP */
   brokerNote?: string;
+  /** ISO timestamp of last live scan tick */
+  lastTickAt?: string | null;
+  /** Short phase for alive UI */
+  livePhase?: 'idle' | 'scanning' | 'in_trade' | 'exited';
+  livePhaseLabel?: string;
 }
 
 export interface StocksLiveOptions {
@@ -200,9 +205,14 @@ export class StocksPaperDeskService {
       strategyId: options.strategyId,
       symbols: this.watchlist.enabledItems().map((x) => x.symbol),
       maxLegs,
+      lastTickAt: new Date().toISOString(),
+      livePhase: 'scanning',
+      livePhaseLabel: options.includeTopGainers
+        ? 'Looking for opportunities · scanning watchlist + top movers'
+        : 'Looking for opportunities · scanning watchlist gaps',
       message: options.realOrders
-        ? `LIVE MONEY · MIS · SL+TP monitor · max ${maxLegs} legs`
-        : `Live paper · max ${maxLegs} legs · gainers=${options.includeTopGainers ? 'on' : 'off'}`,
+        ? `LIVE MONEY · I'm alive · looking for opportunities · max ${maxLegs} legs`
+        : `Live paper · I'm alive · looking for opportunities · max ${maxLegs} legs`,
     });
 
     if (options.realOrders) {
@@ -336,6 +346,20 @@ export class StocksPaperDeskService {
           withTargets.length > 1
             ? ` · split ₹${Math.round(STOCKS_CAPITAL_RS / withTargets.length)}/leg × ${withTargets.length}`
             : '';
+
+        const openCount = options.realOrders
+          ? openLegs.length
+          : displayTrades.filter((t) => t.exitReason?.startsWith('OPEN') || t.exitReason === 'LIVE')
+              .length;
+        const livePhase: StocksDeskSnapshot['livePhase'] =
+          openCount > 0 ? 'in_trade' : 'scanning';
+        const livePhaseLabel =
+          openCount > 0
+            ? `In trade · ${openCount} open · watching SL / TP / 15:15`
+            : options.includeTopGainers
+              ? 'Looking for opportunities · scanning watchlist + top movers'
+              : 'Looking for opportunities · scanning watchlist gaps';
+
         this.snapshot.update((s) => ({
           ...s,
           trades: displayTrades,
@@ -350,8 +374,11 @@ export class StocksPaperDeskService {
           ],
           moversNote,
           brokerNote,
-          message: `${options.realOrders ? 'LIVE MONEY' : 'Live paper'} · signals ${withTargets.length}${legHint} · open ${openLegs.length} · ₹${totals.netRs}${
-            brokerNote ? ` · ${brokerNote}` : ''
+          lastTickAt: new Date().toISOString(),
+          livePhase,
+          livePhaseLabel,
+          message: `${options.realOrders ? 'LIVE MONEY' : 'Live paper'} · ${livePhaseLabel} · signals ${withTargets.length}${legHint} · ₹${totals.netRs}${
+            brokerNote && openCount ? ` · ${brokerNote}` : ''
           }${moversNote ? ` · ${moversNote}` : ''}`,
         }));
       } catch (e) {
@@ -625,6 +652,9 @@ function emptySnapshot(mode: PaperDeskMode): StocksDeskSnapshot {
     dayLossRs: STOCKS_DAY_LOSS_RS,
     symbols: [],
     maxLegs: 3,
+    lastTickAt: null,
+    livePhase: 'idle',
+    livePhaseLabel: 'Idle',
   };
 }
 

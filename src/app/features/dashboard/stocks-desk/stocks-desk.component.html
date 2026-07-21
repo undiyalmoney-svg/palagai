@@ -254,6 +254,30 @@
     </div>
   </section>
 
+  @if (mode() === 'live' && snapshot().running) {
+    <div class="alive-bar" role="status">
+      <span class="pulse" aria-hidden="true"></span>
+      <strong>I'm alive</strong>
+      <span>Last tick {{ fmtTime(snapshot().lastTickAt) }} IST</span>
+      <span class="sep">·</span>
+      <span>{{ snapshot().realOrders ? 'Live money' : 'Live paper' }}</span>
+      <span class="sep">·</span>
+      <span class="phase-pill" [attr.data-phase]="snapshot().livePhase || 'scanning'">
+        {{ snapshot().livePhaseLabel || 'Looking for opportunities' }}
+      </span>
+    </div>
+  }
+
+  @if (mode() === 'live' && snapshot().running && hasOpenBrokerLegs()) {
+    <div class="market-live-bar" role="status" [class.money]="snapshot().realOrders">
+      <span class="market-pulse" aria-hidden="true"></span>
+      <div class="market-live-copy">
+        <strong>{{ snapshot().realOrders ? 'ON MARKET · TRADE LIVE' : 'PAPER TRADE LIVE' }}</strong>
+        <span>{{ snapshot().brokerNote || 'Managing open legs · SL / TP / 15:15' }}</span>
+      </div>
+    </div>
+  }
+
   @if (error()) {
     <p class="err">{{ error() }}</p>
   }

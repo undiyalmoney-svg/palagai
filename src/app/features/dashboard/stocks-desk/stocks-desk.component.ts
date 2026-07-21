@@ -205,6 +205,26 @@ export class StocksDeskComponent implements OnInit, OnDestroy {
     const n = Math.max(1, Math.min(this.maxLegsCap, this.maxLegs));
     return Math.round(this.capitalRs / n);
   }
+
+  protected hasOpenBrokerLegs(): boolean {
+    const note = this.snapshot().brokerNote ?? '';
+    return this.snapshot().livePhase === 'in_trade' || (note.length > 0 && !note.includes('no open'));
+  }
+
+  protected fmtTime(ts: string | null | undefined): string {
+    if (!ts) return '—';
+    try {
+      return new Intl.DateTimeFormat('en-GB', {
+        timeZone: 'Asia/Kolkata',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false,
+      }).format(new Date(ts));
+    } catch {
+      return '—';
+    }
+  }
 }
 
 function todayIso(): string {
