@@ -35,6 +35,15 @@ export interface StrategySettings {
   dayStopPts: number;
   /** Target R-multiple (0 = no fixed target / EOD strategies). */
   targetRMultiple: number;
+  /**
+   * Morning regime filter (prior-day/OR features only — no look-ahead).
+   * When enabled: require OR drive ≥ min and gap/ATR ≤ max.
+   */
+  regimeFilterEnabled: boolean;
+  /** Min |OR close−OR open| / OR width (default 0.30). */
+  regimeMinOrDriveFrac: number;
+  /** Max overnight gap / ATR14 (default 6.0) — skips extreme gap chaos. */
+  regimeMaxGapAtr: number;
   /** Extra strategy-specific knobs. */
   extras: Record<string, number | string | boolean>;
 }
@@ -59,6 +68,9 @@ export function defaultStrategySettings(
     instrumentType: 'index',
     dayStopPts: 60,
     targetRMultiple: 0,
+    regimeFilterEnabled: false,
+    regimeMinOrDriveFrac: 0.3,
+    regimeMaxGapAtr: 6,
     extras: {},
   };
   if (!partial) {

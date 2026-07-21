@@ -18,7 +18,8 @@ Those two files are the product “secret sauce.” Docs 01–03 expand them **l
 3. Use **04** as a map when searching the repo.  
 4. Use **05** for login / Get Token / IP whitelist pointers.  
 5. Use **07** for Stocks Desk treasure watchlist (equity day strategies).  
-6. Use **17** for Strategy Manager (multi-strategy Paper/Live/Shadow; Champion remains default).
+6. Use **17** for Strategy Manager (multi-strategy Paper/Live/Shadow; Champion remains default).  
+7. Use **18** for VolExpand morning regime filter (fixes Mar‑2026 stand-down).
 
 ## Not in the deploy
 Angular assets come from `src/` + `public/` only (`angular.json`).  

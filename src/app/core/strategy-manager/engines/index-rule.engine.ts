@@ -14,6 +14,10 @@ import {
   toMin,
 } from '../indicators/desk-indicators';
 import {
+  computeMorningRegimeFeatures,
+  passesMorningRegimeFilter,
+} from './morning-regime.util';
+import {
   ManagedExitDecision,
   ManagedOpenPosition,
   ManagedStrategySignal,
@@ -106,6 +110,29 @@ export function runIndexRuleStrategy(
   const or = openingRange(dayBars, '09:15', settings.orEnd);
   if (!or) {
     return wait('Opening range not ready');
+  }
+
+  if (settings.regimeFilterEnabled) {
+    const features = computeMorningRegimeFeatures(series, day, settings.orEnd);
+    if (!features) {
+      return wait('Regime filter: morning features not ready');
+    }
+    if (
+      !passesMorningRegimeFilter(
+        features,
+        settings.regimeMinOrDriveFrac,
+        settings.regimeMaxGapAtr,
+      )
+    ) {
+      return skip(
+        `Regime stand-down · drive ${features.orDriveFrac.toFixed(2)} / gapATR ${features.gapAtr.toFixed(2)}`,
+        {
+          regime: features,
+          minDrive: settings.regimeMinOrDriveFrac,
+          maxGapAtr: settings.regimeMaxGapAtr,
+        },
+      );
+    }
   }
 
   // Bias
