@@ -16,7 +16,8 @@ Those two files are the product “secret sauce.” Docs 01–03 expand them **l
 1. Read **01** and **02** when you need the entry rules.  
 2. Read **03** when exits or desk wiring confuse you.  
 3. Use **04** as a map when searching the repo.  
-4. Use **05** for login / Get Token / IP whitelist pointers.
+4. Use **05** for login / Get Token / IP whitelist pointers.  
+5. Use **07** for Stocks Desk treasure watchlist (equity day strategies).
 
 ## Not in the deploy
 Angular assets come from `src/` + `public/` only (`angular.json`).  

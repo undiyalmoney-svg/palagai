@@ -1,7 +1,7 @@
 <div class="palagai-shell">
   <header class="palagai-header">
     <div class="palagai-header-inner">
-      <a class="brand" routerLink="/dashboard/trade-desk">
+      <a class="brand" href="/dashboard/trade-desk" (click)="go('/dashboard/trade-desk', $event)">
         <span class="brand-mark" aria-hidden="true">P</span>
         <span class="brand-text">
           <strong>Palagai</strong>
@@ -12,9 +12,11 @@
       <nav class="palagai-nav" aria-label="Main">
         @for (item of navItems; track item.route) {
           <a
+            [href]="item.route"
             [routerLink]="item.route"
             routerLinkActive="active"
             [routerLinkActiveOptions]="{ exact: true }"
+            (click)="go(item.route, $event)"
           >
             <mat-icon>{{ item.icon }}</mat-icon>
             <span>{{ item.label }}</span>
@@ -37,9 +39,11 @@
     @for (item of navItems; track item.route) {
       <a
         class="tab-item"
+        [href]="item.route"
         [routerLink]="item.route"
         routerLinkActive="active"
         [routerLinkActiveOptions]="{ exact: true }"
+        (click)="go(item.route, $event)"
       >
         <mat-icon>{{ item.icon }}</mat-icon>
         <span class="tab-label">{{ item.shortLabel }}</span>

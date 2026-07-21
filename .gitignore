@@ -50,3 +50,6 @@ Thumbs.db
 # Local research caches / large generated reports
 /reports/
 *.sqlite
+/.venv-pptx/
+/scripts/yt-video/node_modules/
+/Palagai-YouTube-Promo.mp4

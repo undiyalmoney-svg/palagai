@@ -26,10 +26,16 @@ export class DashboardComponent {
   protected readonly navItems = [
     { label: 'Trade Desk', shortLabel: 'Trade', route: '/dashboard/trade-desk', icon: 'calculate' },
     { label: 'Crude Oil Mini', shortLabel: 'Crude', route: '/dashboard/crude-oil', icon: 'water_drop' },
+    { label: 'Stocks Desk', shortLabel: 'Stocks', route: '/dashboard/stocks', icon: 'show_chart' },
     { label: 'Order Test', shortLabel: 'Orders', route: '/dashboard/order-test', icon: 'bolt' },
     { label: 'Get Token', shortLabel: 'Token', route: '/dashboard/get-token', icon: 'vpn_key' },
-    { label: 'Settings', shortLabel: 'Setup', route: '/dashboard/settings', icon: 'settings' },
   ];
+
+  /** Explicit navigate — more reliable than routerLink alone after SSR hydration. */
+  protected go(route: string, event?: Event): void {
+    event?.preventDefault();
+    void this.router.navigateByUrl(route);
+  }
 
   protected logout(): void {
     this.authService.logout();

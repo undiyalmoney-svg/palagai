@@ -6,9 +6,9 @@ import {
   provideBrowserGlobalErrorListeners,
 } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
-import { provideRouter } from '@angular/router';
+import { provideRouter, withInMemoryScrolling } from '@angular/router';
 import { provideAnimations } from '@angular/platform-browser/animations';
-import { provideClientHydration, withEventReplay } from '@angular/platform-browser';
+import { provideClientHydration } from '@angular/platform-browser';
 import { provideHttpClient, withFetch } from '@angular/common/http';
 
 import { routes } from './app.routes';
@@ -19,8 +19,9 @@ export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
     provideHttpClient(withFetch()),
-    provideRouter(routes),
-    provideClientHydration(withEventReplay()),
+    provideRouter(routes, withInMemoryScrolling({ scrollPositionRestoration: 'top' })),
+    // Event replay was swallowing nav clicks after hydration — keep hydration plain.
+    provideClientHydration(),
     provideAnimations(),
     {
       provide: APP_INITIALIZER,

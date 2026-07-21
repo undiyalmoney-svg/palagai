@@ -105,6 +105,10 @@
   background: #fff;
   border: 1px solid #d0d0d0;
   box-shadow: none;
+  cursor: pointer;
+  position: relative;
+  z-index: 2;
+  pointer-events: auto;
   transition: background 0.15s ease, border-color 0.15s ease;
 }
 
@@ -257,6 +261,10 @@
     text-decoration: none;
     color: var(--pg-muted);
     border-radius: 12px;
+    cursor: pointer;
+    pointer-events: auto;
+    position: relative;
+    z-index: 2;
   }
 
   .tab-item mat-icon {

@@ -1,6 +1,5 @@
 import { Routes } from '@angular/router';
 import { authGuard, guestGuard } from './core/auth/auth.guard';
-import { kiteSessionGuard } from './core/auth/kite-session.guard';
 import { stashKiteRequestToken } from './core/kite/kite-request-token.util';
 import { LoginComponent } from './features/login/login.component';
 import { DashboardComponent } from './features/dashboard/dashboard.component';
@@ -9,6 +8,7 @@ import { OrderTestComponent } from './features/dashboard/order-test/order-test.c
 import { GetTokenComponent } from './features/dashboard/get-token/get-token.component';
 import { SettingsComponent } from './features/dashboard/settings/settings.component';
 import { CrudeOilDeskComponent } from './features/dashboard/crude-oil-desk/crude-oil-desk.component';
+import { StocksDeskComponent } from './features/dashboard/stocks-desk/stocks-desk.component';
 
 export const routes: Routes = [
   {
@@ -40,18 +40,19 @@ export const routes: Routes = [
       },
       {
         path: 'trade-desk',
-        canActivate: [kiteSessionGuard],
         component: TradeDeskComponent,
       },
       {
         path: 'order-test',
-        canActivate: [kiteSessionGuard],
         component: OrderTestComponent,
       },
       {
         path: 'crude-oil',
-        canActivate: [kiteSessionGuard],
         component: CrudeOilDeskComponent,
+      },
+      {
+        path: 'stocks',
+        component: StocksDeskComponent,
       },
       {
         path: 'get-token',
@@ -59,7 +60,6 @@ export const routes: Routes = [
       },
       {
         path: 'settings',
-        canActivate: [kiteSessionGuard],
         component: SettingsComponent,
       },
       // Removed tabs — keep old URLs from breaking

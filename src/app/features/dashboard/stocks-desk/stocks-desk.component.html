@@ -1,0 +1,314 @@
+<section class="desk pg-page">
+  <header class="hero pg-page-hero">
+    <div class="hero-copy">
+      <p class="pg-eyebrow">NSE · Equity MIS</p>
+      <h1>Stocks Desk</h1>
+      <p class="pg-lede">
+        Treasure book + <strong>top gainers/losers</strong>. Capital
+        <strong>₹{{ capitalRs | number: '1.0-0' }}</strong>
+        · split across up to {{ maxLegsCap }} legs (~₹{{ capitalPerLeg() | number: '1.0-0' }}/leg when {{ maxLegs }} active).
+        Resolve any symbol → instrument → check entry → BUY/SELL.
+      </p>
+    </div>
+    <div class="hero-meta">
+      <span class="pg-badge pg-badge-neutral" [class.pg-badge-bull]="mode() === 'live'">{{
+        mode() === 'live' ? (realOrders ? 'Live money' : 'Live paper') : 'Backtest'
+      }}</span>
+      <span
+        class="pg-badge"
+        [class.pg-badge-bear]="realOrders && mode() === 'live'"
+        [class.pg-badge-neutral]="!(realOrders && mode() === 'live')"
+      >
+        {{ realOrders && mode() === 'live' ? 'REAL ORDERS' : 'Paper only' }}
+      </span>
+    </div>
+  </header>
+
+  <aside class="trading-basis" aria-label="Stock desk basis">
+    <h2 class="trading-basis-title">How this desk trades</h2>
+    <ul class="trading-basis-list">
+      <li><strong>Universe</strong> — watchlist + optional live top gainers/losers (quoted, instrument resolved)</li>
+      <li><strong>Entry</strong> — Almost-green: fade ≥0.5% gap-up (SELL) · bounce ≥0.5% gap-down (BUY)</li>
+      <li><strong>2–3 potentials?</strong> — yes: take top gaps, <strong>split ₹60k equally</strong> across legs (qty resized per leg)</li>
+      <li><strong>Risk</strong> — stop/TP from DNA · day-loss idea −₹{{ dayLossRs | number: '1.0-0' }} · Testing first</li>
+    </ul>
+  </aside>
+
+  <div class="mode-switch" role="tablist" aria-label="Desk mode">
+    <button type="button" role="tab" class="mode-btn" [class.active]="mode() === 'testing'" (click)="setMode('testing')">
+      <span class="mode-title">Testing</span>
+      <span class="mode-sub">From → To · day candles · paper P&amp;L</span>
+    </button>
+    <button type="button" role="tab" class="mode-btn" [class.active]="mode() === 'live'" (click)="setMode('live')">
+      <span class="mode-title">Live</span>
+      <span class="mode-sub">Quotes · movers · paper or MIS</span>
+    </button>
+  </div>
+
+  <div class="control-bar">
+    @if (mode() === 'testing') {
+      <label class="field">
+        <span>From</span>
+        <input type="date" [(ngModel)]="fromDate" [disabled]="busy() || snapshot().running" />
+      </label>
+      <label class="field">
+        <span>To</span>
+        <input type="date" [(ngModel)]="toDate" [disabled]="busy() || snapshot().running" />
+      </label>
+    } @else {
+      <div class="live-hint">
+        <strong>Today</strong>
+        <span>Scan watchlist{{ includeTopGainers ? ' + top movers' : '' }} · max {{ maxLegs }} legs</span>
+      </div>
+      <label class="desk-check">
+        <input type="checkbox" [(ngModel)]="includeTopGainers" [disabled]="busy() || snapshot().running" />
+        <span>Include top gainers/losers</span>
+      </label>
+      <label class="field">
+        <span>Max legs (split capital)</span>
+        <select [(ngModel)]="maxLegs" [disabled]="busy() || snapshot().running">
+          <option [ngValue]="1">1 · full ₹{{ capitalRs | number: '1.0-0' }}</option>
+          <option [ngValue]="2">2 · ~₹{{ capitalRs / 2 | number: '1.0-0' }} each</option>
+          <option [ngValue]="3">3 · ~₹{{ capitalRs / 3 | number: '1.0-0' }} each</option>
+        </select>
+      </label>
+    }
+
+    <label class="field">
+      <span>Strategy</span>
+      <select [(ngModel)]="strategyId" [disabled]="busy() || snapshot().running">
+        @for (opt of strategyOptions; track opt.id) {
+          <option [ngValue]="opt.id">{{ opt.label }}</option>
+        }
+      </select>
+    </label>
+
+    @if (mode() === 'live') {
+      <label class="desk-check">
+        <input type="checkbox" [(ngModel)]="realOrders" [disabled]="busy() || snapshot().running" />
+        <span>Live money (MIS)</span>
+      </label>
+      @if (realOrders) {
+        <label class="desk-check">
+          <input type="checkbox" [(ngModel)]="realOrdersAck" [disabled]="busy() || snapshot().running" />
+          <span>I understand real orders</span>
+        </label>
+      }
+    }
+
+    <div class="actions">
+      @if (mode() === 'testing') {
+        <button mat-flat-button class="start-btn" type="button" [disabled]="busy()" (click)="runTesting()">
+          @if (busy()) {
+            <span class="start-btn-inner">
+              <mat-spinner diameter="16" />
+              <span>Running…</span>
+            </span>
+          } @else {
+            <span class="start-btn-inner">Run Testing</span>
+          }
+        </button>
+      } @else {
+        <button
+          mat-stroked-button
+          type="button"
+          class="scan-btn"
+          [disabled]="busy() || moversBusy() || snapshot().running"
+          (click)="refreshMovers()"
+        >
+          @if (moversBusy()) {
+            <span class="start-btn-inner">
+              <mat-spinner diameter="16" />
+              <span>Scanning…</span>
+            </span>
+          } @else {
+            <span class="start-btn-inner">Scan movers</span>
+          }
+        </button>
+        @if (!snapshot().running) {
+          <button mat-flat-button class="start-btn" type="button" [disabled]="busy()" (click)="startLive()">
+            <span class="start-btn-inner">Start Live</span>
+          </button>
+        }
+      }
+      @if (busy() || snapshot().running) {
+        <button mat-stroked-button class="stop-btn" type="button" (click)="stop()">
+          <span class="start-btn-inner">{{ busy() ? 'Cancel' : 'Stop' }}</span>
+        </button>
+      }
+    </div>
+  </div>
+
+  @if (movers().gainers.length || movers().losers.length) {
+    <section class="movers-panel">
+      <header class="watch-head">
+        <div>
+          <h2>Top movers (live quotes)</h2>
+          <p>
+            {{ movers().message }}
+            @if (movers().fetchedAt) {
+              · {{ movers().fetchedAt }}
+            }
+          </p>
+        </div>
+      </header>
+      <div class="movers-cols">
+        <div>
+          <h3 class="movers-title up">Gainers — fade candidates (SELL if gap ≥0.5%)</h3>
+          <div class="movers-list">
+            @for (g of movers().gainers; track g.symbol) {
+              <article class="mover-card">
+                <div class="mover-top">
+                  <strong>{{ g.symbol }}</strong>
+                  <span class="up">{{ g.dayChangePct | percent: '1.1-1' }}</span>
+                </div>
+                <p class="meta">
+                  LTP {{ g.lastPrice | number: '1.2-2' }} · gap
+                  {{ g.gapPct | percent: '1.1-1' }} · token {{ g.instrumentToken }}
+                </p>
+                <button type="button" class="linkish" (click)="addMoverToWatch(g.symbol)" [disabled]="busy()">
+                  Add to watch
+                </button>
+              </article>
+            }
+          </div>
+        </div>
+        <div>
+          <h3 class="movers-title down">Losers — bounce candidates (BUY if gap ≤−0.5%)</h3>
+          <div class="movers-list">
+            @for (l of movers().losers; track l.symbol) {
+              <article class="mover-card">
+                <div class="mover-top">
+                  <strong>{{ l.symbol }}</strong>
+                  <span class="down">{{ l.dayChangePct | percent: '1.1-1' }}</span>
+                </div>
+                <p class="meta">
+                  LTP {{ l.lastPrice | number: '1.2-2' }} · gap
+                  {{ l.gapPct | percent: '1.1-1' }} · token {{ l.instrumentToken }}
+                </p>
+                <button type="button" class="linkish" (click)="addMoverToWatch(l.symbol)" [disabled]="busy()">
+                  Add to watch
+                </button>
+              </article>
+            }
+          </div>
+        </div>
+      </div>
+    </section>
+  }
+
+  <section class="watch-panel">
+    <header class="watch-head">
+      <div>
+        <h2>Stocks we trade</h2>
+        <p>Toggle names for Testing / Live. Add any NSE equity by symbol — instrument token is resolved for you.</p>
+      </div>
+      <button mat-stroked-button type="button" class="reset-btn" [disabled]="busy()" (click)="resetTreasure()">
+        Reset treasure
+      </button>
+    </header>
+
+    <div class="add-row">
+      <label class="field grow">
+        <span>Add custom stock</span>
+        <input
+          type="text"
+          placeholder="e.g. RELIANCE / TITAN / IRCTC"
+          [(ngModel)]="customSymbol"
+          [disabled]="busy()"
+          (keyup.enter)="addCustomStock()"
+        />
+      </label>
+      <button mat-flat-button type="button" class="add-btn" [disabled]="busy()" (click)="addCustomStock()">
+        Resolve &amp; add
+      </button>
+    </div>
+    @if (resolveHint()) {
+      <p class="ok-hint">{{ resolveHint() }}</p>
+    }
+
+    <div class="watch-grid">
+      @for (s of watchlist(); track s.symbol) {
+        <article class="watch-card" [class.off]="!s.enabled">
+          <label class="desk-check">
+            <input
+              type="checkbox"
+              [ngModel]="s.enabled"
+              (ngModelChange)="toggleStock(s.symbol, $event)"
+              [disabled]="busy() || snapshot().running"
+            />
+            <span class="sym">{{ s.symbol }}</span>
+          </label>
+          <p class="name">{{ s.name }}</p>
+          <p class="meta">
+            token {{ s.instrumentToken }}
+            · {{ s.source === 'custom' ? 'custom' : 'watchlist' }}
+            @if (s.strategyId) {
+              · {{ s.strategyId }}
+            }
+          </p>
+          <button type="button" class="linkish" (click)="removeStock(s.symbol)" [disabled]="busy()">Remove</button>
+        </article>
+      }
+    </div>
+  </section>
+
+  @if (error()) {
+    <p class="err">{{ error() }}</p>
+  }
+  <p class="status-line">{{ snapshot().message }}</p>
+
+  @if (snapshot().totals.trades || snapshot().trades.length) {
+    <div class="totals">
+      <div class="stat">
+        <span>Trades</span>
+        <strong>{{ snapshot().totals.trades }}</strong>
+      </div>
+      <div class="stat">
+        <span>Wins / Losses</span>
+        <strong>{{ snapshot().totals.wins }} / {{ snapshot().totals.losses }}</strong>
+      </div>
+      <div class="stat" [class.up]="snapshot().totals.netRs > 0" [class.down]="snapshot().totals.netRs < 0">
+        <span>Net ₹</span>
+        <strong>{{ snapshot().totals.netRs > 0 ? '+' : '' }}{{ snapshot().totals.netRs | number: '1.0-0' }}</strong>
+      </div>
+      <div class="stat">
+        <span>Green days</span>
+        <strong>{{ snapshot().totals.greenDays }} / {{ snapshot().totals.days }}</strong>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Symbol</th>
+            <th>Dir</th>
+            <th>Entry</th>
+            <th>Exit</th>
+            <th>Qty</th>
+            <th>P&amp;L ₹</th>
+            <th>Why</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (t of snapshot().trades; track t.symbol + t.date + t.direction + t.entry) {
+            <tr>
+              <td>{{ t.date }}</td>
+              <td>{{ t.symbol }}</td>
+              <td>{{ t.direction }}</td>
+              <td class="num">{{ t.entry | number: '1.2-2' }}</td>
+              <td class="num">{{ t.exit | number: '1.2-2' }}</td>
+              <td class="num">{{ t.qty }}</td>
+              <td class="num" [class.up]="t.pnlRs > 0" [class.down]="t.pnlRs < 0">
+                {{ t.pnlRs > 0 ? '+' : '' }}{{ t.pnlRs | number: '1.0-0' }}
+              </td>
+              <td>{{ t.exitReason }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</section>

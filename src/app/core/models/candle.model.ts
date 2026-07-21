@@ -7,7 +7,7 @@ export interface Candle {
   volume: number;
 }
 
-export type Timeframe = '60minute' | '30minute' | '15minute' | '5minute';
+export type Timeframe = '60minute' | '30minute' | '15minute' | '5minute' | 'day';
 
 export const ALL_TIMEFRAMES: Timeframe[] = ['60minute', '30minute', '15minute', '5minute'];
 

@@ -10,6 +10,8 @@ Do **not** paste these strategy rules into public chats or share the folder casu
 | [00-INDEX.md](./00-INDEX.md) | How to read this pack |
 | [01-SECRET-ENTRY-NIFTY-BANK.md](./01-SECRET-ENTRY-NIFTY-BANK.md) | **Secret entry** — Nifty / Bank champion DNA, line-by-line |
 | [02-SECRET-ENTRY-CRUDE.md](./02-SECRET-ENTRY-CRUDE.md) | **Secret entry** — Crude evening PDHL, line-by-line |
+| [05-CRUDE-HUNT-FINDINGS.md](./05-CRUDE-HUNT-FINDINGS.md) | **Stored hunt data** — Mar–Jul 2026 sample, all-day-green miss, champion pair |
+| [06-ALMOST-ALL-DAYS-GREEN.md](./06-ALMOST-ALL-DAYS-GREEN.md) | Nifty/Bank research — almost-all-days-green **not** achievable on current DNA |
 | [03-EXITS-AND-DESK-WIRING.md](./03-EXITS-AND-DESK-WIRING.md) | Exits (EMA / TP / SL / session) + how desks call the engines |
 | [04-REPO-MAP.md](./04-REPO-MAP.md) | Every major folder / file role in the app |
 | [ANNOTATED-pdhl-opening-range.evaluator.md](./ANNOTATED-pdhl-opening-range.evaluator.md) | **Every line** of Nifty/Bank entry source |
@@ -27,9 +29,9 @@ Do **not** paste these strategy rules into public chats or share the folder casu
 - **Code:** `src/app/core/strategy-engine/strategies/pdhl-opening-range/pdhl-opening-range.evaluator.ts`
 
 ### Crude Oil Mini (Crude Desk)
-- **Family:** Previous-day high/low break + candle colour  
-- **Entries:** 19:00–21:00 IST only  
-- **SL / TP:** 80 / 200 · **≤2/day · ≤8/month · Day loss stop:** −240  
-- **Exit:** SL / TP / 23:10  
-- **₹/pt:** 10  
-- **Code:** `src/app/core/strategy-engine/strategies/crude-pdhl-evening/crude-pdhl-evening.evaluator.ts`
+- **Family:** Morning ORB + Evening PDHL (champion pair from Mar–Jul 2026 hunt)
+- **Morning:** OR 09:00–10:00 · entries **10:00–12:00** · SL **80** / TP **250** · skip OR **>120** · ≤1/day
+- **Evening:** PDHL entries **18:30–20:30** · SL **80** / TP **150** · ≤1/day
+- **Exit:** SL / TP / **23:10** · **Day stop:** −240 pts (≈ −₹2,400); optional Strict −₹2,950
+- **₹/pt:** 10 · **All-day-green:** not found on sample (see [05-CRUDE-HUNT-FINDINGS.md](./05-CRUDE-HUNT-FINDINGS.md))
+- **Code:** `crude-orb-morning.evaluator.ts` + `crude-pdhl-evening.evaluator.ts`
