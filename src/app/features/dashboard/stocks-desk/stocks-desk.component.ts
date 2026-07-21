@@ -3,13 +3,13 @@ import { DecimalPipe, PercentPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { firstValueFrom } from 'rxjs';
 import { StocksPaperDeskService } from '../../../core/paper-desk/stocks-paper-desk.service';
 import { StocksWatchlistService } from '../../../core/services/stocks-watchlist.service';
 import { StocksMoversService } from '../../../core/services/stocks-movers.service';
 import { InstrumentStoreService } from '../../../core/services/instrument-store.service';
 import { KiteSessionService } from '../../../core/kite/kite-session.service';
 import { KiteApiService } from '../../../core/kite/kite-api.service';
+import { resolveNseEquitySymbol } from '../../../core/services/stocks-equity-resolve';
 import { PaperDeskMode } from '../../../core/paper-desk/paper-desk.models';
 import {
   STOCKS_CAPITAL_RS,
@@ -103,90 +103,36 @@ export class StocksDeskComponent implements OnInit, OnDestroy {
       this.error.set('Enter a stock symbol (e.g. RELIANCE, CANBK, HDFCBANK).');
       return;
     }
-    if (!this.kiteSession.getAuthorizationHeader()) {
+    const authorization = this.kiteSession.getAuthorizationHeader();
+    if (!authorization) {
       this.error.set('Connect Kite token first (Get Token), then add the stock.');
       return;
     }
     try {
-      // Force refresh if empty / stale so new names resolve
-      await this.instruments.refreshBestEffort(this.instruments.allInstruments().length < 100);
-      let exact: {
-        tradingSymbol: string;
-        name: string;
-        instrumentToken: number;
-      } | null = (() => {
-        const hit = this.instruments.findNseEquityExact(q);
-        return hit
-          ? {
-              tradingSymbol: hit.tradingSymbol,
-              name: hit.name || hit.tradingSymbol,
-              instrumentToken: hit.instrumentToken,
-            }
-          : null;
-      })();
-
-      // Quote fallback — works even if CSV search missed the EQ row
-      if (!exact) {
-        exact = await this.resolveViaQuote(q);
-      }
-
-      if (!exact) {
+      const resolved = await resolveNseEquitySymbol({
+        symbol: q,
+        authorization,
+        kiteApi: this.kiteApi,
+        instruments: this.instruments,
+      });
+      if (!resolved) {
         this.error.set(
-          `No NSE equity found for “${q}”. Try Get Token → refresh instruments, then add again.`,
+          `Could not resolve “${q}”. Confirm the NSE symbol, then Get Token → refresh, and try again.`,
         );
         return;
       }
       this.watch.upsertCustom({
-        symbol: exact.tradingSymbol.toUpperCase(),
-        name: exact.name || exact.tradingSymbol,
-        instrumentToken: exact.instrumentToken,
+        symbol: resolved.tradingSymbol.toUpperCase(),
+        name: resolved.name || resolved.tradingSymbol,
+        instrumentToken: resolved.instrumentToken,
         enabled: true,
       });
       this.resolveHint.set(
-        `Added ${exact.tradingSymbol} · token ${exact.instrumentToken} · ${exact.name}`,
+        `Added ${resolved.tradingSymbol} · token ${resolved.instrumentToken} · ${resolved.name} (${resolved.source})`,
       );
       this.customSymbol = '';
     } catch (e) {
       this.error.set(formatUnknownError(e));
-    }
-  }
-
-  /** Resolve NSE:SYMBOL via Kite quote when instrument dump search fails. */
-  private async resolveViaQuote(symbol: string): Promise<{
-    tradingSymbol: string;
-    name: string;
-    instrumentToken: number;
-  } | null> {
-    const auth = this.kiteSession.getAuthorizationHeader();
-    if (!auth) return null;
-    const key = `NSE:${symbol}`;
-    try {
-      const body = (await firstValueFrom(this.kiteApi.getQuotes(auth, [key]))) as {
-        status?: string;
-        data?: Record<string, { instrument_token?: number; last_price?: number }>;
-        message?: string;
-      };
-      if (body.status === 'error' || !body.data?.[key]) {
-        return null;
-      }
-      const token = Number(body.data[key]!.instrument_token ?? 0);
-      if (!token) return null;
-      // Prefer dump row if token known
-      const fromDump = this.instruments.getByToken(token);
-      if (fromDump) {
-        return {
-          tradingSymbol: fromDump.tradingSymbol,
-          name: fromDump.name || fromDump.tradingSymbol,
-          instrumentToken: fromDump.instrumentToken,
-        };
-      }
-      return {
-        tradingSymbol: symbol,
-        name: symbol,
-        instrumentToken: token,
-      };
-    } catch {
-      return null;
     }
   }
 

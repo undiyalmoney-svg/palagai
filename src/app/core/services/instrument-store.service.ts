@@ -43,20 +43,24 @@ export class InstrumentStoreService {
     const q = symbol.trim().toUpperCase();
     if (!q) return undefined;
     const list = this.instruments();
-    return (
-      list.find(
-        (i) =>
-          i.exchange === 'NSE' &&
-          (i.instrumentType === 'EQ' || i.instrumentType === 'BE' || i.segment === 'NSE') &&
-          i.tradingSymbol.toUpperCase() === q &&
-          !i.expiry,
-      ) ??
-      list.find(
-        (i) =>
-          i.exchange === 'NSE' &&
-          i.tradingSymbol.toUpperCase() === q &&
-          (i.instrumentType === 'EQ' || !i.expiry),
-      )
+    // Prefer true cash EQ / BE (SME) with no expiry
+    const cash = list.find(
+      (i) =>
+        i.exchange === 'NSE' &&
+        i.tradingSymbol.toUpperCase() === q &&
+        (i.instrumentType === 'EQ' || i.instrumentType === 'BE') &&
+        !i.expiry,
+    );
+    if (cash) return cash;
+    // Fallback: any NSE row with exact symbol and no option-like type
+    return list.find(
+      (i) =>
+        i.exchange === 'NSE' &&
+        i.tradingSymbol.toUpperCase() === q &&
+        !i.expiry &&
+        i.instrumentType !== 'CE' &&
+        i.instrumentType !== 'PE' &&
+        i.instrumentType !== 'FUT',
     );
   }
 
