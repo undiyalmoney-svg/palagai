@@ -18,6 +18,7 @@ Those two files are the product “secret sauce.” Docs 01–03 expand them **l
 3. Use **04** as a map when searching the repo.  
 4. Use **05** for login / Get Token / IP whitelist pointers.  
 5. Use **07** for Stocks Desk treasure watchlist (equity day strategies).
+6. Use **11** (dated) for Trade Rejection Analysis of a session day — every skipped bar’s exact failed condition.
 
 ## Not in the deploy
 Angular assets come from `src/` + `public/` only (`angular.json`).  
