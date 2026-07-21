@@ -148,7 +148,7 @@ Local densification around the winner (+544 neighbors) **did** find a stronger v
 | Challenger B (full session) | Swing5 + prev-day + EOD · 1 trade/day (#10) |
 | Do not deploy | Anything with fixed 1R primary exit; tight ATR trails; Champion PDHL |
 
-**Next research step (not implementation):** paper the primary on the desk path with realistic costs; only then consider a sideways/low-vol stand-down overlay.
+**Next research step:** done in part — see **[16-VEHICLE-COMPARISON.md](./16-VEHICLE-COMPARISON.md)** (futures GO; ATM weekly NO_GO). Remaining: prior-day regime filter before any live wiring.
 
 ---
 
