@@ -117,7 +117,9 @@ export class StrategyManagerPageComponent {
     const current = mod.getSettings();
     const prev = current[key];
     let value: string | number | boolean = raw;
-    if (typeof prev === 'number') {
+    if (typeof prev === 'boolean') {
+      value = raw === 'true' || raw === 'on' || raw === '1';
+    } else if (typeof prev === 'number') {
       value = Number(raw);
       if (!Number.isFinite(value)) {
         return;

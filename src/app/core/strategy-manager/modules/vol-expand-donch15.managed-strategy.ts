@@ -10,9 +10,9 @@ import { BaseIndexRuleStrategy } from './base-index-rule.strategy';
 export class VolExpandDonch15ManagedStrategy extends BaseIndexRuleStrategy {
   readonly id = MANAGED_STRATEGY_IDS.VOL_EXPAND_DONCH15;
   readonly name = 'VolExpand Donchian-15 + EMA50 + EOD';
-  readonly version = '1.0.0';
+  readonly version = '1.1.0';
   readonly description =
-    'Morning vol-expand Donchian-15 breakout with EMA-50 bias, EOD exit, 1 trade/day (10:15–11:30).';
+    'VolExpand Donch15 + EMA50 + EOD (10:15–11:30). Regime filter: OR drive ≥ 0.30 and gap ≤ 6×ATR (no look-ahead).';
   readonly supports: readonly DeskChannel[] = ['nifty', 'bank', 'stocks'];
 
   readonly defaultSettings = defaultStrategySettings({
@@ -28,6 +28,9 @@ export class VolExpandDonch15ManagedStrategy extends BaseIndexRuleStrategy {
     instrumentType: 'futures',
     dayStopPts: 60,
     targetRMultiple: 0,
+    regimeFilterEnabled: true,
+    regimeMinOrDriveFrac: 0.3,
+    regimeMaxGapAtr: 6,
   });
 
   protected readonly spec: IndexRuleSpec = {
