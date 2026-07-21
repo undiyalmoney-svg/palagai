@@ -2,7 +2,7 @@
 
 ## Status
 
-**Architecture implemented.** Champion PDHL is **not** replaced. Defaults keep Paper + Live on Champion for Nifty/Bank.
+**Architecture implemented.** Champion PDHL remains available (DNA untouched). **Defaults** are research-backed VolExpand for Nifty/Bank/Stocks Manager; Stocks Desk UI defaults to GAP_FADE_500.
 
 ## What shipped
 
@@ -18,9 +18,12 @@
 
 | | Paper | Live | Shadow |
 |---|---|---|---|
-| Nifty | Champion | Champion | Off |
-| Bank | Champion | Champion | Off |
-| Stocks | Swing-5 | Champion | Off |
+| Nifty | **VolExpand Donch15** | **VolExpand Donch15** | Off |
+| Bank | **VolExpand Donch15** | **VolExpand Donch15** | Off |
+| Stocks (Manager) | VolExpand Donch15 | VolExpand Donch15 | Off |
+| Stocks Desk | — | **GAP_FADE_500** | — |
+
+VolExpand: regime filter on · Nifty SL 30 · Bank SL 45.
 
 ## How to switch (no code)
 

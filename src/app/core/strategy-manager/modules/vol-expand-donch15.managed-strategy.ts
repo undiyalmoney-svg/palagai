@@ -21,6 +21,7 @@ export class VolExpandDonch15ManagedStrategy extends BaseIndexRuleStrategy {
     exitTime: '15:15',
     orEnd: '10:15',
     stopLossPts: 30,
+    bankStopLossPts: 45,
     donchianLength: 15,
     emaLength: 50,
     volExpandAtrMult: 1.2,

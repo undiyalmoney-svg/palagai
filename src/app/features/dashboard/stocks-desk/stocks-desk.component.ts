@@ -39,7 +39,7 @@ export class StocksDeskComponent implements OnInit, OnDestroy {
   protected toDate = todayIso();
   protected realOrders = false;
   protected realOrdersAck = false;
-  protected strategyId: StocksStrategyId = 'ALMOST_GREEN_MIX';
+  protected strategyId: StocksStrategyId = 'GAP_FADE_500';
   protected includeTopGainers = true;
   protected maxLegs = 3;
   protected customSymbol = '';

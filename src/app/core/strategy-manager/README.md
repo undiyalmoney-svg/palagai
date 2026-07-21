@@ -2,7 +2,7 @@
 
 ## Goal
 
-Multi-strategy platform: strategies are plug-and-play modules. Champion PDHL is **not** replaced — it remains the default Paper/Live assignment for Nifty & Bank.
+Multi-strategy platform: strategies are plug-and-play modules. Champion PDHL remains available; **defaults** are research-backed VolExpand for indices.
 
 ## Layout
 
@@ -21,13 +21,16 @@ Market data → Strategy Manager → IManagedStrategy → Signal → Desk risk �
 | `core/strategy-manager/runtime/` | Manager, event log, shadow book, performance |
 | `features/dashboard/strategy-manager/` | UI |
 
-## Defaults (backward compatible)
+## Defaults (research-backed)
 
 | Channel | Paper | Live | Shadow |
 |---|---|---|---|
-| Nifty | Champion PDHL | Champion PDHL | Off |
-| Bank | Champion PDHL | Champion PDHL | Off |
-| Stocks | Swing-5 + Prev Day | Champion PDHL | Off |
+| Nifty | VolExpand Donch15 | VolExpand Donch15 | Off |
+| Bank | VolExpand Donch15 | VolExpand Donch15 | Off |
+| Stocks (Strategy Manager) | VolExpand Donch15 | VolExpand Donch15 | Off |
+| Stocks Desk UI | — | **GAP_FADE_500** | — |
+
+VolExpand ships with morning regime filter on (OR drive ≥ 0.30, gap ≤ 6×ATR). Nifty stop 30 / Bank stop 45.
 
 Trade Desk resolves strategies via `StrategyManagerService`. Champion DNA file is **unchanged**; desk risk checkboxes still apply through `setPdhlDeskOverrides`.
 

@@ -206,9 +206,11 @@ export function runIndexRuleStrategy(
   if (risk < settings.minStopPts) {
     return skip(`Risk ${risk.toFixed(1)} < min ${settings.minStopPts}`);
   }
-  if (risk > settings.stopLossPts) {
-    stop = direction === 'BUY' ? close - settings.stopLossPts : close + settings.stopLossPts;
-    risk = settings.stopLossPts;
+  const bankLike = /bank/i.test(ctx.instrumentId ?? '');
+  const stopCap = bankLike ? settings.bankStopLossPts : settings.stopLossPts;
+  if (risk > stopCap) {
+    stop = direction === 'BUY' ? close - stopCap : close + stopCap;
+    risk = stopCap;
   }
   if (settings.dayStopPts > 0 && state.dayNetPts - risk < -settings.dayStopPts) {
     return skip('Day stop would be breached by this risk');

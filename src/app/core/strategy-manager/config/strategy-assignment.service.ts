@@ -12,7 +12,8 @@ import {
 import { StrategySettings } from '../models/strategy-settings.model';
 import { StrategyRegistryService } from '../registry/strategy-registry.service';
 
-const STORAGE_KEY = 'palagai_strategy_assignments_v1';
+const STORAGE_KEY = 'palagai_strategy_assignments_v2';
+const LEGACY_STORAGE_KEY = 'palagai_strategy_assignments_v1';
 
 export interface ChannelAssignment {
   paper: string;
@@ -146,8 +147,11 @@ export class StrategyAssignmentService {
       return;
     }
     try {
+      // Drop legacy v1 Champion-centric assignments so research defaults apply once.
+      localStorage.removeItem(LEGACY_STORAGE_KEY);
       const raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) {
+        this.persist();
         return;
       }
       const parsed = JSON.parse(raw) as PersistedState;
@@ -174,6 +178,8 @@ export class StrategyAssignmentService {
       }
     } catch {
       localStorage.removeItem(STORAGE_KEY);
+      this.assignmentsSignal.set(defaultAssignments());
+      this.persist();
     }
   }
 
@@ -189,5 +195,5 @@ export class StrategyAssignmentService {
   }
 }
 
-/** Re-export default champion id for callers. */
-export const DEFAULT_LIVE_STRATEGY_ID = MANAGED_STRATEGY_IDS.CHAMPION_PDHL;
+/** Default live strategy for Trade Desk resolution fallback. */
+export const DEFAULT_LIVE_STRATEGY_ID = MANAGED_STRATEGY_IDS.VOL_EXPAND_DONCH15;

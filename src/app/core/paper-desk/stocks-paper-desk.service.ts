@@ -647,7 +647,7 @@ function emptySnapshot(mode: PaperDeskMode): StocksDeskSnapshot {
     message: 'Idle',
     trades: [],
     totals: { trades: 0, wins: 0, losses: 0, netRs: 0, greenDays: 0, redDays: 0, days: 0 },
-    strategyId: 'ALMOST_GREEN_MIX',
+    strategyId: 'GAP_FADE_500',
     capitalRs: STOCKS_CAPITAL_RS,
     dayLossRs: STOCKS_DAY_LOSS_RS,
     symbols: [],

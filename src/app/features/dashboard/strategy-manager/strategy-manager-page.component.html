@@ -5,7 +5,7 @@
       <h1>Multi-strategy control</h1>
       <p class="sm-sub">
         Switch Paper / Live / Shadow strategies per instrument without changing code.
-        Champion PDHL remains the default live path until you select otherwise.
+        Defaults: Nifty &amp; Bank → VolExpand Donch15 (regime on); Stocks Desk → GAP_FADE_500.
       </p>
     </div>
     <div class="sm-hero-actions">
@@ -105,6 +105,7 @@
           <label>Exit time <input [ngModel]="st.exitTime" (ngModelChange)="patchSetting('exitTime', $event)" /></label>
           <label>OR end <input [ngModel]="st.orEnd" (ngModelChange)="patchSetting('orEnd', $event)" /></label>
           <label>Stop loss pts <input type="number" [ngModel]="st.stopLossPts" (ngModelChange)="patchSetting('stopLossPts', $event)" /></label>
+          <label>Bank stop pts <input type="number" [ngModel]="st.bankStopLossPts" (ngModelChange)="patchSetting('bankStopLossPts', $event)" /></label>
           <label>EMA length <input type="number" [ngModel]="st.emaLength" (ngModelChange)="patchSetting('emaLength', $event)" /></label>
           <label>Donchian length <input type="number" [ngModel]="st.donchianLength" (ngModelChange)="patchSetting('donchianLength', $event)" /></label>
           <label>Swing lookback <input type="number" [ngModel]="st.swingLookback" (ngModelChange)="patchSetting('swingLookback', $event)" /></label>
