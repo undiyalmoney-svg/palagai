@@ -169,8 +169,6 @@ function classifyRejection(
   let failedCondition = reason;
 
   // Near-miss: bias + swing breakout present but risk / day budget blocked.
-  const dayBars = analysis['orHigh'] != null; // OR was computed in analysis bag when past OR
-  void dayBars;
   if (reason.startsWith('Risk ') && reason.includes('< min')) {
     category = 'NEAR_MISS';
     failedCondition = `minStopPts: risk must be ≥ ${p.minStopPts} pts (actual below floor)`;
