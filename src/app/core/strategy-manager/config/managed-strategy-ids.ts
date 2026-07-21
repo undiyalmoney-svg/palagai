@@ -5,6 +5,8 @@ export const MANAGED_STRATEGY_IDS = {
   SWING5_PREV_DAY: 'swing5-prev-day-eod',
   DONCHIAN_20: 'donchian-20-eod',
   DONCHIAN_55_TURTLE: 'donchian-55-turtle',
+  /** Daily-consistency search: max green-day share (not default — fat tails). */
+  INSIDE_BREAK: 'inside-break-eod',
 } as const;
 
 export type ManagedStrategyId =

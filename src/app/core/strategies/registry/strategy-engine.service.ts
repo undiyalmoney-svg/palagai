@@ -29,6 +29,8 @@ const STRATEGY_DESCRIPTIONS: Record<string, string> = {
     'Donchian-20 channel breakout + EOD.',
   [STRATEGY_IDS.DONCHIAN_55_TURTLE]:
     'Donchian-55 Turtle-style breakout + EOD.',
+  [STRATEGY_IDS.INSIDE_BREAK]:
+    'Inside-bar breakout + EOD · multi-trade · daily ₹500 green-day search pick (paper first).',
 };
 
 /**

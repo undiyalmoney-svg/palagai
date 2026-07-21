@@ -27,7 +27,7 @@ import {
   defaultStrategySettings,
 } from '../models/strategy-settings.model';
 
-export type RuleEntryMode = 'vol_expand' | 'donch' | 'swing';
+export type RuleEntryMode = 'vol_expand' | 'donch' | 'swing' | 'inside_break';
 export type RuleBiasMode = 'ema' | 'prev_day' | 'none';
 export type RuleExitMode = 'eod' | 'ema';
 
@@ -42,10 +42,20 @@ export interface RuleDayState {
   dayNetPts: number;
   tradesToday: number;
   dayStopped: boolean;
+  /** Most recent inside-bar high/low for inside_break entries. */
+  insideHigh: number | null;
+  insideLow: number | null;
 }
 
 export function createRuleDayState(): RuleDayState {
-  return { tradingDate: null, dayNetPts: 0, tradesToday: 0, dayStopped: false };
+  return {
+    tradingDate: null,
+    dayNetPts: 0,
+    tradesToday: 0,
+    dayStopped: false,
+    insideHigh: null,
+    insideLow: null,
+  };
 }
 
 /**
@@ -68,6 +78,8 @@ export function runIndexRuleStrategy(
     state.dayNetPts = 0;
     state.tradesToday = 0;
     state.dayStopped = false;
+    state.insideHigh = null;
+    state.insideLow = null;
   }
 
   const wait = (reason: string, analysis: Record<string, unknown> = {}): ManagedStrategySignal => ({
@@ -188,6 +200,30 @@ export function runIndexRuleStrategy(
       direction = 'BUY';
     } else if (close < levelLow) {
       direction = 'SELL';
+    }
+  } else if (spec.entry === 'inside_break') {
+    // Detect prior inside bar (bar[i-1] inside bar[i-2]); break of its range.
+    if (dayBars.length >= 3) {
+      const mother = dayBars[dayBars.length - 3]!;
+      const inside = dayBars[dayBars.length - 2]!;
+      if (inside.high < mother.high && inside.low > mother.low) {
+        state.insideHigh = inside.high;
+        state.insideLow = inside.low;
+      }
+    }
+    if (state.insideHigh == null || state.insideLow == null) {
+      return wait('No inside bar yet');
+    }
+    levelHigh = state.insideHigh;
+    levelLow = state.insideLow;
+    if (close > levelHigh) {
+      direction = 'BUY';
+      state.insideHigh = null;
+      state.insideLow = null;
+    } else if (close < levelLow) {
+      direction = 'SELL';
+      state.insideHigh = null;
+      state.insideLow = null;
     }
   }
 

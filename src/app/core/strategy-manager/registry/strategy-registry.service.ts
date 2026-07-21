@@ -6,6 +6,7 @@ import { VolExpandDonch15ManagedStrategy } from '../modules/vol-expand-donch15.m
 import { Swing5PrevDayManagedStrategy } from '../modules/swing5-prev-day.managed-strategy';
 import { Donchian20ManagedStrategy } from '../modules/donchian-20.managed-strategy';
 import { Donchian55TurtleManagedStrategy } from '../modules/donchian-55-turtle.managed-strategy';
+import { InsideBreakManagedStrategy } from '../modules/inside-break.managed-strategy';
 import { AppLoggerService } from '../../shared/logging/app-logger.service';
 
 /**
@@ -20,6 +21,7 @@ export class StrategyRegistryService {
   private readonly swing5 = inject(Swing5PrevDayManagedStrategy);
   private readonly donch20 = inject(Donchian20ManagedStrategy);
   private readonly turtle55 = inject(Donchian55TurtleManagedStrategy);
+  private readonly insideBreak = inject(InsideBreakManagedStrategy);
 
   private readonly modules: IManagedStrategy[];
 
@@ -30,6 +32,7 @@ export class StrategyRegistryService {
       this.swing5,
       this.donch20,
       this.turtle55,
+      this.insideBreak,
     ];
     for (const m of this.modules) {
       m.initialize();

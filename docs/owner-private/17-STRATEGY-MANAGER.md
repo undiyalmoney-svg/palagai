@@ -8,7 +8,7 @@
 
 - `IManagedStrategy` contract (`initialize`, `analyze`, `generateSignal`, `calculateStopLoss`, `calculateTarget`, `exitLogic`, settings)
 - Strategy Registry + Manager (paper/live/shadow per channel)
-- Modules: Champion wrapper (DNA untouched), VolExpand Donch15, Swing5+PrevDay, Donchian-20, Donchian-55 Turtle
+- Modules: Champion wrapper (DNA untouched), VolExpand Donch15, Swing5+PrevDay, Donchian-20, Donchian-55 Turtle, **Inside Break** (daily ₹500 green-day search; not default)
 - Trade Desk wired through Manager (same logic Paper/Live)
 - Shadow book (signals/trades, no orders)
 - Strategy Management dashboard (`/dashboard/strategy-manager`)

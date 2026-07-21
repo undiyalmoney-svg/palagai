@@ -5,6 +5,7 @@ export const STRATEGY_IDS = {
   SWING5_PREV_DAY: 'swing5-prev-day-eod',
   DONCHIAN_20: 'donchian-20-eod',
   DONCHIAN_55_TURTLE: 'donchian-55-turtle',
+  INSIDE_BREAK: 'inside-break-eod',
   // Paused — removed from active registry
   FIRST_HOUR_BREAKOUT: 'first-hour-breakout',
   INTRADAY_REVERSAL: 'intraday-reversal',
@@ -44,6 +45,7 @@ export const ACTIVE_STRATEGY_IDS = new Set<string>([
   STRATEGY_IDS.SWING5_PREV_DAY,
   STRATEGY_IDS.DONCHIAN_20,
   STRATEGY_IDS.DONCHIAN_55_TURTLE,
+  STRATEGY_IDS.INSIDE_BREAK,
 ]);
 
 /** @deprecated Research platform removed — kept for type compatibility only. */
