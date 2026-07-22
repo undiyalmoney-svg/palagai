@@ -14,8 +14,8 @@ export const MANAGED_STRATEGY_IDS = {
   /** Stocks Desk champion — gap-up fade ₹500 book. */
   GAP_FADE_500: 'gap-fade-500',
   /**
-   * Ruler flow (opt-in toggle): morning witch switch + ₹1,500 day cap +
-   * dyn protect when month green. Not the default — Donch Retest stays default.
+   * Ruler flow (always-on for indices): morning witch switch + ₹1,500 day cap +
+   * dyn protect when month green. Nifty/Bank desks always resolve here.
    */
   RULER: 'ruler-flow',
 } as const;
@@ -25,18 +25,18 @@ export type ManagedStrategyId =
 
 /**
  * Research-backed defaults:
- * - Nifty/Bank: Donch Retest OR-mid 1.5R+BE
+ * - Nifty/Bank: Ruler flow only (no alternate index strategy selection)
  * - Stocks: GAP_FADE_500 (same DNA as Stocks Desk)
  */
 export const DEFAULT_CHANNEL_ASSIGNMENTS = {
   nifty: {
-    paper: MANAGED_STRATEGY_IDS.DONCH_RETEST_OR_MID_2R,
-    live: MANAGED_STRATEGY_IDS.DONCH_RETEST_OR_MID_2R,
+    paper: MANAGED_STRATEGY_IDS.RULER,
+    live: MANAGED_STRATEGY_IDS.RULER,
     shadow: null as string | null,
   },
   bank: {
-    paper: MANAGED_STRATEGY_IDS.DONCH_RETEST_OR_MID_2R,
-    live: MANAGED_STRATEGY_IDS.DONCH_RETEST_OR_MID_2R,
+    paper: MANAGED_STRATEGY_IDS.RULER,
+    live: MANAGED_STRATEGY_IDS.RULER,
     shadow: null as string | null,
   },
   stocks: {

@@ -12,7 +12,8 @@ import {
 import { StrategySettings } from '../models/strategy-settings.model';
 import { StrategyRegistryService } from '../registry/strategy-registry.service';
 
-const STORAGE_KEY = 'palagai_strategy_assignments_v9';
+/** v10: Nifty/Bank are Ruler-only (no competing strategy selection). */
+const STORAGE_KEY = 'palagai_strategy_assignments_v10';
 const LEGACY_STORAGE_KEYS = [
   'palagai_strategy_assignments_v1',
   'palagai_strategy_assignments_v2',
@@ -21,9 +22,9 @@ const LEGACY_STORAGE_KEYS = [
   'palagai_strategy_assignments_v5',
   'palagai_strategy_assignments_v6',
   'palagai_strategy_assignments_v7',
+  'palagai_strategy_assignments_v8',
+  'palagai_strategy_assignments_v9',
 ] as const;
-/** Migrate assignments from v8 without wiping user selections. */
-const MIGRATE_FROM_KEY = 'palagai_strategy_assignments_v8';
 
 export interface ChannelAssignment {
   paper: string;
@@ -39,7 +40,7 @@ export type SettingsMap = Record<string, Partial<StrategySettings>>;
 interface PersistedState {
   assignments: AssignmentMap;
   settings: SettingsMap;
-  /** When true, Nifty + Bank Paper/Live resolve to Ruler flow. */
+  /** Always true for Nifty/Bank Ruler-only product mode. */
   rulerEnabled?: boolean;
 }
 
@@ -51,9 +52,13 @@ function defaultAssignments(): AssignmentMap {
   };
 }
 
+function isIndexChannel(channel: DeskChannel): boolean {
+  return channel === 'nifty' || channel === 'bank';
+}
+
 /**
- * Persists paper/live/shadow strategy selection and per-strategy settings.
- * Selection never requires code changes.
+ * Persists stocks paper/live/shadow selection and per-strategy settings.
+ * Nifty + Bank always resolve to Ruler flow (no alternate strategy UI).
  */
 @Injectable({ providedIn: 'root' })
 export class StrategyAssignmentService {
@@ -61,7 +66,8 @@ export class StrategyAssignmentService {
   private readonly registry = inject(StrategyRegistryService);
 
   private readonly assignmentsSignal = signal<AssignmentMap>(defaultAssignments());
-  private readonly rulerEnabledSignal = signal(false);
+  /** Always on — kept as a signal so existing templates keep working. */
+  private readonly rulerEnabledSignal = signal(true);
   private settingsMap: SettingsMap = {};
 
   readonly assignments = this.assignmentsSignal.asReadonly();
@@ -75,17 +81,19 @@ export class StrategyAssignmentService {
     return this.assignmentsSignal()[channel];
   }
 
+  /** Nifty/Bank always run Ruler. */
   isRulerEnabled(): boolean {
-    return this.rulerEnabledSignal();
+    return true;
   }
 
-  setRulerEnabled(enabled: boolean): void {
-    this.rulerEnabledSignal.set(!!enabled);
+  /** No-op: Ruler cannot be turned off for index desks. */
+  setRulerEnabled(_enabled: boolean): void {
+    this.rulerEnabledSignal.set(true);
     this.persist();
   }
 
   getStrategyId(channel: DeskChannel, mode: ExecutionMode): string {
-    if (this.rulerEnabledSignal() && (channel === 'nifty' || channel === 'bank')) {
+    if (isIndexChannel(channel)) {
       return MANAGED_STRATEGY_IDS.RULER;
     }
     const a = this.getAssignment(channel);
@@ -93,6 +101,10 @@ export class StrategyAssignmentService {
   }
 
   getShadowStrategyId(channel: DeskChannel): string | null {
+    // Index desks stay Ruler-only — no shadow alternate.
+    if (isIndexChannel(channel)) {
+      return null;
+    }
     return this.getAssignment(channel).shadow;
   }
 
@@ -101,6 +113,10 @@ export class StrategyAssignmentService {
     mode: ExecutionMode | 'shadow',
     strategyId: string | null,
   ): void {
+    // Nifty/Bank assignments are locked to Ruler — ignore UI / legacy callers.
+    if (isIndexChannel(channel)) {
+      return;
+    }
     if (mode !== 'shadow' && !strategyId) {
       return;
     }
@@ -138,7 +154,6 @@ export class StrategyAssignmentService {
     }
     const merged = { ...(this.settingsMap[strategyId] ?? {}), ...partial };
     this.settingsMap[strategyId] = merged;
-    // Always re-base from module defaults + overrides (same path as desk hydrate).
     mod.initialize(merged);
     this.persist();
   }
@@ -162,7 +177,7 @@ export class StrategyAssignmentService {
 
   resetAllAssignmentsToDefaults(): void {
     this.assignmentsSignal.set(defaultAssignments());
-    this.rulerEnabledSignal.set(false);
+    this.rulerEnabledSignal.set(true);
     this.settingsMap = {};
     for (const m of this.registry.getAll()) {
       m.initialize();
@@ -172,44 +187,36 @@ export class StrategyAssignmentService {
 
   private load(): void {
     if (!isPlatformBrowser(this.platformId)) {
+      this.rulerEnabledSignal.set(true);
       return;
     }
     try {
-      // Drop legacy assignment keys so research defaults + trade-count settings apply once.
       for (const key of LEGACY_STORAGE_KEYS) {
         localStorage.removeItem(key);
       }
-      let raw = localStorage.getItem(STORAGE_KEY);
+      const raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) {
-        const legacy = localStorage.getItem(MIGRATE_FROM_KEY);
-        if (legacy) {
-          raw = legacy;
-          localStorage.removeItem(MIGRATE_FROM_KEY);
-        }
-      }
-      if (!raw) {
+        this.rulerEnabledSignal.set(true);
         this.persist();
         return;
       }
       const parsed = JSON.parse(raw) as PersistedState;
       const base = defaultAssignments();
-      for (const ch of DESK_CHANNELS) {
-        const a = parsed.assignments?.[ch];
-        if (!a) {
-          continue;
+      // Only restore stocks assignments — index channels stay Ruler defaults.
+      const stocks = parsed.assignments?.stocks;
+      if (stocks) {
+        if (typeof stocks.paper === 'string' && this.registry.getById(stocks.paper)) {
+          base.stocks.paper = stocks.paper;
         }
-        if (typeof a.paper === 'string' && this.registry.getById(a.paper)) {
-          base[ch].paper = a.paper;
+        if (typeof stocks.live === 'string' && this.registry.getById(stocks.live)) {
+          base.stocks.live = stocks.live;
         }
-        if (typeof a.live === 'string' && this.registry.getById(a.live)) {
-          base[ch].live = a.live;
-        }
-        if (a.shadow == null || this.registry.getById(a.shadow)) {
-          base[ch].shadow = a.shadow ?? null;
+        if (stocks.shadow == null || this.registry.getById(stocks.shadow)) {
+          base.stocks.shadow = stocks.shadow ?? null;
         }
       }
       this.assignmentsSignal.set(base);
-      this.rulerEnabledSignal.set(!!parsed.rulerEnabled);
+      this.rulerEnabledSignal.set(true);
       this.settingsMap = parsed.settings ?? {};
       for (const [id, partial] of Object.entries(this.settingsMap)) {
         this.registry.getById(id)?.initialize(partial);
@@ -218,8 +225,8 @@ export class StrategyAssignmentService {
     } catch {
       localStorage.removeItem(STORAGE_KEY);
       this.assignmentsSignal.set(defaultAssignments());
-      this.rulerEnabledSignal.set(false);
-      this.persist();
+      this.rulerEnabledSignal.set(true);
+      this.settingsMap = {};
     }
   }
 
@@ -227,14 +234,14 @@ export class StrategyAssignmentService {
     if (!isPlatformBrowser(this.platformId)) {
       return;
     }
+    // Always pin index channels to Ruler in storage.
+    const assignments = defaultAssignments();
+    assignments.stocks = { ...this.assignmentsSignal().stocks };
     const payload: PersistedState = {
-      assignments: this.assignmentsSignal(),
+      assignments,
       settings: this.settingsMap,
-      rulerEnabled: this.rulerEnabledSignal(),
+      rulerEnabled: true,
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
   }
 }
-
-/** Default live strategy for Trade Desk resolution fallback. */
-export const DEFAULT_LIVE_STRATEGY_ID = MANAGED_STRATEGY_IDS.VOL_EXPAND_DONCH15;
