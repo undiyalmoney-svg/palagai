@@ -56,12 +56,7 @@ export type RulerArm =
 export const RULER_RAMPAGE_UNTIL_INR = 3000;
 /** Hard day loss cap (₹). When month green → min(cap, MTD). */
 export const RULER_DAY_CAP_INR = 500;
-/**
- * Month bank target (₹). Once MTD ≥ this, force STAND for the rest of the month.
- * Trains capital banking toward a ₹15k monthly floor.
- * Banking target only — research shows 1-lot DNA cannot clear ₹15k every month.
- */
-
+/** @deprecated Unused — month bank removed so strong months can keep earning past ₹15k. */
 export const RULER_MONTH_TARGET_INR = 15000;
 
 /**
@@ -272,16 +267,13 @@ export type RulerArmPickOpts = {
  * 1. Breaker active → edge
  * 2. MTD < 0 → hunter (do not beast while month is red)
  * 3. 0 ≤ MTD < ₹3k → beast
- * 4. Else → trail on wide mornings (else 2R/swing) — more profit than calm-only
+ * 4. Else → trail on wide mornings (else 2R/swing) — keep trading past ₹15k
  */
 export function pickRulerArm(
   f: RulerMorningFeatures | null,
   monthMtdInr: number,
   opts?: RulerArmPickOpts,
 ): RulerArm {
-  if (monthMtdInr >= RULER_MONTH_TARGET_INR) {
-    return 'STAND';
-  }
   if (opts?.breakerActive) {
     return witchEdge(f);
   }

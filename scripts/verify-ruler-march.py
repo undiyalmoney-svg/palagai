@@ -26,8 +26,8 @@ sr = load("sr", ROOT / "scripts" / "sr-pullback-retest-daily500.py")
 boost = load("boost", Path("/tmp/ruler-profit-boost.py"))
 sep = load("sep", ROOT / "scripts" / "ruler-sep-boost.py")
 
-# March target under zero-red profit-boost (day-cap ₹500 + wide trail).
-MARCH_TARGET = 16407.2
+# March target under zero-red profit-boost (day-cap ₹500 + wide trail, no month bank).
+MARCH_TARGET = 24115.5
 
 
 def main() -> None:

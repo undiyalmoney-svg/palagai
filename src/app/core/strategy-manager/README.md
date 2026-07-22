@@ -38,7 +38,7 @@ Market data → Strategy Manager → IManagedStrategy → Signal → Desk risk �
 - After **2 consecutive clipped red days** *anytime* → **edge** witch for rest of month
 - **DONCH_TRAIL** allows multi-trade (research `one_trade=False`); other arms stay 1 trade/day
 - **−₹500/day** blocks new entries + flattens opens in **Testing, Live paper, and Live money** (same rule)
-- **+₹15k month bank** = STAND after clipped MTD hits ₹15k (lock, not a guaranteed monthly profit)
+- **No month bank** — keeps trading after MTD passes ₹15k so strong months can earn more
 - Testing MTD is isolated from Live persistence
 - Primary **P&L ₹** = OHLC pts × ₹65/₹30 with day-cap stops applied; day-capped book card is the soft clip of the same book
 - Morning EMA bias uses **OR-end** bar (research `morning_feat`), not 10:15
