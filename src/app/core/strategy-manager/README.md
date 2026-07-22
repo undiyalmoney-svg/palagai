@@ -37,8 +37,10 @@ Market data → Strategy Manager → IManagedStrategy → Signal → Desk risk �
 - **Beast** while 0 ≤ MTD &lt; ₹3k; **hunter** while MTD &lt; 0 (never beast when month already red); then **trail only if wide**
 - After **2 consecutive clipped red days** *anytime* → **edge** witch for rest of month
 - **DONCH_TRAIL** allows multi-trade (research `one_trade=False`); other arms stay 1 trade/day
-- **Testing** uses isolated in-memory MTD; **Live** persists separately and can flatten at day-cap
-- Primary **P&L ₹** = uncapped OHLC pts × ₹65/₹30; **Research score ₹** = same after −₹500 day-cap (compare to research, not live cash)
+- **−₹500/day** blocks new entries + flattens opens in **Testing, Live paper, and Live money** (same rule)
+- **+₹15k month bank** = STAND after clipped MTD hits ₹15k (lock, not a guaranteed monthly profit)
+- Testing MTD is isolated from Live persistence
+- Primary **P&L ₹** = OHLC pts × ₹65/₹30 with day-cap stops applied; day-capped book card is the soft clip of the same book
 - Morning EMA bias uses **OR-end** bar (research `morning_feat`), not 10:15
 - Lots always come from the Trade Desk Lots field
 
