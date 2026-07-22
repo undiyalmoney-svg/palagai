@@ -35,6 +35,7 @@ CACHE = ROOT / "reports" / "analyst-cache"
 DEFAULT_OUT = Path("/tmp/sniper-250-search/report.json")
 TARGET_RS = 250.0
 STOP_RS = 150.0
+EXIT_MODE = "fixed"  # fixed | ema | swing_trail | eod
 DAY_TARGET_RS = 2500.0
 MAX_TRADES_DAY = 10
 
@@ -221,7 +222,9 @@ def signal_direction(
 
 
 def simulate_instrument(inst, spec: SniperSpec) -> list[Trade]:
-    target_points = TARGET_RS / float(inst.rs_mult)
+    target_points = (
+        TARGET_RS / float(inst.rs_mult) if EXIT_MODE == "fixed" else math.inf
+    )
     stop_points = STOP_RS / float(inst.rs_mult)
     opening = 9 * 60 + 15
     or_end = 9 * 60 + 45
@@ -293,19 +296,74 @@ def simulate_instrument(inst, spec: SniperSpec) -> list[Trade]:
                     inst.h[index] >= target
                     if direction == "BUY"
                     else inst.l[index] <= target
-                )
+                ) if EXIT_MODE == "fixed" else False
                 ambiguous = bool(stop_hit and target_hit)
                 if stop_hit:
                     rs, reason = -STOP_RS, "SL"
                 elif target_hit:
                     rs, reason = TARGET_RS, "TP"
+                elif EXIT_MODE == "ema" and np.isfinite(inst.ema20[index]) and (
+                    (direction == "BUY" and inst.c[index] < inst.ema20[index])
+                    or (direction == "SELL" and inst.c[index] > inst.ema20[index])
+                ):
+                    points = (
+                        float(inst.c[index]) - entry_price
+                        if direction == "BUY"
+                        else entry_price - float(inst.c[index])
+                    )
+                    rs, reason = points * inst.rs_mult, "EMA"
+                elif EXIT_MODE == "swing_trail":
+                    swing = (
+                        float(inst.swing3_l[index])
+                        if direction == "BUY"
+                        else float(inst.swing3_h[index])
+                    )
+                    if np.isfinite(swing):
+                        previous_trail = open_trade.get("trail")
+                        trail = (
+                            swing
+                            if previous_trail is None
+                            else max(previous_trail, swing)
+                            if direction == "BUY"
+                            else min(previous_trail, swing)
+                        )
+                        open_trade["trail"] = trail
+                        trail_hit = (
+                            inst.l[index] <= trail
+                            if direction == "BUY"
+                            else inst.h[index] >= trail
+                        )
+                    else:
+                        trail_hit = False
+                        trail = None
+                    if trail_hit and trail is not None:
+                        points = (
+                            trail - entry_price
+                            if direction == "BUY"
+                            else entry_price - trail
+                        )
+                        rs, reason = max(-STOP_RS, points * inst.rs_mult), "TRAIL"
+                    elif index == end:
+                        points = (
+                            float(inst.c[index]) - entry_price
+                            if direction == "BUY"
+                            else entry_price - float(inst.c[index])
+                        )
+                        rs, reason = max(-STOP_RS, points * inst.rs_mult), "EOD"
+                    else:
+                        continue
                 elif index == end:
                     points = (
                         float(inst.c[index]) - entry_price
                         if direction == "BUY"
                         else entry_price - float(inst.c[index])
                     )
-                    rs = max(-STOP_RS, min(TARGET_RS, points * inst.rs_mult))
+                    raw_rs = points * inst.rs_mult
+                    rs = (
+                        max(-STOP_RS, min(TARGET_RS, raw_rs))
+                        if EXIT_MODE == "fixed"
+                        else max(-STOP_RS, raw_rs)
+                    )
                     reason = "EOD"
                 else:
                     continue
@@ -338,6 +396,7 @@ def simulate_instrument(inst, spec: SniperSpec) -> list[Trade]:
                 "direction": direction,
                 "entry": float(inst.c[index]),
                 "time": inst.times[index],
+                "trail": None,
             }
             entries += 1
     return trades
