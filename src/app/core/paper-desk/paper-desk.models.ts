@@ -91,11 +91,6 @@ export interface PaperDeskSnapshot {
   message: string;
   /** When true, Live mode places real Kite MIS orders (addon). */
   realOrders: boolean;
-  /**
-   * True when this snapshot was produced with Ruler flow (always on for index desks).
-   * Keeps day-cap P&L math even if the toggle is flipped after the run.
-   */
-  rulerActive?: boolean;
   /** ISO timestamp of last successful live tick (heartbeat). */
   lastTickAt: string | null;
   statuses: PaperInstrumentStatus[];
@@ -109,26 +104,11 @@ export interface PaperDeskSnapshot {
     /** Lots multiplier used for this run (Testing / Live paper Option ₹ and Live money qty). */
     lotsUsed: number;
     /**
-     * Lot-scaled money from index/futures points (uncapped OHLC truth):
+     * Lot-scaled money from index/futures points:
      * Nifty/Bank ≈ pts × 65 × lots · Crude ≈ pts × 10 × lots.
+     * Use this to verify lots — raw indexNetPts does NOT scale with lots.
      */
     pointsMoneyRs: number;
-    /**
-     * Ruler research score only: same pts money after dyn0 day-cap (−₹500).
-     * Not live cash — compare to research months. Undefined when Ruler is off.
-     */
-    pointsMoneyResearchRs?: number;
-    /** Calendar days with ≥1 closed trade. */
-    tradedDays?: number;
-    /**
-     * Avg denominator: weekday sessions in Testing from→to when known,
-     * else tradedDays (Live).
-     */
-    sessionDays?: number;
-    /** Raw OHLC pts money ÷ sessionDays (Nifty ₹65 + Bank ₹30 × lots). */
-    avgDailyProfitRs?: number;
-    /** Day-capped research book ÷ sessionDays (Ruler). */
-    avgDailyResearchRs?: number;
   };
   /** Testing day breakdown: best/worst days, weekday rollup. */
   dayStats: PaperDeskDayStats;

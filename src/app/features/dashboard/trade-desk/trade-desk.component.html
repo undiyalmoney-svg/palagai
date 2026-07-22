@@ -1,12 +1,11 @@
 <section class="desk pg-page">
   <header class="hero pg-page-hero">
     <div class="hero-copy">
-      <p class="pg-eyebrow">Trade Desk · Ruler flow</p>
+      <p class="pg-eyebrow">Strategy Manager → Trade Desk</p>
       <h1>Trade Desk</h1>
       <p class="pg-lede">
-        Nifty 50 &amp; Bank Nifty Paper + Live run <strong>Ruler flow</strong>
-        (researched ≥₹1,000 avg/session at 1 lot · shared arm · −₹500/day ·
-        P&amp;L = pts × ₹65/₹30 × lots).
+        Nifty &amp; Bank Nifty ATM options — strategy from <strong>Strat</strong> (Paper/Live assignment).
+        Defaults: <strong>Donch Retest · 1.5R+BE</strong>. Testing, Live paper, or Live money.
       </p>
     </div>
     <div class="hero-meta">
@@ -20,7 +19,6 @@
       >
         {{ realOrders && mode() === 'live' ? 'REAL ORDERS' : 'Paper only' }}
       </span>
-      <span class="pg-badge ruler-badge on">RULER</span>
     </div>
   </header>
 
@@ -47,16 +45,26 @@
     </button>
   </div>
 
-  <div class="ruler-toggle on" role="status">
-    <span class="ruler-toggle-copy">
-      <strong>Ruler flow · always on</strong>
-      <em>Nifty 50 + Bank Nifty · Testing / Live paper / Live money</em>
-      <small
-        >Researched ≥₹1,000 avg/session · P&amp;L = pts × ₹65/₹30 × lots · shared arm · −₹500/day · no month bank</small
-      >
-    </span>
-    <span class="ruler-state" aria-hidden="true">ON</span>
-  </div>
+  <aside class="trading-basis" aria-label="How the desk decides trades">
+    <h2 class="trading-basis-title">What the app trades on</h2>
+    <ul class="trading-basis-list">
+      <li>
+        <strong>Active strategy</strong> — Set in <em>Strat</em> (Paper / Live per index). Card below shows the live module name.
+      </li>
+      <li>
+        <strong>Default (indices)</strong> — Donch Retest · OR-mid · 1.5R target · BE lock after +1R · up to 3 trades/day
+      </li>
+      <li>
+        <strong>Stops</strong> — SL capped (Nifty 30 · Bank 45) · day stop −60 pts · optional Strict −₹2,950 / Profit lock +₹5,000
+      </li>
+      <li>
+        <strong>Instrument</strong> — ATM options on the selected index · lots from the Lots control
+      </li>
+      <li>
+        <strong>Settings tip</strong> — Changing Max trades on Champion does nothing if Desk is on Donch Retest. Edit the assigned strategy (Paper/Live badge in Strat).
+      </li>
+    </ul>
+  </aside>
 
   <div class="control-bar">
     @if (mode() === 'testing') {
@@ -150,12 +158,6 @@
           <span>I understand this uses real money</span>
         </label>
       }
-      @if (realOrders) {
-        <p class="hint warn-live-ruler">
-          Ruler money: same rules as Testing / Live paper — shared arm · −₹500 day stop · flatten at day-cap · no month bank.
-          Prefer Live paper first.
-        </p>
-      }
     }
 
     <div class="actions">
@@ -214,21 +216,6 @@
     </p>
   }
 
-  <aside class="trading-basis" aria-label="How the desk decides trades">
-    <h2 class="trading-basis-title">What the app trades on</h2>
-    <ul class="trading-basis-list">
-      <li>
-        <strong>Ruler flow</strong> — only strategy for Nifty + Bank · shared daily arm · hunter when red · −₹500/day in Testing + Live · no month bank
-      </li>
-      <li>
-        <strong>Lots / books</strong> — Lots field · Nifty/Bank checkboxes · optional Strict −₹2,950 / Profit lock +₹5,000
-      </li>
-      <li>
-        <strong>Stocks</strong> — pick strategies on Stocks Desk / Strat · Ruler does not apply
-      </li>
-    </ul>
-  </aside>
-
   @if (resultView().totals.trades || snapshot().statuses.length) {
     <div class="totals">
       <div class="stat">
@@ -243,58 +230,10 @@
         <span>Index pts</span>
         <strong>{{ resultView().totals.indexNetPts > 0 ? '+' : '' }}{{ resultView().totals.indexNetPts | number: '1.1-1' }}</strong>
       </div>
-      @if (resultView().rulerRun) {
-        <div class="stat primary" [class.up]="resultView().totals.pointsMoneyRs > 0" [class.down]="resultView().totals.pointsMoneyRs < 0">
-          <span>P&amp;L ₹ ({{ resultView().totals.lotsUsed }} lot · Nifty ₹65 + Bank ₹30 · OHLC)</span>
-          <strong>{{ resultView().totals.pointsMoneyRs > 0 ? '+' : '' }}{{ resultView().totals.pointsMoneyRs | number: '1.0-0' }}</strong>
-        </div>
-        @if (resultView().totals.pointsMoneyResearchRs != null) {
-          <div class="stat" [class.up]="resultView().totals.pointsMoneyResearchRs! > 0" [class.down]="resultView().totals.pointsMoneyResearchRs! < 0">
-            <span>Day-capped book ₹ (−₹500/day · Testing + Live same rule)</span>
-            <strong>{{ resultView().totals.pointsMoneyResearchRs! > 0 ? '+' : '' }}{{ resultView().totals.pointsMoneyResearchRs! | number: '1.0-0' }}</strong>
-          </div>
-        }
-        @if (resultView().totals.avgDailyResearchRs != null || resultView().totals.avgDailyProfitRs != null) {
-          <div
-            class="stat"
-            [class.up]="(resultView().totals.avgDailyResearchRs ?? resultView().totals.avgDailyProfitRs ?? 0) > 0"
-            [class.down]="(resultView().totals.avgDailyResearchRs ?? resultView().totals.avgDailyProfitRs ?? 0) < 0"
-          >
-            <span>
-              Avg ₹/session
-              @if (resultView().totals.sessionDays) {
-                · {{ resultView().totals.sessionDays }} session(s)
-              }
-              @if (resultView().totals.tradedDays != null) {
-                · {{ resultView().totals.tradedDays }} traded
-              }
-            </span>
-            <strong>
-              {{
-                (resultView().totals.avgDailyResearchRs ?? resultView().totals.avgDailyProfitRs ?? 0) > 0
-                  ? '+'
-                  : ''
-              }}{{
-                (resultView().totals.avgDailyResearchRs ?? resultView().totals.avgDailyProfitRs ?? 0)
-                  | number: '1.0-0'
-              }}
-            </strong>
-          </div>
-        }
-        <div class="stat" [class.up]="resultView().totals.optionNetRs > 0" [class.down]="resultView().totals.optionNetRs < 0">
-          <span>Option ₹ (fills / estimate)</span>
-          <strong>{{ resultView().totals.optionNetRs > 0 ? '+' : '' }}{{ resultView().totals.optionNetRs | number: '1.0-0' }}</strong>
-        </div>
-      } @else {
-        <div class="stat primary" [class.up]="resultView().totals.optionNetRs > 0" [class.down]="resultView().totals.optionNetRs < 0">
-          <span>P&amp;L ₹ ({{ resultView().totals.lotsUsed }} lot{{ resultView().totals.lotsUsed > 1 ? 's' : '' }} · options)</span>
-          <strong>{{ resultView().totals.optionNetRs > 0 ? '+' : '' }}{{ resultView().totals.optionNetRs | number: '1.0-0' }}</strong>
-        </div>
-        <div class="stat" [class.up]="resultView().totals.pointsMoneyRs > 0" [class.down]="resultView().totals.pointsMoneyRs < 0">
-          <span>Pts money ₹ (65/30)</span>
-          <strong>{{ resultView().totals.pointsMoneyRs > 0 ? '+' : '' }}{{ resultView().totals.pointsMoneyRs | number: '1.0-0' }}</strong>
-        </div>
-      }
+      <div class="stat primary" [class.up]="resultView().totals.optionNetRs > 0" [class.down]="resultView().totals.optionNetRs < 0">
+        <span>P&amp;L ₹ ({{ resultView().totals.lotsUsed }} lot{{ resultView().totals.lotsUsed > 1 ? 's' : '' }} · options)</span>
+        <strong>{{ resultView().totals.optionNetRs > 0 ? '+' : '' }}{{ resultView().totals.optionNetRs | number: '1.0-0' }}</strong>
+      </div>
       <div class="stat">
         <span>Kite 5m calls</span>
         <strong>{{ snapshot().kiteStats.historicalCalls }}</strong>
@@ -311,8 +250,7 @@
           <div>
             <h3>Day breakdown</h3>
             <p>
-              {{ resultView().dayStats.tradingDays }} trading day(s) · ranked by
-              {{ resultView().dayStats.rankBy === 'pointsMoney' ? 'Pts money ₹ (OHLC raw)' : 'Option ₹' }}
+              {{ resultView().dayStats.tradingDays }} trading day(s) · ranked by Option ₹
               @if (resultView().filtered) {
                 · {{ resultView().weekdayLabel }}
               }
@@ -334,22 +272,14 @@
             <div class="day-card up">
               <span>Most profitable day</span>
               <strong>{{ best.displayDate }}</strong>
-              @if (resultView().dayStats.rankBy === 'pointsMoney') {
-                <em>{{ best.pointsMoneyRs > 0 ? '+' : '' }}{{ best.pointsMoneyRs | number: '1.0-0' }} · {{ best.trades }} trade(s)</em>
-              } @else {
-                <em>{{ best.optionNetRs > 0 ? '+' : '' }}{{ best.optionNetRs | number: '1.0-0' }} · {{ best.trades }} trade(s)</em>
-              }
+              <em>{{ best.optionNetRs > 0 ? '+' : '' }}{{ best.optionNetRs | number: '1.0-0' }} · {{ best.trades }} trade(s)</em>
             </div>
           }
           @if (resultView().dayStats.worstDay; as worst) {
             <div class="day-card down">
               <span>Most loss day</span>
               <strong>{{ worst.displayDate }}</strong>
-              @if (resultView().dayStats.rankBy === 'pointsMoney') {
-                <em>{{ worst.pointsMoneyRs > 0 ? '+' : '' }}{{ worst.pointsMoneyRs | number: '1.0-0' }} · {{ worst.trades }} trade(s)</em>
-              } @else {
-                <em>{{ worst.optionNetRs > 0 ? '+' : '' }}{{ worst.optionNetRs | number: '1.0-0' }} · {{ worst.trades }} trade(s)</em>
-              }
+              <em>{{ worst.optionNetRs > 0 ? '+' : '' }}{{ worst.optionNetRs | number: '1.0-0' }} · {{ worst.trades }} trade(s)</em>
             </div>
           }
         </div>
@@ -364,7 +294,7 @@
                     <th>Date</th>
                     <th>Day</th>
                     <th>Trades</th>
-                    <th>{{ resultView().dayStats.rankBy === 'pointsMoney' ? 'Pts ₹' : 'Option ₹' }}</th>
+                    <th>Option ₹</th>
                     <th>Pts</th>
                   </tr>
                 </thead>
@@ -374,11 +304,7 @@
                       <td>{{ d.displayDate }}</td>
                       <td>{{ d.weekday }}</td>
                       <td>{{ d.trades }}</td>
-                      @if (resultView().dayStats.rankBy === 'pointsMoney') {
-                        <td class="num up">{{ d.pointsMoneyRs > 0 ? '+' : '' }}{{ d.pointsMoneyRs | number: '1.0-0' }}</td>
-                      } @else {
-                        <td class="num up">{{ d.optionNetRs > 0 ? '+' : '' }}{{ d.optionNetRs | number: '1.0-0' }}</td>
-                      }
+                      <td class="num up">{{ d.optionNetRs > 0 ? '+' : '' }}{{ d.optionNetRs | number: '1.0-0' }}</td>
                       <td class="num">{{ d.indexNetPts > 0 ? '+' : '' }}{{ d.indexNetPts | number: '1.1-1' }}</td>
                     </tr>
                   } @empty {
@@ -397,7 +323,7 @@
                     <th>Date</th>
                     <th>Day</th>
                     <th>Trades</th>
-                    <th>{{ resultView().dayStats.rankBy === 'pointsMoney' ? 'Pts ₹' : 'Option ₹' }}</th>
+                    <th>Option ₹</th>
                     <th>Pts</th>
                   </tr>
                 </thead>
@@ -407,11 +333,7 @@
                       <td>{{ d.displayDate }}</td>
                       <td>{{ d.weekday }}</td>
                       <td>{{ d.trades }}</td>
-                      @if (resultView().dayStats.rankBy === 'pointsMoney') {
-                        <td class="num down">{{ d.pointsMoneyRs | number: '1.0-0' }}</td>
-                      } @else {
-                        <td class="num down">{{ d.optionNetRs | number: '1.0-0' }}</td>
-                      }
+                      <td class="num down">{{ d.optionNetRs | number: '1.0-0' }}</td>
                       <td class="num">{{ d.indexNetPts > 0 ? '+' : '' }}{{ d.indexNetPts | number: '1.1-1' }}</td>
                     </tr>
                   } @empty {
@@ -433,7 +355,7 @@
                     <th>Day</th>
                     <th>Trades</th>
                     <th>W / L</th>
-                    <th>{{ resultView().dayStats.rankBy === 'pointsMoney' ? 'Pts ₹' : 'Option ₹' }}</th>
+                    <th>Option ₹</th>
                     <th>Pts</th>
                   </tr>
                 </thead>
@@ -443,15 +365,9 @@
                       <td>{{ w.weekday }}</td>
                       <td>{{ w.trades }}</td>
                       <td>{{ w.wins }} / {{ w.losses }}</td>
-                      @if (resultView().dayStats.rankBy === 'pointsMoney') {
-                        <td class="num" [class.up]="w.pointsMoneyRs > 0" [class.down]="w.pointsMoneyRs < 0">
-                          {{ w.pointsMoneyRs > 0 ? '+' : '' }}{{ w.pointsMoneyRs | number: '1.0-0' }}
-                        </td>
-                      } @else {
-                        <td class="num" [class.up]="w.optionNetRs > 0" [class.down]="w.optionNetRs < 0">
-                          {{ w.optionNetRs > 0 ? '+' : '' }}{{ w.optionNetRs | number: '1.0-0' }}
-                        </td>
-                      }
+                      <td class="num" [class.up]="w.optionNetRs > 0" [class.down]="w.optionNetRs < 0">
+                        {{ w.optionNetRs > 0 ? '+' : '' }}{{ w.optionNetRs | number: '1.0-0' }}
+                      </td>
                       <td class="num" [class.up]="w.indexNetPts > 0" [class.down]="w.indexNetPts < 0">
                         {{ w.indexNetPts > 0 ? '+' : '' }}{{ w.indexNetPts | number: '1.1-1' }}
                       </td>

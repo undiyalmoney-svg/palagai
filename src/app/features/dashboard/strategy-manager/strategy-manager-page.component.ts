@@ -17,7 +17,6 @@ import { StrategyPerformanceService } from '../../../core/strategy-manager/runti
 import { StrategyRegistryService } from '../../../core/strategy-manager/registry/strategy-registry.service';
 import { StrategySettings } from '../../../core/strategy-manager/models/strategy-settings.model';
 import { PaperTradeDeskService } from '../../../core/paper-desk/paper-trade-desk.service';
-import { MANAGED_STRATEGY_IDS } from '../../../core/strategy-manager/config/managed-strategy-ids';
 
 @Component({
   selector: 'app-strategy-manager-page',
@@ -48,7 +47,7 @@ export class StrategyManagerPageComponent {
   private readonly settingsEpoch = signal(0);
 
   protected readonly selectedStrategyId = signal<string>(
-    MANAGED_STRATEGY_IDS.RULER ||
+    this.assignments.getAssignment('nifty').paper ||
       this.registry.listForChannel('nifty')[0]?.id ||
       this.registry.getAll()[0]?.id ||
       '',
@@ -72,16 +71,12 @@ export class StrategyManagerPageComponent {
 
   protected readonly editingAssigned = computed(() => {
     const id = this.selectedStrategyId();
-    const ch = this.selectedChannel();
-    const a = this.assignmentMap()[ch];
-    const indexRuler = ch !== 'stocks';
-    const effectivePaper = indexRuler ? MANAGED_STRATEGY_IDS.RULER : a.paper;
-    const effectiveLive = indexRuler ? MANAGED_STRATEGY_IDS.RULER : a.live;
+    const a = this.assignmentMap()[this.selectedChannel()];
     return {
-      isPaper: effectivePaper === id,
-      isLive: effectiveLive === id,
-      paperName: this.strategyName(effectivePaper),
-      liveName: this.strategyName(effectiveLive),
+      isPaper: a.paper === id,
+      isLive: a.live === id,
+      paperName: this.strategyName(a.paper),
+      liveName: this.strategyName(a.live),
     };
   });
 
@@ -99,25 +94,19 @@ export class StrategyManagerPageComponent {
   });
 
   protected readonly livePerf = computed(() => {
-    const ch = this.selectedChannel();
-    const id = this.assignments.getStrategyId(ch, 'live');
-    return this.perf.performance(id, ch);
+    const a = this.assignmentMap()[this.selectedChannel()];
+    return this.perf.performance(a.live, this.selectedChannel());
   });
 
   protected readonly paperPerf = computed(() => {
-    const ch = this.selectedChannel();
-    const id = this.assignments.getStrategyId(ch, 'paper');
-    return this.perf.performance(id, ch);
+    const a = this.assignmentMap()[this.selectedChannel()];
+    return this.perf.performance(a.paper, this.selectedChannel());
   });
 
   protected selectChannel(ch: DeskChannel): void {
     this.selectedChannel.set(ch);
-    const list = this.registry.listForChannel(ch);
-    if (ch !== 'stocks') {
-      this.selectedStrategyId.set(MANAGED_STRATEGY_IDS.RULER);
-      return;
-    }
     const paperId = this.assignmentMap()[ch].paper;
+    const list = this.registry.listForChannel(ch);
     if (paperId && list.some((s) => s.id === paperId)) {
       this.selectedStrategyId.set(paperId);
       return;
@@ -147,13 +136,6 @@ export class StrategyManagerPageComponent {
     this.desk.refreshLiveAfterSettingsChange();
   }
 
-  protected deskStrategyLabel(ch: DeskChannel, mode: 'paper' | 'live'): string {
-    if (ch !== 'stocks') {
-      return 'Ruler flow';
-    }
-    return this.strategyName(this.assignmentMap()[ch][mode]);
-  }
-
   protected strategyName(id: string | null): string {
     if (!id) {
       return '— Off —';
@@ -162,23 +144,16 @@ export class StrategyManagerPageComponent {
   }
 
   protected assignmentBadges(id: string): string {
-    const ch = this.selectedChannel();
-    const a = this.assignmentMap()[ch];
+    const a = this.assignmentMap()[this.selectedChannel()];
     const tags: string[] = [];
-    if (ch !== 'stocks') {
-      if (id === MANAGED_STRATEGY_IDS.RULER) {
-        tags.push('Paper', 'Live');
-      }
-    } else {
-      if (a.paper === id) {
-        tags.push('Paper');
-      }
-      if (a.live === id) {
-        tags.push('Live');
-      }
-      if (a.shadow === id) {
-        tags.push('Shadow');
-      }
+    if (a.paper === id) {
+      tags.push('Paper');
+    }
+    if (a.live === id) {
+      tags.push('Live');
+    }
+    if (a.shadow === id) {
+      tags.push('Shadow');
     }
     return tags.join(' · ');
   }

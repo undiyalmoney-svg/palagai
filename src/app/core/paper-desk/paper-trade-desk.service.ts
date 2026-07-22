@@ -33,19 +33,11 @@ import {
   replayPaperOnIndex,
 } from './paper-desk-engine';
 import { buildPaperDeskDayStats, emptyPaperDeskDayStats } from './paper-desk-day-stats';
-import {
-  tradesUsedRuler,
-  buildRulerProfitTotals,
-} from './paper-desk-points-money';
-import {
-  buildDeskRiskOverrides,
-} from '../strategy-engine/strategies/pdhl-opening-range/pdhl-opening-range.evaluator';
+import { PDHL_RUPEES_PER_POINT, buildDeskRiskOverrides } from '../strategy-engine/strategies/pdhl-opening-range/pdhl-opening-range.evaluator';
 import { StrategyManagerService } from '../strategy-manager/runtime/strategy-manager.service';
 import { StrategyEventLogger } from '../strategy-manager/runtime/strategy-event-logger.service';
 import { ShadowBookService } from '../strategy-manager/runtime/shadow-book.service';
 import { StrategyPerformanceService } from '../strategy-manager/runtime/strategy-performance.service';
-import { RulerMonthStateService } from '../strategy-manager/runtime/ruler-month-state.service';
-import { RulerDayPlanService } from '../strategy-manager/runtime/ruler-day-plan.service';
 import { DeskChannel } from '../strategy-manager/models/desk-channel.model';
 import {
   IManagedStrategy,
@@ -89,8 +81,6 @@ export class PaperTradeDeskService {
   private readonly strategyLog = inject(StrategyEventLogger);
   private readonly shadowBook = inject(ShadowBookService);
   private readonly strategyPerf = inject(StrategyPerformanceService);
-  private readonly rulerMonth = inject(RulerMonthStateService);
-  private readonly rulerDayPlan = inject(RulerDayPlanService);
 
   private readonly instruments: Array<{ instrument: TesterInstrument; kind: IndexOptionKind }> = [
     { instrument: NIFTY_50_INSTRUMENT, kind: 'nifty' },
@@ -133,8 +123,6 @@ export class PaperTradeDeskService {
     if (this.busy()) {
       return;
     }
-    this.rulerMonth.setScope('live');
-    this.rulerDayPlan.setScope('live');
     void this.tickLive(false);
   }
 
@@ -340,11 +328,6 @@ export class PaperTradeDeskService {
       typeof lotsOrOptions === 'number' ? { lots: lotsOrOptions } : lotsOrOptions;
     this.normalizeDeskOptions(options);
     this.lotsMultiplier = Math.max(1, Math.floor(options.lots ?? 1) || 1);
-    // Testing uses an isolated in-memory Ruler scope — never wipe / poison live MTD.
-    this.rulerMonth.setScope('testing');
-    this.rulerDayPlan.setScope('testing');
-    this.rulerMonth.clearTesting();
-    this.rulerDayPlan.clearTesting();
     this.busy.set(true);
     const batches = chunkInclusiveDateRange(fromDate, toDate, DESK_HISTORICAL_CHUNK_DAYS);
     this.snapshot.set({
@@ -549,14 +532,7 @@ export class PaperTradeDeskService {
           instrumentId: t.instrumentId,
         })),
       );
-      const rulerOn =
-        this.strategyManager.isRulerEnabled() || tradesUsedRuler(sorted);
-      const rankBy = rulerOn ? 'pointsMoney' : 'option';
-      const dayStats = buildPaperDeskDayStats(sorted, 5, this.lotsMultiplier, rankBy);
-      const totals = summarize(sorted, this.lotsMultiplier, rulerOn, fromDate, toDate);
-      const research = totals.pointsMoneyResearchRs;
-      const rawPts = totals.pointsMoneyRs;
-      const avgDay = totals.avgDailyResearchRs ?? totals.avgDailyProfitRs ?? 0;
+      const dayStats = buildPaperDeskDayStats(sorted);
 
       this.snapshot.set({
         mode: 'testing',
@@ -565,14 +541,11 @@ export class PaperTradeDeskService {
         toDate,
         marketOpen: true,
         realOrders: false,
-        rulerActive: rulerOn,
         lastTickAt: null,
-        message: rulerOn
-          ? `Testing complete · Ruler · Nifty+Bank · ${sorted.length} trade(s) · P&L ₹${Math.round(rawPts)} · day-capped ₹${research != null && research >= 0 ? '+' : ''}${research != null ? Math.round(research) : 0} · avg ₹${Math.round(avgDay)}/session · ${this.lotsMultiplier} lot(s) · ${this.deskOptionsLabel()} · ${this.kiteStatsLabel()}`
-          : `Testing complete · ${sorted.length} paper trade(s) · ${batches.length} batch(es) · ${this.lotsMultiplier} lot(s) · ${this.deskOptionsLabel()} · ${this.kiteStatsLabel()}`,
+        message: `Testing complete · ${sorted.length} paper trade(s) · ${batches.length} batch(es) · ${this.lotsMultiplier} lot(s) · ${this.deskOptionsLabel()} · ${this.kiteStatsLabel()}`,
         statuses,
         trades: sorted,
-        totals,
+        totals: summarize(sorted, this.lotsMultiplier, PDHL_RUPEES_PER_POINT),
         dayStats,
         kiteStats: this.kiteStats(),
         orderEvents: [],
@@ -604,9 +577,6 @@ export class PaperTradeDeskService {
     this.normalizeDeskOptions(options);
     this.realOrders = !!environment.allowLiveMoney && !!options?.realOrders;
     this.lotsMultiplier = Math.max(1, Math.floor(options?.lots ?? 1) || 1);
-    // Live Ruler risk state is separate from Testing (persisted MTD / day arms).
-    this.rulerMonth.setScope('live');
-    this.rulerDayPlan.setScope('live');
     this.liveOrders.reset();
     this.liveOrders.setLotsMultiplier(this.lotsMultiplier);
     const today = todayIso();
@@ -925,11 +895,6 @@ export class PaperTradeDeskService {
     const openMsg = openBits.length
       ? ` · ON MARKET: ${openBits.join(' · ')}`
       : '';
-    const rulerOn =
-      this.strategyManager.isRulerEnabled() || tradesUsedRuler(enriched);
-    const totals = summarize(enriched, this.lotsMultiplier, rulerOn, today, today);
-    const pnl = Math.round(totals.pointsMoneyRs);
-    const avg = Math.round(totals.avgDailyResearchRs ?? totals.avgDailyProfitRs ?? 0);
     this.snapshot.set({
       mode: 'live',
       running: true,
@@ -937,20 +902,12 @@ export class PaperTradeDeskService {
       toDate: today,
       marketOpen: true,
       realOrders: this.realOrders,
-      rulerActive: rulerOn,
       lastTickAt: new Date().toISOString(),
-      message: rulerOn
-        ? `${moneyTag} · Ruler · Nifty+Bank · alive ${now} · P&L ₹${pnl >= 0 ? '+' : ''}${pnl} · avg ₹${avg}/session · waiting ${waiting} · in trade ${inTrade}${targets ? ` · target hit ${targets}` : ''}${openMsg} · ${this.kiteStatsLabel()}`
-        : `${moneyTag} · alive ${now} · waiting ${waiting} · in trade ${inTrade}${targets ? ` · target hit ${targets}` : ''}${openMsg} · ${this.kiteStatsLabel()}`,
+      message: `${moneyTag} · alive ${now} · waiting ${waiting} · in trade ${inTrade}${targets ? ` · target hit ${targets}` : ''}${openMsg} · ${this.kiteStatsLabel()}`,
       statuses,
       trades: enriched.sort((a, b) => b.entryTime.localeCompare(a.entryTime)),
-      totals,
-      dayStats: buildPaperDeskDayStats(
-        enriched,
-        5,
-        this.lotsMultiplier,
-        rulerOn ? 'pointsMoney' : 'option',
-      ),
+      totals: summarize(enriched, this.lotsMultiplier, PDHL_RUPEES_PER_POINT),
+      dayStats: buildPaperDeskDayStats(enriched),
       kiteStats: this.kiteStats(),
       orderEvents: this.liveOrders.getEvents(),
       orderSummary: this.liveOrders.getOrderSummary(),
@@ -1210,22 +1167,10 @@ function emptySnapshot(mode: PaperDeskMode): PaperDeskSnapshot {
     marketOpen: mode === 'testing',
     message: '',
     realOrders: false,
-    rulerActive: false,
     lastTickAt: null,
     statuses: [],
     trades: [],
-    totals: {
-      trades: 0,
-      wins: 0,
-      losses: 0,
-      indexNetPts: 0,
-      optionNetRs: 0,
-      lotsUsed: 1,
-      pointsMoneyRs: 0,
-      tradedDays: 0,
-      sessionDays: 0,
-      avgDailyProfitRs: 0,
-    },
+    totals: { trades: 0, wins: 0, losses: 0, indexNetPts: 0, optionNetRs: 0, lotsUsed: 1, pointsMoneyRs: 0 },
     dayStats: emptyPaperDeskDayStats(),
     kiteStats: {
       historicalCalls: 0,
@@ -1315,17 +1260,10 @@ function isCancelledError(err: unknown): boolean {
 function summarize(
   trades: PaperTrade[],
   lotsUsed: number = 1,
-  rulerDayClip = false,
-  fromDate?: string,
-  toDate?: string,
+  rupeesPerPoint: number = PDHL_RUPEES_PER_POINT,
 ): PaperDeskSnapshot['totals'] {
   const lots = Math.max(1, Math.floor(lotsUsed) || 1);
   const indexNetPts = trades.reduce((a, t) => a + t.indexPoints, 0);
-  const money = buildRulerProfitTotals(trades, lots, {
-    rulerDayClip,
-    fromDate,
-    toDate,
-  });
   return {
     trades: trades.length,
     wins: trades.filter((t) => t.outcome === 'WIN').length,
@@ -1333,12 +1271,7 @@ function summarize(
     indexNetPts,
     optionNetRs: trades.reduce((a, t) => a + (t.optionPnlRs ?? 0), 0),
     lotsUsed: lots,
-    pointsMoneyRs: money.pointsMoneyRs,
-    pointsMoneyResearchRs: money.pointsMoneyResearchRs,
-    tradedDays: money.tradedDays,
-    sessionDays: money.sessionDays,
-    avgDailyProfitRs: money.avgDailyProfitRs,
-    avgDailyResearchRs: money.avgDailyResearchRs,
+    pointsMoneyRs: indexNetPts * rupeesPerPoint * lots,
   };
 }
 

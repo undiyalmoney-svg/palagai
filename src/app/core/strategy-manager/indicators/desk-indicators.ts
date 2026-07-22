@@ -130,7 +130,7 @@ export function swingLevels(candles: Candle[], lb: number): { high: number; low:
 /**
  * Last confirmed 3-bar fractal swing high/low (1 bar each side).
  * Causal: evaluates candidates that have a right-hand neighbor in `candles`.
- * Prefer `researchSwingAt` for Ruler DONCH_TRAIL (matches research swing3).
+ * Prefer `researchSwingAt` for DONCH trail exits (matches research swing3).
  */
 export function lastSwing3(candles: Candle[]): { high: number | null; low: number | null } {
   const n = candles.length;
@@ -156,7 +156,7 @@ export function lastSwing3(candles: Candle[]): { high: number | null; low: numbe
  * Research `precompute_swings(lookback)` at the last bar.
  * Swing extreme needs `lookback` bars on each side; value appears at
  * confirmation index i+lookback and is forward-filled (strategy-universe-search).
- * Ruler trail exit uses lookback=3 (`inst.swing3_*`).
+ * Trail exit uses lookback=3 (`inst.swing3_*`).
  */
 export function researchSwingAt(
   candles: Candle[],

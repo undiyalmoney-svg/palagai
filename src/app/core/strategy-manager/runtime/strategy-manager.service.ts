@@ -128,14 +128,6 @@ export class StrategyManagerService {
     this.assignments.setStrategy(channel, mode, strategyId);
   }
 
-  isRulerEnabled(): boolean {
-    return this.assignments.isRulerEnabled();
-  }
-
-  setRulerEnabled(enabled: boolean): void {
-    this.assignments.setRulerEnabled(enabled);
-  }
-
   private prepareRunner(strategyId: string): IManagedStrategy | undefined {
     const mod = this.registry.getById(strategyId);
     if (!mod) {
