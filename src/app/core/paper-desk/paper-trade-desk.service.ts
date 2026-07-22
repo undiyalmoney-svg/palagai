@@ -42,6 +42,7 @@ import { StrategyEventLogger } from '../strategy-manager/runtime/strategy-event-
 import { ShadowBookService } from '../strategy-manager/runtime/shadow-book.service';
 import { StrategyPerformanceService } from '../strategy-manager/runtime/strategy-performance.service';
 import { RulerMonthStateService } from '../strategy-manager/runtime/ruler-month-state.service';
+import { RulerDayPlanService } from '../strategy-manager/runtime/ruler-day-plan.service';
 import { DeskChannel } from '../strategy-manager/models/desk-channel.model';
 import {
   IManagedStrategy,
@@ -86,6 +87,7 @@ export class PaperTradeDeskService {
   private readonly shadowBook = inject(ShadowBookService);
   private readonly strategyPerf = inject(StrategyPerformanceService);
   private readonly rulerMonth = inject(RulerMonthStateService);
+  private readonly rulerDayPlan = inject(RulerDayPlanService);
 
   private readonly instruments: Array<{ instrument: TesterInstrument; kind: IndexOptionKind }> = [
     { instrument: NIFTY_50_INSTRUMENT, kind: 'nifty' },
@@ -128,6 +130,8 @@ export class PaperTradeDeskService {
     if (this.busy()) {
       return;
     }
+    this.rulerMonth.setScope('live');
+    this.rulerDayPlan.setScope('live');
     void this.tickLive(false);
   }
 
@@ -333,8 +337,11 @@ export class PaperTradeDeskService {
       typeof lotsOrOptions === 'number' ? { lots: lotsOrOptions } : lotsOrOptions;
     this.normalizeDeskOptions(options);
     this.lotsMultiplier = Math.max(1, Math.floor(options.lots ?? 1) || 1);
-    // Fresh MTD for the test range — don't poison witch/day-cap with live residue.
-    this.rulerMonth.clear();
+    // Testing uses an isolated in-memory Ruler scope — never wipe / poison live MTD.
+    this.rulerMonth.setScope('testing');
+    this.rulerDayPlan.setScope('testing');
+    this.rulerMonth.clearTesting();
+    this.rulerDayPlan.clearTesting();
     this.busy.set(true);
     const batches = chunkInclusiveDateRange(fromDate, toDate, DESK_HISTORICAL_CHUNK_DAYS);
     this.snapshot.set({
@@ -586,6 +593,9 @@ export class PaperTradeDeskService {
     this.normalizeDeskOptions(options);
     this.realOrders = !!environment.allowLiveMoney && !!options?.realOrders;
     this.lotsMultiplier = Math.max(1, Math.floor(options?.lots ?? 1) || 1);
+    // Live Ruler risk state is separate from Testing (persisted MTD / day arms).
+    this.rulerMonth.setScope('live');
+    this.rulerDayPlan.setScope('live');
     this.liveOrders.reset();
     this.liveOrders.setLotsMultiplier(this.lotsMultiplier);
     const today = todayIso();
@@ -1282,6 +1292,7 @@ function summarize(
 ): PaperDeskSnapshot['totals'] {
   const lots = Math.max(1, Math.floor(lotsUsed) || 1);
   const indexNetPts = trades.reduce((a, t) => a + t.indexPoints, 0);
+  const raw = sumPointsMoneyRs(trades, lots);
   return {
     trades: trades.length,
     wins: trades.filter((t) => t.outcome === 'WIN').length,
@@ -1289,9 +1300,8 @@ function summarize(
     indexNetPts,
     optionNetRs: trades.reduce((a, t) => a + (t.optionPnlRs ?? 0), 0),
     lotsUsed: lots,
-    pointsMoneyRs: rulerDayClip
-      ? sumPointsMoneyRsRulerClipped(trades, lots)
-      : sumPointsMoneyRs(trades, lots),
+    pointsMoneyRs: rulerDayClip ? sumPointsMoneyRsRulerClipped(trades, lots) : raw,
+    pointsMoneyRawRs: rulerDayClip ? raw : undefined,
   };
 }
 

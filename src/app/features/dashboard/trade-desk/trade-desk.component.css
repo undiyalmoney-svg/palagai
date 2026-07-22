@@ -80,6 +80,17 @@
   background: #fef2f2;
 }
 
+.hint.warn-live-ruler {
+  margin: 0.35rem 0 0;
+  padding: 0.55rem 0.7rem;
+  border-radius: 8px;
+  border: 1px solid #fcd34d;
+  background: #fffbeb;
+  color: #78350f;
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
 .lots-field {
   min-width: 5.5rem;
 }

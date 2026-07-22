@@ -19,7 +19,6 @@ import {
 } from '../engines/index-rule.engine';
 import {
   RulerArm,
-  pickRulerArm,
   computeRulerMorningFeatures,
   rulerDayCapInr,
 } from '../engines/ruler-morning.util';
@@ -35,6 +34,7 @@ import {
   StrategySettings,
   defaultStrategySettings,
 } from '../models/strategy-settings.model';
+import { RulerDayPlanService } from '../runtime/ruler-day-plan.service';
 import { RulerMonthStateService } from '../runtime/ruler-month-state.service';
 
 const ARM_DNA: Record<
@@ -67,13 +67,13 @@ const ARM_DNA: Record<
  * Boosted Ruler flow (research):
  * 1. While month MTD < ₹3,000 → beast witch
  * 2. Else → Donch trail on non-choppy mornings (STAND if choppy)
- * 3. Day loss cap ₹1,500 on **combined** day ₹ (dyn: min(cap, MTD) when month green)
- *    — research scores clip the day; desk also blocks new entries after the cap.
- * 4. One trade per day (matches research 1t books).
+ * 3. One shared arm per day for Nifty + Bank (research comb)
+ * 4. One trade per instrument per day
+ * 5. Research score clips day ₹ to −₹1,500 (dyn when month green)
  *
- * Important: the ₹ day cap is NOT converted into a tiny dayStopPts pre-trade
- * risk filter (that blocked almost all Nifty entries at ~23pts). Engine
- * dayStopPts stays generous; we skip new entries once realized day ₹ hits the cap.
+ * Live vs Testing:
+ * - Testing: both indices may take their 1 trade (research books); score is clipped in totals
+ * - Live: block new entries after combined day ₹ hits cap; flatten open if breach
  *
  * Lots come from the Trade Desk Lots field (LotsPreferenceService).
  */
@@ -81,12 +81,13 @@ const ARM_DNA: Record<
 export class RulerManagedStrategy implements IManagedStrategy {
   private readonly lotsPreference = inject(LotsPreferenceService);
   private readonly monthState = inject(RulerMonthStateService);
+  private readonly dayPlan = inject(RulerDayPlanService);
 
   readonly id = MANAGED_STRATEGY_IDS.RULER;
   readonly name = 'Ruler flow';
-  readonly version = '1.2.0';
+  readonly version = '1.3.0';
   readonly description =
-    'Boosted ruler: beast rampage until MTD ₹3k → Donch trail · ₹1,500 research day-cap (dyn when month green) · 1 trade/day · STAND on choppy. Lots from Trade Desk field.';
+    'Boosted ruler: shared daily arm (Nifty+Bank) · beast→trail · 1 trade/index/day · research day-cap ₹1,500. Testing isolated from live MTD. Lots from Trade Desk.';
   readonly supports: readonly DeskChannel[] = ['nifty', 'bank'];
 
   readonly defaultSettings = defaultStrategySettings({
@@ -99,10 +100,9 @@ export class RulerManagedStrategy implements IManagedStrategy {
     donchianLength: 20,
     emaLength: 50,
     swingLookback: 5,
-    /** Research books are one_trade=True — keep desk aligned. */
+    /** Research books are one_trade=True per instrument. */
     maxTradesPerDay: 1,
     instrumentType: 'futures',
-    /** Generous pts stop for engine bookkeeping only — ₹ cap is enforced in ₹ below. */
     dayStopPts: 60,
     targetRMultiple: 0,
     profitProtectEnabled: false,
@@ -114,12 +114,10 @@ export class RulerManagedStrategy implements IManagedStrategy {
 
   private settings: StrategySettings = { ...this.defaultSettings };
   private state: RuleDayState = createRuleDayState();
-  /** Arm used for the active open (exit mode). */
   private activeArm: Exclude<RulerArm, 'STAND'> | null = null;
   private lastEntryTime: string | null = null;
   private lastChannel: 'nifty' | 'bank' = 'nifty';
   private lastInstrumentId: string | null = null;
-  /** Realized day ₹ for the ₹1,500 cap (combined across Nifty+Bank via month state). */
   private dayNetInr = 0;
   private dayNetDate: string | null = null;
   private dayCapHit = false;
@@ -154,17 +152,20 @@ export class RulerManagedStrategy implements IManagedStrategy {
       this.dayNetDate = day;
       this.dayCapHit = false;
     }
-    // Combined Nifty+Bank day ₹ (survives strategy.reset() between index replays).
     this.dayNetInr = this.monthState.dayInr(day);
 
     const features = computeRulerMorningFeatures(series, day, isBank, this.settings.orEnd);
     const mtd = this.monthState.combinedMtdInr(day);
-    const arm = pickRulerArm(features, mtd);
+    // Shared arm for both indices (research comb) — Nifty locks first when both on.
+    const arm = this.dayPlan.getOrLockArm(day, features, mtd);
     const lots = Math.max(1, this.lotsPreference.get());
     const rs = rupeesPerPointForInstrument(ctx.instrumentId);
     const dayCapInr = rulerDayCapInr(mtd);
+    const liveProtect = this.monthState.getScope() === 'live';
 
-    if (this.dayCapHit || this.dayNetInr <= -dayCapInr) {
+    // Live only: stop new entries after combined day ₹ hits cap.
+    // Testing lets both indices take their research 1t; display/MTD use day-clip.
+    if (liveProtect && (this.dayCapHit || this.dayNetInr <= -dayCapInr)) {
       this.dayCapHit = true;
       return {
         action: 'SKIPPED',
@@ -180,7 +181,9 @@ export class RulerManagedStrategy implements IManagedStrategy {
           dayCapInr,
           dayNetInr: this.dayNetInr,
           features,
+          sharedArm: arm,
           witch: mtd < 3000 ? 'beast' : 'trail',
+          scope: this.monthState.getScope(),
         },
       };
     }
@@ -202,14 +205,14 @@ export class RulerManagedStrategy implements IManagedStrategy {
           dayCapInr,
           dayNetInr: this.dayNetInr,
           features,
+          sharedArm: arm,
           witch: mtd < 3000 ? 'beast' : 'trail',
+          scope: this.monthState.getScope(),
         },
       };
     }
 
     const dna = ARM_DNA[arm];
-    // dayStopPts stays at default 60 so the engine's pre-trade risk check does not
-    // block normal Nifty stops (~30pts). Realized ₹ cap is enforced above.
     const runSettings = mergeSettings(this.settings, {
       targetRMultiple: dna.targetR,
       profitProtectEnabled: dna.profitProtect,
@@ -237,7 +240,9 @@ export class RulerManagedStrategy implements IManagedStrategy {
           lots,
           rs,
           features,
+          sharedArm: arm,
           witch: mtd < 3000 ? 'beast' : 'trail',
+          scope: this.monthState.getScope(),
         },
       };
     }
@@ -254,7 +259,9 @@ export class RulerManagedStrategy implements IManagedStrategy {
         lots,
         rs,
         features,
+        sharedArm: arm,
         witch: mtd < 3000 ? 'beast' : 'trail',
+        scope: this.monthState.getScope(),
       },
     };
   }
@@ -296,8 +303,39 @@ export class RulerManagedStrategy implements IManagedStrategy {
     closes: number[],
     ctx: StrategyContext,
   ): ManagedExitDecision | null {
-    const arm = this.activeArm ?? 'DONCH_TRAIL';
-    const dna = ARM_DNA[arm];
+    // Live safety: flatten if combined day ₹ + this open's mark already breaches cap.
+    if (this.monthState.getScope() === 'live') {
+      const day = extractTradeDate(candle.date);
+      const mtd = this.monthState.combinedMtdInr(day);
+      const dayCapInr = rulerDayCapInr(mtd);
+      const dayNet = this.monthState.dayInr(day);
+      const lots = Math.max(1, this.lotsPreference.get());
+      const rs = rupeesPerPointForInstrument(ctx.instrumentId ?? this.lastInstrumentId);
+      const openPts =
+        open.direction === 'BUY' ? candle.close - open.entry : open.entry - candle.close;
+      const openInr = openPts * rs * lots;
+      if (dayNet + openInr <= -dayCapInr) {
+        this.dayCapHit = true;
+        return {
+          exitPrice: candle.close,
+          reason: `Ruler day cap flatten ₹${dayCapInr.toFixed(0)}`,
+        };
+      }
+    }
+
+    const arm = this.activeArm ?? this.dayPlan.getOrLockArm(
+      extractTradeDate(candle.date),
+      computeRulerMorningFeatures(
+        seriesAt(ctx),
+        extractTradeDate(candle.date),
+        isBankPdhlInstrument(ctx.instrumentId),
+        this.settings.orEnd,
+      ),
+      this.monthState.combinedMtdInr(extractTradeDate(candle.date)),
+    );
+    const useArm: Exclude<RulerArm, 'STAND'> =
+      arm && arm !== 'STAND' ? arm : 'DONCH_TRAIL';
+    const dna = ARM_DNA[useArm];
     const runSettings = mergeSettings(this.settings, {
       targetRMultiple: dna.targetR,
       profitProtectEnabled: dna.profitProtect,
@@ -331,10 +369,9 @@ export class RulerManagedStrategy implements IManagedStrategy {
     this.dayNetInr = this.monthState.dayInr(tradingDate);
     const mtdBefore = this.monthState.combinedMtdInr(tradingDate);
     const dayCapInr = rulerDayCapInr(mtdBefore);
-    if (this.dayNetInr <= -dayCapInr) {
+    if (this.monthState.getScope() === 'live' && this.dayNetInr <= -dayCapInr) {
       this.dayCapHit = true;
     }
-    // Keep engine day bookkeeping in pts (60) for max-trades / diagnostics.
     recordRuleTradeClosed(this.state, points, 60);
     this.activeArm = null;
     this.lastEntryTime = null;
