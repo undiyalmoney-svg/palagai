@@ -1,17 +1,16 @@
 #!/usr/bin/env python3
 """
-Zero-red Ruler + ₹15k month bank.
+Zero-red Ruler profit-boost (no month bank).
 
 Recipe:
-  1. MTD ≥ ₹15,000 → STAND (bank the month)
-  2. Beast only while 0 ≤ MTD < ₹3,000
-  3. MTD < 0 → hunter recover
-  4. Else → trail on wide mornings
-  5. 2 clipped reds anytime → edge
-  6. Day-cap ₹500
+  1. Beast only while 0 ≤ MTD < ₹3,000
+  2. MTD < 0 → hunter recover
+  3. Else → trail on wide mornings (keeps trading past ₹15k)
+  4. 2 clipped reds anytime → edge
+  5. Day-cap ₹500
 
 Trained and reported at 1 lot only.
-Research: no causal 1-lot router clears ₹15k in every 2020–2026 month (0 red kept).
+Optional month_target>0 forces STAND after that MTD (off by default — caps upside).
 """
 from __future__ import annotations
 
@@ -73,7 +72,7 @@ def run_sep_boost(
     rampage_until: float = 3000.0,
     base_cap: float = 500.0,
     loss_streak: int = 2,
-    month_target: float = 15000.0,
+    month_target: float = 0.0,
     post: Callable | None = None,
     hunter: Callable | None = None,
     early_breaker: bool = True,

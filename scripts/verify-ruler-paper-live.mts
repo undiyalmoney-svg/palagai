@@ -91,10 +91,10 @@ function assertArmLogicParity(): void {
   assert.strictEqual(pickRulerArm(choppy, 0), 'STAND');
   assert.strictEqual(pickRulerArm(trailMorning, 0), 'DONCH_TRAIL'); // beast · wide+strong
   assert.strictEqual(pickRulerArm(swingMorning, 0), 'SWING_2R'); // beast · EMA bias
-  // Month bank: MTD ≥ ₹15k → STAND
-  assert.strictEqual(pickRulerArm(trailMorning, 15000), 'STAND');
-  assert.strictEqual(pickRulerArm(trailMorning, RULER_MONTH_TARGET_INR), 'STAND');
-  assert.strictEqual(pickRulerArm(trailMorning, 20000), 'STAND');
+  // No month bank: MTD ≥ ₹15k still trails / trades (does not STAND).
+  assert.strictEqual(pickRulerArm(trailMorning, 15000), 'DONCH_TRAIL');
+  assert.strictEqual(pickRulerArm(trailMorning, RULER_MONTH_TARGET_INR), 'DONCH_TRAIL');
+  assert.strictEqual(pickRulerArm(trailMorning, 20000), 'DONCH_TRAIL');
   assert.strictEqual(pickRulerArm(trailMorning, RULER_RAMPAGE_UNTIL_INR - 1), 'DONCH_TRAIL');
   // Underwater (MTD < 0): hunter, not beast — wide+strong but not vwide → SWING/2R path.
   assert.strictEqual(pickRulerArm(trailMorning, -500), 'SWING_2R'); // hunter · wide+ema, not vwide
@@ -116,7 +116,7 @@ function assertArmLogicParity(): void {
     'SWING_2R',
   );
 
-  // Day-cap math shared; desk applies entry-block / flatten only in live scope.
+  // Day-cap math shared; desk applies entry-block / flatten in Testing + Live.
   assert.strictEqual(rulerDayCapInr(0), RULER_DAY_CAP_INR);
   assert.strictEqual(clipRulerDayInr(-5000, 0), -RULER_DAY_CAP_INR);
   assert.strictEqual(clipRulerDayInr(800, 0), 800);
@@ -144,7 +144,7 @@ function main(): void {
         strategy_id: RULER,
         paper_live_same: true,
         live_extra: 'day-cap blocks new entries + flattens in Testing and Live (same rule)',
-        month_bank: `STAND after +₹${RULER_MONTH_TARGET_INR} MTD (lock, not a monthly promise)`,
+        month_bank: 'removed — keep trading past ₹15k MTD',
         mtd_scopes: 'testing memory isolated from live persistence',
       },
       null,
