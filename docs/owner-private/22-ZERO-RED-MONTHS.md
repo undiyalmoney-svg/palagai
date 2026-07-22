@@ -1,84 +1,84 @@
-# 22 — Zero red months + ₹15k every month (auto-bot)
+# 22 — Monster auto-bot @ 1 lot (clever switches)
 
-## Motive
-Auto bot must deliver:
-1. **0 red months**
-2. **≥ ₹15,000 every month**
+## What you asked for
+- **1 lot** (not “trade 6× size”)
+- **Clever auto flow** — switch strategies like a monster trader
+- Path to big months (₹15k spirit) via skill, not leverage
 
-## Verdict — how to make it possible
+## Hard facts (OOS 2024→2026-07, 1 lot Nifty+Bank)
 
-At **1 lot** Nifty+Bank, zero-red locks max out ~₹2–5k/month average — **not** ₹15k every month.  
-**Oracle** (look-ahead best arm/day) already clears **every** OOS month ≥ ₹42k at 1 lot — the money exists; size + selection is the gap.
+### 1) Flat ₹500/day is not enough for ₹15k every month
+Even with **perfect** arm pick, days where some arm makes ≥₹500 are only ~72% of sessions (~14/month).  
+Clipping those to exactly ₹500 → **~₹5–10k/month**, never a full ₹15k every month.
 
-### Working causal recipe (OOS 2024-01 → 2026-07, 31/31)
+**₹15k/month at 1 lot needs keeping fat wins** (especially Donch trail on the right mornings), not freezing at ₹500.
 
-| Knob | Value |
-|---|---|
-| Books | Nifty + Bank |
-| Size | **6×** the research 1-lot DNA (₹65/pt ×6 Nifty, ₹30/pt ×6 Bank) |
-| Entry filter | Morning **score ≥ 4**, not choppy → **Donch Retest OR-mid 2R** |
-| Else | **STAND** |
-| Month rule | Trade until MTD **≥ ₹15,000** → **STAND** rest of month |
-| Look-ahead | None (morning features + MTD only) |
+### 2) Perfect switching (oracle) already clears the motive at 1 lot
+If the bot always picked the best arm that day (look-ahead — not tradable):
 
-**Result (backtest):**
-
-| Metric | Value |
+| | Oracle @1 lot |
 |---|---:|
-| Months ≥ ₹15k | **31/31** |
+| Every month ≥ ₹15k | **31/31** |
 | Red months | **0** |
-| Worst month | **₹15,472** |
-| Avg month | **₹29,032** |
-| OOS net | **≈ ₹9.0L** |
+| Worst month | **≈ ₹42k** |
+| Avg month | **≈ ₹76k** |
 
-Slightly safer lock **₹16,000** at 6×: worst **₹16,304**, avg **₹29,403**, net **≈ ₹9.1L**.
+So the money is there at **1 lot**. The job is a **smarter causal switcher**.
 
-### 2026 months (6× · lock ₹15k)
+### 3) Best causal monster found so far — EDGE switcher
 
-| Month | ₹ |
+Morning (after 09:45) picks **one** arm:
+
+| Regime | Arm |
+|---|---|
+| Choppy | STAND |
+| Very strong + wide OR | **DONCH_TRAIL** (let it run) |
+| Wide + strong + calm | **DONCH_2R** |
+| EMA aligned | **SWING_2R** |
+| Drive ≥ 0.4 | **DONCH_15R** |
+| Else | STAND |
+
+**OOS @1 lot:**
+
+| Metric | EDGE monster |
 |---|---:|
-| Jan | 18,564 |
-| Feb | 45,579 |
-| Mar | 38,817 |
-| Apr | 22,826 |
-| May | 17,496 |
-| Jun | 19,800 |
-| Jul* | 38,386 |
+| Avg / day | **≈ ₹450–520** |
+| Avg / month | **≈ ₹9–10k** |
+| Months ≥ ₹15k | **13–15 / 31** |
+| Red months | **~11–12** |
+| OOS net | **≈ ₹2.5–3.2L** |
 
-\*partial month in data.
+Optional: **freeze month once MTD ≥ ₹15k** → slightly more months hit 15k (15/31), still not all, still some reds.
 
-### Why 6× is the floor
-| Size | ≥15k months | Red | Notes |
-|---:|---:|---:|---|
-| 4× | 28/31 | 2 | Fails |
-| 5× | 30/31 | 1 | **2024-04** still short/red |
-| **6×** | **31/31** | **0** | **Minimum that works** |
-
-Edge/trail routers **do not** hit this goal even at high size — fat-tail months go red when scaled.
-
-### Score definition (morning, Nifty primary)
-After 09:45 OR:
-- +2 wide (Nifty OR≥80 / Bank OR≥150)
-- +1 very wide
-- +2 drive≥0.45 · +1 drive≥0.65
-- +1 calm (gap/ATR < 1.5)
-- +1 EMA aligned
-- +1 not choppy  
-Trade Donch only if **score ≥ 4** and not choppy.
+Learned EV tables / witch mode grids did **not** beat this hand EDGE router out of sample.
 
 ---
 
-## Capital note
-6× is **position size**, not magic. Margin/premium scales ~6× vs 1-lot desk. Without size, ₹15k **every** month is not available from these index arms under causal zero-red.
+## Monster flow (product target)
 
-## Older low-profit zero-red (1 lot)
-`regime_lock500` / `donch_s4_lock2500` still valid for 0-red at 1 lot (~₹2–5k/mo) — **does not** meet the ₹15k/month motive.
+```
+09:45 OR → regime features
+     ↓
+RAMPAGE? (month MTD low) → prefer TRAIL/OR expansion arms
+     ↓
+HUNT → EDGE switch table above
+     ↓
+DEFEND (MTD red) → only calm Donch / STAND
+     ↓
+BANK (MTD ≥ ₹15k) → STAND unless ultra trail setup
+```
 
-## Artifacts
-- `docs/owner-private/research/zero-red-months/fifteen-k-slim.json`
-- `/tmp/auto-strategy-select/fifteen-k-every-month.json`
-- Repro: `/tmp/fifteen-k-every-month.py` (promote into `scripts/` when wiring Auto)
+**1 lot only. Profit from switches + letting winners run.**
 
-## Deploy status
-**Recipe ready — not wired into Strategy Manager yet.**  
-Auto-bot implementation target: **Donch s4 · 6× · month lock ₹15k**.
+---
+
+## What is NOT the answer
+- Scaling to 6 lots to force ₹15k every month — size hack, not a better trader
+- Tiny month locks (`regime_lock500`) — green months but toy profits
+
+## Gap still open
+Causal bot has not yet matched oracle’s **every month ≥ ₹15k @1 lot**.  
+Next research: finer intraday switches, per-book witches, shadow arms mid-session — still 1 lot.
+
+## Deploy
+Research recipe. Wire Auto = **EDGE monster @1 lot** when implementing (not 6× lock).
