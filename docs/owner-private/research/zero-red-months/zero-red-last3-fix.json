@@ -1,0 +1,675 @@
+{
+  "diagnosis_summary": {
+    "2022-11": {
+      "n_traded": 13,
+      "losses": [
+        {
+          "date": "2022-11-03",
+          "arm": "DONCH_2R",
+          "rs": -1915.5,
+          "mtd_before": 0.0,
+          "feat": {
+            "drive": 0.806,
+            "gap": 4.555,
+            "wide": true,
+            "vwide": false,
+            "calm": false,
+            "choppy": false,
+            "ema_buy": false,
+            "ema_sell": false,
+            "score": 6,
+            "or_up": true,
+            "strong": true,
+            "vstrong": true,
+            "wd": 3,
+            "atr": 22.779,
+            "or_w": 114.35
+          },
+          "alts": {
+            "DONCH_2R": -1915.5,
+            "SWING_2R": -1689.0,
+            "DONCH_15R": -1915.5
+          }
+        },
+        {
+          "date": "2022-11-07",
+          "arm": "DONCH_2R",
+          "rs": -2149.0,
+          "mtd_before": -1915.5,
+          "feat": {
+            "drive": 0.448,
+            "gap": 4.679,
+            "wide": true,
+            "vwide": false,
+            "calm": false,
+            "choppy": false,
+            "ema_buy": false,
+            "ema_sell": false,
+            "score": 3,
+            "or_up": false,
+            "strong": false,
+            "vstrong": false,
+            "wd": 0,
+            "atr": 17.921,
+            "or_w": 89.3
+          },
+          "alts": {
+            "DONCH_2R": -2149.0,
+            "SWING_2R": 1542.5,
+            "DONCH_15R": -2149.0
+          }
+        },
+        {
+          "date": "2022-11-15",
+          "arm": "SWING_2R",
+          "rs": -2539.5,
+          "mtd_before": -2539.5,
+          "feat": {
+            "drive": 0.555,
+            "gap": 2.42,
+            "wide": false,
+            "vwide": false,
+            "calm": false,
+            "choppy": false,
+            "ema_buy": false,
+            "ema_sell": true,
+            "score": 4,
+            "or_up": false,
+            "strong": true,
+            "vstrong": false,
+            "wd": 1,
+            "atr": 17.561,
+            "or_w": 54.05
+          },
+          "alts": {
+            "DONCH_2R": -2794.5,
+            "SWING_2R": -2539.5,
+            "DONCH_15R": -683.2
+          }
+        },
+        {
+          "date": "2022-11-16",
+          "arm": "SWING_2R",
+          "rs": -2152.7,
+          "mtd_before": -5079.0,
+          "feat": {
+            "drive": 0.549,
+            "gap": 1.249,
+            "wide": false,
+            "vwide": false,
+            "calm": true,
+            "choppy": false,
+            "ema_buy": true,
+            "ema_sell": false,
+            "score": 5,
+            "or_up": false,
+            "strong": true,
+            "vstrong": false,
+            "wd": 2,
+            "atr": 18.657,
+            "or_w": 59.6
+          },
+          "alts": {
+            "DONCH_2R": -2152.7,
+            "SWING_2R": -2152.7,
+            "DONCH_15R": 1222.3
+          }
+        },
+        {
+          "date": "2022-11-21",
+          "arm": "DONCH_2R",
+          "rs": -1738.5,
+          "mtd_before": -2240.5,
+          "feat": {
+            "drive": 0.883,
+            "gap": 3.057,
+            "wide": true,
+            "vwide": false,
+            "calm": false,
+            "choppy": false,
+            "ema_buy": false,
+            "ema_sell": true,
+            "score": 7,
+            "or_up": false,
+            "strong": true,
+            "vstrong": true,
+            "wd": 0,
+            "atr": 18.954,
+            "or_w": 105.95
+          },
+          "alts": {
+            "DONCH_2R": -1738.5,
+            "SWING_2R": -1244.5,
+            "DONCH_15R": -1738.5
+          }
+        },
+        {
+          "date": "2022-11-24",
+          "arm": "SWING_2R",
+          "rs": -838.3,
+          "mtd_before": -3979.0,
+          "feat": {
+            "drive": 0.336,
+            "gap": 6.069,
+            "wide": false,
+            "vwide": false,
+            "calm": false,
+            "choppy": false,
+            "ema_buy": true,
+            "ema_sell": false,
+            "score": 2,
+            "or_up": true,
+            "strong": false,
+            "vstrong": false,
+            "wd": 3,
+            "atr": 11.864,
+            "or_w": 49.9
+          },
+          "alts": {
+            "DONCH_2R": 1050.0,
+            "SWING_2R": -838.3,
+            "DONCH_15R": 728.2
+          }
+        }
+      ],
+      "final": -1813.0
+    },
+    "2023-02": {
+      "n_traded": 15,
+      "losses": [
+        {
+          "date": "2023-02-01",
+          "arm": "SWING_2R",
+          "rs": -2682.5,
+          "mtd_before": 0.0,
+          "feat": {
+            "drive": 0.563,
+            "gap": 5.089,
+            "wide": false,
+            "vwide": false,
+            "calm": false,
+            "choppy": false,
+            "ema_buy": true,
+            "ema_sell": false,
+            "score": 4,
+            "or_up": false,
+            "strong": true,
+            "vstrong": false,
+            "wd": 2,
+            "atr": 25.357,
+            "or_w": 75.75
+          },
+          "alts": {
+            "DONCH_2R": -2682.5,
+            "SWING_2R": -2682.5,
+            "DONCH_15R": -2682.5
+          }
+        },
+        {
+          "date": "2023-02-02",
+          "arm": "DONCH_2R",
+          "rs": -3300.0,
+          "mtd_before": -2682.5,
+          "feat": {
+            "drive": 0.525,
+            "gap": 1.565,
+            "wide": true,
+            "vwide": true,
+            "calm": false,
+            "choppy": false,
+            "ema_buy": false,
+            "ema_sell": false,
+            "score": 6,
+            "or_up": true,
+            "strong": true,
+            "vstrong": false,
+            "wd": 3,
+            "atr": 56.418,
+            "or_w": 202.3
+          },
+          "alts": {
+            "DONCH_2R": -3300.0,
+            "SWING_2R": -3300.0,
+            "DONCH_15R": -3300.0
+          }
+        },
+        {
+          "date": "2023-02-06",
+          "arm": "DONCH_2R",
+          "rs": -1955.0,
+          "mtd_before": -5232.5,
+          "feat": {
+            "drive": 0.368,
+            "gap": 0.409,
+            "wide": true,
+            "vwide": false,
+            "calm": true,
+            "choppy": false,
+            "ema_buy": false,
+            "ema_sell": false,
+            "score": 4,
+            "or_up": false,
+            "strong": false,
+            "vstrong": false,
+            "wd": 0,
+            "atr": 29.975,
+            "or_w": 105.35
+          },
+          "alts": {
+            "DONCH_2R": -1955.0,
+            "SWING_2R": -2650.0,
+            "DONCH_15R": -427.5
+          }
+        },
+        {
+          "date": "2023-02-08",
+          "arm": "DONCH_2R",
+          "rs": -1548.8,
+          "mtd_before": -7187.5,
+          "feat": {
+            "drive": 0.899,
+            "gap": 1.285,
+            "wide": true,
+            "vwide": false,
+            "calm": true,
+            "choppy": false,
+            "ema_buy": true,
+            "ema_sell": false,
+            "score": 8,
+            "or_up": true,
+            "strong": true,
+            "vstrong": true,
+            "wd": 2,
+            "atr": 23.271,
+            "or_w": 99.15
+          },
+          "alts": {
+            "DONCH_2R": -1548.8,
+            "SWING_2R": 1194.8,
+            "DONCH_15R": -1548.8
+          }
+        },
+        {
+          "date": "2023-02-09",
+          "arm": "DONCH_2R",
+          "rs": -1957.8,
+          "mtd_before": -8736.3,
+          "feat": {
+            "drive": 0.942,
+            "gap": 0.957,
+            "wide": true,
+            "vwide": false,
+            "calm": true,
+            "choppy": false,
+            "ema_buy": false,
+            "ema_sell": false,
+            "score": 7,
+            "or_up": false,
+            "strong": true,
+            "vstrong": true,
+            "wd": 3,
+            "atr": 24.021,
+            "or_w": 101.75
+          },
+          "alts": {
+            "DONCH_2R": -1957.8,
+            "SWING_2R": -1957.8,
+            "DONCH_15R": -1957.8
+          }
+        },
+        {
+          "date": "2023-02-15",
+          "arm": "SWING_2R",
+          "rs": -2013.0,
+          "mtd_before": -3895.0,
+          "feat": {
+            "drive": 0.759,
+            "gap": 1.551,
+            "wide": false,
+            "vwide": false,
+            "calm": false,
+            "choppy": false,
+            "ema_buy": true,
+            "ema_sell": false,
+            "score": 5,
+            "or_up": false,
+            "strong": true,
+            "vstrong": true,
+            "wd": 2,
+            "atr": 16.279,
+            "or_w": 46.4
+          },
+          "alts": {
+            "DONCH_2R": -2013.0,
+            "SWING_2R": -2013.0,
+            "DONCH_15R": -355.5
+          }
+        },
+        {
+          "date": "2023-02-23",
+          "arm": "DONCH_2R",
+          "rs": -2142.0,
+          "mtd_before": -1124.0,
+          "feat": {
+            "drive": 0.982,
+            "gap": 0.731,
+            "wide": true,
+            "vwide": false,
+            "calm": true,
+            "choppy": false,
+            "ema_buy": false,
+            "ema_sell": false,
+            "score": 7,
+            "or_up": false,
+            "strong": true,
+            "vstrong": true,
+            "wd": 3,
+            "atr": 30.289,
+            "or_w": 103.6
+          },
+          "alts": {
+            "DONCH_2R": -2142.0,
+            "SWING_2R": -3300.0,
+            "DONCH_15R": -2142.0
+          }
+        },
+        {
+          "date": "2023-02-27",
+          "arm": "SWING_2R",
+          "rs": -3300.0,
+          "mtd_before": -3266.0,
+          "feat": {
+            "drive": 0.235,
+            "gap": 1.157,
+            "wide": true,
+            "vwide": false,
+            "calm": true,
+            "choppy": false,
+            "ema_buy": false,
+            "ema_sell": true,
+            "score": 5,
+            "or_up": false,
+            "strong": false,
+            "vstrong": false,
+            "wd": 0,
+            "atr": 31.846,
+            "or_w": 91.95
+          },
+          "alts": {
+            "DONCH_2R": -3300.0,
+            "SWING_2R": -3300.0,
+            "DONCH_15R": -3300.0
+          }
+        }
+      ],
+      "final": -6566.0
+    },
+    "2023-03": {
+      "n_traded": 13,
+      "losses": [
+        {
+          "date": "2023-03-01",
+          "arm": "SWING_2R",
+          "rs": -2656.5,
+          "mtd_before": 0.0,
+          "feat": {
+            "drive": 0.664,
+            "gap": 1.781,
+            "wide": false,
+            "vwide": false,
+            "calm": false,
+            "choppy": false,
+            "ema_buy": true,
+            "ema_sell": false,
+            "score": 5,
+            "or_up": true,
+            "strong": true,
+            "vstrong": true,
+            "wd": 2,
+            "atr": 24.093,
+            "or_w": 68.3
+          },
+          "alts": {
+            "DONCH_2R": -2598.0,
+            "SWING_2R": -2656.5,
+            "DONCH_15R": -2598.0
+          }
+        },
+        {
+          "date": "2023-03-02",
+          "arm": "DONCH_2R",
+          "rs": -2789.8,
+          "mtd_before": -2656.5,
+          "feat": {
+            "drive": 0.415,
+            "gap": 1.715,
+            "wide": true,
+            "vwide": false,
+            "calm": false,
+            "choppy": false,
+            "ema_buy": false,
+            "ema_sell": true,
+            "score": 4,
+            "or_up": false,
+            "strong": false,
+            "vstrong": false,
+            "wd": 3,
+            "atr": 21.2,
+            "or_w": 80.4
+          },
+          "alts": {
+            "DONCH_2R": -2789.8,
+            "SWING_2R": -1952.3,
+            "DONCH_15R": -2789.8
+          }
+        },
+        {
+          "date": "2023-03-06",
+          "arm": "DONCH_2R",
+          "rs": -1734.0,
+          "mtd_before": -5446.2,
+          "feat": {
+            "drive": 0.977,
+            "gap": 4.491,
+            "wide": true,
+            "vwide": false,
+            "calm": false,
+            "choppy": false,
+            "ema_buy": true,
+            "ema_sell": false,
+            "score": 7,
+            "or_up": true,
+            "strong": true,
+            "vstrong": true,
+            "wd": 0,
+            "atr": 19.607,
+            "or_w": 85.1
+          },
+          "alts": {
+            "DONCH_2R": -1734.0,
+            "SWING_2R": -371.8,
+            "DONCH_15R": -1734.0
+          }
+        },
+        {
+          "date": "2023-03-10",
+          "arm": "DONCH_2R",
+          "rs": -2409.5,
+          "mtd_before": -7180.3,
+          "feat": {
+            "drive": 0.946,
+            "gap": 5.798,
+            "wide": true,
+            "vwide": false,
+            "calm": false,
+            "choppy": false,
+            "ema_buy": false,
+            "ema_sell": true,
+            "score": 7,
+            "or_up": false,
+            "strong": true,
+            "vstrong": true,
+            "wd": 4,
+            "atr": 23.975,
+            "or_w": 117.8
+          },
+          "alts": {
+            "DONCH_2R": -2409.5,
+            "SWING_2R": -2630.5,
+            "DONCH_15R": 965.5
+          }
+        },
+        {
+          "date": "2023-03-14",
+          "arm": "SWING_2R",
+          "rs": -3300.0,
+          "mtd_before": -9265.5,
+          "feat": {
+            "drive": 0.027,
+            "gap": 0.6,
+            "wide": true,
+            "vwide": false,
+            "calm": true,
+            "choppy": false,
+            "ema_buy": false,
+            "ema_sell": true,
+            "score": 5,
+            "or_up": false,
+            "strong": false,
+            "vstrong": false,
+            "wd": 1,
+            "atr": 40.086,
+            "or_w": 111.25
+          },
+          "alts": {
+            "DONCH_2R": -3300.0,
+            "SWING_2R": -3300.0,
+            "DONCH_15R": 1575.0
+          }
+        },
+        {
+          "date": "2023-03-16",
+          "arm": "DONCH_2R",
+          "rs": -3300.0,
+          "mtd_before": -12056.5,
+          "feat": {
+            "drive": 0.982,
+            "gap": 0.714,
+            "wide": true,
+            "vwide": true,
+            "calm": true,
+            "choppy": false,
+            "ema_buy": false,
+            "ema_sell": true,
+            "score": 9,
+            "or_up": false,
+            "strong": true,
+            "vstrong": true,
+            "wd": 3,
+            "atr": 29.132,
+            "or_w": 131.95
+          },
+          "alts": {
+            "DONCH_2R": -3300.0,
+            "SWING_2R": 5007.5,
+            "DONCH_15R": -3300.0
+          }
+        },
+        {
+          "date": "2023-03-20",
+          "arm": "DONCH_2R",
+          "rs": -3300.0,
+          "mtd_before": -12808.5,
+          "feat": {
+            "drive": 0.834,
+            "gap": 1.717,
+            "wide": true,
+            "vwide": true,
+            "calm": false,
+            "choppy": false,
+            "ema_buy": false,
+            "ema_sell": true,
+            "score": 8,
+            "or_up": false,
+            "strong": true,
+            "vstrong": true,
+            "wd": 0,
+            "atr": 33.257,
+            "or_w": 137.05
+          },
+          "alts": {
+            "DONCH_2R": -3300.0,
+            "SWING_2R": -2689.0,
+            "DONCH_15R": -3300.0
+          }
+        },
+        {
+          "date": "2023-03-24",
+          "arm": "SWING_2R",
+          "rs": -2113.8,
+          "mtd_before": -14159.3,
+          "feat": {
+            "drive": 0.346,
+            "gap": 0.267,
+            "wide": true,
+            "vwide": false,
+            "calm": true,
+            "choppy": false,
+            "ema_buy": false,
+            "ema_sell": true,
+            "score": 5,
+            "or_up": false,
+            "strong": false,
+            "vstrong": false,
+            "wd": 4,
+            "atr": 28.975,
+            "or_w": 113.15
+          },
+          "alts": {
+            "DONCH_2R": -2113.8,
+            "SWING_2R": -2113.8,
+            "DONCH_15R": 1261.2
+          }
+        }
+      ],
+      "final": -10219.0
+    }
+  },
+  "n_tested": 6755,
+  "n_full_zero": 0,
+  "n_pc_zero": 0,
+  "best_full_zero": [],
+  "best_pc_zero": [],
+  "min_full_red_keeping_oos_zero": [
+    {
+      "name": "fix_atr_high_nifty_L0.01_ml99",
+      "red": 3,
+      "net": 141790.5,
+      "worst": -10219.0,
+      "red_list": [
+        "2022-11",
+        "2023-02",
+        "2023-03"
+      ],
+      "oos_red": 0,
+      "oos_net": 73204.3
+    },
+    {
+      "name": "fix_atr_high_nifty_L500_ml99",
+      "red": 5,
+      "net": 153369.5,
+      "worst": -10219.0,
+      "red_list": [
+        "2022-05",
+        "2022-11",
+        "2023-02",
+        "2023-03",
+        "2023-04"
+      ],
+      "oos_red": 0,
+      "oos_net": 82827.5
+    }
+  ],
+  "elapsed_note": "last3 fix hunt",
+  "verdict": "Could not eliminate all pre-2024 reds while keeping OOS zero. Best full red count with OOS zero: 3 via **fix_atr_high_nifty_L0.01_ml99** (reds ['2022-11', '2023-02', '2023-03']), OOS net \u20b973,204."
+}

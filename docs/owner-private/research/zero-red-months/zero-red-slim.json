@@ -1,0 +1,336 @@
+{
+  "verdict": "FOUND profitable zero-red: **regime_lock500** \u2192 31/31 green months, 0 red, net \u20b982,828, avg month \u20b92,672, worst \u20b9606.",
+  "n_policies": 1099,
+  "n_zero_red_profit": 13,
+  "winner": {
+    "name": "regime_lock500",
+    "green": 31,
+    "flat": 0,
+    "red": 0,
+    "net": 82827.5,
+    "avg_month": 2671.9,
+    "worst": 606.5,
+    "best": 6600.0,
+    "red_list": []
+  },
+  "top_zero_profit": [
+    {
+      "name": "regime_lock500",
+      "green": 31,
+      "red": 0,
+      "net": 82827.5,
+      "avg_month": 2671.9,
+      "worst": 606.5,
+      "red_list": []
+    },
+    {
+      "name": "patient_donch_s4_freeze",
+      "green": 31,
+      "red": 0,
+      "net": 76562.0,
+      "avg_month": 2469.7,
+      "worst": 0.7,
+      "red_list": []
+    },
+    {
+      "name": "grid_s4_ml99_g99_c0_w0",
+      "green": 31,
+      "red": 0,
+      "net": 76562.0,
+      "avg_month": 2469.7,
+      "worst": 0.7,
+      "red_list": []
+    },
+    {
+      "name": "skip_score_lt_4",
+      "green": 31,
+      "red": 0,
+      "net": 76562.0,
+      "avg_month": 2469.7,
+      "worst": 0.7,
+      "red_list": []
+    },
+    {
+      "name": "skip_choppy+score_lt_4",
+      "green": 31,
+      "red": 0,
+      "net": 76562.0,
+      "avg_month": 2469.7,
+      "worst": 0.7,
+      "red_list": []
+    },
+    {
+      "name": "regime_freeze_1",
+      "green": 31,
+      "red": 0,
+      "net": 76123.8,
+      "avg_month": 2455.6,
+      "worst": 70.5,
+      "red_list": []
+    },
+    {
+      "name": "per_book_regime_freeze",
+      "green": 31,
+      "red": 0,
+      "net": 74944.5,
+      "avg_month": 2417.6,
+      "worst": 0.7,
+      "red_list": []
+    },
+    {
+      "name": "regime_freeze_green",
+      "green": 31,
+      "red": 0,
+      "net": 73204.3,
+      "avg_month": 2361.4,
+      "worst": 0.7,
+      "red_list": []
+    },
+    {
+      "name": "regskip_choppy",
+      "green": 31,
+      "red": 0,
+      "net": 73204.3,
+      "avg_month": 2361.4,
+      "worst": 0.7,
+      "red_list": []
+    },
+    {
+      "name": "patient_donch_s3_freeze",
+      "green": 31,
+      "red": 0,
+      "net": 71738.5,
+      "avg_month": 2314.1,
+      "worst": 0.7,
+      "red_list": []
+    },
+    {
+      "name": "grid_s3_ml99_g99_c0_w0",
+      "green": 31,
+      "red": 0,
+      "net": 71738.5,
+      "avg_month": 2314.1,
+      "worst": 0.7,
+      "red_list": []
+    },
+    {
+      "name": "skip_choppy",
+      "green": 31,
+      "red": 0,
+      "net": 70921.0,
+      "avg_month": 2287.8,
+      "worst": 0.7,
+      "red_list": []
+    },
+    {
+      "name": "nifty_only_donch_2r_freeze",
+      "green": 31,
+      "red": 0,
+      "net": 53963.0,
+      "avg_month": 1740.7,
+      "worst": 19.5,
+      "red_list": []
+    }
+  ],
+  "top_near": [
+    {
+      "name": "regime_lock500",
+      "green": 31,
+      "red": 0,
+      "net": 82827.5,
+      "avg_month": 2671.9,
+      "worst": 606.5,
+      "red_list": []
+    },
+    {
+      "name": "patient_donch_s4_freeze",
+      "green": 31,
+      "red": 0,
+      "net": 76562.0,
+      "avg_month": 2469.7,
+      "worst": 0.7,
+      "red_list": []
+    },
+    {
+      "name": "grid_s4_ml99_g99_c0_w0",
+      "green": 31,
+      "red": 0,
+      "net": 76562.0,
+      "avg_month": 2469.7,
+      "worst": 0.7,
+      "red_list": []
+    },
+    {
+      "name": "skip_score_lt_4",
+      "green": 31,
+      "red": 0,
+      "net": 76562.0,
+      "avg_month": 2469.7,
+      "worst": 0.7,
+      "red_list": []
+    },
+    {
+      "name": "skip_choppy+score_lt_4",
+      "green": 31,
+      "red": 0,
+      "net": 76562.0,
+      "avg_month": 2469.7,
+      "worst": 0.7,
+      "red_list": []
+    },
+    {
+      "name": "regime_freeze_1",
+      "green": 31,
+      "red": 0,
+      "net": 76123.8,
+      "avg_month": 2455.6,
+      "worst": 70.5,
+      "red_list": []
+    },
+    {
+      "name": "per_book_regime_freeze",
+      "green": 31,
+      "red": 0,
+      "net": 74944.5,
+      "avg_month": 2417.6,
+      "worst": 0.7,
+      "red_list": []
+    },
+    {
+      "name": "regime_freeze_green",
+      "green": 31,
+      "red": 0,
+      "net": 73204.3,
+      "avg_month": 2361.4,
+      "worst": 0.7,
+      "red_list": []
+    },
+    {
+      "name": "regskip_choppy",
+      "green": 31,
+      "red": 0,
+      "net": 73204.3,
+      "avg_month": 2361.4,
+      "worst": 0.7,
+      "red_list": []
+    },
+    {
+      "name": "patient_donch_s3_freeze",
+      "green": 31,
+      "red": 0,
+      "net": 71738.5,
+      "avg_month": 2314.1,
+      "worst": 0.7,
+      "red_list": []
+    },
+    {
+      "name": "grid_s3_ml99_g99_c0_w0",
+      "green": 31,
+      "red": 0,
+      "net": 71738.5,
+      "avg_month": 2314.1,
+      "worst": 0.7,
+      "red_list": []
+    },
+    {
+      "name": "skip_choppy",
+      "green": 31,
+      "red": 0,
+      "net": 70921.0,
+      "avg_month": 2287.8,
+      "worst": 0.7,
+      "red_list": []
+    },
+    {
+      "name": "nifty_only_donch_2r_freeze",
+      "green": 31,
+      "red": 0,
+      "net": 53963.0,
+      "avg_month": 1740.7,
+      "worst": 19.5,
+      "red_list": []
+    },
+    {
+      "name": "always_stand",
+      "green": 0,
+      "red": 0,
+      "net": 0.0,
+      "avg_month": 0.0,
+      "worst": 0.0,
+      "red_list": []
+    },
+    {
+      "name": "safe_lock1000",
+      "green": 30,
+      "red": 1,
+      "net": 80503.7,
+      "avg_month": 2596.9,
+      "worst": -10774.0,
+      "red_list": [
+        "2026-04"
+      ]
+    },
+    {
+      "name": "regskip_drive_lt_0.35",
+      "green": 30,
+      "red": 1,
+      "net": 75962.0,
+      "avg_month": 2450.4,
+      "worst": -9457.3,
+      "red_list": [
+        "2025-09"
+      ]
+    },
+    {
+      "name": "regskip_choppy+drive_lt_0.35",
+      "green": 30,
+      "red": 1,
+      "net": 75962.0,
+      "avg_month": 2450.4,
+      "worst": -9457.3,
+      "red_list": [
+        "2025-09"
+      ]
+    },
+    {
+      "name": "regime_lock1000",
+      "green": 30,
+      "red": 1,
+      "net": 75961.5,
+      "avg_month": 2450.4,
+      "worst": -8498.5,
+      "red_list": [
+        "2026-06"
+      ]
+    },
+    {
+      "name": "skip_score_lt_4+no_ema",
+      "green": 30,
+      "red": 1,
+      "net": 70189.5,
+      "avg_month": 2264.2,
+      "worst": -3675.0,
+      "red_list": [
+        "2025-02"
+      ]
+    },
+    {
+      "name": "skip_choppy+score_lt_4+no_ema",
+      "green": 30,
+      "red": 1,
+      "net": 70189.5,
+      "avg_month": 2264.2,
+      "worst": -3675.0,
+      "red_list": [
+        "2025-02"
+      ]
+    }
+  ],
+  "oracle_months": {
+    "green": 31,
+    "red": 0,
+    "net": 2352177.6,
+    "worst": 42403.7
+  },
+  "elapsed": 3.3
+}

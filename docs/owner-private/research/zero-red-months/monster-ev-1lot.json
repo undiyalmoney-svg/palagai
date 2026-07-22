@@ -1,0 +1,460 @@
+{
+  "motive": "1-lot monster via learned EV arm switches (train 2020-2023 \u2192 OOS 2024+)",
+  "n_buckets": 228,
+  "verdict": "MONSTER EV **EDGE_hand** @1lot: \u20b9519/day \u00b7 \u20b910436/mo \u00b7 \u226515k in 13/31 \u00b7 red=12 \u00b7 worst \u20b9-19449 \u00b7 days\u2265500 36.6%. Oracle still higher \u2014 this is the best causal learned switcher found.",
+  "recommended": {
+    "name": "EDGE_hand",
+    "avg_day": 519.3,
+    "avg_month": 10436.3,
+    "worst": -19448.7,
+    "ge15k": 13,
+    "red": 12,
+    "day_ge500_pct": 36.6,
+    "net": 323524.1,
+    "monthly": {
+      "2024-01": 60988.2,
+      "2024-02": -6830.0,
+      "2024-03": 21369.0,
+      "2024-04": -11592.5,
+      "2024-05": -5613.3,
+      "2024-06": 64197.0,
+      "2024-07": 23603.7,
+      "2024-08": -3682.5,
+      "2024-09": -1713.0,
+      "2024-10": 15683.3,
+      "2024-11": 2211.5,
+      "2024-12": -8737.7,
+      "2025-01": 19925.8,
+      "2025-02": -19448.7,
+      "2025-03": 12124.7,
+      "2025-04": -8293.5,
+      "2025-05": 37758.5,
+      "2025-06": 7565.0,
+      "2025-07": 20137.9,
+      "2025-08": 4789.0,
+      "2025-09": 1464.7,
+      "2025-10": 17451.0,
+      "2025-11": 26594.7,
+      "2025-12": -4540.2,
+      "2026-01": 27205.3,
+      "2026-02": 34323.8,
+      "2026-03": 1764.5,
+      "2026-04": 24075.2,
+      "2026-05": -11995.5,
+      "2026-06": -14530.3,
+      "2026-07": -2731.5
+    },
+    "arms": {
+      "SWING_2R": 267,
+      "STAND": 120,
+      "DONCH_TRAIL": 160,
+      "DONCH_2R": 52,
+      "DONCH_15R": 24
+    },
+    "red_list": [
+      "2024-02",
+      "2024-04",
+      "2024-05",
+      "2024-08",
+      "2024-09",
+      "2024-12",
+      "2025-02",
+      "2025-04",
+      "2025-12",
+      "2026-05",
+      "2026-06",
+      "2026-07"
+    ]
+  },
+  "top_clever": [
+    {
+      "name": "EDGE_hand",
+      "avg_day": 519.3,
+      "avg_month": 10436.3,
+      "worst": -19448.7,
+      "ge15k": 13,
+      "red": 12,
+      "day_ge500_pct": 36.6,
+      "net": 323524.1
+    },
+    {
+      "name": "EV_me200_tg800_L15000_def0",
+      "avg_day": 141.8,
+      "avg_month": 2850.7,
+      "worst": -23140.0,
+      "ge15k": 7,
+      "red": 15,
+      "day_ge500_pct": 24.4,
+      "net": 88370.9
+    },
+    {
+      "name": "EV_me100_tg800_L15000_def0",
+      "avg_day": 136.6,
+      "avg_month": 2745.7,
+      "worst": -23140.0,
+      "ge15k": 7,
+      "red": 15,
+      "day_ge500_pct": 24.4,
+      "net": 85116.6
+    },
+    {
+      "name": "EV_me100_tg0_L15000_def0",
+      "avg_day": 125.4,
+      "avg_month": 2520.6,
+      "worst": -23140.0,
+      "ge15k": 8,
+      "red": 16,
+      "day_ge500_pct": 24.7,
+      "net": 78138.4
+    },
+    {
+      "name": "EV_me200_tg800_L30000_def0",
+      "avg_day": 182.2,
+      "avg_month": 3661.4,
+      "worst": -23140.0,
+      "ge15k": 6,
+      "red": 15,
+      "day_ge500_pct": 27.0,
+      "net": 113502.2
+    },
+    {
+      "name": "EV_me100_tg800_L30000_def0",
+      "avg_day": 172.0,
+      "avg_month": 3457.5,
+      "worst": -23140.0,
+      "ge15k": 6,
+      "red": 15,
+      "day_ge500_pct": 27.0,
+      "net": 107182.0
+    },
+    {
+      "name": "EV_me200_tg800_LNone_def0",
+      "avg_day": 171.3,
+      "avg_month": 3441.6,
+      "worst": -23140.0,
+      "ge15k": 6,
+      "red": 15,
+      "day_ge500_pct": 27.1,
+      "net": 106690.0
+    },
+    {
+      "name": "EV_me200_tg800_L25000_def0",
+      "avg_day": 165.9,
+      "avg_month": 3334.6,
+      "worst": -23140.0,
+      "ge15k": 6,
+      "red": 15,
+      "day_ge500_pct": 26.6,
+      "net": 103374.1
+    },
+    {
+      "name": "EV_me100_tg800_LNone_def0",
+      "avg_day": 161.1,
+      "avg_month": 3237.7,
+      "worst": -23140.0,
+      "ge15k": 6,
+      "red": 15,
+      "day_ge500_pct": 27.1,
+      "net": 100369.7
+    },
+    {
+      "name": "EV_me100_tg800_L25000_def0",
+      "avg_day": 155.8,
+      "avg_month": 3130.8,
+      "worst": -23140.0,
+      "ge15k": 6,
+      "red": 15,
+      "day_ge500_pct": 26.6,
+      "net": 97053.9
+    },
+    {
+      "name": "EV_me200_tg800_L20000_def0",
+      "avg_day": 142.9,
+      "avg_month": 2871.0,
+      "worst": -23140.0,
+      "ge15k": 6,
+      "red": 15,
+      "day_ge500_pct": 25.2,
+      "net": 88999.9
+    },
+    {
+      "name": "EV_me100_tg800_L20000_def0",
+      "avg_day": 137.6,
+      "avg_month": 2766.0,
+      "worst": -23140.0,
+      "ge15k": 6,
+      "red": 15,
+      "day_ge500_pct": 25.2,
+      "net": 85745.6
+    },
+    {
+      "name": "EV_me200_tg500_L15000_def0",
+      "avg_day": 128.2,
+      "avg_month": 2576.7,
+      "worst": -23140.0,
+      "ge15k": 7,
+      "red": 16,
+      "day_ge500_pct": 24.6,
+      "net": 79878.1
+    },
+    {
+      "name": "EV_me200_tg0_L15000_def0",
+      "avg_day": 123.3,
+      "avg_month": 2478.4,
+      "worst": -23140.0,
+      "ge15k": 7,
+      "red": 16,
+      "day_ge500_pct": 24.6,
+      "net": 76831.4
+    },
+    {
+      "name": "EV_me100_tg500_L15000_def0",
+      "avg_day": 123.0,
+      "avg_month": 2471.7,
+      "worst": -23140.0,
+      "ge15k": 7,
+      "red": 16,
+      "day_ge500_pct": 24.6,
+      "net": 76623.9
+    }
+  ],
+  "top_ge15k": [
+    {
+      "name": "EDGE_hand",
+      "avg_day": 519.3,
+      "avg_month": 10436.3,
+      "worst": -19448.7,
+      "ge15k": 13,
+      "red": 12,
+      "net": 323524.1
+    },
+    {
+      "name": "EV_me100_tg0_L15000_def0",
+      "avg_day": 125.4,
+      "avg_month": 2520.6,
+      "worst": -23140.0,
+      "ge15k": 8,
+      "red": 16,
+      "net": 78138.4
+    },
+    {
+      "name": "EV_me0_tg0_L15000_def0",
+      "avg_day": 88.8,
+      "avg_month": 1784.0,
+      "worst": -23140.0,
+      "ge15k": 8,
+      "red": 17,
+      "net": 55305.1
+    },
+    {
+      "name": "EV_me200_tg800_L15000_def0",
+      "avg_day": 141.8,
+      "avg_month": 2850.7,
+      "worst": -23140.0,
+      "ge15k": 7,
+      "red": 15,
+      "net": 88370.9
+    },
+    {
+      "name": "EV_me100_tg800_L15000_def0",
+      "avg_day": 136.6,
+      "avg_month": 2745.7,
+      "worst": -23140.0,
+      "ge15k": 7,
+      "red": 15,
+      "net": 85116.6
+    },
+    {
+      "name": "EV_me200_tg500_L15000_def0",
+      "avg_day": 128.2,
+      "avg_month": 2576.7,
+      "worst": -23140.0,
+      "ge15k": 7,
+      "red": 16,
+      "net": 79878.1
+    },
+    {
+      "name": "EV_me200_tg0_L15000_def0",
+      "avg_day": 123.3,
+      "avg_month": 2478.4,
+      "worst": -23140.0,
+      "ge15k": 7,
+      "red": 16,
+      "net": 76831.4
+    },
+    {
+      "name": "EV_me100_tg500_L15000_def0",
+      "avg_day": 123.0,
+      "avg_month": 2471.7,
+      "worst": -23140.0,
+      "ge15k": 7,
+      "red": 16,
+      "net": 76623.9
+    },
+    {
+      "name": "EV_me0_tg800_L15000_def0",
+      "avg_day": 111.0,
+      "avg_month": 2231.4,
+      "worst": -23140.0,
+      "ge15k": 7,
+      "red": 16,
+      "net": 69173.6
+    },
+    {
+      "name": "EV_me0_tg500_L15000_def0",
+      "avg_day": 83.3,
+      "avg_month": 1673.2,
+      "worst": -23140.0,
+      "ge15k": 7,
+      "red": 18,
+      "net": 51869.9
+    },
+    {
+      "name": "EV_me200_tg800_L30000_def0",
+      "avg_day": 182.2,
+      "avg_month": 3661.4,
+      "worst": -23140.0,
+      "ge15k": 6,
+      "red": 15,
+      "net": 113502.2
+    },
+    {
+      "name": "EV_me100_tg800_L30000_def0",
+      "avg_day": 172.0,
+      "avg_month": 3457.5,
+      "worst": -23140.0,
+      "ge15k": 6,
+      "red": 15,
+      "net": 107182.0
+    },
+    {
+      "name": "EV_me200_tg800_LNone_def0",
+      "avg_day": 171.3,
+      "avg_month": 3441.6,
+      "worst": -23140.0,
+      "ge15k": 6,
+      "red": 15,
+      "net": 106690.0
+    },
+    {
+      "name": "EV_me200_tg800_L25000_def0",
+      "avg_day": 165.9,
+      "avg_month": 3334.6,
+      "worst": -23140.0,
+      "ge15k": 6,
+      "red": 15,
+      "net": 103374.1
+    },
+    {
+      "name": "EV_me100_tg800_LNone_def0",
+      "avg_day": 161.1,
+      "avg_month": 3237.7,
+      "worst": -23140.0,
+      "ge15k": 6,
+      "red": 15,
+      "net": 100369.7
+    }
+  ],
+  "top_net": [
+    {
+      "name": "EDGE_hand",
+      "avg_day": 519.3,
+      "avg_month": 10436.3,
+      "worst": -19448.7,
+      "ge15k": 13,
+      "red": 12,
+      "net": 323524.1
+    },
+    {
+      "name": "EV_me200_tg800_L30000_def0",
+      "avg_day": 182.2,
+      "avg_month": 3661.4,
+      "worst": -23140.0,
+      "ge15k": 6,
+      "red": 15,
+      "net": 113502.2
+    },
+    {
+      "name": "EV_me100_tg800_L30000_def0",
+      "avg_day": 172.0,
+      "avg_month": 3457.5,
+      "worst": -23140.0,
+      "ge15k": 6,
+      "red": 15,
+      "net": 107182.0
+    },
+    {
+      "name": "EV_me200_tg500_L30000_def0",
+      "avg_day": 171.7,
+      "avg_month": 3451.1,
+      "worst": -23140.0,
+      "ge15k": 6,
+      "red": 16,
+      "net": 106983.0
+    },
+    {
+      "name": "EV_me200_tg800_LNone_def0",
+      "avg_day": 171.3,
+      "avg_month": 3441.6,
+      "worst": -23140.0,
+      "ge15k": 6,
+      "red": 15,
+      "net": 106690.0
+    },
+    {
+      "name": "EV_me200_tg0_L30000_def0",
+      "avg_day": 166.8,
+      "avg_month": 3352.8,
+      "worst": -23140.0,
+      "ge15k": 6,
+      "red": 16,
+      "net": 103936.2
+    },
+    {
+      "name": "EV_me200_tg800_L25000_def0",
+      "avg_day": 165.9,
+      "avg_month": 3334.6,
+      "worst": -23140.0,
+      "ge15k": 6,
+      "red": 15,
+      "net": 103374.1
+    },
+    {
+      "name": "EV_me100_tg500_L30000_def0",
+      "avg_day": 161.6,
+      "avg_month": 3247.2,
+      "worst": -23140.0,
+      "ge15k": 6,
+      "red": 16,
+      "net": 100662.7
+    },
+    {
+      "name": "EV_me100_tg800_LNone_def0",
+      "avg_day": 161.1,
+      "avg_month": 3237.7,
+      "worst": -23140.0,
+      "ge15k": 6,
+      "red": 15,
+      "net": 100369.7
+    },
+    {
+      "name": "EV_me200_tg500_LNone_def0",
+      "avg_day": 160.8,
+      "avg_month": 3231.3,
+      "worst": -23140.0,
+      "ge15k": 6,
+      "red": 16,
+      "net": 100170.7
+    }
+  ],
+  "zero_red": [],
+  "oracle": {
+    "avg_day": 3775.6,
+    "avg_month": 75876.7,
+    "worst": 42403.7,
+    "ge15k": 31,
+    "red": 0,
+    "net": 2352177.6
+  },
+  "how": "Each morning: bucket OR regime (width/drive/gap/EMA/OR dir). Pick the arm with highest historical EV in that bucket from 2020-2023 (Donch/Swing/Trail/OR-retest/STAND). Optional: EV gates, defend when month red, month-lock after target. 1 lot only \u2014 profit from clever switches, not size."
+}

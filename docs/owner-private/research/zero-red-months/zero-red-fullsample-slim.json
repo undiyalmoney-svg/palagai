@@ -1,0 +1,33 @@
+{
+  "verdict": "No profitable full-sample zero-red among 7425 policies. Closest: **weekly_regime_freeze** full red=28 net=\u20b9252,098 red_months=['2020-02', '2020-03', '2020-04', '2020-06', '2020-07', '2020-08'].",
+  "n_tested": 7425,
+  "n_full_zero_profit": 0,
+  "best": [],
+  "near": [
+    {
+      "name": "weekly_regime_freeze",
+      "full_red": 28,
+      "full_net": 252097.5,
+      "full_worst": -11359.3,
+      "full_red_list": [
+        "2020-02",
+        "2020-03",
+        "2020-04",
+        "2020-06",
+        "2020-07",
+        "2020-08",
+        "2020-11",
+        "2021-01"
+      ],
+      "oos_red": 9,
+      "oos_net": 154950.5
+    }
+  ],
+  "weekly": {
+    "full_red": 28,
+    "full_net": 252097.5,
+    "oos_red": 9,
+    "oos_net": 154950.5
+  },
+  "elapsed": 12.3
+}
