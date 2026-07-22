@@ -119,7 +119,8 @@ export class StrategyAssignmentService {
     }
     const merged = { ...(this.settingsMap[strategyId] ?? {}), ...partial };
     this.settingsMap[strategyId] = merged;
-    mod.updateSettings(merged);
+    // Always re-base from module defaults + overrides (same path as desk hydrate).
+    mod.initialize(merged);
     this.persist();
   }
 

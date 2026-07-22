@@ -111,6 +111,21 @@ export class PaperTradeDeskService {
   readonly snapshot = signal<PaperDeskSnapshot>(emptySnapshot('testing'));
   readonly busy = signal(false);
 
+  /**
+   * Re-run the live replay immediately after Strat settings/assignment change
+   * so Max trades / protect updates are not stuck until the next 60s tick.
+   */
+  refreshLiveAfterSettingsChange(): void {
+    const snap = this.snapshot();
+    if (snap.mode !== 'live' || !snap.running || !this.liveLegs.length) {
+      return;
+    }
+    if (this.busy()) {
+      return;
+    }
+    void this.tickLive(false);
+  }
+
   /** Cancel in-flight Testing fetch or stop Live so the UI leaves "Running…". */
   cancelRun(options?: { silent?: boolean }): void {
     const wasBusy = this.busy();
