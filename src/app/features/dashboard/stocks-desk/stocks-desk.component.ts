@@ -15,9 +15,12 @@ import {
   STOCKS_CAPITAL_RS,
   STOCKS_DAY_LOSS_RS,
   STOCKS_MAX_LEGS,
+  STOCKS_STRATEGY_OPTIONS,
   StocksStrategyId,
 } from '../../../core/strategy-engine/strategies/stocks-equity/stocks-equity.evaluator';
 import { formatUnknownError } from '../../../core/utils/kite-error.util';
+
+const DESK_STRATEGY_KEY = 'palagai_stocks_desk_strategy_v1';
 
 @Component({
   selector: 'app-stocks-desk',
@@ -39,7 +42,7 @@ export class StocksDeskComponent implements OnInit, OnDestroy {
   protected toDate = todayIso();
   protected realOrders = false;
   protected realOrdersAck = false;
-  protected strategyId: StocksStrategyId = 'GAP_FADE_500';
+  protected strategyId: StocksStrategyId = readDeskStrategy();
   protected includeTopGainers = true;
   protected maxLegs = 3;
   protected customSymbol = '';
@@ -51,7 +54,7 @@ export class StocksDeskComponent implements OnInit, OnDestroy {
   protected readonly busy = this.desk.busy;
   protected readonly watchlist = this.watch.watchlist;
   protected readonly movers = this.moversSvc.snapshot;
-  protected readonly strategyOptions = this.desk.strategyOptions();
+  protected readonly strategyOptions = STOCKS_STRATEGY_OPTIONS;
   protected readonly capitalRs = STOCKS_CAPITAL_RS;
   protected readonly dayLossRs = STOCKS_DAY_LOSS_RS;
   protected readonly maxLegsCap = STOCKS_MAX_LEGS;
@@ -66,7 +69,14 @@ export class StocksDeskComponent implements OnInit, OnDestroy {
 
   protected resetTreasure(): void {
     this.watch.resetToTreasure();
-    this.resolveHint.set('Restored research treasure watchlist (customs kept).');
+    this.strategyId = 'GAP_FADE_500';
+    persistDeskStrategy(this.strategyId);
+    this.resolveHint.set('Restored treasure watchlist · strategy GAP_FADE_500.');
+  }
+
+  protected onStrategyChange(id: StocksStrategyId): void {
+    this.strategyId = id;
+    persistDeskStrategy(id);
   }
 
   ngOnDestroy(): void {
@@ -236,4 +246,24 @@ function shiftDays(delta: number): string {
   const d = new Date();
   d.setDate(d.getDate() + delta);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function readDeskStrategy(): StocksStrategyId {
+  try {
+    const raw = localStorage.getItem(DESK_STRATEGY_KEY);
+    if (raw && STOCKS_STRATEGY_OPTIONS.some((o) => o.id === raw)) {
+      return raw as StocksStrategyId;
+    }
+  } catch {
+    /* ignore */
+  }
+  return 'GAP_FADE_500';
+}
+
+function persistDeskStrategy(id: StocksStrategyId): void {
+  try {
+    localStorage.setItem(DESK_STRATEGY_KEY, id);
+  } catch {
+    /* ignore */
+  }
 }

@@ -1,6 +1,7 @@
 import { DecimalPipe } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import {
   DESK_CHANNELS,
@@ -20,7 +21,7 @@ import { PaperTradeDeskService } from '../../../core/paper-desk/paper-trade-desk
 @Component({
   selector: 'app-strategy-manager-page',
   standalone: true,
-  imports: [FormsModule, DecimalPipe, MatButtonModule],
+  imports: [FormsModule, DecimalPipe, MatButtonModule, RouterLink],
   templateUrl: './strategy-manager-page.component.html',
   styleUrl: './strategy-manager-page.component.css',
 })

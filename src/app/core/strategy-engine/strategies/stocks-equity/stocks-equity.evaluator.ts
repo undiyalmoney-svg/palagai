@@ -39,12 +39,12 @@ export type StocksStrategyId =
 
 export const STOCKS_STRATEGY_OPTIONS: Array<{ id: StocksStrategyId; label: string }> = [
   {
-    id: 'ALMOST_GREEN_MIX',
-    label: 'Almost-green mix — 0.5% gap ± TP 0.5% (split up to 3)',
+    id: 'GAP_FADE_500',
+    label: '₹500 book — gap-up fade 0.3% · max 3 (DEFAULT)',
   },
   {
-    id: 'GAP_FADE_500',
-    label: '₹500 book — gap-up fade 0.3% (max 3)',
+    id: 'ALMOST_GREEN_MIX',
+    label: 'Almost-green mix — 0.5% gap ± TP 0.5% (split up to 3)',
   },
   { id: 'FOLLOW_PRIOR_COLOR', label: 'Follow prior day colour' },
   { id: 'GAP_DOWN_BOUNCE', label: 'Gap-down bounce 0.5%' },
