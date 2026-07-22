@@ -15,8 +15,8 @@ export class SwingRetestEma50Rr2ManagedStrategy extends BaseIndexRuleStrategy {
   readonly name = 'Swing Retest · EMA50 · 2R';
   readonly version = '1.0.0';
   readonly description =
-    'Break swing-5 S/R, enter on retest · EMA50 bias · 2R target · 1 trade/day. High green-day S/R twin.';
-  readonly supports: readonly DeskChannel[] = ['nifty', 'bank', 'stocks'];
+    'Break swing-5 S/R, enter on retest · EMA50 · 2R · 1t. Index twin — NOT for stocks (use GAP_FADE_500).';
+  readonly supports: readonly DeskChannel[] = ['nifty', 'bank'];
 
   readonly defaultSettings = defaultStrategySettings({
     entryTimeStart: '09:45',

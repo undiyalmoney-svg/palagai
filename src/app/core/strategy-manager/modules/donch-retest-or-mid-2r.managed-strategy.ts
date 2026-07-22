@@ -16,8 +16,8 @@ export class DonchRetestOrMid2rManagedStrategy extends BaseIndexRuleStrategy {
   readonly name = 'Donch Retest · OR-mid · 2R';
   readonly version = '1.0.0';
   readonly description =
-    'Break Donchian-20 S/R, enter on retest · OR-mid bias · 2R target · 1 trade/day. Best daily-₹500 consistency (S/R search).';
-  readonly supports: readonly DeskChannel[] = ['nifty', 'bank', 'stocks'];
+    'Break Donchian-20 S/R, enter on retest · OR-mid bias · 2R · 1t. Index daily-profit DNA — NOT for stocks (use GAP_FADE_500).';
+  readonly supports: readonly DeskChannel[] = ['nifty', 'bank'];
 
   readonly defaultSettings = defaultStrategySettings({
     entryTimeStart: '09:45',
