@@ -350,6 +350,8 @@ def combine_days(
     end: str,
     cost_per_trade: float,
     ambiguous_target_first: bool = False,
+    day_profit_target: float = DAY_TARGET_RS,
+    day_loss_limit: float = math.inf,
 ) -> dict[str, Any]:
     by_day: dict[str, list[Trade]] = defaultdict(list)
     for trade in trades:
@@ -368,7 +370,11 @@ def combine_days(
         realized = 0.0
         count = 0
         for trade in candidates:
-            if count >= MAX_TRADES_DAY or realized >= DAY_TARGET_RS:
+            if (
+                count >= MAX_TRADES_DAY
+                or realized >= day_profit_target
+                or realized <= -day_loss_limit
+            ):
                 break
             trade_value = (
                 TARGET_RS if ambiguous_target_first and trade.ambiguous_bar else trade.rs
@@ -378,7 +384,7 @@ def combine_days(
             accepted_values.append(trade_value)
             count += 1
         day_values.append(realized)
-        if realized >= DAY_TARGET_RS:
+        if realized >= day_profit_target:
             target_days += 1
 
     wins = sum(value > 0 for value in accepted_values)
@@ -403,6 +409,8 @@ def combine_days(
         "red_sessions": red_days,
         "day_target_hits": target_days,
         "day_target_hit_pct": round(100 * target_days / len(sessions), 3),
+        "day_profit_target": day_profit_target,
+        "day_loss_limit": None if math.isinf(day_loss_limit) else day_loss_limit,
         "best_day": round(max(day_values), 1),
         "worst_day": round(min(day_values), 1),
         "ambiguous_stop_first_trades": ambiguous,
