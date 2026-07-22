@@ -150,7 +150,7 @@ export function witchBeast(f: RulerMorningFeatures | null): RulerArm {
   return 'STAND';
 }
 
-/** Trail witch — Donch trail on non-choppy mornings. */
+/** Trail witch — Donch trail on non-choppy mornings (legacy; prefer witchTrailWideElse2r). */
 export function witchTrail(f: RulerMorningFeatures | null): RulerArm {
   if (f == null || f.choppy) {
     return 'STAND';
@@ -159,16 +159,76 @@ export function witchTrail(f: RulerMorningFeatures | null): RulerArm {
 }
 
 /**
- * Boosted ruler pick: rampage beast while MTD < ₹3k, else trail.
+ * Post-rampage (trained vs Sep 2025 bleed):
+ * DONCH_TRAIL only on *wide* mornings. Skinny non-choppy days were taking
+ * blind trail and stacking −₹1,500 clips (Sep 2025 → ₹155).
+ * Non-wide → DONCH_2R / SWING / STAND instead.
+ */
+export function witchTrailWideElse2r(f: RulerMorningFeatures | null): RulerArm {
+  if (f == null || f.choppy) {
+    return 'STAND';
+  }
+  if (f.wide) {
+    return 'DONCH_TRAIL';
+  }
+  if (f.drive >= 0.35) {
+    return 'DONCH_2R';
+  }
+  if (f.emaBuy || f.emaSell) {
+    return 'SWING_2R';
+  }
+  return 'STAND';
+}
+
+/**
+ * Edge witch — used after loss-streak breaker (rest of month).
+ * Matches research ruler-profit-boost.edge().
+ */
+export function witchEdge(f: RulerMorningFeatures | null): RulerArm {
+  if (f == null || f.choppy) {
+    return 'STAND';
+  }
+  if (f.vstrong && f.wide) {
+    return 'DONCH_TRAIL';
+  }
+  if (f.wide && f.strong && f.calm) {
+    return 'DONCH_2R';
+  }
+  if (f.emaBuy || f.emaSell) {
+    return 'SWING_2R';
+  }
+  if (f.drive >= 0.4) {
+    return 'DONCH_15R';
+  }
+  return 'STAND';
+}
+
+/** Consecutive clipped red days before post-rampage breaker engages. */
+export const RULER_LOSS_STREAK_BREAKER = 3;
+
+export type RulerArmPickOpts = {
+  /** After 3 clipped losses post-rampage → edge witch for rest of month. */
+  breakerActive?: boolean;
+};
+
+/**
+ * Boosted ruler pick (Sep-boost trained):
+ * 1. While MTD < ₹3k → beast
+ * 2. Else → trail only if wide, else 2R/swing (not blind trail)
+ * 3. If loss-streak breaker active → edge for rest of month
  */
 export function pickRulerArm(
   f: RulerMorningFeatures | null,
   monthMtdInr: number,
+  opts?: RulerArmPickOpts,
 ): RulerArm {
+  if (opts?.breakerActive) {
+    return witchEdge(f);
+  }
   if (monthMtdInr < RULER_RAMPAGE_UNTIL_INR) {
     return witchBeast(f);
   }
-  return witchTrail(f);
+  return witchTrailWideElse2r(f);
 }
 
 /** Dyn day cap: when month green, one capped loss cannot flip the month red. */

@@ -70,11 +70,11 @@ const ARM_DNA: Record<
 };
 
 /**
- * Boosted Ruler flow (research):
+ * Boosted Ruler flow (research + Sep-boost):
  * 1. While month MTD < ₹3,000 → beast witch
- * 2. Else → Donch trail on non-choppy mornings (STAND if choppy)
- * 3. One shared arm per day for Nifty + Bank (research comb)
- * 4. One trade per instrument per day
+ * 2. Else → Donch trail only if wide (else 2R/swing) — stops skinny trail bleed
+ * 3. After 3 clipped red days post-rampage → edge witch for rest of month
+ * 4. One shared arm per day for Nifty + Bank (research comb)
  * 5. Research score clips day ₹ to −₹1,500 (dyn when month green)
  *
  * Live vs Testing:
@@ -91,9 +91,9 @@ export class RulerManagedStrategy implements IManagedStrategy {
 
   readonly id = MANAGED_STRATEGY_IDS.RULER;
   readonly name = 'Ruler flow';
-  readonly version = '1.5.0';
+  readonly version = '1.6.0';
   readonly description =
-    'Boosted ruler: research DNA parity · EMA at OR-end · no BE on RR arms · swing3 trail · shared arm · day-cap ₹1,500. Lots from Trade Desk.';
+    'Boosted ruler v1.6: Sep-boost (wide-only trail + 3-loss→edge breaker) · research DNA · day-cap ₹1,500. Lots from Trade Desk.';
   readonly supports: readonly DeskChannel[] = ['nifty', 'bank'];
 
   readonly defaultSettings = defaultStrategySettings({
@@ -172,7 +172,11 @@ export class RulerManagedStrategy implements IManagedStrategy {
     const features = computeRulerMorningFeatures(series, day, isBank, this.settings.orEnd);
     const mtd = this.monthState.combinedMtdInr(day);
     // Shared arm for both indices — lock only after morning features exist (OR ready).
-    const { arm, locked } = this.dayPlan.getOrLockArm(day, features, mtd);
+    const { arm, locked, breakerActive, witch } = this.dayPlan.getOrLockArm(
+      day,
+      features,
+      mtd,
+    );
     const lots = Math.max(1, this.lotsPreference.get());
     const rs = rupeesPerPointForInstrument(ctx.instrumentId);
     const dayCapInr = rulerDayCapInr(mtd);
@@ -198,7 +202,7 @@ export class RulerManagedStrategy implements IManagedStrategy {
           features,
           sharedArm: arm,
           armLocked: locked,
-          witch: mtd < 3000 ? 'beast' : 'trail',
+          witch: witch ?? (mtd < 3000 ? 'beast' : 'trail_wide'),
           scope: this.monthState.getScope(),
         },
       };
@@ -215,7 +219,7 @@ export class RulerManagedStrategy implements IManagedStrategy {
           ? 'Ruler waiting · morning OR/features not ready'
           : features?.choppy
             ? 'Ruler STAND · choppy morning'
-            : `Ruler STAND · mtd ₹${mtd.toFixed(0)} · ${mtd < 3000 ? 'beast' : 'trail'}`,
+            : `Ruler STAND · mtd ₹${mtd.toFixed(0)} · ${witch ?? (mtd < 3000 ? 'beast' : 'trail_wide')}`,
         analysis: {
           ruler: true,
           arm,
@@ -225,7 +229,7 @@ export class RulerManagedStrategy implements IManagedStrategy {
           features,
           sharedArm: arm,
           armLocked: locked,
-          witch: mtd < 3000 ? 'beast' : 'trail',
+          witch: witch ?? (mtd < 3000 ? 'beast' : 'trail_wide'),
           scope: this.monthState.getScope(),
         },
       };
@@ -264,7 +268,7 @@ export class RulerManagedStrategy implements IManagedStrategy {
           features,
           sharedArm: arm,
           armLocked: locked,
-          witch: mtd < 3000 ? 'beast' : 'trail',
+          witch: witch ?? (mtd < 3000 ? 'beast' : 'trail_wide'),
           scope: this.monthState.getScope(),
         },
       };
@@ -284,7 +288,7 @@ export class RulerManagedStrategy implements IManagedStrategy {
         features,
         sharedArm: arm,
         armLocked: locked,
-        witch: mtd < 3000 ? 'beast' : 'trail',
+        witch: witch ?? (mtd < 3000 ? 'beast' : 'trail_wide'),
         scope: this.monthState.getScope(),
       },
     };

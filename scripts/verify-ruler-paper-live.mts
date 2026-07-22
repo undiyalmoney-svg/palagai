@@ -91,9 +91,14 @@ function assertArmLogicParity(): void {
   assert.strictEqual(pickRulerArm(trailMorning, 0), 'DONCH_TRAIL'); // beast · wide+strong
   assert.strictEqual(pickRulerArm(swingMorning, 0), 'SWING_2R'); // beast · EMA bias
   assert.strictEqual(pickRulerArm(trailMorning, RULER_RAMPAGE_UNTIL_INR - 1), 'DONCH_TRAIL');
-  // After MTD ≥ ₹3k both paper+live switch to trail witch (always DONCH_TRAIL if not choppy).
-  assert.strictEqual(pickRulerArm(swingMorning, RULER_RAMPAGE_UNTIL_INR), 'DONCH_TRAIL');
+  // After MTD ≥ ₹3k: wide → DONCH_TRAIL; skinny → 2R/swing (Sep-boost, not blind trail).
   assert.strictEqual(pickRulerArm(trailMorning, RULER_RAMPAGE_UNTIL_INR), 'DONCH_TRAIL');
+  assert.strictEqual(pickRulerArm(swingMorning, RULER_RAMPAGE_UNTIL_INR), 'SWING_2R');
+  // Loss-streak breaker → edge witch (wide+strong but not calm → SWING via ema).
+  assert.strictEqual(
+    pickRulerArm(trailMorning, RULER_RAMPAGE_UNTIL_INR, { breakerActive: true }),
+    'SWING_2R',
+  );
 
   // Day-cap math shared; desk applies entry-block / flatten only in live scope.
   assert.strictEqual(rulerDayCapInr(0), RULER_DAY_CAP_INR);

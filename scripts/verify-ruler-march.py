@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
-"""Verify Ruler research March baseline and Angular DNA sensitivity."""
+"""Verify Ruler Sep-boost March baseline and DNA sensitivity."""
 from __future__ import annotations
 
 import importlib.util
 import json
 import sys
 from pathlib import Path
-
-import numpy as np
 
 ROOT = Path("/workspace")
 OUT = Path("/tmp/ruler-verify")
@@ -26,6 +24,10 @@ def load(name: str, path: Path):
 uni = load("uni", ROOT / "scripts" / "strategy-universe-search.py")
 sr = load("sr", ROOT / "scripts" / "sr-pullback-retest-daily500.py")
 boost = load("boost", Path("/tmp/ruler-profit-boost.py"))
+sep = load("sep", ROOT / "scripts" / "ruler-sep-boost.py")
+
+# March target under Sep-boost recipe (was 20212 under plain trail).
+MARCH_TARGET = 20943.0
 
 
 def main() -> None:
@@ -40,35 +42,26 @@ def main() -> None:
         fn = boost.morning_feat(nifty, d) if d in nifty.day_starts else None
         feats[d] = fn or (boost.morning_feat(bank, d) if d in bank.day_starts else None)
 
-    official = boost.run(books, feats, days, "trail", "dyn0", 1500.0, None, 3000.0, "beast")
+    official = sep.run_sep_boost(
+        books,
+        feats,
+        days,
+        comb=boost.comb,
+        clip=boost.clip,
+        beast=boost.beast,
+        edge=boost.edge,
+    )
     march = official["monthly"].get("2026-03")
 
-    # 1t trail books (Angular maxTrades=1 on DONCH_TRAIL)
-    sp_1t = sr.SRSpec("donch_retest", 20, "or_break", "swing_trail", "09:45", "09:45", "15:10", True)
-    books_1t = {k: dict(v) for k, v in books.items()}
-    for inst, name in ((nifty, "nifty"), (bank, "bank")):
-        _, rs, _, dates = sr.simulate(inst, sp_1t)
-        books_1t["DONCH_TRAIL"][name] = boost.day_pnl(dates, rs)
-    one_t = boost.run(books_1t, feats, days, "trail", "dyn0", 1500.0, None, 3000.0, "beast")
+    # Legacy plain-trail (for regression awareness)
+    legacy = boost.run(books, feats, days, "trail", "dyn0", 1500.0, None, 3000.0, "beast")
 
     rows = []
-    mtd = 0.0
-    for d in days:
-        f = feats.get(d)
-        arm = boost.beast(f) if mtd < 3000 else boost.trail(f)
-        raw = boost.comb(books, arm, d)
-        if mtd > 0:
-            dyn = min(1500.0, mtd)
-            clipped = boost.clip(raw, dyn) if dyn > 0 else 0.0
-        else:
-            clipped = boost.clip(raw, 1500.0)
+    for p in official["picks"]:
+        f = feats.get(p["date"])
         rows.append(
             {
-                "date": d,
-                "arm": arm,
-                "raw": round(raw, 2),
-                "clipped": round(clipped, 2),
-                "mtd_before": round(mtd, 2),
+                **p,
                 "choppy": None if f is None else bool(f["choppy"]),
                 "wide": None if f is None else bool(f["wide"]),
                 "strong": None if f is None else bool(f["strong"]),
@@ -77,18 +70,20 @@ def main() -> None:
                 "drive": None if f is None else round(float(f["drive"]), 4),
             }
         )
-        mtd += clipped
 
     report = {
+        "recipe": official["recipe"],
         "official_march": march,
+        "legacy_trail_march": legacy["monthly"].get("2026-03"),
         "official_arms": official["arms"],
-        "one_trade_trail_march": one_t["monthly"].get("2026-03"),
-        "pass_official_near_20212": abs(float(march) - 20212.0) < 1.0,
-        "pass_one_t_still_green": float(one_t["monthly"].get("2026-03", 0)) > 0,
+        "pass_official_near_target": abs(float(march) - MARCH_TARGET) < 1.0,
+        "pass_still_green": float(march) > 15000,
         "days": rows,
     }
     (OUT / "march-report.json").write_text(json.dumps(report, indent=2))
     print(json.dumps({k: report[k] for k in report if k != "days"}, indent=2))
+    if not report["pass_official_near_target"]:
+        sys.exit(1)
 
 
 if __name__ == "__main__":

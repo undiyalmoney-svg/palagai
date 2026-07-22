@@ -118,7 +118,7 @@ function main(): void {
     match,
     total,
     mismatches,
-    pass_official: Math.abs(report.official_march - 20212) < 1,
+    pass_official: Math.abs(report.official_march - 20943) < 1,
     pass_arms: agreement >= 0.85,
   };
   writeFileSync(path.join(OUT, 'ts-arm-compare.json'), JSON.stringify(summary, null, 2));

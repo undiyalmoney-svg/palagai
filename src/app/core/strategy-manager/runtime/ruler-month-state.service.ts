@@ -82,6 +82,17 @@ export class RulerMonthStateService {
     return sum;
   }
 
+  /** Prior calendar dates in `ym` that have recorded trades, strictly before `asOfDate`. */
+  priorTradeDates(ym: string, asOfDate: string): string[] {
+    const set = new Set<string>();
+    for (const t of this.monthTrades(ym).values()) {
+      if (t.date < asOfDate) {
+        set.add(t.date);
+      }
+    }
+    return [...set].sort();
+  }
+
   mtdInr(channel: 'nifty' | 'bank', asOfDate?: string): number {
     const ym = this.yearMonthOf(asOfDate);
     let sum = 0;
