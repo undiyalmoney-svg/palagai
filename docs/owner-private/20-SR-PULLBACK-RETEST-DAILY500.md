@@ -48,6 +48,7 @@ VolExpand wins raw expectancy per trade; **retest+2R wins day-consistency**.
 - Not green every day (~half of days still red/flat).
 - Worst day still ~−₹3300 at 1 lot (day stop 60 pts) — size carefully.
 - Futures/index proxy research; options theta not modeled here.
+- **Does not transfer to stocks** — see doc **21** (NO_GO vs GAP_FADE_500).
 
 ## Reproduce
 

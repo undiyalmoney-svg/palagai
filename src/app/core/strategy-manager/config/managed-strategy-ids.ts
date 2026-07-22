@@ -17,8 +17,10 @@ export type ManagedStrategyId =
   (typeof MANAGED_STRATEGY_IDS)[keyof typeof MANAGED_STRATEGY_IDS];
 
 /**
- * Research-backed defaults — S/R Donch retest for daily ₹500 consistency on indices.
- * Stocks Desk UI still defaults to GAP_FADE_500.
+ * Research-backed defaults:
+ * - Nifty/Bank: Donch Retest OR-mid 2R (index daily-profit DNA)
+ * - Stocks Manager: VolExpand placeholder only — Stocks Desk must use GAP_FADE_500
+ *   (Donch Retest is NO_GO on equities; see doc 21)
  */
 export const DEFAULT_CHANNEL_ASSIGNMENTS = {
   nifty: {
@@ -32,8 +34,8 @@ export const DEFAULT_CHANNEL_ASSIGNMENTS = {
     shadow: null as string | null,
   },
   stocks: {
-    paper: MANAGED_STRATEGY_IDS.DONCH_RETEST_OR_MID_2R,
-    live: MANAGED_STRATEGY_IDS.DONCH_RETEST_OR_MID_2R,
+    paper: MANAGED_STRATEGY_IDS.VOL_EXPAND_DONCH15,
+    live: MANAGED_STRATEGY_IDS.VOL_EXPAND_DONCH15,
     shadow: null as string | null,
   },
 } as const;
