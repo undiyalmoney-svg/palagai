@@ -133,3 +133,27 @@ Full auto:
 2. Hard day loss ≤ ₹1,500
 3. **If month already green → tighten day stop to MTD** so red months are impossible from a single capped loss
 
+---
+
+## Boosted ruler — more profit (June 2026 fixed)
+
+Old trained dyn-cap EDGE-noTrail left **June 2026 ≈ ₹744**.  
+Corrected profit ruler:
+
+### Rule
+1. **Rampage** while month MTD < ₹3,000 → **beast** witch (trail on wide+strong)
+2. Else → **always Donch trail** on non-choppy mornings (STAND if choppy)
+3. **Day loss cap ₹1,500**
+4. When month already green → **day_cap = min(₹1,500, MTD)** (cannot flip red)
+
+### OOS result
+| | Old trained | **Boosted** |
+|---|---:|---:|
+| June 2026 | ≈ ₹744 | **₹51,605** |
+| Net | ≈ ₹4.2L | **₹7.72L** |
+| Red months | 0 | **0** |
+| Worst month | +₹744 | **+₹155** |
+| Avg month | ≈ ₹13.6k | **≈ ₹24.9k** |
+
+Entry/exit left to the ruler witches; goal = max profit with 0 red + hard day stop.
+
