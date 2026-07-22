@@ -23,6 +23,7 @@ Those two files are the product “secret sauce.” Docs 01–03 expand them **l
 8. Use **19** for daily ₹500 consistency search (Inside Break vs VolExpand; stocks GAP_FADE still best green-day rate).  
 9. Use **20** for S/R · pullback · retest daily ₹500 (**Donch Retest OR-mid 1.5R+BE** default on indices).  
 10. Use **21** for stocks check — **Donch Retest is NO_GO on equities**; keep **GAP_FADE_500**.
+11. Use **22** for Ruler ₹1,500/session training — the average is possible only with many red sessions; the combined max-three-red target is **NO_GO** at 1 lot.
 
 ## Not in the deploy
 Angular assets come from `src/` + `public/` only (`angular.json`).  
