@@ -349,6 +349,7 @@ def combine_days(
     start: str,
     end: str,
     cost_per_trade: float,
+    ambiguous_target_first: bool = False,
 ) -> dict[str, Any]:
     by_day: dict[str, list[Trade]] = defaultdict(list)
     for trade in trades:
@@ -357,6 +358,7 @@ def combine_days(
 
     day_values: list[float] = []
     accepted: list[Trade] = []
+    accepted_values: list[float] = []
     target_days = 0
     for day in sessions:
         candidates = sorted(
@@ -368,16 +370,20 @@ def combine_days(
         for trade in candidates:
             if count >= MAX_TRADES_DAY or realized >= DAY_TARGET_RS:
                 break
-            realized += trade.rs - cost_per_trade
+            trade_value = (
+                TARGET_RS if ambiguous_target_first and trade.ambiguous_bar else trade.rs
+            )
+            realized += trade_value - cost_per_trade
             accepted.append(trade)
+            accepted_values.append(trade_value)
             count += 1
         day_values.append(realized)
         if realized >= DAY_TARGET_RS:
             target_days += 1
 
-    wins = sum(trade.rs > 0 for trade in accepted)
-    losses = sum(trade.rs < 0 for trade in accepted)
-    gross = sum(trade.rs for trade in accepted)
+    wins = sum(value > 0 for value in accepted_values)
+    losses = sum(value < 0 for value in accepted_values)
+    gross = sum(accepted_values)
     net = sum(day_values)
     red_days = sum(value < 0 for value in day_values)
     green_days = sum(value > 0 for value in day_values)
@@ -400,6 +406,7 @@ def combine_days(
         "best_day": round(max(day_values), 1),
         "worst_day": round(min(day_values), 1),
         "ambiguous_stop_first_trades": ambiguous,
+        "same_bar_rule": "target_first" if ambiguous_target_first else "stop_first",
     }
 
 
@@ -459,6 +466,7 @@ def main() -> None:
     specs = build_specs()
     print(f"Searching {len(specs):,} entry/filter systems…", flush=True)
     train_rows: list[dict[str, Any]] = []
+    optimistic_train_rows: list[dict[str, Any]] = []
     trade_cache: dict[str, list[Trade]] = {}
     for index, spec in enumerate(specs, start=1):
         trades = simulate_instrument(nifty, spec) + simulate_instrument(bank, spec)
@@ -471,6 +479,18 @@ def main() -> None:
         )
         if train["trades"] >= 200:
             train_rows.append({"spec": spec, "train": train})
+            optimistic_train_rows.append(
+                {
+                    "spec": spec,
+                    "train": combine_days(
+                        trades,
+                        window_sessions["train_2020_2023"],
+                        *WINDOWS["train_2020_2023"],
+                        cost_per_trade=0.0,
+                        ambiguous_target_first=True,
+                    ),
+                }
+            )
         if index % 200 == 0:
             print(f"  {index:,}/{len(specs):,}", flush=True)
 
@@ -498,6 +518,37 @@ def main() -> None:
             {"spec": spec, "train": row["train"], "validation": validation}
         )
     validation_rows.sort(
+        key=lambda row: (
+            row["validation"]["day_target_hit_pct"],
+            row["validation"]["avg_per_session_after_cost"],
+            row["validation"]["win_rate_pct"],
+        ),
+        reverse=True,
+    )
+
+    optimistic_train_rows.sort(
+        key=lambda row: (
+            row["train"]["day_target_hit_pct"],
+            row["train"]["avg_per_session_after_cost"],
+            row["train"]["win_rate_pct"],
+        ),
+        reverse=True,
+    )
+    optimistic_validation_rows: list[dict[str, Any]] = []
+    for row in optimistic_train_rows[:100]:
+        spec = row["spec"]
+        trades = trade_cache[spec.label()]
+        validation = combine_days(
+            trades,
+            window_sessions["validation_2024_2025"],
+            *WINDOWS["validation_2024_2025"],
+            cost_per_trade=0.0,
+            ambiguous_target_first=True,
+        )
+        optimistic_validation_rows.append(
+            {"spec": spec, "train": row["train"], "validation": validation}
+        )
+    optimistic_validation_rows.sort(
         key=lambda row: (
             row["validation"]["day_target_hit_pct"],
             row["validation"]["avg_per_session_after_cost"],
@@ -538,6 +589,28 @@ def main() -> None:
                     "test_2026": test,
                 },
                 "cost_stress": stressed,
+            }
+        )
+
+    optimistic_finalists = []
+    for row in optimistic_validation_rows[:20]:
+        spec = row["spec"]
+        trades = trade_cache[spec.label()]
+        optimistic_finalists.append(
+            {
+                "label": spec.label(),
+                "spec": asdict(spec),
+                "windows": {
+                    "train_2020_2023": row["train"],
+                    "validation_2024_2025": row["validation"],
+                    "test_2026": combine_days(
+                        trades,
+                        window_sessions["test_2026"],
+                        *WINDOWS["test_2026"],
+                        cost_per_trade=0.0,
+                        ambiguous_target_first=True,
+                    ),
+                },
             }
         )
 
@@ -591,6 +664,13 @@ def main() -> None:
             else "NO_GO — no candidate evidenced ₹2,500/session within 10 fixed ₹250/₹150 trades"
         ),
         "finalists": finalists,
+        "optimistic_target_first_upper_bound": {
+            "warning": (
+                "Not deployable evidence: assumes target wins whenever target and stop "
+                "are both touched inside the same 5-minute candle."
+            ),
+            "finalists": optimistic_finalists,
+        },
     }
     output.write_text(json.dumps(report, indent=2))
 
@@ -604,6 +684,15 @@ def main() -> None:
                 f"WR {metrics['win_rate_pct']:.1f}% · "
                 f"target days {metrics['day_target_hit_pct']:.2f}% · "
                 f"trades/day {metrics['avg_trades_per_session']:.2f}"
+            )
+    if optimistic_finalists:
+        optimistic = optimistic_finalists[0]
+        print(f"Optimistic target-first bound: {optimistic['label']}")
+        for name, metrics in optimistic["windows"].items():
+            print(
+                f"  {name}: avg/day ₹{metrics['avg_per_session_after_cost']:,.0f} · "
+                f"WR {metrics['win_rate_pct']:.1f}% · "
+                f"target days {metrics['day_target_hit_pct']:.2f}%"
             )
     print(f"Wrote {output}")
 
