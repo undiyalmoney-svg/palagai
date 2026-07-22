@@ -38,7 +38,6 @@ export class StrategyManagerPageComponent {
   protected readonly channels = DESK_CHANNELS;
   protected readonly channelLabels = DESK_CHANNEL_LABELS;
   protected readonly assignmentMap = this.assignments.assignments;
-  protected readonly rulerEnabled = this.assignments.rulerEnabled;
   protected readonly eventLog = this.events.events;
   protected readonly shadowSignals = this.shadow.signals;
   protected readonly shadowTrades = this.shadow.trades;
@@ -49,7 +48,7 @@ export class StrategyManagerPageComponent {
   private readonly settingsEpoch = signal(0);
 
   protected readonly selectedStrategyId = signal<string>(
-    this.assignments.getAssignment('nifty').paper ||
+    MANAGED_STRATEGY_IDS.RULER ||
       this.registry.listForChannel('nifty')[0]?.id ||
       this.registry.getAll()[0]?.id ||
       '',
@@ -75,9 +74,9 @@ export class StrategyManagerPageComponent {
     const id = this.selectedStrategyId();
     const ch = this.selectedChannel();
     const a = this.assignmentMap()[ch];
-    const rulerOn = this.rulerEnabled() && ch !== 'stocks';
-    const effectivePaper = rulerOn ? MANAGED_STRATEGY_IDS.RULER : a.paper;
-    const effectiveLive = rulerOn ? MANAGED_STRATEGY_IDS.RULER : a.live;
+    const indexRuler = ch !== 'stocks';
+    const effectivePaper = indexRuler ? MANAGED_STRATEGY_IDS.RULER : a.paper;
+    const effectiveLive = indexRuler ? MANAGED_STRATEGY_IDS.RULER : a.live;
     return {
       isPaper: effectivePaper === id,
       isLive: effectiveLive === id,
@@ -100,19 +99,25 @@ export class StrategyManagerPageComponent {
   });
 
   protected readonly livePerf = computed(() => {
-    const a = this.assignmentMap()[this.selectedChannel()];
-    return this.perf.performance(a.live, this.selectedChannel());
+    const ch = this.selectedChannel();
+    const id = this.assignments.getStrategyId(ch, 'live');
+    return this.perf.performance(id, ch);
   });
 
   protected readonly paperPerf = computed(() => {
-    const a = this.assignmentMap()[this.selectedChannel()];
-    return this.perf.performance(a.paper, this.selectedChannel());
+    const ch = this.selectedChannel();
+    const id = this.assignments.getStrategyId(ch, 'paper');
+    return this.perf.performance(id, ch);
   });
 
   protected selectChannel(ch: DeskChannel): void {
     this.selectedChannel.set(ch);
-    const paperId = this.assignmentMap()[ch].paper;
     const list = this.registry.listForChannel(ch);
+    if (ch !== 'stocks') {
+      this.selectedStrategyId.set(MANAGED_STRATEGY_IDS.RULER);
+      return;
+    }
+    const paperId = this.assignmentMap()[ch].paper;
     if (paperId && list.some((s) => s.id === paperId)) {
       this.selectedStrategyId.set(paperId);
       return;
@@ -142,16 +147,8 @@ export class StrategyManagerPageComponent {
     this.desk.refreshLiveAfterSettingsChange();
   }
 
-  protected setRulerEnabled(enabled: boolean): void {
-    this.manager.setRulerEnabled(enabled);
-    if (enabled && this.selectedChannel() !== 'stocks') {
-      this.selectedStrategyId.set(MANAGED_STRATEGY_IDS.RULER);
-    }
-    this.desk.refreshLiveAfterSettingsChange();
-  }
-
   protected deskStrategyLabel(ch: DeskChannel, mode: 'paper' | 'live'): string {
-    if (this.rulerEnabled() && ch !== 'stocks') {
+    if (ch !== 'stocks') {
       return 'Ruler flow';
     }
     return this.strategyName(this.assignmentMap()[ch][mode]);
@@ -168,19 +165,20 @@ export class StrategyManagerPageComponent {
     const ch = this.selectedChannel();
     const a = this.assignmentMap()[ch];
     const tags: string[] = [];
-    const rulerOn = this.rulerEnabled() && ch !== 'stocks';
-    if (rulerOn && id === MANAGED_STRATEGY_IDS.RULER) {
-      tags.push('Paper', 'Live');
-    } else if (!rulerOn) {
+    if (ch !== 'stocks') {
+      if (id === MANAGED_STRATEGY_IDS.RULER) {
+        tags.push('Paper', 'Live');
+      }
+    } else {
       if (a.paper === id) {
         tags.push('Paper');
       }
       if (a.live === id) {
         tags.push('Live');
       }
-    }
-    if (a.shadow === id) {
-      tags.push('Shadow');
+      if (a.shadow === id) {
+        tags.push('Shadow');
+      }
     }
     return tags.join(' · ');
   }

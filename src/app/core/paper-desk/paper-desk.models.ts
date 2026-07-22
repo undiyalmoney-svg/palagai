@@ -92,7 +92,7 @@ export interface PaperDeskSnapshot {
   /** When true, Live mode places real Kite MIS orders (addon). */
   realOrders: boolean;
   /**
-   * True when this snapshot was produced with Ruler flow (toggle on at Start).
+   * True when this snapshot was produced with Ruler flow (always on for index desks).
    * Keeps day-cap P&L math even if the toggle is flipped after the run.
    */
   rulerActive?: boolean;

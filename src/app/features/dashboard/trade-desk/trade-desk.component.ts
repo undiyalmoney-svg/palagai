@@ -37,6 +37,7 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
   private readonly assignments = inject(StrategyAssignmentService);
 
   protected readonly mode = signal<PaperDeskMode>('testing');
+  /** Always true — Nifty/Bank are Ruler-only. */
   protected readonly rulerEnabled = this.assignments.rulerEnabled;
   protected fromDate = shiftDays(-14);
   protected toDate = todayIso();
@@ -97,11 +98,6 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
     const normalized = Math.max(1, Math.floor(Number(this.lots)) || 1);
     this.lots = normalized;
     this.lotsPreference.set(normalized);
-  }
-
-  protected setRulerEnabled(enabled: boolean): void {
-    this.strategyManager.setRulerEnabled(enabled);
-    this.desk.refreshLiveAfterSettingsChange();
   }
 
   protected toggleWeekday(key: PaperWeekdayKey): void {

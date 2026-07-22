@@ -1,11 +1,11 @@
 <section class="desk pg-page">
   <header class="hero pg-page-hero">
     <div class="hero-copy">
-      <p class="pg-eyebrow">Strategy Manager → Trade Desk</p>
+      <p class="pg-eyebrow">Trade Desk · Ruler flow</p>
       <h1>Trade Desk</h1>
       <p class="pg-lede">
-        Nifty &amp; Bank Nifty ATM options — Testing, Live paper, or Live money.
-        Turn on <strong>Ruler</strong> below for the research flow (shared arm · day-cap ₹1,500).
+        Nifty &amp; Bank Nifty ATM options run <strong>Ruler flow</strong> only
+        (shared arm · Donch trail · day-cap ₹1,500). Testing, Live paper, or Live money.
       </p>
     </div>
     <div class="hero-meta">
@@ -19,13 +19,7 @@
       >
         {{ realOrders && mode() === 'live' ? 'REAL ORDERS' : 'Paper only' }}
       </span>
-      <span
-        class="pg-badge ruler-badge"
-        [class.on]="rulerEnabled()"
-        [class.off]="!rulerEnabled()"
-      >
-        {{ rulerEnabled() ? 'RULER ON' : 'RULER OFF' }}
-      </span>
+      <span class="pg-badge ruler-badge on">RULER</span>
     </div>
   </header>
 
@@ -52,24 +46,14 @@
     </button>
   </div>
 
-  <label class="ruler-toggle" [class.on]="rulerEnabled()" [class.pulse]="!rulerEnabled()">
-    <input
-      type="checkbox"
-      [ngModel]="rulerEnabled()"
-      (ngModelChange)="setRulerEnabled($event)"
-      [disabled]="busy() || snapshot().running"
-    />
+  <div class="ruler-toggle on" role="status">
     <span class="ruler-toggle-copy">
-      <strong>Ruler flow {{ rulerEnabled() ? '· LIVE' : '· tap to wake' }}</strong>
-      <em>{{
-        rulerEnabled()
-          ? 'ON — Nifty + Bank Paper/Live run Ruler · P&L = pts × ₹65/₹30 with ₹1,500 day-cap'
-          : 'OFF — desk uses Strat Donch Retest. Enable Ruler for research beast→trail.'
-      }}</em>
+      <strong>Ruler flow · always on</strong>
+      <em>Nifty + Bank Paper/Live · pts × ₹65/₹30 · research day-cap ₹1,500</em>
       <small>Shared daily arm · Donch trail multi-trade · other arms 1t/day · Testing MTD isolated from Live · lots from Lots field</small>
     </span>
-    <span class="ruler-state" aria-hidden="true">{{ rulerEnabled() ? 'ON' : 'OFF' }}</span>
-  </label>
+    <span class="ruler-state" aria-hidden="true">ON</span>
+  </div>
 
   <div class="control-bar">
     @if (mode() === 'testing') {
@@ -163,10 +147,10 @@
           <span>I understand this uses real money</span>
         </label>
       }
-      @if (realOrders && rulerEnabled()) {
+      @if (realOrders) {
         <p class="hint warn-live-ruler">
-          Ruler live: shared daily arm · 1 trade/index/day · new entries blocked after −₹1,500 day ₹ · open flattened at day-cap.
-          Testing MTD is isolated and will not change live witch state. Prefer Live paper first.
+          Ruler live: shared daily arm · new entries blocked after −₹1,500 day ₹ · open flattened at day-cap.
+          Prefer Live paper first.
         </p>
       }
     }
@@ -231,13 +215,13 @@
     <h2 class="trading-basis-title">What the app trades on</h2>
     <ul class="trading-basis-list">
       <li>
-        <strong>Ruler ON</strong> — shared daily arm · Donch trail multi-trade (research) · other arms 1t/day · research day-cap ₹1,500 · Testing MTD isolated from Live
-      </li>
-      <li>
-        <strong>Ruler OFF</strong> — Strat Paper/Live assignments (default Donch Retest · 1.5R+BE · up to 3 trades/day)
+        <strong>Ruler flow</strong> — only strategy for Nifty + Bank · shared daily arm · Donch trail multi-trade · day-cap ₹1,500
       </li>
       <li>
         <strong>Lots / books</strong> — Lots field · Nifty/Bank checkboxes · optional Strict −₹2,950 / Profit lock +₹5,000
+      </li>
+      <li>
+        <strong>Stocks</strong> — pick strategies on Stocks Desk / Strat · Ruler does not apply
       </li>
     </ul>
   </aside>
