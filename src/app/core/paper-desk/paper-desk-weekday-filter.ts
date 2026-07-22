@@ -61,8 +61,10 @@ export function summarizePaperTrades(
     indexNetPts,
     optionNetRs: trades.reduce((a, t) => a + (t.optionPnlRs ?? 0), 0),
     lotsUsed: lots,
-    pointsMoneyRs: rulerDayClip ? sumPointsMoneyRsRulerClipped(trades, lots) : raw,
-    pointsMoneyRawRs: rulerDayClip ? raw : undefined,
+    pointsMoneyRs: raw,
+    pointsMoneyResearchRs: rulerDayClip
+      ? sumPointsMoneyRsRulerClipped(trades, lots)
+      : undefined,
   };
 }
 

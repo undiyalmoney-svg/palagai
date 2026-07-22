@@ -108,14 +108,16 @@ export interface PaperDeskSnapshot {
     optionNetRs: number;
     /** Lots multiplier used for this run (Testing / Live paper Option ₹ and Live money qty). */
     lotsUsed: number;
-/**
-     * Lot-scaled money from index/futures points:
+    /**
+     * Lot-scaled money from index/futures points (uncapped OHLC truth):
      * Nifty/Bank ≈ pts × 65 × lots · Crude ≈ pts × 10 × lots.
-     * When Ruler is on, this is the research day-clipped score.
      */
     pointsMoneyRs: number;
-    /** Uncapped pts×₹65/₹30 sum (actual OHLC risk) — set when Ruler day-clip is on. */
-    pointsMoneyRawRs?: number;
+    /**
+     * Ruler research score only: same pts money after dyn0 day-cap (−₹1,500).
+     * Not live cash — compare to research months. Undefined when Ruler is off.
+     */
+    pointsMoneyResearchRs?: number;
   };
   /** Testing day breakdown: best/worst days, weekday rollup. */
   dayStats: PaperDeskDayStats;

@@ -165,8 +165,8 @@ export class RulerManagedStrategy implements IManagedStrategy {
 
     const features = computeRulerMorningFeatures(series, day, isBank, this.settings.orEnd);
     const mtd = this.monthState.combinedMtdInr(day);
-    // Shared arm for both indices (research comb) — Nifty locks first when both on.
-    const arm = this.dayPlan.getOrLockArm(day, features, mtd);
+    // Shared arm for both indices — lock only after morning features exist (OR ready).
+    const { arm, locked } = this.dayPlan.getOrLockArm(day, features, mtd);
     const lots = Math.max(1, this.lotsPreference.get());
     const rs = rupeesPerPointForInstrument(ctx.instrumentId);
     const dayCapInr = rulerDayCapInr(mtd);
@@ -191,22 +191,25 @@ export class RulerManagedStrategy implements IManagedStrategy {
           dayNetInr: this.dayNetInr,
           features,
           sharedArm: arm,
+          armLocked: locked,
           witch: mtd < 3000 ? 'beast' : 'trail',
           scope: this.monthState.getScope(),
         },
       };
     }
 
-    if (arm === 'STAND') {
+    if (!locked || arm === 'STAND') {
       return {
         action: 'SKIPPED',
         entryPrice: ctx.candle5m.close,
         stopLoss: ctx.candle5m.close,
         target: ctx.candle5m.close,
         riskRewardRatio: 0,
-        reason: features?.choppy
-          ? 'Ruler STAND · choppy morning'
-          : `Ruler STAND · mtd ₹${mtd.toFixed(0)} · ${mtd < 3000 ? 'beast' : 'trail'}`,
+        reason: !locked
+          ? 'Ruler waiting · morning OR/features not ready'
+          : features?.choppy
+            ? 'Ruler STAND · choppy morning'
+            : `Ruler STAND · mtd ₹${mtd.toFixed(0)} · ${mtd < 3000 ? 'beast' : 'trail'}`,
         analysis: {
           ruler: true,
           arm,
@@ -215,6 +218,7 @@ export class RulerManagedStrategy implements IManagedStrategy {
           dayNetInr: this.dayNetInr,
           features,
           sharedArm: arm,
+          armLocked: locked,
           witch: mtd < 3000 ? 'beast' : 'trail',
           scope: this.monthState.getScope(),
         },
@@ -251,6 +255,7 @@ export class RulerManagedStrategy implements IManagedStrategy {
           rs,
           features,
           sharedArm: arm,
+          armLocked: locked,
           witch: mtd < 3000 ? 'beast' : 'trail',
           scope: this.monthState.getScope(),
         },
@@ -270,6 +275,7 @@ export class RulerManagedStrategy implements IManagedStrategy {
         rs,
         features,
         sharedArm: arm,
+        armLocked: locked,
         witch: mtd < 3000 ? 'beast' : 'trail',
         scope: this.monthState.getScope(),
       },
@@ -333,18 +339,19 @@ export class RulerManagedStrategy implements IManagedStrategy {
       }
     }
 
-    const arm = this.activeArm ?? this.dayPlan.getOrLockArm(
-      extractTradeDate(candle.date),
+    const day = extractTradeDate(candle.date);
+    const pick = this.dayPlan.getOrLockArm(
+      day,
       computeRulerMorningFeatures(
         seriesAt(ctx),
-        extractTradeDate(candle.date),
+        day,
         isBankPdhlInstrument(ctx.instrumentId),
         this.settings.orEnd,
       ),
-      this.monthState.combinedMtdInr(extractTradeDate(candle.date)),
+      this.monthState.combinedMtdInr(day),
     );
-    const useArm: Exclude<RulerArm, 'STAND'> =
-      arm && arm !== 'STAND' ? arm : 'DONCH_TRAIL';
+    const arm = this.activeArm ?? (pick.locked && pick.arm !== 'STAND' ? pick.arm : null);
+    const useArm: Exclude<RulerArm, 'STAND'> = arm ?? 'DONCH_TRAIL';
     const dna = ARM_DNA[useArm];
     const runSettings = mergeSettings(this.settings, {
       targetRMultiple: dna.targetR,
