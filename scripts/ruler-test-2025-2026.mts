@@ -477,6 +477,26 @@ print(json.dumps({'days': len(days), 'official_total': official['net'], 'monthly
   console.log(`Angular research-score total:        ₹${angClip.toFixed(0)}`);
   console.log(`Delta (Ang − Res score):             ₹${(angClip - resClip).toFixed(0)}`);
 
+  // Always print per-month profits after Angular integration check.
+  console.log('\n=== MONTHLY PROFITS (research score ₹) ===');
+  console.log(`${'MONTH'.padEnd(10)} ${'RESEARCH ₹'.padStart(12)} ${'ANGULAR ₹'.padStart(12)}`);
+  console.log('-'.repeat(38));
+  for (const ym of Object.keys(monthlyResClip).sort()) {
+    console.log(
+      `${ym.padEnd(10)} ${monthlyResClip[ym]!.toFixed(1).padStart(12)} ${monthlyAngClip[ym]!.toFixed(1).padStart(12)}`,
+    );
+  }
+  console.log('-'.repeat(38));
+  console.log(
+    `${'TOTAL'.padEnd(10)} ${resClip.toFixed(1).padStart(12)} ${angClip.toFixed(1).padStart(12)}`,
+  );
+  const redMonths = Object.entries(monthlyResClip)
+    .filter(([, v]) => v < 0)
+    .map(([m]) => m);
+  console.log(
+    `Red months (research): ${redMonths.length === 0 ? 'none' : redMonths.join(', ')}`,
+  );
+
   const summary = {
     from: FROM,
     to: TO,
