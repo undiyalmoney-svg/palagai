@@ -564,7 +564,7 @@ export class PaperTradeDeskService {
         rulerActive: rulerOn,
         lastTickAt: null,
         message: rulerOn
-          ? `Testing complete · Ruler · ${sorted.length} trade(s) · pts ₹${Math.round(rawPts)} · research day-cap ₹${research != null && research >= 0 ? '+' : ''}${research != null ? Math.round(research) : 0} · ${this.lotsMultiplier} lot(s) · ${this.deskOptionsLabel()} · ${this.kiteStatsLabel()}`
+          ? `Testing complete · Ruler · ${sorted.length} trade(s) · P&L ₹${Math.round(rawPts)} · day-capped ₹${research != null && research >= 0 ? '+' : ''}${research != null ? Math.round(research) : 0} · ${this.lotsMultiplier} lot(s) · ${this.deskOptionsLabel()} · ${this.kiteStatsLabel()}`
           : `Testing complete · ${sorted.length} paper trade(s) · ${batches.length} batch(es) · ${this.lotsMultiplier} lot(s) · ${this.deskOptionsLabel()} · ${this.kiteStatsLabel()}`,
         statuses,
         trades: sorted,

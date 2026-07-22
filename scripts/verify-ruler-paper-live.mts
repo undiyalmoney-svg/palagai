@@ -143,7 +143,8 @@ function main(): void {
       {
         strategy_id: RULER,
         paper_live_same: true,
-        live_extra: 'day-cap blocks new entries only in live scope; Testing shows raw + research clip',
+        live_extra: 'day-cap blocks new entries + flattens in Testing and Live (same rule)',
+        month_bank: `STAND after +₹${RULER_MONTH_TARGET_INR} MTD (lock, not a monthly promise)`,
         mtd_scopes: 'testing memory isolated from live persistence',
       },
       null,

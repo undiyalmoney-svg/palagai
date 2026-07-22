@@ -95,7 +95,7 @@ export class RulerManagedStrategy implements IManagedStrategy {
   readonly name = 'Ruler flow';
   readonly version = '1.10.0';
   readonly description =
-    'Boosted ruler v1.10: 1-lot DNA · ₹15k month bank · hunter when red · wide trail · 2-loss→edge · day-cap ₹500. Lots from Trade Desk.';
+    'Boosted ruler v1.11: 1-lot DNA · STAND after +₹15k MTD · hunter when red · wide trail · 2-loss→edge · −₹500/day in Testing + Live. Lots from Trade Desk.';
   readonly supports: readonly DeskChannel[] = ['nifty', 'bank'];
 
   readonly defaultSettings = defaultStrategySettings({
@@ -182,11 +182,9 @@ export class RulerManagedStrategy implements IManagedStrategy {
     const lots = Math.max(1, this.lotsPreference.get());
     const rs = rupeesPerPointForInstrument(ctx.instrumentId);
     const dayCapInr = rulerDayCapInr(mtd);
-    const liveProtect = this.monthState.getScope() === 'live';
 
-    // Live only: stop new entries after combined day ₹ hits cap.
-    // Testing lets both indices take their research 1t; display/MTD use day-clip.
-    if (liveProtect && (this.dayCapHit || this.dayNetInr <= -dayCapInr)) {
+    // Same guard in Testing + Live paper/money: stop new entries after combined day ₹ hits cap.
+    if (this.dayCapHit || this.dayNetInr <= -dayCapInr) {
       this.dayCapHit = true;
       return {
         action: 'SKIPPED',
@@ -333,8 +331,8 @@ export class RulerManagedStrategy implements IManagedStrategy {
     closes: number[],
     ctx: StrategyContext,
   ): ManagedExitDecision | null {
-    // Live safety: flatten if combined day ₹ + this open's mark already breaches cap.
-    if (this.monthState.getScope() === 'live') {
+    // Same in Testing + Live: flatten if combined day ₹ + this open's mark already breaches cap.
+    {
       const day = extractTradeDate(candle.date);
       const mtd = this.monthState.combinedMtdInr(day);
       const dayCapInr = rulerDayCapInr(mtd);
@@ -400,7 +398,7 @@ export class RulerManagedStrategy implements IManagedStrategy {
     this.dayNetInr = this.monthState.dayInr(tradingDate);
     const mtdBefore = this.monthState.combinedMtdInr(tradingDate);
     const dayCapInr = rulerDayCapInr(mtdBefore);
-    if (this.monthState.getScope() === 'live' && this.dayNetInr <= -dayCapInr) {
+    if (this.dayNetInr <= -dayCapInr) {
       this.dayCapHit = true;
     }
     recordRuleTradeClosed(this.state, points, 60);
