@@ -27,6 +27,11 @@ export interface ManagedOpenPosition {
   stop: number;
   target: number;
   entryTime: string;
+  /**
+   * Research swing_trail: separate trailing level (does not replace hard `stop`).
+   * Ratchets via confirmed swing3; null until first swing prints.
+   */
+  trail?: number | null;
 }
 
 export interface ManagedExitDecision {

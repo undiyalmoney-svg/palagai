@@ -130,6 +130,7 @@ export function swingLevels(candles: Candle[], lb: number): { high: number; low:
 /**
  * Last confirmed 3-bar fractal swing high/low (1 bar each side).
  * Causal: evaluates candidates that have a right-hand neighbor in `candles`.
+ * Prefer `researchSwingAt` for Ruler DONCH_TRAIL (matches research swing3).
  */
 export function lastSwing3(candles: Candle[]): { high: number | null; low: number | null } {
   const n = candles.length;
@@ -149,6 +150,71 @@ export function lastSwing3(candles: Candle[]): { high: number | null; low: numbe
     }
   }
   return { high, low };
+}
+
+/**
+ * Research `precompute_swings(lookback)` at the last bar.
+ * Swing extreme needs `lookback` bars on each side; value appears at
+ * confirmation index i+lookback and is forward-filled (strategy-universe-search).
+ * Ruler trail exit uses lookback=3 (`inst.swing3_*`).
+ */
+export function researchSwingAt(
+  candles: Candle[],
+  lookback: number,
+): { high: number | null; low: number | null } {
+  const n = candles.length;
+  if (n < lookback * 2 + 1 || lookback < 1) {
+    return { high: null, low: null };
+  }
+  const lastSh = new Array<number>(n).fill(Number.NaN);
+  const lastSl = new Array<number>(n).fill(Number.NaN);
+  let curH = Number.NaN;
+  let curL = Number.NaN;
+  for (let i = lookback; i < n - lookback; i += 1) {
+    const h = candles[i]!.high;
+    const l = candles[i]!.low;
+    let isH = true;
+    let isL = true;
+    for (let j = i - lookback; j <= i + lookback; j += 1) {
+      if (j === i) {
+        continue;
+      }
+      if (candles[j]!.high >= h) {
+        isH = false;
+      }
+      if (candles[j]!.low <= l) {
+        isL = false;
+      }
+      if (!isH && !isL) {
+        break;
+      }
+    }
+    const conf = i + lookback;
+    if (isH) {
+      curH = h;
+    }
+    if (isL) {
+      curL = l;
+    }
+    if (conf < n) {
+      lastSh[conf] = curH;
+      lastSl[conf] = curL;
+    }
+  }
+  for (let i = 1; i < n; i += 1) {
+    if (Number.isNaN(lastSh[i]) && !Number.isNaN(lastSh[i - 1]!)) {
+      lastSh[i] = lastSh[i - 1]!;
+    }
+    if (Number.isNaN(lastSl[i]) && !Number.isNaN(lastSl[i - 1]!)) {
+      lastSl[i] = lastSl[i - 1]!;
+    }
+  }
+  const hi = lastSh[n - 1]!;
+  const lo = lastSl[n - 1]!;
+  return {
+    high: Number.isNaN(hi) ? null : hi,
+    low: Number.isNaN(lo) ? null : lo,
+  };
 }
 
 export interface DayOrRange {

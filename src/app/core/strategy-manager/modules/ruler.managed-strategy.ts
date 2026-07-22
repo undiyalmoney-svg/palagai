@@ -37,6 +37,12 @@ import {
 import { RulerDayPlanService } from '../runtime/ruler-day-plan.service';
 import { RulerMonthStateService } from '../runtime/ruler-month-state.service';
 
+/**
+ * Research ARM books (ruler-profit-boost.build):
+ * - DONCH_2R / DONCH_15R / SWING_2R: RR exits, one_trade, NO break-even profit-protect
+ * - DONCH_TRAIL: swing_trail, multi-trade, NO BE
+ * Earlier Angular BE@1R flattened 03-11 winners to ₹0 (research +₹6,600).
+ */
 const ARM_DNA: Record<
   Exclude<RulerArm, 'STAND'>,
   { spec: IndexRuleSpec; targetR: number; profitProtect: boolean }
@@ -49,17 +55,17 @@ const ARM_DNA: Record<
   DONCH_2R: {
     spec: { entry: 'donch_retest', bias: 'or_mid', exit: 'eod' },
     targetR: 2,
-    profitProtect: true,
+    profitProtect: false,
   },
   DONCH_15R: {
     spec: { entry: 'donch_retest', bias: 'or_mid', exit: 'eod' },
     targetR: 1.5,
-    profitProtect: true,
+    profitProtect: false,
   },
   SWING_2R: {
     spec: { entry: 'swing_retest', bias: 'ema', exit: 'eod' },
     targetR: 2,
-    profitProtect: true,
+    profitProtect: false,
   },
 };
 
@@ -85,9 +91,9 @@ export class RulerManagedStrategy implements IManagedStrategy {
 
   readonly id = MANAGED_STRATEGY_IDS.RULER;
   readonly name = 'Ruler flow';
-  readonly version = '1.4.0';
+  readonly version = '1.5.0';
   readonly description =
-    'Boosted ruler: shared daily arm (Nifty+Bank) · beast→trail · Donch trail multi-trade (research) · other arms 1t/day · day-cap ₹1,500. Testing isolated from live MTD. Lots from Trade Desk.';
+    'Boosted ruler: research DNA parity · EMA at OR-end · no BE on RR arms · swing3 trail · shared arm · day-cap ₹1,500. Lots from Trade Desk.';
   readonly supports: readonly DeskChannel[] = ['nifty', 'bank'];
 
   readonly defaultSettings = defaultStrategySettings({

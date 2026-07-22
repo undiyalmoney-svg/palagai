@@ -64,8 +64,7 @@ function seriesThroughOr(candles: Candle[], day: string, orEnd = '09:45'): Candl
     if (hhmm < orEnd) {
       out.push(c);
     } else if (hhmm === orEnd) {
-      // include first orEnd bar if present as close of OR in some feeds
-      out.push(c);
+      // Research OR uses mins < orEnd — do not include orEnd bar.
       break;
     } else {
       break;

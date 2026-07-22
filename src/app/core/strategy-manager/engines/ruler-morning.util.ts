@@ -1,11 +1,32 @@
 import { Candle } from '../../models/candle.model';
 import {
-  atrAt,
   barsOnDay,
   emaLast,
   openingRange,
   previousDayBars,
 } from '../indicators/desk-indicators';
+
+/**
+ * Research atr14: mean of prior `period` bar ranges (high−low), excluding current bar.
+ * Matches strategy-universe-search.py — not true-range ATR.
+ */
+function researchRangeAtr(candlesThroughBar: Candle[], period = 14): number | null {
+  if (candlesThroughBar.length < 2) {
+    return null;
+  }
+  const i = candlesThroughBar.length - 1;
+  const start = Math.max(0, i - period);
+  if (start >= i) {
+    return null;
+  }
+  let sum = 0;
+  let n = 0;
+  for (let k = start; k < i; k += 1) {
+    sum += candlesThroughBar[k]!.high - candlesThroughBar[k]!.low;
+    n += 1;
+  }
+  return n > 0 ? sum / n : null;
+}
 
 /** Morning features for Ruler witch switching (causal — OR end 09:45). */
 export interface RulerMorningFeatures {
@@ -51,7 +72,22 @@ export function computeRulerMorningFeatures(
   if (!or || !(or.high > or.low)) {
     return null;
   }
-  const atr = atrAt(series, 14);
+  // Research morning_feat evaluates at last OR bar (hhmm < orEnd), never the orEnd bar itself.
+  const orEndBar =
+    dayBars.filter((b) => {
+      const hhmm = b.date.slice(11, 16);
+      return hhmm >= '09:15' && hhmm < orEnd;
+    }).at(-1) ?? null;
+  if (!orEndBar) {
+    return null;
+  }
+  const orEndIdx = series.findIndex((c) => c.date === orEndBar.date);
+  if (orEndIdx < 0) {
+    return null;
+  }
+  // Truncate to OR-end bar so EMA/ATR match research inst.ema*/atr14[j] at j = OR end.
+  const throughOr = series.slice(0, orEndIdx + 1);
+  const atr = researchRangeAtr(throughOr, 14);
   if (atr == null || atr <= 0) {
     return null;
   }
@@ -74,15 +110,9 @@ export function computeRulerMorningFeatures(
   const vwide = orWidth >= (isBank ? 220 : 120);
   const choppy = !wide && drive < 0.3;
   const calm = gap < 1.5;
-  const closes = series.map((c) => c.close);
+  const closes = throughOr.map((c) => c.close);
   const e20 = emaLast(closes, 20);
   const e50 = emaLast(closes, 50);
-  // Research morning_feat uses price/EMA at OR end (last bar before orEnd), not 10:15.
-  const orEndBar =
-    dayBars.filter((b) => {
-      const hhmm = b.date.slice(11, 16);
-      return hhmm >= '09:15' && hhmm < orEnd;
-    }).at(-1) ?? dayBars[dayBars.length - 1]!;
   const px = orEndBar.close;
   const emaBuy = e20 != null && e50 != null && px > e20 && e20 > e50;
   const emaSell = e20 != null && e50 != null && px < e20 && e20 < e50;
