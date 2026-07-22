@@ -1,84 +1,107 @@
-# 22 — Monster auto-bot @ 1 lot (clever switches)
+# 22 — Empire auto-bot (₹60k · 1 lot · max profit · tiny losses)
 
-## What you asked for
-- **1 lot** (not “trade 6× size”)
-- **Clever auto flow** — switch strategies like a monster trader
-- Path to big months (₹15k spirit) via skill, not leverage
+## Motive
+Not “just ₹15k/month.”  
+**Build an empire:** max profit at **1 lot**, **losses kept tiny**, **don’t blow the ₹60k**.
 
-## Hard facts (OOS 2024→2026-07, 1 lot Nifty+Bank)
-
-### 1) Flat ₹500/day is not enough for ₹15k every month
-Even with **perfect** arm pick, days where some arm makes ≥₹500 are only ~72% of sessions (~14/month).  
-Clipping those to exactly ₹500 → **~₹5–10k/month**, never a full ₹15k every month.
-
-**₹15k/month at 1 lot needs keeping fat wins** (especially Donch trail on the right mornings), not freezing at ₹500.
-
-### 2) Perfect switching (oracle) already clears the motive at 1 lot
-If the bot always picked the best arm that day (look-ahead — not tradable):
-
-| | Oracle @1 lot |
-|---|---:|
-| Every month ≥ ₹15k | **31/31** |
-| Red months | **0** |
-| Worst month | **≈ ₹42k** |
-| Avg month | **≈ ₹76k** |
-
-So the money is there at **1 lot**. The job is a **smarter causal switcher**.
-
-### 3) Best causal monster found so far — EDGE switcher
-
-Morning (after 09:45) picks **one** arm:
-
-| Regime | Arm |
+## Capital truth
+| Role of ₹60k | Meaning |
 |---|---|
-| Choppy | STAND |
-| Very strong + wide OR | **DONCH_TRAIL** (let it run) |
-| Wide + strong + calm | **DONCH_2R** |
-| EMA aligned | **SWING_2R** |
-| Drive ≥ 0.4 | **DONCH_15R** |
-| Else | STAND |
+| **Risk budget** | Max drawdown we refuse to exceed (~50% = ₹30k hard ceiling in research) |
+| **Stocks book** | Exact fit for GAP_FADE_500 / treasure list (doc 07 / 21) |
+| **Index futures** | 1 lot Nifty+Bank **margin usually exceeds ₹60k** — live empire needs options (defined risk), single-index, or margin beyond the 60k risk wallet |
 
-**OOS @1 lot:**
+Research PnL still uses 1-lot index proxy (₹65/₹30). Empire rules are about **how** that lot is run.
 
-| Metric | EDGE monster |
+---
+
+## Empire law (non-negotiable)
+1. **1 lot** — no size hacks  
+2. **Hard day max loss** — flatten at **−₹1,500** combined (losses stay small)  
+3. **Clever switches** — morning regime picks the arm  
+4. **No naked unlimited trail** without the day stop  
+5. **Profit-protect** — BE after +1R when using fixed-R arms  
+
+---
+
+## Winner under ₹60k drawdown budget (OOS 2024→2026-07)
+
+### A) Aggressive empire — Trail + day cap ₹1,500
+Trade **Donch trail** most days, but **never lose more than ₹1,500/day**.
+
+| Metric | Result |
 |---|---:|
-| Avg / day | **≈ ₹450–520** |
-| Avg / month | **≈ ₹9–10k** |
-| Months ≥ ₹15k | **13–15 / 31** |
-| Red months | **~11–12** |
-| OOS net | **≈ ₹2.5–3.2L** |
+| OOS net | **≈ ₹9.75L** |
+| Avg / day | **≈ ₹1,565** |
+| Avg / month | **≈ ₹31,500** |
+| Max drawdown | **≈ ₹21k** (35% of ₹60k — inside budget) |
+| Avg losing day | **≈ −₹1,340** |
+| Worst day | **−₹1,500** (capped) |
+| Red months | **2 / 31** |
+| Months ≥ ₹15k | **24 / 31** |
+| Profit factor | **≈ 2.85** |
 
-Optional: **freeze month once MTD ≥ ₹15k** → slightly more months hit 15k (15/31), still not all, still some reds.
+**Compounding sketch (add PnL to ₹60k wallet):**  
+₹60k → **≈ ₹10.3L** over 31 OOS months (research curve).
 
-Learned EV tables / witch mode grids did **not** beat this hand EDGE router out of sample.
+### B) Capital-guard empire — EDGE switches · no trail · day cap ₹1,500 (recommended default)
+Morning witch (same as EDGE) but **replace TRAIL with Donch 2R**, plus day cap:
+
+| Metric | Result |
+|---|---:|
+| OOS net | **≈ ₹4.1L** |
+| Avg / day | **≈ ₹655** |
+| Max DD | **≈ ₹12.7k** (21% of ₹60k) |
+| Worst day | **−₹1,500** |
+| Avg loss | **≈ −₹1,410** |
+
+Still a monster vs toy locks — **much safer DD** than naked trail.
+
+### C) Tightest DD — EDGE as 1.5R + day cap ₹1,500
+| Metric | Result |
+|---|---:|
+| OOS net | **≈ ₹3.6L** |
+| Max DD | **≈ ₹10.4k** (17% of ₹60k) |
+| Worst day | **−₹1,500** |
+
+Closest to “never scare the ₹60k.”
 
 ---
 
-## Monster flow (product target)
+## Auto flow (product)
 
 ```
-09:45 OR → regime features
-     ↓
-RAMPAGE? (month MTD low) → prefer TRAIL/OR expansion arms
-     ↓
-HUNT → EDGE switch table above
-     ↓
-DEFEND (MTD red) → only calm Donch / STAND
-     ↓
-BANK (MTD ≥ ₹15k) → STAND unless ultra trail setup
+09:45 → regime features
+  ├─ choppy                    → STAND
+  ├─ vstrong + wide            → TRAIL  (only if day-stop armed)  else DONCH_2R / 1.5R
+  ├─ wide + strong + calm      → DONCH_2R (or 1.5R+BE)
+  ├─ EMA aligned               → SWING_2R
+  ├─ drive ≥ 0.4               → DONCH_15R
+  └─ else                      → STAND
+
+Intraday:
+  · profit-protect BE after +1R on fixed-R arms
+  · combined day PnL ≤ −₹1,500 → FLATTEN + STAND rest of day
+
+Parallel (₹60k cash book):
+  · Stocks GAP_FADE_500 · risk ~₹1,200/trade · day stop ~₹2,400
 ```
 
-**1 lot only. Profit from switches + letting winners run.**
+**Mode dial:** Aggressive (A) / Default (B) / Guard (C).
 
 ---
 
-## What is NOT the answer
-- Scaling to 6 lots to force ₹15k every month — size hack, not a better trader
-- Tiny month locks (`regime_lock500`) — green months but toy profits
+## What this rejects
+- Scaling to 6 lots to fake ₹15k months  
+- Freezing the month at ₹500 (toy empire)  
+- Unlimited trail without a day stop (can nuke capital)
 
-## Gap still open
-Causal bot has not yet matched oracle’s **every month ≥ ₹15k @1 lot**.  
-Next research: finer intraday switches, per-book witches, shadow arms mid-session — still 1 lot.
+## Caveat
+Day-cap results **assume** the desk can flatten near −₹1,500. Slippage on trail exists — prefer **B/C** until live day-stop is proven.
 
-## Deploy
-Research recipe. Wire Auto = **EDGE monster @1 lot** when implementing (not 6× lock).
+## Artifacts
+- `docs/owner-private/research/zero-red-months/empire-60k.json`
+- Scripts: monster / fifteen-k research under `scripts/research-*.py`
+
+## Deploy status
+**Recipe ready.** Wire Auto empire modes + **hard day loss ₹1,500** next.
