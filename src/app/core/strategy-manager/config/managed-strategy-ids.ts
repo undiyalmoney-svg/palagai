@@ -13,6 +13,11 @@ export const MANAGED_STRATEGY_IDS = {
   SWING_RETEST_EMA50_2R: 'swing-retest-ema50-2r',
   /** Stocks Desk champion — gap-up fade ₹500 book. */
   GAP_FADE_500: 'gap-fade-500',
+  /**
+   * Ruler flow (opt-in toggle): morning witch switch + ₹1,500 day cap +
+   * dyn protect when month green. Not the default — Donch Retest stays default.
+   */
+  RULER: 'ruler-flow',
 } as const;
 
 export type ManagedStrategyId =

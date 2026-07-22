@@ -20,6 +20,7 @@ import {
   recordRuleTradeClosed,
   runIndexRuleStrategy,
 } from '../engines/index-rule.engine';
+import { seriesAt } from '../indicators/desk-indicators';
 
 /** Shared base for rule-based index strategies. */
 export abstract class BaseIndexRuleStrategy implements IManagedStrategy {
@@ -88,9 +89,16 @@ export abstract class BaseIndexRuleStrategy implements IManagedStrategy {
     candle: Candle,
     open: ManagedOpenPosition,
     closes: number[],
-    _ctx: StrategyContext,
+    ctx: StrategyContext,
   ): ManagedExitDecision | null {
-    return indexRuleExitLogic(candle, open, closes, this.settings, this.spec);
+    return indexRuleExitLogic(
+      candle,
+      open,
+      closes,
+      this.settings,
+      this.spec,
+      seriesAt(ctx),
+    );
   }
 
   onTradeClosed(points: number): void {
