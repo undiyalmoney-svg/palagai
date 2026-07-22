@@ -10,7 +10,8 @@ export interface StocksWatchItem {
   strategyId?: string;
 }
 
-const STORAGE_KEY = 'palagai_stocks_watchlist_v3';
+const STORAGE_KEY = 'palagai_stocks_watchlist_v4';
+const LEGACY_WATCH_KEYS = ['palagai_stocks_watchlist_v3', 'palagai_stocks_watchlist_v2'] as const;
 
 /**
  * ₹500/day champion book — all use GAP_FADE_500 (desk caps max 3 by gap rank).
@@ -144,6 +145,9 @@ export class StocksWatchlistService {
 
   private read(): StocksWatchItem[] {
     try {
+      for (const key of LEGACY_WATCH_KEYS) {
+        localStorage.removeItem(key);
+      }
       const raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) {
         return DEFAULT_WATCH.map((x) => ({ ...x }));
@@ -152,7 +156,12 @@ export class StocksWatchlistService {
       if (!Array.isArray(parsed) || !parsed.length) {
         return DEFAULT_WATCH.map((x) => ({ ...x }));
       }
-      return parsed;
+      // Force research default on treasure rows
+      return parsed.map((row) =>
+        row.source === 'treasure'
+          ? { ...row, strategyId: 'GAP_FADE_500' }
+          : row,
+      );
     } catch {
       return DEFAULT_WATCH.map((x) => ({ ...x }));
     }

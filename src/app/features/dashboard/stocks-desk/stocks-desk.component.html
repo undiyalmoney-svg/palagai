@@ -4,10 +4,9 @@
       <p class="pg-eyebrow">NSE · Equity MIS</p>
       <h1>Stocks Desk</h1>
       <p class="pg-lede">
-        Treasure book + <strong>top gainers/losers</strong>. Capital
+        Default: <strong>GAP_FADE_500</strong> (₹500/day research book). Capital
         <strong>₹{{ capitalRs | number: '1.0-0' }}</strong>
-        · split across up to {{ maxLegsCap }} legs (~₹{{ capitalPerLeg() | number: '1.0-0' }}/leg when {{ maxLegs }} active).
-        Resolve any symbol → instrument → check entry → BUY/SELL.
+        · up to {{ maxLegsCap }} legs · treasure watchlist + optional top movers.
       </p>
     </div>
     <div class="hero-meta">
@@ -27,11 +26,11 @@
   <aside class="trading-basis" aria-label="Stock desk basis">
     <h2 class="trading-basis-title">How this desk trades</h2>
     <ul class="trading-basis-list">
-      <li><strong>Universe</strong> — watchlist + optional live top gainers/losers (quoted, instrument resolved)</li>
-      <li><strong>Entry</strong> — Almost-green: fade ≥0.5% gap-up (SELL) · bounce ≥0.5% gap-down (BUY)</li>
-      <li><strong>2–3 potentials?</strong> — yes: take top gaps, <strong>split ₹60k equally</strong> across legs (qty resized per leg)</li>
-      <li><strong>Risk</strong> — Live money places <strong>SL-M</strong> + monitors <strong>TP</strong> (like Nifty desk); EOD exit 15:15 · Testing first</li>
-      <li><strong>Restart</strong> — re-opens Live → adopts open MIS, exits if SL/TP already hit, else places missing SL</li>
+      <li><strong>Default strategy</strong> — <strong>GAP_FADE_500</strong>: fade gap-up ≥0.3% (SELL) · stop 1.5% · max 3 names by gap size</li>
+      <li><strong>Universe</strong> — treasure watchlist + optional live top gainers/losers</li>
+      <li><strong>2–3 potentials?</strong> — take largest gaps, <strong>split ₹60k</strong> across legs</li>
+      <li><strong>Exit</strong> — stop / EOD 15:15 · Live money uses SL-M</li>
+      <li><strong>Restart</strong> — re-open Live → adopts open MIS, exits if SL already hit</li>
     </ul>
   </aside>
 
@@ -77,7 +76,11 @@
 
     <label class="field">
       <span>Strategy</span>
-      <select [(ngModel)]="strategyId" [disabled]="busy() || snapshot().running">
+      <select
+        [(ngModel)]="strategyId"
+        (ngModelChange)="onStrategyChange($event)"
+        [disabled]="busy() || snapshot().running"
+      >
         @for (opt of strategyOptions; track opt.id) {
           <option [ngValue]="opt.id">{{ opt.label }}</option>
         }

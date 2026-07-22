@@ -5,8 +5,9 @@
       <h1>Multi-strategy control</h1>
       <p class="sm-sub">
         Switch Paper / Live / Shadow strategies per instrument without changing code.
-        Defaults: Nifty &amp; Bank → VolExpand Donch15 (full morning signals); Stocks Desk → GAP_FADE_500.
-        Turn on Regime filter in Settings if you want fewer, higher-quality days.
+        Defaults: Nifty &amp; Bank → <strong>Donch Retest · OR-mid · 2R</strong>.
+        Stocks → use <strong>Stocks Desk</strong> with <strong>GAP_FADE_500</strong> (not index Donch).
+        Turn on Regime filter in Settings only for VolExpand-style morning filters.
       </p>
     </div>
     <div class="sm-hero-actions">
@@ -34,6 +35,13 @@
   <section class="sm-grid">
     <article class="sm-panel">
       <h2>Assignments · {{ channelLabels[selectedChannel()] }}</h2>
+      @if (selectedChannel() === 'stocks') {
+        <p class="sm-stocks-note">
+          Stocks live trading runs on <strong>Stocks Desk</strong> with default
+          <strong>GAP_FADE_500</strong>. Index strategies here are not the equity DNA.
+          Open <a routerLink="/dashboard/stocks">Stocks Desk</a> to trade today.
+        </p>
+      }
       <label>
         Paper strategy
         <select
