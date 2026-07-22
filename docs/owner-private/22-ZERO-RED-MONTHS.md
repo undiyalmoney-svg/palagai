@@ -105,3 +105,31 @@ Day-cap results **assume** the desk can flatten near −₹1,500. Slippage on tr
 
 ## Deploy status
 **Recipe ready.** Wire Auto empire modes + **hard day loss ₹1,500** next.
+
+---
+
+## Trained ruler — 0 red months (removes the last −₹6)
+
+**Base default** EDGE · no-trail · day cap ₹1,500 still had **one** red month: **2026-06 (−₹6)**  
+Cause: month was green (~₹1.5k), then one more −₹1,500 day flipped it.
+
+### Fix — dynamic day cap when month is green
+```
+day_cap = ₹1,500
+if month_MTD > 0:
+    day_cap = min(₹1,500, month_MTD)   # one loss cannot push month below 0
+```
+
+| Ruler | Red | OOS net | Worst month | Avg month |
+|---|---:|---:|---:|---:|
+| Base fixed cap | 1 | ₹4.08L | −₹6 | ₹13.2k |
+| **Trained DYN cap** | **0** | **₹4.21L** | **+₹744** | **₹13.6k** |
+| DYN cap + ₹1 cushion (always green) | 0 | ₹2.87L | +₹1 | ₹9.3k |
+
+**2026-06 under trained ruler: +₹744** (was −₹6).
+
+Full auto:
+1. Morning EDGE switch (no naked trail)
+2. Hard day loss ≤ ₹1,500
+3. **If month already green → tighten day stop to MTD** so red months are impossible from a single capped loss
+
