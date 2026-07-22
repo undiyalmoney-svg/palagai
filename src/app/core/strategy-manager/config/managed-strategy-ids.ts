@@ -7,7 +7,7 @@ export const MANAGED_STRATEGY_IDS = {
   DONCHIAN_55_TURTLE: 'donchian-55-turtle',
   /** Daily-consistency search: max green-day share (not default — fat tails). */
   INSIDE_BREAK: 'inside-break-eod',
-  /** S/R retest daily-₹500 winner: Donch-20 retest + OR-mid + 2R. */
+  /** S/R retest daily-₹500 winner: Donch-20 retest + OR-mid + 1.5R + BE protect. */
   DONCH_RETEST_OR_MID_2R: 'donch-retest-or-mid-2r',
   /** S/R retest twin: Swing-5 retest + EMA50 + 2R. */
   SWING_RETEST_EMA50_2R: 'swing-retest-ema50-2r',
@@ -20,7 +20,7 @@ export type ManagedStrategyId =
 
 /**
  * Research-backed defaults:
- * - Nifty/Bank: Donch Retest OR-mid 2R
+ * - Nifty/Bank: Donch Retest OR-mid 1.5R+BE
  * - Stocks: GAP_FADE_500 (same DNA as Stocks Desk)
  */
 export const DEFAULT_CHANNEL_ASSIGNMENTS = {

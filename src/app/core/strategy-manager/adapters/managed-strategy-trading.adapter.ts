@@ -67,18 +67,23 @@ export class ManagedStrategyTradingAdapter implements TradingStrategy {
 
   checkEarlyExit(ctx: StrategyContext, trade: OpenTrade): ExitResult | null {
     const closes = [...ctx.previous5m, ctx.candle5m].map((c) => c.close);
+    const managedOpen = {
+      direction: trade.direction,
+      entry: trade.entryPrice,
+      stop: trade.stopLoss,
+      target: trade.targetPrice,
+      entryTime: trade.entryTime,
+    };
     const decision = this.module.exitLogic(
       ctx.candle5m,
-      {
-        direction: trade.direction,
-        entry: trade.entryPrice,
-        stop: trade.stopLoss,
-        target: trade.targetPrice,
-        entryTime: trade.entryTime,
-      },
+      managedOpen,
       closes,
       ctx,
     );
+    // Profit-protect may tighten stop; TradeManager SL uses trade.stopLoss.
+    if (managedOpen.stop !== trade.stopLoss) {
+      trade.stopLoss = managedOpen.stop;
+    }
     if (!decision) {
       return null;
     }

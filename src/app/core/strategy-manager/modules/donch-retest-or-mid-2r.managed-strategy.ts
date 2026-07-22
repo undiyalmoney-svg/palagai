@@ -6,17 +6,18 @@ import { IndexRuleSpec } from '../engines/index-rule.engine';
 import { BaseIndexRuleStrategy } from './base-index-rule.strategy';
 
 /**
- * Donchian-20 break → retest + OR-mid bias + 2R target.
- * Daily ₹500 S/R search winner (OOS 2024+): ~50.6% green days, median traded > 0.
- * At 1 lot Nifty+Bank avg ~₹195; ~2–3 lots targets ~₹500 average.
+ * Donchian-20 break → retest + OR-mid bias.
+ * Daily ₹500 S/R search DNA; profit-protect defaults: 1.5R target + BE lock after +1R
+ * (research: higher green-day share vs 2R/EOD, less giveback on open winners).
+ * At 1 lot Nifty+Bank ~₹146 avg with 1.5R; ~3–4 lots toward ~₹500 average.
  */
 @Injectable({ providedIn: 'root' })
 export class DonchRetestOrMid2rManagedStrategy extends BaseIndexRuleStrategy {
   readonly id = MANAGED_STRATEGY_IDS.DONCH_RETEST_OR_MID_2R;
-  readonly name = 'Donch Retest · OR-mid · 2R';
-  readonly version = '1.0.0';
+  readonly name = 'Donch Retest · OR-mid · 1.5R+BE';
+  readonly version = '1.1.0';
   readonly description =
-    'Break Donchian-20 S/R, enter on retest · OR-mid bias · 2R · 1t. Index daily-profit DNA — NOT for stocks (use GAP_FADE_500).';
+    'Break Donchian-20 S/R, enter on retest · OR-mid · 1.5R target · BE lock after +1R · 1t. Index daily-profit DNA — NOT for stocks (use GAP_FADE_500).';
   readonly supports: readonly DeskChannel[] = ['nifty', 'bank'];
 
   readonly defaultSettings = defaultStrategySettings({
@@ -30,7 +31,10 @@ export class DonchRetestOrMid2rManagedStrategy extends BaseIndexRuleStrategy {
     maxTradesPerDay: 1,
     instrumentType: 'futures',
     dayStopPts: 60,
-    targetRMultiple: 2,
+    targetRMultiple: 1.5,
+    profitProtectEnabled: true,
+    profitProtectArmR: 1,
+    profitProtectLockR: 0,
     regimeFilterEnabled: false,
     positionSizeLots: 1,
   });

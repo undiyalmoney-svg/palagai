@@ -38,6 +38,15 @@ export interface StrategySettings {
   /** Target R-multiple (0 = no fixed target / EOD strategies). */
   targetRMultiple: number;
   /**
+   * After favorable move reaches profitProtectArmR × risk, tighten stop
+   * to entry + profitProtectLockR × risk (0 = break-even). Reduces giveback.
+   */
+  profitProtectEnabled: boolean;
+  /** Arm protect after this R of favorable excursion (e.g. 1 = +1R). */
+  profitProtectArmR: number;
+  /** Locked stop offset in R once armed (0 = break-even). */
+  profitProtectLockR: number;
+  /**
    * Morning regime filter (prior-day/OR features only — no look-ahead).
    * When enabled: require OR drive ≥ min and gap/ATR ≤ max.
    */
@@ -71,6 +80,9 @@ export function defaultStrategySettings(
     instrumentType: 'index',
     dayStopPts: 60,
     targetRMultiple: 0,
+    profitProtectEnabled: false,
+    profitProtectArmR: 1,
+    profitProtectLockR: 0,
     regimeFilterEnabled: false,
     regimeMinOrDriveFrac: 0.3,
     regimeMaxGapAtr: 6,

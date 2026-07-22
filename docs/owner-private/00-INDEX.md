@@ -21,7 +21,7 @@ Those two files are the product “secret sauce.” Docs 01–03 expand them **l
 6. Use **17** for Strategy Manager (multi-strategy Paper/Live/Shadow; Champion remains default).  
 7. Use **18** for VolExpand morning regime filter (fixes Mar‑2026 stand-down).  
 8. Use **19** for daily ₹500 consistency search (Inside Break vs VolExpand; stocks GAP_FADE still best green-day rate).  
-9. Use **20** for S/R · pullback · retest daily ₹500 (**Donch Retest OR-mid 2R** default on indices).  
+9. Use **20** for S/R · pullback · retest daily ₹500 (**Donch Retest OR-mid 1.5R+BE** default on indices).  
 10. Use **21** for stocks check — **Donch Retest is NO_GO on equities**; keep **GAP_FADE_500**.
 
 ## Not in the deploy

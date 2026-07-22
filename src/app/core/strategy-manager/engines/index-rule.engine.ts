@@ -363,6 +363,57 @@ export function runIndexRuleStrategy(
   };
 }
 
+/** Initial risk from entry/target (stable after stop is moved by profit-protect). */
+export function indexRuleInitialRisk(
+  open: ManagedOpenPosition,
+  settings: StrategySettings,
+): number {
+  if (settings.targetRMultiple > 0) {
+    const fromTarget = Math.abs(open.target - open.entry) / settings.targetRMultiple;
+    if (fromTarget > 0) {
+      return fromTarget;
+    }
+  }
+  return Math.abs(open.entry - open.stop);
+}
+
+/**
+ * If MFE ≥ armR × risk, ratchet stop to entry + lockR × risk (never loosen).
+ * Mutates `open.stop` so paper/live desks can sync the tightened stop.
+ */
+export function applyIndexRuleProfitProtect(
+  candle: Candle,
+  open: ManagedOpenPosition,
+  settings: StrategySettings,
+): void {
+  if (!settings.profitProtectEnabled || settings.profitProtectArmR <= 0) {
+    return;
+  }
+  const risk = indexRuleInitialRisk(open, settings);
+  if (!(risk > 0)) {
+    return;
+  }
+  const armPts = settings.profitProtectArmR * risk;
+  const lockPts = settings.profitProtectLockR * risk;
+  if (open.direction === 'BUY') {
+    const mfe = candle.high - open.entry;
+    if (mfe >= armPts) {
+      const lockStop = open.entry + lockPts;
+      if (lockStop > open.stop) {
+        open.stop = lockStop;
+      }
+    }
+  } else {
+    const mfe = open.entry - candle.low;
+    if (mfe >= armPts) {
+      const lockStop = open.entry - lockPts;
+      if (lockStop < open.stop) {
+        open.stop = lockStop;
+      }
+    }
+  }
+}
+
 export function indexRuleExitLogic(
   candle: Candle,
   open: ManagedOpenPosition,
@@ -371,6 +422,8 @@ export function indexRuleExitLogic(
   spec: IndexRuleSpec,
 ): ManagedExitDecision | null {
   const time = extractHhMm(candle.date);
+
+  applyIndexRuleProfitProtect(candle, open, settings);
 
   if (open.direction === 'BUY') {
     if (candle.low <= open.stop) {

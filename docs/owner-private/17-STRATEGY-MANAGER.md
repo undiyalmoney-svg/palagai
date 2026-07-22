@@ -2,13 +2,13 @@
 
 ## Status
 
-**Architecture implemented.** Champion PDHL remains available (DNA untouched). **Defaults:** Donch Retest · OR-mid · 2R for **Nifty/Bank**; **GAP_FADE_500** for Stocks (Manager + Desk).
+**Architecture implemented.** Champion PDHL remains available (DNA untouched). **Defaults:** Donch Retest · OR-mid · **1.5R+BE** (profit-protect) for **Nifty/Bank**; **GAP_FADE_500** for Stocks (Manager + Desk).
 
 ## What shipped
 
 - `IManagedStrategy` contract (`initialize`, `analyze`, `generateSignal`, `calculateStopLoss`, `calculateTarget`, `exitLogic`, settings)
 - Strategy Registry + Manager (paper/live/shadow per channel)
-- Modules: Champion wrapper (DNA untouched), VolExpand Donch15, Swing5+PrevDay, Donchian-20, Donchian-55 Turtle, Inside Break, **Donch Retest OR-mid 2R**, **Swing Retest EMA50 2R** (index channels only)
+- Modules: Champion wrapper (DNA untouched), VolExpand Donch15, Swing5+PrevDay, Donchian-20, Donchian-55 Turtle, Inside Break, **Donch Retest OR-mid 1.5R+BE**, **Swing Retest EMA50 2R** (index channels only)
 - Trade Desk wired through Manager (same logic Paper/Live)
 - Shadow book (signals/trades, no orders)
 - Strategy Management dashboard (`/dashboard/strategy-manager`)
@@ -18,12 +18,12 @@
 
 | | Paper | Live | Shadow |
 |---|---|---|---|
-| Nifty | **Donch Retest · OR-mid · 2R** | **Donch Retest · OR-mid · 2R** | Off |
-| Bank | **Donch Retest · OR-mid · 2R** | **Donch Retest · OR-mid · 2R** | Off |
+| Nifty | **Donch Retest · OR-mid · 1.5R+BE** | **Donch Retest · OR-mid · 1.5R+BE** | Off |
+| Bank | **Donch Retest · OR-mid · 1.5R+BE** | **Donch Retest · OR-mid · 1.5R+BE** | Off |
 | Stocks (Manager) | **GAP_FADE_500** | **GAP_FADE_500** | Off |
 | Stocks Desk | — | **GAP_FADE_500** | — |
 
-Donch Retest is **index-only**. Stocks use **GAP_FADE_500** in Strategy Manager and Stocks Desk (doc **21**).
+Donch Retest defaults: **1.5R target**, **profit protect on** (arm at +1R → lock stop to break-even). Index-only. Stocks use **GAP_FADE_500** (doc **21**).
 
 ## How to switch (no code)
 
