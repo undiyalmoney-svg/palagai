@@ -65,6 +65,11 @@ export interface PaperInstrumentStatus {
   chosenAsOf: string | null;
   lastSignal: string;
   tradesToday: number;
+  /** Strategy Manager module driving this instrument (desk resolve). */
+  strategyId?: string;
+  strategyName?: string;
+  /** Max trades/day from strategy settings (0 = unlimited). */
+  maxTradesPerDay?: number;
   /** Live desk phase for UI. */
   livePhase: 'idle' | 'waiting' | 'in_trade' | 'target_hit' | 'sl_hit' | 'exited';
   livePhaseLabel: string;

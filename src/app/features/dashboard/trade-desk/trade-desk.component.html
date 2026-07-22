@@ -1,12 +1,11 @@
 <section class="desk pg-page">
   <header class="hero pg-page-hero">
     <div class="hero-copy">
-      <p class="pg-eyebrow">OR Swing Breakout</p>
+      <p class="pg-eyebrow">Strategy Manager → Trade Desk</p>
       <h1>Trade Desk</h1>
       <p class="pg-lede">
-        Champion DNA on Nifty &amp; Bank Nifty ATM options — Testing, Live paper, or Live money.
-        Mon/Thu use the full day window; <strong>Tue / Wed / Fri</strong> use weekday filters from
-        the 2020–2026 research (see below).
+        Nifty &amp; Bank Nifty ATM options — strategy from <strong>Strat</strong> (Paper/Live assignment).
+        Defaults: <strong>Donch Retest · 1.5R+BE</strong>. Testing, Live paper, or Live money.
       </p>
     </div>
     <div class="hero-meta">
@@ -50,24 +49,19 @@
     <h2 class="trading-basis-title">What the app trades on</h2>
     <ul class="trading-basis-list">
       <li>
-        <strong>Setup</strong> — Opening range (09:15–10:15) bias + swing breakout (lookback 3)
+        <strong>Active strategy</strong> — Set in <em>Strat</em> (Paper / Live per index). Card below shows the live module name.
       </li>
       <li>
-        <strong>Target / stop</strong> — 1R target · SL capped (Nifty 30 pts · Bank 45 pts) · EMA-20 exit
+        <strong>Default (indices)</strong> — Donch Retest · OR-mid · 1.5R target · BE lock after +1R · max 1 trade/day
       </li>
       <li>
-        <strong>Day risk</strong> — Default day stop −60 pts · optional Strict −₹2,950 / Profit lock +₹5,000
-      </li>
-      <li>
-        <strong>Tue &amp; Fri</strong> — No entry before <em>11:30</em> · max
-        <em>3</em> Nifty / <em>2</em> Bank trades
-      </li>
-      <li>
-        <strong>Wednesday</strong> — Nifty: after <em>11:00</em> and only if OR width
-        <em>&lt; 90</em> pts · Bank: same as Tue/Fri (<em>11:30</em>, max <em>2</em>)
+        <strong>Stops</strong> — SL capped (Nifty 30 · Bank 45) · day stop −60 pts · optional Strict −₹2,950 / Profit lock +₹5,000
       </li>
       <li>
         <strong>Instrument</strong> — ATM options on the selected index · lots from the Lots control
+      </li>
+      <li>
+        <strong>Settings tip</strong> — Changing Max trades on Champion does nothing if Desk is on Donch Retest. Edit the assigned strategy (Paper/Live badge in Strat).
       </li>
     </ul>
   </aside>
@@ -400,6 +394,9 @@
           <header>
             <h2>{{ s.instrumentName }}</h2>
             <p>{{ s.lastSignal }}</p>
+            @if (s.strategyName) {
+              <p class="strategy-running">Running · {{ s.strategyName }}</p>
+            }
           </header>
 
           <div class="phase-pill" [attr.data-phase]="s.livePhase">
@@ -460,7 +457,9 @@
               }
             </div>
           } @else if (s.livePhase === 'waiting') {
-            <p class="waiting-copy">Scanning for OR Swing Breakout entry…</p>
+            <p class="waiting-copy">
+              Scanning for {{ s.strategyName || 'assigned strategy' }} entry…
+            </p>
           } @else if (s.lastExitReason) {
             <p class="waiting-copy">Last exit: {{ s.lastExitReason }} · {{ fmtTime(s.lastExitTime) }}</p>
           }
@@ -509,7 +508,11 @@
             </div>
             <div>
               <span>Closed</span>
-              <strong>{{ s.tradesToday }}</strong>
+              <strong>
+                {{ s.tradesToday }}@if (s.maxTradesPerDay && s.maxTradesPerDay > 0) {
+                  / {{ s.maxTradesPerDay }}
+                }
+              </strong>
             </div>
           </div>
           @if (s.openTrade; as o) {

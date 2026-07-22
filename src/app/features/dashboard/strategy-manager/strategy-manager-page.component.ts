@@ -43,8 +43,14 @@ export class StrategyManagerPageComponent {
   protected readonly deskSnap = this.desk.snapshot;
 
   protected readonly selectedChannel = signal<DeskChannel>('nifty');
+  /** Bumps when settings change so the settings panel re-reads module state. */
+  private readonly settingsEpoch = signal(0);
+
   protected readonly selectedStrategyId = signal<string>(
-    this.registry.getAll()[0]?.id ?? '',
+    this.assignments.getAssignment('nifty').paper ||
+      this.registry.listForChannel('nifty')[0]?.id ||
+      this.registry.getAll()[0]?.id ||
+      '',
   );
 
   protected readonly strategies = computed(() => this.registry.getAll());
@@ -58,8 +64,20 @@ export class StrategyManagerPageComponent {
   );
 
   protected readonly selectedSettings = computed(() => {
+    this.settingsEpoch();
     const mod = this.selectedStrategy();
     return mod ? mod.getSettings() : null;
+  });
+
+  protected readonly editingAssigned = computed(() => {
+    const id = this.selectedStrategyId();
+    const a = this.assignmentMap()[this.selectedChannel()];
+    return {
+      isPaper: a.paper === id,
+      isLive: a.live === id,
+      paperName: this.strategyName(a.paper),
+      liveName: this.strategyName(a.live),
+    };
   });
 
   protected readonly selectedPerf = computed(() => {
@@ -87,7 +105,12 @@ export class StrategyManagerPageComponent {
 
   protected selectChannel(ch: DeskChannel): void {
     this.selectedChannel.set(ch);
+    const paperId = this.assignmentMap()[ch].paper;
     const list = this.registry.listForChannel(ch);
+    if (paperId && list.some((s) => s.id === paperId)) {
+      this.selectedStrategyId.set(paperId);
+      return;
+    }
     if (list.length && !list.some((s) => s.id === this.selectedStrategyId())) {
       this.selectedStrategyId.set(list[0]!.id);
     }
@@ -97,9 +120,19 @@ export class StrategyManagerPageComponent {
     this.selectedStrategyId.set(id);
   }
 
+  protected jumpToAssigned(mode: 'paper' | 'live'): void {
+    const id = this.assignmentMap()[this.selectedChannel()][mode];
+    if (id) {
+      this.selectedStrategyId.set(id);
+    }
+  }
+
   protected setAssignment(mode: ExecutionMode | 'shadow', strategyId: string): void {
     const value = mode === 'shadow' && strategyId === '' ? null : strategyId;
     this.manager.setAssignment(this.selectedChannel(), mode, value);
+    if (mode === 'paper' && strategyId) {
+      this.selectedStrategyId.set(strategyId);
+    }
   }
 
   protected strategyName(id: string | null): string {
@@ -109,7 +142,22 @@ export class StrategyManagerPageComponent {
     return this.registry.getById(id)?.name ?? id;
   }
 
-  protected patchSetting(key: keyof StrategySettings, raw: string): void {
+  protected assignmentBadges(id: string): string {
+    const a = this.assignmentMap()[this.selectedChannel()];
+    const tags: string[] = [];
+    if (a.paper === id) {
+      tags.push('Paper');
+    }
+    if (a.live === id) {
+      tags.push('Live');
+    }
+    if (a.shadow === id) {
+      tags.push('Shadow');
+    }
+    return tags.join(' · ');
+  }
+
+  protected patchSetting(key: keyof StrategySettings, raw: string | number | boolean): void {
     const id = this.selectedStrategyId();
     const mod = this.registry.getById(id);
     if (!mod) {
@@ -119,22 +167,28 @@ export class StrategyManagerPageComponent {
     const prev = current[key];
     let value: string | number | boolean = raw;
     if (typeof prev === 'boolean') {
-      value = raw === 'true' || raw === 'on' || raw === '1';
+      value = raw === true || raw === 'true' || raw === 'on' || raw === '1';
     } else if (typeof prev === 'number') {
-      value = Number(raw);
+      value = typeof raw === 'number' ? raw : Number(raw);
       if (!Number.isFinite(value)) {
         return;
       }
+    } else {
+      value = String(raw);
     }
     this.manager.updateSettings(id, { [key]: value } as Partial<StrategySettings>);
+    this.settingsEpoch.update((n) => n + 1);
   }
 
   protected resetSettings(): void {
     this.assignments.resetStrategySettings(this.selectedStrategyId());
+    this.settingsEpoch.update((n) => n + 1);
   }
 
   protected resetAssignments(): void {
     this.assignments.resetAllAssignmentsToDefaults();
+    this.settingsEpoch.update((n) => n + 1);
+    this.selectChannel(this.selectedChannel());
   }
 
   protected clearLogs(): void {

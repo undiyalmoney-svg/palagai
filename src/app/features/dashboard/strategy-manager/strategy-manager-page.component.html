@@ -86,8 +86,9 @@
 
     <article class="sm-panel">
       <h2>Strategy catalog</h2>
+      <p class="sm-hint">Settings below edit the selected module. Desk only uses Paper/Live assignments.</p>
       <ul class="sm-catalog">
-        @for (s of strategies(); track s.id) {
+        @for (s of channelStrategies(); track s.id) {
           <li>
             <button
               type="button"
@@ -95,6 +96,11 @@
               (click)="selectStrategy(s.id)"
             >
               <strong>{{ s.name }}</strong>
+              @if (assignmentBadges(s.id); as badges) {
+                @if (badges) {
+                  <span class="sm-assign-badge">{{ badges }}</span>
+                }
+              }
               <small>{{ s.id }} · v{{ s.version }}</small>
               <em>{{ s.description }}</em>
             </button>
@@ -105,6 +111,26 @@
 
     <article class="sm-panel">
       <h2>Settings · {{ selectedStrategy()?.name || '—' }}</h2>
+      @if (editingAssigned(); as ed) {
+        @if (ed.isPaper || ed.isLive) {
+          <p class="sm-settings-banner ok">
+            Editing the strategy assigned to
+            {{ channelLabels[selectedChannel()] }}
+            {{ ed.isPaper && ed.isLive ? 'Paper + Live' : ed.isPaper ? 'Paper' : 'Live' }}.
+            Max trades / profit-protect here drive the Trade Desk.
+          </p>
+        } @else {
+          <p class="sm-settings-banner warn">
+            Not assigned to {{ channelLabels[selectedChannel()] }} Paper/Live.
+            Desk runs <strong>{{ ed.paperName }}</strong> (Paper) /
+            <strong>{{ ed.liveName }}</strong> (Live).
+            Edits here will not change today’s desk until you assign this strategy.
+            <button mat-stroked-button type="button" (click)="jumpToAssigned('paper')">
+              Edit Paper strategy
+            </button>
+          </p>
+        }
+      }
       @if (selectedSettings(); as st) {
         <div class="sm-settings">
           <label>Entry start <input [ngModel]="st.entryTimeStart" (ngModelChange)="patchSetting('entryTimeStart', $event)" /></label>
