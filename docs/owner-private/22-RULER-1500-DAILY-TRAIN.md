@@ -54,6 +54,19 @@ The max-three-red policy stops early after losses and misses later fat-tail
 winners. Its average is far below target and unstable in the untouched 2026
 test.
 
+## Angular comparison
+
+The existing Angular DNA replay for 2025-01-01 through 2026-07-21 reports:
+
+- 378 / 378 morning ARM choices match research
+- Angular day-capped score ₹503,264
+- research day-capped score ₹496,300
+- Angular average **₹1,331/session**, below ₹1,500
+- zero red research months
+
+The ₹6,963 score difference is fill simulation, not a router mismatch. This
+confirms that the current Angular code does not already satisfy the target.
+
 ## Upper bound
 
 An oracle that chooses the best ARM after seeing each day's outcome averages
