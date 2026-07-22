@@ -53,3 +53,4 @@ Thumbs.db
 /.venv-pptx/
 /scripts/yt-video/node_modules/
 /Palagai-YouTube-Promo.mp4
+scripts/__pycache__/
