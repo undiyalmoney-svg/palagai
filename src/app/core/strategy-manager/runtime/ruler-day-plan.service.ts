@@ -18,19 +18,19 @@ export type RulerArmPick = {
   locked: boolean;
   /** True when loss-streak breaker is forcing edge witch. */
   breakerActive?: boolean;
-  witch?: 'beast' | 'hunter_uw' | 'trail_wide_calm' | 'breaker_edge';
+  witch?: 'beast' | 'hunter_uw' | 'trail_wide' | 'breaker_edge';
 };
 
 /**
  * Research-faithful shared daily arm: one witch pick per calendar day,
  * applied to both Nifty and Bank (see ruler-profit-boost comb()).
  *
- * Zero-red discipline (fixes 2022-05 / 2022-11):
+ * Zero-red profit-boost:
  * - Beast only while 0 ≤ MTD < ₹3k (never while month is already red)
  * - MTD < 0 → hunter recover witch
- * - MTD ≥ ₹3k → trail only on wide+calm mornings
+ * - MTD ≥ ₹3k → trail on wide mornings (else 2R/swing)
  * - After 2 consecutive clipped red days *anytime* → edge for rest of month
- * - Day-cap ₹1,000
+ * - Day-cap ₹500
  *
  * IMPORTANT: do NOT lock STAND while morning features are still null
  * (pre-OR bars). Research picks the arm once at OR 09:45.
@@ -78,7 +78,7 @@ export class RulerDayPlanService {
         ? 'hunter_uw'
         : monthMtdInr < RULER_RAMPAGE_UNTIL_INR
           ? 'beast'
-          : 'trail_wide_calm';
+          : 'trail_wide';
     if (existing != null) {
       return { arm: existing, locked: true, breakerActive, witch };
     }

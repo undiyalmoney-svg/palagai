@@ -100,8 +100,8 @@ function assertArmLogicParity(): void {
     calm: true,
   };
   assert.strictEqual(pickRulerArm(vwideHunter, -500), 'DONCH_TRAIL'); // hunter · vwide+vstrong
-  // After MTD ≥ ₹3k: wide+calm → DONCH_TRAIL; wide-not-calm → 2R; skinny → 2R/swing.
-  assert.strictEqual(pickRulerArm(trailMorning, RULER_RAMPAGE_UNTIL_INR), 'DONCH_2R'); // wide but not calm
+  // After MTD ≥ ₹3k: wide → DONCH_TRAIL; skinny → 2R/swing.
+  assert.strictEqual(pickRulerArm(trailMorning, RULER_RAMPAGE_UNTIL_INR), 'DONCH_TRAIL');
   const calmTrail: RulerMorningFeatures = { ...trailMorning, calm: true };
   assert.strictEqual(pickRulerArm(calmTrail, RULER_RAMPAGE_UNTIL_INR), 'DONCH_TRAIL');
   assert.strictEqual(pickRulerArm(swingMorning, RULER_RAMPAGE_UNTIL_INR), 'SWING_2R');

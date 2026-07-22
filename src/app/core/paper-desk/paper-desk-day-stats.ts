@@ -102,7 +102,7 @@ export function buildPaperDeskDayStats(
   }
 
   // Keep day rows as raw OHLC pts money. Research day-cap belongs on the
-  // totals.research card — replacing every loss day with −₹1,000 looked like a bug.
+  // totals.research card — replacing every loss day with −₹500 looked like a bug.
   const days = [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date));
   const money = (d: PaperDayStat) => (rankBy === 'pointsMoney' ? d.pointsMoneyRs : d.optionNetRs);
   const byProfit = [...days].sort((a, b) => money(b) - money(a));

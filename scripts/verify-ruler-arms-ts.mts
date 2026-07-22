@@ -17,7 +17,7 @@ import type { Candle } from '../src/app/core/models/candle.model';
 const ROOT = '/workspace';
 const CACHE = path.join(ROOT, 'reports/analyst-cache');
 const OUT = '/tmp/ruler-verify';
-const MARCH_TARGET = 20115.5;
+const MARCH_TARGET = 24116;
 
 type CacheBar = {
   date?: string;

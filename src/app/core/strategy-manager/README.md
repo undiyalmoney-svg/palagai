@@ -34,11 +34,11 @@ Market data → Strategy Manager → IManagedStrategy → Signal → Desk risk �
 **Ruler flow (always on for indices):** Nifty + Bank Paper/Live always resolve to Ruler. No competing index strategy selection. Stocks keep Strat / Stocks Desk pickers.
 
 - **Shared daily arm** locked only after morning OR features exist (never lock STAND on pre-OR bars)
-- **Beast** while 0 ≤ MTD &lt; ₹3k; **hunter** while MTD &lt; 0 (never beast when month already red); then **trail only if wide+calm**
+- **Beast** while 0 ≤ MTD &lt; ₹3k; **hunter** while MTD &lt; 0 (never beast when month already red); then **trail only if wide**
 - After **2 consecutive clipped red days** *anytime* → **edge** witch for rest of month
 - **DONCH_TRAIL** allows multi-trade (research `one_trade=False`); other arms stay 1 trade/day
 - **Testing** uses isolated in-memory MTD; **Live** persists separately and can flatten at day-cap
-- Primary **P&L ₹** = uncapped OHLC pts × ₹65/₹30; **Research score ₹** = same after −₹1,000 day-cap (compare to research, not live cash)
+- Primary **P&L ₹** = uncapped OHLC pts × ₹65/₹30; **Research score ₹** = same after −₹500 day-cap (compare to research, not live cash)
 - Morning EMA bias uses **OR-end** bar (research `morning_feat`), not 10:15
 - Lots always come from the Trade Desk Lots field
 

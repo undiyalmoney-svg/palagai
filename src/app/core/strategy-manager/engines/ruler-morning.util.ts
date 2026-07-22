@@ -54,8 +54,8 @@ export type RulerArm =
 
 /** Boosted ruler: rampage while MTD < ₹3,000. */
 export const RULER_RAMPAGE_UNTIL_INR = 3000;
-/** Hard day loss cap (₹). When month green → min(cap, MTD). Capital-protect train: ₹1,000. */
-export const RULER_DAY_CAP_INR = 1000;
+/** Hard day loss cap (₹). When month green → min(cap, MTD). Tighter cap = more capital protect + higher net. */
+export const RULER_DAY_CAP_INR = 500;
 
 /**
  * Causal morning features at OR 09:45 (matches research morning_feat).
@@ -261,11 +261,11 @@ export type RulerArmPickOpts = {
 };
 
 /**
- * Zero-red discipline pick:
+ * Zero-red discipline pick (profit-boost):
  * 1. Breaker active → edge
  * 2. MTD < 0 → hunter (do not beast while month is red)
  * 3. 0 ≤ MTD < ₹3k → beast
- * 4. Else → trail only if wide+calm, else 2R/swing
+ * 4. Else → trail on wide mornings (else 2R/swing) — more profit than calm-only
  */
 export function pickRulerArm(
   f: RulerMorningFeatures | null,
@@ -281,7 +281,7 @@ export function pickRulerArm(
   if (monthMtdInr < RULER_RAMPAGE_UNTIL_INR) {
     return witchBeast(f);
   }
-  return witchTrailWideCalmElse2r(f);
+  return witchTrailWideElse2r(f);
 }
 
 /** Dyn day cap: when month green, one capped loss cannot flip the month red. */
