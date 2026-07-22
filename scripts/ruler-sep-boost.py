@@ -10,8 +10,8 @@ Recipe:
   5. 2 clipped reds anytime → edge
   6. Day-cap ₹500
 
-1-lot DNA cannot clear ₹15k in every 2020–2026 month (causal).
-With Trade Desk lots ≥ 3 (same DNA, absolute ₹ thresholds) every month ≥ ₹15k.
+Trained and reported at 1 lot only.
+Research: no causal 1-lot router clears ₹15k in every 2020–2026 month (0 red kept).
 """
 from __future__ import annotations
 

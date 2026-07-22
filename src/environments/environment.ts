@@ -6,8 +6,8 @@ export const environment = {
    * Prod: SSR /api/order-kite → droplet (avoids mixed content).
    */
   orderApiBaseUrl: '/api/order-kite',
-  /** Default lots (Ruler 1-lot DNA × 3 clears ≥₹15k every historical month with month bank). */
-  defaultLots: 3,
+  /** Default lots multiplier across desks (exchange lot × this). */
+  defaultLots: 1,
   /**
    * When true, Live money checkboxes on Trade Desk / Crude Desk can place real Kite orders.
    */

@@ -93,15 +93,16 @@ def main() -> None:
     print("-" * 56)
     print(f"TOTAL {one['net']:,.1f}  ≥15k {one['ge15k']}/{one['n_months']}  worst ₹{one['worst']:,.1f}")
     print()
+    print(
+        f"VERDICT (1-lot only): cannot clear ₹15k every month — "
+        f"{one['ge15k']}/{one['n_months']} months ≥₹15k, worst ₹{one['worst']:,.0f}, "
+        f"0 red. Oracle look-ahead can; causal 1-lot routers cannot on Nifty+Bank books."
+    )
     if clear_lots:
         print(
-            f"VERDICT: 1-lot DNA cannot clear ₹15k every month "
-            f"({one['ge15k']}/{one['n_months']} months). "
-            f"Same DNA with Trade Desk lots={clear_lots} clears all months "
-            f"(worst ₹{rows[clear_lots-1]['worst']:,.0f})."
+            f"(Sizing note only, not used: lots={clear_lots} would clear historically; "
+            f"Ruler stays trained and defaulted at 1 lot.)"
         )
-    else:
-        print("VERDICT: no lots≤7 cleared the ₹15k floor.")
 
     out = {
         "target": TARGET,

@@ -59,9 +59,9 @@ export const RULER_DAY_CAP_INR = 500;
 /**
  * Month bank target (₹). Once MTD ≥ this, force STAND for the rest of the month.
  * Trains capital banking toward a ₹15k monthly floor.
- * Note: 1-lot DNA cannot clear ₹15k in every historical month; Trade Desk lots≥3
- * with this lock does (research 2020–2026).
+ * Banking target only — research shows 1-lot DNA cannot clear ₹15k every month.
  */
+
 export const RULER_MONTH_TARGET_INR = 15000;
 
 /**
