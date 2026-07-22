@@ -9,7 +9,7 @@ import {
   emaLast,
   openingRange,
   previousDayBars,
-  lastSwing3,
+  researchSwingAt,
   seriesAt,
   swingLevels,
   toMin,
@@ -329,8 +329,16 @@ export function runIndexRuleStrategy(
     }
   }
 
+  // Research retest stop: beyond S/R by 1pt, then min-risk / max-stop caps.
   let stop =
     direction === 'BUY' ? Math.min(candle.low, levelLow) : Math.max(candle.high, levelHigh);
+  if (spec.entry === 'donch_retest' || spec.entry === 'swing_retest') {
+    if (direction === 'BUY') {
+      stop = Math.min(stop, levelLow - 1);
+    } else {
+      stop = Math.max(stop, levelHigh + 1);
+    }
+  }
   let risk = Math.abs(close - stop);
   if (risk < settings.minStopPts) {
     return skip(`Risk ${risk.toFixed(1)} < min ${settings.minStopPts}`);
@@ -447,24 +455,51 @@ export function indexRuleExitLogic(
   const time = extractHhMm(candle.date);
 
   if (spec.exit === 'swing_trail') {
+    // Research order: hard SL first, then separate swing3 trail (lookback=3), then EOD.
+    // Do NOT merge trail into hard stop — that diverged from research books.
+    if (open.direction === 'BUY') {
+      if (candle.low <= open.stop) {
+        return { exitPrice: open.stop, reason: 'Swing trail / stop' };
+      }
+    } else if (candle.high >= open.stop) {
+      return { exitPrice: open.stop, reason: 'Swing trail / stop' };
+    }
+
     const bars = series ?? [];
-    if (bars.length >= 3) {
-      const sw = lastSwing3(bars);
-      if (open.direction === 'BUY' && sw.low != null && sw.low > open.stop) {
-        open.stop = sw.low;
-      } else if (open.direction === 'SELL' && sw.high != null && sw.high < open.stop) {
-        open.stop = sw.high;
+    if (bars.length >= 7) {
+      const sw = researchSwingAt(bars, 3);
+      if (open.direction === 'BUY' && sw.low != null) {
+        open.trail =
+          open.trail == null || !Number.isFinite(open.trail)
+            ? sw.low
+            : Math.max(open.trail, sw.low);
+        if (candle.low <= open.trail) {
+          return { exitPrice: open.trail, reason: 'Swing trail / stop' };
+        }
+      } else if (open.direction === 'SELL' && sw.high != null) {
+        open.trail =
+          open.trail == null || !Number.isFinite(open.trail)
+            ? sw.high
+            : Math.min(open.trail, sw.high);
+        if (candle.high >= open.trail) {
+          return { exitPrice: open.trail, reason: 'Swing trail / stop' };
+        }
       }
     }
-  } else {
-    applyIndexRuleProfitProtect(candle, open, settings);
+
+    if (time >= settings.exitTime) {
+      return { exitPrice: candle.close, reason: 'EOD / session exit' };
+    }
+    return null;
   }
+
+  applyIndexRuleProfitProtect(candle, open, settings);
 
   if (open.direction === 'BUY') {
     if (candle.low <= open.stop) {
       return {
         exitPrice: open.stop,
-        reason: spec.exit === 'swing_trail' ? 'Swing trail / stop' : 'Stop loss hit',
+        reason: 'Stop loss hit',
       };
     }
     if (settings.targetRMultiple > 0 && candle.high >= open.target) {
@@ -474,7 +509,7 @@ export function indexRuleExitLogic(
     if (candle.high >= open.stop) {
       return {
         exitPrice: open.stop,
-        reason: spec.exit === 'swing_trail' ? 'Swing trail / stop' : 'Stop loss hit',
+        reason: 'Stop loss hit',
       };
     }
     if (settings.targetRMultiple > 0 && candle.low <= open.target) {

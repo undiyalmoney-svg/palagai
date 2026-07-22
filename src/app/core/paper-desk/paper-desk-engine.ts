@@ -28,6 +28,8 @@ export interface IndexOpenPaper {
   stop: number;
   target: number;
   entryTime: string;
+  /** Research swing_trail separate trail level. */
+  trail?: number | null;
   option: PaperOptionContract | null;
   optionEntryPremium: number | null;
   premiumEstimated: boolean;
@@ -299,11 +301,15 @@ export function replayPaperOnIndex(params: {
         stop: open.stop,
         target: open.target,
         entryTime: open.entryTime,
+        trail: open.trail ?? null,
       };
       const exit = strategy.exitLogic(candle, managedOpen, closes, ctx);
-      // Profit-protect may ratchet stop; keep desk open in sync for next bars.
+      // Profit-protect may ratchet stop; swing_trail updates separate trail.
       if (managedOpen.stop !== open.stop) {
         open.stop = managedOpen.stop;
+      }
+      if (managedOpen.trail !== open.trail) {
+        open.trail = managedOpen.trail ?? null;
       }
       if (exit) {
         const closed = closePaperTrade({
@@ -365,6 +371,7 @@ export function replayPaperOnIndex(params: {
       stop: signal.stopLoss,
       target: signal.target,
       entryTime: candle.date,
+      trail: null,
       option,
       optionEntryPremium,
       premiumEstimated,
