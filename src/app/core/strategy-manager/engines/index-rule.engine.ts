@@ -189,12 +189,13 @@ export function runIndexRuleStrategy(
   } else if (spec.bias === 'or_mid') {
     bias = candle.close >= or.mid ? 'BUY' : 'SELL';
   } else if (spec.bias === 'or_break') {
+    // Do not early-return while inside OR — retest break state must still update.
     if (candle.close > or.high) {
       bias = 'BUY';
     } else if (candle.close < or.low) {
       bias = 'SELL';
     } else {
-      return wait('Waiting for OR break bias', { orHigh: or.high, orLow: or.low });
+      bias = 'FLAT';
     }
   }
 
@@ -311,6 +312,16 @@ export function runIndexRuleStrategy(
       spec.entry.includes('retest') ? 'Waiting for S/R retest' : 'No breakout',
       { levelHigh, levelLow, bias, brokeRes: state.brokeRes, brokeSup: state.brokeSup },
     );
+  }
+  if (spec.bias === 'or_break' && bias === 'FLAT') {
+    return wait('Waiting for OR break bias', {
+      levelHigh,
+      levelLow,
+      orHigh: or.high,
+      orLow: or.low,
+      brokeRes: state.brokeRes,
+      brokeSup: state.brokeSup,
+    });
   }
   if (bias === 'BUY' || bias === 'SELL') {
     if (direction !== bias) {
