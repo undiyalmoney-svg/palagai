@@ -27,8 +27,14 @@ import {
   defaultStrategySettings,
 } from '../models/strategy-settings.model';
 
-export type RuleEntryMode = 'vol_expand' | 'donch' | 'swing';
-export type RuleBiasMode = 'ema' | 'prev_day' | 'none';
+export type RuleEntryMode =
+  | 'vol_expand'
+  | 'donch'
+  | 'swing'
+  | 'inside_break'
+  | 'donch_retest'
+  | 'swing_retest';
+export type RuleBiasMode = 'ema' | 'prev_day' | 'none' | 'or_mid';
 export type RuleExitMode = 'eod' | 'ema';
 
 export interface IndexRuleSpec {
@@ -42,10 +48,29 @@ export interface RuleDayState {
   dayNetPts: number;
   tradesToday: number;
   dayStopped: boolean;
+  /** Most recent inside-bar high/low for inside_break entries. */
+  insideHigh: number | null;
+  insideLow: number | null;
+  /** Break-then-retest state (Donchian / swing / PDHL-style). */
+  brokeRes: boolean;
+  brokeSup: boolean;
+  brokeLevelRes: number | null;
+  brokeLevelSup: number | null;
 }
 
 export function createRuleDayState(): RuleDayState {
-  return { tradingDate: null, dayNetPts: 0, tradesToday: 0, dayStopped: false };
+  return {
+    tradingDate: null,
+    dayNetPts: 0,
+    tradesToday: 0,
+    dayStopped: false,
+    insideHigh: null,
+    insideLow: null,
+    brokeRes: false,
+    brokeSup: false,
+    brokeLevelRes: null,
+    brokeLevelSup: null,
+  };
 }
 
 /**
@@ -68,6 +93,12 @@ export function runIndexRuleStrategy(
     state.dayNetPts = 0;
     state.tradesToday = 0;
     state.dayStopped = false;
+    state.insideHigh = null;
+    state.insideLow = null;
+    state.brokeRes = false;
+    state.brokeSup = false;
+    state.brokeLevelRes = null;
+    state.brokeLevelSup = null;
   }
 
   const wait = (reason: string, analysis: Record<string, unknown> = {}): ManagedStrategySignal => ({
@@ -152,6 +183,8 @@ export function runIndexRuleStrategy(
     const prevOpen = prev[0]!.open;
     const prevClose = prev[prev.length - 1]!.close;
     bias = prevClose >= prevOpen ? 'BUY' : 'SELL';
+  } else if (spec.bias === 'or_mid') {
+    bias = candle.close >= or.mid ? 'BUY' : 'SELL';
   }
 
   const close = candle.close;
@@ -189,14 +222,88 @@ export function runIndexRuleStrategy(
     } else if (close < levelLow) {
       direction = 'SELL';
     }
+  } else if (spec.entry === 'inside_break') {
+    // Detect prior inside bar (bar[i-1] inside bar[i-2]); break of its range.
+    if (dayBars.length >= 3) {
+      const mother = dayBars[dayBars.length - 3]!;
+      const inside = dayBars[dayBars.length - 2]!;
+      if (inside.high < mother.high && inside.low > mother.low) {
+        state.insideHigh = inside.high;
+        state.insideLow = inside.low;
+      }
+    }
+    if (state.insideHigh == null || state.insideLow == null) {
+      return wait('No inside bar yet');
+    }
+    levelHigh = state.insideHigh;
+    levelLow = state.insideLow;
+    if (close > levelHigh) {
+      direction = 'BUY';
+      state.insideHigh = null;
+      state.insideLow = null;
+    } else if (close < levelLow) {
+      direction = 'SELL';
+      state.insideHigh = null;
+      state.insideLow = null;
+    }
+  } else if (spec.entry === 'donch_retest' || spec.entry === 'swing_retest') {
+    if (spec.entry === 'donch_retest') {
+      const ch = donchian(series, settings.donchianLength, true);
+      if (!ch) {
+        return wait(`Donchian-${settings.donchianLength} warming up`);
+      }
+      levelHigh = ch.high;
+      levelLow = ch.low;
+    } else {
+      const sw = swingLevels(series, settings.swingLookback);
+      if (!sw) {
+        return wait(`Swing-${settings.swingLookback} not confirmed`);
+      }
+      levelHigh = sw.high;
+      levelLow = sw.low;
+    }
+    if (close > levelHigh) {
+      state.brokeRes = true;
+      state.brokeLevelRes = levelHigh;
+    }
+    if (close < levelLow) {
+      state.brokeSup = true;
+      state.brokeLevelSup = levelLow;
+    }
+    if (
+      state.brokeRes &&
+      state.brokeLevelRes != null &&
+      candle.low <= state.brokeLevelRes &&
+      close >= state.brokeLevelRes
+    ) {
+      direction = 'BUY';
+      levelHigh = state.brokeLevelRes;
+      levelLow = state.brokeLevelRes;
+      state.brokeRes = false;
+      state.brokeLevelRes = null;
+    } else if (
+      state.brokeSup &&
+      state.brokeLevelSup != null &&
+      candle.high >= state.brokeLevelSup &&
+      close <= state.brokeLevelSup
+    ) {
+      direction = 'SELL';
+      levelHigh = state.brokeLevelSup;
+      levelLow = state.brokeLevelSup;
+      state.brokeSup = false;
+      state.brokeLevelSup = null;
+    }
   }
 
   if (!direction) {
-    return wait('No breakout', { levelHigh, levelLow, bias });
+    return wait(
+      spec.entry.includes('retest') ? 'Waiting for S/R retest' : 'No breakout',
+      { levelHigh, levelLow, bias, brokeRes: state.brokeRes, brokeSup: state.brokeSup },
+    );
   }
   if (bias === 'BUY' || bias === 'SELL') {
     if (direction !== bias) {
-      return skip(`Breakout ${direction} against bias ${bias}`, { levelHigh, levelLow, bias });
+      return skip(`Signal ${direction} against bias ${bias}`, { levelHigh, levelLow, bias });
     }
   }
 
