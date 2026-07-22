@@ -12,7 +12,7 @@ import {
 import { StrategySettings } from '../models/strategy-settings.model';
 import { StrategyRegistryService } from '../registry/strategy-registry.service';
 
-const STORAGE_KEY = 'palagai_strategy_assignments_v8';
+const STORAGE_KEY = 'palagai_strategy_assignments_v9';
 const LEGACY_STORAGE_KEYS = [
   'palagai_strategy_assignments_v1',
   'palagai_strategy_assignments_v2',
@@ -22,6 +22,8 @@ const LEGACY_STORAGE_KEYS = [
   'palagai_strategy_assignments_v6',
   'palagai_strategy_assignments_v7',
 ] as const;
+/** Migrate assignments from v8 without wiping user selections. */
+const MIGRATE_FROM_KEY = 'palagai_strategy_assignments_v8';
 
 export interface ChannelAssignment {
   paper: string;
@@ -37,6 +39,8 @@ export type SettingsMap = Record<string, Partial<StrategySettings>>;
 interface PersistedState {
   assignments: AssignmentMap;
   settings: SettingsMap;
+  /** When true, Nifty + Bank Paper/Live resolve to Ruler flow. */
+  rulerEnabled?: boolean;
 }
 
 function defaultAssignments(): AssignmentMap {
@@ -57,9 +61,11 @@ export class StrategyAssignmentService {
   private readonly registry = inject(StrategyRegistryService);
 
   private readonly assignmentsSignal = signal<AssignmentMap>(defaultAssignments());
+  private readonly rulerEnabledSignal = signal(false);
   private settingsMap: SettingsMap = {};
 
   readonly assignments = this.assignmentsSignal.asReadonly();
+  readonly rulerEnabled = this.rulerEnabledSignal.asReadonly();
 
   constructor() {
     this.load();
@@ -69,7 +75,19 @@ export class StrategyAssignmentService {
     return this.assignmentsSignal()[channel];
   }
 
+  isRulerEnabled(): boolean {
+    return this.rulerEnabledSignal();
+  }
+
+  setRulerEnabled(enabled: boolean): void {
+    this.rulerEnabledSignal.set(!!enabled);
+    this.persist();
+  }
+
   getStrategyId(channel: DeskChannel, mode: ExecutionMode): string {
+    if (this.rulerEnabledSignal() && (channel === 'nifty' || channel === 'bank')) {
+      return MANAGED_STRATEGY_IDS.RULER;
+    }
     const a = this.getAssignment(channel);
     return mode === 'live' ? a.live : a.paper;
   }
@@ -144,6 +162,7 @@ export class StrategyAssignmentService {
 
   resetAllAssignmentsToDefaults(): void {
     this.assignmentsSignal.set(defaultAssignments());
+    this.rulerEnabledSignal.set(false);
     this.settingsMap = {};
     for (const m of this.registry.getAll()) {
       m.initialize();
@@ -160,7 +179,14 @@ export class StrategyAssignmentService {
       for (const key of LEGACY_STORAGE_KEYS) {
         localStorage.removeItem(key);
       }
-      const raw = localStorage.getItem(STORAGE_KEY);
+      let raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) {
+        const legacy = localStorage.getItem(MIGRATE_FROM_KEY);
+        if (legacy) {
+          raw = legacy;
+          localStorage.removeItem(MIGRATE_FROM_KEY);
+        }
+      }
       if (!raw) {
         this.persist();
         return;
@@ -183,13 +209,16 @@ export class StrategyAssignmentService {
         }
       }
       this.assignmentsSignal.set(base);
+      this.rulerEnabledSignal.set(!!parsed.rulerEnabled);
       this.settingsMap = parsed.settings ?? {};
       for (const [id, partial] of Object.entries(this.settingsMap)) {
         this.registry.getById(id)?.initialize(partial);
       }
+      this.persist();
     } catch {
       localStorage.removeItem(STORAGE_KEY);
       this.assignmentsSignal.set(defaultAssignments());
+      this.rulerEnabledSignal.set(false);
       this.persist();
     }
   }
@@ -201,6 +230,7 @@ export class StrategyAssignmentService {
     const payload: PersistedState = {
       assignments: this.assignmentsSignal(),
       settings: this.settingsMap,
+      rulerEnabled: this.rulerEnabledSignal(),
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
   }

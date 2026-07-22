@@ -9,6 +9,7 @@ import {
   emaLast,
   openingRange,
   previousDayBars,
+  lastSwing3,
   seriesAt,
   swingLevels,
   toMin,
@@ -34,8 +35,8 @@ export type RuleEntryMode =
   | 'inside_break'
   | 'donch_retest'
   | 'swing_retest';
-export type RuleBiasMode = 'ema' | 'prev_day' | 'none' | 'or_mid';
-export type RuleExitMode = 'eod' | 'ema';
+export type RuleBiasMode = 'ema' | 'prev_day' | 'none' | 'or_mid' | 'or_break';
+export type RuleExitMode = 'eod' | 'ema' | 'swing_trail';
 
 export interface IndexRuleSpec {
   entry: RuleEntryMode;
@@ -187,6 +188,14 @@ export function runIndexRuleStrategy(
     bias = prevClose >= prevOpen ? 'BUY' : 'SELL';
   } else if (spec.bias === 'or_mid') {
     bias = candle.close >= or.mid ? 'BUY' : 'SELL';
+  } else if (spec.bias === 'or_break') {
+    if (candle.close > or.high) {
+      bias = 'BUY';
+    } else if (candle.close < or.low) {
+      bias = 'SELL';
+    } else {
+      return wait('Waiting for OR break bias', { orHigh: or.high, orLow: or.low });
+    }
   }
 
   const close = candle.close;
@@ -422,21 +431,40 @@ export function indexRuleExitLogic(
   closes: number[],
   settings: StrategySettings,
   spec: IndexRuleSpec,
+  series?: Candle[],
 ): ManagedExitDecision | null {
   const time = extractHhMm(candle.date);
 
-  applyIndexRuleProfitProtect(candle, open, settings);
+  if (spec.exit === 'swing_trail') {
+    const bars = series ?? [];
+    if (bars.length >= 3) {
+      const sw = lastSwing3(bars);
+      if (open.direction === 'BUY' && sw.low != null && sw.low > open.stop) {
+        open.stop = sw.low;
+      } else if (open.direction === 'SELL' && sw.high != null && sw.high < open.stop) {
+        open.stop = sw.high;
+      }
+    }
+  } else {
+    applyIndexRuleProfitProtect(candle, open, settings);
+  }
 
   if (open.direction === 'BUY') {
     if (candle.low <= open.stop) {
-      return { exitPrice: open.stop, reason: 'Stop loss hit' };
+      return {
+        exitPrice: open.stop,
+        reason: spec.exit === 'swing_trail' ? 'Swing trail / stop' : 'Stop loss hit',
+      };
     }
     if (settings.targetRMultiple > 0 && candle.high >= open.target) {
       return { exitPrice: open.target, reason: 'Target hit' };
     }
   } else {
     if (candle.high >= open.stop) {
-      return { exitPrice: open.stop, reason: 'Stop loss hit' };
+      return {
+        exitPrice: open.stop,
+        reason: spec.exit === 'swing_trail' ? 'Swing trail / stop' : 'Stop loss hit',
+      };
     }
     if (settings.targetRMultiple > 0 && candle.low <= open.target) {
       return { exitPrice: open.target, reason: 'Target hit' };

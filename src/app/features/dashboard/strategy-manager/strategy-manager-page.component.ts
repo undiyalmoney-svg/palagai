@@ -17,6 +17,7 @@ import { StrategyPerformanceService } from '../../../core/strategy-manager/runti
 import { StrategyRegistryService } from '../../../core/strategy-manager/registry/strategy-registry.service';
 import { StrategySettings } from '../../../core/strategy-manager/models/strategy-settings.model';
 import { PaperTradeDeskService } from '../../../core/paper-desk/paper-trade-desk.service';
+import { MANAGED_STRATEGY_IDS } from '../../../core/strategy-manager/config/managed-strategy-ids';
 
 @Component({
   selector: 'app-strategy-manager-page',
@@ -37,6 +38,7 @@ export class StrategyManagerPageComponent {
   protected readonly channels = DESK_CHANNELS;
   protected readonly channelLabels = DESK_CHANNEL_LABELS;
   protected readonly assignmentMap = this.assignments.assignments;
+  protected readonly rulerEnabled = this.assignments.rulerEnabled;
   protected readonly eventLog = this.events.events;
   protected readonly shadowSignals = this.shadow.signals;
   protected readonly shadowTrades = this.shadow.trades;
@@ -71,12 +73,16 @@ export class StrategyManagerPageComponent {
 
   protected readonly editingAssigned = computed(() => {
     const id = this.selectedStrategyId();
-    const a = this.assignmentMap()[this.selectedChannel()];
+    const ch = this.selectedChannel();
+    const a = this.assignmentMap()[ch];
+    const rulerOn = this.rulerEnabled() && ch !== 'stocks';
+    const effectivePaper = rulerOn ? MANAGED_STRATEGY_IDS.RULER : a.paper;
+    const effectiveLive = rulerOn ? MANAGED_STRATEGY_IDS.RULER : a.live;
     return {
-      isPaper: a.paper === id,
-      isLive: a.live === id,
-      paperName: this.strategyName(a.paper),
-      liveName: this.strategyName(a.live),
+      isPaper: effectivePaper === id,
+      isLive: effectiveLive === id,
+      paperName: this.strategyName(effectivePaper),
+      liveName: this.strategyName(effectiveLive),
     };
   });
 
@@ -136,6 +142,21 @@ export class StrategyManagerPageComponent {
     this.desk.refreshLiveAfterSettingsChange();
   }
 
+  protected setRulerEnabled(enabled: boolean): void {
+    this.manager.setRulerEnabled(enabled);
+    if (enabled && this.selectedChannel() !== 'stocks') {
+      this.selectedStrategyId.set(MANAGED_STRATEGY_IDS.RULER);
+    }
+    this.desk.refreshLiveAfterSettingsChange();
+  }
+
+  protected deskStrategyLabel(ch: DeskChannel, mode: 'paper' | 'live'): string {
+    if (this.rulerEnabled() && ch !== 'stocks') {
+      return 'Ruler flow';
+    }
+    return this.strategyName(this.assignmentMap()[ch][mode]);
+  }
+
   protected strategyName(id: string | null): string {
     if (!id) {
       return '— Off —';
@@ -144,13 +165,19 @@ export class StrategyManagerPageComponent {
   }
 
   protected assignmentBadges(id: string): string {
-    const a = this.assignmentMap()[this.selectedChannel()];
+    const ch = this.selectedChannel();
+    const a = this.assignmentMap()[ch];
     const tags: string[] = [];
-    if (a.paper === id) {
-      tags.push('Paper');
-    }
-    if (a.live === id) {
-      tags.push('Live');
+    const rulerOn = this.rulerEnabled() && ch !== 'stocks';
+    if (rulerOn && id === MANAGED_STRATEGY_IDS.RULER) {
+      tags.push('Paper', 'Live');
+    } else if (!rulerOn) {
+      if (a.paper === id) {
+        tags.push('Paper');
+      }
+      if (a.live === id) {
+        tags.push('Live');
+      }
     }
     if (a.shadow === id) {
       tags.push('Shadow');

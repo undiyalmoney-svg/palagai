@@ -127,6 +127,30 @@ export function swingLevels(candles: Candle[], lb: number): { high: number; low:
   return { high: sh, low: sl };
 }
 
+/**
+ * Last confirmed 3-bar fractal swing high/low (1 bar each side).
+ * Causal: evaluates candidates that have a right-hand neighbor in `candles`.
+ */
+export function lastSwing3(candles: Candle[]): { high: number | null; low: number | null } {
+  const n = candles.length;
+  let high: number | null = null;
+  let low: number | null = null;
+  for (let i = n - 2; i >= 1; i -= 1) {
+    const h = candles[i]!.high;
+    const l = candles[i]!.low;
+    if (high == null && candles[i - 1]!.high < h && candles[i + 1]!.high < h) {
+      high = h;
+    }
+    if (low == null && candles[i - 1]!.low > l && candles[i + 1]!.low > l) {
+      low = l;
+    }
+    if (high != null && low != null) {
+      break;
+    }
+  }
+  return { high, low };
+}
+
 export interface DayOrRange {
   high: number;
   low: number;

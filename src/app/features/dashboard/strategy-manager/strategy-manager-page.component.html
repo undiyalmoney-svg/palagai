@@ -7,6 +7,7 @@
         Switch Paper / Live / Shadow strategies per instrument without changing code.
         Defaults: Nifty &amp; Bank → <strong>Donch Retest · OR-mid · 1.5R+BE</strong>.
         Stocks → <strong>GAP_FADE_500</strong> (same as Stocks Desk).
+        Optional: enable <strong>Ruler flow</strong> on Nifty/Bank to override Paper + Live.
       </p>
     </div>
     <div class="sm-hero-actions">
@@ -24,8 +25,8 @@
         (click)="selectChannel(ch)"
       >
         <strong>{{ channelLabels[ch] }}</strong>
-        <span>Paper · {{ strategyName(assignmentMap()[ch].paper) }}</span>
-        <span>Live · {{ strategyName(assignmentMap()[ch].live) }}</span>
+        <span>Paper · {{ deskStrategyLabel(ch, 'paper') }}</span>
+        <span>Live · {{ deskStrategyLabel(ch, 'live') }}</span>
         <span>Shadow · {{ strategyName(assignmentMap()[ch].shadow) }}</span>
       </button>
     }
@@ -34,6 +35,26 @@
   <section class="sm-grid">
     <article class="sm-panel">
       <h2>Assignments · {{ channelLabels[selectedChannel()] }}</h2>
+      @if (selectedChannel() !== 'stocks') {
+        <label class="sm-ruler-toggle">
+          <input
+            type="checkbox"
+            [ngModel]="rulerEnabled()"
+            (ngModelChange)="setRulerEnabled($event)"
+          />
+          <span>
+            <strong>Ruler flow</strong>
+            — overrides Paper + Live for Nifty &amp; Bank with the boosted ruler
+            (beast rampage → Donch trail · ₹1,500 day cap). Lots stay from the Trade Desk Lots field.
+          </span>
+        </label>
+        @if (rulerEnabled()) {
+          <p class="sm-ruler-active">
+            Ruler is ON — desk Paper/Live run <strong>Ruler flow</strong>.
+            Stored Paper/Live picks are kept for when you turn it off.
+          </p>
+        }
+      }
       @if (selectedChannel() === 'stocks') {
         <p class="sm-stocks-note">
           Stocks default is <strong>GAP_FADE_500</strong>.
@@ -45,6 +66,7 @@
         <select
           [ngModel]="assignmentMap()[selectedChannel()].paper"
           (ngModelChange)="setAssignment('paper', $event)"
+          [disabled]="rulerEnabled() && selectedChannel() !== 'stocks'"
         >
           @for (s of channelStrategies(); track s.id) {
             <option [value]="s.id">{{ s.name }}</option>
@@ -56,6 +78,7 @@
         <select
           [ngModel]="assignmentMap()[selectedChannel()].live"
           (ngModelChange)="setAssignment('live', $event)"
+          [disabled]="rulerEnabled() && selectedChannel() !== 'stocks'"
         >
           @for (s of channelStrategies(); track s.id) {
             <option [value]="s.id">{{ s.name }}</option>

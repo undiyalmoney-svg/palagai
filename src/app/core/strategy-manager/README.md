@@ -16,7 +16,7 @@ Market data → Strategy Manager → IManagedStrategy → Signal → Desk risk �
 |---|---|
 | `core/strategy-manager/models/` | `IManagedStrategy`, settings, channels |
 ## Modules: Champion wrapper + VolExpand / Swing5 / Donch20 / Turtle55 / Inside Break
-| `core/strategy-manager/modules/` | Champion + VolExpand / Swing5 / Donch20 / Turtle55 / Inside Break / Donch Retest / Swing Retest |
+| `core/strategy-manager/modules/` | Champion + VolExpand / Swing5 / Donch20 / Turtle55 / Inside Break / Donch Retest / Swing Retest / Gap Fade / **Ruler** |
 | `core/strategy-manager/registry/` | Registration (add strategy = new class + inject here) |
 | `core/strategy-manager/config/` | Paper/Live/Shadow assignments + per-strategy settings (localStorage) |
 | `core/strategy-manager/runtime/` | Manager, event log, shadow book, performance |
@@ -32,6 +32,8 @@ Market data → Strategy Manager → IManagedStrategy → Signal → Desk risk �
 | Stocks Desk UI | — | **GAP_FADE_500** | — |
 
 Donch Retest: **1.5R** target + **BE after +1R** + **up to 3 trades/day**. Regime filter **off** by default. Nifty stop 30 / Bank stop 45.
+
+**Ruler flow (opt-in):** Strategy Manager toggle. When ON, Nifty + Bank Paper/Live resolve to Ruler (beast rampage → Donch trail, ₹1,500 day cap, dyn protect when month green). Defaults and stored assignments stay unchanged when OFF. Lots always come from the Trade Desk Lots field.
 
 Trade Desk resolves strategies via `StrategyManagerService`. Champion DNA file is **unchanged**; desk risk checkboxes still apply through `setPdhlDeskOverrides`.
 
