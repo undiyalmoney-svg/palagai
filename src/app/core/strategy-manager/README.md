@@ -31,7 +31,7 @@ Market data → Strategy Manager → IManagedStrategy → Signal → Desk risk �
 | Stocks (Strategy Manager) | **GAP_FADE_500** | **GAP_FADE_500** | Off |
 | Stocks Desk UI | — | **GAP_FADE_500** | — |
 
-Donch Retest: **1.5R** target + **BE after +1R**. Regime filter **off** by default. Nifty stop 30 / Bank stop 45.
+Donch Retest: **1.5R** target + **BE after +1R** + **up to 3 trades/day**. Regime filter **off** by default. Nifty stop 30 / Bank stop 45.
 
 Trade Desk resolves strategies via `StrategyManagerService`. Champion DNA file is **unchanged**; desk risk checkboxes still apply through `setPdhlDeskOverrides`.
 

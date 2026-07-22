@@ -32,7 +32,7 @@ const STRATEGY_DESCRIPTIONS: Record<string, string> = {
   [STRATEGY_IDS.INSIDE_BREAK]:
     'Inside-bar breakout + EOD · multi-trade · daily ₹500 green-day search pick (paper first).',
   [STRATEGY_IDS.DONCH_RETEST_OR_MID_2R]:
-    'Donchian-20 S/R retest · OR-mid · 1.5R + BE after +1R · 1t · daily ₹500 default.',
+    'Donchian-20 S/R retest · OR-mid · 1.5R + BE after +1R · up to 3t/day · daily ₹500 default.',
   [STRATEGY_IDS.SWING_RETEST_EMA50_2R]:
     'Swing-5 S/R retest · EMA50 bias · 2R · 1t · high green-day twin.',
   [STRATEGY_IDS.GAP_FADE_500]:
