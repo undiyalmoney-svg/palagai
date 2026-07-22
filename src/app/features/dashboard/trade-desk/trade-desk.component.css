@@ -80,17 +80,6 @@
   background: #fef2f2;
 }
 
-.hint.warn-live-ruler {
-  margin: 0.35rem 0 0;
-  padding: 0.55rem 0.7rem;
-  border-radius: 8px;
-  border: 1px solid #fcd34d;
-  background: #fffbeb;
-  color: #78350f;
-  font-size: 0.82rem;
-  line-height: 1.35;
-}
-
 .lots-field {
   min-width: 5.5rem;
 }
@@ -123,118 +112,6 @@
 
 .desk-check input {
   margin: 0;
-}
-
-.ruler-toggle {
-  display: flex;
-  gap: 0.85rem;
-  align-items: center;
-  width: 100%;
-  box-sizing: border-box;
-  margin: 0 0 1rem;
-  padding: 1rem 1.1rem;
-  border-radius: 14px;
-  border: 2px solid #0f6e56;
-  background: linear-gradient(135deg, #ecfdf5 0%, #f0fdf4 55%, #fff 100%);
-  cursor: pointer;
-  user-select: none;
-  position: relative;
-  overflow: hidden;
-}
-
-.ruler-toggle.pulse:not(.on) {
-  animation: ruler-wake 1.8s ease-in-out infinite;
-  border-color: #059669;
-}
-
-.ruler-toggle.on {
-  border-color: #047857;
-  background: linear-gradient(135deg, #a7f3d0 0%, #d1fae5 45%, #ecfdf5 100%);
-  box-shadow: inset 5px 0 0 #047857, 0 8px 24px rgba(4, 120, 87, 0.18);
-}
-
-.ruler-toggle input {
-  margin: 0;
-  width: 1.35rem;
-  height: 1.35rem;
-  flex-shrink: 0;
-  accent-color: #047857;
-}
-
-.ruler-toggle-copy {
-  display: grid;
-  gap: 0.2rem;
-  min-width: 0;
-  flex: 1;
-}
-
-.ruler-toggle-copy strong {
-  font-size: 1.15rem;
-  letter-spacing: 0.01em;
-  color: #064e3b;
-}
-
-.ruler-toggle-copy em {
-  font-style: normal;
-  font-size: 0.92rem;
-  color: #047857;
-  font-weight: 700;
-}
-
-.ruler-toggle-copy small {
-  font-size: 0.8rem;
-  color: #3f6212;
-  line-height: 1.35;
-}
-
-.ruler-state {
-  flex-shrink: 0;
-  min-width: 3.2rem;
-  text-align: center;
-  font-weight: 800;
-  font-size: 0.85rem;
-  letter-spacing: 0.06em;
-  padding: 0.45rem 0.65rem;
-  border-radius: 999px;
-  background: #fff;
-  border: 1px solid #a7f3d0;
-  color: #065f46;
-}
-
-.ruler-toggle.on .ruler-state {
-  background: #047857;
-  border-color: #047857;
-  color: #ecfdf5;
-}
-
-.ruler-badge {
-  font-weight: 800;
-  letter-spacing: 0.04em;
-}
-
-.ruler-badge.on {
-  background: #047857 !important;
-  color: #ecfdf5 !important;
-  border-color: #047857 !important;
-}
-
-.ruler-badge.off {
-  background: #fef3c7 !important;
-  color: #92400e !important;
-  border-color: #f59e0b !important;
-  animation: ruler-wake 2s ease-in-out infinite;
-}
-
-@keyframes ruler-wake {
-  0%,
-  100% {
-    box-shadow: 0 0 0 0 rgba(5, 150, 105, 0.35);
-    transform: translateY(0);
-  }
-  50% {
-    box-shadow: 0 0 0 8px rgba(5, 150, 105, 0);
-    transform: translateY(-1px);
-  }
 }
 
 .weekday-filter {

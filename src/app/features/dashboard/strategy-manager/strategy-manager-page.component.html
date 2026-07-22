@@ -1,29 +1,19 @@
 <div class="sm-page">
   <header class="sm-hero">
     <div>
-      <p class="sm-kicker">Ruler · indices</p>
-      <h1>Strategy desk</h1>
+      <p class="sm-kicker">Strategy Manager</p>
+      <h1>Multi-strategy control</h1>
       <p class="sm-sub">
-        <strong>Nifty</strong> and <strong>Bank Nifty</strong> always run the boosted Ruler flow
-        (beast while month green under ₹3k · hunter when red · wide trail; shared arm; −₹500/day in Testing + Live · no month bank).
-        No competing index strategy to pick — that was confusing vs research books.
-        Stocks still use the picker below. Open <a routerLink="/dashboard/trade-desk">Trade Desk</a> to run Testing / Live.
+        Switch Paper / Live / Shadow strategies per instrument without changing code.
+        Defaults: Nifty &amp; Bank → <strong>Donch Retest · OR-mid · 1.5R+BE</strong>.
+        Stocks → <strong>GAP_FADE_500</strong> (same as Stocks Desk).
       </p>
     </div>
     <div class="sm-hero-actions">
-      <button mat-stroked-button type="button" (click)="resetAssignments()">Reset stocks assignments</button>
+      <button mat-stroked-button type="button" (click)="resetAssignments()">Reset assignments</button>
       <button mat-stroked-button type="button" (click)="clearLogs()">Clear logs</button>
     </div>
   </header>
-
-  <div class="sm-ruler-toggle sm-ruler-hero on" role="status">
-    <span>
-      <strong>Ruler flow · always on</strong>
-      <em>Nifty + Bank Paper/Live locked to Ruler</em>
-      — shared arm · hunter when red · wide trail · −₹500/day in Testing + Live · keeps trading past ₹15k. Lots from Trade Desk.
-    </span>
-    <span class="sm-ruler-pill">ON</span>
-  </div>
 
   <section class="sm-channels" aria-label="Instrument channels">
     @for (ch of channels; track ch) {
@@ -34,13 +24,9 @@
         (click)="selectChannel(ch)"
       >
         <strong>{{ channelLabels[ch] }}</strong>
-        <span>Paper · {{ deskStrategyLabel(ch, 'paper') }}</span>
-        <span>Live · {{ deskStrategyLabel(ch, 'live') }}</span>
-        @if (ch === 'stocks') {
-          <span>Shadow · {{ strategyName(assignmentMap()[ch].shadow) }}</span>
-        } @else {
-          <span>Shadow · off (Ruler only)</span>
-        }
+        <span>Paper · {{ strategyName(assignmentMap()[ch].paper) }}</span>
+        <span>Live · {{ strategyName(assignmentMap()[ch].live) }}</span>
+        <span>Shadow · {{ strategyName(assignmentMap()[ch].shadow) }}</span>
       </button>
     }
   </section>
@@ -48,58 +34,46 @@
   <section class="sm-grid">
     <article class="sm-panel">
       <h2>Assignments · {{ channelLabels[selectedChannel()] }}</h2>
-
       @if (selectedChannel() === 'stocks') {
         <p class="sm-stocks-note">
           Stocks default is <strong>GAP_FADE_500</strong>.
           Trade live from <a routerLink="/dashboard/stocks">Stocks Desk</a> (treasure book · max 3).
-          Ruler does not apply to stocks.
         </p>
-        <label>
-          Paper strategy
-          <select
-            [ngModel]="assignmentMap()[selectedChannel()].paper"
-            (ngModelChange)="setAssignment('paper', $event)"
-          >
-            @for (s of channelStrategies(); track s.id) {
-              <option [value]="s.id">{{ s.name }}</option>
-            }
-          </select>
-        </label>
-        <label>
-          Live strategy
-          <select
-            [ngModel]="assignmentMap()[selectedChannel()].live"
-            (ngModelChange)="setAssignment('live', $event)"
-          >
-            @for (s of channelStrategies(); track s.id) {
-              <option [value]="s.id">{{ s.name }}</option>
-            }
-          </select>
-        </label>
-        <label>
-          Shadow strategy (signals only)
-          <select
-            [ngModel]="assignmentMap()[selectedChannel()].shadow ?? ''"
-            (ngModelChange)="setAssignment('shadow', $event)"
-          >
-            <option value="">— Off —</option>
-            @for (s of channelStrategies(); track s.id) {
-              <option [value]="s.id">{{ s.name }}</option>
-            }
-          </select>
-        </label>
-      } @else {
-        <p class="sm-ruler-active">
-          Index desk is locked to <strong>Ruler flow</strong> — no Paper / Live / Shadow picker.
-          Use Trade Desk for lots, Testing books, and day status.
-        </p>
-        <div class="sm-ruler-lock">
-          <p><span>Paper</span> Ruler flow</p>
-          <p><span>Live</span> Ruler flow</p>
-          <p><span>Shadow</span> Off</p>
-        </div>
       }
+      <label>
+        Paper strategy
+        <select
+          [ngModel]="assignmentMap()[selectedChannel()].paper"
+          (ngModelChange)="setAssignment('paper', $event)"
+        >
+          @for (s of channelStrategies(); track s.id) {
+            <option [value]="s.id">{{ s.name }}</option>
+          }
+        </select>
+      </label>
+      <label>
+        Live strategy
+        <select
+          [ngModel]="assignmentMap()[selectedChannel()].live"
+          (ngModelChange)="setAssignment('live', $event)"
+        >
+          @for (s of channelStrategies(); track s.id) {
+            <option [value]="s.id">{{ s.name }}</option>
+          }
+        </select>
+      </label>
+      <label>
+        Shadow strategy (signals only)
+        <select
+          [ngModel]="assignmentMap()[selectedChannel()].shadow ?? ''"
+          (ngModelChange)="setAssignment('shadow', $event)"
+        >
+          <option value="">— Off —</option>
+          @for (s of channelStrategies(); track s.id) {
+            <option [value]="s.id">{{ s.name }}</option>
+          }
+        </select>
+      </label>
 
       <div class="sm-status">
         <h3>Desk status</h3>
@@ -111,12 +85,8 @@
     </article>
 
     <article class="sm-panel">
-      <h2>{{ selectedChannel() === 'stocks' ? 'Strategy catalog' : 'Ruler module' }}</h2>
-      @if (selectedChannel() !== 'stocks') {
-        <p class="sm-hint">Settings edit the Ruler module. Index desks always run this strategy.</p>
-      } @else {
-        <p class="sm-hint">Settings below edit the selected module. Desk only uses Paper/Live assignments.</p>
-      }
+      <h2>Strategy catalog</h2>
+      <p class="sm-hint">Settings below edit the selected module. Desk only uses Paper/Live assignments.</p>
       <ul class="sm-catalog">
         @for (s of channelStrategies(); track s.id) {
           <li>
@@ -155,11 +125,9 @@
             Desk runs <strong>{{ ed.paperName }}</strong> (Paper) /
             <strong>{{ ed.liveName }}</strong> (Live).
             Edits here will not change today’s desk until you assign this strategy.
-            @if (selectedChannel() === 'stocks') {
-              <button mat-stroked-button type="button" (click)="jumpToAssigned('paper')">
-                Edit Paper strategy
-              </button>
-            }
+            <button mat-stroked-button type="button" (click)="jumpToAssigned('paper')">
+              Edit Paper strategy
+            </button>
           </p>
         }
       }
@@ -234,13 +202,13 @@
         </div>
         <div>
           <h3>Paper assignment</h3>
-          <p>{{ deskStrategyLabel(selectedChannel(), 'paper') }}</p>
+          <p>{{ strategyName(assignmentMap()[selectedChannel()].paper) }}</p>
           <p>WR {{ paperPerf().winRate ?? '—' }}% · Exp {{ paperPerf().expectancy ?? '—' }}</p>
           <p>Net {{ paperPerf().netPoints }} · n={{ paperPerf().trades }}</p>
         </div>
         <div>
           <h3>Live assignment</h3>
-          <p>{{ deskStrategyLabel(selectedChannel(), 'live') }}</p>
+          <p>{{ strategyName(assignmentMap()[selectedChannel()].live) }}</p>
           <p>WR {{ livePerf().winRate ?? '—' }}% · Exp {{ livePerf().expectancy ?? '—' }}</p>
           <p>Net {{ livePerf().netPoints }} · n={{ livePerf().trades }}</p>
         </div>
@@ -248,77 +216,75 @@
       <button mat-stroked-button type="button" (click)="clearPerf()">Clear selected perf history</button>
     </article>
 
-    @if (selectedChannel() === 'stocks') {
-      <article class="sm-panel sm-wide">
-        <div class="sm-row-head">
-          <h2>Shadow comparison</h2>
-          <button mat-stroked-button type="button" (click)="clearShadow()">Clear shadow book</button>
+    <article class="sm-panel sm-wide">
+      <div class="sm-row-head">
+        <h2>Shadow comparison</h2>
+        <button mat-stroked-button type="button" (click)="clearShadow()">Clear shadow book</button>
+      </div>
+      @if (shadowStats(); as ss) {
+        <div class="sm-metrics">
+          <p>Signals {{ ss.signals }}</p>
+          <p>Trades {{ ss.trades }}</p>
+          <p>Win rate {{ ss.winRate ?? '—' }}%</p>
+          <p>Expectancy {{ ss.expectancy ?? '—' }}</p>
+          <p>PF {{ ss.profitFactor ?? '—' }}</p>
+          <p>Net pts {{ ss.netPoints }}</p>
         </div>
-        @if (shadowStats(); as ss) {
-          <div class="sm-metrics">
-            <p>Signals {{ ss.signals }}</p>
-            <p>Trades {{ ss.trades }}</p>
-            <p>Win rate {{ ss.winRate ?? '—' }}%</p>
-            <p>Expectancy {{ ss.expectancy ?? '—' }}</p>
-            <p>PF {{ ss.profitFactor ?? '—' }}</p>
-            <p>Net pts {{ ss.netPoints }}</p>
-          </div>
-        } @else {
-          <p class="sm-muted">No shadow strategy selected for Stocks.</p>
-        }
-        <div class="sm-tables">
-          <div>
-            <h3>Recent shadow signals</h3>
-            <div class="sm-table-scroll">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Time</th><th>Action</th><th>Entry</th><th>Primary</th><th>Reason</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  @for (s of shadowSignals().slice(0, 12); track s.id) {
-                    @if (s.channel === selectedChannel()) {
-                      <tr>
-                        <td>{{ s.barTime }}</td>
-                        <td>{{ s.action }}</td>
-                        <td>{{ s.entryPrice | number: '1.1-1' }}</td>
-                        <td>{{ s.primaryAction || '—' }}</td>
-                        <td>{{ s.reason }}</td>
-                      </tr>
-                    }
+      } @else {
+        <p class="sm-muted">No shadow strategy selected for this channel.</p>
+      }
+      <div class="sm-tables">
+        <div>
+          <h3>Recent shadow signals</h3>
+          <div class="sm-table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Time</th><th>Action</th><th>Entry</th><th>Primary</th><th>Reason</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (s of shadowSignals().slice(0, 12); track s.id) {
+                  @if (s.channel === selectedChannel()) {
+                    <tr>
+                      <td>{{ s.barTime }}</td>
+                      <td>{{ s.action }}</td>
+                      <td>{{ s.entryPrice | number: '1.1-1' }}</td>
+                      <td>{{ s.primaryAction || '—' }}</td>
+                      <td>{{ s.reason }}</td>
+                    </tr>
                   }
-                </tbody>
-              </table>
-            </div>
-          </div>
-          <div>
-            <h3>Recent shadow trades</h3>
-            <div class="sm-table-scroll">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Entry</th><th>Dir</th><th>Pts</th><th>Exit reason</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  @for (t of shadowTrades().slice(0, 12); track t.id) {
-                    @if (t.channel === selectedChannel()) {
-                      <tr>
-                        <td>{{ t.entryTime }}</td>
-                        <td>{{ t.direction }}</td>
-                        <td [class.win]="t.points > 0" [class.loss]="t.points < 0">{{ t.points | number: '1.1-1' }}</td>
-                        <td>{{ t.exitReason }}</td>
-                      </tr>
-                    }
-                  }
-                </tbody>
-              </table>
-            </div>
+                }
+              </tbody>
+            </table>
           </div>
         </div>
-      </article>
-    }
+        <div>
+          <h3>Recent shadow trades</h3>
+          <div class="sm-table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Entry</th><th>Dir</th><th>Pts</th><th>Exit reason</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (t of shadowTrades().slice(0, 12); track t.id) {
+                  @if (t.channel === selectedChannel()) {
+                    <tr>
+                      <td>{{ t.entryTime }}</td>
+                      <td>{{ t.direction }}</td>
+                      <td [class.win]="t.points > 0" [class.loss]="t.points < 0">{{ t.points | number: '1.1-1' }}</td>
+                      <td>{{ t.exitReason }}</td>
+                    </tr>
+                  }
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </article>
 
     <article class="sm-panel sm-wide">
       <h2>Strategy event log</h2>

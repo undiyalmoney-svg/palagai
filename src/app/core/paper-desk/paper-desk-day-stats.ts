@@ -1,6 +1,5 @@
 import { extractTradeDate, formatDayOfWeek, formatDisplayDate } from '../utils/trade-date.util';
 import { PaperTrade } from './paper-desk.models';
-import { indexPointsMoneyRs } from './paper-desk-points-money';
 
 export interface PaperDayStat {
   date: string;
@@ -11,8 +10,6 @@ export interface PaperDayStat {
   losses: number;
   indexNetPts: number;
   optionNetRs: number;
-  /** Research-scale: pts × ₹65/₹30 × lots. */
-  pointsMoneyRs: number;
 }
 
 export interface PaperWeekdayStat {
@@ -22,7 +19,6 @@ export interface PaperWeekdayStat {
   losses: number;
   indexNetPts: number;
   optionNetRs: number;
-  pointsMoneyRs: number;
 }
 
 export interface PaperDeskDayStats {
@@ -32,8 +28,6 @@ export interface PaperDeskDayStats {
   topLossDays: PaperDayStat[];
   byWeekday: PaperWeekdayStat[];
   tradingDays: number;
-  /** Which money column was used for best/worst / top lists. */
-  rankBy: 'option' | 'pointsMoney';
 }
 
 const WEEKDAY_ORDER = [
@@ -54,24 +48,18 @@ export function emptyPaperDeskDayStats(): PaperDeskDayStats {
     topLossDays: [],
     byWeekday: [],
     tradingDays: 0,
-    rankBy: 'option',
   };
 }
-
-export type DayStatsRankBy = 'option' | 'pointsMoney';
 
 /** Group closed paper trades by calendar day and rank best / worst days. */
 export function buildPaperDeskDayStats(
   trades: PaperTrade[],
   topN: number = 5,
-  lotsUsed: number = 1,
-  rankBy: DayStatsRankBy = 'option',
 ): PaperDeskDayStats {
   if (!trades.length) {
-    return { ...emptyPaperDeskDayStats(), rankBy };
+    return emptyPaperDeskDayStats();
   }
 
-  const lots = Math.max(1, Math.floor(lotsUsed) || 1);
   const byDate = new Map<string, PaperDayStat>();
   for (const t of trades) {
     const date = extractTradeDate(t.entryTime);
@@ -86,7 +74,6 @@ export function buildPaperDeskDayStats(
         losses: 0,
         indexNetPts: 0,
         optionNetRs: 0,
-        pointsMoneyRs: 0,
       };
       byDate.set(date, row);
     }
@@ -98,14 +85,10 @@ export function buildPaperDeskDayStats(
     }
     row.indexNetPts += t.indexPoints;
     row.optionNetRs += t.optionPnlRs ?? 0;
-    row.pointsMoneyRs += indexPointsMoneyRs(t.indexPoints, t.instrumentId, lots);
   }
 
-  // Keep day rows as raw OHLC pts money. Research day-cap belongs on the
-  // totals.research card — replacing every loss day with −₹500 looked like a bug.
   const days = [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date));
-  const money = (d: PaperDayStat) => (rankBy === 'pointsMoney' ? d.pointsMoneyRs : d.optionNetRs);
-  const byProfit = [...days].sort((a, b) => money(b) - money(a));
+  const byProfit = [...days].sort((a, b) => b.optionNetRs - a.optionNetRs);
   const n = Math.max(1, Math.floor(topN) || 5);
 
   const weekdayMap = new Map<string, PaperWeekdayStat>();
@@ -119,7 +102,6 @@ export function buildPaperDeskDayStats(
         losses: 0,
         indexNetPts: 0,
         optionNetRs: 0,
-        pointsMoneyRs: 0,
       };
       weekdayMap.set(d.weekday, w);
     }
@@ -128,7 +110,6 @@ export function buildPaperDeskDayStats(
     w.losses += d.losses;
     w.indexNetPts += d.indexNetPts;
     w.optionNetRs += d.optionNetRs;
-    w.pointsMoneyRs += d.pointsMoneyRs;
   }
 
   const byWeekday = WEEKDAY_ORDER.map((name) => weekdayMap.get(name)).filter(
@@ -138,13 +119,12 @@ export function buildPaperDeskDayStats(
   return {
     bestDay: byProfit[0] ?? null,
     worstDay: byProfit[byProfit.length - 1] ?? null,
-    topProfitDays: byProfit.filter((d) => money(d) > 0).slice(0, n),
+    topProfitDays: byProfit.filter((d) => d.optionNetRs > 0).slice(0, n),
     topLossDays: [...byProfit]
-      .filter((d) => money(d) < 0)
-      .sort((a, b) => money(a) - money(b))
+      .filter((d) => d.optionNetRs < 0)
+      .sort((a, b) => a.optionNetRs - b.optionNetRs)
       .slice(0, n),
     byWeekday,
     tradingDays: days.length,
-    rankBy,
   };
 }

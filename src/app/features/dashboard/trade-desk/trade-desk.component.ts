@@ -13,11 +13,9 @@ import {
   buildWeekdayFilteredView,
   defaultPaperWeekdaySelection,
 } from '../../../core/paper-desk/paper-desk-weekday-filter';
-import { tradesUsedRuler } from '../../../core/paper-desk/paper-desk-points-money';
+import { PDHL_RUPEES_PER_POINT } from '../../../core/strategy-engine/strategies/pdhl-opening-range/pdhl-opening-range.evaluator';
 import { KiteSessionService } from '../../../core/kite/kite-session.service';
 import { LotsPreferenceService } from '../../../core/services/lots-preference.service';
-import { StrategyManagerService } from '../../../core/strategy-manager/runtime/strategy-manager.service';
-import { StrategyAssignmentService } from '../../../core/strategy-manager/config/strategy-assignment.service';
 import { formatUnknownError } from '../../../core/utils/kite-error.util';
 import { extractTradeDate, formatDayOfWeek, formatDisplayDate } from '../../../core/utils/trade-date.util';
 
@@ -33,12 +31,8 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
   private readonly deskExport = inject(PaperDeskExportService);
   private readonly kiteSession = inject(KiteSessionService);
   private readonly lotsPreference = inject(LotsPreferenceService);
-  private readonly strategyManager = inject(StrategyManagerService);
-  private readonly assignments = inject(StrategyAssignmentService);
 
   protected readonly mode = signal<PaperDeskMode>('testing');
-  /** Always true — Nifty/Bank are Ruler-only. */
-  protected readonly rulerEnabled = this.assignments.rulerEnabled;
   protected fromDate = shiftDays(-14);
   protected toDate = todayIso();
   /** When Live + checked, places real Kite MIS orders. */
@@ -63,14 +57,9 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
   protected readonly busy = this.desk.busy;
   protected readonly error = signal('');
 
-  /** Filtered Testing view; Live uses full snapshot. Ruler P&L follows run, not only toggle. */
+  /** Filtered Testing view; Live uses full snapshot. */
   protected readonly resultView = computed(() => {
     const snap = this.snapshot();
-    const rulerRun =
-      !!snap.rulerActive ||
-      this.rulerEnabled() ||
-      tradesUsedRuler(snap.trades);
-    const rankBy = rulerRun ? 'pointsMoney' : 'option';
     if (this.mode() !== 'testing' || !snap.trades.length) {
       return {
         trades: snap.trades,
@@ -78,18 +67,15 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
         dayStats: snap.dayStats,
         weekdayLabel: 'all',
         filtered: false,
-        rulerRun,
       };
     }
     const view = buildWeekdayFilteredView(
       snap.trades,
       this.weekdayOn(),
       snap.totals.lotsUsed || this.lots,
-      rankBy,
-      snap.fromDate,
-      snap.toDate,
+      PDHL_RUPEES_PER_POINT,
     );
-    return { ...view, filtered: true, rulerRun };
+    return { ...view, filtered: true };
   });
 
   ngOnInit(): void {
