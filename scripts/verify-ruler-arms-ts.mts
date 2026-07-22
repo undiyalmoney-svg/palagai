@@ -10,12 +10,14 @@ import {
   computeRulerMorningFeatures,
   pickRulerArm,
   clipRulerDayInr,
+  RULER_LOSS_STREAK_BREAKER,
 } from '../src/app/core/strategy-manager/engines/ruler-morning.util';
 import type { Candle } from '../src/app/core/models/candle.model';
 
 const ROOT = '/workspace';
 const CACHE = path.join(ROOT, 'reports/analyst-cache');
 const OUT = '/tmp/ruler-verify';
+const MARCH_TARGET = 16407.2;
 
 type CacheBar = {
   date?: string;
@@ -97,17 +99,27 @@ function main(): void {
   const mismatches: Array<{ date: string; research: string; angular: string }> = [];
   let mtd = 0;
   let researchScore = 0;
+  let streak = 0;
+  let broken = false;
 
   for (const row of report.days) {
     total += 1;
     const series = seriesThroughOr(nifty, row.date);
     const feats = computeRulerMorningFeatures(series, row.date, false, '09:45');
-    const arm = pickRulerArm(feats, row.mtd_before);
+    const arm = pickRulerArm(feats, row.mtd_before, { breakerActive: broken });
     if (arm === row.arm) match += 1;
     else mismatches.push({ date: row.date, research: row.arm, angular: arm });
 
-    // Recompute research score with Angular arm on research raw? use research raw/clip path
-    researchScore += clipRulerDayInr(row.raw, mtd);
+    const clipped = clipRulerDayInr(row.raw, mtd);
+    researchScore += clipped;
+    if (clipped < 0) {
+      streak += 1;
+      if (streak >= RULER_LOSS_STREAK_BREAKER && !broken) {
+        broken = true;
+      }
+    } else if (clipped > 0) {
+      streak = 0;
+    }
     mtd = researchScore;
   }
 
@@ -118,7 +130,7 @@ function main(): void {
     match,
     total,
     mismatches,
-    pass_official: Math.abs(report.official_march - 20943) < 1,
+    pass_official: Math.abs(report.official_march - MARCH_TARGET) < 1,
     pass_arms: agreement >= 0.85,
   };
   writeFileSync(path.join(OUT, 'ts-arm-compare.json'), JSON.stringify(summary, null, 2));

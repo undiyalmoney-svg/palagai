@@ -14,7 +14,7 @@ export const MANAGED_STRATEGY_IDS = {
   /** Stocks Desk champion — gap-up fade ₹500 book. */
   GAP_FADE_500: 'gap-fade-500',
   /**
-   * Ruler flow (always-on for indices): morning witch switch + ₹1,500 day cap +
+   * Ruler flow (always-on for indices): morning witch switch + ₹500 day cap +
    * dyn protect when month green. Nifty/Bank desks always resolve here.
    */
   RULER: 'ruler-flow',

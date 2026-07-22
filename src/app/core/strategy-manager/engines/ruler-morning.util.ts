@@ -55,7 +55,14 @@ export type RulerArm =
 /** Boosted ruler: rampage while MTD < ₹3,000. */
 export const RULER_RAMPAGE_UNTIL_INR = 3000;
 /** Hard day loss cap (₹). When month green → min(cap, MTD). */
-export const RULER_DAY_CAP_INR = 1500;
+export const RULER_DAY_CAP_INR = 500;
+/**
+ * Month bank target (₹). Once MTD ≥ this, force STAND for the rest of the month.
+ * Trains capital banking toward a ₹15k monthly floor.
+ * Banking target only — research shows 1-lot DNA cannot clear ₹15k every month.
+ */
+
+export const RULER_MONTH_TARGET_INR = 15000;
 
 /**
  * Causal morning features at OR 09:45 (matches research morning_feat).
@@ -159,10 +166,8 @@ export function witchTrail(f: RulerMorningFeatures | null): RulerArm {
 }
 
 /**
- * Post-rampage (trained vs Sep 2025 bleed):
- * DONCH_TRAIL only on *wide* mornings. Skinny non-choppy days were taking
- * blind trail and stacking −₹1,500 clips (Sep 2025 → ₹155).
- * Non-wide → DONCH_2R / SWING / STAND instead.
+ * Legacy post-rampage (Sep-boost): trail on any wide morning.
+ * Prefer witchTrailWideCalmElse2r for capital-protect discipline.
  */
 export function witchTrailWideElse2r(f: RulerMorningFeatures | null): RulerArm {
   if (f == null || f.choppy) {
@@ -170,6 +175,30 @@ export function witchTrailWideElse2r(f: RulerMorningFeatures | null): RulerArm {
   }
   if (f.wide) {
     return 'DONCH_TRAIL';
+  }
+  if (f.drive >= 0.35) {
+    return 'DONCH_2R';
+  }
+  if (f.emaBuy || f.emaSell) {
+    return 'SWING_2R';
+  }
+  return 'STAND';
+}
+
+/**
+ * Post-rampage exit discipline (2020–2026 capital-protect train):
+ * DONCH_TRAIL only on *wide and calm* mornings. Wide-but-jumpy days take
+ * DONCH_2R instead of open-ended trail. Skinny → 2R / SWING / STAND.
+ */
+export function witchTrailWideCalmElse2r(f: RulerMorningFeatures | null): RulerArm {
+  if (f == null || f.choppy) {
+    return 'STAND';
+  }
+  if (f.wide && f.calm) {
+    return 'DONCH_TRAIL';
+  }
+  if (f.wide && f.drive >= 0.35) {
+    return 'DONCH_2R';
   }
   if (f.drive >= 0.35) {
     return 'DONCH_2R';
@@ -203,27 +232,61 @@ export function witchEdge(f: RulerMorningFeatures | null): RulerArm {
   return 'STAND';
 }
 
-/** Consecutive clipped red days before post-rampage breaker engages. */
-export const RULER_LOSS_STREAK_BREAKER = 3;
+/**
+ * Underwater recover witch (fixes 2022-05 / 2022-11 red months).
+ * Research hunter with OR_RETEST mapped to DONCH_2R (no new Angular arm).
+ * Used only while month MTD is negative — never keep beasting when red.
+ */
+export function witchHunterUw(f: RulerMorningFeatures | null): RulerArm {
+  if (f == null || f.choppy) {
+    return 'STAND';
+  }
+  if (f.vwide && f.vstrong) {
+    return 'DONCH_TRAIL';
+  }
+  if (f.vwide && f.strong) {
+    return 'DONCH_2R';
+  }
+  if (f.wide && f.drive >= 0.35 && f.calm) {
+    return 'DONCH_2R';
+  }
+  if (f.wide && (f.emaBuy || f.emaSell)) {
+    return 'SWING_2R';
+  }
+  if (f.drive >= 0.5) {
+    return 'DONCH_15R';
+  }
+  return 'STAND';
+}
+
+/** Consecutive clipped red days before breaker engages (anytime in the month). */
+export const RULER_LOSS_STREAK_BREAKER = 2;
 
 export type RulerArmPickOpts = {
-  /** After 3 clipped losses post-rampage → edge witch for rest of month. */
+  /** After 2 clipped losses → edge witch for rest of month. */
   breakerActive?: boolean;
 };
 
 /**
- * Boosted ruler pick (Sep-boost trained):
- * 1. While MTD < ₹3k → beast
- * 2. Else → trail only if wide, else 2R/swing (not blind trail)
- * 3. If loss-streak breaker active → edge for rest of month
+ * Zero-red discipline pick (profit-boost):
+ * 1. Breaker active → edge
+ * 2. MTD < 0 → hunter (do not beast while month is red)
+ * 3. 0 ≤ MTD < ₹3k → beast
+ * 4. Else → trail on wide mornings (else 2R/swing) — more profit than calm-only
  */
 export function pickRulerArm(
   f: RulerMorningFeatures | null,
   monthMtdInr: number,
   opts?: RulerArmPickOpts,
 ): RulerArm {
+  if (monthMtdInr >= RULER_MONTH_TARGET_INR) {
+    return 'STAND';
+  }
   if (opts?.breakerActive) {
     return witchEdge(f);
+  }
+  if (monthMtdInr < 0) {
+    return witchHunterUw(f);
   }
   if (monthMtdInr < RULER_RAMPAGE_UNTIL_INR) {
     return witchBeast(f);

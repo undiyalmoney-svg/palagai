@@ -14,6 +14,7 @@ import {
   rulerDayCapInr,
   RULER_RAMPAGE_UNTIL_INR,
   RULER_DAY_CAP_INR,
+  RULER_MONTH_TARGET_INR,
   type RulerMorningFeatures,
 } from '../src/app/core/strategy-manager/engines/ruler-morning.util';
 
@@ -90,9 +91,24 @@ function assertArmLogicParity(): void {
   assert.strictEqual(pickRulerArm(choppy, 0), 'STAND');
   assert.strictEqual(pickRulerArm(trailMorning, 0), 'DONCH_TRAIL'); // beast · wide+strong
   assert.strictEqual(pickRulerArm(swingMorning, 0), 'SWING_2R'); // beast · EMA bias
+  // Month bank: MTD ≥ ₹15k → STAND
+  assert.strictEqual(pickRulerArm(trailMorning, 15000), 'STAND');
+  assert.strictEqual(pickRulerArm(trailMorning, RULER_MONTH_TARGET_INR), 'STAND');
+  assert.strictEqual(pickRulerArm(trailMorning, 20000), 'STAND');
   assert.strictEqual(pickRulerArm(trailMorning, RULER_RAMPAGE_UNTIL_INR - 1), 'DONCH_TRAIL');
-  // After MTD ≥ ₹3k: wide → DONCH_TRAIL; skinny → 2R/swing (Sep-boost, not blind trail).
+  // Underwater (MTD < 0): hunter, not beast — wide+strong but not vwide → SWING/2R path.
+  assert.strictEqual(pickRulerArm(trailMorning, -500), 'SWING_2R'); // hunter · wide+ema, not vwide
+  const vwideHunter: RulerMorningFeatures = {
+    ...trailMorning,
+    vwide: true,
+    vstrong: true,
+    calm: true,
+  };
+  assert.strictEqual(pickRulerArm(vwideHunter, -500), 'DONCH_TRAIL'); // hunter · vwide+vstrong
+  // After MTD ≥ ₹3k: wide → DONCH_TRAIL; skinny → 2R/swing.
   assert.strictEqual(pickRulerArm(trailMorning, RULER_RAMPAGE_UNTIL_INR), 'DONCH_TRAIL');
+  const calmTrail: RulerMorningFeatures = { ...trailMorning, calm: true };
+  assert.strictEqual(pickRulerArm(calmTrail, RULER_RAMPAGE_UNTIL_INR), 'DONCH_TRAIL');
   assert.strictEqual(pickRulerArm(swingMorning, RULER_RAMPAGE_UNTIL_INR), 'SWING_2R');
   // Loss-streak breaker → edge witch (wide+strong but not calm → SWING via ema).
   assert.strictEqual(

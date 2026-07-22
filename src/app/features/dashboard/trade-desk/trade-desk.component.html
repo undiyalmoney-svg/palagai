@@ -5,7 +5,7 @@
       <h1>Trade Desk</h1>
       <p class="pg-lede">
         Nifty &amp; Bank Nifty ATM options run <strong>Ruler flow</strong> only
-        (shared arm · wide-only trail · 3-loss→edge · day-cap ₹1,500). Testing, Live paper, or Live money.
+        (shared arm · ₹15k month bank · hunter when red · day-cap ₹500). Testing, Live paper, or Live money.
       </p>
     </div>
     <div class="hero-meta">
@@ -49,8 +49,8 @@
   <div class="ruler-toggle on" role="status">
     <span class="ruler-toggle-copy">
       <strong>Ruler flow · always on</strong>
-      <em>Nifty + Bank Paper/Live · pts × ₹65/₹30 · research day-cap ₹1,500</em>
-      <small>Shared daily arm · wide-only trail · 3-loss→edge breaker · other arms 1t/day · Testing MTD isolated from Live · lots from Lots field</small>
+      <em>Nifty + Bank Paper/Live · pts × ₹65/₹30 · research day-cap ₹500</em>
+      <small>Shared daily arm · ₹15k month bank · hunter when red · wide trail · other arms 1t/day · Testing MTD isolated from Live · lots from Lots field</small>
     </span>
     <span class="ruler-state" aria-hidden="true">ON</span>
   </div>
@@ -149,7 +149,7 @@
       }
       @if (realOrders) {
         <p class="hint warn-live-ruler">
-          Ruler live: shared daily arm · new entries blocked after −₹1,500 day ₹ · open flattened at day-cap.
+          Ruler live: shared daily arm · new entries blocked after −₹500 day ₹ · open flattened at day-cap.
           Prefer Live paper first.
         </p>
       }
@@ -215,7 +215,7 @@
     <h2 class="trading-basis-title">What the app trades on</h2>
     <ul class="trading-basis-list">
       <li>
-        <strong>Ruler flow</strong> — only strategy for Nifty + Bank · shared daily arm · wide-only trail · 3-loss→edge · day-cap ₹1,500
+        <strong>Ruler flow</strong> — only strategy for Nifty + Bank · shared daily arm · ₹15k month bank · hunter when red · day-cap ₹500
       </li>
       <li>
         <strong>Lots / books</strong> — Lots field · Nifty/Bank checkboxes · optional Strict −₹2,950 / Profit lock +₹5,000
@@ -247,7 +247,7 @@
         </div>
         @if (resultView().totals.pointsMoneyResearchRs != null) {
           <div class="stat" [class.up]="resultView().totals.pointsMoneyResearchRs! > 0" [class.down]="resultView().totals.pointsMoneyResearchRs! < 0">
-            <span>Research score ₹ (day-cap −₹1,500 · not live cash)</span>
+            <span>Research score ₹ (day-cap −₹500 · not live cash)</span>
             <strong>{{ resultView().totals.pointsMoneyResearchRs! > 0 ? '+' : '' }}{{ resultView().totals.pointsMoneyResearchRs! | number: '1.0-0' }}</strong>
           </div>
         }

@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
 """
-Sep-boost Ruler recipe (trained 2025-09 weakness).
+Zero-red Ruler + ₹15k month bank.
 
-Problem: after MTD ≥ ₹3k, blind trail took DONCH_TRAIL on skinny mornings and
-stacked −₹1,500 clips → Sep 2025 finished ≈ ₹155.
+Recipe:
+  1. MTD ≥ ₹15,000 → STAND (bank the month)
+  2. Beast only while 0 ≤ MTD < ₹3,000
+  3. MTD < 0 → hunter recover
+  4. Else → trail on wide mornings
+  5. 2 clipped reds anytime → edge
+  6. Day-cap ₹500
 
-Fix:
-  1. Beast while MTD < ₹3,000 (unchanged)
-  2. Post-rampage: DONCH_TRAIL only if wide; else DONCH_2R / SWING / STAND
-  3. After 3 consecutive clipped red days (post-rampage) → edge witch for rest of month
-
-Keeps red months at 0 on 2025–2026; Sep ≈ ₹14.2k; March ≈ ₹20.9k.
+Trained and reported at 1 lot only.
+Research: no causal 1-lot router clears ₹15k in every 2020–2026 month (0 red kept).
 """
 from __future__ import annotations
 
@@ -30,6 +31,36 @@ def trail_wide_else_2r(f: dict | None) -> str:
     return "STAND"
 
 
+def trail_wide_calm_else_2r(f: dict | None) -> str:
+    if f is None or f["choppy"]:
+        return "STAND"
+    if f["wide"] and f["calm"]:
+        return "DONCH_TRAIL"
+    if f["wide"] and f["drive"] >= 0.35:
+        return "DONCH_2R"
+    if f["drive"] >= 0.35:
+        return "DONCH_2R"
+    if f["ema_buy"] or f["ema_sell"]:
+        return "SWING_2R"
+    return "STAND"
+
+
+def hunter_uw(f: dict | None) -> str:
+    if f is None or f["choppy"]:
+        return "STAND"
+    if f["vwide"] and f["vstrong"]:
+        return "DONCH_TRAIL"
+    if f["vwide"] and f["strong"]:
+        return "DONCH_2R"
+    if f["wide"] and f["drive"] >= 0.35 and f["calm"]:
+        return "DONCH_2R"
+    if f["wide"] and (f["ema_buy"] or f["ema_sell"]):
+        return "SWING_2R"
+    if f["drive"] >= 0.5:
+        return "DONCH_15R"
+    return "STAND"
+
+
 def run_sep_boost(
     books: dict,
     feats: dict,
@@ -40,9 +71,16 @@ def run_sep_boost(
     beast: Callable,
     edge: Callable,
     rampage_until: float = 3000.0,
-    base_cap: float = 1500.0,
-    loss_streak: int = 3,
+    base_cap: float = 500.0,
+    loss_streak: int = 2,
+    month_target: float = 15000.0,
+    post: Callable | None = None,
+    hunter: Callable | None = None,
+    early_breaker: bool = True,
+    lots: float = 1.0,
 ) -> dict[str, Any]:
+    post_witch = post or trail_wide_else_2r
+    hunter_witch = hunter or hunter_uw
     day_rs: dict[str, float] = {}
     arms: dict[str, int] = defaultdict(int)
     picks: list[dict] = []
@@ -51,24 +89,31 @@ def run_sep_boost(
     streak = 0
     broken = False
 
+    def sized_comb(arm: str, d: str) -> float:
+        return float(lots) * float(comb(books, arm, d))
+
     for d in days:
         m = d[:7]
         if m != cur:
             cur, mtd, streak, broken = m, 0.0, 0, False
         f = feats.get(d)
-        in_ramp = mtd < rampage_until
-        if broken:
+        if month_target and mtd >= month_target:
+            arm, mode = "STAND", "month_bank"
+        elif broken:
             arm, mode = edge(f), "breaker_edge"
-        elif in_ramp:
+        elif mtd < 0:
+            arm, mode = hunter_witch(f), "hunter_uw"
+        elif mtd < rampage_until:
             arm, mode = beast(f), "beast"
         else:
-            arm, mode = trail_wide_else_2r(f), "trail_wide"
-        raw = float(comb(books, arm, d))
+            arm, mode = post_witch(f), "trail_wide"
+        raw = float(sized_comb(arm, d))
+        cap = float(base_cap)  # absolute ₹ (Angular-style), not scaled by lots
         if mtd > 0:
-            dyn = min(base_cap, mtd)
+            dyn = min(cap, mtd)
             r = float(clip(raw, dyn)) if dyn > 0 else 0.0
         else:
-            r = float(clip(raw, base_cap))
+            r = float(clip(raw, cap))
         arms[arm] += 1
         day_rs[d] = r
         picks.append(
@@ -83,8 +128,9 @@ def run_sep_boost(
         )
         if r < 0:
             streak += 1
-            if streak >= loss_streak and not broken and not in_ramp:
-                broken = True
+            if streak >= loss_streak and not broken:
+                if early_breaker or mtd >= rampage_until:
+                    broken = True
         elif r > 0:
             streak = 0
         mtd += r
@@ -94,14 +140,19 @@ def run_sep_boost(
         mon[d[:7]] += r
     vals = list(mon.values())
     red = [m for m, v in mon.items() if v < 0]
+    below = sorted(m for m, v in mon.items() if v < month_target)
     return {
         "net": round(sum(vals), 1),
         "red": len(red),
         "red_list": red,
         "worst": round(min(vals), 1) if vals else 0.0,
         "best": round(max(vals), 1) if vals else 0.0,
+        "ge15k": sum(1 for v in vals if v >= month_target),
+        "below15k": below,
+        "n_months": len(vals),
         "monthly": {k: round(v, 1) for k, v in sorted(mon.items())},
         "arms": dict(arms),
         "picks": picks,
-        "recipe": "beast@3k→trail_wide_else_2r + streak3→edge",
+        "lots": lots,
+        "recipe": f"beast@0..3k / hunter when red / wide trail · streak2→edge · day_cap₹{int(base_cap)} · bank@{int(month_target)} · lots={lots}",
     }
