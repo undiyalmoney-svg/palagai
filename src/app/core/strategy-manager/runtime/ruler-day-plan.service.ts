@@ -18,16 +18,18 @@ export type RulerArmPick = {
   locked: boolean;
   /** True when loss-streak breaker is forcing edge witch. */
   breakerActive?: boolean;
-  witch?: 'beast' | 'trail_wide_calm' | 'breaker_edge';
+  witch?: 'beast' | 'hunter_uw' | 'trail_wide_calm' | 'breaker_edge';
 };
 
 /**
  * Research-faithful shared daily arm: one witch pick per calendar day,
  * applied to both Nifty and Bank (see ruler-profit-boost comb()).
  *
- * Discipline train (2020–2026 capital protect):
- * - Post-rampage trail only on wide+calm mornings (else 2R/swing)
- * - After 2 consecutive clipped red days post-rampage → edge for rest of month
+ * Zero-red discipline (fixes 2022-05 / 2022-11):
+ * - Beast only while 0 ≤ MTD < ₹3k (never while month is already red)
+ * - MTD < 0 → hunter recover witch
+ * - MTD ≥ ₹3k → trail only on wide+calm mornings
+ * - After 2 consecutive clipped red days *anytime* → edge for rest of month
  * - Day-cap ₹1,000
  *
  * IMPORTANT: do NOT lock STAND while morning features are still null
@@ -72,9 +74,11 @@ export class RulerDayPlanService {
     const breakerActive = this.isBreakerActive(date);
     const witch = breakerActive
       ? 'breaker_edge'
-      : monthMtdInr < RULER_RAMPAGE_UNTIL_INR
-        ? 'beast'
-        : 'trail_wide_calm';
+      : monthMtdInr < 0
+        ? 'hunter_uw'
+        : monthMtdInr < RULER_RAMPAGE_UNTIL_INR
+          ? 'beast'
+          : 'trail_wide_calm';
     if (existing != null) {
       return { arm: existing, locked: true, breakerActive, witch };
     }
@@ -89,7 +93,7 @@ export class RulerDayPlanService {
 
   /**
    * Replay prior days in the month (from locked arms / month trades) to see if
-   * the 2-loss post-rampage breaker has tripped before `asOfDate`.
+   * the 2-loss breaker has tripped before `asOfDate` (trips anytime, including rampage).
    */
   isBreakerActive(asOfDate: string): boolean {
     const ym = asOfDate.slice(0, 7);
@@ -106,12 +110,11 @@ export class RulerDayPlanService {
     let streak = 0;
     let broken = false;
     for (const d of days) {
-      const inRampage = mtd < RULER_RAMPAGE_UNTIL_INR;
       const raw = this.monthState.dayInr(d);
       const clipped = clipRulerDayInr(raw, mtd);
       if (clipped < 0) {
         streak += 1;
-        if (streak >= RULER_LOSS_STREAK_BREAKER && !broken && !inRampage) {
+        if (streak >= RULER_LOSS_STREAK_BREAKER && !broken) {
           broken = true;
         }
       } else if (clipped > 0) {

@@ -225,19 +225,47 @@ export function witchEdge(f: RulerMorningFeatures | null): RulerArm {
   return 'STAND';
 }
 
-/** Consecutive clipped red days before post-rampage breaker engages. */
+/**
+ * Underwater recover witch (fixes 2022-05 / 2022-11 red months).
+ * Research hunter with OR_RETEST mapped to DONCH_2R (no new Angular arm).
+ * Used only while month MTD is negative — never keep beasting when red.
+ */
+export function witchHunterUw(f: RulerMorningFeatures | null): RulerArm {
+  if (f == null || f.choppy) {
+    return 'STAND';
+  }
+  if (f.vwide && f.vstrong) {
+    return 'DONCH_TRAIL';
+  }
+  if (f.vwide && f.strong) {
+    return 'DONCH_2R';
+  }
+  if (f.wide && f.drive >= 0.35 && f.calm) {
+    return 'DONCH_2R';
+  }
+  if (f.wide && (f.emaBuy || f.emaSell)) {
+    return 'SWING_2R';
+  }
+  if (f.drive >= 0.5) {
+    return 'DONCH_15R';
+  }
+  return 'STAND';
+}
+
+/** Consecutive clipped red days before breaker engages (anytime in the month). */
 export const RULER_LOSS_STREAK_BREAKER = 2;
 
 export type RulerArmPickOpts = {
-  /** After 2 clipped losses post-rampage → edge witch for rest of month. */
+  /** After 2 clipped losses → edge witch for rest of month. */
   breakerActive?: boolean;
 };
 
 /**
- * Discipline-trained ruler pick (capital protect + entry/exit gates):
- * 1. While MTD < ₹3k → beast (entry: choppy STAND / wide+strong trail / 2R / EMA swing)
- * 2. Else → trail only if wide+calm, else 2R/swing (exit discipline)
- * 3. If loss-streak breaker active → edge for rest of month
+ * Zero-red discipline pick:
+ * 1. Breaker active → edge
+ * 2. MTD < 0 → hunter (do not beast while month is red)
+ * 3. 0 ≤ MTD < ₹3k → beast
+ * 4. Else → trail only if wide+calm, else 2R/swing
  */
 export function pickRulerArm(
   f: RulerMorningFeatures | null,
@@ -246,6 +274,9 @@ export function pickRulerArm(
 ): RulerArm {
   if (opts?.breakerActive) {
     return witchEdge(f);
+  }
+  if (monthMtdInr < 0) {
+    return witchHunterUw(f);
   }
   if (monthMtdInr < RULER_RAMPAGE_UNTIL_INR) {
     return witchBeast(f);

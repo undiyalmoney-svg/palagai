@@ -10,7 +10,6 @@ import {
   computeRulerMorningFeatures,
   pickRulerArm,
   clipRulerDayInr,
-  RULER_RAMPAGE_UNTIL_INR,
   RULER_LOSS_STREAK_BREAKER,
 } from '../src/app/core/strategy-manager/engines/ruler-morning.util';
 import type { Candle } from '../src/app/core/models/candle.model';
@@ -18,7 +17,7 @@ import type { Candle } from '../src/app/core/models/candle.model';
 const ROOT = '/workspace';
 const CACHE = path.join(ROOT, 'reports/analyst-cache');
 const OUT = '/tmp/ruler-verify';
-const MARCH_TARGET = 27370;
+const MARCH_TARGET = 20115.5;
 
 type CacheBar = {
   date?: string;
@@ -111,12 +110,11 @@ function main(): void {
     if (arm === row.arm) match += 1;
     else mismatches.push({ date: row.date, research: row.arm, angular: arm });
 
-    const inRamp = mtd < RULER_RAMPAGE_UNTIL_INR;
     const clipped = clipRulerDayInr(row.raw, mtd);
     researchScore += clipped;
     if (clipped < 0) {
       streak += 1;
-      if (streak >= RULER_LOSS_STREAK_BREAKER && !broken && !inRamp) {
+      if (streak >= RULER_LOSS_STREAK_BREAKER && !broken) {
         broken = true;
       }
     } else if (clipped > 0) {

@@ -1,24 +1,21 @@
 #!/usr/bin/env python3
 """
-Discipline-trained Ruler recipe (capital protect + selective entry/exit).
+Zero-red discipline Ruler (capital protect + no underwater beast).
 
 Research window: candle cache 2020-01-01..2026-07-21 (no 2018–2019 data).
 
-Problem history:
-  - Blind post-rampage trail on skinny mornings → Sep 2025 bleed (Sep-boost fix).
-  - ₹1,500 day-cap + 3-loss breaker still left 9 red months 2020–2026
-    (worst 2022-05 ≈ −₹8,050).
+Why 2022-05 / 2022-11 were red under prior discipline:
+  Rampage used `mtd < ₹3k`, so a month already underwater kept trading the
+  aggressive *beast* witch and stacked −₹1,000 clips.
 
-Discipline train (2020–2026):
-  1. Beast while MTD < ₹3,000 (entry gate: choppy STAND; wide+strong trail;
-     wide+drive 2R; EMA swing)
-  2. Post-rampage: DONCH_TRAIL only if *wide and calm*; else DONCH_2R / SWING / STAND
-     (exit discipline — no trail on wide-but-jumpy mornings)
-  3. After 2 consecutive clipped red days (post-rampage) → edge witch for rest of month
-  4. Day-cap ₹1,000 (capital protect; dyn when month green)
+Fix (2020–2026 train → 0 red months):
+  1. Beast only while 0 ≤ MTD < ₹3,000
+  2. When MTD < 0 → hunter (selective recover; vwide+strong → DONCH_2R, not OR)
+  3. When MTD ≥ ₹3,000 → trail only if wide+calm (else 2R/swing)
+  4. After 2 consecutive clipped red days *anytime* → edge for rest of month
+  5. Day-cap ₹1,000
 
-Keeps 2025–2026 red=0; Sep ≈ ₹19.7k; March ≈ ₹27.4k;
-full-history red 9→2, worst −₹8k→−₹2.1k.
+Full history: 0 red; worst soft ≈ ₹754; Sep ≈ ₹19.7k; March ≈ ₹20.1k.
 """
 from __future__ import annotations
 
@@ -27,7 +24,7 @@ from typing import Any, Callable
 
 
 def trail_wide_else_2r(f: dict | None) -> str:
-    """Legacy Sep-boost post witch (wide → trail). Prefer trail_wide_calm_else_2r."""
+    """Legacy Sep-boost post witch (wide → trail)."""
     if f is None or f["choppy"]:
         return "STAND"
     if f["wide"]:
@@ -54,6 +51,26 @@ def trail_wide_calm_else_2r(f: dict | None) -> str:
     return "STAND"
 
 
+def hunter_uw(f: dict | None) -> str:
+    """
+    Underwater recover witch (research hunter, OR_RETEST → DONCH_2R so Angular
+    needs no new arm). Used only while month MTD is negative.
+    """
+    if f is None or f["choppy"]:
+        return "STAND"
+    if f["vwide"] and f["vstrong"]:
+        return "DONCH_TRAIL"
+    if f["vwide"] and f["strong"]:
+        return "DONCH_2R"
+    if f["wide"] and f["drive"] >= 0.35 and f["calm"]:
+        return "DONCH_2R"
+    if f["wide"] and (f["ema_buy"] or f["ema_sell"]):
+        return "SWING_2R"
+    if f["drive"] >= 0.5:
+        return "DONCH_15R"
+    return "STAND"
+
+
 def run_sep_boost(
     books: dict,
     feats: dict,
@@ -67,8 +84,11 @@ def run_sep_boost(
     base_cap: float = 1000.0,
     loss_streak: int = 2,
     post: Callable | None = None,
+    hunter: Callable | None = None,
+    early_breaker: bool = True,
 ) -> dict[str, Any]:
     post_witch = post or trail_wide_calm_else_2r
+    hunter_witch = hunter or hunter_uw
     day_rs: dict[str, float] = {}
     arms: dict[str, int] = defaultdict(int)
     picks: list[dict] = []
@@ -82,10 +102,11 @@ def run_sep_boost(
         if m != cur:
             cur, mtd, streak, broken = m, 0.0, 0, False
         f = feats.get(d)
-        in_ramp = mtd < rampage_until
         if broken:
             arm, mode = edge(f), "breaker_edge"
-        elif in_ramp:
+        elif mtd < 0:
+            arm, mode = hunter_witch(f), "hunter_uw"
+        elif mtd < rampage_until:
             arm, mode = beast(f), "beast"
         else:
             arm, mode = post_witch(f), "trail_wide_calm"
@@ -109,8 +130,11 @@ def run_sep_boost(
         )
         if r < 0:
             streak += 1
-            if streak >= loss_streak and not broken and not in_ramp:
-                broken = True
+            # Early breaker (default): trip after streak even during beast rampage.
+            # Legacy (early_breaker=False): only after MTD has left the ₹0..3k band upward.
+            if streak >= loss_streak and not broken:
+                if early_breaker or mtd >= rampage_until:
+                    broken = True
         elif r > 0:
             streak = 0
         mtd += r
@@ -129,5 +153,5 @@ def run_sep_boost(
         "monthly": {k: round(v, 1) for k, v in sorted(mon.items())},
         "arms": dict(arms),
         "picks": picks,
-        "recipe": "beast@3k→trail_wide_calm + streak2→edge · day_cap₹1000",
+        "recipe": "beast@0..3k / hunter when red / wide+calm trail · streak2 anytime→edge · day_cap₹1000",
     }

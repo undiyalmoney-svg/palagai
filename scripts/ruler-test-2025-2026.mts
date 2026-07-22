@@ -12,7 +12,6 @@ import {
   computeRulerMorningFeatures,
   pickRulerArm,
   clipRulerDayInr,
-  RULER_RAMPAGE_UNTIL_INR,
   RULER_LOSS_STREAK_BREAKER,
   type RulerArm,
 } from '../src/app/core/strategy-manager/engines/ruler-morning.util';
@@ -342,10 +341,9 @@ print(json.dumps({'days': len(days), 'official_total': official['net'], 'monthly
     const mtdBefore = r?.mtd_before ?? walkMtd;
     dayArm.set(day, pickRulerArm(feat, mtdBefore, { breakerActive: walkBroken }));
     const clipped = r?.clipped ?? 0;
-    const inRamp = walkMtd < RULER_RAMPAGE_UNTIL_INR;
     if (clipped < 0) {
       walkStreak += 1;
-      if (walkStreak >= RULER_LOSS_STREAK_BREAKER && !walkBroken && !inRamp) {
+      if (walkStreak >= RULER_LOSS_STREAK_BREAKER && !walkBroken) {
         walkBroken = true;
       }
     } else if (clipped > 0) {

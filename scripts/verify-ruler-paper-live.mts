@@ -91,6 +91,15 @@ function assertArmLogicParity(): void {
   assert.strictEqual(pickRulerArm(trailMorning, 0), 'DONCH_TRAIL'); // beast · wide+strong
   assert.strictEqual(pickRulerArm(swingMorning, 0), 'SWING_2R'); // beast · EMA bias
   assert.strictEqual(pickRulerArm(trailMorning, RULER_RAMPAGE_UNTIL_INR - 1), 'DONCH_TRAIL');
+  // Underwater (MTD < 0): hunter, not beast — wide+strong but not vwide → SWING/2R path.
+  assert.strictEqual(pickRulerArm(trailMorning, -500), 'SWING_2R'); // hunter · wide+ema, not vwide
+  const vwideHunter: RulerMorningFeatures = {
+    ...trailMorning,
+    vwide: true,
+    vstrong: true,
+    calm: true,
+  };
+  assert.strictEqual(pickRulerArm(vwideHunter, -500), 'DONCH_TRAIL'); // hunter · vwide+vstrong
   // After MTD ≥ ₹3k: wide+calm → DONCH_TRAIL; wide-not-calm → 2R; skinny → 2R/swing.
   assert.strictEqual(pickRulerArm(trailMorning, RULER_RAMPAGE_UNTIL_INR), 'DONCH_2R'); // wide but not calm
   const calmTrail: RulerMorningFeatures = { ...trailMorning, calm: true };
