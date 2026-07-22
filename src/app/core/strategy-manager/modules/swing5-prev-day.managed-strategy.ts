@@ -13,7 +13,7 @@ export class Swing5PrevDayManagedStrategy extends BaseIndexRuleStrategy {
   readonly version = '1.0.0';
   readonly description =
     'Swing-5 breakout filtered by previous-day bullish/bearish bias; hold to EOD.';
-  readonly supports: readonly DeskChannel[] = ['nifty', 'bank', 'stocks'];
+  readonly supports: readonly DeskChannel[] = ['nifty', 'bank'];
 
   readonly defaultSettings = defaultStrategySettings({
     entryTimeStart: '10:15',

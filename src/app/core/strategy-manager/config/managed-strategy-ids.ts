@@ -11,6 +11,8 @@ export const MANAGED_STRATEGY_IDS = {
   DONCH_RETEST_OR_MID_2R: 'donch-retest-or-mid-2r',
   /** S/R retest twin: Swing-5 retest + EMA50 + 2R. */
   SWING_RETEST_EMA50_2R: 'swing-retest-ema50-2r',
+  /** Stocks Desk champion — gap-up fade ₹500 book. */
+  GAP_FADE_500: 'gap-fade-500',
 } as const;
 
 export type ManagedStrategyId =
@@ -18,9 +20,8 @@ export type ManagedStrategyId =
 
 /**
  * Research-backed defaults:
- * - Nifty/Bank: Donch Retest OR-mid 2R (index daily-profit DNA)
- * - Stocks Manager: VolExpand placeholder only — Stocks Desk must use GAP_FADE_500
- *   (Donch Retest is NO_GO on equities; see doc 21)
+ * - Nifty/Bank: Donch Retest OR-mid 2R
+ * - Stocks: GAP_FADE_500 (same DNA as Stocks Desk)
  */
 export const DEFAULT_CHANNEL_ASSIGNMENTS = {
   nifty: {
@@ -34,8 +35,8 @@ export const DEFAULT_CHANNEL_ASSIGNMENTS = {
     shadow: null as string | null,
   },
   stocks: {
-    paper: MANAGED_STRATEGY_IDS.VOL_EXPAND_DONCH15,
-    live: MANAGED_STRATEGY_IDS.VOL_EXPAND_DONCH15,
+    paper: MANAGED_STRATEGY_IDS.GAP_FADE_500,
+    live: MANAGED_STRATEGY_IDS.GAP_FADE_500,
     shadow: null as string | null,
   },
 } as const;

@@ -8,6 +8,7 @@ export const STRATEGY_IDS = {
   INSIDE_BREAK: 'inside-break-eod',
   DONCH_RETEST_OR_MID_2R: 'donch-retest-or-mid-2r',
   SWING_RETEST_EMA50_2R: 'swing-retest-ema50-2r',
+  GAP_FADE_500: 'gap-fade-500',
   // Paused — removed from active registry
   FIRST_HOUR_BREAKOUT: 'first-hour-breakout',
   INTRADAY_REVERSAL: 'intraday-reversal',
@@ -50,6 +51,7 @@ export const ACTIVE_STRATEGY_IDS = new Set<string>([
   STRATEGY_IDS.INSIDE_BREAK,
   STRATEGY_IDS.DONCH_RETEST_OR_MID_2R,
   STRATEGY_IDS.SWING_RETEST_EMA50_2R,
+  STRATEGY_IDS.GAP_FADE_500,
 ]);
 
 /** @deprecated Research platform removed — kept for type compatibility only. */

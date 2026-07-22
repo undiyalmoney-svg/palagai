@@ -17,7 +17,7 @@ export class InsideBreakManagedStrategy extends BaseIndexRuleStrategy {
   readonly version = '1.0.0';
   readonly description =
     'Break of prior inside-bar range · no bias · EOD · multi-trade · day stop 60. Best green-day rate in daily ₹500 search; deep red median — paper first.';
-  readonly supports: readonly DeskChannel[] = ['nifty', 'bank', 'stocks'];
+  readonly supports: readonly DeskChannel[] = ['nifty', 'bank'];
 
   readonly defaultSettings = defaultStrategySettings({
     entryTimeStart: '10:15',

@@ -13,7 +13,7 @@ export class Donchian55TurtleManagedStrategy extends BaseIndexRuleStrategy {
   readonly version = '1.0.0';
   readonly description =
     'Turtle-style 55-bar Donchian breakout on the desk timeframe; EOD exit, 1 trade/day.';
-  readonly supports: readonly DeskChannel[] = ['nifty', 'bank', 'stocks'];
+  readonly supports: readonly DeskChannel[] = ['nifty', 'bank'];
 
   readonly defaultSettings = defaultStrategySettings({
     entryTimeStart: '10:15',
