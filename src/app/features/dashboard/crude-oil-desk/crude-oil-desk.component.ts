@@ -71,7 +71,6 @@ export class CrudeOilDeskComponent implements OnInit, OnDestroy {
       snap.trades,
       this.weekdayOn(),
       snap.totals.lotsUsed || this.lots,
-      CRUDE_RUPEES_PER_POINT,
     );
     return { ...view, filtered: true };
   });
