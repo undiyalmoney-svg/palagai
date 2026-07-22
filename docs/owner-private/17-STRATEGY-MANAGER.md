@@ -2,7 +2,7 @@
 
 ## Status
 
-**Architecture implemented.** Champion PDHL remains available (DNA untouched). **Defaults:** Donch Retest · OR-mid · 2R for **Nifty/Bank**. Stocks Manager is not Donch (NO_GO on equities — doc **21**). Stocks Desk UI defaults to **GAP_FADE_500**.
+**Architecture implemented.** Champion PDHL remains available (DNA untouched). **Defaults:** Donch Retest · OR-mid · 2R for **Nifty/Bank**; **GAP_FADE_500** for Stocks (Manager + Desk).
 
 ## What shipped
 
@@ -20,10 +20,10 @@
 |---|---|---|---|
 | Nifty | **Donch Retest · OR-mid · 2R** | **Donch Retest · OR-mid · 2R** | Off |
 | Bank | **Donch Retest · OR-mid · 2R** | **Donch Retest · OR-mid · 2R** | Off |
-| Stocks (Manager) | VolExpand (placeholder) | VolExpand (placeholder) | Off |
+| Stocks (Manager) | **GAP_FADE_500** | **GAP_FADE_500** | Off |
 | Stocks Desk | — | **GAP_FADE_500** | — |
 
-Donch Retest is **index-only**. On stocks it lost OOS (doc **21**). Use Stocks Desk **GAP_FADE_500** for equity daily profit.
+Donch Retest is **index-only**. Stocks use **GAP_FADE_500** in Strategy Manager and Stocks Desk (doc **21**).
 
 ## How to switch (no code)
 

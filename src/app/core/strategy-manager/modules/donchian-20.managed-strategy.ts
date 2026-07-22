@@ -12,7 +12,7 @@ export class Donchian20ManagedStrategy extends BaseIndexRuleStrategy {
   readonly name = 'Donchian-20 + EOD';
   readonly version = '1.0.0';
   readonly description = 'Classic 20-bar Donchian channel breakout; hold to EOD.';
-  readonly supports: readonly DeskChannel[] = ['nifty', 'bank', 'stocks'];
+  readonly supports: readonly DeskChannel[] = ['nifty', 'bank'];
 
   readonly defaultSettings = defaultStrategySettings({
     entryTimeStart: '10:15',

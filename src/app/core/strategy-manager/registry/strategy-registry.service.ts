@@ -9,6 +9,7 @@ import { Donchian55TurtleManagedStrategy } from '../modules/donchian-55-turtle.m
 import { InsideBreakManagedStrategy } from '../modules/inside-break.managed-strategy';
 import { DonchRetestOrMid2rManagedStrategy } from '../modules/donch-retest-or-mid-2r.managed-strategy';
 import { SwingRetestEma50Rr2ManagedStrategy } from '../modules/swing-retest-ema50-2r.managed-strategy';
+import { GapFade500ManagedStrategy } from '../modules/gap-fade-500.managed-strategy';
 import { AppLoggerService } from '../../shared/logging/app-logger.service';
 
 /**
@@ -26,6 +27,7 @@ export class StrategyRegistryService {
   private readonly insideBreak = inject(InsideBreakManagedStrategy);
   private readonly donchRetest = inject(DonchRetestOrMid2rManagedStrategy);
   private readonly swingRetest = inject(SwingRetestEma50Rr2ManagedStrategy);
+  private readonly gapFade500 = inject(GapFade500ManagedStrategy);
 
   private readonly modules: IManagedStrategy[];
 
@@ -39,6 +41,7 @@ export class StrategyRegistryService {
       this.insideBreak,
       this.donchRetest,
       this.swingRetest,
+      this.gapFade500,
     ];
     for (const m of this.modules) {
       m.initialize();

@@ -13,7 +13,7 @@ export class VolExpandDonch15ManagedStrategy extends BaseIndexRuleStrategy {
   readonly version = '1.2.0';
   readonly description =
     'VolExpand Donch15 + EMA50 + EOD (10:15–11:30, 1 trade/day). Regime filter available in Settings (off by default for full trade count).';
-  readonly supports: readonly DeskChannel[] = ['nifty', 'bank', 'stocks'];
+  readonly supports: readonly DeskChannel[] = ['nifty', 'bank'];
 
   readonly defaultSettings = defaultStrategySettings({
     entryTimeStart: '10:15',
