@@ -125,7 +125,9 @@ export function runIndexRuleStrategy(
     return skip(`Day stopped (net ${state.dayNetPts.toFixed(1)})`);
   }
   if (settings.maxTradesPerDay > 0 && state.tradesToday >= settings.maxTradesPerDay) {
-    return skip('Max trades per day reached');
+    return skip(
+      `Max trades per day reached (${state.tradesToday}/${settings.maxTradesPerDay})`,
+    );
   }
 
   const earliest = settings.entryTimeStart;

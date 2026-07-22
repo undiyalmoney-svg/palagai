@@ -266,6 +266,15 @@
   color: #6b3b08;
 }
 
+.sm-setting-note {
+  grid-column: 1 / -1;
+  margin: -0.15rem 0 0.35rem;
+  font-family: "IBM Plex Sans", "Avenir Next", "Segoe UI", sans-serif;
+  font-size: 0.78rem;
+  color: var(--sm-muted);
+  line-height: 1.35;
+}
+
 .sm-settings {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

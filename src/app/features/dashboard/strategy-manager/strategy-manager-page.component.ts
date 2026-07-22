@@ -130,9 +130,10 @@ export class StrategyManagerPageComponent {
   protected setAssignment(mode: ExecutionMode | 'shadow', strategyId: string): void {
     const value = mode === 'shadow' && strategyId === '' ? null : strategyId;
     this.manager.setAssignment(this.selectedChannel(), mode, value);
-    if (mode === 'paper' && strategyId) {
+    if ((mode === 'paper' || mode === 'live') && strategyId) {
       this.selectedStrategyId.set(strategyId);
     }
+    this.desk.refreshLiveAfterSettingsChange();
   }
 
   protected strategyName(id: string | null): string {
@@ -178,17 +179,20 @@ export class StrategyManagerPageComponent {
     }
     this.manager.updateSettings(id, { [key]: value } as Partial<StrategySettings>);
     this.settingsEpoch.update((n) => n + 1);
+    this.desk.refreshLiveAfterSettingsChange();
   }
 
   protected resetSettings(): void {
     this.assignments.resetStrategySettings(this.selectedStrategyId());
     this.settingsEpoch.update((n) => n + 1);
+    this.desk.refreshLiveAfterSettingsChange();
   }
 
   protected resetAssignments(): void {
     this.assignments.resetAllAssignmentsToDefaults();
     this.settingsEpoch.update((n) => n + 1);
     this.selectChannel(this.selectedChannel());
+    this.desk.refreshLiveAfterSettingsChange();
   }
 
   protected clearLogs(): void {
@@ -213,7 +217,21 @@ export class StrategyManagerPageComponent {
   }
 
   protected todayTradeCount(): number {
+    const snap = this.deskSnap();
+    const ch = this.selectedChannel();
+    if (ch === 'stocks') {
+      return 0;
+    }
+    const name = ch === 'nifty' ? 'Nifty' : 'Bank';
+    const status = snap.statuses.find((s) => s.instrumentName.includes(name));
+    if (status) {
+      return status.tradesToday;
+    }
     const today = new Date().toISOString().slice(0, 10);
-    return this.deskSnap().trades.filter((t) => t.entryTime.slice(0, 10) === today).length;
+    return snap.trades.filter(
+      (t) =>
+        t.entryTime.slice(0, 10) === today &&
+        t.instrumentName.toLowerCase().includes(ch === 'nifty' ? 'nifty' : 'bank'),
+    ).length;
   }
 }
