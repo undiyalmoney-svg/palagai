@@ -258,13 +258,13 @@
       </div>
       @if (resultView().rulerRun) {
         <div class="stat primary" [class.up]="resultView().totals.pointsMoneyRs > 0" [class.down]="resultView().totals.pointsMoneyRs < 0">
-          <span>P&amp;L ₹ ({{ resultView().totals.lotsUsed }} lot · pts · ₹65/₹30 · day-cap ₹1,500)</span>
+          <span>P&amp;L ₹ ({{ resultView().totals.lotsUsed }} lot · pts × ₹65/₹30 · OHLC)</span>
           <strong>{{ resultView().totals.pointsMoneyRs > 0 ? '+' : '' }}{{ resultView().totals.pointsMoneyRs | number: '1.0-0' }}</strong>
         </div>
-        @if (resultView().totals.pointsMoneyRawRs != null) {
-          <div class="stat" [class.up]="resultView().totals.pointsMoneyRawRs! > 0" [class.down]="resultView().totals.pointsMoneyRawRs! < 0">
-            <span>Raw pts ₹ (uncapped OHLC · live risk)</span>
-            <strong>{{ resultView().totals.pointsMoneyRawRs! > 0 ? '+' : '' }}{{ resultView().totals.pointsMoneyRawRs! | number: '1.0-0' }}</strong>
+        @if (resultView().totals.pointsMoneyResearchRs != null) {
+          <div class="stat" [class.up]="resultView().totals.pointsMoneyResearchRs! > 0" [class.down]="resultView().totals.pointsMoneyResearchRs! < 0">
+            <span>Research score ₹ (day-cap −₹1,500 · not live cash)</span>
+            <strong>{{ resultView().totals.pointsMoneyResearchRs! > 0 ? '+' : '' }}{{ resultView().totals.pointsMoneyResearchRs! | number: '1.0-0' }}</strong>
           </div>
         }
         <div class="stat" [class.up]="resultView().totals.optionNetRs > 0" [class.down]="resultView().totals.optionNetRs < 0">
@@ -298,7 +298,7 @@
             <h3>Day breakdown</h3>
             <p>
               {{ resultView().dayStats.tradingDays }} trading day(s) · ranked by
-              {{ resultView().dayStats.rankBy === 'pointsMoney' ? 'Pts money ₹ (research day-cap)' : 'Option ₹' }}
+              {{ resultView().dayStats.rankBy === 'pointsMoney' ? 'Pts money ₹ (OHLC raw)' : 'Option ₹' }}
               @if (resultView().filtered) {
                 · {{ resultView().weekdayLabel }}
               }

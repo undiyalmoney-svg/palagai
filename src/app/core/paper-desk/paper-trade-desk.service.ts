@@ -550,8 +550,9 @@ export class PaperTradeDeskService {
         this.strategyManager.isRulerEnabled() || tradesUsedRuler(sorted);
       const rankBy = rulerOn ? 'pointsMoney' : 'option';
       const dayStats = buildPaperDeskDayStats(sorted, 5, this.lotsMultiplier, rankBy);
-      const clipped = rulerOn ? sumPointsMoneyRsRulerClipped(sorted, this.lotsMultiplier) : null;
-      const rawPts = sumPointsMoneyRs(sorted, this.lotsMultiplier);
+      const totals = summarize(sorted, this.lotsMultiplier, rulerOn);
+      const research = totals.pointsMoneyResearchRs;
+      const rawPts = totals.pointsMoneyRs;
 
       this.snapshot.set({
         mode: 'testing',
@@ -563,11 +564,11 @@ export class PaperTradeDeskService {
         rulerActive: rulerOn,
         lastTickAt: null,
         message: rulerOn
-          ? `Testing complete · Ruler · ${sorted.length} trade(s) · day-cap P&L ₹${clipped != null && clipped >= 0 ? '+' : ''}${clipped != null ? Math.round(clipped) : 0} · raw ₹${Math.round(rawPts)} · ${this.lotsMultiplier} lot(s) · ${this.deskOptionsLabel()} · ${this.kiteStatsLabel()}`
+          ? `Testing complete · Ruler · ${sorted.length} trade(s) · pts ₹${Math.round(rawPts)} · research day-cap ₹${research != null && research >= 0 ? '+' : ''}${research != null ? Math.round(research) : 0} · ${this.lotsMultiplier} lot(s) · ${this.deskOptionsLabel()} · ${this.kiteStatsLabel()}`
           : `Testing complete · ${sorted.length} paper trade(s) · ${batches.length} batch(es) · ${this.lotsMultiplier} lot(s) · ${this.deskOptionsLabel()} · ${this.kiteStatsLabel()}`,
         statuses,
         trades: sorted,
-        totals: summarize(sorted, this.lotsMultiplier, rulerOn),
+        totals,
         dayStats,
         kiteStats: this.kiteStats(),
         orderEvents: [],
@@ -1306,8 +1307,11 @@ function summarize(
     indexNetPts,
     optionNetRs: trades.reduce((a, t) => a + (t.optionPnlRs ?? 0), 0),
     lotsUsed: lots,
-    pointsMoneyRs: rulerDayClip ? sumPointsMoneyRsRulerClipped(trades, lots) : raw,
-    pointsMoneyRawRs: rulerDayClip ? raw : undefined,
+    // Primary card = honest OHLC pts money (never fake-clip the headline).
+    pointsMoneyRs: raw,
+    pointsMoneyResearchRs: rulerDayClip
+      ? sumPointsMoneyRsRulerClipped(trades, lots)
+      : undefined,
   };
 }
 

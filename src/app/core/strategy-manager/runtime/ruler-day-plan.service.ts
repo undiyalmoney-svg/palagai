@@ -6,12 +6,19 @@ import {
 } from '../engines/ruler-morning.util';
 import { RulerRiskScope } from './ruler-month-state.service';
 
+export type RulerArmPick = {
+  arm: RulerArm;
+  /** True only when morning features were available and the day arm is final. */
+  locked: boolean;
+};
+
 /**
  * Research-faithful shared daily arm: one witch pick per calendar day,
  * applied to both Nifty and Bank (see ruler-profit-boost comb()).
  *
- * Desk always processes Nifty before Bank when both are enabled, so the first
- * lock uses Nifty morning features — matching research `morning_feat(nifty)`.
+ * IMPORTANT: do NOT lock STAND while morning features are still null
+ * (pre-OR bars). Research picks the arm once at OR 09:45. Locking STAND on
+ * the first 09:15 bar permanently killed the day → bogus −₹1,500 clipped totals.
  */
 @Injectable({ providedIn: 'root' })
 export class RulerDayPlanService {
@@ -37,22 +44,26 @@ export class RulerDayPlanService {
   }
 
   /**
-   * Return existing day arm, or lock a new pick from `features` + MTD.
-   * Subsequent calls the same day (other index) reuse the locked arm.
+   * Return existing day arm, or lock a new pick once morning features exist.
+   * Pre-OR (`features == null`) returns provisional STAND without locking.
    */
   getOrLockArm(
     date: string,
     features: RulerMorningFeatures | null,
     monthMtdInr: number,
-  ): RulerArm {
+  ): RulerArmPick {
     const map = this.active();
     const existing = map.get(date);
     if (existing != null) {
-      return existing;
+      return { arm: existing, locked: true };
+    }
+    // Wait for OR/morning features — never permanently lock STAND from null.
+    if (features == null) {
+      return { arm: 'STAND', locked: false };
     }
     const arm = pickRulerArm(features, monthMtdInr);
     map.set(date, arm);
-    return arm;
+    return { arm, locked: true };
   }
 
   private active(): Map<string, RulerArm> {
