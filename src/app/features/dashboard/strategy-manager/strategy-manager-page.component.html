@@ -16,6 +16,19 @@
     </div>
   </header>
 
+  <label class="sm-ruler-toggle sm-ruler-hero" [class.on]="rulerEnabled()">
+    <input
+      type="checkbox"
+      [ngModel]="rulerEnabled()"
+      (ngModelChange)="setRulerEnabled($event)"
+    />
+    <span>
+      <strong>Ruler flow</strong>
+      <em>{{ rulerEnabled() ? 'ON — Nifty + Bank Paper/Live run Ruler' : 'OFF — using Paper/Live assignments below' }}</em>
+      — beast rampage → Donch trail · ₹1,500 day cap. Lots stay from the Trade Desk Lots field.
+    </span>
+  </label>
+
   <section class="sm-channels" aria-label="Instrument channels">
     @for (ch of channels; track ch) {
       <button
@@ -35,30 +48,17 @@
   <section class="sm-grid">
     <article class="sm-panel">
       <h2>Assignments · {{ channelLabels[selectedChannel()] }}</h2>
-      @if (selectedChannel() !== 'stocks') {
-        <label class="sm-ruler-toggle">
-          <input
-            type="checkbox"
-            [ngModel]="rulerEnabled()"
-            (ngModelChange)="setRulerEnabled($event)"
-          />
-          <span>
-            <strong>Ruler flow</strong>
-            — overrides Paper + Live for Nifty &amp; Bank with the boosted ruler
-            (beast rampage → Donch trail · ₹1,500 day cap). Lots stay from the Trade Desk Lots field.
-          </span>
-        </label>
-        @if (rulerEnabled()) {
-          <p class="sm-ruler-active">
-            Ruler is ON — desk Paper/Live run <strong>Ruler flow</strong>.
-            Stored Paper/Live picks are kept for when you turn it off.
-          </p>
-        }
-      }
       @if (selectedChannel() === 'stocks') {
         <p class="sm-stocks-note">
           Stocks default is <strong>GAP_FADE_500</strong>.
           Trade live from <a routerLink="/dashboard/stocks">Stocks Desk</a> (treasure book · max 3).
+          Ruler toggle does not apply to stocks.
+        </p>
+      }
+      @if (rulerEnabled() && selectedChannel() !== 'stocks') {
+        <p class="sm-ruler-active">
+          Ruler is ON — desk Paper/Live run <strong>Ruler flow</strong>.
+          Stored Paper/Live picks are kept for when you turn it off.
         </p>
       }
       <label>

@@ -150,28 +150,49 @@
   align-items: flex-start;
   margin: 0 0 0.75rem;
   padding: 0.75rem 0.9rem;
-  border: 1px solid rgba(26, 35, 50, 0.16);
-  border-radius: 0.35rem;
-  background: rgba(243, 239, 230, 0.55);
+  border: 2px solid rgba(15, 110, 86, 0.45);
+  border-radius: 0.5rem;
+  background: linear-gradient(135deg, rgba(15, 110, 86, 0.12) 0%, rgba(243, 239, 230, 0.7) 100%);
   font-family: "IBM Plex Sans", "Avenir Next", "Segoe UI", sans-serif;
   font-size: 0.88rem;
   line-height: 1.4;
   cursor: pointer;
 }
 
+.sm-ruler-toggle.sm-ruler-hero {
+  margin: 0 0 1rem;
+  padding: 0.95rem 1.1rem;
+  font-size: 0.95rem;
+}
+
+.sm-ruler-toggle.on {
+  border-color: #0f6e56;
+  box-shadow: inset 4px 0 0 #0f6e56;
+  background: linear-gradient(135deg, rgba(15, 110, 86, 0.18) 0%, rgba(232, 240, 236, 0.9) 100%);
+}
+
 .sm-ruler-toggle input {
   margin-top: 0.2rem;
   flex-shrink: 0;
-  width: 1rem;
-  height: 1rem;
+  width: 1.1rem;
+  height: 1.1rem;
+  accent-color: #0f6e56;
 }
 
 .sm-ruler-toggle strong {
   color: var(--sm-accent);
 }
 
+.sm-ruler-toggle em {
+  display: block;
+  margin: 0.15rem 0 0.25rem;
+  font-style: normal;
+  font-weight: 600;
+  color: #0f6e56;
+}
+
 .sm-ruler-active {
-  margin: -0.35rem 0 0.85rem;
+  margin: 0 0 0.85rem;
   font-family: "IBM Plex Sans", "Avenir Next", "Segoe UI", sans-serif;
   font-size: 0.85rem;
   color: var(--sm-accent);
