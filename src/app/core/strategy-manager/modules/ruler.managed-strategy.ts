@@ -85,9 +85,9 @@ export class RulerManagedStrategy implements IManagedStrategy {
 
   readonly id = MANAGED_STRATEGY_IDS.RULER;
   readonly name = 'Ruler flow';
-  readonly version = '1.3.0';
+  readonly version = '1.4.0';
   readonly description =
-    'Boosted ruler: shared daily arm (Nifty+Bank) · beast→trail · 1 trade/index/day · research day-cap ₹1,500. Testing isolated from live MTD. Lots from Trade Desk.';
+    'Boosted ruler: shared daily arm (Nifty+Bank) · beast→trail · Donch trail multi-trade (research) · other arms 1t/day · day-cap ₹1,500. Testing isolated from live MTD. Lots from Trade Desk.';
   readonly supports: readonly DeskChannel[] = ['nifty', 'bank'];
 
   readonly defaultSettings = defaultStrategySettings({
@@ -100,7 +100,7 @@ export class RulerManagedStrategy implements IManagedStrategy {
     donchianLength: 20,
     emaLength: 50,
     swingLookback: 5,
-    /** Research books are one_trade=True per instrument. */
+    /** Research: non-trail arms are 1t; DONCH_TRAIL overrides to unlimited in generateSignal. */
     maxTradesPerDay: 1,
     instrumentType: 'futures',
     dayStopPts: 60,
@@ -226,13 +226,15 @@ export class RulerManagedStrategy implements IManagedStrategy {
     }
 
     const dna = ARM_DNA[arm];
+    // Research: DONCH_TRAIL books are one_trade=False; other arms are 1t.
+    const maxTrades = arm === 'DONCH_TRAIL' ? 0 : 1;
     const runSettings = mergeSettings(this.settings, {
       targetRMultiple: dna.targetR,
       profitProtectEnabled: dna.profitProtect,
       profitProtectArmR: 1,
       profitProtectLockR: 0,
       dayStopPts: 60,
-      maxTradesPerDay: 1,
+      maxTradesPerDay: maxTrades,
       positionSizeLots: lots,
       emaLength: arm === 'SWING_2R' ? 50 : this.settings.emaLength,
     });

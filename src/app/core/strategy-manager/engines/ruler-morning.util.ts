@@ -77,11 +77,13 @@ export function computeRulerMorningFeatures(
   const closes = series.map((c) => c.close);
   const e20 = emaLast(closes, 20);
   const e50 = emaLast(closes, 50);
-  // Prefer ~10:15 bar when available for EMA bias (research j1015).
-  const pxBar =
-    dayBars.find((b) => b.date.slice(11, 16) >= '10:15') ??
-    dayBars[dayBars.length - 1]!;
-  const px = pxBar.close;
+  // Research morning_feat uses price/EMA at OR end (last bar before orEnd), not 10:15.
+  const orEndBar =
+    dayBars.filter((b) => {
+      const hhmm = b.date.slice(11, 16);
+      return hhmm >= '09:15' && hhmm < orEnd;
+    }).at(-1) ?? dayBars[dayBars.length - 1]!;
+  const px = orEndBar.close;
   const emaBuy = e20 != null && e50 != null && px > e20 && e20 > e50;
   const emaSell = e20 != null && e50 != null && px < e20 && e20 < e50;
   return {
