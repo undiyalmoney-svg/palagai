@@ -13,7 +13,6 @@ import {
   buildWeekdayFilteredView,
   defaultPaperWeekdaySelection,
 } from '../../../core/paper-desk/paper-desk-weekday-filter';
-import { PDHL_RUPEES_PER_POINT } from '../../../core/strategy-engine/strategies/pdhl-opening-range/pdhl-opening-range.evaluator';
 import { KiteSessionService } from '../../../core/kite/kite-session.service';
 import { LotsPreferenceService } from '../../../core/services/lots-preference.service';
 import { StrategyManagerService } from '../../../core/strategy-manager/runtime/strategy-manager.service';
@@ -65,6 +64,7 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
   /** Filtered Testing view; Live uses full snapshot. */
   protected readonly resultView = computed(() => {
     const snap = this.snapshot();
+    const rankBy = this.rulerEnabled() ? 'pointsMoney' : 'option';
     if (this.mode() !== 'testing' || !snap.trades.length) {
       return {
         trades: snap.trades,
@@ -78,7 +78,7 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
       snap.trades,
       this.weekdayOn(),
       snap.totals.lotsUsed || this.lots,
-      PDHL_RUPEES_PER_POINT,
+      rankBy,
     );
     return { ...view, filtered: true };
   });

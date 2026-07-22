@@ -13,7 +13,6 @@ import {
   buildWeekdayFilteredView,
   defaultPaperWeekdaySelection,
 } from '../../../core/paper-desk/paper-desk-weekday-filter';
-import { CRUDE_RUPEES_PER_POINT } from '../../../core/strategy-engine/strategies/crude-pdhl-evening/crude-pdhl-evening.evaluator';
 import { KiteSessionService } from '../../../core/kite/kite-session.service';
 import { LotsPreferenceService } from '../../../core/services/lots-preference.service';
 import { MCX_CRUDE_SESSION } from '../../../core/config/session.config';
@@ -71,7 +70,6 @@ export class CrudeOilDeskComponent implements OnInit, OnDestroy {
       snap.trades,
       this.weekdayOn(),
       snap.totals.lotsUsed || this.lots,
-      CRUDE_RUPEES_PER_POINT,
     );
     return { ...view, filtered: true };
   });

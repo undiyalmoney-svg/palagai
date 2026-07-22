@@ -33,11 +33,15 @@ import {
   replayPaperOnIndex,
 } from './paper-desk-engine';
 import { buildPaperDeskDayStats, emptyPaperDeskDayStats } from './paper-desk-day-stats';
-import { PDHL_RUPEES_PER_POINT, buildDeskRiskOverrides } from '../strategy-engine/strategies/pdhl-opening-range/pdhl-opening-range.evaluator';
+import { sumPointsMoneyRs } from './paper-desk-points-money';
+import {
+  buildDeskRiskOverrides,
+} from '../strategy-engine/strategies/pdhl-opening-range/pdhl-opening-range.evaluator';
 import { StrategyManagerService } from '../strategy-manager/runtime/strategy-manager.service';
 import { StrategyEventLogger } from '../strategy-manager/runtime/strategy-event-logger.service';
 import { ShadowBookService } from '../strategy-manager/runtime/shadow-book.service';
 import { StrategyPerformanceService } from '../strategy-manager/runtime/strategy-performance.service';
+import { RulerMonthStateService } from '../strategy-manager/runtime/ruler-month-state.service';
 import { DeskChannel } from '../strategy-manager/models/desk-channel.model';
 import {
   IManagedStrategy,
@@ -81,6 +85,7 @@ export class PaperTradeDeskService {
   private readonly strategyLog = inject(StrategyEventLogger);
   private readonly shadowBook = inject(ShadowBookService);
   private readonly strategyPerf = inject(StrategyPerformanceService);
+  private readonly rulerMonth = inject(RulerMonthStateService);
 
   private readonly instruments: Array<{ instrument: TesterInstrument; kind: IndexOptionKind }> = [
     { instrument: NIFTY_50_INSTRUMENT, kind: 'nifty' },
@@ -328,6 +333,8 @@ export class PaperTradeDeskService {
       typeof lotsOrOptions === 'number' ? { lots: lotsOrOptions } : lotsOrOptions;
     this.normalizeDeskOptions(options);
     this.lotsMultiplier = Math.max(1, Math.floor(options.lots ?? 1) || 1);
+    // Fresh MTD for the test range — don't poison witch/day-cap with live residue.
+    this.rulerMonth.clear();
     this.busy.set(true);
     const batches = chunkInclusiveDateRange(fromDate, toDate, DESK_HISTORICAL_CHUNK_DAYS);
     this.snapshot.set({
@@ -532,7 +539,8 @@ export class PaperTradeDeskService {
           instrumentId: t.instrumentId,
         })),
       );
-      const dayStats = buildPaperDeskDayStats(sorted);
+      const rankBy = this.strategyManager.isRulerEnabled() ? 'pointsMoney' : 'option';
+      const dayStats = buildPaperDeskDayStats(sorted, 5, this.lotsMultiplier, rankBy);
 
       this.snapshot.set({
         mode: 'testing',
@@ -545,7 +553,7 @@ export class PaperTradeDeskService {
         message: `Testing complete · ${sorted.length} paper trade(s) · ${batches.length} batch(es) · ${this.lotsMultiplier} lot(s) · ${this.deskOptionsLabel()} · ${this.kiteStatsLabel()}`,
         statuses,
         trades: sorted,
-        totals: summarize(sorted, this.lotsMultiplier, PDHL_RUPEES_PER_POINT),
+        totals: summarize(sorted, this.lotsMultiplier),
         dayStats,
         kiteStats: this.kiteStats(),
         orderEvents: [],
@@ -906,8 +914,13 @@ export class PaperTradeDeskService {
       message: `${moneyTag} · alive ${now} · waiting ${waiting} · in trade ${inTrade}${targets ? ` · target hit ${targets}` : ''}${openMsg} · ${this.kiteStatsLabel()}`,
       statuses,
       trades: enriched.sort((a, b) => b.entryTime.localeCompare(a.entryTime)),
-      totals: summarize(enriched, this.lotsMultiplier, PDHL_RUPEES_PER_POINT),
-      dayStats: buildPaperDeskDayStats(enriched),
+      totals: summarize(enriched, this.lotsMultiplier),
+      dayStats: buildPaperDeskDayStats(
+        enriched,
+        5,
+        this.lotsMultiplier,
+        this.strategyManager.isRulerEnabled() ? 'pointsMoney' : 'option',
+      ),
       kiteStats: this.kiteStats(),
       orderEvents: this.liveOrders.getEvents(),
       orderSummary: this.liveOrders.getOrderSummary(),
@@ -1260,7 +1273,6 @@ function isCancelledError(err: unknown): boolean {
 function summarize(
   trades: PaperTrade[],
   lotsUsed: number = 1,
-  rupeesPerPoint: number = PDHL_RUPEES_PER_POINT,
 ): PaperDeskSnapshot['totals'] {
   const lots = Math.max(1, Math.floor(lotsUsed) || 1);
   const indexNetPts = trades.reduce((a, t) => a + t.indexPoints, 0);
@@ -1271,7 +1283,7 @@ function summarize(
     indexNetPts,
     optionNetRs: trades.reduce((a, t) => a + (t.optionPnlRs ?? 0), 0),
     lotsUsed: lots,
-    pointsMoneyRs: indexNetPts * rupeesPerPoint * lots,
+    pointsMoneyRs: sumPointsMoneyRs(trades, lots),
   };
 }
 
