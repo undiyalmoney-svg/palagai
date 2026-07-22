@@ -99,6 +99,7 @@ export class PaperDeskExportService {
         <div class="card"><span>Option ₹</span><strong class="${t.optionNetRs >= 0 ? 'up' : 'down'}">${fmtRs(t.optionNetRs)}</strong></div>
         <div class="card"><span>Index / futures pts</span><strong class="${t.indexNetPts >= 0 ? 'up' : 'down'}">${fmtPts(t.indexNetPts)}</strong></div>
         <div class="card"><span>Pts money ₹</span><strong class="${t.pointsMoneyRs >= 0 ? 'up' : 'down'}">${fmtRs(t.pointsMoneyRs)}</strong></div>
+        ${t.avgDailyResearchRs != null || t.avgDailyProfitRs != null ? `<div class="card"><span>Avg ₹/session</span><strong class="${(t.avgDailyResearchRs ?? t.avgDailyProfitRs ?? 0) >= 0 ? 'up' : 'down'}">${fmtRs(t.avgDailyResearchRs ?? t.avgDailyProfitRs ?? 0)}</strong></div>` : ''}
       </div>
 
       <h2>Most profitable day</h2>

@@ -86,6 +86,8 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
       this.weekdayOn(),
       snap.totals.lotsUsed || this.lots,
       rankBy,
+      snap.fromDate,
+      snap.toDate,
     );
     return { ...view, filtered: true, rulerRun };
   });

@@ -92,3 +92,93 @@ export function sumPointsMoneyRsRulerClipped(
 export function tradesUsedRuler(trades: PaperTrade[]): boolean {
   return trades.some((t) => t.strategyId === 'ruler-flow');
 }
+
+/** Unique calendar days that produced at least one closed trade. */
+export function tradedSessionCount(trades: PaperTrade[]): number {
+  const days = new Set<string>();
+  for (const t of trades) {
+    days.add(extractTradeDate(t.entryTime));
+  }
+  return days.size;
+}
+
+/**
+ * Count Mon–Fri sessions in an inclusive IST date range (index cash sessions).
+ * Used for research-style average daily profit across the Testing window.
+ */
+export function countWeekdaySessions(fromDate: string, toDate: string): number {
+  if (!fromDate || !toDate || fromDate > toDate) {
+    return 0;
+  }
+  let n = 0;
+  const cur = new Date(`${fromDate}T12:00:00`);
+  const end = new Date(`${toDate}T12:00:00`);
+  while (cur <= end) {
+    const dow = cur.getDay(); // 0 Sun … 6 Sat
+    if (dow >= 1 && dow <= 5) {
+      n += 1;
+    }
+    cur.setDate(cur.getDate() + 1);
+  }
+  return n;
+}
+
+export interface RulerProfitTotals {
+  pointsMoneyRs: number;
+  pointsMoneyResearchRs?: number;
+  /** Days with ≥1 closed trade. */
+  tradedDays: number;
+  /**
+   * Denominator for avg/day: weekday sessions in [from,to] when provided,
+   * else tradedDays (Live / unknown range).
+   */
+  sessionDays: number;
+  /** Raw OHLC pts money ÷ sessionDays. */
+  avgDailyProfitRs: number;
+  /** Day-capped research book ÷ sessionDays (Ruler only). */
+  avgDailyResearchRs?: number;
+}
+
+/** Central profit math for Nifty 50 + Bank Nifty Paper / Live / Testing. */
+export function buildRulerProfitTotals(
+  trades: PaperTrade[],
+  lots: number,
+  options?: {
+    rulerDayClip?: boolean;
+    fromDate?: string;
+    toDate?: string;
+  },
+): RulerProfitTotals {
+  const lotMult = Math.max(1, Math.floor(lots) || 1);
+  const pointsMoneyRs = sumPointsMoneyRs(trades, lotMult);
+  const tradedDays = tradedSessionCount(trades);
+  const rangeSessions =
+    options?.fromDate && options?.toDate
+      ? countWeekdaySessions(options.fromDate, options.toDate)
+      : 0;
+  const sessionDays = rangeSessions > 0 ? rangeSessions : Math.max(1, tradedDays);
+  const avgDailyProfitRs =
+    trades.length === 0 ? 0 : Math.round((pointsMoneyRs / sessionDays) * 10) / 10;
+
+  if (!options?.rulerDayClip) {
+    return {
+      pointsMoneyRs,
+      tradedDays,
+      sessionDays: trades.length === 0 ? 0 : sessionDays,
+      avgDailyProfitRs: trades.length === 0 ? 0 : avgDailyProfitRs,
+    };
+  }
+
+  const pointsMoneyResearchRs = sumPointsMoneyRsRulerClipped(trades, lotMult);
+  const denom = trades.length === 0 ? 0 : sessionDays;
+  return {
+    pointsMoneyRs,
+    pointsMoneyResearchRs,
+    tradedDays,
+    sessionDays: denom,
+    avgDailyProfitRs: denom ? Math.round((pointsMoneyRs / denom) * 10) / 10 : 0,
+    avgDailyResearchRs: denom
+      ? Math.round((pointsMoneyResearchRs / denom) * 10) / 10
+      : 0,
+  };
+}

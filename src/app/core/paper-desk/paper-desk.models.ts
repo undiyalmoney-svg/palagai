@@ -118,6 +118,17 @@ export interface PaperDeskSnapshot {
      * Not live cash — compare to research months. Undefined when Ruler is off.
      */
     pointsMoneyResearchRs?: number;
+    /** Calendar days with ≥1 closed trade. */
+    tradedDays?: number;
+    /**
+     * Avg denominator: weekday sessions in Testing from→to when known,
+     * else tradedDays (Live).
+     */
+    sessionDays?: number;
+    /** Raw OHLC pts money ÷ sessionDays (Nifty ₹65 + Bank ₹30 × lots). */
+    avgDailyProfitRs?: number;
+    /** Day-capped research book ÷ sessionDays (Ruler). */
+    avgDailyResearchRs?: number;
   };
   /** Testing day breakdown: best/worst days, weekday rollup. */
   dayStats: PaperDeskDayStats;

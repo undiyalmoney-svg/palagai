@@ -4,8 +4,9 @@
       <p class="pg-eyebrow">Trade Desk · Ruler flow</p>
       <h1>Trade Desk</h1>
       <p class="pg-lede">
-        Nifty &amp; Bank Nifty ATM options run <strong>Ruler flow</strong> only
-        (shared arm · hunter when red · day-cap −₹500 in Testing + Live · no month bank).
+        Nifty 50 &amp; Bank Nifty Paper + Live run <strong>Ruler flow</strong>
+        (researched ≥₹1,000 avg/session at 1 lot · shared arm · −₹500/day ·
+        P&amp;L = pts × ₹65/₹30 × lots).
       </p>
     </div>
     <div class="hero-meta">
@@ -49,8 +50,10 @@
   <div class="ruler-toggle on" role="status">
     <span class="ruler-toggle-copy">
       <strong>Ruler flow · always on</strong>
-      <em>Nifty + Bank · Testing / Live paper / Live money · same day-cap</em>
-      <small>Shared daily arm · hunter when red · −₹500/day stop in Testing + Live · keeps trading past ₹15k · lots from Lots field</small>
+      <em>Nifty 50 + Bank Nifty · Testing / Live paper / Live money</em>
+      <small
+        >Researched ≥₹1,000 avg/session · P&amp;L = pts × ₹65/₹30 × lots · shared arm · −₹500/day · no month bank</small
+      >
     </span>
     <span class="ruler-state" aria-hidden="true">ON</span>
   </div>
@@ -242,13 +245,40 @@
       </div>
       @if (resultView().rulerRun) {
         <div class="stat primary" [class.up]="resultView().totals.pointsMoneyRs > 0" [class.down]="resultView().totals.pointsMoneyRs < 0">
-          <span>P&amp;L ₹ ({{ resultView().totals.lotsUsed }} lot · pts × ₹65/₹30 · OHLC)</span>
+          <span>P&amp;L ₹ ({{ resultView().totals.lotsUsed }} lot · Nifty ₹65 + Bank ₹30 · OHLC)</span>
           <strong>{{ resultView().totals.pointsMoneyRs > 0 ? '+' : '' }}{{ resultView().totals.pointsMoneyRs | number: '1.0-0' }}</strong>
         </div>
         @if (resultView().totals.pointsMoneyResearchRs != null) {
           <div class="stat" [class.up]="resultView().totals.pointsMoneyResearchRs! > 0" [class.down]="resultView().totals.pointsMoneyResearchRs! < 0">
-            <span>Day-capped book ₹ (−₹500/day · same rule as P&amp;L now)</span>
+            <span>Day-capped book ₹ (−₹500/day · Testing + Live same rule)</span>
             <strong>{{ resultView().totals.pointsMoneyResearchRs! > 0 ? '+' : '' }}{{ resultView().totals.pointsMoneyResearchRs! | number: '1.0-0' }}</strong>
+          </div>
+        }
+        @if (resultView().totals.avgDailyResearchRs != null || resultView().totals.avgDailyProfitRs != null) {
+          <div
+            class="stat"
+            [class.up]="(resultView().totals.avgDailyResearchRs ?? resultView().totals.avgDailyProfitRs ?? 0) > 0"
+            [class.down]="(resultView().totals.avgDailyResearchRs ?? resultView().totals.avgDailyProfitRs ?? 0) < 0"
+          >
+            <span>
+              Avg ₹/session
+              @if (resultView().totals.sessionDays) {
+                · {{ resultView().totals.sessionDays }} session(s)
+              }
+              @if (resultView().totals.tradedDays != null) {
+                · {{ resultView().totals.tradedDays }} traded
+              }
+            </span>
+            <strong>
+              {{
+                (resultView().totals.avgDailyResearchRs ?? resultView().totals.avgDailyProfitRs ?? 0) > 0
+                  ? '+'
+                  : ''
+              }}{{
+                (resultView().totals.avgDailyResearchRs ?? resultView().totals.avgDailyProfitRs ?? 0)
+                  | number: '1.0-0'
+              }}
+            </strong>
           </div>
         }
         <div class="stat" [class.up]="resultView().totals.optionNetRs > 0" [class.down]="resultView().totals.optionNetRs < 0">
