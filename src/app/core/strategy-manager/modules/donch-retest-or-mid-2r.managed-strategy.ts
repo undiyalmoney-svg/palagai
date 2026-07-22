@@ -7,17 +7,16 @@ import { BaseIndexRuleStrategy } from './base-index-rule.strategy';
 
 /**
  * Donchian-20 break → retest + OR-mid bias.
- * Daily ₹500 S/R search DNA; profit-protect defaults: 1.5R target + BE lock after +1R
- * (research: higher green-day share vs 2R/EOD, less giveback on open winners).
- * At 1 lot Nifty+Bank ~₹146 avg with 1.5R; ~3–4 lots toward ~₹500 average.
+ * Profit-protect: 1.5R target + BE lock after +1R.
+ * Live default allows up to 3 entries/day (day stop −60 still caps damage).
  */
 @Injectable({ providedIn: 'root' })
 export class DonchRetestOrMid2rManagedStrategy extends BaseIndexRuleStrategy {
   readonly id = MANAGED_STRATEGY_IDS.DONCH_RETEST_OR_MID_2R;
   readonly name = 'Donch Retest · OR-mid · 1.5R+BE';
-  readonly version = '1.1.0';
+  readonly version = '1.2.0';
   readonly description =
-    'Break Donchian-20 S/R, enter on retest · OR-mid · 1.5R target · BE lock after +1R · 1t. Index daily-profit DNA — NOT for stocks (use GAP_FADE_500).';
+    'Break Donchian-20 S/R, enter on retest · OR-mid · 1.5R target · BE after +1R · up to 3t/day. Index DNA — NOT for stocks (use GAP_FADE_500).';
   readonly supports: readonly DeskChannel[] = ['nifty', 'bank'];
 
   readonly defaultSettings = defaultStrategySettings({
@@ -28,7 +27,7 @@ export class DonchRetestOrMid2rManagedStrategy extends BaseIndexRuleStrategy {
     stopLossPts: 30,
     bankStopLossPts: 45,
     donchianLength: 20,
-    maxTradesPerDay: 1,
+    maxTradesPerDay: 3,
     instrumentType: 'futures',
     dayStopPts: 60,
     targetRMultiple: 1.5,
