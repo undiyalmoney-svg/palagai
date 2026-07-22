@@ -16,18 +16,19 @@ export type RulerArmPick = {
   arm: RulerArm;
   /** True only when morning features were available and the day arm is final. */
   locked: boolean;
-  /** True when Sep-boost loss-streak breaker is forcing edge witch. */
+  /** True when loss-streak breaker is forcing edge witch. */
   breakerActive?: boolean;
-  witch?: 'beast' | 'trail_wide' | 'breaker_edge';
+  witch?: 'beast' | 'trail_wide_calm' | 'breaker_edge';
 };
 
 /**
  * Research-faithful shared daily arm: one witch pick per calendar day,
  * applied to both Nifty and Bank (see ruler-profit-boost comb()).
  *
- * Sep-boost (2025-09):
- * - Post-rampage trail only on wide mornings (else 2R/swing)
- * - After 3 consecutive clipped red days post-rampage → edge for rest of month
+ * Discipline train (2020–2026 capital protect):
+ * - Post-rampage trail only on wide+calm mornings (else 2R/swing)
+ * - After 2 consecutive clipped red days post-rampage → edge for rest of month
+ * - Day-cap ₹1,000
  *
  * IMPORTANT: do NOT lock STAND while morning features are still null
  * (pre-OR bars). Research picks the arm once at OR 09:45.
@@ -73,7 +74,7 @@ export class RulerDayPlanService {
       ? 'breaker_edge'
       : monthMtdInr < RULER_RAMPAGE_UNTIL_INR
         ? 'beast'
-        : 'trail_wide';
+        : 'trail_wide_calm';
     if (existing != null) {
       return { arm: existing, locked: true, breakerActive, witch };
     }
@@ -88,7 +89,7 @@ export class RulerDayPlanService {
 
   /**
    * Replay prior days in the month (from locked arms / month trades) to see if
-   * the 3-loss post-rampage breaker has tripped before `asOfDate`.
+   * the 2-loss post-rampage breaker has tripped before `asOfDate`.
    */
   isBreakerActive(asOfDate: string): boolean {
     const ym = asOfDate.slice(0, 7);

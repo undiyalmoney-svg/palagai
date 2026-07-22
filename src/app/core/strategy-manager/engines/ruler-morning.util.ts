@@ -54,8 +54,8 @@ export type RulerArm =
 
 /** Boosted ruler: rampage while MTD < ₹3,000. */
 export const RULER_RAMPAGE_UNTIL_INR = 3000;
-/** Hard day loss cap (₹). When month green → min(cap, MTD). */
-export const RULER_DAY_CAP_INR = 1500;
+/** Hard day loss cap (₹). When month green → min(cap, MTD). Capital-protect train: ₹1,000. */
+export const RULER_DAY_CAP_INR = 1000;
 
 /**
  * Causal morning features at OR 09:45 (matches research morning_feat).
@@ -159,10 +159,8 @@ export function witchTrail(f: RulerMorningFeatures | null): RulerArm {
 }
 
 /**
- * Post-rampage (trained vs Sep 2025 bleed):
- * DONCH_TRAIL only on *wide* mornings. Skinny non-choppy days were taking
- * blind trail and stacking −₹1,500 clips (Sep 2025 → ₹155).
- * Non-wide → DONCH_2R / SWING / STAND instead.
+ * Legacy post-rampage (Sep-boost): trail on any wide morning.
+ * Prefer witchTrailWideCalmElse2r for capital-protect discipline.
  */
 export function witchTrailWideElse2r(f: RulerMorningFeatures | null): RulerArm {
   if (f == null || f.choppy) {
@@ -170,6 +168,30 @@ export function witchTrailWideElse2r(f: RulerMorningFeatures | null): RulerArm {
   }
   if (f.wide) {
     return 'DONCH_TRAIL';
+  }
+  if (f.drive >= 0.35) {
+    return 'DONCH_2R';
+  }
+  if (f.emaBuy || f.emaSell) {
+    return 'SWING_2R';
+  }
+  return 'STAND';
+}
+
+/**
+ * Post-rampage exit discipline (2020–2026 capital-protect train):
+ * DONCH_TRAIL only on *wide and calm* mornings. Wide-but-jumpy days take
+ * DONCH_2R instead of open-ended trail. Skinny → 2R / SWING / STAND.
+ */
+export function witchTrailWideCalmElse2r(f: RulerMorningFeatures | null): RulerArm {
+  if (f == null || f.choppy) {
+    return 'STAND';
+  }
+  if (f.wide && f.calm) {
+    return 'DONCH_TRAIL';
+  }
+  if (f.wide && f.drive >= 0.35) {
+    return 'DONCH_2R';
   }
   if (f.drive >= 0.35) {
     return 'DONCH_2R';
@@ -204,17 +226,17 @@ export function witchEdge(f: RulerMorningFeatures | null): RulerArm {
 }
 
 /** Consecutive clipped red days before post-rampage breaker engages. */
-export const RULER_LOSS_STREAK_BREAKER = 3;
+export const RULER_LOSS_STREAK_BREAKER = 2;
 
 export type RulerArmPickOpts = {
-  /** After 3 clipped losses post-rampage → edge witch for rest of month. */
+  /** After 2 clipped losses post-rampage → edge witch for rest of month. */
   breakerActive?: boolean;
 };
 
 /**
- * Boosted ruler pick (Sep-boost trained):
- * 1. While MTD < ₹3k → beast
- * 2. Else → trail only if wide, else 2R/swing (not blind trail)
+ * Discipline-trained ruler pick (capital protect + entry/exit gates):
+ * 1. While MTD < ₹3k → beast (entry: choppy STAND / wide+strong trail / 2R / EMA swing)
+ * 2. Else → trail only if wide+calm, else 2R/swing (exit discipline)
  * 3. If loss-streak breaker active → edge for rest of month
  */
 export function pickRulerArm(
@@ -228,7 +250,7 @@ export function pickRulerArm(
   if (monthMtdInr < RULER_RAMPAGE_UNTIL_INR) {
     return witchBeast(f);
   }
-  return witchTrailWideElse2r(f);
+  return witchTrailWideCalmElse2r(f);
 }
 
 /** Dyn day cap: when month green, one capped loss cannot flip the month red. */

@@ -12,6 +12,8 @@ import {
   computeRulerMorningFeatures,
   pickRulerArm,
   clipRulerDayInr,
+  RULER_RAMPAGE_UNTIL_INR,
+  RULER_LOSS_STREAK_BREAKER,
   type RulerArm,
 } from '../src/app/core/strategy-manager/engines/ruler-morning.util';
 import {
@@ -262,6 +264,7 @@ def load(name, path):
     return mod
 uni = load('uni', ROOT/'scripts'/'strategy-universe-search.py')
 boost = load('boost', Path('/tmp/ruler-profit-boost.py'))
+sep = load('sep', ROOT/'scripts'/'ruler-sep-boost.py')
 nifty = uni.load_inst(uni.CACHE/'nifty-5m-2020-2026.json', 'nifty', 30, 65)
 bank = uni.load_inst(uni.CACHE/'banknifty-5m-2020-2026.json', 'bank', 45, 30)
 books = boost.build(nifty, bank)
@@ -271,32 +274,20 @@ feats = {}
 for d in days:
     fn = boost.morning_feat(nifty, d) if d in nifty.day_starts else None
     feats[d] = fn or (boost.morning_feat(bank, d) if d in bank.day_starts else None)
-official = boost.run(books, feats, days, 'trail', 'dyn0', 1500.0, None, 3000.0, 'beast')
-rows = []
-mtd = 0.0
-cur = None
-for d in days:
-    m = d[:7]
-    if m != cur:
-        cur, mtd = m, 0.0
-    f = feats.get(d)
-    arm = boost.beast(f) if mtd < 3000 else boost.trail(f)
-    raw = boost.comb(books, arm, d)
-    if mtd > 0:
-        dyn = min(1500.0, mtd)
-        clipped = boost.clip(raw, dyn) if dyn > 0 else 0.0
-    else:
-        clipped = boost.clip(raw, 1500.0)
-    rows.append({'date': d, 'arm': arm, 'raw': round(raw,2), 'clipped': round(clipped,2), 'mtd_before': round(mtd,2)})
-    mtd += clipped
+official = sep.run_sep_boost(
+    books, feats, days,
+    comb=boost.comb, clip=boost.clip, beast=boost.beast, edge=boost.edge,
+)
+rows = official['picks']
 Path('${OUT}/range-research.json').write_text(json.dumps({
   'from': FROM, 'to': TO, 'days': len(days),
   'official_total': official['net'],
   'monthly': official['monthly'],
   'arms': official.get('arms'),
+  'recipe': official.get('recipe'),
   'rows': rows,
 }, indent=2))
-print(json.dumps({'days': len(days), 'official_total': official['net'], 'monthly': official['monthly']}))
+print(json.dumps({'days': len(days), 'official_total': official['net'], 'monthly': official['monthly'], 'recipe': official.get('recipe')}))
 `;
   const researchOut = execFileSync('python3', ['-c', py], {
     encoding: 'utf8',
@@ -329,15 +320,38 @@ print(json.dumps({'days': len(days), 'official_total': official['net'], 'monthly
 
   const dayArm = new Map<string, RulerArm>();
   const researchByDate = new Map(research.rows.map((r) => [r.date, r]));
+  // Replay breaker the same way as RulerDayPlanService.isBreakerActive.
+  let walkMtd = 0;
+  let walkStreak = 0;
+  let walkBroken = false;
+  let walkMonth: string | null = null;
   for (const day of days) {
+    const ym = day.slice(0, 7);
+    if (ym !== walkMonth) {
+      walkMonth = ym;
+      walkMtd = 0;
+      walkStreak = 0;
+      walkBroken = false;
+    }
     const seriesN = seriesThroughOr(nifty, day);
     const fn = computeRulerMorningFeatures(seriesN, day, false, '09:45');
     const seriesB = seriesThroughOr(bank, day);
     const fb = computeRulerMorningFeatures(seriesB, day, true, '09:45');
     const feat = fn ?? fb;
     const r = researchByDate.get(day);
-    const mtdBefore = r?.mtd_before ?? 0;
-    dayArm.set(day, pickRulerArm(feat, mtdBefore));
+    const mtdBefore = r?.mtd_before ?? walkMtd;
+    dayArm.set(day, pickRulerArm(feat, mtdBefore, { breakerActive: walkBroken }));
+    const clipped = r?.clipped ?? 0;
+    const inRamp = walkMtd < RULER_RAMPAGE_UNTIL_INR;
+    if (clipped < 0) {
+      walkStreak += 1;
+      if (walkStreak >= RULER_LOSS_STREAK_BREAKER && !walkBroken && !inRamp) {
+        walkBroken = true;
+      }
+    } else if (clipped > 0) {
+      walkStreak = 0;
+    }
+    walkMtd += clipped;
   }
 
   const allTrades = [

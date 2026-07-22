@@ -114,7 +114,7 @@ export interface PaperDeskSnapshot {
      */
     pointsMoneyRs: number;
     /**
-     * Ruler research score only: same pts money after dyn0 day-cap (−₹1,500).
+     * Ruler research score only: same pts money after dyn0 day-cap (−₹1,000).
      * Not live cash — compare to research months. Undefined when Ruler is off.
      */
     pointsMoneyResearchRs?: number;

@@ -26,8 +26,8 @@ sr = load("sr", ROOT / "scripts" / "sr-pullback-retest-daily500.py")
 boost = load("boost", Path("/tmp/ruler-profit-boost.py"))
 sep = load("sep", ROOT / "scripts" / "ruler-sep-boost.py")
 
-# March target under Sep-boost recipe (was 20212 under plain trail).
-MARCH_TARGET = 20943.0
+# March target under discipline recipe (was 20943 under Sep-boost / 20212 plain trail).
+MARCH_TARGET = 27370.0
 
 
 def main() -> None:

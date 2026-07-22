@@ -51,7 +51,7 @@ export function pointsMoneyByDate(
 
 /**
  * Research-faithful pts money: walk days in order, clip each combined day ₹
- * with dyn0 (−₹1,500 / min(cap, MTD) when month green).
+ * with dyn0 (−₹1,000 / min(cap, MTD) when month green).
  * This is what the Ruler research monthly totals use — not the uncapped trade sum.
  */
 export function applyRulerDayClipByDate(
