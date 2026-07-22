@@ -301,6 +301,10 @@ export function replayPaperOnIndex(params: {
         entryTime: open.entryTime,
       };
       const exit = strategy.exitLogic(candle, managedOpen, closes, ctx);
+      // Profit-protect may ratchet stop; keep desk open in sync for next bars.
+      if (managedOpen.stop !== open.stop) {
+        open.stop = managedOpen.stop;
+      }
       if (exit) {
         const closed = closePaperTrade({
           instrumentId,

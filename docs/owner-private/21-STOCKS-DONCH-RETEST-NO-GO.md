@@ -21,7 +21,7 @@ Donch Retest · OR-mid · 2R is an **index** DNA. On equities it loses; **GAP_FA
 
 | Channel | Strategy |
 |---|---|
-| Nifty / Bank | **Donch Retest · OR-mid · 2R** |
+| Nifty / Bank | **Donch Retest · OR-mid · 1.5R+BE** |
 | Stocks Desk | **GAP_FADE_500** (unchanged) |
 | Stocks Strategy Manager | Do **not** use Donch Retest (removed from stocks supports; default VolExpand placeholder only) |
 

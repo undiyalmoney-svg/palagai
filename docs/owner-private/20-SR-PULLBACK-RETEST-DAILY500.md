@@ -25,6 +25,19 @@ Breakout chasing is fat-tailed. **Support/resistance retests** and **pullbacks**
 
 Id: `donch-retest-or-mid-2r` · **Nifty/Bank Paper+Live default**
 
+### Deployed default (profit-protect, 2026-07-22)
+
+Live defaults moved to **1.5R target + BE lock after +1R** to cut giveback on open winners:
+
+| Setting | Value |
+|---|---|
+| `targetRMultiple` | **1.5** |
+| `profitProtectEnabled` | **true** |
+| `profitProtectArmR` | **1** |
+| `profitProtectLockR` | **0** (break-even) |
+
+Research tradeoff vs original 2R/EOD: higher green-day share (~56% band), lower avg (~₹146/day at 1 lot). Display name: **Donch Retest · OR-mid · 1.5R+BE**. Strategy id unchanged.
+
 ## Twin (higher green, lower avg)
 
 **Swing-5 retest · EMA50 · 2R · 1t · 09:45–15:10**

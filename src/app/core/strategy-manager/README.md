@@ -2,7 +2,7 @@
 
 ## Goal
 
-Multi-strategy platform: strategies are plug-and-play modules. Champion PDHL remains available; **defaults** are **Donch Retest · OR-mid · 2R** for indices (daily ₹500 S/R search).
+Multi-strategy platform: strategies are plug-and-play modules. Champion PDHL remains available; **defaults** are **Donch Retest · OR-mid · 1.5R+BE** for indices (daily ₹500 S/R search + profit-protect).
 
 ## Layout
 
@@ -26,12 +26,12 @@ Market data → Strategy Manager → IManagedStrategy → Signal → Desk risk �
 
 | Channel | Paper | Live | Shadow |
 |---|---|---|---|
-| Nifty | VolExpand Donch15 | VolExpand Donch15 | Off |
-| Bank | VolExpand Donch15 | VolExpand Donch15 | Off |
-| Stocks (Strategy Manager) | VolExpand Donch15 | VolExpand Donch15 | Off |
+| Nifty | **Donch Retest · OR-mid · 1.5R+BE** | **Donch Retest · OR-mid · 1.5R+BE** | Off |
+| Bank | **Donch Retest · OR-mid · 1.5R+BE** | **Donch Retest · OR-mid · 1.5R+BE** | Off |
+| Stocks (Strategy Manager) | **GAP_FADE_500** | **GAP_FADE_500** | Off |
 | Stocks Desk UI | — | **GAP_FADE_500** | — |
 
-VolExpand: regime filter **off** by default (full morning trade count). Enable in Settings for chop stand-down. Nifty stop 30 / Bank stop 45.
+Donch Retest: **1.5R** target + **BE after +1R**. Regime filter **off** by default. Nifty stop 30 / Bank stop 45.
 
 Trade Desk resolves strategies via `StrategyManagerService`. Champion DNA file is **unchanged**; desk risk checkboxes still apply through `setPdhlDeskOverrides`.
 
