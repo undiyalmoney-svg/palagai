@@ -23,7 +23,7 @@
 | Stocks (Manager) | **GAP_FADE_500** | **GAP_FADE_500** | Off |
 | Stocks Desk | — | **GAP_FADE_500** | — |
 
-Donch Retest defaults: **1.5R target**, **profit protect on** (arm at +1R → lock stop to break-even). Index-only. Stocks use **GAP_FADE_500** (doc **21**).
+Donch Retest defaults: **1.5R target**, **profit protect on** (arm at +1R → BE), **up to 3 trades/day**. Index-only. Stocks use **GAP_FADE_500** (doc **21**).
 
 ## How to switch (no code)
 
