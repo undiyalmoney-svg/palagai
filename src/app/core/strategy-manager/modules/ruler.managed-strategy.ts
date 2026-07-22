@@ -88,9 +88,9 @@ export class RulerManagedStrategy implements IManagedStrategy {
 
   readonly id = MANAGED_STRATEGY_IDS.RULER;
   readonly name = 'Ruler flow';
-  readonly version = '1.12.0';
+  readonly version = '1.13.0';
   readonly description =
-    'Boosted ruler v1.12: 1-lot DNA · no month bank · hunter when red · wide trail · 2-loss→edge · −₹500/day in Testing + Live. Lots from Trade Desk.';
+    'Ruler v1.13 (≥₹1k avg/session research): Nifty+Bank Paper/Live · 1-lot DNA · pts×₹65/₹30 profit · no month bank · hunter when red · wide trail · 2-loss→edge · −₹500/day. Lots from Trade Desk.';
   readonly supports: readonly DeskChannel[] = ['nifty', 'bank'];
 
   readonly defaultSettings = defaultStrategySettings({

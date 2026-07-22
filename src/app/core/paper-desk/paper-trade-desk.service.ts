@@ -33,7 +33,10 @@ import {
   replayPaperOnIndex,
 } from './paper-desk-engine';
 import { buildPaperDeskDayStats, emptyPaperDeskDayStats } from './paper-desk-day-stats';
-import { sumPointsMoneyRs, sumPointsMoneyRsRulerClipped, tradesUsedRuler } from './paper-desk-points-money';
+import {
+  tradesUsedRuler,
+  buildRulerProfitTotals,
+} from './paper-desk-points-money';
 import {
   buildDeskRiskOverrides,
 } from '../strategy-engine/strategies/pdhl-opening-range/pdhl-opening-range.evaluator';
@@ -550,9 +553,10 @@ export class PaperTradeDeskService {
         this.strategyManager.isRulerEnabled() || tradesUsedRuler(sorted);
       const rankBy = rulerOn ? 'pointsMoney' : 'option';
       const dayStats = buildPaperDeskDayStats(sorted, 5, this.lotsMultiplier, rankBy);
-      const totals = summarize(sorted, this.lotsMultiplier, rulerOn);
+      const totals = summarize(sorted, this.lotsMultiplier, rulerOn, fromDate, toDate);
       const research = totals.pointsMoneyResearchRs;
       const rawPts = totals.pointsMoneyRs;
+      const avgDay = totals.avgDailyResearchRs ?? totals.avgDailyProfitRs ?? 0;
 
       this.snapshot.set({
         mode: 'testing',
@@ -564,7 +568,7 @@ export class PaperTradeDeskService {
         rulerActive: rulerOn,
         lastTickAt: null,
         message: rulerOn
-          ? `Testing complete · Ruler · ${sorted.length} trade(s) · P&L ₹${Math.round(rawPts)} · day-capped ₹${research != null && research >= 0 ? '+' : ''}${research != null ? Math.round(research) : 0} · ${this.lotsMultiplier} lot(s) · ${this.deskOptionsLabel()} · ${this.kiteStatsLabel()}`
+          ? `Testing complete · Ruler · Nifty+Bank · ${sorted.length} trade(s) · P&L ₹${Math.round(rawPts)} · day-capped ₹${research != null && research >= 0 ? '+' : ''}${research != null ? Math.round(research) : 0} · avg ₹${Math.round(avgDay)}/session · ${this.lotsMultiplier} lot(s) · ${this.deskOptionsLabel()} · ${this.kiteStatsLabel()}`
           : `Testing complete · ${sorted.length} paper trade(s) · ${batches.length} batch(es) · ${this.lotsMultiplier} lot(s) · ${this.deskOptionsLabel()} · ${this.kiteStatsLabel()}`,
         statuses,
         trades: sorted,
@@ -923,6 +927,9 @@ export class PaperTradeDeskService {
       : '';
     const rulerOn =
       this.strategyManager.isRulerEnabled() || tradesUsedRuler(enriched);
+    const totals = summarize(enriched, this.lotsMultiplier, rulerOn, today, today);
+    const pnl = Math.round(totals.pointsMoneyRs);
+    const avg = Math.round(totals.avgDailyResearchRs ?? totals.avgDailyProfitRs ?? 0);
     this.snapshot.set({
       mode: 'live',
       running: true,
@@ -932,10 +939,12 @@ export class PaperTradeDeskService {
       realOrders: this.realOrders,
       rulerActive: rulerOn,
       lastTickAt: new Date().toISOString(),
-      message: `${moneyTag} · alive ${now} · waiting ${waiting} · in trade ${inTrade}${targets ? ` · target hit ${targets}` : ''}${openMsg} · ${this.kiteStatsLabel()}`,
+      message: rulerOn
+        ? `${moneyTag} · Ruler · Nifty+Bank · alive ${now} · P&L ₹${pnl >= 0 ? '+' : ''}${pnl} · avg ₹${avg}/session · waiting ${waiting} · in trade ${inTrade}${targets ? ` · target hit ${targets}` : ''}${openMsg} · ${this.kiteStatsLabel()}`
+        : `${moneyTag} · alive ${now} · waiting ${waiting} · in trade ${inTrade}${targets ? ` · target hit ${targets}` : ''}${openMsg} · ${this.kiteStatsLabel()}`,
       statuses,
       trades: enriched.sort((a, b) => b.entryTime.localeCompare(a.entryTime)),
-      totals: summarize(enriched, this.lotsMultiplier, rulerOn),
+      totals,
       dayStats: buildPaperDeskDayStats(
         enriched,
         5,
@@ -1205,7 +1214,18 @@ function emptySnapshot(mode: PaperDeskMode): PaperDeskSnapshot {
     lastTickAt: null,
     statuses: [],
     trades: [],
-    totals: { trades: 0, wins: 0, losses: 0, indexNetPts: 0, optionNetRs: 0, lotsUsed: 1, pointsMoneyRs: 0 },
+    totals: {
+      trades: 0,
+      wins: 0,
+      losses: 0,
+      indexNetPts: 0,
+      optionNetRs: 0,
+      lotsUsed: 1,
+      pointsMoneyRs: 0,
+      tradedDays: 0,
+      sessionDays: 0,
+      avgDailyProfitRs: 0,
+    },
     dayStats: emptyPaperDeskDayStats(),
     kiteStats: {
       historicalCalls: 0,
@@ -1296,10 +1316,16 @@ function summarize(
   trades: PaperTrade[],
   lotsUsed: number = 1,
   rulerDayClip = false,
+  fromDate?: string,
+  toDate?: string,
 ): PaperDeskSnapshot['totals'] {
   const lots = Math.max(1, Math.floor(lotsUsed) || 1);
   const indexNetPts = trades.reduce((a, t) => a + t.indexPoints, 0);
-  const raw = sumPointsMoneyRs(trades, lots);
+  const money = buildRulerProfitTotals(trades, lots, {
+    rulerDayClip,
+    fromDate,
+    toDate,
+  });
   return {
     trades: trades.length,
     wins: trades.filter((t) => t.outcome === 'WIN').length,
@@ -1307,11 +1333,12 @@ function summarize(
     indexNetPts,
     optionNetRs: trades.reduce((a, t) => a + (t.optionPnlRs ?? 0), 0),
     lotsUsed: lots,
-    // Primary card = honest OHLC pts money (never fake-clip the headline).
-    pointsMoneyRs: raw,
-    pointsMoneyResearchRs: rulerDayClip
-      ? sumPointsMoneyRsRulerClipped(trades, lots)
-      : undefined,
+    pointsMoneyRs: money.pointsMoneyRs,
+    pointsMoneyResearchRs: money.pointsMoneyResearchRs,
+    tradedDays: money.tradedDays,
+    sessionDays: money.sessionDays,
+    avgDailyProfitRs: money.avgDailyProfitRs,
+    avgDailyResearchRs: money.avgDailyResearchRs,
   };
 }
 

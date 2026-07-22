@@ -31,7 +31,7 @@ Market data → Strategy Manager → IManagedStrategy → Signal → Desk risk �
 | Stocks (Strategy Manager) | **GAP_FADE_500** | **GAP_FADE_500** | Off |
 | Stocks Desk UI | — | **GAP_FADE_500** | — |
 
-**Ruler flow (always on for indices):** Nifty + Bank Paper/Live always resolve to Ruler. No competing index strategy selection. Stocks keep Strat / Stocks Desk pickers.
+**Ruler flow (always on for indices):** Nifty + Bank Paper/Live always resolve to Ruler. No competing index strategy selection. Stocks keep Strat / Stocks Desk pickers. Researched **≥₹1,000 average/session** at 1 lot; desk P&amp;L = OHLC pts × ₹65 (Nifty) / ₹30 (Bank) × lots, with −₹500 day-cap book.
 
 - **Shared daily arm** locked only after morning OR features exist (never lock STAND on pre-OR bars)
 - **Beast** while 0 ≤ MTD &lt; ₹3k; **hunter** while MTD &lt; 0 (never beast when month already red); then **trail only if wide**

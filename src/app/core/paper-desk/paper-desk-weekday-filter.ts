@@ -1,7 +1,7 @@
 import { extractTradeDate, formatDayOfWeek } from '../utils/trade-date.util';
 import { PaperTrade, PaperDeskSnapshot } from './paper-desk.models';
 import { buildPaperDeskDayStats, emptyPaperDeskDayStats, DayStatsRankBy } from './paper-desk-day-stats';
-import { sumPointsMoneyRs, sumPointsMoneyRsRulerClipped } from './paper-desk-points-money';
+import { buildRulerProfitTotals } from './paper-desk-points-money';
 
 export const PAPER_WEEKDAY_OPTIONS = [
   { key: 'Monday', short: 'Mon' },
@@ -50,10 +50,16 @@ export function summarizePaperTrades(
   trades: PaperTrade[],
   lotsUsed: number,
   rulerDayClip = false,
+  fromDate?: string,
+  toDate?: string,
 ): PaperDeskSnapshot['totals'] {
   const lots = Math.max(1, Math.floor(lotsUsed) || 1);
   const indexNetPts = trades.reduce((a, t) => a + t.indexPoints, 0);
-  const raw = sumPointsMoneyRs(trades, lots);
+  const money = buildRulerProfitTotals(trades, lots, {
+    rulerDayClip,
+    fromDate,
+    toDate,
+  });
   return {
     trades: trades.length,
     wins: trades.filter((t) => t.outcome === 'WIN').length,
@@ -61,10 +67,12 @@ export function summarizePaperTrades(
     indexNetPts,
     optionNetRs: trades.reduce((a, t) => a + (t.optionPnlRs ?? 0), 0),
     lotsUsed: lots,
-    pointsMoneyRs: raw,
-    pointsMoneyResearchRs: rulerDayClip
-      ? sumPointsMoneyRsRulerClipped(trades, lots)
-      : undefined,
+    pointsMoneyRs: money.pointsMoneyRs,
+    pointsMoneyResearchRs: money.pointsMoneyResearchRs,
+    tradedDays: money.tradedDays,
+    sessionDays: money.sessionDays,
+    avgDailyProfitRs: money.avgDailyProfitRs,
+    avgDailyResearchRs: money.avgDailyResearchRs,
   };
 }
 
@@ -74,6 +82,8 @@ export function buildWeekdayFilteredView(
   selection: PaperWeekdaySelection,
   lotsUsed: number,
   rankBy: DayStatsRankBy = 'option',
+  fromDate?: string,
+  toDate?: string,
 ): {
   trades: PaperTrade[];
   totals: PaperDeskSnapshot['totals'];
@@ -84,7 +94,13 @@ export function buildWeekdayFilteredView(
   const names = PAPER_WEEKDAY_OPTIONS.filter((o) => selection[o.key]).map((o) => o.short);
   return {
     trades: filtered,
-    totals: summarizePaperTrades(filtered, lotsUsed, rankBy === 'pointsMoney'),
+    totals: summarizePaperTrades(
+      filtered,
+      lotsUsed,
+      rankBy === 'pointsMoney',
+      fromDate,
+      toDate,
+    ),
     dayStats: filtered.length
       ? buildPaperDeskDayStats(filtered, 5, lotsUsed, rankBy)
       : { ...emptyPaperDeskDayStats(), rankBy },
