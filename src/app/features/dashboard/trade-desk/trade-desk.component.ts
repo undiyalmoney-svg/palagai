@@ -16,6 +16,8 @@ import {
 import { PDHL_RUPEES_PER_POINT } from '../../../core/strategy-engine/strategies/pdhl-opening-range/pdhl-opening-range.evaluator';
 import { KiteSessionService } from '../../../core/kite/kite-session.service';
 import { LotsPreferenceService } from '../../../core/services/lots-preference.service';
+import { StrategyManagerService } from '../../../core/strategy-manager/runtime/strategy-manager.service';
+import { StrategyAssignmentService } from '../../../core/strategy-manager/config/strategy-assignment.service';
 import { formatUnknownError } from '../../../core/utils/kite-error.util';
 import { extractTradeDate, formatDayOfWeek, formatDisplayDate } from '../../../core/utils/trade-date.util';
 
@@ -31,8 +33,11 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
   private readonly deskExport = inject(PaperDeskExportService);
   private readonly kiteSession = inject(KiteSessionService);
   private readonly lotsPreference = inject(LotsPreferenceService);
+  private readonly strategyManager = inject(StrategyManagerService);
+  private readonly assignments = inject(StrategyAssignmentService);
 
   protected readonly mode = signal<PaperDeskMode>('testing');
+  protected readonly rulerEnabled = this.assignments.rulerEnabled;
   protected fromDate = shiftDays(-14);
   protected toDate = todayIso();
   /** When Live + checked, places real Kite MIS orders. */
@@ -86,6 +91,11 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
     const normalized = Math.max(1, Math.floor(Number(this.lots)) || 1);
     this.lots = normalized;
     this.lotsPreference.set(normalized);
+  }
+
+  protected setRulerEnabled(enabled: boolean): void {
+    this.strategyManager.setRulerEnabled(enabled);
+    this.desk.refreshLiveAfterSettingsChange();
   }
 
   protected toggleWeekday(key: PaperWeekdayKey): void {

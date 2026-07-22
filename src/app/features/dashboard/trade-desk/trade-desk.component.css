@@ -114,6 +114,59 @@
   margin: 0;
 }
 
+.ruler-toggle {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0 0 1rem;
+  padding: 0.85rem 1rem;
+  border-radius: 12px;
+  border: 2px solid #0f6e56;
+  background: linear-gradient(135deg, #ecfdf5 0%, #f0fdf4 55%, #fff 100%);
+  cursor: pointer;
+  user-select: none;
+}
+
+.ruler-toggle.on {
+  border-color: #047857;
+  background: linear-gradient(135deg, #d1fae5 0%, #ecfdf5 100%);
+  box-shadow: inset 4px 0 0 #047857;
+}
+
+.ruler-toggle input {
+  margin-top: 0.25rem;
+  width: 1.15rem;
+  height: 1.15rem;
+  flex-shrink: 0;
+  accent-color: #047857;
+}
+
+.ruler-toggle-copy {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.ruler-toggle-copy strong {
+  font-size: 1.05rem;
+  color: #065f46;
+}
+
+.ruler-toggle-copy em {
+  font-style: normal;
+  font-size: 0.9rem;
+  color: #047857;
+  font-weight: 600;
+}
+
+.ruler-toggle-copy small {
+  font-size: 0.8rem;
+  color: #3f6212;
+  line-height: 1.35;
+}
+
 .weekday-filter {
   display: flex;
   flex-wrap: wrap;
