@@ -14,6 +14,7 @@ import {
   rulerDayCapInr,
   RULER_RAMPAGE_UNTIL_INR,
   RULER_DAY_CAP_INR,
+  RULER_MONTH_TARGET_INR,
   type RulerMorningFeatures,
 } from '../src/app/core/strategy-manager/engines/ruler-morning.util';
 
@@ -90,6 +91,10 @@ function assertArmLogicParity(): void {
   assert.strictEqual(pickRulerArm(choppy, 0), 'STAND');
   assert.strictEqual(pickRulerArm(trailMorning, 0), 'DONCH_TRAIL'); // beast · wide+strong
   assert.strictEqual(pickRulerArm(swingMorning, 0), 'SWING_2R'); // beast · EMA bias
+  // Month bank: MTD ≥ ₹15k → STAND
+  assert.strictEqual(pickRulerArm(trailMorning, 15000), 'STAND');
+  assert.strictEqual(pickRulerArm(trailMorning, RULER_MONTH_TARGET_INR), 'STAND');
+  assert.strictEqual(pickRulerArm(trailMorning, 20000), 'STAND');
   assert.strictEqual(pickRulerArm(trailMorning, RULER_RAMPAGE_UNTIL_INR - 1), 'DONCH_TRAIL');
   // Underwater (MTD < 0): hunter, not beast — wide+strong but not vwide → SWING/2R path.
   assert.strictEqual(pickRulerArm(trailMorning, -500), 'SWING_2R'); // hunter · wide+ema, not vwide

@@ -27,7 +27,7 @@ boost = load("boost", Path("/tmp/ruler-profit-boost.py"))
 sep = load("sep", ROOT / "scripts" / "ruler-sep-boost.py")
 
 # March target under zero-red profit-boost (day-cap ₹500 + wide trail).
-MARCH_TARGET = 24116.0
+MARCH_TARGET = 16407.2
 
 
 def main() -> None:

@@ -54,8 +54,15 @@ export type RulerArm =
 
 /** Boosted ruler: rampage while MTD < ₹3,000. */
 export const RULER_RAMPAGE_UNTIL_INR = 3000;
-/** Hard day loss cap (₹). When month green → min(cap, MTD). Tighter cap = more capital protect + higher net. */
+/** Hard day loss cap (₹). When month green → min(cap, MTD). */
 export const RULER_DAY_CAP_INR = 500;
+/**
+ * Month bank target (₹). Once MTD ≥ this, force STAND for the rest of the month.
+ * Trains capital banking toward a ₹15k monthly floor.
+ * Note: 1-lot DNA cannot clear ₹15k in every historical month; Trade Desk lots≥3
+ * with this lock does (research 2020–2026).
+ */
+export const RULER_MONTH_TARGET_INR = 15000;
 
 /**
  * Causal morning features at OR 09:45 (matches research morning_feat).
@@ -272,6 +279,9 @@ export function pickRulerArm(
   monthMtdInr: number,
   opts?: RulerArmPickOpts,
 ): RulerArm {
+  if (monthMtdInr >= RULER_MONTH_TARGET_INR) {
+    return 'STAND';
+  }
   if (opts?.breakerActive) {
     return witchEdge(f);
   }

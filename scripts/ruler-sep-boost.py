@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
 """
-Zero-red profit-boost Ruler.
-
-Research window: candle cache 2020-01-01..2026-07-21 (no 2018–2019 data).
+Zero-red Ruler + ₹15k month bank.
 
 Recipe:
-  1. Beast only while 0 ≤ MTD < ₹3,000
-  2. When MTD < 0 → hunter recover (OR_RETEST → DONCH_2R)
-  3. When MTD ≥ ₹3,000 → DONCH_TRAIL on any *wide* morning (else 2R/swing)
-  4. After 2 consecutive clipped red days *anytime* → edge for rest of month
-  5. Day-cap ₹500 (tighter clip preserves MTD → higher monthly nets, still 0 red)
+  1. MTD ≥ ₹15,000 → STAND (bank the month)
+  2. Beast only while 0 ≤ MTD < ₹3,000
+  3. MTD < 0 → hunter recover
+  4. Else → trail on wide mornings
+  5. 2 clipped reds anytime → edge
+  6. Day-cap ₹500
 
-Full history: 0 red months; net ≈ ₹17.9L; Sep ≈ ₹20.7k; March ≈ ₹24.1k.
+1-lot DNA cannot clear ₹15k in every 2020–2026 month (causal).
+With Trade Desk lots ≥ 3 (same DNA, absolute ₹ thresholds) every month ≥ ₹15k.
 """
 from __future__ import annotations
 
@@ -20,7 +20,6 @@ from typing import Any, Callable
 
 
 def trail_wide_else_2r(f: dict | None) -> str:
-    """Post-rampage: trail on any wide morning (profit-boost vs calm-only)."""
     if f is None or f["choppy"]:
         return "STAND"
     if f["wide"]:
@@ -33,7 +32,6 @@ def trail_wide_else_2r(f: dict | None) -> str:
 
 
 def trail_wide_calm_else_2r(f: dict | None) -> str:
-    """Legacy calm-only trail (kept for comparisons)."""
     if f is None or f["choppy"]:
         return "STAND"
     if f["wide"] and f["calm"]:
@@ -48,7 +46,6 @@ def trail_wide_calm_else_2r(f: dict | None) -> str:
 
 
 def hunter_uw(f: dict | None) -> str:
-    """Underwater recover witch — research hunter with OR_RETEST → DONCH_2R."""
     if f is None or f["choppy"]:
         return "STAND"
     if f["vwide"] and f["vstrong"]:
@@ -76,9 +73,11 @@ def run_sep_boost(
     rampage_until: float = 3000.0,
     base_cap: float = 500.0,
     loss_streak: int = 2,
+    month_target: float = 15000.0,
     post: Callable | None = None,
     hunter: Callable | None = None,
     early_breaker: bool = True,
+    lots: float = 1.0,
 ) -> dict[str, Any]:
     post_witch = post or trail_wide_else_2r
     hunter_witch = hunter or hunter_uw
@@ -90,12 +89,17 @@ def run_sep_boost(
     streak = 0
     broken = False
 
+    def sized_comb(arm: str, d: str) -> float:
+        return float(lots) * float(comb(books, arm, d))
+
     for d in days:
         m = d[:7]
         if m != cur:
             cur, mtd, streak, broken = m, 0.0, 0, False
         f = feats.get(d)
-        if broken:
+        if month_target and mtd >= month_target:
+            arm, mode = "STAND", "month_bank"
+        elif broken:
             arm, mode = edge(f), "breaker_edge"
         elif mtd < 0:
             arm, mode = hunter_witch(f), "hunter_uw"
@@ -103,12 +107,13 @@ def run_sep_boost(
             arm, mode = beast(f), "beast"
         else:
             arm, mode = post_witch(f), "trail_wide"
-        raw = float(comb(books, arm, d))
+        raw = float(sized_comb(arm, d))
+        cap = float(base_cap)  # absolute ₹ (Angular-style), not scaled by lots
         if mtd > 0:
-            dyn = min(base_cap, mtd)
+            dyn = min(cap, mtd)
             r = float(clip(raw, dyn)) if dyn > 0 else 0.0
         else:
-            r = float(clip(raw, base_cap))
+            r = float(clip(raw, cap))
         arms[arm] += 1
         day_rs[d] = r
         picks.append(
@@ -135,14 +140,19 @@ def run_sep_boost(
         mon[d[:7]] += r
     vals = list(mon.values())
     red = [m for m, v in mon.items() if v < 0]
+    below = sorted(m for m, v in mon.items() if v < month_target)
     return {
         "net": round(sum(vals), 1),
         "red": len(red),
         "red_list": red,
         "worst": round(min(vals), 1) if vals else 0.0,
         "best": round(max(vals), 1) if vals else 0.0,
+        "ge15k": sum(1 for v in vals if v >= month_target),
+        "below15k": below,
+        "n_months": len(vals),
         "monthly": {k: round(v, 1) for k, v in sorted(mon.items())},
         "arms": dict(arms),
         "picks": picks,
-        "recipe": "beast@0..3k / hunter when red / wide trail · streak2 anytime→edge · day_cap₹500",
+        "lots": lots,
+        "recipe": f"beast@0..3k / hunter when red / wide trail · streak2→edge · day_cap₹{int(base_cap)} · bank@{int(month_target)} · lots={lots}",
     }

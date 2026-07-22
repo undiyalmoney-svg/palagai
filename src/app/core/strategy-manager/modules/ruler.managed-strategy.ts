@@ -70,8 +70,9 @@ const ARM_DNA: Record<
 };
 
 /**
- * Boosted Ruler flow (zero-red profit-boost):
- * 1. While 0 ≤ MTD < ₹3,000 → beast witch (entry gates)
+ * Boosted Ruler flow (zero-red + ₹15k month bank):
+ * 1. MTD ≥ ₹15,000 → STAND (month bank)
+ * 2. While 0 ≤ MTD < ₹3,000 → beast witch (entry gates)
  * 2. While MTD < 0 → hunter recover (never beast when month already red)
  * 3. Else → Donch trail on wide mornings (else 2R/swing)
  * 4. After 2 clipped red days anytime → edge witch for rest of month
@@ -92,9 +93,9 @@ export class RulerManagedStrategy implements IManagedStrategy {
 
   readonly id = MANAGED_STRATEGY_IDS.RULER;
   readonly name = 'Ruler flow';
-  readonly version = '1.9.0';
+  readonly version = '1.10.0';
   readonly description =
-    'Boosted ruler v1.9: zero-red profit-boost (hunter when red · wide trail · 2-loss anytime→edge · day-cap ₹500). Lots from Trade Desk.';
+    'Boosted ruler v1.10: ₹15k month bank · hunter when red · wide trail · 2-loss→edge · day-cap ₹500 (1-lot DNA; lots≥3 clears ₹15k every month). Lots from Trade Desk.';
   readonly supports: readonly DeskChannel[] = ['nifty', 'bank'];
 
   readonly defaultSettings = defaultStrategySettings({
@@ -203,7 +204,7 @@ export class RulerManagedStrategy implements IManagedStrategy {
           features,
           sharedArm: arm,
           armLocked: locked,
-          witch: witch ?? (mtd < 0 ? 'hunter_uw' : mtd < 3000 ? 'beast' : 'trail_wide'),
+          witch: witch ?? (mtd >= 15000 ? 'month_bank' : mtd < 0 ? 'hunter_uw' : mtd < 3000 ? 'beast' : 'trail_wide'),
           scope: this.monthState.getScope(),
         },
       };
@@ -220,7 +221,7 @@ export class RulerManagedStrategy implements IManagedStrategy {
           ? 'Ruler waiting · morning OR/features not ready'
           : features?.choppy
             ? 'Ruler STAND · choppy morning'
-            : `Ruler STAND · mtd ₹${mtd.toFixed(0)} · ${witch ?? (mtd < 0 ? 'hunter_uw' : mtd < 3000 ? 'beast' : 'trail_wide')}`,
+            : `Ruler STAND · mtd ₹${mtd.toFixed(0)} · ${witch ?? (mtd >= 15000 ? 'month_bank' : mtd < 0 ? 'hunter_uw' : mtd < 3000 ? 'beast' : 'trail_wide')}`,
         analysis: {
           ruler: true,
           arm,
@@ -230,7 +231,7 @@ export class RulerManagedStrategy implements IManagedStrategy {
           features,
           sharedArm: arm,
           armLocked: locked,
-          witch: witch ?? (mtd < 0 ? 'hunter_uw' : mtd < 3000 ? 'beast' : 'trail_wide'),
+          witch: witch ?? (mtd >= 15000 ? 'month_bank' : mtd < 0 ? 'hunter_uw' : mtd < 3000 ? 'beast' : 'trail_wide'),
           scope: this.monthState.getScope(),
         },
       };
@@ -269,7 +270,7 @@ export class RulerManagedStrategy implements IManagedStrategy {
           features,
           sharedArm: arm,
           armLocked: locked,
-          witch: witch ?? (mtd < 0 ? 'hunter_uw' : mtd < 3000 ? 'beast' : 'trail_wide'),
+          witch: witch ?? (mtd >= 15000 ? 'month_bank' : mtd < 0 ? 'hunter_uw' : mtd < 3000 ? 'beast' : 'trail_wide'),
           scope: this.monthState.getScope(),
         },
       };
@@ -289,7 +290,7 @@ export class RulerManagedStrategy implements IManagedStrategy {
         features,
         sharedArm: arm,
         armLocked: locked,
-        witch: witch ?? (mtd < 0 ? 'hunter_uw' : mtd < 3000 ? 'beast' : 'trail_wide'),
+        witch: witch ?? (mtd >= 15000 ? 'month_bank' : mtd < 0 ? 'hunter_uw' : mtd < 3000 ? 'beast' : 'trail_wide'),
         scope: this.monthState.getScope(),
       },
     };

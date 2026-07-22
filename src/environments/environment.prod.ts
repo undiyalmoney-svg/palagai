@@ -5,7 +5,7 @@ export const environment = {
    * Kite sees the droplet static egress IP.
    */
   orderApiBaseUrl: '/api/order-kite',
-  defaultLots: 1,
+  defaultLots: 3,
   allowLiveMoney: true,
   orderEgressIp: '168.144.28.89',
 };

@@ -83,13 +83,14 @@ def main() -> None:
     print(f"{'MONTH':<10} {'PROFIT ₹':>12}  NOTE")
     print("-" * 56)
     for m, v in sorted(mon.items()):
-        note = "RED" if v < 0 else ("soft" if v < 5000 else "")
+        note = "RED" if v < 0 else ("below 15k" if v < 15000 else "")
         print(f"{m:<10} {v:>12,.1f}  {note}")
     print("-" * 56)
     print(f"{'TOTAL':<10} {result['net']:>12,.1f}")
+    ge = sum(1 for v in mon.values() if v >= 15000)
     print(
-        f"Red months: {result['red']}  "
-        f"Worst: ₹{result['worst']:,.1f}  Best: ₹{result['best']:,.1f}"
+        f"Red months: {result['red']}  Worst: ₹{result['worst']:,.1f}  Best: ₹{result['best']:,.1f}  "
+        f"≥₹15k: {ge}/{len(mon)}"
     )
     print()
 
