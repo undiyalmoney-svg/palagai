@@ -123,7 +123,16 @@ export class RulerManagedStrategy implements IManagedStrategy {
   private dayCapHit = false;
 
   initialize(settings?: Partial<StrategySettings>): void {
-    this.settings = mergeSettings(this.defaultSettings, settings);
+    // Strip research locks from Strat/localStorage so older builds (maxTrades=3)
+    // cannot revive multi-trade Ruler and recreate −₹12k uncapped months.
+    const cleaned = settings ? { ...settings } : undefined;
+    if (cleaned) {
+      delete cleaned.maxTradesPerDay;
+      delete cleaned.dayStopPts;
+    }
+    this.settings = mergeSettings(this.defaultSettings, cleaned);
+    this.settings.maxTradesPerDay = 1;
+    this.settings.dayStopPts = 60;
     this.reset();
   }
 
@@ -219,6 +228,7 @@ export class RulerManagedStrategy implements IManagedStrategy {
       profitProtectArmR: 1,
       profitProtectLockR: 0,
       dayStopPts: 60,
+      maxTradesPerDay: 1,
       positionSizeLots: lots,
       emaLength: arm === 'SWING_2R' ? 50 : this.settings.emaLength,
     });
@@ -382,6 +392,11 @@ export class RulerManagedStrategy implements IManagedStrategy {
   }
 
   updateSettings(partial: Partial<StrategySettings>): void {
-    this.settings = mergeSettings(this.settings, partial);
+    const cleaned = { ...partial };
+    delete cleaned.maxTradesPerDay;
+    delete cleaned.dayStopPts;
+    this.settings = mergeSettings(this.settings, cleaned);
+    this.settings.maxTradesPerDay = 1;
+    this.settings.dayStopPts = 60;
   }
 }

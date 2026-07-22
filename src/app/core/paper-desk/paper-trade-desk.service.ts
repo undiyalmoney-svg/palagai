@@ -33,7 +33,7 @@ import {
   replayPaperOnIndex,
 } from './paper-desk-engine';
 import { buildPaperDeskDayStats, emptyPaperDeskDayStats } from './paper-desk-day-stats';
-import { sumPointsMoneyRs, sumPointsMoneyRsRulerClipped } from './paper-desk-points-money';
+import { sumPointsMoneyRs, sumPointsMoneyRsRulerClipped, tradesUsedRuler } from './paper-desk-points-money';
 import {
   buildDeskRiskOverrides,
 } from '../strategy-engine/strategies/pdhl-opening-range/pdhl-opening-range.evaluator';
@@ -546,9 +546,12 @@ export class PaperTradeDeskService {
           instrumentId: t.instrumentId,
         })),
       );
-      const rulerOn = this.strategyManager.isRulerEnabled();
+      const rulerOn =
+        this.strategyManager.isRulerEnabled() || tradesUsedRuler(sorted);
       const rankBy = rulerOn ? 'pointsMoney' : 'option';
       const dayStats = buildPaperDeskDayStats(sorted, 5, this.lotsMultiplier, rankBy);
+      const clipped = rulerOn ? sumPointsMoneyRsRulerClipped(sorted, this.lotsMultiplier) : null;
+      const rawPts = sumPointsMoneyRs(sorted, this.lotsMultiplier);
 
       this.snapshot.set({
         mode: 'testing',
@@ -557,8 +560,11 @@ export class PaperTradeDeskService {
         toDate,
         marketOpen: true,
         realOrders: false,
+        rulerActive: rulerOn,
         lastTickAt: null,
-        message: `Testing complete · ${sorted.length} paper trade(s) · ${batches.length} batch(es) · ${this.lotsMultiplier} lot(s) · ${this.deskOptionsLabel()} · ${this.kiteStatsLabel()}`,
+        message: rulerOn
+          ? `Testing complete · Ruler · ${sorted.length} trade(s) · day-cap P&L ₹${clipped != null && clipped >= 0 ? '+' : ''}${clipped != null ? Math.round(clipped) : 0} · raw ₹${Math.round(rawPts)} · ${this.lotsMultiplier} lot(s) · ${this.deskOptionsLabel()} · ${this.kiteStatsLabel()}`
+          : `Testing complete · ${sorted.length} paper trade(s) · ${batches.length} batch(es) · ${this.lotsMultiplier} lot(s) · ${this.deskOptionsLabel()} · ${this.kiteStatsLabel()}`,
         statuses,
         trades: sorted,
         totals: summarize(sorted, this.lotsMultiplier, rulerOn),
@@ -914,6 +920,8 @@ export class PaperTradeDeskService {
     const openMsg = openBits.length
       ? ` · ON MARKET: ${openBits.join(' · ')}`
       : '';
+    const rulerOn =
+      this.strategyManager.isRulerEnabled() || tradesUsedRuler(enriched);
     this.snapshot.set({
       mode: 'live',
       running: true,
@@ -921,20 +929,17 @@ export class PaperTradeDeskService {
       toDate: today,
       marketOpen: true,
       realOrders: this.realOrders,
+      rulerActive: rulerOn,
       lastTickAt: new Date().toISOString(),
       message: `${moneyTag} · alive ${now} · waiting ${waiting} · in trade ${inTrade}${targets ? ` · target hit ${targets}` : ''}${openMsg} · ${this.kiteStatsLabel()}`,
       statuses,
       trades: enriched.sort((a, b) => b.entryTime.localeCompare(a.entryTime)),
-      totals: summarize(
-        enriched,
-        this.lotsMultiplier,
-        this.strategyManager.isRulerEnabled(),
-      ),
+      totals: summarize(enriched, this.lotsMultiplier, rulerOn),
       dayStats: buildPaperDeskDayStats(
         enriched,
         5,
         this.lotsMultiplier,
-        this.strategyManager.isRulerEnabled() ? 'pointsMoney' : 'option',
+        rulerOn ? 'pointsMoney' : 'option',
       ),
       kiteStats: this.kiteStats(),
       orderEvents: this.liveOrders.getEvents(),
@@ -1195,6 +1200,7 @@ function emptySnapshot(mode: PaperDeskMode): PaperDeskSnapshot {
     marketOpen: mode === 'testing',
     message: '',
     realOrders: false,
+    rulerActive: false,
     lastTickAt: null,
     statuses: [],
     trades: [],

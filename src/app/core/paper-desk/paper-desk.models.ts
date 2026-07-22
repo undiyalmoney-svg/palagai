@@ -91,6 +91,11 @@ export interface PaperDeskSnapshot {
   message: string;
   /** When true, Live mode places real Kite MIS orders (addon). */
   realOrders: boolean;
+  /**
+   * True when this snapshot was produced with Ruler flow (toggle on at Start).
+   * Keeps day-cap P&L math even if the toggle is flipped after the run.
+   */
+  rulerActive?: boolean;
   /** ISO timestamp of last successful live tick (heartbeat). */
   lastTickAt: string | null;
   statuses: PaperInstrumentStatus[];

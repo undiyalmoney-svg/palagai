@@ -4,9 +4,8 @@
       <p class="pg-eyebrow">Strategy Manager → Trade Desk</p>
       <h1>Trade Desk</h1>
       <p class="pg-lede">
-        Nifty &amp; Bank Nifty ATM options — strategy from <strong>Strat</strong> (Paper/Live assignment).
-        Defaults: <strong>Donch Retest · 1.5R+BE</strong>. Toggle <strong>Ruler flow</strong> below for the boosted ruler.
-        Testing, Live paper, or Live money.
+        Nifty &amp; Bank Nifty ATM options — Testing, Live paper, or Live money.
+        Turn on <strong>Ruler</strong> below for the research flow (shared arm · day-cap ₹1,500).
       </p>
     </div>
     <div class="hero-meta">
@@ -19,6 +18,13 @@
         [class.pg-badge-neutral]="!(realOrders && mode() === 'live')"
       >
         {{ realOrders && mode() === 'live' ? 'REAL ORDERS' : 'Paper only' }}
+      </span>
+      <span
+        class="pg-badge ruler-badge"
+        [class.on]="rulerEnabled()"
+        [class.off]="!rulerEnabled()"
+      >
+        {{ rulerEnabled() ? 'RULER ON' : 'RULER OFF' }}
       </span>
     </div>
   </header>
@@ -46,29 +52,7 @@
     </button>
   </div>
 
-  <aside class="trading-basis" aria-label="How the desk decides trades">
-    <h2 class="trading-basis-title">What the app trades on</h2>
-    <ul class="trading-basis-list">
-      <li>
-        <strong>Active strategy</strong> — Set in <em>Strat</em> (Paper / Live per index). Card below shows the live module name.
-        Or enable <strong>Ruler flow</strong> here / in Strat to override Nifty + Bank Paper+Live.
-      </li>
-      <li>
-        <strong>Default (indices)</strong> — Donch Retest · OR-mid · 1.5R target · BE lock after +1R · up to 3 trades/day
-      </li>
-      <li>
-        <strong>Stops</strong> — SL capped (Nifty 30 · Bank 45) · day stop −60 pts · optional Strict −₹2,950 / Profit lock +₹5,000
-      </li>
-      <li>
-        <strong>Instrument</strong> — ATM options on the selected index · lots from the Lots control
-      </li>
-      <li>
-        <strong>Settings tip</strong> — Changing Max trades on Champion does nothing if Desk is on Donch Retest. Edit the assigned strategy (Paper/Live badge in Strat).
-      </li>
-    </ul>
-  </aside>
-
-  <label class="ruler-toggle" [class.on]="rulerEnabled()">
+  <label class="ruler-toggle" [class.on]="rulerEnabled()" [class.pulse]="!rulerEnabled()">
     <input
       type="checkbox"
       [ngModel]="rulerEnabled()"
@@ -76,10 +60,15 @@
       [disabled]="busy() || snapshot().running"
     />
     <span class="ruler-toggle-copy">
-      <strong>Ruler flow</strong>
-      <em>{{ rulerEnabled() ? 'ON — Nifty + Bank Paper/Live run Ruler · primary P&L = pts × ₹65/₹30' : 'OFF — using Strat Paper/Live assignments' }}</em>
-      <small>Beast rampage → Donch trail · ₹1,500 day cap · lots from the Lots field</small>
+      <strong>Ruler flow {{ rulerEnabled() ? '· LIVE' : '· tap to wake' }}</strong>
+      <em>{{
+        rulerEnabled()
+          ? 'ON — Nifty + Bank Paper/Live run Ruler · P&L = pts × ₹65/₹30 with ₹1,500 day-cap'
+          : 'OFF — desk uses Strat Donch Retest. Enable Ruler for research beast→trail.'
+      }}</em>
+      <small>Shared daily arm · 1 trade/index/day · Testing MTD isolated from Live · lots from Lots field</small>
     </span>
+    <span class="ruler-state" aria-hidden="true">{{ rulerEnabled() ? 'ON' : 'OFF' }}</span>
   </label>
 
   <div class="control-bar">
@@ -238,6 +227,21 @@
     </p>
   }
 
+  <aside class="trading-basis" aria-label="How the desk decides trades">
+    <h2 class="trading-basis-title">What the app trades on</h2>
+    <ul class="trading-basis-list">
+      <li>
+        <strong>Ruler ON</strong> — shared daily arm · 1 trade/index/day · research day-cap ₹1,500 · Testing MTD isolated from Live
+      </li>
+      <li>
+        <strong>Ruler OFF</strong> — Strat Paper/Live assignments (default Donch Retest · 1.5R+BE · up to 3 trades/day)
+      </li>
+      <li>
+        <strong>Lots / books</strong> — Lots field · Nifty/Bank checkboxes · optional Strict −₹2,950 / Profit lock +₹5,000
+      </li>
+    </ul>
+  </aside>
+
   @if (resultView().totals.trades || snapshot().statuses.length) {
     <div class="totals">
       <div class="stat">
@@ -252,7 +256,7 @@
         <span>Index pts</span>
         <strong>{{ resultView().totals.indexNetPts > 0 ? '+' : '' }}{{ resultView().totals.indexNetPts | number: '1.1-1' }}</strong>
       </div>
-      @if (rulerEnabled()) {
+      @if (resultView().rulerRun) {
         <div class="stat primary" [class.up]="resultView().totals.pointsMoneyRs > 0" [class.down]="resultView().totals.pointsMoneyRs < 0">
           <span>P&amp;L ₹ ({{ resultView().totals.lotsUsed }} lot · pts · ₹65/₹30 · day-cap ₹1,500)</span>
           <strong>{{ resultView().totals.pointsMoneyRs > 0 ? '+' : '' }}{{ resultView().totals.pointsMoneyRs | number: '1.0-0' }}</strong>

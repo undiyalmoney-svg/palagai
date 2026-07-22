@@ -16,17 +16,18 @@
     </div>
   </header>
 
-  <label class="sm-ruler-toggle sm-ruler-hero" [class.on]="rulerEnabled()">
+  <label class="sm-ruler-toggle sm-ruler-hero" [class.on]="rulerEnabled()" [class.pulse]="!rulerEnabled()">
     <input
       type="checkbox"
       [ngModel]="rulerEnabled()"
       (ngModelChange)="setRulerEnabled($event)"
     />
     <span>
-      <strong>Ruler flow</strong>
+      <strong>Ruler flow {{ rulerEnabled() ? '· LIVE' : '· tap to wake' }}</strong>
       <em>{{ rulerEnabled() ? 'ON — Nifty + Bank Paper/Live run Ruler' : 'OFF — using Paper/Live assignments below' }}</em>
-      — beast rampage → Donch trail · ₹1,500 day cap. Lots stay from the Trade Desk Lots field.
+      — shared arm · 1 trade/index/day · ₹1,500 day-cap. Lots from Trade Desk.
     </span>
+    <span class="sm-ruler-pill">{{ rulerEnabled() ? 'ON' : 'OFF' }}</span>
   </label>
 
   <section class="sm-channels" aria-label="Instrument channels">

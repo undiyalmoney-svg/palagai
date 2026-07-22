@@ -87,3 +87,8 @@ export function sumPointsMoneyRsRulerClipped(
 ): number {
   return applyRulerDayClipByDate(pointsMoneyByDate(trades, lots)).total;
 }
+
+/** True when trades (or the run) used Ruler flow — drives day-cap P&L. */
+export function tradesUsedRuler(trades: PaperTrade[]): boolean {
+  return trades.some((t) => t.strategyId === 'ruler-flow');
+}
