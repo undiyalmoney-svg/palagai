@@ -91,6 +91,11 @@ export interface PaperDeskSnapshot {
   message: string;
   /** When true, Live mode places real Kite MIS orders (addon). */
   realOrders: boolean;
+  /**
+   * True when this snapshot was produced with Ruler flow (toggle on at Start).
+   * Keeps day-cap P&L math even if the toggle is flipped after the run.
+   */
+  rulerActive?: boolean;
   /** ISO timestamp of last successful live tick (heartbeat). */
   lastTickAt: string | null;
   statuses: PaperInstrumentStatus[];
@@ -103,12 +108,14 @@ export interface PaperDeskSnapshot {
     optionNetRs: number;
     /** Lots multiplier used for this run (Testing / Live paper Option ₹ and Live money qty). */
     lotsUsed: number;
-    /**
+/**
      * Lot-scaled money from index/futures points:
      * Nifty/Bank ≈ pts × 65 × lots · Crude ≈ pts × 10 × lots.
-     * Use this to verify lots — raw indexNetPts does NOT scale with lots.
+     * When Ruler is on, this is the research day-clipped score.
      */
     pointsMoneyRs: number;
+    /** Uncapped pts×₹65/₹30 sum (actual OHLC risk) — set when Ruler day-clip is on. */
+    pointsMoneyRawRs?: number;
   };
   /** Testing day breakdown: best/worst days, weekday rollup. */
   dayStats: PaperDeskDayStats;

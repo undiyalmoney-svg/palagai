@@ -13,6 +13,7 @@ import {
   buildWeekdayFilteredView,
   defaultPaperWeekdaySelection,
 } from '../../../core/paper-desk/paper-desk-weekday-filter';
+import { tradesUsedRuler } from '../../../core/paper-desk/paper-desk-points-money';
 import { KiteSessionService } from '../../../core/kite/kite-session.service';
 import { LotsPreferenceService } from '../../../core/services/lots-preference.service';
 import { StrategyManagerService } from '../../../core/strategy-manager/runtime/strategy-manager.service';
@@ -61,10 +62,14 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
   protected readonly busy = this.desk.busy;
   protected readonly error = signal('');
 
-  /** Filtered Testing view; Live uses full snapshot. */
+  /** Filtered Testing view; Live uses full snapshot. Ruler P&L follows run, not only toggle. */
   protected readonly resultView = computed(() => {
     const snap = this.snapshot();
-    const rankBy = this.rulerEnabled() ? 'pointsMoney' : 'option';
+    const rulerRun =
+      !!snap.rulerActive ||
+      this.rulerEnabled() ||
+      tradesUsedRuler(snap.trades);
+    const rankBy = rulerRun ? 'pointsMoney' : 'option';
     if (this.mode() !== 'testing' || !snap.trades.length) {
       return {
         trades: snap.trades,
@@ -72,6 +77,7 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
         dayStats: snap.dayStats,
         weekdayLabel: 'all',
         filtered: false,
+        rulerRun,
       };
     }
     const view = buildWeekdayFilteredView(
@@ -80,7 +86,7 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
       snap.totals.lotsUsed || this.lots,
       rankBy,
     );
-    return { ...view, filtered: true };
+    return { ...view, filtered: true, rulerRun };
   });
 
   ngOnInit(): void {

@@ -33,7 +33,13 @@ Market data → Strategy Manager → IManagedStrategy → Signal → Desk risk �
 
 Donch Retest: **1.5R** target + **BE after +1R** + **up to 3 trades/day**. Regime filter **off** by default. Nifty stop 30 / Bank stop 45.
 
-**Ruler flow (opt-in):** Strategy Manager toggle. When ON, Nifty + Bank Paper/Live resolve to Ruler (beast rampage → Donch trail, ₹1,500 day cap, dyn protect when month green). Defaults and stored assignments stay unchanged when OFF. Lots always come from the Trade Desk Lots field.
+**Ruler flow (opt-in):** Strategy Manager / Trade Desk toggle. When ON, Nifty + Bank Paper/Live resolve to Ruler.
+
+- **Shared daily arm** for both indices (research `comb()`), **1 trade per index per day**
+- **Testing** uses an isolated in-memory MTD scope (never writes live localStorage)
+- **Live** persists MTD separately; blocks new entries after combined day ₹ −₹1,500 and can flatten an open at the day-cap
+- Testing **P&L ₹** = research day-clipped score; **Raw pts ₹** = uncapped OHLC risk
+- Lots always come from the Trade Desk Lots field. Defaults stay Donch Retest when Ruler is OFF.
 
 Trade Desk resolves strategies via `StrategyManagerService`. Champion DNA file is **unchanged**; desk risk checkboxes still apply through `setPdhlDeskOverrides`.
 

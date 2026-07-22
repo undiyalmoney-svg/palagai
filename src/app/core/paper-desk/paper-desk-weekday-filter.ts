@@ -1,7 +1,7 @@
 import { extractTradeDate, formatDayOfWeek } from '../utils/trade-date.util';
 import { PaperTrade, PaperDeskSnapshot } from './paper-desk.models';
 import { buildPaperDeskDayStats, emptyPaperDeskDayStats, DayStatsRankBy } from './paper-desk-day-stats';
-import { sumPointsMoneyRs } from './paper-desk-points-money';
+import { sumPointsMoneyRs, sumPointsMoneyRsRulerClipped } from './paper-desk-points-money';
 
 export const PAPER_WEEKDAY_OPTIONS = [
   { key: 'Monday', short: 'Mon' },
@@ -49,9 +49,11 @@ export function filterTradesByWeekdays(
 export function summarizePaperTrades(
   trades: PaperTrade[],
   lotsUsed: number,
+  rulerDayClip = false,
 ): PaperDeskSnapshot['totals'] {
   const lots = Math.max(1, Math.floor(lotsUsed) || 1);
   const indexNetPts = trades.reduce((a, t) => a + t.indexPoints, 0);
+  const raw = sumPointsMoneyRs(trades, lots);
   return {
     trades: trades.length,
     wins: trades.filter((t) => t.outcome === 'WIN').length,
@@ -59,7 +61,8 @@ export function summarizePaperTrades(
     indexNetPts,
     optionNetRs: trades.reduce((a, t) => a + (t.optionPnlRs ?? 0), 0),
     lotsUsed: lots,
-    pointsMoneyRs: sumPointsMoneyRs(trades, lots),
+    pointsMoneyRs: rulerDayClip ? sumPointsMoneyRsRulerClipped(trades, lots) : raw,
+    pointsMoneyRawRs: rulerDayClip ? raw : undefined,
   };
 }
 
@@ -79,7 +82,7 @@ export function buildWeekdayFilteredView(
   const names = PAPER_WEEKDAY_OPTIONS.filter((o) => selection[o.key]).map((o) => o.short);
   return {
     trades: filtered,
-    totals: summarizePaperTrades(filtered, lotsUsed),
+    totals: summarizePaperTrades(filtered, lotsUsed, rankBy === 'pointsMoney'),
     dayStats: filtered.length
       ? buildPaperDeskDayStats(filtered, 5, lotsUsed, rankBy)
       : { ...emptyPaperDeskDayStats(), rankBy },
