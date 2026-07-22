@@ -349,6 +349,9 @@ export class PaperTradeDeskService {
           indexSpot: number | null;
           chosenAsOf: string | null;
           lastSignal: string;
+          strategyId?: string;
+          strategyName?: string;
+          maxTradesPerDay?: number;
         }
       >();
 
@@ -440,6 +443,9 @@ export class PaperTradeDeskService {
             indexSpot: replay.indexSpot ?? prev?.indexSpot ?? null,
             chosenAsOf: replay.chosenAsOf ?? prev?.chosenAsOf ?? null,
             lastSignal: replay.lastSignal || prev?.lastSignal || 'Waiting',
+            strategyId: resolved.primary.id,
+            strategyName: resolved.primary.name,
+            maxTradesPerDay: resolved.primary.getSettings().maxTradesPerDay,
           });
         }
 
@@ -486,6 +492,9 @@ export class PaperTradeDeskService {
           chosenAsOf: acc.chosenAsOf,
           lastSignal: acc.lastSignal,
           tradesToday: mine.length,
+          strategyId: acc.strategyId,
+          strategyName: acc.strategyName,
+          maxTradesPerDay: acc.maxTradesPerDay,
         });
         applyLivePhase(status, mine, false);
         return status;
@@ -801,6 +810,9 @@ export class PaperTradeDeskService {
           chosenAsOf: replay.chosenAsOf,
           lastSignal: replay.lastSignal,
           tradesToday: replay.trades.length,
+          strategyId: resolved.primary.id,
+          strategyName: resolved.primary.name,
+          maxTradesPerDay: resolved.primary.getSettings().maxTradesPerDay,
         }),
       );
     }

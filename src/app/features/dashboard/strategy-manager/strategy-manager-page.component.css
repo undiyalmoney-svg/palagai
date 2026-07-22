@@ -223,6 +223,49 @@
   overflow-wrap: anywhere;
 }
 
+.sm-hint {
+  margin: 0 0 0.65rem;
+  font-family: "IBM Plex Sans", "Avenir Next", "Segoe UI", sans-serif;
+  font-size: 0.82rem;
+  color: var(--sm-muted);
+  line-height: 1.4;
+}
+
+.sm-assign-badge {
+  display: inline-block;
+  width: fit-content;
+  margin-top: 0.15rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 0.2rem;
+  background: rgba(15, 110, 86, 0.12);
+  color: var(--sm-accent);
+  font-family: "IBM Plex Sans", "Avenir Next", "Segoe UI", sans-serif;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.sm-settings-banner {
+  margin: 0 0 0.75rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 0.3rem;
+  font-family: "IBM Plex Sans", "Avenir Next", "Segoe UI", sans-serif;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.sm-settings-banner.ok {
+  background: rgba(15, 110, 86, 0.1);
+  color: #0b4f3d;
+}
+
+.sm-settings-banner.warn {
+  background: rgba(160, 90, 20, 0.12);
+  color: #6b3b08;
+}
+
 .sm-settings {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
