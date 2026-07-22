@@ -36,9 +36,10 @@ Donch Retest: **1.5R** target + **BE after +1R** + **up to 3 trades/day**. Regim
 **Ruler flow (opt-in):** Strategy Manager / Trade Desk toggle. When ON, Nifty + Bank Paper/Live resolve to Ruler.
 
 - **Shared daily arm** locked only after morning OR features exist (never lock STAND on pre-OR bars)
-- **1 trade per index per day**
+- **DONCH_TRAIL** allows multi-trade (research `one_trade=False`); other arms stay 1 trade/day
 - **Testing** uses isolated in-memory MTD; **Live** persists separately and can flatten at day-cap
 - Primary **P&L ₹** = uncapped OHLC pts × ₹65/₹30; **Research score ₹** = same after −₹1,500 day-cap (compare to research, not live cash)
+- Morning EMA bias uses **OR-end** bar (research `morning_feat`), not 10:15
 - Lots always come from the Trade Desk Lots field. Defaults stay Donch Retest when Ruler is OFF.
 
 Trade Desk resolves strategies via `StrategyManagerService`. Champion DNA file is **unchanged**; desk risk checkboxes still apply through `setPdhlDeskOverrides`.
