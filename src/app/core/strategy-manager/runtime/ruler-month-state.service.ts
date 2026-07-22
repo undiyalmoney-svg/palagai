@@ -1,7 +1,8 @@
 import { Injectable, PLATFORM_ID, inject } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
 
-const STORAGE_KEY = 'palagai_ruler_mtd_v1';
+const STORAGE_KEY = 'palagai_ruler_mtd_v2';
+const LEGACY_KEY = 'palagai_ruler_mtd_v1';
 
 interface TradeRecord {
   /** Unique key: channel|date|entryTime */
@@ -12,38 +13,40 @@ interface TradeRecord {
 }
 
 interface PersistedState {
-  yearMonth: string;
-  trades: TradeRecord[];
+  /** yearMonth → trades */
+  months: Record<string, TradeRecord[]>;
 }
 
 /**
- * Persists Ruler month-to-date ₹ PnL (Nifty + Bank combined).
+ * Persists Ruler month-to-date ₹ PnL (Nifty + Bank combined), keyed by calendar month.
  * Idempotent by trade key so live day-replays do not double-count.
+ * Reads always use the as-of trade date's month (so June paper tests are not
+ * poisoned by July live ticks).
  */
 @Injectable({ providedIn: 'root' })
 export class RulerMonthStateService {
   private readonly platformId = inject(PLATFORM_ID);
-  private yearMonth = this.currentYearMonth();
-  private trades = new Map<string, TradeRecord>();
+  /** yearMonth → tradeKey → record */
+  private readonly months = new Map<string, Map<string, TradeRecord>>();
 
   constructor() {
     this.load();
   }
 
-  /** Combined Nifty + Bank MTD in ₹ for the current calendar month. */
-  combinedMtdInr(): number {
-    this.rollMonthIfNeeded();
+  /** Combined Nifty + Bank MTD in ₹ for the month of `asOfDate` (YYYY-MM-DD). */
+  combinedMtdInr(asOfDate?: string): number {
+    const ym = this.yearMonthOf(asOfDate);
     let sum = 0;
-    for (const t of this.trades.values()) {
+    for (const t of this.monthTrades(ym).values()) {
       sum += t.inr;
     }
     return sum;
   }
 
-  mtdInr(channel: 'nifty' | 'bank'): number {
-    this.rollMonthIfNeeded();
+  mtdInr(channel: 'nifty' | 'bank', asOfDate?: string): number {
+    const ym = this.yearMonthOf(asOfDate);
     let sum = 0;
-    for (const t of this.trades.values()) {
+    for (const t of this.monthTrades(ym).values()) {
       if (t.channel === channel) {
         sum += t.inr;
       }
@@ -52,7 +55,7 @@ export class RulerMonthStateService {
   }
 
   /**
-   * Record (or replace) a closed trade's ₹ PnL.
+   * Record (or replace) a closed trade's ₹ PnL into that trade's calendar month.
    * Safe to call on every live replay tick.
    */
   recordTrade(params: {
@@ -61,12 +64,12 @@ export class RulerMonthStateService {
     entryTime: string;
     inr: number;
   }): void {
-    this.rollMonthIfNeeded(params.date);
-    if (params.date.slice(0, 7) !== this.yearMonth) {
+    const ym = params.date.slice(0, 7);
+    if (!/^\d{4}-\d{2}$/.test(ym)) {
       return;
     }
     const key = `${params.channel}|${params.date}|${params.entryTime}`;
-    this.trades.set(key, {
+    this.monthTrades(ym).set(key, {
       key,
       channel: params.channel,
       date: params.date,
@@ -76,18 +79,24 @@ export class RulerMonthStateService {
   }
 
   clear(): void {
-    this.trades.clear();
-    this.yearMonth = this.currentYearMonth();
+    this.months.clear();
     this.persist();
   }
 
-  private rollMonthIfNeeded(refDate?: string): void {
-    const ym = (refDate ?? this.currentYearMonth()).slice(0, 7);
-    if (ym !== this.yearMonth) {
-      this.yearMonth = ym;
-      this.trades.clear();
-      this.persist();
+  private monthTrades(ym: string): Map<string, TradeRecord> {
+    let m = this.months.get(ym);
+    if (!m) {
+      m = new Map();
+      this.months.set(ym, m);
     }
+    return m;
+  }
+
+  private yearMonthOf(asOfDate?: string): string {
+    if (asOfDate && asOfDate.length >= 7) {
+      return asOfDate.slice(0, 7);
+    }
+    return this.currentYearMonth();
   }
 
   private currentYearMonth(): string {
@@ -102,26 +111,39 @@ export class RulerMonthStateService {
     }
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) {
-        return;
-      }
-      const parsed = JSON.parse(raw) as PersistedState;
-      const ym = this.currentYearMonth();
-      if (parsed.yearMonth !== ym) {
-        this.yearMonth = ym;
-        this.trades.clear();
-        this.persist();
-        return;
-      }
-      this.yearMonth = parsed.yearMonth;
-      this.trades.clear();
-      for (const t of parsed.trades ?? []) {
-        if (t?.key) {
-          this.trades.set(t.key, t);
+      if (raw) {
+        const parsed = JSON.parse(raw) as PersistedState;
+        this.months.clear();
+        for (const [ym, trades] of Object.entries(parsed.months ?? {})) {
+          const map = new Map<string, TradeRecord>();
+          for (const t of trades ?? []) {
+            if (t?.key) {
+              map.set(t.key, t);
+            }
+          }
+          this.months.set(ym, map);
         }
+        return;
+      }
+      // One-time migrate v1 (single-month) if present.
+      const legacy = localStorage.getItem(LEGACY_KEY);
+      if (legacy) {
+        const parsed = JSON.parse(legacy) as { yearMonth?: string; trades?: TradeRecord[] };
+        if (parsed.yearMonth && parsed.trades?.length) {
+          const map = new Map<string, TradeRecord>();
+          for (const t of parsed.trades) {
+            if (t?.key) {
+              map.set(t.key, t);
+            }
+          }
+          this.months.set(parsed.yearMonth, map);
+        }
+        localStorage.removeItem(LEGACY_KEY);
+        this.persist();
       }
     } catch {
       localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(LEGACY_KEY);
     }
   }
 
@@ -129,10 +151,11 @@ export class RulerMonthStateService {
     if (!isPlatformBrowser(this.platformId)) {
       return;
     }
-    const payload: PersistedState = {
-      yearMonth: this.yearMonth,
-      trades: [...this.trades.values()],
-    };
+    const months: Record<string, TradeRecord[]> = {};
+    for (const [ym, map] of this.months) {
+      months[ym] = [...map.values()];
+    }
+    const payload: PersistedState = { months };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
   }
 }
