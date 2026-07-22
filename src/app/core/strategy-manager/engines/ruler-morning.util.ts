@@ -146,3 +146,22 @@ export function rulerDayCapInr(monthMtdInr: number, baseCap = RULER_DAY_CAP_INR)
   }
   return baseCap;
 }
+
+/**
+ * Research dyn0 day clip: if raw day ₹ < −cap, count −cap (not the full trail loss).
+ * When MTD > 0, cap = min(baseCap, MTD) so one loss cannot flip the month red.
+ */
+export function clipRulerDayInr(
+  rawDayInr: number,
+  mtdBefore: number,
+  baseCap = RULER_DAY_CAP_INR,
+): number {
+  if (mtdBefore > 0) {
+    const dyn = Math.min(baseCap, mtdBefore);
+    if (dyn <= 0) {
+      return 0;
+    }
+    return rawDayInr < -dyn ? -dyn : rawDayInr;
+  }
+  return rawDayInr < -baseCap ? -baseCap : rawDayInr;
+}

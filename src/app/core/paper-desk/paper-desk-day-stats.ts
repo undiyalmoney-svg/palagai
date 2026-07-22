@@ -1,6 +1,9 @@
 import { extractTradeDate, formatDayOfWeek, formatDisplayDate } from '../utils/trade-date.util';
 import { PaperTrade } from './paper-desk.models';
-import { indexPointsMoneyRs } from './paper-desk-points-money';
+import {
+  applyRulerDayClipByDate,
+  indexPointsMoneyRs,
+} from './paper-desk-points-money';
 
 export interface PaperDayStat {
   date: string;
@@ -99,6 +102,18 @@ export function buildPaperDeskDayStats(
     row.indexNetPts += t.indexPoints;
     row.optionNetRs += t.optionPnlRs ?? 0;
     row.pointsMoneyRs += indexPointsMoneyRs(t.indexPoints, t.instrumentId, lots);
+  }
+
+  // Ruler research score: clip each combined day ₹ (dyn −₹1,500), not raw trail losses.
+  if (rankBy === 'pointsMoney') {
+    const raw = new Map<string, number>();
+    for (const [date, row] of byDate) {
+      raw.set(date, row.pointsMoneyRs);
+    }
+    const { clippedByDate } = applyRulerDayClipByDate(raw);
+    for (const [date, row] of byDate) {
+      row.pointsMoneyRs = clippedByDate.get(date) ?? row.pointsMoneyRs;
+    }
   }
 
   const days = [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date));

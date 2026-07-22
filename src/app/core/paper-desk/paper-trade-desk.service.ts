@@ -33,7 +33,7 @@ import {
   replayPaperOnIndex,
 } from './paper-desk-engine';
 import { buildPaperDeskDayStats, emptyPaperDeskDayStats } from './paper-desk-day-stats';
-import { sumPointsMoneyRs } from './paper-desk-points-money';
+import { sumPointsMoneyRs, sumPointsMoneyRsRulerClipped } from './paper-desk-points-money';
 import {
   buildDeskRiskOverrides,
 } from '../strategy-engine/strategies/pdhl-opening-range/pdhl-opening-range.evaluator';
@@ -539,7 +539,8 @@ export class PaperTradeDeskService {
           instrumentId: t.instrumentId,
         })),
       );
-      const rankBy = this.strategyManager.isRulerEnabled() ? 'pointsMoney' : 'option';
+      const rulerOn = this.strategyManager.isRulerEnabled();
+      const rankBy = rulerOn ? 'pointsMoney' : 'option';
       const dayStats = buildPaperDeskDayStats(sorted, 5, this.lotsMultiplier, rankBy);
 
       this.snapshot.set({
@@ -553,7 +554,7 @@ export class PaperTradeDeskService {
         message: `Testing complete · ${sorted.length} paper trade(s) · ${batches.length} batch(es) · ${this.lotsMultiplier} lot(s) · ${this.deskOptionsLabel()} · ${this.kiteStatsLabel()}`,
         statuses,
         trades: sorted,
-        totals: summarize(sorted, this.lotsMultiplier),
+        totals: summarize(sorted, this.lotsMultiplier, rulerOn),
         dayStats,
         kiteStats: this.kiteStats(),
         orderEvents: [],
@@ -914,7 +915,11 @@ export class PaperTradeDeskService {
       message: `${moneyTag} · alive ${now} · waiting ${waiting} · in trade ${inTrade}${targets ? ` · target hit ${targets}` : ''}${openMsg} · ${this.kiteStatsLabel()}`,
       statuses,
       trades: enriched.sort((a, b) => b.entryTime.localeCompare(a.entryTime)),
-      totals: summarize(enriched, this.lotsMultiplier),
+      totals: summarize(
+        enriched,
+        this.lotsMultiplier,
+        this.strategyManager.isRulerEnabled(),
+      ),
       dayStats: buildPaperDeskDayStats(
         enriched,
         5,
@@ -1273,6 +1278,7 @@ function isCancelledError(err: unknown): boolean {
 function summarize(
   trades: PaperTrade[],
   lotsUsed: number = 1,
+  rulerDayClip = false,
 ): PaperDeskSnapshot['totals'] {
   const lots = Math.max(1, Math.floor(lotsUsed) || 1);
   const indexNetPts = trades.reduce((a, t) => a + t.indexPoints, 0);
@@ -1283,7 +1289,9 @@ function summarize(
     indexNetPts,
     optionNetRs: trades.reduce((a, t) => a + (t.optionPnlRs ?? 0), 0),
     lotsUsed: lots,
-    pointsMoneyRs: sumPointsMoneyRs(trades, lots),
+    pointsMoneyRs: rulerDayClip
+      ? sumPointsMoneyRsRulerClipped(trades, lots)
+      : sumPointsMoneyRs(trades, lots),
   };
 }
 

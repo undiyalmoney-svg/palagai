@@ -1,5 +1,6 @@
 import { Injectable, PLATFORM_ID, inject } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
+import { clipRulerDayInr } from '../engines/ruler-morning.util';
 
 const STORAGE_KEY = 'palagai_ruler_mtd_v2';
 const LEGACY_KEY = 'palagai_ruler_mtd_v1';
@@ -22,6 +23,8 @@ interface PersistedState {
  * Idempotent by trade key so live day-replays do not double-count.
  * Reads always use the as-of trade date's month (so June paper tests are not
  * poisoned by July live ticks).
+ *
+ * `combinedMtdInr` applies research dyn0 day-clip on prior days (not raw trail sums).
  */
 @Injectable({ providedIn: 'root' })
 export class RulerMonthStateService {
@@ -33,12 +36,36 @@ export class RulerMonthStateService {
     this.load();
   }
 
-  /** Combined Nifty + Bank MTD in ₹ for the month of `asOfDate` (YYYY-MM-DD). */
+  /**
+   * Combined Nifty + Bank MTD in ₹ for the month of `asOfDate` (YYYY-MM-DD).
+   * When `asOfDate` is set, only **prior** calendar days are included (research witch/MTD).
+   * Each prior day is dyn0-clipped before summing.
+   */
   combinedMtdInr(asOfDate?: string): number {
     const ym = this.yearMonthOf(asOfDate);
+    const byDate = new Map<string, number>();
+    for (const t of this.monthTrades(ym).values()) {
+      if (asOfDate && t.date >= asOfDate) {
+        continue;
+      }
+      byDate.set(t.date, (byDate.get(t.date) ?? 0) + t.inr);
+    }
+    const dates = [...byDate.keys()].sort();
+    let mtd = 0;
+    for (const d of dates) {
+      mtd += clipRulerDayInr(byDate.get(d) ?? 0, mtd);
+    }
+    return mtd;
+  }
+
+  /** Raw combined ₹ for one calendar day (both channels). */
+  dayInr(date: string): number {
+    const ym = date.slice(0, 7);
     let sum = 0;
     for (const t of this.monthTrades(ym).values()) {
-      sum += t.inr;
+      if (t.date === date) {
+        sum += t.inr;
+      }
     }
     return sum;
   }
@@ -47,6 +74,9 @@ export class RulerMonthStateService {
     const ym = this.yearMonthOf(asOfDate);
     let sum = 0;
     for (const t of this.monthTrades(ym).values()) {
+      if (asOfDate && t.date >= asOfDate) {
+        continue;
+      }
       if (t.channel === channel) {
         sum += t.inr;
       }

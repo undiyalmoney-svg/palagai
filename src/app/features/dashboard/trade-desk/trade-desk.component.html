@@ -248,7 +248,7 @@
       </div>
       @if (rulerEnabled()) {
         <div class="stat primary" [class.up]="resultView().totals.pointsMoneyRs > 0" [class.down]="resultView().totals.pointsMoneyRs < 0">
-          <span>P&amp;L ₹ ({{ resultView().totals.lotsUsed }} lot · pts · Nifty ₹65 / Bank ₹30)</span>
+          <span>P&amp;L ₹ ({{ resultView().totals.lotsUsed }} lot · pts · ₹65/₹30 · day-cap ₹1,500)</span>
           <strong>{{ resultView().totals.pointsMoneyRs > 0 ? '+' : '' }}{{ resultView().totals.pointsMoneyRs | number: '1.0-0' }}</strong>
         </div>
         <div class="stat" [class.up]="resultView().totals.optionNetRs > 0" [class.down]="resultView().totals.optionNetRs < 0">
@@ -282,7 +282,7 @@
             <h3>Day breakdown</h3>
             <p>
               {{ resultView().dayStats.tradingDays }} trading day(s) · ranked by
-              {{ resultView().dayStats.rankBy === 'pointsMoney' ? 'Pts money ₹ (research scale)' : 'Option ₹' }}
+              {{ resultView().dayStats.rankBy === 'pointsMoney' ? 'Pts money ₹ (research day-cap)' : 'Option ₹' }}
               @if (resultView().filtered) {
                 · {{ resultView().weekdayLabel }}
               }
