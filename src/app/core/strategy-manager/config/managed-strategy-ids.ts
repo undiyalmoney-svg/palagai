@@ -16,6 +16,11 @@ export const MANAGED_STRATEGY_IDS = {
    * Selectable (not default). Research: scripts/smart-pullback-pro-daily-research.py
    */
   SMART_PULLBACK_PRO: 'smart-pullback-pro',
+  /**
+   * Align Combo · GENIE — Nifty+Bank together when aligned, one alone, skip chop.
+   * Same DNA as Smart PB GENIE; user-facing playbook name for COMBO/ALONE days.
+   */
+  ALIGN_COMBO_GENIE: 'align-combo-genie',
   /** Stocks Desk champion — gap-up fade ₹500 book. */
   GAP_FADE_500: 'gap-fade-500',
 } as const;

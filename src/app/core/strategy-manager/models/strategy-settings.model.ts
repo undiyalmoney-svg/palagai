@@ -56,7 +56,7 @@ export interface StrategySettings {
   /** Max overnight gap / ATR14 (default 6.0) — skips extreme gap chaos. */
   regimeMaxGapAtr: number;
   /** Extra strategy-specific knobs. */
-  extras: Record<string, number | string | boolean>;
+  extras: Record<string, number | string | boolean | null>;
 }
 
 export function defaultStrategySettings(

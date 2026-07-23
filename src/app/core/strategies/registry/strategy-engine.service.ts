@@ -37,6 +37,8 @@ const STRATEGY_DESCRIPTIONS: Record<string, string> = {
     'Swing-5 S/R retest · EMA50 bias · 2R · 1t · high green-day twin.',
   [STRATEGY_IDS.SMART_PULLBACK_PRO]:
     'Smart PB PRO · 1+1 ₹500 book: Nifty breakout·3R + Bank armed-retest·1.5R (Kite OOS).',
+  [STRATEGY_IDS.ALIGN_COMBO_GENIE]:
+    'Align Combo · GENIE — Nifty+Bank together when aligned, one alone, skip chop. Short/long PA + swing SL.',
   [STRATEGY_IDS.GAP_FADE_500]:
     'Stocks GAP_FADE_500 — fade gap-up ≥0.3% · stop 1.5% · ₹500 book default.',
 };

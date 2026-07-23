@@ -10,6 +10,7 @@ import { InsideBreakManagedStrategy } from '../modules/inside-break.managed-stra
 import { DonchRetestOrMid2rManagedStrategy } from '../modules/donch-retest-or-mid-2r.managed-strategy';
 import { SwingRetestEma50Rr2ManagedStrategy } from '../modules/swing-retest-ema50-2r.managed-strategy';
 import { SmartPullbackProManagedStrategy } from '../modules/smart-pullback-pro.managed-strategy';
+import { AlignComboGenieManagedStrategy } from '../modules/align-combo-genie.managed-strategy';
 import { GapFade500ManagedStrategy } from '../modules/gap-fade-500.managed-strategy';
 import { AppLoggerService } from '../../shared/logging/app-logger.service';
 
@@ -29,6 +30,7 @@ export class StrategyRegistryService {
   private readonly donchRetest = inject(DonchRetestOrMid2rManagedStrategy);
   private readonly swingRetest = inject(SwingRetestEma50Rr2ManagedStrategy);
   private readonly smartPullbackPro = inject(SmartPullbackProManagedStrategy);
+  private readonly alignComboGenie = inject(AlignComboGenieManagedStrategy);
   private readonly gapFade500 = inject(GapFade500ManagedStrategy);
 
   private readonly modules: IManagedStrategy[];
@@ -44,6 +46,7 @@ export class StrategyRegistryService {
       this.donchRetest,
       this.swingRetest,
       this.smartPullbackPro,
+      this.alignComboGenie,
       this.gapFade500,
     ];
     for (const m of this.modules) {
