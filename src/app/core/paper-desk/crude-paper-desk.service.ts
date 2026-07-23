@@ -29,7 +29,13 @@ import {
   replayPaperOnCrude,
 } from './crude-paper-engine';
 import { buildPaperDeskDayStats, emptyPaperDeskDayStats } from './paper-desk-day-stats';
-import { CRUDE_EXIT_BY, CRUDE_RUPEES_PER_POINT, resolveCrudeDayLossStopPts } from '../strategy-engine/strategies/crude-pdhl-evening/crude-pdhl-evening.evaluator';
+import { CRUDE_EXIT_BY, CRUDE_RUPEES_PER_POINT } from '../strategy-engine/strategies/crude-pdhl-evening/crude-pdhl-evening.evaluator';
+import {
+  CrudeStrategyProfileId,
+  CrudeTradeParams,
+  resolveCrudeProfileDayLossPts,
+  resolveCrudeStrategyProfile,
+} from '../strategy-engine/strategies/crude-pdhl-evening/crude-strategy-profile';
 import {
   PaperDeskMode,
   PaperDeskSnapshot,
@@ -43,12 +49,17 @@ const HISTORICAL_TIMEOUT_MS = 45_000;
 export interface CrudeDeskRunOptions {
   lots?: number;
   realOrders?: boolean;
-  /** Stricter day loss ≈ −₹2,950 (295 pts). Off = champion −240 pts. */
+  /** Stricter day loss (profile-dependent pts). */
   strictDayStop?: boolean;
-  /** Morning ORB entries 10:00–12:00 (all-months-green on Mar–Jul sample). */
+  /** Morning ORB entries 10:00–12:00. */
   enableMorning?: boolean;
-  /** Evening PDHL entries 18:30–20:30 (optional; not all-months-green). */
+  /** Evening PDHL entries 18:30–20:30. */
   enableEvening?: boolean;
+  /**
+   * Strategy profile. Default `daily-income` (₹300–1,000/day band, 1 lot × ₹10).
+   * Use `champion` for hunt SL/TP without day profit lock.
+   */
+  strategyProfile?: CrudeStrategyProfileId;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -70,7 +81,8 @@ export class CrudePaperDeskService {
   private strictDayStop = false;
   private enableMorning = true;
   private enableEvening = true;
-  private dayLossStopPts = resolveCrudeDayLossStopPts(false);
+  private tradeParams: CrudeTradeParams = resolveCrudeStrategyProfile('daily-income');
+  private dayLossStopPts = this.tradeParams.dayLossStopPts;
   private runGeneration = 0;
   private readonly maxDaysPerCall = DESK_HISTORICAL_CHUNK_DAYS;
 
@@ -110,7 +122,8 @@ export class CrudePaperDeskService {
     this.strictDayStop = !!options.strictDayStop;
     this.enableMorning = options.enableMorning !== false;
     this.enableEvening = options.enableEvening !== false;
-    this.dayLossStopPts = resolveCrudeDayLossStopPts(this.strictDayStop);
+    this.tradeParams = resolveCrudeStrategyProfile(options.strategyProfile);
+    this.dayLossStopPts = resolveCrudeProfileDayLossPts(this.tradeParams, this.strictDayStop);
     if (!this.enableMorning && !this.enableEvening) {
       this.busy.set(false);
       this.snapshot.set({
@@ -189,6 +202,7 @@ export class CrudePaperDeskService {
           dayLossStopPts: this.dayLossStopPts,
           enableMorning: this.enableMorning,
           enableEvening: this.enableEvening,
+          tradeParams: this.tradeParams,
         });
         dayNetIndexPts += Object.values(replay.dayNetByDate).reduce((a, v) => a + v, 0);
         lastSignal = replay.lastSignal || lastSignal;
@@ -244,7 +258,7 @@ export class CrudePaperDeskService {
         marketOpen: true,
         realOrders: false,
         lastTickAt: null,
-        message: `Testing complete · ${sorted.length} paper trade(s) · ${batches.length} batch(es) · ${this.lotsMultiplier} lot(s) · ${this.windowsLabel()} · day stop −${this.dayLossStopPts} · ${this.kiteStatsLabel()}`,
+        message: `Testing complete · ${sorted.length} paper trade(s) · ${batches.length} batch(es) · ${this.lotsMultiplier} lot(s) · ${this.tradeParams.label} · ${this.windowsLabel()} · ${this.riskLabel()} · ${this.kiteStatsLabel()}`,
         statuses: [status],
         trades: sorted,
         totals: summarize(sorted, this.lotsMultiplier, CRUDE_RUPEES_PER_POINT),
@@ -281,7 +295,8 @@ export class CrudePaperDeskService {
     this.strictDayStop = !!options?.strictDayStop;
     this.enableMorning = options?.enableMorning !== false;
     this.enableEvening = options?.enableEvening !== false;
-    this.dayLossStopPts = resolveCrudeDayLossStopPts(this.strictDayStop);
+    this.tradeParams = resolveCrudeStrategyProfile(options?.strategyProfile);
+    this.dayLossStopPts = resolveCrudeProfileDayLossPts(this.tradeParams, this.strictDayStop);
     this.liveOrders.reset();
     this.liveOrders.setLotsMultiplier(this.lotsMultiplier);
     const today = todayIso();
@@ -332,8 +347,8 @@ export class CrudePaperDeskService {
       marketOpen: true,
       realOrders: this.realOrders,
       message: this.realOrders
-        ? `Starting LIVE MONEY crude desk (day stop −${this.dayLossStopPts})…`
-        : `Starting live paper crude desk (day stop −${this.dayLossStopPts})…`,
+        ? `Starting LIVE MONEY crude desk (${this.tradeParams.label} · ${this.riskLabel()})…`
+        : `Starting live paper crude desk (${this.tradeParams.label} · ${this.riskLabel()})…`,
       kiteStats: this.kiteStats(),
     });
 
@@ -449,6 +464,7 @@ export class CrudePaperDeskService {
       dayLossStopPts: this.dayLossStopPts,
       enableMorning: this.enableMorning,
       enableEvening: this.enableEvening,
+      tradeParams: this.tradeParams,
     });
 
     const optionCandles = await this.fetchOptionHistories(
@@ -750,12 +766,20 @@ export class CrudePaperDeskService {
   private windowsLabel(): string {
     const parts: string[] = [];
     if (this.enableMorning) {
-      parts.push('morning ORB 10:00–12:00');
+      parts.push(`morning ORB SL${this.tradeParams.stopPts}/TP${this.tradeParams.morningTargetPts}`);
     }
     if (this.enableEvening) {
-      parts.push('evening PDHL 18:30–20:30');
+      parts.push(`evening PDHL SL${this.tradeParams.stopPts}/TP${this.tradeParams.eveningTargetPts}`);
     }
     return parts.length ? parts.join(' + ') : 'no window';
+  }
+
+  private riskLabel(): string {
+    const lock =
+      this.tradeParams.dayProfitLockPts > 0
+        ? ` · lock +${this.tradeParams.dayProfitLockPts}pts (₹${this.tradeParams.dayProfitLockPts * CRUDE_RUPEES_PER_POINT})`
+        : '';
+    return `day stop −${this.dayLossStopPts}pts${lock}`;
   }
 
   private kiteStatsLabel(): string {
