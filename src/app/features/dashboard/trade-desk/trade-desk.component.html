@@ -238,7 +238,7 @@
       </div>
       <div class="stat primary" [class.up]="resultView().totals.optionNetRs > 0" [class.down]="resultView().totals.optionNetRs < 0">
         <span>P&amp;L ₹ ({{ resultView().totals.lotsUsed }} lot{{ resultView().totals.lotsUsed > 1 ? 's' : '' }} · options)</span>
-        <strong>{{ resultView().totals.optionNetRs > 0 ? '+' : '' }}{{ resultView().totals.optionNetRs | number: '1.0-0' }}</strong>
+        <strong>{{ resultView().totals.optionNetRs > 0 ? '+' : '' }}{{ resultView().totals.optionNetRs | number: '1.2-2' }}</strong>
       </div>
       <div class="stat">
         <span>Kite 5m calls</span>
@@ -692,13 +692,13 @@
                 </td>
                 <td>
                   @if (t.optionEntryPremium != null && t.optionExitPremium != null) {
-                    {{ t.optionEntryPremium | number: '1.1-1' }} → {{ t.optionExitPremium | number: '1.1-1' }}
+                    {{ t.optionEntryPremium | number: '1.2-2' }} → {{ t.optionExitPremium | number: '1.2-2' }}
                   } @else {
                     —
                   }
                 </td>
                 <td class="num" [class.up]="(t.optionPnlRs ?? 0) > 0" [class.down]="(t.optionPnlRs ?? 0) < 0">
-                  {{ t.optionPnlRs != null ? ((t.optionPnlRs > 0 ? '+' : '') + (t.optionPnlRs | number: '1.0-0')) : '—' }}
+                  {{ t.optionPnlRs != null ? ((t.optionPnlRs > 0 ? '+' : '') + (t.optionPnlRs | number: '1.2-2')) : '—' }}
                 </td>
                 <td class="num" [class.up]="t.indexPoints > 0" [class.down]="t.indexPoints < 0">
                   {{ t.indexPoints > 0 ? '+' : '' }}{{ t.indexPoints | number: '1.1-1' }}

@@ -34,7 +34,11 @@ export interface PaperTrade {
   option: PaperOptionContract | null;
   optionEntryPremium: number | null;
   optionExitPremium: number | null;
-  /** Main P&L: (exit − entry) × lotSize × lots multiplier for long CE/PE. */
+  /**
+   * Main P&L (Kite Positions style for long CE/PE):
+   * (exitPremium − entryPremium) × lotSize × lots.
+   * Live money overlays Kite order average_price fills when present.
+   */
   optionPnlRs: number | null;
   premiumEstimated: boolean;
   outcome: 'WIN' | 'LOSS' | 'FLAT';
