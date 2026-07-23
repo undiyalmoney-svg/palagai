@@ -36,7 +36,7 @@ const STRATEGY_DESCRIPTIONS: Record<string, string> = {
   [STRATEGY_IDS.SWING_RETEST_EMA50_2R]:
     'Swing-5 S/R retest · EMA50 bias · 2R · 1t · high green-day twin.',
   [STRATEGY_IDS.SMART_PULLBACK_PRO]:
-    'Smart PB PRO · EMA breakout+strong · 2R · 10:15–14:30 · 1t · gap30 (Kite OOS).',
+    'Smart PB PRO · 1+1 ₹500 book: Nifty breakout·3R + Bank armed-retest·1.5R (Kite OOS).',
   [STRATEGY_IDS.GAP_FADE_500]:
     'Stocks GAP_FADE_500 — fade gap-up ≥0.3% · stop 1.5% · ₹500 book default.',
 };

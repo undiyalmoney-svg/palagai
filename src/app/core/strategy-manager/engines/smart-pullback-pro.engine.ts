@@ -2,7 +2,14 @@ import { Candle } from '../../models/candle.model';
 import { StrategyContext } from '../../strategy-engine/models/strategy-context.model';
 import { extractHhMm } from '../../strategy-engine/utils/market-session.util';
 import { extractTradeDate } from '../../utils/trade-date.util';
-import { atrAt, barsOnDay, emaLast, openingRange, seriesAt } from '../indicators/desk-indicators';
+import {
+  atrAt,
+  barsOnDay,
+  donchian,
+  emaLast,
+  openingRange,
+  seriesAt,
+} from '../indicators/desk-indicators';
 import {
   ManagedExitDecision,
   ManagedOpenPosition,
@@ -18,8 +25,8 @@ import {
   recordRuleTradeClosed,
 } from './index-rule.engine';
 
-/** Pine "Smart Pull back PRO" signal family. */
-export type SmartPbSignalMode = 'breakout' | 'pullback' | 'both';
+/** Pine / pro-trader Smart PB signal family. */
+export type SmartPbSignalMode = 'breakout' | 'pullback' | 'both' | 'armed_retest';
 
 export interface SmartPbProExtras {
   /** Prior-bar retest tolerance in pts (Pine: 10). */
@@ -36,24 +43,46 @@ export interface SmartPbProExtras {
   emaFlatPts: number;
   /** Skip entries when sideways warning fires. */
   skipSideways: boolean;
-  /** Which Pine signal family to trade. */
+  /** Which signal family to trade. */
   signalMode: SmartPbSignalMode;
+  /** Require close on OR-mid side (pro confluence). */
+  requireOrMid: boolean;
+  /** Require close in top/bottom third of bar (quality). */
+  requireCloseThird: boolean;
+  /** Donchian lookback for armed_retest. */
+  donchianLength: number;
 }
 
 /**
- * Kite 5m OOS 2024+ defaults (doc 27):
- * Pine same-bar breakout+strong · 2R · gap30 · no sideways skip.
- * (Yahoo-only EMA-pullback winner did not transfer.)
+ * Kite pro-loop defaults for **Nifty primary** (doc 27):
+ * Pine breakout+strong+close-third · OR-mid · 3R · gap15 · sideways · 2t.
+ * Bank overlay uses armed_retest · 1.5R via channel profile.
  */
 export const DEFAULT_SMART_PB_EXTRAS: SmartPbProExtras = {
   retestTolerancePts: 10,
-  minBarsBetweenSignals: 30,
+  minBarsBetweenSignals: 15,
   avgBodyLen: 10,
   strongBodyMult: 0.6,
   atrSidewaysMult: 0.7,
   emaFlatPts: 10,
-  skipSideways: false,
+  skipSideways: true,
   signalMode: 'breakout',
+  requireOrMid: true,
+  requireCloseThird: true,
+  donchianLength: 20,
+};
+
+/** Bank overlay DNA (1-lot book with Nifty primary). */
+export const BANK_OVERLAY_SMART_PB_EXTRAS: SmartPbProExtras = {
+  ...DEFAULT_SMART_PB_EXTRAS,
+  signalMode: 'armed_retest',
+  strongBodyMult: 0.8,
+  retestTolerancePts: 12,
+  minBarsBetweenSignals: 30,
+  requireCloseThird: false,
+  requireOrMid: true,
+  skipSideways: true,
+  donchianLength: 20,
 };
 
 export interface SmartPbDayState extends RuleDayState {
@@ -72,11 +101,41 @@ export function createSmartPbDayState(): SmartPbDayState {
   };
 }
 
+/** Channel profiles for the 1+1 lot ₹500 book (Kite OOS). */
+export function channelProfileExtras(instrumentId: string | undefined): {
+  extras: Partial<SmartPbProExtras>;
+  targetRMultiple: number;
+  maxTradesPerDay: number;
+  minBarsBetweenSignals: number;
+  emaFlatPts: number;
+} {
+  const bank = /bank/i.test(instrumentId ?? '');
+  if (bank) {
+    return {
+      extras: { ...BANK_OVERLAY_SMART_PB_EXTRAS },
+      targetRMultiple: 1.5,
+      maxTradesPerDay: 1,
+      minBarsBetweenSignals: 30,
+      emaFlatPts: 25,
+    };
+  }
+  return {
+    extras: { ...DEFAULT_SMART_PB_EXTRAS },
+    targetRMultiple: 3,
+    maxTradesPerDay: 2,
+    minBarsBetweenSignals: 15,
+    emaFlatPts: 10,
+  };
+}
+
 function readExtras(settings: StrategySettings): SmartPbProExtras {
   const x = settings.extras ?? {};
   const mode = x['signalMode'];
   const signalMode: SmartPbSignalMode =
-    mode === 'breakout' || mode === 'pullback' || mode === 'both'
+    mode === 'breakout' ||
+    mode === 'pullback' ||
+    mode === 'both' ||
+    mode === 'armed_retest'
       ? mode
       : DEFAULT_SMART_PB_EXTRAS.signalMode;
   return {
@@ -94,6 +153,15 @@ function readExtras(settings: StrategySettings): SmartPbProExtras {
         ? x['skipSideways']
         : DEFAULT_SMART_PB_EXTRAS.skipSideways,
     signalMode,
+    requireOrMid:
+      typeof x['requireOrMid'] === 'boolean'
+        ? x['requireOrMid']
+        : DEFAULT_SMART_PB_EXTRAS.requireOrMid,
+    requireCloseThird:
+      typeof x['requireCloseThird'] === 'boolean'
+        ? x['requireCloseThird']
+        : DEFAULT_SMART_PB_EXTRAS.requireCloseThird,
+    donchianLength: num(x['donchianLength'], DEFAULT_SMART_PB_EXTRAS.donchianLength),
   };
 }
 
@@ -206,6 +274,10 @@ export function runSmartPullbackPro(
     state.dayNetPts = 0;
     state.tradesToday = 0;
     state.dayStopped = false;
+    state.brokeRes = false;
+    state.brokeSup = false;
+    state.brokeLevelRes = null;
+    state.brokeLevelSup = null;
     // Keep lastBuyBar/lastSellBar across days — Pine var persists on the chart.
   }
 
@@ -267,41 +339,94 @@ export function runSmartPullbackPro(
     extras.avgBodyLen,
     extras.strongBodyMult,
   );
+  const range = candle.high - candle.low;
+  const closeThirdBull = range > 0 && (candle.close - candle.low) / range >= 0.66;
+  const closeThirdBear = range > 0 && (candle.high - candle.close) / range >= 0.66;
 
-  // Pine breakout + same-bar "retest" + strong body
+  // Pine breakout + same-bar "retest" + strong body (+ optional close-third)
   const bullBreakout = candle.close > prev.high && candle.close > ema;
   const bearBreakout = candle.close < prev.low && candle.close < ema;
   const bullRetest = candle.low <= prev.low + extras.retestTolerancePts;
   const bearRetest = candle.high >= prev.high - extras.retestTolerancePts;
-  const breakoutBuy = bullBreakout && bullRetest && strongBull;
-  const breakoutSell = bearBreakout && bearRetest && strongBear;
+  const breakoutBuy =
+    bullBreakout &&
+    bullRetest &&
+    strongBull &&
+    (!extras.requireCloseThird || closeThirdBull);
+  const breakoutSell =
+    bearBreakout &&
+    bearRetest &&
+    strongBear &&
+    (!extras.requireCloseThird || closeThirdBear);
 
   // Pine EMA pullback
   const pullbackBuy = candle.close > ema && candle.close > candle.open && candle.low <= ema;
   const pullbackSell = candle.close < ema && candle.close < candle.open && candle.high >= ema;
 
+  // Armed Donchian break → later retest (Bank overlay DNA)
+  const ch = donchian(series, extras.donchianLength, true);
+  if (ch) {
+    if (candle.close > ch.high) {
+      state.brokeRes = true;
+      state.brokeLevelRes = ch.high;
+    }
+    if (candle.close < ch.low) {
+      state.brokeSup = true;
+      state.brokeLevelSup = ch.low;
+    }
+  }
+  const armedBuy =
+    state.brokeRes &&
+    state.brokeLevelRes != null &&
+    candle.low <= state.brokeLevelRes &&
+    candle.close >= state.brokeLevelRes &&
+    candle.close > ema &&
+    strongBull;
+  const armedSell =
+    state.brokeSup &&
+    state.brokeLevelSup != null &&
+    candle.high >= state.brokeLevelSup &&
+    candle.close <= state.brokeLevelSup &&
+    candle.close < ema &&
+    strongBear;
+
   let buySignal = false;
   let sellSignal = false;
   let setup: string | null = null;
+  let level: number | null = null;
   if (extras.signalMode === 'breakout' || extras.signalMode === 'both') {
     if (breakoutBuy) {
       buySignal = true;
       setup = 'breakout';
+      level = prev.high;
     }
     if (breakoutSell) {
       sellSignal = true;
       setup = setup ?? 'breakout';
+      level = prev.low;
     }
   }
   if (extras.signalMode === 'pullback' || extras.signalMode === 'both') {
-    // Prefer breakout label when both fire on the same bar.
     if (pullbackBuy && !buySignal) {
       buySignal = true;
       setup = 'pullback';
+      level = ema;
     }
     if (pullbackSell && !sellSignal) {
       sellSignal = true;
       setup = setup === 'breakout' ? 'breakout' : 'pullback';
+      level = ema;
+    }
+  }
+  if (extras.signalMode === 'armed_retest') {
+    if (armedBuy) {
+      buySignal = true;
+      setup = 'armed_retest';
+      level = state.brokeLevelRes;
+    } else if (armedSell) {
+      sellSignal = true;
+      setup = 'armed_retest';
+      level = state.brokeLevelSup;
     }
   }
 
@@ -319,6 +444,8 @@ export function runSmartPullbackPro(
     breakoutSell,
     pullbackBuy,
     pullbackSell,
+    armedBuy,
+    armedSell,
     strongBull,
     strongBear,
     bodySize,
@@ -329,6 +456,7 @@ export function runSmartPullbackPro(
     emaDrift: side.emaDrift,
     orHigh: or.high,
     orLow: or.low,
+    orMid: or.mid,
     dayNetPts: state.dayNetPts,
     tradesToday: state.tradesToday,
     extras,
@@ -342,7 +470,6 @@ export function runSmartPullbackPro(
     return skip('Sideways market (ATR compressed + flat EMA)', analysisBase);
   }
 
-  // If both sides fire (rare), prefer breakout direction aligned with EMA.
   let direction: 'BUY' | 'SELL' | null = null;
   if (buySignal && !sellSignal) {
     direction = 'BUY';
@@ -356,9 +483,16 @@ export function runSmartPullbackPro(
     return wait('No Smart PB setup', analysisBase);
   }
 
+  if (extras.requireOrMid) {
+    if (direction === 'BUY' && candle.close < or.mid) {
+      return skip('OR-mid confluence failed (BUY below mid)', analysisBase);
+    }
+    if (direction === 'SELL' && candle.close > or.mid) {
+      return skip('OR-mid confluence failed (SELL above mid)', analysisBase);
+    }
+  }
+
   const lastBar = direction === 'BUY' ? state.lastBuyBar : state.lastSellBar;
-  // Idempotent on the same bar (desks may re-call generateSignal for SL/target).
-  // Pine: bar_index - lastBuyBar > 15
   if (
     lastBar != null &&
     state.barSeq !== lastBar &&
@@ -372,9 +506,12 @@ export function runSmartPullbackPro(
 
   const close = candle.close;
   let stop = direction === 'BUY' ? candle.low : candle.high;
-  // Pullback setups: stop beyond EMA by a small buffer.
-  if (setup === 'pullback') {
+  if (setup === 'pullback' || setup === 'armed_retest') {
     stop = direction === 'BUY' ? Math.min(stop, ema - 1) : Math.max(stop, ema + 1);
+  }
+  if (level != null && Number.isFinite(level)) {
+    stop =
+      direction === 'BUY' ? Math.min(stop, level - 1) : Math.max(stop, level + 1);
   }
   let risk = Math.abs(close - stop);
   if (risk < settings.minStopPts) {
@@ -405,8 +542,16 @@ export function runSmartPullbackPro(
 
   if (direction === 'BUY') {
     state.lastBuyBar = state.barSeq;
+    if (setup === 'armed_retest') {
+      state.brokeRes = false;
+      state.brokeLevelRes = null;
+    }
   } else {
     state.lastSellBar = state.barSeq;
+    if (setup === 'armed_retest') {
+      state.brokeSup = false;
+      state.brokeLevelSup = null;
+    }
   }
 
   return {
@@ -422,6 +567,7 @@ export function runSmartPullbackPro(
       risk,
       stop,
       target,
+      level,
     },
   };
 }
