@@ -76,18 +76,35 @@ function checkFuturesExit(
   return null;
 }
 
-function lookupPremium(optionCandles: Candle[] | undefined, when: string): number | null {
+function normalizeMinute(ts: string): string {
+  return ts.replace('T', ' ').slice(0, 16);
+}
+
+/** Same-day option premium from the option's own OHLC (entry=open, exit=close). */
+function lookupPremium(
+  optionCandles: Candle[] | undefined,
+  when: string,
+  edge: 'entry' | 'exit' = 'exit',
+): number | null {
   if (!optionCandles?.length) {
     return null;
   }
-  const target = when.slice(0, 16);
+  const target = normalizeMinute(when);
+  const targetDay = target.slice(0, 10);
   let best: Candle | null = null;
   for (const c of optionCandles) {
-    if (c.date.slice(0, 16) <= target) {
+    const norm = normalizeMinute(c.date);
+    if (norm.slice(0, 10) !== targetDay) {
+      continue;
+    }
+    if (norm <= target) {
       best = c;
     }
   }
-  return best?.close ?? null;
+  if (!best) {
+    return null;
+  }
+  return edge === 'entry' ? best.open : best.close;
 }
 
 function estimatePremiumMove(points: number): number {
@@ -119,6 +136,7 @@ function closePaperTrade(params: {
     optionExitPremium = lookupPremium(
       params.optionCandlesByToken.get(open.option.instrumentToken),
       params.exitTime,
+      'exit',
     );
     if (open.optionEntryPremium != null && optionExitPremium != null) {
       optionPnlRs =
@@ -291,6 +309,7 @@ export function replayPaperOnCrude(params: {
     const entryPremium = lookupPremium(
       optionCandlesByToken.get(option.instrumentToken),
       candle.date,
+      'entry',
     );
 
     open = {
@@ -399,10 +418,10 @@ export function enrichCrudeTradesWithOptionPremiums(
       return t;
     }
     const entry =
-      lookupPremium(optionCandlesByToken.get(t.option.instrumentToken), t.entryTime) ??
+      lookupPremium(optionCandlesByToken.get(t.option.instrumentToken), t.entryTime, 'entry') ??
       t.optionEntryPremium;
     const exit =
-      lookupPremium(optionCandlesByToken.get(t.option.instrumentToken), t.exitTime) ??
+      lookupPremium(optionCandlesByToken.get(t.option.instrumentToken), t.exitTime, 'exit') ??
       t.optionExitPremium;
     if (entry != null && exit != null) {
       return {
