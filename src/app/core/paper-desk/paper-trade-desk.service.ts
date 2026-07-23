@@ -33,6 +33,7 @@ import {
   replayPaperOnIndex,
   toOptionContract,
 } from './paper-desk-engine';
+import { applyKiteFillPnl } from './apply-kite-fill-pnl';
 import { buildPaperDeskDayStats, emptyPaperDeskDayStats } from './paper-desk-day-stats';
 import { PDHL_RUPEES_PER_POINT, buildDeskRiskOverrides } from '../strategy-engine/strategies/pdhl-opening-range/pdhl-opening-range.evaluator';
 import { StrategyManagerService } from '../strategy-manager/runtime/strategy-manager.service';
@@ -844,7 +845,7 @@ export class PaperTradeDeskService {
       today,
       authorization,
     );
-    const enriched = enrichTradesWithOptionPremiums(allTrades, optionCandles, this.lotsMultiplier);
+    let enriched = enrichTradesWithOptionPremiums(allTrades, optionCandles, this.lotsMultiplier);
 
     for (const s of statuses) {
       const mine = enriched.filter((t) => t.instrumentId === s.instrumentId);
@@ -912,6 +913,17 @@ export class PaperTradeDeskService {
           s.livePhase = 'target_hit';
           s.livePhaseLabel = 'Target achieved';
         }
+        // Open row entry premium: show Kite fill when available (display only).
+        if (s.openTrade && pos?.entryPremium != null && pos.entryPremium > 0) {
+          s.openTrade = { ...s.openTrade, optionEntryPremium: pos.entryPremium };
+        }
+      }
+
+      // Kite Positions formula: (exitAvg − entryAvg) × qty — calc only, no flow change.
+      enriched = applyKiteFillPnl(enriched, this.liveOrders.getOrderSummary());
+      for (const s of statuses) {
+        const mine = enriched.filter((t) => t.instrumentId === s.instrumentId);
+        s.dayNetOptionRs = mine.reduce((a, t) => a + (t.optionPnlRs ?? 0), 0);
       }
     } else {
       for (const s of statuses) {

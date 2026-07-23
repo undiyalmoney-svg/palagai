@@ -212,15 +212,46 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
     return open
       .map((s) => {
         const o = s.openTrade!;
+        const optTgt = this.optionTargetPremium(o);
+        const optBits =
+          o.optionEntryPremium != null
+            ? ` · Opt ${o.optionEntryPremium.toFixed(2)}${optTgt != null ? `→${optTgt.toFixed(2)}` : ''}`
+            : '';
         if (this.snapshot().realOrders && s.brokerEntryOrderId) {
-          return `${s.instrumentName}: ${o.direction} · Entry ${o.indexEntry.toFixed(1)} · Kite ${s.brokerEntryOrderId}`;
+          return `${s.instrumentName}: ${o.direction} · E ${o.indexEntry.toFixed(1)} → Tgt ${o.indexTarget.toFixed(1)}${optBits} · Kite ${s.brokerEntryOrderId}`;
         }
         if (this.snapshot().realOrders) {
           return `${s.instrumentName}: ${o.direction} · desk only · NOT on Kite${s.kiteBlockReason ? ` (${s.kiteBlockReason})` : ''}`;
         }
-        return `${s.instrumentName}: ${o.direction} · Entry ${o.indexEntry.toFixed(1)} · SL ${o.indexStop.toFixed(1)} · Tgt ${o.indexTarget.toFixed(1)} · paper`;
+        return `${s.instrumentName}: ${o.direction} · E ${o.indexEntry.toFixed(1)} → Tgt ${o.indexTarget.toFixed(1)}${optBits} · paper`;
       })
       .join('  |  ');
+  }
+
+  /** Option SL premium proxy: entry − |index entry − stop| × 0.5 (same as live SL-M). */
+  protected optionStopPremium(open: {
+    indexEntry: number;
+    indexStop: number;
+    optionEntryPremium: number | null;
+  }): number | null {
+    if (open.optionEntryPremium == null || open.optionEntryPremium <= 0) {
+      return null;
+    }
+    const indexRisk = Math.abs(open.indexEntry - open.indexStop);
+    return Math.max(0.05, Math.round((open.optionEntryPremium - indexRisk * 0.5) / 0.05) * 0.05);
+  }
+
+  /** Option target premium proxy: entry + |index target − entry| × 0.5. */
+  protected optionTargetPremium(open: {
+    indexEntry: number;
+    indexTarget: number;
+    optionEntryPremium: number | null;
+  }): number | null {
+    if (open.optionEntryPremium == null || open.optionEntryPremium <= 0) {
+      return null;
+    }
+    const indexReward = Math.abs(open.indexTarget - open.indexEntry);
+    return Math.max(0.05, Math.round((open.optionEntryPremium + indexReward * 0.5) / 0.05) * 0.05);
   }
 
   protected fmtTime(ts: string | null | undefined): string {

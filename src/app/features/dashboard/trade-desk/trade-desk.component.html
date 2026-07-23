@@ -238,7 +238,7 @@
       </div>
       <div class="stat primary" [class.up]="resultView().totals.optionNetRs > 0" [class.down]="resultView().totals.optionNetRs < 0">
         <span>P&amp;L ₹ ({{ resultView().totals.lotsUsed }} lot{{ resultView().totals.lotsUsed > 1 ? 's' : '' }} · options)</span>
-        <strong>{{ resultView().totals.optionNetRs > 0 ? '+' : '' }}{{ resultView().totals.optionNetRs | number: '1.0-0' }}</strong>
+        <strong>{{ resultView().totals.optionNetRs > 0 ? '+' : '' }}{{ resultView().totals.optionNetRs | number: '1.2-2' }}</strong>
       </div>
       <div class="stat">
         <span>Kite 5m calls</span>
@@ -451,19 +451,63 @@
                 </div>
               }
 
-              <div class="levels-row levels-row-live">
-                <div>
-                  <span>Entry</span>
-                  <strong>{{ o.indexEntry | number: '1.1-1' }}</strong>
+              <div class="levels-block">
+                <p class="levels-caption">Index levels</p>
+                <div class="levels-row levels-row-live">
+                  <div>
+                    <span>Entry</span>
+                    <strong>{{ o.indexEntry | number: '1.1-1' }}</strong>
+                  </div>
+                  <div>
+                    <span>SL</span>
+                    <strong class="sl">{{ o.indexStop | number: '1.1-1' }}</strong>
+                  </div>
+                  <div>
+                    <span>Target</span>
+                    <strong class="tgt">{{ o.indexTarget | number: '1.1-1' }}</strong>
+                  </div>
                 </div>
-                <div>
-                  <span>SL</span>
-                  <strong class="sl">{{ o.indexStop | number: '1.1-1' }}</strong>
+              </div>
+
+              <div class="levels-block">
+                <p class="levels-caption">Option prices</p>
+                <div class="levels-row levels-row-live">
+                  <div>
+                    <span>Entry</span>
+                    <strong>
+                      @if (o.optionEntryPremium != null) {
+                        {{ o.optionEntryPremium | number: '1.2-2' }}
+                      } @else {
+                        —
+                      }
+                    </strong>
+                  </div>
+                  <div>
+                    <span>SL-M</span>
+                    <strong class="sl">
+                      @if (s.brokerSlTrigger != null) {
+                        {{ s.brokerSlTrigger | number: '1.2-2' }}
+                      } @else if (optionStopPremium(o); as stopPrem) {
+                        {{ stopPrem | number: '1.2-2' }}
+                      } @else {
+                        —
+                      }
+                    </strong>
+                  </div>
+                  <div>
+                    <span>Target</span>
+                    <strong class="tgt">
+                      @if (optionTargetPremium(o); as tgtPrem) {
+                        {{ tgtPrem | number: '1.2-2' }}
+                      } @else {
+                        —
+                      }
+                    </strong>
+                  </div>
                 </div>
-                <div>
-                  <span>Target</span>
-                  <strong class="tgt">{{ o.indexTarget | number: '1.1-1' }}</strong>
-                </div>
+                <small class="levels-note">
+                  Option target ≈ entry + |index target − entry| × 0.5 (same delta used for SL-M)
+                </small>
               </div>
 
               @if (s.brokerEntryOrderId || s.brokerSlTrigger != null) {
@@ -471,12 +515,8 @@
                   @if (s.brokerEntryOrderId) {
                     <span>Entry order {{ s.brokerEntryOrderId }}</span>
                   }
-                  @if (s.brokerSlTrigger != null) {
-                    <span>Option SL-M {{ s.brokerSlTrigger | number: '1.2-2' }}
-                      @if (s.brokerSlOrderId) {
-                        · {{ s.brokerSlOrderId }}
-                      }
-                    </span>
+                  @if (s.brokerSlOrderId) {
+                    <span>SL-M order {{ s.brokerSlOrderId }}</span>
                   }
                 </div>
               }
@@ -544,7 +584,15 @@
             <div class="open-strip">
               <span class="dir" [attr.data-dir]="o.direction">{{ o.direction }}</span>
               <span>{{ o.option?.tradingSymbol ?? 'ATM option pending' }}</span>
-              <span>Entry {{ o.indexEntry | number: '1.1-1' }} · SL {{ o.indexStop | number: '1.1-1' }} · Tgt {{ o.indexTarget | number: '1.1-1' }}</span>
+              <span>
+                Idx E {{ o.indexEntry | number: '1.1-1' }} → Tgt {{ o.indexTarget | number: '1.1-1' }}
+                @if (o.optionEntryPremium != null) {
+                  · Opt E {{ o.optionEntryPremium | number: '1.2-2' }}
+                }
+                @if (optionTargetPremium(o); as tgtPrem) {
+                  → Tgt {{ tgtPrem | number: '1.2-2' }}
+                }
+              </span>
             </div>
           }
         </article>
@@ -641,6 +689,7 @@
               <th>Index</th>
               <th>Dir</th>
               <th>Chosen instrument</th>
+              <th>Idx entry / tgt</th>
               <th>Prem in/out</th>
               <th>Option ₹</th>
               <th>Idx pts</th>
@@ -690,15 +739,21 @@
                     <span class="muted">—</span>
                   }
                 </td>
+                <td class="num">
+                  <div class="stack">
+                    <strong>{{ t.indexEntry | number: '1.1-1' }}</strong>
+                    <small>Tgt {{ t.indexTarget | number: '1.1-1' }}</small>
+                  </div>
+                </td>
                 <td>
                   @if (t.optionEntryPremium != null && t.optionExitPremium != null) {
-                    {{ t.optionEntryPremium | number: '1.1-1' }} → {{ t.optionExitPremium | number: '1.1-1' }}
+                    {{ t.optionEntryPremium | number: '1.2-2' }} → {{ t.optionExitPremium | number: '1.2-2' }}
                   } @else {
                     —
                   }
                 </td>
                 <td class="num" [class.up]="(t.optionPnlRs ?? 0) > 0" [class.down]="(t.optionPnlRs ?? 0) < 0">
-                  {{ t.optionPnlRs != null ? ((t.optionPnlRs > 0 ? '+' : '') + (t.optionPnlRs | number: '1.0-0')) : '—' }}
+                  {{ t.optionPnlRs != null ? ((t.optionPnlRs > 0 ? '+' : '') + (t.optionPnlRs | number: '1.2-2')) : '—' }}
                 </td>
                 <td class="num" [class.up]="t.indexPoints > 0" [class.down]="t.indexPoints < 0">
                   {{ t.indexPoints > 0 ? '+' : '' }}{{ t.indexPoints | number: '1.1-1' }}

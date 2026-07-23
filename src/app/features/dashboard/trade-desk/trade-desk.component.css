@@ -323,6 +323,26 @@
   line-height: 1.35;
 }
 
+.levels-block {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.levels-caption {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #0f766e;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.levels-note {
+  color: #0f766e;
+  opacity: 0.85;
+  line-height: 1.3;
+}
+
 .levels-row {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
