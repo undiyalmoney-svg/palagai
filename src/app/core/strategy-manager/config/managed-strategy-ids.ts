@@ -11,6 +11,11 @@ export const MANAGED_STRATEGY_IDS = {
   DONCH_RETEST_OR_MID_2R: 'donch-retest-or-mid-2r',
   /** S/R retest twin: Swing-5 retest + EMA50 + 2R. */
   SWING_RETEST_EMA50_2R: 'swing-retest-ema50-2r',
+  /**
+   * Pine Smart Pullback PRO port — EMA50 pullback · 1.5R.
+   * Selectable (not default). Research: scripts/smart-pullback-pro-daily-research.py
+   */
+  SMART_PULLBACK_PRO: 'smart-pullback-pro',
   /** Stocks Desk champion — gap-up fade ₹500 book. */
   GAP_FADE_500: 'gap-fade-500',
 } as const;

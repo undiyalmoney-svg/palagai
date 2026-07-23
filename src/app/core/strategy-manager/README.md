@@ -16,7 +16,7 @@ Market data → Strategy Manager → IManagedStrategy → Signal → Desk risk �
 |---|---|
 | `core/strategy-manager/models/` | `IManagedStrategy`, settings, channels |
 ## Modules: Champion wrapper + VolExpand / Swing5 / Donch20 / Turtle55 / Inside Break
-| `core/strategy-manager/modules/` | Champion + VolExpand / Swing5 / Donch20 / Turtle55 / Inside Break / Donch Retest / Swing Retest |
+| `core/strategy-manager/modules/` | Champion + VolExpand / Swing5 / Donch20 / Turtle55 / Inside Break / Donch Retest / Swing Retest / Smart PB PRO |
 | `core/strategy-manager/registry/` | Registration (add strategy = new class + inject here) |
 | `core/strategy-manager/config/` | Paper/Live/Shadow assignments + per-strategy settings (localStorage) |
 | `core/strategy-manager/runtime/` | Manager, event log, shadow book, performance |

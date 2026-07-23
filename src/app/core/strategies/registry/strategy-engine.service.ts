@@ -35,6 +35,8 @@ const STRATEGY_DESCRIPTIONS: Record<string, string> = {
     'Donchian-20 S/R retest · OR-mid · 1.5R + BE after +1R · up to 3t/day · daily ₹500 default.',
   [STRATEGY_IDS.SWING_RETEST_EMA50_2R]:
     'Swing-5 S/R retest · EMA50 bias · 2R · 1t · high green-day twin.',
+  [STRATEGY_IDS.SMART_PULLBACK_PRO]:
+    'Smart PB PRO · EMA50 pullback · sideways skip · 1.5R · 2t/day · gap30 (Pine port).',
   [STRATEGY_IDS.GAP_FADE_500]:
     'Stocks GAP_FADE_500 — fade gap-up ≥0.3% · stop 1.5% · ₹500 book default.',
 };
