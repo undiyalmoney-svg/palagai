@@ -18,6 +18,8 @@ import {
   STOCKS_STRATEGY_OPTIONS,
   StocksStrategyId,
 } from '../../../core/strategy-engine/strategies/stocks-equity/stocks-equity.evaluator';
+import { MANAGED_STRATEGY_IDS } from '../../../core/strategy-manager/config/managed-strategy-ids';
+import { StrategyManagerService } from '../../../core/strategy-manager/runtime/strategy-manager.service';
 import { formatUnknownError } from '../../../core/utils/kite-error.util';
 
 const DESK_STRATEGY_KEY = 'palagai_stocks_desk_strategy_v1';
@@ -36,6 +38,7 @@ export class StocksDeskComponent implements OnInit, OnDestroy {
   private readonly instruments = inject(InstrumentStoreService);
   private readonly kiteSession = inject(KiteSessionService);
   private readonly kiteApi = inject(KiteApiService);
+  private readonly strategyManager = inject(StrategyManagerService);
 
   protected readonly mode = signal<PaperDeskMode>('testing');
   protected fromDate = shiftDays(-60);
@@ -77,6 +80,20 @@ export class StocksDeskComponent implements OnInit, OnDestroy {
   protected onStrategyChange(id: StocksStrategyId): void {
     this.strategyId = id;
     persistDeskStrategy(id);
+    // Keep Strat Manager stocks Paper+Live in sync only for Align Combo (separate path).
+    // Defaults and other Stocks Desk strategies are left alone.
+    if (id === 'ALIGN_COMBO_GENIE') {
+      this.strategyManager.setAssignment(
+        'stocks',
+        'paper',
+        MANAGED_STRATEGY_IDS.ALIGN_COMBO_GENIE,
+      );
+      this.strategyManager.setAssignment(
+        'stocks',
+        'live',
+        MANAGED_STRATEGY_IDS.ALIGN_COMBO_GENIE,
+      );
+    }
   }
 
   ngOnDestroy(): void {

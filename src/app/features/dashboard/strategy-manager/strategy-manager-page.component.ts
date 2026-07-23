@@ -16,6 +16,7 @@ import { ShadowBookService } from '../../../core/strategy-manager/runtime/shadow
 import { StrategyPerformanceService } from '../../../core/strategy-manager/runtime/strategy-performance.service';
 import { StrategyRegistryService } from '../../../core/strategy-manager/registry/strategy-registry.service';
 import { StrategySettings } from '../../../core/strategy-manager/models/strategy-settings.model';
+import { MANAGED_STRATEGY_IDS } from '../../../core/strategy-manager/config/managed-strategy-ids';
 import { PaperTradeDeskService } from '../../../core/paper-desk/paper-trade-desk.service';
 
 @Component({
@@ -129,7 +130,17 @@ export class StrategyManagerPageComponent {
 
   protected setAssignment(mode: ExecutionMode | 'shadow', strategyId: string): void {
     const value = mode === 'shadow' && strategyId === '' ? null : strategyId;
-    this.manager.setAssignment(this.selectedChannel(), mode, value);
+    const channel = this.selectedChannel();
+    this.manager.setAssignment(channel, mode, value);
+    // Align Combo: selecting for Paper or Live activates both modes on this channel only.
+    // Other strategies keep independent Paper/Live picks (existing flow untouched).
+    if (
+      (mode === 'paper' || mode === 'live') &&
+      strategyId === MANAGED_STRATEGY_IDS.ALIGN_COMBO_GENIE
+    ) {
+      const other: ExecutionMode = mode === 'paper' ? 'live' : 'paper';
+      this.manager.setAssignment(channel, other, strategyId);
+    }
     if ((mode === 'paper' || mode === 'live') && strategyId) {
       this.selectedStrategyId.set(strategyId);
     }

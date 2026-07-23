@@ -3,9 +3,11 @@
  *
  * GAP_FADE_500 — ~₹500/weekday avg (docs/08)
  * ALMOST_GREEN_MIX — ~82% signal green / ~70% calendar green (docs/10)
+ * ALIGN_COMBO_GENIE — selectable Align Combo equity adaptation (separate evaluator)
  */
 import { Candle } from '../../../models/candle.model';
 import { extractTradeDate } from '../../../utils/trade-date.util';
+import { replayAlignComboGenieStocks } from './align-combo-genie-stocks.evaluator';
 
 export const STOCKS_CAPITAL_RS = 60_000;
 export const STOCKS_RISK_PCT = 0.02;
@@ -30,6 +32,7 @@ export const STOCKS_MAX_LEGS = 3;
 export type StocksStrategyId =
   | 'ALMOST_GREEN_MIX'
   | 'GAP_FADE_500'
+  | 'ALIGN_COMBO_GENIE'
   | 'FOLLOW_PRIOR_COLOR'
   | 'GAP_DOWN_BOUNCE'
   | 'GAP_UP_FADE'
@@ -41,6 +44,10 @@ export const STOCKS_STRATEGY_OPTIONS: Array<{ id: StocksStrategyId; label: strin
   {
     id: 'GAP_FADE_500',
     label: '₹500 book — gap-up fade 0.3% · max 3 (DEFAULT)',
+  },
+  {
+    id: 'ALIGN_COMBO_GENIE',
+    label: 'Align Combo · GENIE — prior-color + gap continuation (selectable)',
   },
   {
     id: 'ALMOST_GREEN_MIX',
@@ -110,6 +117,13 @@ export function stockRiskParams(strategyId: StocksStrategyId): {
       riskPct: ALMOST_GREEN_RISK_PCT,
     };
   }
+  if (strategyId === 'ALIGN_COMBO_GENIE') {
+    return {
+      stopPct: 0.015,
+      targetPct: 0,
+      riskPct: 0.025,
+    };
+  }
   return { stopPct: STOCKS_STOP_PCT, targetPct: 0, riskPct: STOCKS_RISK_PCT };
 }
 
@@ -164,6 +178,7 @@ export function applyMaxTradesPerDayByGap(
 export function maxPerDayForStrategy(strategyId: StocksStrategyId): number | null {
   if (strategyId === 'GAP_FADE_500') return GAP_FADE_500_MAX_PER_DAY;
   if (strategyId === 'ALMOST_GREEN_MIX') return ALMOST_GREEN_MAX_PER_DAY;
+  if (strategyId === 'ALIGN_COMBO_GENIE') return 3;
   return null;
 }
 
@@ -195,7 +210,9 @@ export function resizeTradesForCapitalSplit(
           ? ALMOST_GREEN_RISK_PCT
           : t.strategyId === 'GAP_FADE_500'
             ? GAP_FADE_500_RISK_PCT
-            : STOCKS_RISK_PCT;
+            : t.strategyId === 'ALIGN_COMBO_GENIE'
+              ? 0.025
+              : STOCKS_RISK_PCT;
       const qty = qtyForRisk(t.entry, t.stop, perLegCapital, riskPct);
       out.push({
         ...t,
@@ -216,6 +233,12 @@ export function replayStocksDayStrategy(params: {
 }): StocksDayTrade[] {
   const { symbol, days, strategyId } = params;
   const capital = params.capitalRs ?? STOCKS_CAPITAL_RS;
+
+  // Align Combo · GENIE stocks path — separate evaluator (does not alter other cases).
+  if (strategyId === 'ALIGN_COMBO_GENIE') {
+    return replayAlignComboGenieStocks({ symbol, days, capitalRs: capital });
+  }
+
   const trades: StocksDayTrade[] = [];
 
   let gapFadePct = 0.005;
