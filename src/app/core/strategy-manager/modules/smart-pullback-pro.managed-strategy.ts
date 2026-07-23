@@ -25,43 +25,44 @@ import {
 } from '../engines/smart-pullback-pro.engine';
 
 /**
- * Smart Pullback PRO — Pine DNA port (EMA50 pullback family).
+ * Smart Pullback PRO — Pine DNA port (breakout+strong family).
  *
- * Research (Yahoo 5m ~60d, 1 lot Nifty ₹65 + 1 lot Bank ₹30):
- *   pullback · 1.5R · 09:45–15:10 · 2t/day · gap30 · sideways skip
- *   → ~61% days ≥ ₹500 · ~63% green · avg ~₹1140 (not a guarantee).
+ * Kite 5m OOS 2024+ (1 lot Nifty ₹65 + 1 lot Bank ₹30):
+ *   breakout · 2R · 10:15–14:30 · 1t/day · gap30
+ *   → ~49% days ≥ ₹500 · ~52% green · avg ~₹138 (not ₹500/day at 1 lot).
+ *   ~3.5–4 lots ≈ ₹500 avg path. Yahoo pullback winner did not transfer.
  *
  * Selectable in Strategy Manager — does NOT replace Donch Retest defaults.
  */
 @Injectable({ providedIn: 'root' })
 export class SmartPullbackProManagedStrategy implements IManagedStrategy {
   readonly id = MANAGED_STRATEGY_IDS.SMART_PULLBACK_PRO;
-  readonly name = 'Smart PB PRO · EMA pullback · 1.5R';
-  readonly version = '1.0.0';
+  readonly name = 'Smart PB PRO · breakout · 2R';
+  readonly version = '1.1.0';
   readonly description =
-    'Pine Smart Pullback PRO port: EMA50 pullback entries · skip sideways · 1.5R · 2t/day · gap30. Index paper first — research sample is Yahoo 5m ~60d.';
+    'Pine Smart Pullback PRO port (Kite-validated): EMA-filtered breakout+strong · 2R · 10:15–14:30 · 1t · gap30. Paper first — ~₹138/day avg @ 1+1 lot OOS.';
   readonly supports: readonly DeskChannel[] = ['nifty', 'bank'];
 
   readonly defaultSettings = defaultStrategySettings({
-    entryTimeStart: '09:45',
-    entryTimeEnd: '15:10',
+    entryTimeStart: '10:15',
+    entryTimeEnd: '14:30',
     exitTime: '15:15',
-    orEnd: '09:45',
+    orEnd: '10:15',
     stopLossPts: 30,
     bankStopLossPts: 45,
     emaLength: 50,
-    maxTradesPerDay: 2,
+    maxTradesPerDay: 1,
     instrumentType: 'futures',
     dayStopPts: 60,
-    targetRMultiple: 1.5,
+    targetRMultiple: 2,
     profitProtectEnabled: false,
     regimeFilterEnabled: false,
     positionSizeLots: 1,
     extras: {
       ...DEFAULT_SMART_PB_EXTRAS,
-      signalMode: 'pullback',
+      signalMode: 'breakout',
       minBarsBetweenSignals: 30,
-      skipSideways: true,
+      skipSideways: false,
       retestTolerancePts: 10,
       strongBodyMult: 0.6,
       emaFlatPts: 10,

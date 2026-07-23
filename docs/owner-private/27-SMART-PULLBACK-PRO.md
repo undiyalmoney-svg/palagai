@@ -1,83 +1,85 @@
-# 27 — Smart Pullback PRO (Pine) · daily ₹ research
+# 27 — Smart Pullback PRO (Pine) · Kite daily ₹ research
 
 **Date:** 2026-07-23  
-**Script:** `scripts/smart-pullback-pro-daily-research.py`  
+**Scripts:** `scripts/smart-pullback-pro-daily-research.py` (+ Kite cache runner)  
 **Strategy id:** `smart-pullback-pro`  
-**Book:** Nifty ₹65/pt + Bank ₹30/pt · **1 lot each**
+**Book:** Nifty ₹65/pt + Bank ₹30/pt · **1 lot each** (unless noted)
 
 ## Thesis
 
-TradingView **Smart Pull back PRO** prints many BUY/SELL labels. The money question is not “does it signal?” — it is **which entry family** + **when to exit** for a usable ₹500–₹5000 daily band.
+TradingView **Smart Pull back PRO** prints many BUY/SELL labels. The money question is **which entry family** + **when to exit** for a usable daily ₹ band.
 
-## Data (this environment)
+## Data
 
 | Series | Source | Span |
 |---|---|---|
-| Primary | Yahoo `^NSEI` / `^NSEBANK` **5m** | ~57 sessions (≈60d max Yahoo keeps) |
-| Sanity | Yahoo **60m** | ~2y · OOS calendar 2024+ |
+| **Truth** | Kite 5m `256265` / `260105` | 2020→2026 · **OOS calendar 2024+ (635 days)** |
+| Overfit check | Yahoo 5m ~60d | showed a false “pullback · 1.5R” winner |
 
-No Kite futures cache here — results are **index spot proxy**, not live futures fills. Re-run on Kite 5m when auth is available.
+Auth for fetch: `KITE_AUTH='token apiKey:accessToken'` (never commit tokens). Cache path: `reports/analyst-cache/*-5m-2020-2026.json` (gitignored).
 
-## What actually printed money (recent 5m)
-
-**Winner DNA**
+## Kite OOS winner (deploy DNA)
 
 | Knob | Value |
 |---|---|
-| Entry | **EMA50 pullback** (close above/below EMA50, bullish/bearish candle, wick touches EMA) |
-| Exit | **1.5R** hard target (BE protect did **not** help on this sample) |
-| Window | **09:45–15:10** |
-| Max trades / day / instrument | **2** |
-| Min bars between same-side signals | **30** |
-| Sideways skip | **ON** (`ATR < SMA(ATR,20)×0.7` and `|EMA−EMA[5]| < 10`) |
-| Stop | candle extreme, capped Nifty 30 / Bank 45; day stop −60 pts |
+| Entry | **Pine breakout** — close beyond prior H/L + EMA50 side + same-bar “retest” tol + strong body |
+| Exit | **2R** hard target |
+| Window | **10:15–14:30** |
+| Max trades / day / instrument | **1** |
+| Min bars between same-side | **30** |
+| Sideways skip | **OFF** (did not help leaders) |
+| Stop | candle extreme, cap Nifty 30 / Bank 45; day stop −60 pts |
 
-### Recent 5m metrics (1+1 lot, calendar days)
+### Metrics @ 1+1 lot (OOS 2024+)
 
-| Metric | Smart PB winner | Donch Retest baseline (same sample) |
-|---|---:|---:|
-| Days ≥ ₹500 | **61.4%** | 26.3% |
-| Green calendar | **63.2%** | 31.6% |
-| In ₹500–₹5000 band | **56.1%** | 22.8% |
-| Avg ₹ / day | **~1140** | **−1146** |
-| Median traded day | **+1365** | −1222 |
-| Best / worst | +7731 / **−3832** | +6054 / −5273 |
-| Coverage | 89% | 96% |
+| Metric | Smart PB breakout·2R | Yahoo pullback·1.5R on Kite | Notes |
+|---|---:|---:|---|
+| Days ≥ ₹500 | **~49%** | ~37% | |
+| Green calendar | **~52%** | ~43% | |
+| In ₹500–₹5000 | **~39%** | ~34% | |
+| Avg ₹ / day | **~₹138** | **−₹44** | Yahoo winner **does not transfer** |
+| Median traded | **~+₹372** | −₹371 | |
+| Best / worst | +6600 / **−3300** | / −5694 | day-stop bound |
+| Coverage | ~99% | ~93% | |
 
-Traded-day view: **~69% ≥ ₹500**, **~63% inside ₹500–₹5000**, a few days **> ₹5000**, and **~10 red days ≤ −₹2000**.
+### By year (breakout · 2R · 10:15–14:30 · 1t)
 
-### Entry family ranking (top of grid)
+| Year | ≥₹500 | Green | Avg ₹ |
+|---|---:|---:|---:|
+| 2024 | 54% | 57% | ~300 |
+| 2025 | 44% | 47% | ~13 |
+| 2026 YTD | 49% | 53% | ~65 |
 
-1. **`pullback` + `rr1_5`** — best daily consistency  
-2. **`pb_reject` + `rr1_5`/`rr2`** — fewer trades, still useful twin (strong body + close beyond prior H/L)  
-3. Raw Pine **`breakout` same-bar** family — did **not** lead the money grid  
-4. Trading **both** breakout+pullback — noisier than pullback-only
+## Path to ₹500 / day
 
-## Exit answer (short)
+At **1+1 lot**, avg is ~₹138 — **not** ₹500–₹5000 daily.  
+Rough sizing: **~3.5–4 lots each** → ~₹500 avg (same DNA), with worst days scaling too (~−₹12k at 4×).
 
-- **Take profit at 1.5R** — highest share of days landing in the ₹500–₹5000 band.  
-- **2R** raises average ₹ but drops band hit-rate (more giveback / fewer completes).  
-- **EOD / EMA exits** underperformed fixed R on this sample.  
-- **BE after +1R** did not beat plain 1.5R here (unlike Donch Retest defaults).
+## Entry / exit answers
+
+**Enter:** Pine **breakout+strong** (EMA-filtered), morning-mid session only (10:15–14:30), one trade.  
+**Exit:** **2R**. 1.5R hits the ₹500 band slightly more often but lower average; EOD/EMA exits lost.
+
+EMA **pullback** labels are plentiful but **lose money** on Kite multi-year OOS when sized 1+1.
 
 ## Honest limits
 
-- **Not every day ₹500.** ~35–40% of calendar days are still red/flat on the winning DNA.  
-- **Worst day ~−₹3800** at 1+1 lot with day-stop 60 — size carefully.  
-- **60m long sample** does **not** validate the same DNA (different timeframe). Treat 5m ~60d as a **recent regime** result, not multi-year proof.  
-- Spot ≠ futures; slippage/fees not modeled.  
-- **Do not auto-replace** Donch Retest as Paper/Live default until Kite multi-year 5m confirms.
+- **Cannot promise min ₹500 every day** at 1 lot — ~half the days miss.  
+- Worst day ~**−₹3300** @ 1+1 with day-stop 60.  
+- Index spot tokens used as research proxy; futures/options theta not modeled.  
+- **Do not replace** Donch Retest Paper/Live defaults on this DNA alone.
 
 ## App wiring
 
 - Engine: `src/app/core/strategy-manager/engines/smart-pullback-pro.engine.ts`  
 - Module: `src/app/core/strategy-manager/modules/smart-pullback-pro.managed-strategy.ts`  
-- Select **Smart PB PRO · EMA pullback · 1.5R** in Strategy Manager (Nifty/Bank).  
-- Extras: `signalMode` = `pullback` | `breakout` | `both` | (use `pb_reject` via research script; app uses pullback/breakout/both).
+- Select **Smart PB PRO · breakout · 2R** in Strategy Manager.  
+- Extras: `signalMode` = `breakout` | `pullback` | `both`
 
 ## Reproduce
 
 ```bash
-python3 scripts/smart-pullback-pro-daily-research.py
-# → /tmp/smart-pb-pro/summary.json
+# after Kite fetch into reports/analyst-cache/
+python3 scripts/smart-pullback-pro-daily-research.py   # Yahoo probe
+# Kite OOS grid output: /tmp/smart-pb-kite/summary.json
 ```

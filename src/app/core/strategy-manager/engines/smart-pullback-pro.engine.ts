@@ -40,7 +40,11 @@ export interface SmartPbProExtras {
   signalMode: SmartPbSignalMode;
 }
 
-/** Research defaults (Yahoo 5m ~60d): EMA pullback · gap30 · sideways skip. */
+/**
+ * Kite 5m OOS 2024+ defaults (doc 27):
+ * Pine same-bar breakout+strong · 2R · gap30 · no sideways skip.
+ * (Yahoo-only EMA-pullback winner did not transfer.)
+ */
 export const DEFAULT_SMART_PB_EXTRAS: SmartPbProExtras = {
   retestTolerancePts: 10,
   minBarsBetweenSignals: 30,
@@ -48,8 +52,8 @@ export const DEFAULT_SMART_PB_EXTRAS: SmartPbProExtras = {
   strongBodyMult: 0.6,
   atrSidewaysMult: 0.7,
   emaFlatPts: 10,
-  skipSideways: true,
-  signalMode: 'pullback',
+  skipSideways: false,
+  signalMode: 'breakout',
 };
 
 export interface SmartPbDayState extends RuleDayState {

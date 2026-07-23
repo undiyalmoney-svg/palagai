@@ -5,14 +5,14 @@ Smart Pullback PRO — daily ₹ research (Nifty 1 lot + Bank 1 lot).
 Thesis (owner): Pine "Smart Pull back PRO" fires many BUY/SELL labels;
 the edge is *which* entries + *when* to exit for ₹500–₹5000/day.
 
-Data (no Kite cache in this env):
-  - Yahoo ^NSEI / ^NSEBANK 5m (~60 trading days) — primary DNA fidelity
-  - Yahoo 60m (~2y) — longer sanity check (same rules, coarser bars)
+Data priority:
+  1. Kite cache `reports/analyst-cache/nifty-5m-2020-2026.json` (+ bank) if present
+     → OOS calendar 2024+ is the truth check (see docs/owner-private/27-*.md)
+  2. Else Yahoo ^NSEI / ^NSEBANK 5m (~60d) + 60m (~2y) probe
 
-Book: Nifty ₹65/pt · Bank ₹30/pt · day stop 60 pts/instrument · OOS = full sample
-      (5m window is recent; 60m uses calendar days 2024+).
+Book: Nifty ₹65/pt · Bank ₹30/pt · day stop 60 pts/instrument.
 
-Outputs: /tmp/smart-pb-pro/summary.json + leaders printed to stdout.
+Outputs: /tmp/smart-pb-pro/summary.json (+ /tmp/smart-pb-kite/ when using Kite).
 """
 from __future__ import annotations
 
