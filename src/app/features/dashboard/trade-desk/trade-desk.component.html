@@ -487,8 +487,10 @@
                     <strong class="sl">
                       @if (s.brokerSlTrigger != null) {
                         {{ s.brokerSlTrigger | number: '1.2-2' }}
+                      } @else if (optionStopPremium(o); as stopPrem) {
+                        {{ stopPrem | number: '1.2-2' }}
                       } @else {
-                        {{ optionStopPremium(o) != null ? (optionStopPremium(o)! | number: '1.2-2') : '—' }}
+                        —
                       }
                     </strong>
                   </div>
