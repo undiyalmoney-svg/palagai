@@ -36,12 +36,11 @@ OOS (Kite 5m 2024+ @ 1+1): **~₹507/day**, red **~34%** (vs ~49% always-combo),
 
 ## How to run
 
-1. Paper Desk → assign **Align Combo · GENIE** on **Nifty** and **Bank**.  
-2. After OR (~09:45), set peer extras for full COMBO/ALONE:  
-   - `geniePeerDrive`, `geniePeerGap`, `geniePeerBias`  
-   - on Bank: `genieNiftyBias` = BUY or SELL (matches your screenshot when both red → SELL)  
-3. Without peer extras: local lite still skips Tuesday + weak Mon/Wed drives.  
-4. Does **not** replace Donch Retest defaults.
+1. **Strategy Manager** → Nifty / Bank / Stocks → pick **Align Combo · GENIE** for Paper (also sets Live on that channel).  
+2. **Trade Desk** (Nifty/Bank): Testing uses Paper assignment; Live uses Live assignment.  
+3. **Stocks Desk**: choose **Align Combo · GENIE** in the strategy dropdown (paper Testing + Live). Default remains GAP_FADE_500.  
+4. After OR on index (~09:45), optional peer extras: `geniePeerDrive`, `genieNiftyBias`.  
+5. Does **not** replace Donch Retest or GAP_FADE_500 defaults.
 
 ## Code
 

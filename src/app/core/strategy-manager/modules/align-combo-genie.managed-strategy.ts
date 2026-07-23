@@ -37,7 +37,7 @@ import {
  *   Nifty: Pine breakout · OR-mid · 3R · SL beyond bar/swing
  *   Bank:  armed Donch retest · OR-mid · 1.5R · bias-sync to Nifty
  *
- * Selectable — does NOT replace Donch Retest defaults.
+ * Selectable on Nifty, Bank, and Stocks — does NOT replace Donch Retest or GAP_FADE defaults.
  */
 @Injectable({ providedIn: 'root' })
 export class AlignComboGenieManagedStrategy implements IManagedStrategy {
@@ -45,8 +45,8 @@ export class AlignComboGenieManagedStrategy implements IManagedStrategy {
   readonly name = 'Align Combo · GENIE';
   readonly version = '1.0.0';
   readonly description =
-    'Nifty+Bank together when aligned, one alone when not, skip chop. Short/long PA with swing SL + R target — paper first.';
-  readonly supports: readonly DeskChannel[] = ['nifty', 'bank'];
+    'Nifty+Bank together when aligned, one alone when not, skip chop. Also selectable on Stocks Desk. Paper first.';
+  readonly supports: readonly DeskChannel[] = ['nifty', 'bank', 'stocks'];
 
   readonly defaultSettings = defaultStrategySettings({
     entryTimeStart: '10:15',

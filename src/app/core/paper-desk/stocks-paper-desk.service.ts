@@ -137,7 +137,9 @@ export class StocksPaperDeskService {
         if (gen !== this.runGeneration) return;
         const candles = await this.fetchDayRange(auth, item.instrumentToken, fromDate, toDate);
         const sid =
-          strategyId === 'GAP_FADE_500' || strategyId === 'ALMOST_GREEN_MIX'
+          strategyId === 'GAP_FADE_500' ||
+          strategyId === 'ALMOST_GREEN_MIX' ||
+          strategyId === 'ALIGN_COMBO_GENIE'
             ? strategyId
             : ((item.strategyId as StocksStrategyId | undefined) ?? strategyId);
         const trades = replayStocksDayStrategy({
@@ -272,7 +274,9 @@ export class StocksPaperDeskService {
               today,
             );
             const sid =
-              options.strategyId === 'GAP_FADE_500' || options.strategyId === 'ALMOST_GREEN_MIX'
+              options.strategyId === 'GAP_FADE_500' ||
+              options.strategyId === 'ALMOST_GREEN_MIX' ||
+              options.strategyId === 'ALIGN_COMBO_GENIE'
                 ? options.strategyId
                 : ((item.strategyId as StocksStrategyId | undefined) ?? options.strategyId);
             const todayTrades = replayStocksDayStrategy({
@@ -426,6 +430,10 @@ export class StocksPaperDeskService {
       if (strategyId === 'ALMOST_GREEN_MIX') {
         if (gap >= ALMOST_GREEN_GAP_PCT) dir = 'SELL'; // fade gainer gap-up
         else if (gap <= -ALMOST_GREEN_GAP_PCT) dir = 'BUY'; // bounce loser gap-down
+      } else if (strategyId === 'ALIGN_COMBO_GENIE') {
+        // Live proxy: trade with the move (gap continuation), separate from fade books.
+        if (gap <= -0.003) dir = 'SELL';
+        else if (gap >= 0.003) dir = 'BUY';
       } else if (strategyId === 'GAP_FADE_500' || strategyId === 'GAP_UP_FADE') {
         if (gap >= (strategyId === 'GAP_FADE_500' ? 0.003 : 0.005)) dir = 'SELL';
       } else if (strategyId === 'GAP_DOWN_BOUNCE') {
@@ -434,11 +442,15 @@ export class StocksPaperDeskService {
       if (!dir) continue;
 
       const stopPct =
-        strategyId === 'ALMOST_GREEN_MIX' ? ALMOST_GREEN_STOP_PCT : strategyId === 'GAP_FADE_500' ? 0.015 : 0.01;
+        strategyId === 'ALMOST_GREEN_MIX'
+          ? ALMOST_GREEN_STOP_PCT
+          : strategyId === 'GAP_FADE_500' || strategyId === 'ALIGN_COMBO_GENIE'
+            ? 0.015
+            : 0.01;
       const riskPct =
         strategyId === 'ALMOST_GREEN_MIX'
           ? ALMOST_GREEN_RISK_PCT
-          : strategyId === 'GAP_FADE_500'
+          : strategyId === 'GAP_FADE_500' || strategyId === 'ALIGN_COMBO_GENIE'
             ? 0.025
             : 0.02;
       const entry = m.open > 0 ? m.open : m.lastPrice;
