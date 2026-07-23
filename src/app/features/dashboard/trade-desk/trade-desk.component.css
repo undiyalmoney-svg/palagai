@@ -195,6 +195,30 @@
   color: #14532d;
 }
 
+.kite-block-banner {
+  display: grid;
+  gap: 0.2rem;
+  margin: 0 0 0.65rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 10px;
+  border: 1px solid #fca5a5;
+  background: #fff1f2;
+  color: #9f1239;
+}
+
+.kite-block-banner strong {
+  font-size: 0.85rem;
+}
+
+.kite-block-banner span {
+  font-size: 0.8rem;
+}
+
+.trade-live-panel.blocked {
+  border-color: #fca5a5;
+  background: #fff7f7;
+}
+
 .market-live-bar {
   display: flex;
   align-items: flex-start;

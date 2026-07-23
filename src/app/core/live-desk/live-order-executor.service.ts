@@ -126,6 +126,24 @@ export class LiveOrderExecutorService {
     return [...this.summary.values()].sort((a, b) => b.at.localeCompare(a.at));
   }
 
+  /** Latest SKIP/ERROR detail for an instrument (for Trade Desk banners). */
+  getLastBlockReason(instrumentId: string): string | null {
+    for (let i = this.events.length - 1; i >= 0; i -= 1) {
+      const e = this.events[i]!;
+      if (e.instrumentId !== instrumentId) {
+        continue;
+      }
+      if (e.action === 'SKIP' || e.action === 'ERROR') {
+        return e.detail;
+      }
+      if (e.action === 'ENTRY') {
+        return null;
+      }
+    }
+    const pos = this.positions.get(instrumentId);
+    return pos?.lastError ?? null;
+  }
+
   async syncInstrument(params: {
     authorization: string;
     instrumentId: string;

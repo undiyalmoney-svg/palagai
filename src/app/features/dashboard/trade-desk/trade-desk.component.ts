@@ -196,6 +196,14 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
     return this.snapshot().statuses.some((s) => !!s.openTrade);
   }
 
+  protected hasKiteOpenTrade(): boolean {
+    return this.snapshot().statuses.some((s) => !!s.openTrade && !!s.brokerEntryOrderId);
+  }
+
+  protected hasKiteBlockEvents(): boolean {
+    return this.snapshot().orderEvents.some((e) => e.action === 'SKIP' || e.action === 'ERROR');
+  }
+
   protected marketLiveSummary(): string {
     const open = this.snapshot().statuses.filter((s) => s.openTrade);
     if (!open.length) {
@@ -204,8 +212,13 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
     return open
       .map((s) => {
         const o = s.openTrade!;
-        const money = this.snapshot().realOrders && s.brokerEntryOrderId ? ' · Kite live' : '';
-        return `${s.instrumentName}: ${o.direction} · Entry ${o.indexEntry.toFixed(1)} · SL ${o.indexStop.toFixed(1)} · Tgt ${o.indexTarget.toFixed(1)}${money}`;
+        if (this.snapshot().realOrders && s.brokerEntryOrderId) {
+          return `${s.instrumentName}: ${o.direction} · Entry ${o.indexEntry.toFixed(1)} · Kite ${s.brokerEntryOrderId}`;
+        }
+        if (this.snapshot().realOrders) {
+          return `${s.instrumentName}: ${o.direction} · desk only · NOT on Kite${s.kiteBlockReason ? ` (${s.kiteBlockReason})` : ''}`;
+        }
+        return `${s.instrumentName}: ${o.direction} · Entry ${o.indexEntry.toFixed(1)} · SL ${o.indexStop.toFixed(1)} · Tgt ${o.indexTarget.toFixed(1)} · paper`;
       })
       .join('  |  ');
   }

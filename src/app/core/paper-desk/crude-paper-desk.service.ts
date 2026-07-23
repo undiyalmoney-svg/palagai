@@ -812,6 +812,7 @@ function withLiveFields(
     | 'brokerSlTrigger'
     | 'brokerSlOrderId'
     | 'brokerEntryOrderId'
+    | 'kiteBlockReason'
   >,
 ): PaperInstrumentStatus {
   return {
@@ -823,6 +824,7 @@ function withLiveFields(
     brokerSlTrigger: null,
     brokerSlOrderId: null,
     brokerEntryOrderId: null,
+    kiteBlockReason: null,
   };
 }
 
