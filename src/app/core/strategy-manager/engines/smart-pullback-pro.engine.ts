@@ -8,6 +8,7 @@ import {
   donchian,
   emaLast,
   openingRange,
+  previousDayBars,
   seriesAt,
 } from '../indicators/desk-indicators';
 import {
@@ -27,6 +28,19 @@ import {
 
 /** Pine / pro-trader Smart PB signal family. */
 export type SmartPbSignalMode = 'breakout' | 'pullback' | 'both' | 'armed_retest';
+
+/** Day book mode: combo, one leg alone, or sit out. */
+export type SmartPbRouteMode = 'BOTH' | 'NIFTY' | 'BANK' | 'SKIP';
+
+export interface SmartPbGenieFeat {
+  /** 0=Mon … 4=Fri */
+  wd: number;
+  nDrive: number;
+  bDrive: number;
+  nGap: number;
+  bGap: number;
+  aligned: boolean;
+}
 
 export interface SmartPbProExtras {
   /** Prior-bar retest tolerance in pts (Pine: 10). */
@@ -51,6 +65,22 @@ export interface SmartPbProExtras {
   requireCloseThird: boolean;
   /** Donchian lookback for armed_retest. */
   donchianLength: number;
+  /**
+   * GENIE v3 day router (COMBO / ALONE / SKIP by weekday + morning drive).
+   * Default on for the 1+1 ₹500 book.
+   */
+  genieRouterEnabled: boolean;
+  /** Optional peer OR-drive (other index). Enables full combo-vs-alone. */
+  geniePeerDrive: number | null;
+  /** Optional peer gap pts (other index open − prior close). */
+  geniePeerGap: number | null;
+  /** Optional peer EMA bias at ~10:15. */
+  geniePeerBias: 'BUY' | 'SELL' | 'FLAT' | null;
+  /**
+   * Nifty EMA50 bias at ~10:15 — Bank overlay only takes matching direction.
+   * When null, Bank trades without bias sync.
+   */
+  genieNiftyBias: 'BUY' | 'SELL' | 'FLAT' | null;
 }
 
 /**
@@ -70,6 +100,11 @@ export const DEFAULT_SMART_PB_EXTRAS: SmartPbProExtras = {
   requireOrMid: true,
   requireCloseThird: true,
   donchianLength: 20,
+  genieRouterEnabled: true,
+  geniePeerDrive: null,
+  geniePeerGap: null,
+  geniePeerBias: null,
+  genieNiftyBias: null,
 };
 
 /** Bank overlay DNA (1-lot book with Nifty primary). */
@@ -84,6 +119,98 @@ export const BANK_OVERLAY_SMART_PB_EXTRAS: SmartPbProExtras = {
   skipSideways: true,
   donchianLength: 20,
 };
+
+/** Mon=0 … Sun=6 from YYYY-MM-DD (local calendar). */
+export function weekdayMon0(date: string): number {
+  const parsed = new Date(`${date}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) {
+    return 0;
+  }
+  const sun0 = parsed.getDay();
+  return sun0 === 0 ? 6 : sun0 - 1;
+}
+
+export function orDrive(or: { firstOpen: number; lastClose: number; high: number; low: number }): number {
+  const width = Math.max(or.high - or.low, 1e-9);
+  return Math.abs(or.lastClose - or.firstOpen) / width;
+}
+
+function aloneByDrive(f: SmartPbGenieFeat): SmartPbRouteMode {
+  return f.nDrive >= f.bDrive ? 'NIFTY' : 'BANK';
+}
+
+function drvSkip(f: SmartPbGenieFeat, minDrive: number): SmartPbRouteMode {
+  if (Math.max(f.nDrive, f.bDrive) < minDrive) {
+    return 'SKIP';
+  }
+  return f.aligned ? 'BOTH' : aloneByDrive(f);
+}
+
+/**
+ * GENIE v3 — causal COMBO / ALONE / SKIP (Kite OOS 2024+):
+ *   Tue → SKIP
+ *   Fri → BOTH (combo)
+ *   Mon → drive≥0.35 then BOTH if aligned else stronger alone
+ *   Wed → drive≥0.25 then BOTH if aligned else stronger alone
+ *   Thu → BOTH if aligned else stronger alone
+ *
+ * OOS: ~₹507/day · red ~34% (vs ~49% always-combo) · cov ~71% · all years green.
+ */
+export function resolveGenieV3Route(f: SmartPbGenieFeat): SmartPbRouteMode {
+  if (f.wd < 0 || f.wd > 4) {
+    return 'SKIP';
+  }
+  if (f.wd === 1) {
+    return 'SKIP';
+  }
+  if (f.wd === 4) {
+    return 'BOTH';
+  }
+  if (f.wd === 0) {
+    return drvSkip(f, 0.35);
+  }
+  if (f.wd === 2) {
+    return drvSkip(f, 0.25);
+  }
+  return f.aligned ? 'BOTH' : aloneByDrive(f);
+}
+
+/** Local-only fallback when peer OR features are not wired yet. */
+export function resolveGenieV3LocalRoute(wd: number, localDrive: number): SmartPbRouteMode {
+  if (wd < 0 || wd > 4) {
+    return 'SKIP';
+  }
+  if (wd === 1) {
+    return 'SKIP';
+  }
+  if (wd === 0 && localDrive < 0.35) {
+    return 'SKIP';
+  }
+  if (wd === 2 && localDrive < 0.25) {
+    return 'SKIP';
+  }
+  return 'BOTH';
+}
+
+export function instrumentAllowedByGenieRoute(
+  route: SmartPbRouteMode,
+  instrumentId: string | undefined,
+): boolean {
+  if (route === 'SKIP') {
+    return false;
+  }
+  const bank = /bank/i.test(instrumentId ?? '');
+  if (route === 'BOTH') {
+    return true;
+  }
+  if (route === 'NIFTY') {
+    return !bank;
+  }
+  if (route === 'BANK') {
+    return bank;
+  }
+  return false;
+}
 
 export interface SmartPbDayState extends RuleDayState {
   lastBuyBar: number | null;
@@ -162,6 +289,30 @@ function readExtras(settings: StrategySettings): SmartPbProExtras {
         ? x['requireCloseThird']
         : DEFAULT_SMART_PB_EXTRAS.requireCloseThird,
     donchianLength: num(x['donchianLength'], DEFAULT_SMART_PB_EXTRAS.donchianLength),
+    genieRouterEnabled:
+      typeof x['genieRouterEnabled'] === 'boolean'
+        ? x['genieRouterEnabled']
+        : DEFAULT_SMART_PB_EXTRAS.genieRouterEnabled,
+    geniePeerDrive:
+      typeof x['geniePeerDrive'] === 'number' && Number.isFinite(x['geniePeerDrive'])
+        ? x['geniePeerDrive']
+        : null,
+    geniePeerGap:
+      typeof x['geniePeerGap'] === 'number' && Number.isFinite(x['geniePeerGap'])
+        ? x['geniePeerGap']
+        : null,
+    geniePeerBias:
+      x['geniePeerBias'] === 'BUY' ||
+      x['geniePeerBias'] === 'SELL' ||
+      x['geniePeerBias'] === 'FLAT'
+        ? x['geniePeerBias']
+        : null,
+    genieNiftyBias:
+      x['genieNiftyBias'] === 'BUY' ||
+      x['genieNiftyBias'] === 'SELL' ||
+      x['genieNiftyBias'] === 'FLAT'
+        ? x['genieNiftyBias']
+        : null,
   };
 }
 
@@ -332,6 +483,59 @@ export function runSmartPullbackPro(
     return wait(`EMA-${settings.emaLength} warming up`);
   }
 
+  const bankLike = /bank/i.test(ctx.instrumentId ?? '');
+  const localDrive = orDrive(or);
+  const prevBars = previousDayBars(series, day);
+  const prevClose = prevBars.length ? prevBars[prevBars.length - 1]!.close : dayBars[0]!.open;
+  const localGap = dayBars[0]!.open - prevClose;
+  const wd = weekdayMon0(day);
+  const peerReady =
+    extras.geniePeerDrive != null && Number.isFinite(extras.geniePeerDrive);
+  let genieRoute: SmartPbRouteMode = 'BOTH';
+  if (extras.genieRouterEnabled) {
+    if (peerReady) {
+      const nDrive = bankLike ? extras.geniePeerDrive! : localDrive;
+      const bDrive = bankLike ? localDrive : extras.geniePeerDrive!;
+      const nGap = bankLike
+        ? extras.geniePeerGap ?? 0
+        : localGap;
+      const bGap = bankLike ? localGap : extras.geniePeerGap ?? 0;
+      const localBias: 'BUY' | 'SELL' =
+        candle.close >= ema ? 'BUY' : 'SELL';
+      const peerBias = extras.geniePeerBias;
+      const niftyBias = bankLike
+        ? extras.genieNiftyBias ?? peerBias
+        : localBias;
+      const bankBias = bankLike
+        ? localBias
+        : peerBias ?? localBias;
+      const aligned =
+        niftyBias != null &&
+        bankBias != null &&
+        niftyBias !== 'FLAT' &&
+        niftyBias === bankBias;
+      genieRoute = resolveGenieV3Route({
+        wd,
+        nDrive,
+        bDrive,
+        nGap,
+        bGap,
+        aligned,
+      });
+    } else {
+      genieRoute = resolveGenieV3LocalRoute(wd, localDrive);
+    }
+    if (!instrumentAllowedByGenieRoute(genieRoute, ctx.instrumentId)) {
+      return skip(`GENIE ${genieRoute}: sit out this leg`, {
+        genieRoute,
+        wd,
+        localDrive,
+        localGap,
+        peerReady,
+      });
+    }
+  }
+
   const prev = series[series.length - 2]!;
   const { strongBull, strongBear, bodySize, avgBody } = strongByAvgBody(
     candle,
@@ -459,6 +663,10 @@ export function runSmartPullbackPro(
     orMid: or.mid,
     dayNetPts: state.dayNetPts,
     tradesToday: state.tradesToday,
+    genieRoute,
+    wd,
+    localDrive,
+    localGap,
     extras,
   };
 
@@ -481,6 +689,19 @@ export function runSmartPullbackPro(
 
   if (!direction) {
     return wait('No Smart PB setup', analysisBase);
+  }
+
+  // Bank bias-sync: only when Nifty bias is provided and matches.
+  if (
+    bankLike &&
+    extras.genieNiftyBias != null &&
+    extras.genieNiftyBias !== 'FLAT' &&
+    direction !== extras.genieNiftyBias
+  ) {
+    return skip(
+      `Bank bias-sync: signal ${direction} ≠ Nifty bias ${extras.genieNiftyBias}`,
+      { ...analysisBase, genieRoute, genieNiftyBias: extras.genieNiftyBias },
+    );
   }
 
   if (extras.requireOrMid) {
@@ -517,7 +738,6 @@ export function runSmartPullbackPro(
   if (risk < settings.minStopPts) {
     return skip(`Risk ${risk.toFixed(1)} < min ${settings.minStopPts}`, analysisBase);
   }
-  const bankLike = /bank/i.test(ctx.instrumentId ?? '');
   const stopCap = bankLike ? settings.bankStopLossPts : settings.stopLossPts;
   if (risk > stopCap) {
     stop = direction === 'BUY' ? close - stopCap : close + stopCap;

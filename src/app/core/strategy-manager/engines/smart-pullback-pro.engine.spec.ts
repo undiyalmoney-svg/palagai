@@ -3,8 +3,12 @@ import { StrategyContext } from '../../strategy-engine/models/strategy-context.m
 import { defaultStrategySettings } from '../models/strategy-settings.model';
 import {
   createSmartPbDayState,
+  instrumentAllowedByGenieRoute,
   isSidewaysSmartPb,
+  resolveGenieV3LocalRoute,
+  resolveGenieV3Route,
   runSmartPullbackPro,
+  weekdayMon0,
 } from './smart-pullback-pro.engine';
 
 function c(date: string, open: number, high: number, low: number, close: number): Candle {
@@ -61,6 +65,30 @@ function buildDaySeries(): Candle[] {
 }
 
 describe('smart-pullback-pro.engine', () => {
+  it('GENIE v3: Tuesday SKIP, Friday BOTH, Mon low-drive SKIP', () => {
+    expect(weekdayMon0('2026-07-21')).toBe(1); // Tue
+    expect(resolveGenieV3Route({
+      wd: 1, nDrive: 0.9, bDrive: 0.9, nGap: 0, bGap: 0, aligned: true,
+    })).toBe('SKIP');
+    expect(resolveGenieV3Route({
+      wd: 4, nDrive: 0.1, bDrive: 0.1, nGap: 0, bGap: 0, aligned: false,
+    })).toBe('BOTH');
+    expect(resolveGenieV3Route({
+      wd: 0, nDrive: 0.2, bDrive: 0.2, nGap: 0, bGap: 0, aligned: true,
+    })).toBe('SKIP');
+    expect(resolveGenieV3Route({
+      wd: 0, nDrive: 0.5, bDrive: 0.2, nGap: 0, bGap: 0, aligned: false,
+    })).toBe('NIFTY');
+    expect(resolveGenieV3Route({
+      wd: 3, nDrive: 0.2, bDrive: 0.4, nGap: 0, bGap: 0, aligned: false,
+    })).toBe('BANK');
+    expect(resolveGenieV3LocalRoute(1, 0.9)).toBe('SKIP');
+    expect(resolveGenieV3LocalRoute(4, 0.1)).toBe('BOTH');
+    expect(instrumentAllowedByGenieRoute('NIFTY', 'BANKNIFTY')).toBe(false);
+    expect(instrumentAllowedByGenieRoute('BANK', 'BANKNIFTY')).toBe(true);
+    expect(instrumentAllowedByGenieRoute('BOTH', 'NIFTY')).toBe(true);
+  });
+
   it('exposes sideways helper without throwing on short series', () => {
     const bars = buildDaySeries().slice(0, 20);
     const r = isSidewaysSmartPb(bars, 50, 0.7, 10);

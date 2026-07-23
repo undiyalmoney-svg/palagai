@@ -1,27 +1,42 @@
 {
-  "goal": "\u20b9500/day avg @ 1 lot Nifty + 1 lot Bank",
-  "solution": "dual DNA + EMA bias sync",
-  "deploy": {
-    "nifty": "pine_bo \u00b7 3R \u00b7 10:15-14:30 \u00b7 mt2 \u00b7 gap15 \u00b7 sideways \u00b7 OR-mid \u00b7 close-third",
-    "bank": "armed_retest \u00b7 1.5R \u00b7 10:15-14:30 \u00b7 mt1 \u00b7 gap30 \u00b7 sideways \u00b7 OR-mid",
-    "sync": "Bank only when Nifty EMA50 bias matches direction"
-  },
-  "kite_oos_2024_plus": {
-    "avg": 504.91929133858156,
-    "ge500": 0.44251968503937006,
-    "in_band": 0.30866141732283464,
-    "green": 0.5039370078740157,
-    "coverage": 0.9858267716535433,
-    "worst": -5250.0,
-    "best": 13725.0,
-    "year": {
-      "2024": 698.5070281124556,
-      "2025": 511.7128514056262,
-      "2026": 140.72262773720382
+  "strategyId": "smart-pullback-pro",
+  "version": "2.1.0",
+  "name": "Smart PB PRO · GENIE 1+1",
+  "book": "1 lot Nifty + 1 lot Bank",
+  "genie": {
+    "id": "genie_v3",
+    "modes": ["BOTH", "NIFTY", "BANK", "SKIP"],
+    "rules": {
+      "Mon": "drv_skip035 → BOTH if aligned else alone",
+      "Tue": "SKIP",
+      "Wed": "drv_skip025 → BOTH if aligned else alone",
+      "Thu": "align → BOTH if aligned else alone",
+      "Fri": "BOTH"
+    },
+    "oos": {
+      "avg": 507,
+      "green": 0.369,
+      "red": 0.339,
+      "ge500": 0.332,
+      "in_band": 0.239,
+      "coverage": 0.71,
+      "years": { "2024": 697, "2025": 417, "2026": 326 }
     }
   },
-  "honest": {
-    "every_day_500": false,
-    "note": "Avg ~505 with ~44% days \u2265500; 2026 softer."
+  "baseline_both_bias_sync": {
+    "avg": 525,
+    "green": 0.50,
+    "red": 0.49,
+    "coverage": 0.99
+  },
+  "oracle_lookahead": {
+    "avg": 2210,
+    "green": 0.57,
+    "red": 0.0,
+    "note": "Upper bound only — not tradable"
+  },
+  "legs": {
+    "nifty": "pine_bo · 3R · mt2 · gap15 · or_mid · close_third",
+    "bank": "armed_retest · 1.5R · mt1 · gap30 · or_mid · bias_sync"
   }
 }

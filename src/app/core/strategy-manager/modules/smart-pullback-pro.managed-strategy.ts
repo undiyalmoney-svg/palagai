@@ -26,22 +26,23 @@ import {
 } from '../engines/smart-pullback-pro.engine';
 
 /**
- * Smart Pullback PRO — 1+1 lot ₹500 book (Kite OOS 2024+).
+ * Smart Pullback PRO — 1+1 lot ₹500 book + GENIE v3 day router (Kite OOS 2024+).
  *
  * Nifty primary: Pine breakout+strong+close-third · OR-mid · **3R** · 2t · gap15
  * Bank overlay: Donch armed-retest · OR-mid · **1.5R** · 1t · gap30
- * Live tip: take Bank only when Nifty is on the same side of its EMA50 (bias sync).
+ * GENIE v3: Tue SKIP · Fri COMBO · Mon/Wed drive gates · Thu align → COMBO or ALONE
+ * Bank bias-sync via extras.genieNiftyBias when set.
  *
- * OOS: ~₹505/day avg @ 1+1 lot · ~44% days ≥₹500 · not every day.
+ * OOS GENIE: ~₹507/day · ~34% red (vs ~49% always-combo) · cov ~71%.
  * Selectable — does NOT replace Donch Retest defaults.
  */
 @Injectable({ providedIn: 'root' })
 export class SmartPullbackProManagedStrategy implements IManagedStrategy {
   readonly id = MANAGED_STRATEGY_IDS.SMART_PULLBACK_PRO;
-  readonly name = 'Smart PB PRO · 1+1 ₹500 book';
-  readonly version = '2.0.0';
+  readonly name = 'Smart PB PRO · GENIE 1+1';
+  readonly version = '2.1.0';
   readonly description =
-    'Kite-proven 1-lot book: Nifty Pine breakout·3R + Bank armed-retest·1.5R · OR-mid · 10:15–14:30. ~₹505/day avg OOS — paper first.';
+    'GENIE v3 day router (COMBO/ALONE/SKIP) + Nifty Pine·3R + Bank armed-retest·1.5R. ~₹507/day OOS, fewer reds — paper first.';
   readonly supports: readonly DeskChannel[] = ['nifty', 'bank'];
 
   readonly defaultSettings = defaultStrategySettings({
