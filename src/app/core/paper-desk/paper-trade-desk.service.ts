@@ -31,6 +31,7 @@ import {
   buildContext,
   enrichTradesWithOptionPremiums,
   replayPaperOnIndex,
+  toOptionContract,
 } from './paper-desk-engine';
 import { buildPaperDeskDayStats, emptyPaperDeskDayStats } from './paper-desk-day-stats';
 import { PDHL_RUPEES_PER_POINT, buildDeskRiskOverrides } from '../strategy-engine/strategies/pdhl-opening-range/pdhl-opening-range.evaluator';
@@ -631,6 +632,11 @@ export class PaperTradeDeskService {
       this.assertActive(runId);
       const authorization = this.requireAuth();
       await this.loadOptionInstruments({ patchStatus: false });
+      // Live money needs a fresh NFO dump — stale/empty cache → synthetic options → no Kite orders.
+      if (this.realOrders) {
+        this.patchMessage('Live money · refreshing NFO option chain for real orders…');
+        await this.instrumentStore.refreshBestEffort(true);
+      }
       this.assertActive(runId);
       const lookbackFrom = shiftDate(today, -12);
 
@@ -848,7 +854,25 @@ export class PaperTradeDeskService {
     }
 
     if (this.realOrders) {
+      const allInstruments = this.instrumentStore.allInstruments();
       for (const s of statuses) {
+        // Re-resolve ATM from the live chain so we don't send synthetic labels to Kite.
+        if (s.openTrade) {
+          const kind: IndexOptionKind =
+            s.instrumentId === NIFTY_50_INSTRUMENT.id ? 'nifty' : 'banknifty';
+          const resolved = resolveAtmWeeklyOption({
+            instruments: allInstruments,
+            kind,
+            direction: s.openTrade.direction,
+            spot: s.openTrade.indexEntry,
+            asOfDateTime: s.openTrade.entryTime,
+          });
+          const fresh = toOptionContract(resolved.instrument, resolved.source);
+          s.openTrade = { ...s.openTrade, option: fresh };
+          s.chosenOption = fresh;
+          s.chosenBias = s.openTrade.direction;
+        }
+
         await this.liveOrders.syncInstrument({
           authorization,
           instrumentId: s.instrumentId,
@@ -871,6 +895,16 @@ export class PaperTradeDeskService {
         s.brokerSlTrigger = pos?.slTrigger ?? null;
         s.brokerSlOrderId = pos?.slOrderId ?? null;
         s.brokerEntryOrderId = pos?.entryOrderId ?? null;
+        if (s.openTrade && !s.brokerEntryOrderId) {
+          s.kiteBlockReason =
+            this.liveOrders.getLastBlockReason(s.instrumentId) ??
+            (s.openTrade.option?.source === 'synthetic'
+              ? 'Synthetic/missing NFO option — refresh Instruments, then restart Live money'
+              : 'Kite entry not confirmed — see Event log');
+          s.livePhaseLabel = `Signal only · not on Kite`;
+        } else {
+          s.kiteBlockReason = null;
+        }
         if (pos?.status === 'open' && s.livePhase === 'waiting') {
           // broker still open while paper flat — rare race; keep in_trade label
         }
@@ -879,21 +913,34 @@ export class PaperTradeDeskService {
           s.livePhaseLabel = 'Target achieved';
         }
       }
+    } else {
+      for (const s of statuses) {
+        s.kiteBlockReason = s.openTrade
+          ? 'Live paper only — tick Real Orders + confirm to send MIS to Kite'
+          : null;
+      }
     }
 
     this.liveTrades = enriched;
     const moneyTag = this.realOrders ? 'LIVE MONEY' : 'Live paper';
     const waiting = statuses.filter((s) => s.livePhase === 'waiting').length;
-    const inTrade = statuses.filter((s) => s.livePhase === 'in_trade').length;
+    const inTrade = statuses.filter((s) => s.openTrade && (!this.realOrders || !!s.brokerEntryOrderId)).length;
+    const blocked = statuses.filter((s) => !!s.kiteBlockReason && !!s.openTrade && !s.brokerEntryOrderId).length;
     const targets = statuses.filter((s) => s.livePhase === 'target_hit').length;
     const openBits = statuses
-      .filter((s) => s.openTrade)
+      .filter((s) => s.openTrade && (!this.realOrders || !!s.brokerEntryOrderId))
       .map((s) => {
         const o = s.openTrade!;
         return `${s.instrumentName} ${o.direction} E${o.indexEntry.toFixed(0)}/SL${o.indexStop.toFixed(0)}/T${o.indexTarget.toFixed(0)}`;
       });
+    const blockedBits = statuses
+      .filter((s) => s.openTrade && this.realOrders && !s.brokerEntryOrderId)
+      .map((s) => `${s.instrumentName}: ${s.kiteBlockReason ?? 'blocked'}`);
     const openMsg = openBits.length
-      ? ` · ON MARKET: ${openBits.join(' · ')}`
+      ? ` · ON KITE: ${openBits.join(' · ')}`
+      : '';
+    const blockedMsg = blockedBits.length
+      ? ` · NOT ON KITE (${blocked}): ${blockedBits.join(' · ')}`
       : '';
     this.snapshot.set({
       mode: 'live',
@@ -903,7 +950,7 @@ export class PaperTradeDeskService {
       marketOpen: true,
       realOrders: this.realOrders,
       lastTickAt: new Date().toISOString(),
-      message: `${moneyTag} · alive ${now} · waiting ${waiting} · in trade ${inTrade}${targets ? ` · target hit ${targets}` : ''}${openMsg} · ${this.kiteStatsLabel()}`,
+      message: `${moneyTag} · alive ${now} · waiting ${waiting} · in trade ${inTrade}${targets ? ` · target hit ${targets}` : ''}${openMsg}${blockedMsg} · ${this.kiteStatsLabel()}`,
       statuses,
       trades: enriched.sort((a, b) => b.entryTime.localeCompare(a.entryTime)),
       totals: summarize(enriched, this.lotsMultiplier, PDHL_RUPEES_PER_POINT),
@@ -1192,6 +1239,7 @@ function withLiveFields(
     | 'brokerSlTrigger'
     | 'brokerSlOrderId'
     | 'brokerEntryOrderId'
+    | 'kiteBlockReason'
   >,
 ): PaperInstrumentStatus {
   return {
@@ -1203,6 +1251,7 @@ function withLiveFields(
     brokerSlTrigger: null,
     brokerSlOrderId: null,
     brokerEntryOrderId: null,
+    kiteBlockReason: null,
   };
 }
 

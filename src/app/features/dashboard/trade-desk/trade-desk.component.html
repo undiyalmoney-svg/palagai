@@ -201,7 +201,13 @@
     <div class="market-live-bar" role="status" [class.money]="snapshot().realOrders">
       <span class="market-pulse" aria-hidden="true"></span>
       <div class="market-live-copy">
-        <strong>{{ snapshot().realOrders ? 'ON MARKET · TRADE LIVE' : 'PAPER TRADE LIVE' }}</strong>
+        <strong>{{
+          snapshot().realOrders
+            ? hasKiteOpenTrade()
+              ? 'ON KITE · LIVE MONEY'
+              : 'LIVE MONEY · waiting for confirmed Kite order'
+            : 'PAPER TRADE LIVE'
+        }}</strong>
         <span>{{ marketLiveSummary() }}</span>
       </div>
     </div>
@@ -411,20 +417,39 @@
           }
 
           @if (s.openTrade; as o) {
-            <div class="trade-live-panel" role="status">
+            <div
+              class="trade-live-panel"
+              role="status"
+              [class.blocked]="snapshot().realOrders && !s.brokerEntryOrderId"
+            >
               <div class="trade-live-head">
                 <strong>
-                  {{ snapshot().realOrders && s.brokerEntryOrderId ? 'Live on market' : 'Trade open' }}
+                  @if (snapshot().realOrders && s.brokerEntryOrderId) {
+                    Live on Kite
+                  } @else if (snapshot().realOrders) {
+                    Desk signal · NOT on Kite
+                  } @else {
+                    Trade open (paper)
+                  }
                 </strong>
                 <span>
                   {{ o.direction }} {{ o.option?.tradingSymbol ?? 'ATM option' }}
                   @if (snapshot().realOrders && s.brokerEntryOrderId) {
                     · Kite order active · waiting for target / SL / EMA / 15:15
+                  } @else if (snapshot().realOrders) {
+                    · check Event log / Instruments refresh
                   } @else {
-                    · levels locked until exit
+                    · tick Real Orders to send MIS to Kite
                   }
                 </span>
               </div>
+
+              @if (s.kiteBlockReason) {
+                <div class="kite-block-banner" role="alert">
+                  <strong>Kite order blocked</strong>
+                  <span>{{ s.kiteBlockReason }}</span>
+                </div>
+              }
 
               <div class="levels-row levels-row-live">
                 <div>
@@ -574,7 +599,7 @@
         </div>
       }
       @if (snapshot().orderEvents.length) {
-        <details class="order-log-details">
+        <details class="order-log-details" [open]="hasKiteBlockEvents()">
           <summary>Event log ({{ snapshot().orderEvents.length }})</summary>
           <ul class="order-log">
             @for (e of snapshot().orderEvents; track e.at + e.detail) {

@@ -80,6 +80,11 @@ export interface PaperInstrumentStatus {
   brokerSlTrigger: number | null;
   brokerSlOrderId: string | null;
   brokerEntryOrderId: string | null;
+  /**
+   * Live money only: why the desk signal did not become a Kite order
+   * (synthetic option, API error, Real Orders off, etc.).
+   */
+  kiteBlockReason: string | null;
 }
 
 export interface PaperDeskSnapshot {
