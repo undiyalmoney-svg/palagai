@@ -242,9 +242,22 @@
       <div class="stat primary" [class.up]="resultView().totals.optionNetRs > 0" [class.down]="resultView().totals.optionNetRs < 0">
         <span
           title="Option P&L = (exit premium − entry premium) × lot size × lots, from the option's own 5m OHLC. Rows marked 'est. premium' are approximated (~0.5 × index pts) when option history is unavailable — the raw index-points column is separate."
-        >P&amp;L ₹ ({{ resultView().totals.lotsUsed }} lot{{ resultView().totals.lotsUsed > 1 ? 's' : '' }} · options)</span>
+        >P&amp;L ₹ gross ({{ resultView().totals.lotsUsed }} lot{{ resultView().totals.lotsUsed > 1 ? 's' : '' }} · options)</span>
         <strong>{{ resultView().totals.optionNetRs > 0 ? '+' : '' }}{{ resultView().totals.optionNetRs | number: '1.2-2' }}</strong>
       </div>
+      @if (resultView().totals.optionNetAfterChargesRs != null) {
+        <div
+          class="stat"
+          [class.up]="(resultView().totals.optionNetAfterChargesRs ?? 0) > 0"
+          [class.down]="(resultView().totals.optionNetAfterChargesRs ?? 0) < 0"
+        >
+          <span title="Gross option ₹ minus estimated Zerodha round-trip charges (approx).">Net ₹ est.</span>
+          <strong
+            >{{ (resultView().totals.optionNetAfterChargesRs ?? 0) > 0 ? '+' : ''
+            }}{{ resultView().totals.optionNetAfterChargesRs | number: '1.2-2' }}</strong
+          >
+        </div>
+      }
       <div class="stat">
         <span>Kite 5m calls</span>
         <strong>{{ snapshot().kiteStats.historicalCalls }}</strong>
@@ -697,6 +710,7 @@
               <th>Idx entry / tgt</th>
               <th>Prem in/out</th>
               <th>Option ₹</th>
+              <th>MFE/MAE</th>
               <th>Idx pts</th>
               <th>Exit</th>
             </tr>
@@ -759,6 +773,17 @@
                 </td>
                 <td class="num" [class.up]="(t.optionPnlRs ?? 0) > 0" [class.down]="(t.optionPnlRs ?? 0) < 0">
                   {{ t.optionPnlRs != null ? ((t.optionPnlRs > 0 ? '+' : '') + (t.optionPnlRs | number: '1.2-2')) : '—' }}
+                  @if (t.netOptionPnlRs != null) {
+                    <div class="stack">
+                      <small title="After estimated charges">net {{ t.netOptionPnlRs | number: '1.0-0' }}</small>
+                    </div>
+                  }
+                </td>
+                <td class="num">
+                  <div class="stack">
+                    <small title="Max favorable excursion (index pts)">+{{ t.mfeIndexPts ?? 0 | number: '1.0-0' }}</small>
+                    <small title="Max adverse excursion (index pts)">−{{ t.maeIndexPts ?? 0 | number: '1.0-0' }}</small>
+                  </div>
                 </td>
                 <td class="num" [class.up]="t.indexPoints > 0" [class.down]="t.indexPoints < 0">
                   {{ t.indexPoints > 0 ? '+' : '' }}{{ t.indexPoints | number: '1.1-1' }}

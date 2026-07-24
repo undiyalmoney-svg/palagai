@@ -21,13 +21,16 @@ export interface LiveBrokerPosition {
   lastError: string | null;
   exchange: 'NFO' | 'MCX';
   product: 'MIS' | 'NRML';
+  /** Index levels used to size / amend protective SL-M. */
+  indexEntry?: number;
+  indexStop?: number;
 }
 
 export interface LiveOrderEvent {
   at: string;
   instrumentId: string;
   instrumentName: string;
-  action: 'ENTRY' | 'SL' | 'CANCEL_SL' | 'EXIT' | 'SKIP' | 'ERROR';
+  action: 'ENTRY' | 'SL' | 'MODIFY_SL' | 'CANCEL_SL' | 'EXIT' | 'ADOPT' | 'SKIP' | 'ERROR';
   detail: string;
   orderId?: string;
   tradingSymbol?: string;
@@ -65,6 +68,12 @@ interface KiteOrderRow {
   average_price?: number;
   trigger_price?: number;
   tradingsymbol?: string;
+  exchange?: string;
+  transaction_type?: string;
+  order_type?: string;
+  product?: string;
+  quantity?: number;
+  tag?: string;
 }
 
 interface KiteOrdersBook {
@@ -75,6 +84,21 @@ interface KiteOrdersBook {
 interface KiteQuoteBook {
   status?: string;
   data?: Record<string, { last_price?: number }>;
+}
+
+interface KitePositionRow {
+  tradingsymbol?: string;
+  exchange?: string;
+  instrument_token?: number;
+  product?: string;
+  quantity?: number;
+  average_price?: number;
+  last_price?: number;
+}
+
+interface KitePositionsBook {
+  status?: string;
+  data?: { net?: KitePositionRow[]; day?: KitePositionRow[] };
 }
 
 export interface LiveOpenSignal {
@@ -98,6 +122,8 @@ export class LiveOrderExecutorService {
   private readonly kiteApi = inject(KiteApiService);
 
   private readonly positions = new Map<string, LiveBrokerPosition>();
+  /** Open broker legs keyed by option tradingsymbol (restart adopt). */
+  private readonly positionsBySymbol = new Map<string, LiveBrokerPosition>();
   private readonly events: LiveOrderEvent[] = [];
   private readonly summary = new Map<string, LiveOrderSummaryRow>();
   private readonly instrumentNames = new Map<string, string>();
@@ -106,6 +132,7 @@ export class LiveOrderExecutorService {
 
   reset(): void {
     this.positions.clear();
+    this.positionsBySymbol.clear();
     this.events.length = 0;
     this.summary.clear();
   }
@@ -144,6 +171,96 @@ export class LiveOrderExecutorService {
     return pos?.lastError ?? null;
   }
 
+  /**
+   * On Live money start: adopt open NFO/MCX legs tagged PALAGAI* so restart
+   * does not double-enter. Places missing SL-M when needed.
+   */
+  async reconcileFromBroker(authorization: string): Promise<string> {
+    let adopted = 0;
+    let slPlaced = 0;
+    try {
+      const book = (await firstValueFrom(
+        this.kiteApi.getPositions(authorization),
+      )) as KitePositionsBook;
+      const orders = await this.fetchOrders(authorization);
+      const rows = [...(book.data?.net ?? []), ...(book.data?.day ?? [])];
+      const seen = new Set<string>();
+
+      for (const row of rows) {
+        const exchange = (row.exchange ?? '').toUpperCase();
+        if (exchange !== 'NFO' && exchange !== 'MCX') continue;
+        const qty = Number(row.quantity ?? 0);
+        if (!qty) continue;
+        const symbol = (row.tradingsymbol ?? '').toUpperCase();
+        if (!symbol || seen.has(symbol)) continue;
+        seen.add(symbol);
+
+        const tagged = orders.some(
+          (o) =>
+            (o.tradingsymbol ?? '').toUpperCase() === symbol &&
+            isPalagaiTag(o.tag) &&
+            isFilledOrWorking(o.status),
+        );
+        if (!tagged) continue;
+
+        const product = ((row.product ?? 'MIS').toUpperCase() === 'NRML' ? 'NRML' : 'MIS') as
+          | 'MIS'
+          | 'NRML';
+        const pendingSl = findPendingOptionSl(orders, symbol);
+        const entryAvg = Number(row.average_price ?? 0) || Number(row.last_price ?? 0) || 1;
+        const orphanId = `orphan:${symbol}`;
+
+        const pos: LiveBrokerPosition = {
+          instrumentId: orphanId,
+          tradingSymbol: symbol,
+          instrumentToken: Number(row.instrument_token ?? 0),
+          quantity: Math.abs(qty),
+          direction: 'BUY',
+          entryOrderId: null,
+          slOrderId: pendingSl?.order_id ?? null,
+          exitOrderId: null,
+          entryPremium: entryAvg,
+          slTrigger: pendingSl?.trigger_price ?? null,
+          entryTime: new Date().toISOString(),
+          status: 'open',
+          lastError: null,
+          exchange: exchange as 'NFO' | 'MCX',
+          product,
+          indexEntry: undefined,
+          indexStop: undefined,
+        };
+        this.positions.set(orphanId, pos);
+        this.positionsBySymbol.set(symbol, pos);
+        adopted += 1;
+        this.pushEvent({
+          at: new Date().toISOString(),
+          instrumentId: orphanId,
+          action: 'ADOPT',
+          detail: `Adopted open ${exchange} ${product} ${symbol} qty ${pos.quantity} @ ~${entryAvg.toFixed(2)}`,
+          tradingSymbol: symbol,
+          quantity: pos.quantity,
+          orderId: pendingSl?.order_id,
+        });
+
+        if (!pos.slOrderId && entryAvg > 0) {
+          // Protective SL ~ half of a default 30pt index risk if unknown
+          const slTrigger = roundOptionTick(Math.max(0.05, entryAvg - 15));
+          const ok = await this.placeSlOnly(authorization, pos, slTrigger);
+          if (ok) slPlaced += 1;
+        }
+      }
+    } catch (err) {
+      this.pushEvent({
+        at: new Date().toISOString(),
+        instrumentId: 'reconcile',
+        action: 'ERROR',
+        detail: `Reconcile failed: ${this.formatErr(err)}`,
+      });
+      return `Reconcile failed: ${this.formatErr(err)}`;
+    }
+    return `Reconcile · adopted ${adopted} · SL placed ${slPlaced}`;
+  }
+
   async syncInstrument(params: {
     authorization: string;
     instrumentId: string;
@@ -151,8 +268,28 @@ export class LiveOrderExecutorService {
     open: LiveOpenSignal | null;
   }): Promise<void> {
     this.instrumentNames.set(params.instrumentId, params.instrumentName);
-    const current = this.positions.get(params.instrumentId) ?? null;
     const open = params.open;
+
+    // Remap adopted orphan → desk instrument when symbols match.
+    if (open?.option?.tradingSymbol) {
+      const sym = open.option.tradingSymbol.toUpperCase();
+      const bySym = this.positionsBySymbol.get(sym);
+      if (bySym?.status === 'open') {
+        const remapped: LiveBrokerPosition = {
+          ...bySym,
+          instrumentId: params.instrumentId,
+          indexEntry: open.indexEntry,
+          indexStop: open.indexStop,
+        };
+        this.positions.set(params.instrumentId, remapped);
+        this.positionsBySymbol.set(sym, remapped);
+        if (bySym.instrumentId.startsWith('orphan:')) {
+          this.positions.delete(bySym.instrumentId);
+        }
+      }
+    }
+
+    let current = this.positions.get(params.instrumentId) ?? null;
 
     if (current?.status === 'open') {
       const slState = await this.refreshSlState(params.authorization, current);
@@ -160,9 +297,36 @@ export class LiveOrderExecutorService {
         await this.refreshSummaryStatuses(params.authorization);
         return;
       }
+      current = this.positions.get(params.instrumentId) ?? current;
+    }
+
+    // Open paper + open broker: amend SL if index stop moved (BE / trail) — never re-enter.
+    if (open && current?.status === 'open') {
+      await this.syncProtectiveSl(params.authorization, current, open);
+      await this.refreshSummaryStatuses(params.authorization);
+      return;
     }
 
     if (open && (!current || current.status === 'flat' || current.status === 'error')) {
+      // Safety: if broker already has this option open, adopt instead of second entry.
+      if (open.option?.tradingSymbol) {
+        const existing = this.positionsBySymbol.get(open.option.tradingSymbol.toUpperCase());
+        if (existing?.status === 'open') {
+          this.positions.set(params.instrumentId, {
+            ...existing,
+            instrumentId: params.instrumentId,
+            indexEntry: open.indexEntry,
+            indexStop: open.indexStop,
+          });
+          await this.syncProtectiveSl(
+            params.authorization,
+            this.positions.get(params.instrumentId)!,
+            open,
+          );
+          await this.refreshSummaryStatuses(params.authorization);
+          return;
+        }
+      }
       await this.placeEntry(params.authorization, params.instrumentId, open);
       await this.refreshSummaryStatuses(params.authorization);
       return;
@@ -297,7 +461,10 @@ export class LiveOrderExecutorService {
         lastError: slOrderId ? null : 'SL-M not placed',
         exchange,
         product,
+        indexEntry: open.indexEntry,
+        indexStop: open.indexStop,
       });
+      this.positionsBySymbol.set(option.tradingSymbol.toUpperCase(), this.positions.get(instrumentId)!);
     } catch (err) {
       const message = this.formatErr(err);
       this.positions.set(instrumentId, this.errorPos(instrumentId, open, option, message));
@@ -309,6 +476,153 @@ export class LiveOrderExecutorService {
         tradingSymbol: option.tradingSymbol,
         quantity,
       });
+    }
+  }
+
+  /**
+   * When paper stop ratchets (BE / trail), amend pending SL-M trigger.
+   * Never places a second entry.
+   */
+  private async syncProtectiveSl(
+    authorization: string,
+    pos: LiveBrokerPosition,
+    open: LiveOpenSignal,
+  ): Promise<void> {
+    const fillPremium = pos.entryPremium ?? open.optionEntryPremium ?? 0;
+    if (fillPremium <= 0) return;
+
+    const indexRisk = Math.abs(open.indexEntry - open.indexStop);
+    const nextTrigger = roundOptionTick(Math.max(0.05, fillPremium - indexRisk * 0.5));
+    const prevTrigger = pos.slTrigger ?? 0;
+
+    // Only tighten / move when meaningfully different (≥ 1 tick).
+    if (Math.abs(nextTrigger - prevTrigger) < 0.049) {
+      this.positions.set(pos.instrumentId, {
+        ...pos,
+        indexEntry: open.indexEntry,
+        indexStop: open.indexStop,
+      });
+      return;
+    }
+
+    // Prefer modify; if no SL yet, place one.
+    if (!pos.slOrderId) {
+      await this.placeSlOnly(authorization, { ...pos, indexEntry: open.indexEntry, indexStop: open.indexStop }, nextTrigger);
+      return;
+    }
+
+    const slStatus = await this.getOrderStatus(authorization, pos.slOrderId);
+    if (slStatus === 'COMPLETE') {
+      await this.refreshSlState(authorization, pos);
+      return;
+    }
+    if (!slStatus || !isCancellable(slStatus)) {
+      return;
+    }
+
+    try {
+      await firstValueFrom(
+        this.kiteApi.modifyOrder(authorization, 'regular', pos.slOrderId, {
+          order_type: 'SL-M',
+          quantity: String(pos.quantity),
+          trigger_price: String(nextTrigger),
+          validity: 'DAY',
+          market_protection: '-1',
+        }),
+      );
+      const updated: LiveBrokerPosition = {
+        ...pos,
+        slTrigger: nextTrigger,
+        indexEntry: open.indexEntry,
+        indexStop: open.indexStop,
+        lastError: null,
+      };
+      this.positions.set(pos.instrumentId, updated);
+      this.positionsBySymbol.set(pos.tradingSymbol.toUpperCase(), updated);
+      this.pushEvent({
+        at: new Date().toISOString(),
+        instrumentId: pos.instrumentId,
+        action: 'MODIFY_SL',
+        detail: `SL-M trigger ${prevTrigger} → ${nextTrigger} (index SL ${open.indexStop.toFixed(1)})`,
+        orderId: pos.slOrderId,
+        tradingSymbol: pos.tradingSymbol,
+        quantity: pos.quantity,
+        triggerPrice: nextTrigger,
+      });
+    } catch (err) {
+      this.pushEvent({
+        at: new Date().toISOString(),
+        instrumentId: pos.instrumentId,
+        action: 'ERROR',
+        detail: `SL modify failed: ${this.formatErr(err)}`,
+        tradingSymbol: pos.tradingSymbol,
+        orderId: pos.slOrderId ?? undefined,
+      });
+    }
+  }
+
+  private async placeSlOnly(
+    authorization: string,
+    pos: LiveBrokerPosition,
+    slTrigger: number,
+  ): Promise<boolean> {
+    try {
+      const slRes = await firstValueFrom(
+        this.kiteApi.placeRegularOrder(authorization, {
+          exchange: pos.exchange,
+          tradingsymbol: pos.tradingSymbol,
+          transaction_type: 'SELL',
+          order_type: 'SL-M',
+          quantity: String(pos.quantity),
+          product: pos.product,
+          validity: 'DAY',
+          trigger_price: String(slTrigger),
+          market_protection: '-1',
+          tag: 'PALAGAISL',
+        }),
+      );
+      const slOrderId = this.readOrderId(slRes);
+      if (!slOrderId) {
+        throw new Error(this.readError(slRes) || 'No order_id on SL-M');
+      }
+      const updated: LiveBrokerPosition = {
+        ...pos,
+        slOrderId,
+        slTrigger,
+        lastError: null,
+        status: 'open',
+      };
+      this.positions.set(pos.instrumentId, updated);
+      this.positionsBySymbol.set(pos.tradingSymbol.toUpperCase(), updated);
+      this.pushEvent({
+        at: new Date().toISOString(),
+        instrumentId: pos.instrumentId,
+        action: 'SL',
+        detail: `SL-M SELL ${pos.quantity} ${pos.tradingSymbol} trigger ${slTrigger}`,
+        orderId: slOrderId,
+        tradingSymbol: pos.tradingSymbol,
+        quantity: pos.quantity,
+        triggerPrice: slTrigger,
+      });
+      return true;
+    } catch (err) {
+      this.pushEvent({
+        at: new Date().toISOString(),
+        instrumentId: pos.instrumentId,
+        action: 'ERROR',
+        detail: `SL-M place failed: ${this.formatErr(err)}`,
+        tradingSymbol: pos.tradingSymbol,
+      });
+      return false;
+    }
+  }
+
+  private async fetchOrders(authorization: string): Promise<KiteOrderRow[]> {
+    try {
+      const book = (await firstValueFrom(this.kiteApi.getOrders(authorization))) as KiteOrdersBook;
+      return book.data ?? [];
+    } catch {
+      return [];
     }
   }
 
@@ -377,6 +691,7 @@ export class LiveOrderExecutorService {
         status: 'flat',
         lastError: null,
       });
+      this.positionsBySymbol.delete(pos.tradingSymbol.toUpperCase());
       this.pushEvent({
         at: new Date().toISOString(),
         instrumentId: pos.instrumentId,
@@ -418,6 +733,7 @@ export class LiveOrderExecutorService {
         status: 'flat',
         lastError: null,
       });
+      this.positionsBySymbol.delete(pos.tradingSymbol.toUpperCase());
       this.pushEvent({
         at: new Date().toISOString(),
         instrumentId: pos.instrumentId,
@@ -624,6 +940,16 @@ export class LiveOrderExecutorService {
     } else if (event.action === 'EXIT') {
       leg = 'EXIT';
       side = 'SELL';
+    } else if (event.action === 'MODIFY_SL') {
+      if (prev) {
+        this.summary.set(event.orderId, {
+          ...prev,
+          at: event.at,
+          triggerPrice: event.triggerPrice ?? prev.triggerPrice,
+          status: prev.status ?? 'TRIGGER PENDING',
+        });
+      }
+      return;
     } else {
       return;
     }
@@ -653,6 +979,32 @@ function isCancellable(status: string): boolean {
     s.includes('PENDING') ||
     s === 'AMO REQ RECEIVED'
   );
+}
+
+function isPalagaiTag(tag?: string): boolean {
+  const t = (tag ?? '').toUpperCase();
+  return t.startsWith('PALAGAI');
+}
+
+function isFilledOrWorking(status?: string): boolean {
+  const s = (status ?? '').toUpperCase();
+  return (
+    s === 'COMPLETE' ||
+    s === 'OPEN' ||
+    s === 'TRIGGER PENDING' ||
+    s === 'AMO REQ RECEIVED' ||
+    s === 'PUT ORDER REQ RECEIVED'
+  );
+}
+
+function findPendingOptionSl(orders: KiteOrderRow[], symbol: string): KiteOrderRow | undefined {
+  return orders.find((o) => {
+    if ((o.tradingsymbol ?? '').toUpperCase() !== symbol) return false;
+    if ((o.transaction_type ?? '').toUpperCase() !== 'SELL') return false;
+    const ot = (o.order_type ?? '').toUpperCase();
+    if (ot !== 'SL-M' && ot !== 'SL') return false;
+    return isCancellable(o.status ?? '');
+  });
 }
 
 function roundOptionTick(price: number): number {

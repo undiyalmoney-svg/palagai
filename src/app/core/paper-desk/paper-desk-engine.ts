@@ -16,6 +16,7 @@ import {
   PaperOptionContract,
   PaperTrade,
 } from './paper-desk.models';
+import { applyChargesToOptionTrade } from './trade-charges.util';
 import {
   IManagedStrategy,
   ManagedOpenPosition,
@@ -33,6 +34,12 @@ export interface IndexOpenPaper {
   option: PaperOptionContract | null;
   optionEntryPremium: number | null;
   premiumEstimated: boolean;
+  /** Running max favorable excursion (index pts). */
+  mfeIndexPts?: number;
+  /** Running max adverse excursion (index pts, ≥ 0). */
+  maeIndexPts?: number;
+  entryReason?: string;
+  timeline?: Array<{ at: string; event: string; detail?: string }>;
 }
 
 export interface ReplayInstrumentResult {
@@ -61,6 +68,8 @@ function buildContext(
   instrumentId: string,
 ): StrategyContext {
   const candle5m = candles[index]!;
+  // Causal only: never expose bars after `index` (fixes swing look-ahead).
+  const causal = candles.slice(0, index + 1);
   return {
     candle60m: stubCandle(candle5m),
     candle30m: stubCandle(candle5m),
@@ -73,10 +82,10 @@ function buildContext(
     candleIndex5m: index,
     replayStepIndex: index,
     replayFrom: candles[0]?.date ?? candle5m.date,
-    replayTo: candles.at(-1)?.date ?? candle5m.date,
+    replayTo: candle5m.date,
     session: NSE_SESSION,
     instrumentId,
-    series5m: candles,
+    series5m: causal,
   };
 }
 
@@ -258,6 +267,42 @@ function closePaperTrade(params: {
   }
 
   tradeSeq += 1;
+  const qty =
+    open.option != null
+      ? Math.max(1, open.option.lotSize || 1) * lots
+      : 0;
+  let chargesRs: number | null = null;
+  let netOptionPnlRs: number | null = null;
+  if (optionPnlRs != null && open.optionEntryPremium != null && optionExitPremium != null && qty > 0) {
+    const charged = applyChargesToOptionTrade({
+      entryPremium: open.optionEntryPremium,
+      exitPremium: optionExitPremium,
+      quantity: qty,
+      segment: open.option?.exchange === 'MCX' ? 'mcx_option' : 'nfo_option',
+      grossPnlRs: optionPnlRs,
+    });
+    chargesRs = charged.chargesRs;
+    netOptionPnlRs = charged.netPnlRs;
+  }
+
+  const moneyOutcome: PaperTrade['moneyOutcome'] =
+    optionPnlRs == null
+      ? undefined
+      : optionPnlRs > 0
+        ? 'WIN'
+        : optionPnlRs < 0
+          ? 'LOSS'
+          : 'FLAT';
+
+  const timeline = [
+    ...(open.timeline ?? []),
+    {
+      at: params.exitTime,
+      event: 'EXIT',
+      detail: `${params.exitReason} @ ${params.exitPrice.toFixed(2)}`,
+    },
+  ];
+
   return {
     id: `pt-${tradeSeq}-${params.exitTime}`,
     instrumentId: params.instrumentId,
@@ -279,6 +324,13 @@ function closePaperTrade(params: {
     outcome: indexPoints > 0 ? 'WIN' : indexPoints < 0 ? 'LOSS' : 'FLAT',
     strategyId: params.strategyId,
     strategyName: params.strategyName,
+    mfeIndexPts: open.mfeIndexPts ?? 0,
+    maeIndexPts: open.maeIndexPts ?? 0,
+    chargesRs,
+    netOptionPnlRs,
+    moneyOutcome,
+    timeline,
+    entryReason: open.entryReason,
   };
 }
 
@@ -351,6 +403,14 @@ export function replayPaperOnIndex(params: {
     const ctx = buildContext(candles, i, instrumentId);
 
     if (open) {
+      // Track MFE/MAE on every bar while open (audit / giveback analysis).
+      const fav =
+        open.direction === 'BUY' ? candle.high - open.entry : open.entry - candle.low;
+      const adv =
+        open.direction === 'BUY' ? open.entry - candle.low : candle.high - open.entry;
+      open.mfeIndexPts = Math.max(open.mfeIndexPts ?? 0, Math.max(0, fav));
+      open.maeIndexPts = Math.max(open.maeIndexPts ?? 0, Math.max(0, adv));
+
       const managedOpen: ManagedOpenPosition = {
         direction: open.direction,
         entry: open.entry,
@@ -362,6 +422,14 @@ export function replayPaperOnIndex(params: {
       const exit = strategy.exitLogic(candle, managedOpen, closes, ctx);
       // Profit-protect may ratchet stop; swing_trail updates separate trail.
       if (managedOpen.stop !== open.stop) {
+        open.timeline = [
+          ...(open.timeline ?? []),
+          {
+            at: candle.date,
+            event: 'STOP_MOVED',
+            detail: `SL ${open.stop.toFixed(2)} → ${managedOpen.stop.toFixed(2)}`,
+          },
+        ];
         open.stop = managedOpen.stop;
       }
       if (managedOpen.trail !== open.trail) {
@@ -432,6 +500,16 @@ export function replayPaperOnIndex(params: {
       option,
       optionEntryPremium,
       premiumEstimated,
+      mfeIndexPts: 0,
+      maeIndexPts: 0,
+      entryReason: signal.reason,
+      timeline: [
+        {
+          at: candle.date,
+          event: 'ENTRY',
+          detail: `${signal.action} @ ${signal.entryPrice.toFixed(2)} · SL ${signal.stopLoss.toFixed(2)} · T ${signal.target.toFixed(2)} · ${signal.reason}`,
+        },
+      ],
     };
     chosenOption = option;
     chosenBias = signal.action;

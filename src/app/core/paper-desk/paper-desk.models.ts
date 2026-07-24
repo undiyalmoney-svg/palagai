@@ -17,6 +17,12 @@ export interface PaperOptionContract {
   product?: 'MIS' | 'NRML';
 }
 
+export interface PaperTradeTimelineEvent {
+  at: string;
+  event: string;
+  detail?: string;
+}
+
 export interface PaperTrade {
   id: string;
   instrumentId: string;
@@ -38,13 +44,28 @@ export interface PaperTrade {
    * Main P&L (Kite Positions style for long CE/PE):
    * (exitPremium − entryPremium) × lotSize × lots.
    * Live money overlays Kite order average_price fills when present.
+   * Gross of estimated charges — see netOptionPnlRs.
    */
   optionPnlRs: number | null;
   premiumEstimated: boolean;
+  /** Index-points outcome (legacy desk win/loss). */
   outcome: 'WIN' | 'LOSS' | 'FLAT';
   /** Strategy Manager id that generated this trade. */
   strategyId?: string;
   strategyName?: string;
+  /** Max favorable / adverse index excursion while open (pts). */
+  mfeIndexPts?: number;
+  maeIndexPts?: number;
+  /** Estimated round-trip charges (₹). */
+  chargesRs?: number | null;
+  /** optionPnlRs − chargesRs when both known. */
+  netOptionPnlRs?: number | null;
+  /** Outcome from option ₹ (gross); optional audit field. */
+  moneyOutcome?: 'WIN' | 'LOSS' | 'FLAT';
+  /** Sparse timeline for audit UI. */
+  timeline?: PaperTradeTimelineEvent[];
+  /** Entry signal reason captured at open (when available). */
+  entryReason?: string;
 }
 
 export interface PaperInstrumentStatus {
@@ -114,10 +135,14 @@ export interface PaperDeskSnapshot {
     lotsUsed: number;
     /**
      * Lot-scaled money from index/futures points:
-     * Nifty/Bank ≈ pts × 65 × lots · Crude ≈ pts × 10 × lots.
+     * Nifty/Bank ≈ pts × 65/30 × lots · Crude ≈ pts × 10 × lots.
      * Use this to verify lots — raw indexNetPts does NOT scale with lots.
      */
     pointsMoneyRs: number;
+    /** Sum of estimated charges (₹). Additive — does not change optionNetRs. */
+    optionChargesRs?: number;
+    /** optionNetRs − optionChargesRs when charges known. */
+    optionNetAfterChargesRs?: number;
   };
   /** Testing day breakdown: best/worst days, weekday rollup. */
   dayStats: PaperDeskDayStats;

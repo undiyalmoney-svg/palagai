@@ -34,8 +34,9 @@ import {
   toOptionContract,
 } from './paper-desk-engine';
 import { applyKiteFillPnl } from './apply-kite-fill-pnl';
+import { enrichTradesWithCharges } from './trade-charges.util';
 import { buildPaperDeskDayStats, emptyPaperDeskDayStats } from './paper-desk-day-stats';
-import { PDHL_RUPEES_PER_POINT, buildDeskRiskOverrides } from '../strategy-engine/strategies/pdhl-opening-range/pdhl-opening-range.evaluator';
+import { PDHL_RUPEES_PER_POINT, buildDeskRiskOverrides, rupeesPerPointForInstrument } from '../strategy-engine/strategies/pdhl-opening-range/pdhl-opening-range.evaluator';
 import { StrategyManagerService } from '../strategy-manager/runtime/strategy-manager.service';
 import { StrategyEventLogger } from '../strategy-manager/runtime/strategy-event-logger.service';
 import { ShadowBookService } from '../strategy-manager/runtime/shadow-book.service';
@@ -517,7 +518,10 @@ export class PaperTradeDeskService {
         return status;
       });
 
-      const sorted = allEnriched.sort((a, b) => a.entryTime.localeCompare(b.entryTime));
+      const sorted = enrichTradesWithCharges(
+        allEnriched.sort((a, b) => a.entryTime.localeCompare(b.entryTime)),
+        this.lotsMultiplier,
+      );
       this.strategyPerf.recordMany(
         sorted.map((t) => ({
           strategyId: t.strategyId ?? 'unknown',
@@ -637,6 +641,9 @@ export class PaperTradeDeskService {
       if (this.realOrders) {
         this.patchMessage('Live money · refreshing NFO option chain for real orders…');
         await this.instrumentStore.refreshBestEffort(true);
+        this.patchMessage('Live money · reconciling open Kite positions…');
+        const note = await this.liveOrders.reconcileFromBroker(authorization);
+        this.patchMessage(`Live money · ${note}`);
       }
       this.assertActive(runId);
       const lookbackFrom = shiftDate(today, -12);
@@ -845,7 +852,10 @@ export class PaperTradeDeskService {
       today,
       authorization,
     );
-    let enriched = enrichTradesWithOptionPremiums(allTrades, optionCandles, this.lotsMultiplier);
+    let enriched = enrichTradesWithCharges(
+      enrichTradesWithOptionPremiums(allTrades, optionCandles, this.lotsMultiplier),
+      this.lotsMultiplier,
+    );
 
     for (const s of statuses) {
       const mine = enriched.filter((t) => t.instrumentId === s.instrumentId);
@@ -921,6 +931,7 @@ export class PaperTradeDeskService {
 
       // Kite Positions formula: (exitAvg − entryAvg) × qty — calc only, no flow change.
       enriched = applyKiteFillPnl(enriched, this.liveOrders.getOrderSummary());
+      enriched = enrichTradesWithCharges(enriched);
       for (const s of statuses) {
         const mine = enriched.filter((t) => t.instrumentId === s.instrumentId);
         s.dayNetOptionRs = mine.reduce((a, t) => a + (t.optionPnlRs ?? 0), 0);
@@ -1325,14 +1336,26 @@ function summarize(
 ): PaperDeskSnapshot['totals'] {
   const lots = Math.max(1, Math.floor(lotsUsed) || 1);
   const indexNetPts = trades.reduce((a, t) => a + t.indexPoints, 0);
+  const optionNetRs = trades.reduce((a, t) => a + (t.optionPnlRs ?? 0), 0);
+  const optionChargesRs = trades.reduce((a, t) => a + (t.chargesRs ?? 0), 0);
+  // Prefer per-instrument ₹/pt when present (Nifty 65 / Bank 30).
+  const pointsMoneyRs = trades.reduce((a, t) => {
+    const rpp = rupeesPerPointForInstrument(t.instrumentId);
+    return a + t.indexPoints * rpp * lots;
+  }, 0);
+  // Fallback blend when no trades: keep legacy single rate.
+  const pointsFallback =
+    trades.length === 0 ? 0 : pointsMoneyRs || indexNetPts * rupeesPerPoint * lots;
   return {
     trades: trades.length,
     wins: trades.filter((t) => t.outcome === 'WIN').length,
     losses: trades.filter((t) => t.outcome === 'LOSS').length,
     indexNetPts,
-    optionNetRs: trades.reduce((a, t) => a + (t.optionPnlRs ?? 0), 0),
+    optionNetRs,
     lotsUsed: lots,
-    pointsMoneyRs: indexNetPts * rupeesPerPoint * lots,
+    pointsMoneyRs: pointsFallback,
+    optionChargesRs,
+    optionNetAfterChargesRs: Math.round((optionNetRs - optionChargesRs) * 100) / 100,
   };
 }
 

@@ -28,6 +28,8 @@ import {
   enrichCrudeTradesWithOptionPremiums,
   replayPaperOnCrude,
 } from './crude-paper-engine';
+import { applyKiteFillPnl } from './apply-kite-fill-pnl';
+import { enrichTradesWithCharges } from './trade-charges.util';
 import { buildPaperDeskDayStats, emptyPaperDeskDayStats } from './paper-desk-day-stats';
 import { CRUDE_EXIT_BY, CRUDE_RUPEES_PER_POINT, resolveCrudeDayLossStopPts } from '../strategy-engine/strategies/crude-pdhl-evening/crude-pdhl-evening.evaluator';
 import {
@@ -219,7 +221,10 @@ export class CrudePaperDeskService {
         allEnriched.push(...enriched);
       }
 
-      const sorted = allEnriched.sort((a, b) => a.entryTime.localeCompare(b.entryTime));
+      const sorted = enrichTradesWithCharges(
+        allEnriched.sort((a, b) => a.entryTime.localeCompare(b.entryTime)),
+        this.lotsMultiplier,
+      );
       const status = withLiveFields({
         instrumentId: CRUDE_OIL_MINI_INSTRUMENT.id,
         instrumentName: `${CRUDE_OIL_MINI_INSTRUMENT.name} (${future.tradingSymbol})`,
@@ -342,6 +347,11 @@ export class CrudePaperDeskService {
       const authorization = this.requireAuth();
       const allInstruments = await this.loadInstruments();
       this.assertActive(runId);
+      if (this.realOrders) {
+        this.patchMessage('Live money · reconciling open Kite positions…');
+        const note = await this.liveOrders.reconcileFromBroker(authorization);
+        this.patchMessage(`Live money · ${note}`);
+      }
       const future = resolveCrudeOilMiniFuturesToken(allInstruments);
       if (!future) {
         throw new Error('No live CRUDEOILM futures contract.');
@@ -490,6 +500,7 @@ export class CrudePaperDeskService {
     });
     applyLivePhase(status, enriched, true);
 
+    let displayTrades = enrichTradesWithCharges(enriched, this.lotsMultiplier);
     if (this.realOrders) {
       await this.liveOrders.syncInstrument({
         authorization,
@@ -510,6 +521,11 @@ export class CrudePaperDeskService {
       status.brokerSlTrigger = pos?.slTrigger ?? null;
       status.brokerSlOrderId = pos?.slOrderId ?? null;
       status.brokerEntryOrderId = pos?.entryOrderId ?? null;
+      displayTrades = enrichTradesWithCharges(
+        applyKiteFillPnl(displayTrades, this.liveOrders.getOrderSummary()),
+        this.lotsMultiplier,
+      );
+      status.dayNetOptionRs = displayTrades.reduce((a, t) => a + (t.optionPnlRs ?? 0), 0);
     }
 
     const moneyTag = this.realOrders ? 'LIVE MONEY' : 'Live paper';
@@ -523,9 +539,9 @@ export class CrudePaperDeskService {
       lastTickAt: new Date().toISOString(),
       message: `${moneyTag} · alive ${now} · ${status.livePhaseLabel} · ${this.kiteStatsLabel()}`,
       statuses: [status],
-      trades: enriched.sort((a, b) => a.entryTime.localeCompare(b.entryTime)),
-      totals: summarize(enriched, this.lotsMultiplier, CRUDE_RUPEES_PER_POINT),
-      dayStats: buildPaperDeskDayStats(enriched, 5),
+      trades: displayTrades.sort((a, b) => a.entryTime.localeCompare(b.entryTime)),
+      totals: summarize(displayTrades, this.lotsMultiplier, CRUDE_RUPEES_PER_POINT),
+      dayStats: buildPaperDeskDayStats(displayTrades, 5),
       kiteStats: this.kiteStats(),
       orderEvents: this.realOrders ? this.liveOrders.getEvents() : [],
       orderSummary: this.realOrders ? this.liveOrders.getOrderSummary() : [],
@@ -874,14 +890,18 @@ function summarize(
 ): PaperDeskSnapshot['totals'] {
   const lots = Math.max(1, Math.floor(lotsUsed) || 1);
   const indexNetPts = trades.reduce((a, t) => a + t.indexPoints, 0);
+  const optionNetRs = trades.reduce((a, t) => a + (t.optionPnlRs ?? 0), 0);
+  const optionChargesRs = trades.reduce((a, t) => a + (t.chargesRs ?? 0), 0);
   return {
     trades: trades.length,
     wins: trades.filter((t) => t.outcome === 'WIN').length,
     losses: trades.filter((t) => t.outcome === 'LOSS').length,
     indexNetPts,
-    optionNetRs: trades.reduce((a, t) => a + (t.optionPnlRs ?? 0), 0),
+    optionNetRs,
     lotsUsed: lots,
     pointsMoneyRs: indexNetPts * rupeesPerPoint * lots,
+    optionChargesRs,
+    optionNetAfterChargesRs: Math.round((optionNetRs - optionChargesRs) * 100) / 100,
   };
 }
 
