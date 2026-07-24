@@ -64,6 +64,7 @@ export function recordCrudeTradeClosed(
   points: number,
   dayLossStopPts: number = CRUDE_DAY_LOSS_STOP_PTS,
   book: CrudeSessionBook = 'evening',
+  dayProfitLockPts: number = 0,
 ): void {
   state.dayNetPts += points;
   state.tradesToday += 1;
@@ -73,7 +74,9 @@ export function recordCrudeTradeClosed(
   } else {
     state.eveningTradesToday += 1;
   }
-  if (state.dayNetPts <= -dayLossStopPts) {
+  if (dayProfitLockPts > 0 && state.dayNetPts >= dayProfitLockPts) {
+    state.dayStoppedReason = `Day profit lock +${state.dayNetPts.toFixed(1)} pts`;
+  } else if (state.dayNetPts <= -dayLossStopPts) {
     state.dayStoppedReason = `Day max loss ${state.dayNetPts.toFixed(1)} pts`;
   }
 }
@@ -127,9 +130,18 @@ export function runCrudePdhlEvening(params: {
   state: CrudePdhlState;
   /** Override champion day loss stop (pts). Default −240. */
   dayLossStopPts?: number;
+  /** Day profit lock (pts). 0 = off. */
+  dayProfitLockPts?: number;
+  /** Override stop distance (pts). Default champion 80. */
+  stopPts?: number;
+  /** Override evening target (pts). Default champion 150. */
+  targetPts?: number;
 }): CrudePdhlSignal {
   const { candle, series, index, state } = params;
   const dayLossStopPts = params.dayLossStopPts ?? CRUDE_DAY_LOSS_STOP_PTS;
+  const dayProfitLockPts = params.dayProfitLockPts ?? 0;
+  const stopPts = params.stopPts ?? CRUDE_STOP_PTS;
+  const targetPts = params.targetPts ?? CRUDE_EVENING_TARGET_PTS;
   const tradingDate = extractTradeDate(candle.date);
   const month = tradingDate.slice(0, 7);
   const time = extractHhMm(candle.date);
@@ -148,6 +160,10 @@ export function runCrudePdhlEvening(params: {
   }
 
   if (state.dayStoppedReason) {
+    return wait(candle, state.dayStoppedReason);
+  }
+  if (dayProfitLockPts > 0 && state.dayNetPts >= dayProfitLockPts) {
+    state.dayStoppedReason = `Day profit lock +${state.dayNetPts.toFixed(1)} pts`;
     return wait(candle, state.dayStoppedReason);
   }
   if (state.dayNetPts <= -dayLossStopPts) {
@@ -183,11 +199,10 @@ export function runCrudePdhlEvening(params: {
   }
 
   const entry = candle.close;
-  const stopLoss = action === 'BUY' ? entry - CRUDE_STOP_PTS : entry + CRUDE_STOP_PTS;
-  const target =
-    action === 'BUY' ? entry + CRUDE_EVENING_TARGET_PTS : entry - CRUDE_EVENING_TARGET_PTS;
+  const stopLoss = action === 'BUY' ? entry - stopPts : entry + stopPts;
+  const target = action === 'BUY' ? entry + targetPts : entry - targetPts;
 
-  if (state.dayNetPts - CRUDE_STOP_PTS < -dayLossStopPts) {
+  if (state.dayNetPts - stopPts < -dayLossStopPts) {
     return {
       action: 'NO_TRADE',
       entryPrice: entry,
@@ -202,7 +217,7 @@ export function runCrudePdhlEvening(params: {
     entryPrice: entry,
     stopLoss,
     target,
-    reason: `${action} PDHL · SL ${CRUDE_STOP_PTS} / TP ${CRUDE_EVENING_TARGET_PTS} · day ${state.dayNetPts.toFixed(1)}`,
+    reason: `${action} PDHL · SL ${stopPts} / TP ${targetPts} · day ${state.dayNetPts.toFixed(1)}`,
   };
 }
 

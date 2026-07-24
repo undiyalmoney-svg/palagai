@@ -4,10 +4,10 @@
       <p class="pg-eyebrow">MCX · Crude Oil Mini</p>
       <h1>Crude Oil Desk</h1>
       <p class="pg-lede">
-        Paper Testing &amp; Live: trades only in
-        <strong>Morning 10:00–12:00</strong> (ORB) and/or
-        <strong>Evening 18:30–20:30</strong> (PDHL) on <strong>CRUDEOILM</strong>.
-        Morning SL80/TP250 · Evening SL80/TP150 · hold to 23:10. Use Result days + Download PDF for profits.
+        Default <strong>Daily Income</strong> aims ~₹300–₹1,000/day on <strong>1 lot</strong> (₹10/pt)
+        with day profit lock +₹1,000. Paper Testing &amp; Live (no real money unless you tick Live money).
+        Entries: <strong>Morning 10:00–12:00</strong> ORB · <strong>Evening 18:30–20:30</strong> PDHL on
+        <strong>CRUDEOILM</strong>. {{ profileSlTpLabel() }}.
       </p>
     </div>
     <div class="hero-meta">
@@ -21,6 +21,7 @@
       >
         {{ realOrders && mode() === 'live' ? 'REAL ORDERS' : 'Paper only' }}
       </span>
+      <span class="pg-badge pg-badge-neutral">{{ activeProfile().label }}</span>
       <span class="pg-badge pg-badge-neutral">{{ session.marketOpen }}–{{ session.marketClose }} IST</span>
     </div>
   </header>
@@ -61,7 +62,7 @@
     } @else {
       <div class="live-hint">
         <strong>Today</strong>
-        <span>{{ realOrders ? 'Real MCX NRML orders on signals' : 'Auto paper on CRUDEOILM' }} ·
+        <span>{{ realOrders ? 'Real MCX NRML orders on signals' : 'Auto paper on CRUDEOILM (no real money)' }} ·
           {{
             enableMorning && enableEvening
               ? '10:00–12:00 + 18:30–20:30'
@@ -73,6 +74,20 @@
           }}</span>
       </div>
     }
+
+    <label class="field profile-field">
+      <span>Strategy</span>
+      <select
+        [(ngModel)]="strategyProfile"
+        [disabled]="busy() || snapshot().running"
+        aria-label="Crude strategy profile"
+      >
+        @for (p of strategyProfiles; track p.profileId) {
+          <option [ngValue]="p.profileId">{{ p.label }}</option>
+        }
+      </select>
+      <small>{{ activeProfile().dailyBandLabel }}</small>
+    </label>
 
     <label class="field lots-field">
       <span>Lots</span>
@@ -89,7 +104,13 @@
     <div class="desk-toggles" role="group" aria-label="Session windows">
       <label
         class="desk-check"
-        title="ORB · OR 09:00–10:00 · entries 10:00–12:00 · SL80/TP250 · skip OR>120 · ≤1/day · paper + live."
+        [attr.title]="
+          'ORB · OR 09:00–10:00 · entries 10:00–12:00 · SL' +
+          activeProfile().stopPts +
+          '/TP' +
+          activeProfile().morningTargetPts +
+          ' · skip OR>120 · ≤1/day · paper + live.'
+        "
       >
         <input
           type="checkbox"
@@ -100,7 +121,13 @@
       </label>
       <label
         class="desk-check"
-        title="PDHL · entries 18:30–20:30 · SL80/TP150 · ≤1/day · paper + live. Hold to TP/SL/23:10."
+        [attr.title]="
+          'PDHL · entries 18:30–20:30 · SL' +
+          activeProfile().stopPts +
+          '/TP' +
+          activeProfile().eveningTargetPts +
+          ' · ≤1/day · paper + live. Hold to TP/SL/23:10.'
+        "
       >
         <input
           type="checkbox"
@@ -112,17 +139,19 @@
     </div>
 
     <div class="desk-toggles" role="group" aria-label="Day risk">
-      <label
-        class="desk-check"
-        title="Off: champion day stop −₹2,400 (−240 pts). On: stricter −₹2,950 (−295 pts)."
-      >
+      <label class="desk-check" [attr.title]="profileRiskTitle()">
         <input
           type="checkbox"
           [(ngModel)]="strictDayStop"
           [disabled]="busy() || snapshot().running"
         />
-        <span>Strict day stop (−₹2,950)</span>
+        <span>{{ strictDayStopLabel() }}</span>
       </label>
+      @if (activeProfile().dayProfitLockPts > 0) {
+        <span class="desk-lock-hint" title="Stops new entries after day net hits lock (1 lot × ₹10/pt).">
+          Day lock +₹{{ activeProfile().dayProfitLockPts * 10 }}
+        </span>
+      }
     </div>
 
     @if (mode() === 'testing') {
@@ -189,6 +218,8 @@
       <span>Last tick {{ fmtTime(snapshot().lastTickAt) }} IST</span>
       <span class="sep">·</span>
       <span>{{ snapshot().realOrders ? 'Live money' : 'Live paper' }}</span>
+      <span class="sep">·</span>
+      <span>{{ activeProfile().label }}</span>
     </div>
   }
 
@@ -413,7 +444,10 @@
               </div>
             </div>
           } @else if (s.livePhase === 'waiting') {
-            <p class="waiting-copy">Waiting PDHL break · entries 18:30–20:30 IST…</p>
+            <p class="waiting-copy">
+              Waiting {{ enableMorning && enableEvening ? 'ORB / PDHL' : enableMorning ? 'ORB' : 'PDHL' }}
+              break · {{ activeProfile().label }}…
+            </p>
           }
 
           <div class="chosen-option" [class.missing]="!s.chosenOption" [class.synthetic]="s.chosenOption?.source === 'synthetic'">
@@ -504,7 +538,7 @@
     <div class="trades-block">
       <div class="trades-head">
         <h3>Paper trades</h3>
-        <p>Option ₹ primary · futures pts from evening PDHL champion</p>
+        <p>Option ₹ primary · {{ activeProfile().label }} · futures pts × ₹10/lot</p>
         <button
           mat-stroked-button
           type="button"
@@ -580,12 +614,16 @@
   <aside class="rules">
     <h4>How it runs</h4>
     <ul>
-      <li><strong>Sessions</strong> — Morning 10:00–12:00 ORB (≤1/day) and Evening 18:30–20:30 PDHL (≤1/day). Both on by default for Testing &amp; Live. No entries outside these windows. Morning SL80/TP250 · Evening SL80/TP150 · day stop shared.</li>
+      <li>
+        <strong>Daily Income (default)</strong> — same ORB + PDHL entries, tighter SL/TP for ~₹300–₹1,000/day on
+        1 lot (₹10/pt): Morning SL40/TP80 · Evening SL40/TP50 · day profit lock +₹1,000 · day stop −₹500
+        (strict −₹800). Switch Strategy to Champion for hunt-sized SL80/TP250|150 (no profit lock).
+      </li>
+      <li><strong>Live without real money</strong> — open Live tab, leave “Live money” unchecked, press Start. Paper fills only.</li>
+      <li><strong>Sessions</strong> — Morning 10:00–12:00 ORB (≤1/day) and Evening 18:30–20:30 PDHL (≤1/day). Both on by default.</li>
       <li><strong>Hold</strong> — until TP/SL, or force-flat at 23:10. Window end only stops new entries.</li>
-      <li><strong>Testing</strong> — From/To dates + Result days (Mon–Fri) filter · Download PDF for profits.</li>
-      <li><strong>Live paper</strong> — auto-poll during MCX hours; after hours use Testing.</li>
+      <li><strong>Testing</strong> — From/To dates + Result days filter · Download PDF for profits.</li>
       <li><strong>Live money</strong> — tick the box + confirm; MCX NRML MARKET entry + protective SL-M.</li>
-      <li><strong>PDF</strong> — Download PDF for totals, best/worst days, weekday rollup, and trades.</li>
       <li>ATM CRUDEOILM CE on BUY / PE on SELL · Option ₹ / order qty scales with Lots · Nifty/Bank desk separate.</li>
     </ul>
   </aside>
