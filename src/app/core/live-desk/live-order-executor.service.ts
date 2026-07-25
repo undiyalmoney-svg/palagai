@@ -137,6 +137,27 @@ export class LiveOrderExecutorService {
     this.summary.clear();
   }
 
+  /**
+   * Clear broker state for one desk only so Trade Desk + Crude can run live together.
+   * Full `reset()` would wipe the other desk's open SL / adopt map.
+   */
+  clearInstruments(instrumentIds: readonly string[]): void {
+    const idSet = new Set(instrumentIds);
+    for (const id of idSet) {
+      const pos = this.positions.get(id);
+      if (pos?.tradingSymbol) {
+        this.positionsBySymbol.delete(pos.tradingSymbol.toUpperCase());
+      }
+      this.positions.delete(id);
+      this.summary.delete(id);
+    }
+    for (let i = this.events.length - 1; i >= 0; i -= 1) {
+      if (idSet.has(this.events[i]!.instrumentId)) {
+        this.events.splice(i, 1);
+      }
+    }
+  }
+
   setLotsMultiplier(lots: number): void {
     this.lotsMultiplier = Math.max(1, Math.floor(lots) || 1);
   }

@@ -78,6 +78,14 @@ export class CrudeOilDeskComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.lots = this.lotsPreference.get();
+    if (this.snapshot().running) {
+      this.mode.set('live');
+      this.realOrders = this.snapshot().realOrders;
+    }
+  }
+
+  ngOnDestroy(): void {
+    // Do not stopLive — keep Crude polling while on Trade Desk / other tabs.
   }
 
   protected onLotsChange(): void {
@@ -92,10 +100,6 @@ export class CrudeOilDeskComponent implements OnInit, OnDestroy {
 
   protected isWeekdayOn(key: PaperWeekdayKey): boolean {
     return this.weekdayOn()[key];
-  }
-
-  ngOnDestroy(): void {
-    this.desk.stopLive();
   }
 
   protected setMode(mode: PaperDeskMode): void {

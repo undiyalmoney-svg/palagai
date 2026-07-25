@@ -12,7 +12,7 @@ import {
 import { StrategySettings } from '../models/strategy-settings.model';
 import { StrategyRegistryService } from '../registry/strategy-registry.service';
 
-const STORAGE_KEY = 'palagai_strategy_assignments_v11';
+const STORAGE_KEY = 'palagai_strategy_assignments_v12';
 const LEGACY_STORAGE_KEYS = [
   'palagai_strategy_assignments_v1',
   'palagai_strategy_assignments_v2',
@@ -24,6 +24,7 @@ const LEGACY_STORAGE_KEYS = [
   'palagai_strategy_assignments_v8',
   'palagai_strategy_assignments_v9',
   'palagai_strategy_assignments_v10',
+  'palagai_strategy_assignments_v11',
 ] as const;
 
 export interface ChannelAssignment {

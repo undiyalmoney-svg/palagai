@@ -29,6 +29,7 @@ import {
 } from '../utils/option-chain.util';
 import {
   buildContext,
+  effectiveProtectiveStop,
   enrichTradesWithOptionPremiums,
   replayPaperOnIndex,
   toOptionContract,
@@ -583,11 +584,12 @@ export class PaperTradeDeskService {
     this.normalizeDeskOptions(options);
     this.realOrders = !!environment.allowLiveMoney && !!options?.realOrders;
     this.lotsMultiplier = Math.max(1, Math.floor(options?.lots ?? 1) || 1);
-    this.liveOrders.reset();
+    const active = this.activeInstruments();
+    // Soft clear — keep Crude (or other desk) live broker state intact.
+    this.liveOrders.clearInstruments(active.map((i) => i.instrument.id));
     this.liveOrders.setLotsMultiplier(this.lotsMultiplier);
     const today = todayIso();
     const now = istNowHhMm();
-    const active = this.activeInstruments();
 
     if (now < '09:15' || now > '15:30') {
       try {
@@ -826,7 +828,7 @@ export class PaperTradeDeskService {
             ? {
                 direction: replay.open.direction,
                 indexEntry: replay.open.entry,
-                indexStop: replay.open.stop,
+                indexStop: effectiveProtectiveStop(replay.open),
                 indexTarget: replay.open.target,
                 entryTime: replay.open.entryTime,
                 option: replay.open.option,

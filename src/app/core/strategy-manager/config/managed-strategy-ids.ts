@@ -7,7 +7,7 @@ export const MANAGED_STRATEGY_IDS = {
   DONCHIAN_55_TURTLE: 'donchian-55-turtle',
   /** Daily-consistency search: max green-day share (not default — fat tails). */
   INSIDE_BREAK: 'inside-break-eod',
-  /** S/R retest daily-₹500 winner: Donch-20 retest + OR-mid + 1.5R + BE protect. */
+  /** Donch-20 retest + OR-mid + Swing-5 structure trail (exit-lab high-profit). */
   DONCH_RETEST_OR_MID_2R: 'donch-retest-or-mid-2r',
   /** S/R retest twin: Swing-5 retest + EMA50 + 2R. */
   SWING_RETEST_EMA50_2R: 'swing-retest-ema50-2r',
@@ -18,7 +18,7 @@ export const MANAGED_STRATEGY_IDS = {
   SMART_PULLBACK_PRO: 'smart-pullback-pro',
   /**
    * Align Combo · GENIE — Nifty+Bank together when aligned, one alone, skip chop.
-   * Same DNA as Smart PB GENIE; user-facing playbook name for COMBO/ALONE days.
+   * Default for Nifty/Bank Paper+Live (Kite OOS ~₹507/day).
    */
   ALIGN_COMBO_GENIE: 'align-combo-genie',
   /** Stocks Desk champion — gap-up fade ₹500 book. */
@@ -30,18 +30,18 @@ export type ManagedStrategyId =
 
 /**
  * Research-backed defaults:
- * - Nifty/Bank: Donch Retest OR-mid 1.5R+BE
+ * - Nifty/Bank: Align Combo · GENIE (Nifty ≤2t · Bank ≤1t · Tue SKIP)
  * - Stocks: GAP_FADE_500 (same DNA as Stocks Desk)
  */
 export const DEFAULT_CHANNEL_ASSIGNMENTS = {
   nifty: {
-    paper: MANAGED_STRATEGY_IDS.DONCH_RETEST_OR_MID_2R,
-    live: MANAGED_STRATEGY_IDS.DONCH_RETEST_OR_MID_2R,
+    paper: MANAGED_STRATEGY_IDS.ALIGN_COMBO_GENIE,
+    live: MANAGED_STRATEGY_IDS.ALIGN_COMBO_GENIE,
     shadow: null as string | null,
   },
   bank: {
-    paper: MANAGED_STRATEGY_IDS.DONCH_RETEST_OR_MID_2R,
-    live: MANAGED_STRATEGY_IDS.DONCH_RETEST_OR_MID_2R,
+    paper: MANAGED_STRATEGY_IDS.ALIGN_COMBO_GENIE,
+    live: MANAGED_STRATEGY_IDS.ALIGN_COMBO_GENIE,
     shadow: null as string | null,
   },
   stocks: {

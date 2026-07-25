@@ -80,6 +80,15 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.lots = this.lotsPreference.get();
+    // Live continues in the root desk service across tab switches — restore UI mode.
+    if (this.snapshot().running) {
+      this.mode.set('live');
+      this.realOrders = this.snapshot().realOrders;
+    }
+  }
+
+  ngOnDestroy(): void {
+    // Do not stopLive — Trade Desk + Crude must keep polling when you switch tabs.
   }
 
   protected onLotsChange(): void {
@@ -94,10 +103,6 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
 
   protected isWeekdayOn(key: PaperWeekdayKey): boolean {
     return this.weekdayOn()[key];
-  }
-
-  ngOnDestroy(): void {
-    this.desk.stopLive();
   }
 
   protected setMode(mode: PaperDeskMode): void {

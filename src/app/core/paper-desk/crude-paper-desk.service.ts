@@ -28,6 +28,7 @@ import {
   enrichCrudeTradesWithOptionPremiums,
   replayPaperOnCrude,
 } from './crude-paper-engine';
+import { effectiveProtectiveStop } from './paper-desk-engine';
 import { applyKiteFillPnl } from './apply-kite-fill-pnl';
 import { enrichTradesWithCharges } from './trade-charges.util';
 import { buildPaperDeskDayStats, emptyPaperDeskDayStats } from './paper-desk-day-stats';
@@ -287,7 +288,8 @@ export class CrudePaperDeskService {
     this.enableMorning = options?.enableMorning !== false;
     this.enableEvening = options?.enableEvening !== false;
     this.dayLossStopPts = resolveCrudeDayLossStopPts(this.strictDayStop);
-    this.liveOrders.reset();
+    // Soft clear — keep Nifty/Bank Trade Desk live broker state intact.
+    this.liveOrders.clearInstruments([CRUDE_OIL_MINI_INSTRUMENT.id]);
     this.liveOrders.setLotsMultiplier(this.lotsMultiplier);
     const today = todayIso();
     const now = istNowHhMm();
@@ -484,7 +486,7 @@ export class CrudePaperDeskService {
         ? {
             direction: replay.open.direction,
             indexEntry: replay.open.entry,
-            indexStop: replay.open.stop,
+            indexStop: effectiveProtectiveStop(replay.open),
             indexTarget: replay.open.target,
             entryTime: replay.open.entryTime,
             option: replay.open.option,

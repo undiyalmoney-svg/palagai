@@ -23,6 +23,21 @@ import {
 } from '../strategy-manager/models/strategy-module.interface';
 import { ChampionPdhlManagedStrategy } from '../strategy-manager/modules/champion-pdhl.managed-strategy';
 
+/** Tighter of hard stop and swing trail — for live SL-M / UI (paper exit keeps them separate). */
+export function effectiveProtectiveStop(open: {
+  direction: 'BUY' | 'SELL';
+  stop: number;
+  trail?: number | null;
+}): number {
+  const trail = open.trail;
+  if (trail == null || !Number.isFinite(trail)) {
+    return open.stop;
+  }
+  return open.direction === 'BUY'
+    ? Math.max(open.stop, trail)
+    : Math.min(open.stop, trail);
+}
+
 export interface IndexOpenPaper {
   direction: 'BUY' | 'SELL';
   entry: number;

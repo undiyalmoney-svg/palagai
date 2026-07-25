@@ -455,26 +455,28 @@ export function indexRuleExitLogic(
   const time = extractHhMm(candle.date);
 
   if (spec.exit === 'swing_trail') {
-    // Research order: hard SL first, then separate swing3 trail (lookback=3), then EOD.
+    // Research order: hard SL first, then separate structure trail, then EOD.
+    // Lookback from settings (Donch default: 5 = exit-lab structure_sw5; classic swing3 = 3).
     // Do NOT merge trail into hard stop — that diverged from research books.
+    const lb = Math.max(1, Math.floor(settings.swingLookback) || 3);
     if (open.direction === 'BUY') {
       if (candle.low <= open.stop) {
-        return { exitPrice: open.stop, reason: 'Swing trail / stop' };
+        return { exitPrice: open.stop, reason: `Swing-${lb} trail / stop` };
       }
     } else if (candle.high >= open.stop) {
-      return { exitPrice: open.stop, reason: 'Swing trail / stop' };
+      return { exitPrice: open.stop, reason: `Swing-${lb} trail / stop` };
     }
 
     const bars = series ?? [];
-    if (bars.length >= 7) {
-      const sw = researchSwingAt(bars, 3);
+    if (bars.length >= lb * 2 + 1) {
+      const sw = researchSwingAt(bars, lb);
       if (open.direction === 'BUY' && sw.low != null) {
         open.trail =
           open.trail == null || !Number.isFinite(open.trail)
             ? sw.low
             : Math.max(open.trail, sw.low);
         if (candle.low <= open.trail) {
-          return { exitPrice: open.trail, reason: 'Swing trail / stop' };
+          return { exitPrice: open.trail, reason: `Swing-${lb} trail / stop` };
         }
       } else if (open.direction === 'SELL' && sw.high != null) {
         open.trail =
@@ -482,7 +484,7 @@ export function indexRuleExitLogic(
             ? sw.high
             : Math.min(open.trail, sw.high);
         if (candle.high >= open.trail) {
-          return { exitPrice: open.trail, reason: 'Swing trail / stop' };
+          return { exitPrice: open.trail, reason: `Swing-${lb} trail / stop` };
         }
       }
     }

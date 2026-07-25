@@ -68,6 +68,14 @@ export class StocksDeskComponent implements OnInit, OnDestroy {
     } catch {
       /* watchlist tokens still work */
     }
+    if (this.snapshot().running) {
+      this.mode.set('live');
+      this.realOrders = this.snapshot().realOrders;
+    }
+  }
+
+  ngOnDestroy(): void {
+    // Do not stopLive — keep Stocks polling across tab switches.
   }
 
   protected resetTreasure(): void {
@@ -94,10 +102,6 @@ export class StocksDeskComponent implements OnInit, OnDestroy {
         MANAGED_STRATEGY_IDS.ALIGN_COMBO_GENIE,
       );
     }
-  }
-
-  ngOnDestroy(): void {
-    this.desk.stopLive();
   }
 
   protected setMode(mode: PaperDeskMode): void {

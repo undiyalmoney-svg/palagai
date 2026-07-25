@@ -2,7 +2,7 @@
 
 ## Goal
 
-Multi-strategy platform: strategies are plug-and-play modules. Champion PDHL remains available; **defaults** are **Donch Retest · OR-mid · 1.5R+BE** for indices (daily ₹500 S/R search + profit-protect).
+Multi-strategy platform: strategies are plug-and-play modules. Champion PDHL remains available; **defaults** are **Align Combo · GENIE** for indices (Nifty ≤2t · Bank ≤1t · BOTH/ALONE/SKIP).
 
 ## Layout
 
@@ -26,12 +26,12 @@ Market data → Strategy Manager → IManagedStrategy → Signal → Desk risk �
 
 | Channel | Paper | Live | Shadow |
 |---|---|---|---|
-| Nifty | **Donch Retest · OR-mid · 1.5R+BE** | **Donch Retest · OR-mid · 1.5R+BE** | Off |
-| Bank | **Donch Retest · OR-mid · 1.5R+BE** | **Donch Retest · OR-mid · 1.5R+BE** | Off |
+| Nifty | **Align Combo · GENIE** | **Align Combo · GENIE** | Off |
+| Bank | **Align Combo · GENIE** | **Align Combo · GENIE** | Off |
 | Stocks (Strategy Manager) | **GAP_FADE_500** | **GAP_FADE_500** | Off |
 | Stocks Desk UI | — | **GAP_FADE_500** | — |
 
-Donch Retest: **1.5R** target + **BE after +1R** + **up to 3 trades/day**. Regime filter **off** by default. Nifty stop 30 / Bank stop 45.
+GENIE: Nifty **≤2 trades/day** · Bank **≤1** · Tue SKIP · day stop −60. Regime filter **off**. Nifty stop 30 / Bank stop 45.
 
 Trade Desk resolves strategies via `StrategyManagerService`. Champion DNA file is **unchanged**; desk risk checkboxes still apply through `setPdhlDeskOverrides`.
 

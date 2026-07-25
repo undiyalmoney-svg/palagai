@@ -32,13 +32,13 @@ const STRATEGY_DESCRIPTIONS: Record<string, string> = {
   [STRATEGY_IDS.INSIDE_BREAK]:
     'Inside-bar breakout + EOD · multi-trade · daily ₹500 green-day search pick (paper first).',
   [STRATEGY_IDS.DONCH_RETEST_OR_MID_2R]:
-    'Donchian-20 S/R retest · OR-mid · 1.5R + BE after +1R · up to 3t/day · daily ₹500 default.',
+    'Donchian-20 S/R retest · OR-mid · Swing-5 structure trail + EOD · up to 3t/day.',
   [STRATEGY_IDS.SWING_RETEST_EMA50_2R]:
     'Swing-5 S/R retest · EMA50 bias · 2R · 1t · high green-day twin.',
   [STRATEGY_IDS.SMART_PULLBACK_PRO]:
     'Smart PB PRO · 1+1 ₹500 book: Nifty breakout·3R + Bank armed-retest·1.5R (Kite OOS).',
   [STRATEGY_IDS.ALIGN_COMBO_GENIE]:
-    'Align Combo · GENIE — Nifty+Bank together when aligned, one alone, skip chop. Short/long PA + swing SL.',
+    'Default indices · GENIE BOTH/ALONE/SKIP · Nifty ≤2t · Bank ≤1t · ~₹507/day OOS.',
   [STRATEGY_IDS.GAP_FADE_500]:
     'Stocks GAP_FADE_500 — fade gap-up ≥0.3% · stop 1.5% · ₹500 book default.',
 };

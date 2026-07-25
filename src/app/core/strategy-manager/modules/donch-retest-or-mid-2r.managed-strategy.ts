@@ -7,16 +7,17 @@ import { BaseIndexRuleStrategy } from './base-index-rule.strategy';
 
 /**
  * Donchian-20 break → retest + OR-mid bias.
- * Profit-protect: 1.5R target + BE lock after +1R.
+ * Exit (exit-lab high-profit): hard SL + Swing-5 structure trail + EOD
+ * (no fixed 1.5R target / BE protect — entry DNA unchanged).
  * Live default allows up to 3 entries/day (day stop −60 still caps damage).
  */
 @Injectable({ providedIn: 'root' })
 export class DonchRetestOrMid2rManagedStrategy extends BaseIndexRuleStrategy {
   readonly id = MANAGED_STRATEGY_IDS.DONCH_RETEST_OR_MID_2R;
-  readonly name = 'Donch Retest · OR-mid · 1.5R+BE';
-  readonly version = '1.2.0';
+  readonly name = 'Donch Retest · OR-mid · Swing-5 trail';
+  readonly version = '1.3.0';
   readonly description =
-    'Break Donchian-20 S/R, enter on retest · OR-mid · 1.5R target · BE after +1R · up to 3t/day. Index DNA — NOT for stocks (use GAP_FADE_500).';
+    'Break Donchian-20 S/R, enter on retest · OR-mid · Swing-5 structure trail + EOD · up to 3t/day. Index DNA — NOT for stocks (use GAP_FADE_500).';
   readonly supports: readonly DeskChannel[] = ['nifty', 'bank'];
 
   readonly defaultSettings = defaultStrategySettings({
@@ -27,13 +28,12 @@ export class DonchRetestOrMid2rManagedStrategy extends BaseIndexRuleStrategy {
     stopLossPts: 30,
     bankStopLossPts: 45,
     donchianLength: 20,
+    swingLookback: 5,
     maxTradesPerDay: 3,
     instrumentType: 'futures',
     dayStopPts: 60,
-    targetRMultiple: 1.5,
-    profitProtectEnabled: true,
-    profitProtectArmR: 1,
-    profitProtectLockR: 0,
+    targetRMultiple: 0,
+    profitProtectEnabled: false,
     regimeFilterEnabled: false,
     positionSizeLots: 1,
   });
@@ -41,6 +41,6 @@ export class DonchRetestOrMid2rManagedStrategy extends BaseIndexRuleStrategy {
   protected readonly spec: IndexRuleSpec = {
     entry: 'donch_retest',
     bias: 'or_mid',
-    exit: 'eod',
+    exit: 'swing_trail',
   };
 }
