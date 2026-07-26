@@ -22,6 +22,24 @@
     </div>
   </header>
 
+  <div class="active-strategy-bar" role="status" aria-live="polite">
+    <div class="active-strategy-label">
+      <span class="as-kicker">Active now · {{ activeStrategies().modeLabel }}</span>
+      @if (activeStrategies().same) {
+        <strong class="as-name">{{ activeStrategies().nifty.name }}</strong>
+        <span class="as-meta">Nifty + Bank · {{ activeStrategies().nifty.maxTradesLabel }}</span>
+      } @else {
+        <strong class="as-name"
+          >Nifty {{ activeStrategies().nifty.name }} · Bank {{ activeStrategies().bank.name }}</strong
+        >
+        <span class="as-meta"
+          >{{ activeStrategies().nifty.maxTradesLabel }} / {{ activeStrategies().bank.maxTradesLabel }}</span
+        >
+      }
+    </div>
+    <a class="as-link" href="/strategy-manager">Change in Strat</a>
+  </div>
+
   <div class="mode-switch" role="tablist" aria-label="Desk mode">
     <button
       type="button"
@@ -52,13 +70,13 @@
     </div>
     <ul class="trading-basis-list">
       <li>
-        <strong>Active strategy</strong> — Set in <em>Strat</em> (Paper / Live per index). Card below shows the live module name.
+        <strong>Active strategy</strong> — Banner above shows Strat Paper/Live assignment live. Per-index cards also show <em>Running · …</em> after a run.
       </li>
       <li>
-        <strong>Default (indices)</strong> — <em>Donch Retest</em> · ≤3 trades/day · Donchian-20 break→retest · OR-mid · Swing-5 trail + EOD (<em>Trap</em> / <em>Genie</em> still selectable in Strat)
+        <strong>Default (indices)</strong> — <em>Donch Retest</em> · ≤2 trades/day · tighter SL + day stop −40 · Swing-5 trail (<em>Trap</em> still selectable — wins more calendar years)
       </li>
       <li>
-        <strong>Stops</strong> — Hard SL Nifty 30 / Bank 45 pts · day stop −60 · Swing-5 trail · optional Strict −₹2,950 / Profit lock +₹5,000
+        <strong>Stops</strong> — Hard SL Nifty 22 / Bank 35 pts · day stop −40 · Strict −₹2,950 <em>on by default</em> · optional Profit lock +₹5,000
       </li>
       <li>
         <strong>Instrument</strong> — ATM options on the selected index · lots from the Lots control
@@ -67,10 +85,10 @@
         <strong>P&amp;L math</strong> — Front-week option OHLC: <em>(exit − entry) × lot × lots</em>. Missing week / stop / target → <em>est. premium</em> = <strong>Index ₹ proxy</strong> (Nifty pts×65 · Bank pts×30). Never prices a far live weekly. Raw “Index pts” mixes underlyings — don’t judge money from pts alone.
       </li>
       <li>
-        <strong>Settings tip</strong> — Max trades is DNA-locked per index (Donch = 3 · Trap = 3 · Genie = Nifty 2 / Bank 1).
+        <strong>Settings tip</strong> — Max trades DNA-locked (Donch = 2 · Trap = 3 · Genie = Nifty 2 / Bank 1). Strict day stop cuts stacked red days.
       </li>
       <li>
-        <strong>P&amp;L tip</strong> — Badge must be <em>v1.3.6 · …mt3</em> (hard-refresh if not). All-est rows → Option ₹ <strong>equals</strong> Index ₹. Live money still uses Kite fills.
+        <strong>P&amp;L tip</strong> — Badge must be <em>v1.3.7 · …risk</em> (hard-refresh if not). All-est rows → Option ₹ <strong>equals</strong> Index ₹. Live money still uses Kite fills.
       </li>
     </ul>
   </aside>

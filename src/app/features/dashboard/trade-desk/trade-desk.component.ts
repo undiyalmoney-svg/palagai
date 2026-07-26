@@ -19,6 +19,10 @@ import { LotsPreferenceService } from '../../../core/services/lots-preference.se
 import { formatUnknownError } from '../../../core/utils/kite-error.util';
 import { extractTradeDate, formatDayOfWeek, formatDisplayDate } from '../../../core/utils/trade-date.util';
 import { APP_BUILD_LABEL } from '../../../core/config/app-build';
+import { StrategyAssignmentService } from '../../../core/strategy-manager/config/strategy-assignment.service';
+import { StrategyRegistryService } from '../../../core/strategy-manager/registry/strategy-registry.service';
+import { dnaCapsForStrategy } from '../../../core/strategy-manager/config/strategy-dna-caps';
+import { DeskChannel } from '../../../core/strategy-manager/models/desk-channel.model';
 
 @Component({
   selector: 'app-trade-desk',
@@ -32,6 +36,8 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
   private readonly deskExport = inject(PaperDeskExportService);
   private readonly kiteSession = inject(KiteSessionService);
   private readonly lotsPreference = inject(LotsPreferenceService);
+  private readonly assignments = inject(StrategyAssignmentService);
+  private readonly registry = inject(StrategyRegistryService);
 
   protected readonly appBuildLabel = APP_BUILD_LABEL;
 
@@ -48,8 +54,8 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
   /** Trade Desk book + risk checkboxes (Testing + Live). */
   protected enableNifty = true;
   protected enableBank = true;
-  /** Combined strict day loss ≈ −₹2,950 (safer than default ~−₹8k days). */
-  protected strictDayStop = false;
+  /** Combined strict day loss ≈ −₹2,950 — on by default to cut heavy red days. */
+  protected strictDayStop = true;
   /** Combined day profit lock ≈ +₹5,000. */
   protected dayProfitLock = false;
 
@@ -60,6 +66,30 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
   protected readonly snapshot = this.desk.snapshot;
   protected readonly busy = this.desk.busy;
   protected readonly error = signal('');
+
+  /** Active Strat assignments for the desk mode (Paper in Testing, Live in Live). */
+  protected readonly activeStrategies = computed(() => {
+    const assignMode = this.mode() === 'live' ? 'live' : 'paper';
+    const map = this.assignments.assignments();
+    const row = (channel: DeskChannel) => {
+      const id = assignMode === 'live' ? map[channel].live : map[channel].paper;
+      const mod = this.registry.getById(id);
+      const caps = dnaCapsForStrategy(id, channel);
+      const mt = caps.maxTradesPerDay > 0 ? `${caps.maxTradesPerDay}t/day` : '∞ t/day';
+      return {
+        channel,
+        id,
+        name: mod?.name ?? id,
+        maxTradesLabel: mt,
+      };
+    };
+    return {
+      modeLabel: assignMode === 'live' ? 'Live' : 'Paper',
+      nifty: row('nifty'),
+      bank: row('bank'),
+      same: map.nifty[assignMode] === map.bank[assignMode],
+    };
+  });
 
   /** Filtered Testing view; Live uses full snapshot. */
   protected readonly resultView = computed(() => {
