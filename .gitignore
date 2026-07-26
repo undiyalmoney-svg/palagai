@@ -3,7 +3,6 @@
 # Compiled output
 /dist
 /tmp
-/.tmp-run
 /out-tsc
 /bazel-out
 
@@ -50,7 +49,6 @@ Thumbs.db
 
 # Local research caches / large generated reports
 /reports/
-/backups/
 *.sqlite
 /.venv-pptx/
 /scripts/yt-video/node_modules/

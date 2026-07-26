@@ -11,7 +11,6 @@ import { StrategyContext } from '../../strategy-engine/models/strategy-context.m
 import { extractHhMm } from '../../strategy-engine/utils/market-session.util';
 import { extractTradeDate } from '../../utils/trade-date.util';
 import { barsOnDay, emaLast, seriesAt } from '../indicators/desk-indicators';
-import { rupeesPerPointForInstrument } from '../../strategy-engine/strategies/pdhl-opening-range/pdhl-opening-range.evaluator';
 import {
   ManagedExitDecision,
   ManagedOpenPosition,
@@ -36,8 +35,6 @@ export interface SrTrapDayState extends RuleDayState {
     barSeq: number;
   } | null;
   barSeq: number;
-  /** Day loss cap converted to points for the traded instrument (0 = off). */
-  dayLossCapPts: number;
 }
 
 export function createSrTrapDayState(): SrTrapDayState {
@@ -45,16 +42,7 @@ export function createSrTrapDayState(): SrTrapDayState {
     ...createRuleDayState(),
     pending: null,
     barSeq: 0,
-    dayLossCapPts: 0,
   };
-}
-
-/** Points of loss budget still available today (Infinity when cap is off). */
-export function remainingLossBudgetPts(state: SrTrapDayState): number {
-  if (!(state.dayLossCapPts > 0)) {
-    return Number.POSITIVE_INFINITY;
-  }
-  return state.dayLossCapPts + Math.min(0, state.dayNetPts);
 }
 
 export function recordSrTrapTradeClosed(
@@ -63,10 +51,6 @@ export function recordSrTrapTradeClosed(
   dayStopPts: number,
 ): void {
   recordRuleTradeClosed(state, points, dayStopPts);
-  // Rupee cap is the hard rail — stop the day the moment the budget is spent.
-  if (state.dayLossCapPts > 0 && state.dayNetPts <= -state.dayLossCapPts) {
-    state.dayStopped = true;
-  }
 }
 
 function num(v: unknown, fallback: number): number {
@@ -123,13 +107,6 @@ export function runSrTrapConfirm(
   const extras = readTrapExtras(settings);
   state.barSeq = series.length;
 
-  // ₹ cap → points for this instrument (Nifty ₹65/pt · Bank ₹30/pt).
-  const rupeesPerPt = rupeesPerPointForInstrument(ctx.instrumentId);
-  state.dayLossCapPts =
-    settings.dayLossCapRs > 0 && rupeesPerPt > 0
-      ? settings.dayLossCapRs / rupeesPerPt
-      : 0;
-
   if (state.tradingDate !== day) {
     state.tradingDate = day;
     state.dayNetPts = 0;
@@ -167,12 +144,6 @@ export function runSrTrapConfirm(
     );
   }
 
-  const budgetPts = remainingLossBudgetPts(state);
-  if (budgetPts <= 0) {
-    state.dayStopped = true;
-    return skip(`Day ₹ loss cap spent (₹${settings.dayLossCapRs})`);
-  }
-
   const dayBars = barsOnDay(series, day);
   const i = dayBars.findIndex((b) => b.date === candle.date);
   if (i < extras.swingLb) {
@@ -202,17 +173,10 @@ export function runSrTrapConfirm(
       p.dir === 1 ? Math.min(p.stop, fill - 1) : Math.max(p.stop, fill + 1);
     const risk = Math.abs(fill - stop);
     const bank = /bank/i.test(ctx.instrumentId ?? '');
-    const bandMax = bank ? Math.max(extras.maxRisk, 50) : extras.maxRisk;
+    const maxRisk = bank ? Math.max(extras.maxRisk, 50) : extras.maxRisk;
     const minRisk = bank ? Math.max(extras.minRisk, 8) : extras.minRisk;
-    // Never risk more than the ₹ budget left today.
-    const maxRisk = Math.min(bandMax, budgetPts);
-    if (risk < minRisk) {
-      return wait(`Risk ${risk.toFixed(1)} below min ${minRisk}`);
-    }
-    if (risk > maxRisk) {
-      return wait(
-        `Risk ${risk.toFixed(1)} > allowed ${maxRisk.toFixed(1)} (₹ budget left ${(budgetPts * rupeesPerPt).toFixed(0)})`,
-      );
+    if (risk < minRisk || risk > maxRisk) {
+      return wait(`Risk ${risk.toFixed(1)} outside ${minRisk}–${maxRisk}`);
     }
     const rr = settings.targetRMultiple > 0 ? settings.targetRMultiple : 3.5;
     const target = p.dir === 1 ? fill + risk * rr : fill - risk * rr;
@@ -288,9 +252,8 @@ export function runSrTrapConfirm(
 
   const risk = Math.abs(cc - stop);
   const bank = /bank/i.test(ctx.instrumentId ?? '');
-  const bandMax = bank ? Math.max(extras.maxRisk, 50) : extras.maxRisk;
+  const maxRisk = bank ? Math.max(extras.maxRisk, 50) : extras.maxRisk;
   const minRisk = bank ? Math.max(extras.minRisk, 8) : extras.minRisk;
-  const maxRisk = Math.min(bandMax, budgetPts);
   if (risk < minRisk || risk > maxRisk) {
     return wait(`Signal risk ${risk.toFixed(1)} outside band`);
   }

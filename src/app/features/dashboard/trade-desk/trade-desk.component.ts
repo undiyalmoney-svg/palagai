@@ -54,8 +54,8 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
   /** Trade Desk book + risk checkboxes (Testing + Live). */
   protected enableNifty = true;
   protected enableBank = true;
-  /** Optional Champion-PDHL desk override; Trap has its own −60pt day stop. */
-  protected strictDayStop = false;
+  /** Combined strict day loss ≈ −₹2,950 — on by default to cut heavy red days. */
+  protected strictDayStop = true;
   /** Combined day profit lock ≈ +₹5,000. */
   protected dayProfitLock = false;
 
@@ -76,25 +76,18 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
       const mod = this.registry.getById(id);
       const caps = dnaCapsForStrategy(id, channel);
       const mt = caps.maxTradesPerDay > 0 ? `${caps.maxTradesPerDay}t/day` : '∞ t/day';
-      // Cap is per lot per index — show what the desk Lots control actually risks.
-      const capRs = (mod?.getSettings().dayLossCapRs ?? 0) * Math.max(1, this.lots);
       return {
         channel,
         id,
         name: mod?.name ?? id,
         maxTradesLabel: mt,
-        capRs,
-        capLabel: capRs > 0 ? `max −₹${capRs.toLocaleString('en-IN')}/day` : 'no ₹ cap',
       };
     };
-    const nifty = row('nifty');
-    const bank = row('bank');
     return {
       modeLabel: assignMode === 'live' ? 'Live' : 'Paper',
-      nifty,
-      bank,
+      nifty: row('nifty'),
+      bank: row('bank'),
       same: map.nifty[assignMode] === map.bank[assignMode],
-      deskCapRs: nifty.capRs + bank.capRs,
     };
   });
 
