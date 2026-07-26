@@ -145,6 +145,8 @@ export interface PaperDeskSnapshot {
     optionChargesRs?: number;
     /** optionNetRs − optionChargesRs when charges known. */
     optionNetAfterChargesRs?: number;
+    /** How many closed trades used δ/index estimate (not real front-week OHLC). */
+    premiumEstimatedCount?: number;
   };
   /** Testing day breakdown: best/worst days, weekday rollup. */
   dayStats: PaperDeskDayStats;

@@ -194,4 +194,42 @@ describe('enrichTradesWithOptionPremiums', () => {
     // Must track δ×index, not 195−10 phantoms
     expect(Math.abs(out!.optionPnlRs!)).toBeLessThan(65 * 50);
   });
+
+  it('REGRESSION: far-week OHLC must not mint ~₹28k on +24 index pts', () => {
+    // Simulates old bug: bind Jul trade to Jul-30 weekly with explosive premium move.
+    const fakeFarWeekToken = 9999;
+    const candles = new Map<number, Candle[]>([
+      [
+        fakeFarWeekToken,
+        [
+          optCandle('2026-07-08T10:15:00+0530', 50, 60, 48, 55),
+          optCandle('2026-07-08T11:00:00+0530', 55, 120, 54, 110),
+        ],
+      ],
+    ]);
+    const trades = Array.from({ length: 20 }, (_, i) =>
+      trade({
+        id: `g${i}`,
+        indexPoints: 1.22, // ~24.4 / 20
+        entryTime: '2026-07-08T10:15:00+0530',
+        exitTime: '2026-07-08T11:00:00+0530',
+        exitReason: 'Target hit',
+        optionEntryEdge: 'open', // old Genie bug used open while fill was close
+        option: {
+          tradingSymbol: 'NIFTY FAR WEEK CE',
+          instrumentToken: fakeFarWeekToken,
+          strike: 24500,
+          expiry: '2026-07-30',
+          optionType: 'CE',
+          lotSize: 65,
+          source: 'chain',
+        },
+      }),
+    );
+    const out = enrichTradesWithOptionPremiums(trades, candles, 1);
+    const optionNet = out.reduce((a, t) => a + (t.optionPnlRs ?? 0), 0);
+    // Target exits → δ estimate: 0.5 * 1.22 * 65 ≈ 39.65 per trade → ~₹793 total
+    expect(optionNet).toBeLessThan(5000);
+    expect(out.every((t) => t.premiumEstimated)).toBe(true);
+  });
 });

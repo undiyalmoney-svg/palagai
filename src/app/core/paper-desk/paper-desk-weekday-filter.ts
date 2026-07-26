@@ -52,14 +52,19 @@ export function summarizePaperTrades(
 ): PaperDeskSnapshot['totals'] {
   const lots = Math.max(1, Math.floor(lotsUsed) || 1);
   const indexNetPts = trades.reduce((a, t) => a + t.indexPoints, 0);
+  const optionNetRs = trades.reduce((a, t) => a + (t.optionPnlRs ?? 0), 0);
+  const optionChargesRs = trades.reduce((a, t) => a + (t.chargesRs ?? 0), 0);
   return {
     trades: trades.length,
     wins: trades.filter((t) => t.outcome === 'WIN').length,
     losses: trades.filter((t) => t.outcome === 'LOSS').length,
     indexNetPts,
-    optionNetRs: trades.reduce((a, t) => a + (t.optionPnlRs ?? 0), 0),
+    optionNetRs,
     lotsUsed: lots,
     pointsMoneyRs: indexNetPts * rupeesPerPoint * lots,
+    optionChargesRs,
+    optionNetAfterChargesRs: Math.round((optionNetRs - optionChargesRs) * 100) / 100,
+    premiumEstimatedCount: trades.filter((t) => t.premiumEstimated).length,
   };
 }
 

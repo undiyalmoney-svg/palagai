@@ -1245,7 +1245,16 @@ function emptySnapshot(mode: PaperDeskMode): PaperDeskSnapshot {
     lastTickAt: null,
     statuses: [],
     trades: [],
-    totals: { trades: 0, wins: 0, losses: 0, indexNetPts: 0, optionNetRs: 0, lotsUsed: 1, pointsMoneyRs: 0 },
+    totals: {
+      trades: 0,
+      wins: 0,
+      losses: 0,
+      indexNetPts: 0,
+      optionNetRs: 0,
+      lotsUsed: 1,
+      pointsMoneyRs: 0,
+      premiumEstimatedCount: 0,
+    },
     dayStats: emptyPaperDeskDayStats(),
     kiteStats: {
       historicalCalls: 0,
@@ -1361,6 +1370,7 @@ function summarize(
     pointsMoneyRs: pointsFallback,
     optionChargesRs,
     optionNetAfterChargesRs: Math.round((optionNetRs - optionChargesRs) * 100) / 100,
+    premiumEstimatedCount: trades.filter((t) => t.premiumEstimated).length,
   };
 }
 

@@ -18,6 +18,7 @@ import { KiteSessionService } from '../../../core/kite/kite-session.service';
 import { LotsPreferenceService } from '../../../core/services/lots-preference.service';
 import { formatUnknownError } from '../../../core/utils/kite-error.util';
 import { extractTradeDate, formatDayOfWeek, formatDisplayDate } from '../../../core/utils/trade-date.util';
+import { APP_BUILD_LABEL } from '../../../core/config/app-build';
 
 @Component({
   selector: 'app-trade-desk',
@@ -31,6 +32,8 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
   private readonly deskExport = inject(PaperDeskExportService);
   private readonly kiteSession = inject(KiteSessionService);
   private readonly lotsPreference = inject(LotsPreferenceService);
+
+  protected readonly appBuildLabel = APP_BUILD_LABEL;
 
   protected readonly mode = signal<PaperDeskMode>('testing');
   protected fromDate = shiftDays(-14);
