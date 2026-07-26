@@ -4,7 +4,6 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { AuthService } from '../../core/auth/auth.service';
-import { APP_BUILD_LABEL, APP_VERSION } from '../../core/config/app-build';
 
 @Component({
   selector: 'app-dashboard',
@@ -23,9 +22,6 @@ import { APP_BUILD_LABEL, APP_VERSION } from '../../core/config/app-build';
 export class DashboardComponent {
   private readonly authService = inject(AuthService);
   private readonly router = inject(Router);
-
-  protected readonly appVersion = APP_VERSION;
-  protected readonly appBuildLabel = APP_BUILD_LABEL;
 
   protected readonly navItems = [
     { label: 'Trade Desk', shortLabel: 'Trade', route: '/dashboard/trade-desk', icon: 'calculate' },

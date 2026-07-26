@@ -574,13 +574,35 @@
   background: color-mix(in srgb, var(--card) 92%, #0f766e 8%);
 }
 
+.trading-basis-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem 0.75rem;
+  margin-bottom: 0.45rem;
+}
+
 .trading-basis-title {
-  margin: 0 0 0.45rem;
+  margin: 0;
   font-size: 0.78rem;
   font-weight: 800;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--muted);
+}
+
+.build-chip {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  padding: 0.18rem 0.45rem;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--card, #fff);
+  color: var(--muted);
+  white-space: nowrap;
 }
 
 .trading-basis-list {

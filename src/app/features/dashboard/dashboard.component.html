@@ -8,12 +8,6 @@
           <small>Trade with clarity</small>
         </span>
       </a>
-      <span
-        class="build-badge"
-        [attr.title]="'App build ' + appBuildLabel + ' — if this is missing/old after pull, hard-refresh (Cmd+Shift+R)'"
-      >
-        {{ appBuildLabel }}
-      </span>
 
       <nav class="palagai-nav" aria-label="Main">
         @for (item of navItems; track item.route) {
@@ -59,7 +53,7 @@
 
   <footer class="palagai-footer">
     <span class="bull-dot" aria-hidden="true"></span>
-    <span>Bull · Bear · Same rules every session · {{ appBuildLabel }}</span>
+    <span>Bull · Bear · Same rules every session</span>
     <span class="bear-dot" aria-hidden="true"></span>
   </footer>
 </div>

@@ -9,7 +9,6 @@
       </p>
     </div>
     <div class="hero-meta">
-      <span class="pg-badge pg-badge-neutral build-chip" [attr.title]="appBuildLabel">{{ appBuildLabel }}</span>
       <span class="pg-badge pg-badge-neutral" [class.pg-badge-bull]="mode() === 'live'">{{
         mode() === 'live' ? (realOrders ? 'Live money' : 'Live paper') : 'Backtest'
       }}</span>
@@ -47,7 +46,10 @@
   </div>
 
   <aside class="trading-basis" aria-label="How the desk decides trades">
-    <h2 class="trading-basis-title">What the app trades on</h2>
+    <div class="trading-basis-head">
+      <h2 class="trading-basis-title">What the app trades on</h2>
+      <span class="build-chip" [attr.title]="'Hard-refresh if this build looks stale'">{{ appBuildLabel }}</span>
+    </div>
     <ul class="trading-basis-list">
       <li>
         <strong>Active strategy</strong> — Set in <em>Strat</em> (Paper / Live per index). Card below shows the live module name.

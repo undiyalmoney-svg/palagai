@@ -84,20 +84,6 @@
   letter-spacing: 0.02em;
 }
 
-.build-badge {
-  flex-shrink: 0;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 0.72rem;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-  padding: 0.28rem 0.55rem;
-  border-radius: 999px;
-  border: 1px solid var(--pg-line, #d5ddd7);
-  background: #eef6f0;
-  color: #1a3d2e;
-  white-space: nowrap;
-}
-
 .palagai-nav {
   display: flex;
   flex-wrap: wrap;
