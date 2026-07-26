@@ -49,6 +49,8 @@ export interface IndexOpenPaper {
   option: PaperOptionContract | null;
   optionEntryPremium: number | null;
   premiumEstimated: boolean;
+  /** Which option OHLC side matched the strategy index fill. */
+  optionEntryEdge?: 'open' | 'close';
   /** Running max favorable excursion (index pts). */
   mfeIndexPts?: number;
   /** Running max adverse excursion (index pts, ≥ 0). */
@@ -173,16 +175,16 @@ function normalizeMinute(ts: string): string {
  * Option premium from the option's OWN 5m OHLC at a given time.
  *
  * `edge`:
- *   'entry' → OPEN of the bar covering `when` (matches "2:30 open is 72")
- *   'exit'  → CLOSE of the bar covering `when` (exit fill on that bar)
+ *   'open'  → OPEN of the bar covering `when` (Trap next-bar open fill)
+ *   'close' → CLOSE of the bar covering `when` (Genie / EOD / exit fill)
  *
  * Only matches bars on the SAME trading day as `when`, so a missing option
  * history never silently borrows a stale prior-day price.
  */
-function lookupPremium(
+export function lookupPremium(
   optionCandles: Candle[] | undefined,
   when: string,
-  edge: 'entry' | 'exit' = 'exit',
+  edge: 'open' | 'close' = 'close',
 ): number | null {
   if (!optionCandles?.length) {
     return null;
@@ -202,13 +204,48 @@ function lookupPremium(
   if (!best) {
     return null;
   }
-  return edge === 'entry' ? best.open : best.close;
+  return edge === 'open' ? best.open : best.close;
+}
+
+/** Prefer the OHLC side that matches the strategy's index fill price. */
+export function entryPremiumEdge(
+  entryPrice: number,
+  candle: Pick<Candle, 'open' | 'close'>,
+): 'open' | 'close' {
+  const dOpen = Math.abs(entryPrice - candle.open);
+  const dClose = Math.abs(entryPrice - candle.close);
+  return dOpen <= dClose ? 'open' : 'close';
 }
 
 function estimatePremiumMove(indexPoints: number): number {
-  // Rough ATM delta ≈ 0.5 for paper fallback when option OHLC missing.
-  // Only used when the option's real 5m OHLC could not be fetched/matched.
+  // Rough ATM delta ≈ 0.5 for paper fallback when option OHLC missing / SL-TP mid-bar.
   return indexPoints * 0.5;
+}
+
+function isLevelExitReason(reason: string): boolean {
+  const r = reason.toLowerCase();
+  return r.includes('stop') || r.includes('target') || r.includes('sl');
+}
+
+function applyEstimatedOptionPnl(params: {
+  indexPoints: number;
+  entryPremium: number | null;
+  lotSize: number;
+  lots: number;
+}): { entry: number; exit: number; pnl: number } {
+  const estMove = estimatePremiumMove(params.indexPoints);
+  const entry = params.entryPremium ?? Math.max(10, Math.abs(estMove) + 20);
+  const exit = entry + estMove;
+  return {
+    entry,
+    exit,
+    pnl: computeOptionPnl({
+      entryPremium: entry,
+      exitPremium: exit,
+      lotSize: params.lotSize,
+      lots: params.lots,
+    }),
+  };
 }
 
 /**
@@ -252,31 +289,45 @@ function closePaperTrade(params: {
   let optionExitPremium: number | null = null;
   let optionPnlRs: number | null = null;
   let premiumEstimated = open.premiumEstimated;
+  let optionEntryPremium = open.optionEntryPremium;
 
   if (open.option) {
-    optionExitPremium = lookupPremium(
-      params.optionCandlesByToken.get(open.option.instrumentToken),
-      params.exitTime,
-      'exit',
-    );
-    if (open.optionEntryPremium != null && optionExitPremium != null) {
+    const useEstimate =
+      open.option.source === 'synthetic' ||
+      open.option.instrumentToken <= 0 ||
+      open.premiumEstimated ||
+      isLevelExitReason(params.exitReason);
+
+    if (!useEstimate) {
+      optionExitPremium = lookupPremium(
+        params.optionCandlesByToken.get(open.option.instrumentToken),
+        params.exitTime,
+        'close',
+      );
+    }
+
+    if (
+      !useEstimate &&
+      optionEntryPremium != null &&
+      optionExitPremium != null
+    ) {
       optionPnlRs = computeOptionPnl({
-        entryPremium: open.optionEntryPremium,
+        entryPremium: optionEntryPremium,
         exitPremium: optionExitPremium,
         lotSize: open.option.lotSize,
         lots,
       });
       premiumEstimated = false;
     } else {
-      const estMove = estimatePremiumMove(indexPoints);
-      const entryPx = open.optionEntryPremium ?? Math.max(10, Math.abs(estMove) + 20);
-      optionExitPremium = entryPx + estMove;
-      optionPnlRs = computeOptionPnl({
-        entryPremium: entryPx,
-        exitPremium: optionExitPremium,
+      const est = applyEstimatedOptionPnl({
+        indexPoints,
+        entryPremium: optionEntryPremium,
         lotSize: open.option.lotSize,
         lots,
       });
+      optionEntryPremium = est.entry;
+      optionExitPremium = est.exit;
+      optionPnlRs = est.pnl;
       premiumEstimated = true;
     }
   }
@@ -288,9 +339,9 @@ function closePaperTrade(params: {
       : 0;
   let chargesRs: number | null = null;
   let netOptionPnlRs: number | null = null;
-  if (optionPnlRs != null && open.optionEntryPremium != null && optionExitPremium != null && qty > 0) {
+  if (optionPnlRs != null && optionEntryPremium != null && optionExitPremium != null && qty > 0) {
     const charged = applyChargesToOptionTrade({
-      entryPremium: open.optionEntryPremium,
+      entryPremium: optionEntryPremium,
       exitPremium: optionExitPremium,
       quantity: qty,
       segment: open.option?.exchange === 'MCX' ? 'mcx_option' : 'nfo_option',
@@ -332,10 +383,11 @@ function closePaperTrade(params: {
     exitTime: params.exitTime,
     exitReason: params.exitReason,
     option: open.option,
-    optionEntryPremium: open.optionEntryPremium,
+    optionEntryPremium,
     optionExitPremium,
     optionPnlRs,
     premiumEstimated,
+    optionEntryEdge: open.optionEntryEdge,
     outcome: indexPoints > 0 ? 'WIN' : indexPoints < 0 ? 'LOSS' : 'FLAT',
     strategyId: params.strategyId,
     strategyName: params.strategyName,
@@ -491,6 +543,7 @@ export function replayPaperOnIndex(params: {
     if (resolved.source === 'chain' && resolved.instrument.instrumentToken > 0) {
       neededOptionTokens.add(resolved.instrument.instrumentToken);
     }
+    const fillEdge = entryPremiumEdge(signal.entryPrice, candle);
     let optionEntryPremium: number | null = null;
     let premiumEstimated = resolved.source === 'synthetic';
 
@@ -498,7 +551,7 @@ export function replayPaperOnIndex(params: {
       optionEntryPremium = lookupPremium(
         optionCandlesByToken.get(resolved.instrument.instrumentToken),
         candle.date,
-        'entry',
+        fillEdge,
       );
       if (optionEntryPremium == null) {
         premiumEstimated = true;
@@ -515,6 +568,7 @@ export function replayPaperOnIndex(params: {
       option,
       optionEntryPremium,
       premiumEstimated,
+      optionEntryEdge: fillEdge,
       mfeIndexPts: 0,
       maeIndexPts: 0,
       entryReason: signal.reason,
@@ -654,45 +708,72 @@ export function enrichTradesWithOptionPremiums(
     if (!t.option) {
       return t;
     }
-    const entry =
-      lookupPremium(optionCandlesByToken.get(t.option.instrumentToken), t.entryTime, 'entry') ??
-      t.optionEntryPremium;
-    const exit =
-      lookupPremium(optionCandlesByToken.get(t.option.instrumentToken), t.exitTime, 'exit') ??
-      t.optionExitPremium;
 
-    if (entry != null && exit != null) {
-      const optionPnlRs = computeOptionPnl({
-        entryPremium: entry,
-        exitPremium: exit,
+    // Synthetic / missing token → always track index via δ≈0.5 (never invent far-week OHLC).
+    if (t.option.source === 'synthetic' || t.option.instrumentToken <= 0) {
+      const est = applyEstimatedOptionPnl({
+        indexPoints: t.indexPoints,
+        entryPremium: null,
         lotSize: t.option.lotSize,
         lots,
       });
       return {
         ...t,
-        optionEntryPremium: entry,
-        optionExitPremium: exit,
-        optionPnlRs,
-        premiumEstimated: false,
+        optionEntryPremium: est.entry,
+        optionExitPremium: est.exit,
+        optionPnlRs: est.pnl,
+        premiumEstimated: true,
       };
     }
 
-    const estMove = estimatePremiumMove(t.indexPoints);
-    const entryPx = entry ?? Math.max(10, Math.abs(estMove) + 20);
-    const exitPx = exit ?? entryPx + estMove;
-    return {
-      ...t,
-      optionEntryPremium: entryPx,
-      optionExitPremium: exitPx,
-      optionPnlRs: computeOptionPnl({
-        entryPremium: entryPx,
-        exitPremium: exitPx,
+    const entryEdge = t.optionEntryEdge ?? 'close';
+    const entryHit = lookupPremium(
+      optionCandlesByToken.get(t.option.instrumentToken),
+      t.entryTime,
+      entryEdge,
+    );
+    const levelExit = isLevelExitReason(t.exitReason);
+    const exitHit = levelExit
+      ? null
+      : lookupPremium(
+          optionCandlesByToken.get(t.option.instrumentToken),
+          t.exitTime,
+          'close',
+        );
+
+    // Both sides must come from real candles — never mix estimate + OHLC.
+    if (entryHit != null && exitHit != null) {
+      const optionPnlRs = computeOptionPnl({
+        entryPremium: entryHit,
+        exitPremium: exitHit,
         lotSize: t.option.lotSize,
         lots,
-      }),
+      });
+      return {
+        ...t,
+        optionEntryPremium: entryHit,
+        optionExitPremium: exitHit,
+        optionPnlRs,
+        premiumEstimated: false,
+        optionEntryEdge: entryEdge,
+      };
+    }
+
+    const est = applyEstimatedOptionPnl({
+      indexPoints: t.indexPoints,
+      entryPremium: entryHit,
+      lotSize: t.option.lotSize,
+      lots,
+    });
+    return {
+      ...t,
+      optionEntryPremium: est.entry,
+      optionExitPremium: est.exit,
+      optionPnlRs: est.pnl,
       premiumEstimated: true,
+      optionEntryEdge: entryEdge,
     };
   });
 }
 
-export { buildContext, checkIndexExit, toOptionContract, lookupPremium };
+export { buildContext, checkIndexExit, toOptionContract };

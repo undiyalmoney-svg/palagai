@@ -134,10 +134,37 @@ export function buildSyntheticAtmOption(params: {
   };
 }
 
+/** Days from as-of → expiry allowed for a front weekly (Fri→next Thu ≈ 6–7; +holiday slack). */
+const MAX_FRONT_WEEKLY_DAYS = 10;
+
+function daysBetween(a: Date, b: Date): number {
+  return Math.round((b.getTime() - a.getTime()) / (24 * 60 * 60 * 1000));
+}
+
+/** True when expiry is the trade-date front weekly — not a far live week from today's dump. */
+export function isFrontWeeklyExpiry(asOfDay: Date, expiry: Date, rollSameDay: boolean): boolean {
+  if (expiry < asOfDay) {
+    return false;
+  }
+  if (expiry.getTime() === asOfDay.getTime() && rollSameDay) {
+    return false;
+  }
+  const expected = nextWeeklyExpiryDate(asOfDay, rollSameDay);
+  const toExp = daysBetween(asOfDay, expiry);
+  if (toExp < 0 || toExp > MAX_FRONT_WEEKLY_DAYS) {
+    return false;
+  }
+  // Must be near the expected weekly (holiday moves expiry by a day or two).
+  return Math.abs(daysBetween(expected, expiry)) <= 3;
+}
+
 /**
  * Nearest weekly CE/PE at ATM from Kite instruments.
  * Falls back to a synthetic label when the chain has no match
  * (common for historical Testing dates — expired contracts leave the dump).
+ *
+ * Never binds historical trades to far live weeklies still in today's NFO dump —
+ * that invented huge option ₹ vs flat index pts.
  */
 export function resolveAtmWeeklyOption(params: {
   instruments: Instrument[];
@@ -170,6 +197,7 @@ export function resolveAtmWeeklyOption(params: {
   const optType = direction === 'BUY' ? 'CE' : 'PE';
   const strike = roundAtmStrike(spot, kind);
   const step = strikeStep(kind);
+  const expected = nextWeeklyExpiryDate(asOfDay, rollSameDay);
 
   const pool = instruments.filter(
     (item) => isIndexOption(item, kind) && item.instrumentType === optType,
@@ -177,42 +205,21 @@ export function resolveAtmWeeklyOption(params: {
 
   const withExpiry = pool
     .map((item) => ({ item, exp: parseExpiry(item.expiry) }))
-    .filter((row): row is { item: Instrument; exp: Date } => row.exp != null);
+    .filter((row): row is { item: Instrument; exp: Date } => row.exp != null)
+    .filter((row) => isFrontWeeklyExpiry(asOfDay, row.exp, rollSameDay));
 
-  // 1) Exact ATM, expiry on/after as-of
+  // 1) Exact ATM, front weekly only
   const exact = withExpiry
-    .filter((row) => {
-      if (Math.abs(row.item.strike - strike) > 0.01) {
-        return false;
-      }
-      if (row.exp < asOfDay) {
-        return false;
-      }
-      if (row.exp.getTime() === asOfDay.getTime() && rollSameDay) {
-        return false;
-      }
-      return true;
-    })
+    .filter((row) => Math.abs(row.item.strike - strike) <= 0.01)
     .sort((a, b) => a.exp.getTime() - b.exp.getTime());
 
   if (exact[0]) {
     return { instrument: exact[0].item, source: 'chain' };
   }
 
-  // 2) Near ATM (±1 step), expiry on/after as-of
+  // 2) Near ATM (±1 step), front weekly only
   const near = withExpiry
-    .filter((row) => {
-      if (Math.abs(row.item.strike - strike) > step) {
-        return false;
-      }
-      if (row.exp < asOfDay) {
-        return false;
-      }
-      if (row.exp.getTime() === asOfDay.getTime() && rollSameDay) {
-        return false;
-      }
-      return true;
-    })
+    .filter((row) => Math.abs(row.item.strike - strike) <= step)
     .sort((a, b) => {
       const ea = a.exp.getTime() - b.exp.getTime();
       if (ea !== 0) {
@@ -225,24 +232,9 @@ export function resolveAtmWeeklyOption(params: {
     return { instrument: near[0].item, source: 'chain' };
   }
 
-  // 3) Historical date: chain only has live contracts — pick nearest live expiry ATM
-  const liveAtm = withExpiry
-    .filter((row) => Math.abs(row.item.strike - strike) <= step)
-    .sort((a, b) => {
-      const ea = a.exp.getTime() - b.exp.getTime();
-      if (ea !== 0) {
-        return ea;
-      }
-      return Math.abs(a.item.strike - strike) - Math.abs(b.item.strike - strike);
-    });
-
-  if (liveAtm[0]) {
-    return { instrument: liveAtm[0].item, source: 'chain' };
-  }
-
-  // 4) Always show something
+  // Historical / missing week: synthetic + δ estimate in paper desk (do NOT use far live week).
   const synthetic = buildSyntheticAtmOption(params);
-  synthetic.tradingSymbol = `${optionName(kind)} ATM ${strike} ${optType} · week ${formatExpiryLabel(nextWeeklyExpiryDate(asOfDay, rollSameDay))}`;
+  synthetic.tradingSymbol = `${optionName(kind)} ATM ${strike} ${optType} · week ${formatExpiryLabel(expected)}`;
   return { instrument: synthetic, source: 'synthetic' };
 }
 

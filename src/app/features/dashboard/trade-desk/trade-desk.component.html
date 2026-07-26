@@ -61,13 +61,13 @@
         <strong>Instrument</strong> — ATM options on the selected index · lots from the Lots control
       </li>
       <li>
-        <strong>P&amp;L math</strong> — options: <em>(exit premium − entry premium) × lot size × lots</em> from the option's own 5m OHLC (e.g. 72 → 82 = 10 × 65 = ₹650). Rows tagged <em>est. premium</em> are approximated when option history is missing; “Index pts” is the raw index move, not money.
+        <strong>P&amp;L math</strong> — options: <em>(exit premium − entry premium) × lot size × lots</em>. Entry uses the same bar side as the strategy fill (Trap open · Genie close). Stop/target exits track index via ~0.5δ when mid-bar. Rows tagged <em>est. premium</em> = missing front-week option history (never prices a far live weekly). “Index pts” is the raw index move.
       </li>
       <li>
         <strong>Settings tip</strong> — Max trades auto-updates from DNA (Trap = 3 · Genie = Nifty 2 / Bank 1). Raising the cap does not make trades “more sure.”
       </li>
       <li>
-        <strong>P&amp;L tip</strong> — Testing now fetches up to 120 option contracts (was 24) so fewer rows fall back to <em>est. premium</em>. Re-run Testing after switching strategies.
+        <strong>P&amp;L tip</strong> — Compare Genie vs Trap on <em>Index Pts</em> first. Option ₹ now rejects wrong-week contracts; historical weeks without chain data show est. premium. Live money still uses real Kite fills.
       </li>
     </ul>
   </aside>

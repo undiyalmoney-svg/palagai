@@ -1,3 +1,4 @@
+import { describe, expect, it } from 'vitest';
 import { applyKiteFillPnl } from './apply-kite-fill-pnl';
 import { PaperTrade } from './paper-desk.models';
 

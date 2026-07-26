@@ -48,6 +48,8 @@ export interface PaperTrade {
    */
   optionPnlRs: number | null;
   premiumEstimated: boolean;
+  /** Option bar side used for entry premium (open = Trap-style, close = Genie-style). */
+  optionEntryEdge?: 'open' | 'close';
   /** Index-points outcome (legacy desk win/loss). */
   outcome: 'WIN' | 'LOSS' | 'FLAT';
   /** Strategy Manager id that generated this trade. */
