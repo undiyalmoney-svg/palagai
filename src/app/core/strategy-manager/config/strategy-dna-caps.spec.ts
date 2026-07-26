@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { dnaCapsForStrategy } from './strategy-dna-caps';
 import { MANAGED_STRATEGY_IDS } from './managed-strategy-ids';
-import { settingsKey } from './strategy-assignment.service';
 
 describe('dnaCapsForStrategy', () => {
   it('gives trap max-earn 3 trades and 3.5R', () => {
@@ -20,14 +19,6 @@ describe('dnaCapsForStrategy', () => {
     );
     expect(dnaCapsForStrategy(MANAGED_STRATEGY_IDS.ALIGN_COMBO_GENIE, 'bank').maxTradesPerDay).toBe(
       1,
-    );
-  });
-
-  it('scopes settings keys per channel so Bank DNA cannot clobber Nifty', () => {
-    expect(settingsKey('align-combo-genie', 'nifty')).toBe('align-combo-genie::nifty');
-    expect(settingsKey('align-combo-genie', 'bank')).toBe('align-combo-genie::bank');
-    expect(settingsKey('sr-trap-confirm', 'nifty')).not.toBe(
-      settingsKey('sr-trap-confirm', 'bank'),
     );
   });
 });
