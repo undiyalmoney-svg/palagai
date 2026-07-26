@@ -22,6 +22,7 @@ import {
   ManagedOpenPosition,
 } from '../strategy-manager/models/strategy-module.interface';
 import { ChampionPdhlManagedStrategy } from '../strategy-manager/modules/champion-pdhl.managed-strategy';
+import { rupeesPerPointForInstrument } from '../strategy-engine/strategies/pdhl-opening-range/pdhl-opening-range.evaluator';
 
 /** Tighter of hard stop and swing trail — for live SL-M / UI (paper exit keeps them separate). */
 export function effectiveProtectiveStop(open: {
@@ -217,35 +218,38 @@ export function entryPremiumEdge(
   return dOpen <= dClose ? 'open' : 'close';
 }
 
-function estimatePremiumMove(indexPoints: number): number {
-  // Rough ATM delta ≈ 0.5 for paper fallback when option OHLC missing / SL-TP mid-bar.
-  return indexPoints * 0.5;
-}
-
 function isLevelExitReason(reason: string): boolean {
   const r = reason.toLowerCase();
   return r.includes('stop') || r.includes('target') || r.includes('sl');
 }
 
-function applyEstimatedOptionPnl(params: {
+/**
+ * When option OHLC is missing/unreliable, option ₹ MUST equal index ₹ proxy
+ * (pts × Nifty65/Bank30 × lots). Old 0.5δ × lotSize diverged in sign on Nifty+Bank mixes.
+ */
+export function applyEstimatedOptionPnl(params: {
   indexPoints: number;
   entryPremium: number | null;
   lotSize: number;
   lots: number;
+  instrumentId?: string | null;
 }): { entry: number; exit: number; pnl: number } {
-  const estMove = estimatePremiumMove(params.indexPoints);
-  const entry = params.entryPremium ?? Math.max(10, Math.abs(estMove) + 20);
-  const exit = entry + estMove;
-  return {
-    entry,
-    exit,
-    pnl: computeOptionPnl({
-      entryPremium: entry,
-      exitPremium: exit,
-      lotSize: params.lotSize,
-      lots: params.lots,
-    }),
-  };
+  const lots = Math.max(1, Math.floor(params.lots) || 1);
+  const rpp = rupeesPerPointForInstrument(params.instrumentId);
+  // Keep lotSize as fallback when instrument id unknown (crude etc.).
+  const moneyPerPt =
+    params.instrumentId != null && String(params.instrumentId).length > 0
+      ? rpp
+      : params.lotSize > 0
+        ? params.lotSize
+        : rpp;
+  const pnl = params.indexPoints * moneyPerPt * lots;
+  const estMove = moneyPerPt !== 0 ? pnl / (moneyPerPt * lots) : 0; // = indexPoints
+  // Synthetic premiums for UI only — money comes from pnl above.
+  const premiumMove = estMove * 0.5;
+  const entry = params.entryPremium ?? Math.max(10, Math.abs(premiumMove) + 20);
+  const exit = entry + premiumMove;
+  return { entry, exit, pnl };
 }
 
 /**
@@ -324,6 +328,7 @@ function closePaperTrade(params: {
         entryPremium: optionEntryPremium,
         lotSize: open.option.lotSize,
         lots,
+        instrumentId: params.instrumentId,
       });
       optionEntryPremium = est.entry;
       optionExitPremium = est.exit;
@@ -709,13 +714,14 @@ export function enrichTradesWithOptionPremiums(
       return t;
     }
 
-    // Synthetic / missing token → always track index via δ≈0.5 (never invent far-week OHLC).
+    // Synthetic / missing token → option ₹ = index ₹ proxy (pts × 65/30).
     if (t.option.source === 'synthetic' || t.option.instrumentToken <= 0) {
       const est = applyEstimatedOptionPnl({
         indexPoints: t.indexPoints,
         entryPremium: null,
         lotSize: t.option.lotSize,
         lots,
+        instrumentId: t.instrumentId,
       });
       return {
         ...t,
@@ -764,6 +770,7 @@ export function enrichTradesWithOptionPremiums(
       entryPremium: entryHit,
       lotSize: t.option.lotSize,
       lots,
+      instrumentId: t.instrumentId,
     });
     return {
       ...t,

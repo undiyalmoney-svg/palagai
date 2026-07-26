@@ -86,7 +86,8 @@ function formatExpiryLabel(d: Date): string {
 }
 
 function defaultLot(kind: IndexOptionKind): number {
-  return kind === 'banknifty' ? 15 : 65;
+  // Money proxy / research: Nifty ₹65/pt · Bank ₹30/pt (current NSE lot sizes).
+  return kind === 'banknifty' ? 30 : 65;
 }
 
 export function buildSyntheticAtmOption(params: {

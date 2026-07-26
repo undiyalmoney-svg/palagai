@@ -1,6 +1,7 @@
 import { extractTradeDate, formatDayOfWeek } from '../utils/trade-date.util';
 import { PaperTrade, PaperDeskSnapshot } from './paper-desk.models';
 import { buildPaperDeskDayStats, emptyPaperDeskDayStats } from './paper-desk-day-stats';
+import { rupeesPerPointForInstrument } from '../strategy-engine/strategies/pdhl-opening-range/pdhl-opening-range.evaluator';
 
 export const PAPER_WEEKDAY_OPTIONS = [
   { key: 'Monday', short: 'Mon' },
@@ -54,6 +55,10 @@ export function summarizePaperTrades(
   const indexNetPts = trades.reduce((a, t) => a + t.indexPoints, 0);
   const optionNetRs = trades.reduce((a, t) => a + (t.optionPnlRs ?? 0), 0);
   const optionChargesRs = trades.reduce((a, t) => a + (t.chargesRs ?? 0), 0);
+  const pointsMoneyRs = trades.reduce((a, t) => {
+    const rpp = rupeesPerPointForInstrument(t.instrumentId) || rupeesPerPoint;
+    return a + t.indexPoints * rpp * lots;
+  }, 0);
   return {
     trades: trades.length,
     wins: trades.filter((t) => t.outcome === 'WIN').length,
@@ -61,7 +66,7 @@ export function summarizePaperTrades(
     indexNetPts,
     optionNetRs,
     lotsUsed: lots,
-    pointsMoneyRs: indexNetPts * rupeesPerPoint * lots,
+    pointsMoneyRs,
     optionChargesRs,
     optionNetAfterChargesRs: Math.round((optionNetRs - optionChargesRs) * 100) / 100,
     premiumEstimatedCount: trades.filter((t) => t.premiumEstimated).length,

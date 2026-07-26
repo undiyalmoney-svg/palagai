@@ -133,6 +133,7 @@ describe('enrichTradesWithOptionPremiums', () => {
     const [out] = enrichTradesWithOptionPremiums(
       [
         trade({
+          instrumentId: 'nifty-50',
           optionEntryEdge: 'close',
           exitReason: 'Stop loss hit',
           indexPoints: -30,
@@ -142,10 +143,8 @@ describe('enrichTradesWithOptionPremiums', () => {
       1,
     );
     expect(out!.premiumEstimated).toBe(true);
-    // entry 74 (close) + δ0.5×(-30) = 59 → pnl (59-74)*65 = -975
-    expect(out!.optionEntryPremium).toBe(74);
-    expect(out!.optionExitPremium).toBe(59);
-    expect(out!.optionPnlRs).toBe(-975);
+    // Money = pts × ₹65 (index proxy), not recovered bar close
+    expect(out!.optionPnlRs).toBe(-30 * 65);
   });
 
   it('forces estimate for synthetic contracts (historical missing week)', () => {
@@ -153,6 +152,7 @@ describe('enrichTradesWithOptionPremiums', () => {
       [
         trade({
           indexPoints: 40,
+          instrumentId: 'nifty-50',
           option: {
             tradingSymbol: 'NIFTY ATM 24500 CE',
             instrumentToken: 0,
@@ -168,8 +168,7 @@ describe('enrichTradesWithOptionPremiums', () => {
       1,
     );
     expect(out!.premiumEstimated).toBe(true);
-    // 0.5 * 40 = 20 premium pts × 65 = 1300
-    expect(out!.optionPnlRs).toBe(1300);
+    expect(out!.optionPnlRs).toBe(40 * 65);
   });
 
   it('does NOT borrow a stale prior-day bar', () => {
@@ -181,22 +180,19 @@ describe('enrichTradesWithOptionPremiums', () => {
   });
 
   it('never invents Genie-sized ₹ on tiny index pts via mixed estimate+OHLC', () => {
-    // Only exit candle present — old bug could pair synthetic entry with real exit.
     const candles = new Map<number, Candle[]>([
       [111, [optCandle('2026-07-23T14:55:00+0530', 80, 200, 79, 195)]],
     ]);
     const [out] = enrichTradesWithOptionPremiums(
-      [trade({ indexPoints: 24.4, optionEntryPremium: 10, exitReason: 'End of day' })],
+      [trade({ instrumentId: 'nifty-50', indexPoints: 24.4, optionEntryPremium: 10, exitReason: 'End of day' })],
       candles,
       1,
     );
     expect(out!.premiumEstimated).toBe(true);
-    // Must track δ×index, not 195−10 phantoms
-    expect(Math.abs(out!.optionPnlRs!)).toBeLessThan(65 * 50);
+    expect(out!.optionPnlRs).toBeCloseTo(24.4 * 65, 6);
   });
 
   it('REGRESSION: far-week OHLC must not mint ~₹28k on +24 index pts', () => {
-    // Simulates old bug: bind Jul trade to Jul-30 weekly with explosive premium move.
     const fakeFarWeekToken = 9999;
     const candles = new Map<number, Candle[]>([
       [
@@ -210,11 +206,12 @@ describe('enrichTradesWithOptionPremiums', () => {
     const trades = Array.from({ length: 20 }, (_, i) =>
       trade({
         id: `g${i}`,
-        indexPoints: 1.22, // ~24.4 / 20
+        instrumentId: 'nifty-50',
+        indexPoints: 1.22,
         entryTime: '2026-07-08T10:15:00+0530',
         exitTime: '2026-07-08T11:00:00+0530',
         exitReason: 'Target hit',
-        optionEntryEdge: 'open', // old Genie bug used open while fill was close
+        optionEntryEdge: 'open',
         option: {
           tradingSymbol: 'NIFTY FAR WEEK CE',
           instrumentToken: fakeFarWeekToken,
@@ -228,8 +225,49 @@ describe('enrichTradesWithOptionPremiums', () => {
     );
     const out = enrichTradesWithOptionPremiums(trades, candles, 1);
     const optionNet = out.reduce((a, t) => a + (t.optionPnlRs ?? 0), 0);
-    // Target exits → δ estimate: 0.5 * 1.22 * 65 ≈ 39.65 per trade → ~₹793 total
+    // 20 * 1.22 * 65 ≈ 1586
+    expect(optionNet).toBeCloseTo(20 * 1.22 * 65, 6);
     expect(optionNet).toBeLessThan(5000);
     expect(out.every((t) => t.premiumEstimated)).toBe(true);
+  });
+
+  it('REGRESSION: all-estimated Nifty+Bank matches Index ₹ proxy (no green option on red money)', () => {
+    const trades = [
+      trade({
+        id: 'a',
+        instrumentId: 'nifty-50',
+        indexPoints: -80,
+        exitReason: 'Stop loss hit',
+        option: {
+          tradingSymbol: 'N',
+          instrumentToken: 0,
+          strike: 1,
+          expiry: '2026-07-01',
+          optionType: 'CE',
+          lotSize: 65,
+          source: 'synthetic',
+        },
+      }),
+      trade({
+        id: 'b',
+        instrumentId: 'bank-nifty',
+        indexPoints: -23.9,
+        exitReason: 'Stop loss hit',
+        option: {
+          tradingSymbol: 'B',
+          instrumentToken: 0,
+          strike: 1,
+          expiry: '2026-07-01',
+          optionType: 'PE',
+          lotSize: 15,
+          source: 'synthetic',
+        },
+      }),
+    ];
+    const out = enrichTradesWithOptionPremiums(trades, new Map(), 1);
+    const optionNet = out.reduce((a, t) => a + (t.optionPnlRs ?? 0), 0);
+    const proxy = -80 * 65 + -23.9 * 30;
+    expect(optionNet).toBeCloseTo(proxy, 6);
+    expect(optionNet).toBeLessThan(0);
   });
 });

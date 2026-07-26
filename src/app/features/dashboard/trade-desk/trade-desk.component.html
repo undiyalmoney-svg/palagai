@@ -68,7 +68,7 @@
         <strong>Settings tip</strong> — Max trades auto-updates from DNA (Trap = 3 · Genie = Nifty 2 / Bank 1). Raising the cap does not make trades “more sure.”
       </li>
       <li>
-        <strong>P&amp;L tip</strong> — Compare Genie vs Trap on <em>Index Pts</em> first. Option ₹ now rejects wrong-week contracts; historical weeks without chain data show est. premium. Live money still uses real Kite fills.
+        <strong>P&amp;L tip</strong> — If badge is not <em>v1.3.1 · …pnl-v4</em>, hard-refresh. With <em>est. premium</em> rows, Option ₹ = Index ₹ proxy (Nifty×65 · Bank×30). Raw “Index pts” mixes underlyings — don’t judge money from that alone. Live money still uses Kite fills.
       </li>
     </ul>
   </aside>
@@ -248,7 +248,7 @@
         [class.up]="resultView().totals.pointsMoneyRs > 0"
         [class.down]="resultView().totals.pointsMoneyRs < 0"
       >
-        <span title="Honest pts × lot money (Nifty×65 · Bank×30). Use this to compare Genie vs Trap."
+        <span title="Honest pts × lot money (Nifty×65 · Bank×30). When rows are est. premium, Option ₹ matches this."
           >Index ₹ proxy</span
         >
         <strong
