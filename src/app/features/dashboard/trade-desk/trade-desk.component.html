@@ -5,7 +5,7 @@
       <h1>Trade Desk</h1>
       <p class="pg-lede">
         Nifty &amp; Bank Nifty ATM options — strategy from <strong>Strat</strong> (Paper/Live assignment).
-        Defaults: <strong>Align Combo · GENIE</strong>. Testing, Live paper, or Live money.
+        Defaults: <strong>S/R Trap · Confirm</strong>. Testing, Live paper, or Live money.
       </p>
     </div>
     <div class="hero-meta">
@@ -52,10 +52,10 @@
         <strong>Active strategy</strong> — Set in <em>Strat</em> (Paper / Live per index). Card below shows the live module name.
       </li>
       <li>
-        <strong>Default (indices)</strong> — Align Combo · GENIE · Nifty ≤2 trades/day · Bank ≤1 · Tue SKIP · BOTH when aligned
+        <strong>Default (indices)</strong> — S/R Trap · Confirm · ≤3 trades/day per index · 3.5R · next-bar confirm after S/R liquidity trap (GENIE still selectable in Strat)
       </li>
       <li>
-        <strong>Stops</strong> — SL capped (Nifty 30 · Bank 45) · day stop −60 pts · optional Strict −₹2,950 / Profit lock +₹5,000
+        <strong>Stops</strong> — SL beyond trap wick (risk band Nifty ~4–28 · Bank ~8–50) · day stop −80 pts · optional Strict −₹2,950 / Profit lock +₹5,000
       </li>
       <li>
         <strong>Instrument</strong> — ATM options on the selected index · lots from the Lots control
@@ -64,7 +64,7 @@
         <strong>P&amp;L math</strong> — options: <em>(exit premium − entry premium) × lot size × lots</em> from the option's own 5m OHLC (e.g. 72 → 82 = 10 × 65 = ₹650). Rows tagged <em>est. premium</em> are approximated when option history is missing; “Index pts” is the raw index move, not money.
       </li>
       <li>
-        <strong>Settings tip</strong> — GENIE trade caps are fixed by DNA (Nifty 2 / Bank 1). Don’t raise Max trades expecting “more sure profit.”
+        <strong>Settings tip</strong> — Max trades auto-updates from strategy DNA when you switch Paper/Live in Strat (Trap = 3 · GENIE = Nifty 2 / Bank 1). Raising the cap does not make trades “more sure.”
       </li>
     </ul>
   </aside>

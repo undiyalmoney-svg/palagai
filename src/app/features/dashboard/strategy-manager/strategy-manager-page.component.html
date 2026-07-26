@@ -5,8 +5,9 @@
       <h1>Multi-strategy control</h1>
       <p class="sm-sub">
         Switch Paper / Live / Shadow strategies per instrument without changing code.
-        Defaults: Nifty &amp; Bank → <strong>Align Combo · GENIE</strong> (Nifty ≤2t · Bank ≤1t).
+        Defaults: Nifty &amp; Bank → <strong>S/R Trap · Confirm</strong> (≤3t/day · 3.5R).
         Stocks → <strong>GAP_FADE_500</strong> (same as Stocks Desk).
+        Max trades auto-sync from strategy DNA when you switch Paper/Live.
       </p>
     </div>
     <div class="sm-hero-actions">
@@ -37,7 +38,8 @@
       @if (selectedChannel() === 'stocks') {
         <p class="sm-stocks-note">
           Stocks default remains <strong>GAP_FADE_500</strong> (unchanged).
-          <strong>Align Combo · GENIE</strong> is selectable here and on Stocks Desk — paper + live both activate when you pick it.
+          <strong>Align Combo · GENIE</strong> and index strategies are selectable —
+          Trap / GENIE activate paper + live together when you pick them.
           Trade equities from <a routerLink="/dashboard/stocks">Stocks Desk</a>.
         </p>
       }
