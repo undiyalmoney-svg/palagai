@@ -3,7 +3,8 @@
 **Date:** 2026-07-23  
 **Strategy id:** `align-combo-genie`  
 **UI name:** **Align Combo · GENIE**  
-**Book:** 1 lot Nifty + 1 lot Bank (index DNA; map SELL → PE / BUY → CE on desk)
+**Book:** 1 lot Nifty + 1 lot Bank (index DNA; map SELL → PE / BUY → CE on desk)  
+**Status:** Selectable — **not** the indices default anymore (default is **S/R Trap · Confirm**, doc 31).
 
 ## What this is
 

@@ -18,9 +18,14 @@ export const MANAGED_STRATEGY_IDS = {
   SMART_PULLBACK_PRO: 'smart-pullback-pro',
   /**
    * Align Combo · GENIE — Nifty+Bank together when aligned, one alone, skip chop.
-   * Default for Nifty/Bank Paper+Live (Kite OOS ~₹507/day).
+   * Selectable (was prior default). OOS ~₹507/day.
    */
   ALIGN_COMBO_GENIE: 'align-combo-genie',
+  /**
+   * S/R Trap + Confirm — liquidity sweep at swing S/R + next-bar confirm · 3.5R.
+   * **Default for Nifty/Bank** Paper+Live (OOS ~₹1,049+/day · beats GENIE).
+   */
+  SR_TRAP_CONFIRM: 'sr-trap-confirm',
   /** Stocks Desk champion — gap-up fade ₹500 book. */
   GAP_FADE_500: 'gap-fade-500',
 } as const;
@@ -30,18 +35,18 @@ export type ManagedStrategyId =
 
 /**
  * Research-backed defaults:
- * - Nifty/Bank: Align Combo · GENIE (Nifty ≤2t · Bank ≤1t · Tue SKIP)
+ * - Nifty/Bank: S/R Trap · Confirm (≤3t · 3.5R · max-earn OOS)
  * - Stocks: GAP_FADE_500 (same DNA as Stocks Desk)
  */
 export const DEFAULT_CHANNEL_ASSIGNMENTS = {
   nifty: {
-    paper: MANAGED_STRATEGY_IDS.ALIGN_COMBO_GENIE,
-    live: MANAGED_STRATEGY_IDS.ALIGN_COMBO_GENIE,
+    paper: MANAGED_STRATEGY_IDS.SR_TRAP_CONFIRM,
+    live: MANAGED_STRATEGY_IDS.SR_TRAP_CONFIRM,
     shadow: null as string | null,
   },
   bank: {
-    paper: MANAGED_STRATEGY_IDS.ALIGN_COMBO_GENIE,
-    live: MANAGED_STRATEGY_IDS.ALIGN_COMBO_GENIE,
+    paper: MANAGED_STRATEGY_IDS.SR_TRAP_CONFIRM,
+    live: MANAGED_STRATEGY_IDS.SR_TRAP_CONFIRM,
     shadow: null as string | null,
   },
   stocks: {

@@ -9,10 +9,11 @@ import {
   DEFAULT_CHANNEL_ASSIGNMENTS,
   MANAGED_STRATEGY_IDS,
 } from '../config/managed-strategy-ids';
+import { dnaCapsForStrategy } from '../config/strategy-dna-caps';
 import { StrategySettings } from '../models/strategy-settings.model';
 import { StrategyRegistryService } from '../registry/strategy-registry.service';
 
-const STORAGE_KEY = 'palagai_strategy_assignments_v12';
+const STORAGE_KEY = 'palagai_strategy_assignments_v13';
 const LEGACY_STORAGE_KEYS = [
   'palagai_strategy_assignments_v1',
   'palagai_strategy_assignments_v2',
@@ -25,6 +26,7 @@ const LEGACY_STORAGE_KEYS = [
   'palagai_strategy_assignments_v9',
   'palagai_strategy_assignments_v10',
   'palagai_strategy_assignments_v11',
+  'palagai_strategy_assignments_v12',
 ] as const;
 
 export interface ChannelAssignment {
@@ -107,7 +109,32 @@ export class StrategyAssignmentService {
     }
     next[channel] = cur;
     this.assignmentsSignal.set(next);
+    // Auto-sync max trades (and R) to strategy DNA whenever assignment changes.
+    if (strategyId && (mode === 'paper' || mode === 'live')) {
+      this.applyDnaCaps(strategyId, channel);
+    }
     this.persist();
+  }
+
+  /**
+   * When user switches strategy, maxTradesPerDay (and target R) snap to research DNA.
+   * Manual overrides remain possible afterward via Settings.
+   */
+  applyDnaCaps(strategyId: string, channel: DeskChannel): void {
+    const mod = this.registry.getById(strategyId);
+    if (!mod) {
+      return;
+    }
+    const caps = dnaCapsForStrategy(strategyId, channel);
+    const patch: Partial<StrategySettings> = {
+      maxTradesPerDay: caps.maxTradesPerDay,
+    };
+    if (caps.targetRMultiple != null) {
+      patch.targetRMultiple = caps.targetRMultiple;
+    }
+    const merged = { ...(this.settingsMap[strategyId] ?? {}), ...patch };
+    this.settingsMap[strategyId] = merged;
+    mod.initialize(merged);
   }
 
   getStrategySettings(strategyId: string): Partial<StrategySettings> {

@@ -17,6 +17,7 @@ import { StrategyPerformanceService } from '../../../core/strategy-manager/runti
 import { StrategyRegistryService } from '../../../core/strategy-manager/registry/strategy-registry.service';
 import { StrategySettings } from '../../../core/strategy-manager/models/strategy-settings.model';
 import { MANAGED_STRATEGY_IDS } from '../../../core/strategy-manager/config/managed-strategy-ids';
+import { dnaCapsForStrategy } from '../../../core/strategy-manager/config/strategy-dna-caps';
 import { PaperTradeDeskService } from '../../../core/paper-desk/paper-trade-desk.service';
 
 @Component({
@@ -132,19 +133,27 @@ export class StrategyManagerPageComponent {
     const value = mode === 'shadow' && strategyId === '' ? null : strategyId;
     const channel = this.selectedChannel();
     this.manager.setAssignment(channel, mode, value);
-    // Align Combo: selecting for Paper or Live activates both modes on this channel only.
-    // Other strategies keep independent Paper/Live picks (existing flow untouched).
-    if (
-      (mode === 'paper' || mode === 'live') &&
-      strategyId === MANAGED_STRATEGY_IDS.ALIGN_COMBO_GENIE
-    ) {
+    // Trap / GENIE: selecting for Paper or Live activates both modes on this channel.
+    const syncBoth =
+      strategyId === MANAGED_STRATEGY_IDS.ALIGN_COMBO_GENIE ||
+      strategyId === MANAGED_STRATEGY_IDS.SR_TRAP_CONFIRM;
+    if ((mode === 'paper' || mode === 'live') && syncBoth) {
       const other: ExecutionMode = mode === 'paper' ? 'live' : 'paper';
       this.manager.setAssignment(channel, other, strategyId);
     }
     if ((mode === 'paper' || mode === 'live') && strategyId) {
       this.selectedStrategyId.set(strategyId);
+      this.settingsEpoch.update((n) => n + 1);
     }
     this.desk.refreshLiveAfterSettingsChange();
+  }
+
+  /** DNA auto-cap hint under Max trades/day. */
+  protected dnaMaxTradesHint(): string {
+    const caps = dnaCapsForStrategy(this.selectedStrategyId(), this.selectedChannel());
+    const mt = caps.maxTradesPerDay > 0 ? String(caps.maxTradesPerDay) : '∞';
+    const rr = caps.targetRMultiple != null ? ` · ${caps.targetRMultiple}R` : '';
+    return `DNA auto-cap: ${mt} trades/day${rr} (applies when you set Paper/Live)`;
   }
 
   protected strategyName(id: string | null): string {

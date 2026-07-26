@@ -145,6 +145,7 @@
           <label>Swing lookback <input type="number" [ngModel]="st.swingLookback" (ngModelChange)="patchSetting('swingLookback', $event)" /></label>
           <label>Vol expand ATR× <input type="number" step="0.1" [ngModel]="st.volExpandAtrMult" (ngModelChange)="patchSetting('volExpandAtrMult', $event)" /></label>
           <label>Max trades/day <input type="number" [ngModel]="st.maxTradesPerDay" (ngModelChange)="patchSetting('maxTradesPerDay', $event)" /></label>
+          <p class="sm-setting-note">{{ dnaMaxTradesHint() }}</p>
           @if (editingAssigned().isPaper || editingAssigned().isLive) {
             <p class="sm-setting-note">
               Desk today: {{ todayTradeCount() }} closed

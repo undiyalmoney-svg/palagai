@@ -10,6 +10,7 @@ export const STRATEGY_IDS = {
   SWING_RETEST_EMA50_2R: 'swing-retest-ema50-2r',
   SMART_PULLBACK_PRO: 'smart-pullback-pro',
   ALIGN_COMBO_GENIE: 'align-combo-genie',
+  SR_TRAP_CONFIRM: 'sr-trap-confirm',
   GAP_FADE_500: 'gap-fade-500',
   // Paused — removed from active registry
   FIRST_HOUR_BREAKOUT: 'first-hour-breakout',
@@ -55,6 +56,7 @@ export const ACTIVE_STRATEGY_IDS = new Set<string>([
   STRATEGY_IDS.SWING_RETEST_EMA50_2R,
   STRATEGY_IDS.SMART_PULLBACK_PRO,
   STRATEGY_IDS.ALIGN_COMBO_GENIE,
+  STRATEGY_IDS.SR_TRAP_CONFIRM,
   STRATEGY_IDS.GAP_FADE_500,
 ]);
 

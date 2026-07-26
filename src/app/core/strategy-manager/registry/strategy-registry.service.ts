@@ -11,6 +11,7 @@ import { DonchRetestOrMid2rManagedStrategy } from '../modules/donch-retest-or-mi
 import { SwingRetestEma50Rr2ManagedStrategy } from '../modules/swing-retest-ema50-2r.managed-strategy';
 import { SmartPullbackProManagedStrategy } from '../modules/smart-pullback-pro.managed-strategy';
 import { AlignComboGenieManagedStrategy } from '../modules/align-combo-genie.managed-strategy';
+import { SrTrapConfirmManagedStrategy } from '../modules/sr-trap-confirm.managed-strategy';
 import { GapFade500ManagedStrategy } from '../modules/gap-fade-500.managed-strategy';
 import { AppLoggerService } from '../../shared/logging/app-logger.service';
 
@@ -31,12 +32,15 @@ export class StrategyRegistryService {
   private readonly swingRetest = inject(SwingRetestEma50Rr2ManagedStrategy);
   private readonly smartPullbackPro = inject(SmartPullbackProManagedStrategy);
   private readonly alignComboGenie = inject(AlignComboGenieManagedStrategy);
+  private readonly srTrapConfirm = inject(SrTrapConfirmManagedStrategy);
   private readonly gapFade500 = inject(GapFade500ManagedStrategy);
 
   private readonly modules: IManagedStrategy[];
 
   constructor() {
     this.modules = [
+      this.srTrapConfirm,
+      this.alignComboGenie,
       this.champion,
       this.volExpand,
       this.swing5,
@@ -46,7 +50,6 @@ export class StrategyRegistryService {
       this.donchRetest,
       this.swingRetest,
       this.smartPullbackPro,
-      this.alignComboGenie,
       this.gapFade500,
     ];
     for (const m of this.modules) {

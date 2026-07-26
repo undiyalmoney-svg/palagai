@@ -38,7 +38,9 @@ const STRATEGY_DESCRIPTIONS: Record<string, string> = {
   [STRATEGY_IDS.SMART_PULLBACK_PRO]:
     'Smart PB PRO · 1+1 ₹500 book: Nifty breakout·3R + Bank armed-retest·1.5R (Kite OOS).',
   [STRATEGY_IDS.ALIGN_COMBO_GENIE]:
-    'Default indices · GENIE BOTH/ALONE/SKIP · Nifty ≤2t · Bank ≤1t · ~₹507/day OOS.',
+    'GENIE BOTH/ALONE/SKIP · Nifty ≤2t · Bank ≤1t · ~₹507/day OOS (selectable).',
+  [STRATEGY_IDS.SR_TRAP_CONFIRM]:
+    'Default indices · S/R trap + next confirm · 3.5R · ≤3t/day · beats GENIE OOS.',
   [STRATEGY_IDS.GAP_FADE_500]:
     'Stocks GAP_FADE_500 — fade gap-up ≥0.3% · stop 1.5% · ₹500 book default.',
 };

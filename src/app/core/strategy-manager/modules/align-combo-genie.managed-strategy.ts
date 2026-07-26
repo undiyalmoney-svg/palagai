@@ -37,7 +37,7 @@ import {
  *   Nifty: Pine breakout · OR-mid · 3R · SL beyond bar/swing
  *   Bank:  armed Donch retest · OR-mid · 1.5R · bias-sync to Nifty
  *
- * Selectable on Nifty, Bank, and Stocks — **default for Nifty/Bank** Paper+Live.
+ * Selectable on Nifty, Bank, and Stocks — prior default; S/R Trap is now default for indices.
  */
 @Injectable({ providedIn: 'root' })
 export class AlignComboGenieManagedStrategy implements IManagedStrategy {
@@ -45,7 +45,7 @@ export class AlignComboGenieManagedStrategy implements IManagedStrategy {
   readonly name = 'Align Combo · GENIE';
   readonly version = '1.1.0';
   readonly description =
-    'Default indices book: Nifty ≤2t · Bank ≤1t · BOTH/ALONE/SKIP · ~₹507/day OOS. Skip Tue / weak drive.';
+    'GENIE router book: Nifty ≤2t · Bank ≤1t · BOTH/ALONE/SKIP · ~₹507/day OOS. Skip Tue / weak drive.';
   readonly supports: readonly DeskChannel[] = ['nifty', 'bank', 'stocks'];
 
   readonly defaultSettings = defaultStrategySettings({
