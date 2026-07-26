@@ -1,8 +1,9 @@
+import { describe, expect, it } from 'vitest';
 import { SrTrapConfirmManagedStrategy } from './sr-trap-confirm.managed-strategy';
 import { MANAGED_STRATEGY_IDS } from '../config/managed-strategy-ids';
 
 describe('SrTrapConfirmManagedStrategy', () => {
-  it('registers as default trap book with mt3 / 3.5R', () => {
+  it('registers trap book with mt3 / 3.5R', () => {
     const s = new SrTrapConfirmManagedStrategy();
     s.initialize();
     expect(s.id).toBe(MANAGED_STRATEGY_IDS.SR_TRAP_CONFIRM);

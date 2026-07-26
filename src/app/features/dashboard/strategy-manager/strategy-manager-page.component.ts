@@ -137,10 +137,11 @@ export class StrategyManagerPageComponent {
     const value = mode === 'shadow' && strategyId === '' ? null : strategyId;
     const channel = this.selectedChannel();
     this.manager.setAssignment(channel, mode, value);
-    // Trap / GENIE: selecting for Paper or Live activates both modes on this channel.
+    // Donch / Trap / GENIE: selecting Paper or Live activates both modes on this channel.
     const syncBoth =
       strategyId === MANAGED_STRATEGY_IDS.ALIGN_COMBO_GENIE ||
-      strategyId === MANAGED_STRATEGY_IDS.SR_TRAP_CONFIRM;
+      strategyId === MANAGED_STRATEGY_IDS.SR_TRAP_CONFIRM ||
+      strategyId === MANAGED_STRATEGY_IDS.DONCH_RETEST_OR_MID_2R;
     if ((mode === 'paper' || mode === 'live') && syncBoth) {
       const other: ExecutionMode = mode === 'paper' ? 'live' : 'paper';
       this.manager.setAssignment(channel, other, strategyId);
@@ -157,7 +158,7 @@ export class StrategyManagerPageComponent {
     const caps = dnaCapsForStrategy(this.selectedStrategyId(), this.selectedChannel());
     const mt = caps.maxTradesPerDay > 0 ? String(caps.maxTradesPerDay) : '∞';
     const rr = caps.targetRMultiple != null ? ` · ${caps.targetRMultiple}R` : '';
-    return `DNA locked for desk runs: ${mt}/day${rr} (Trap needs ≥2 — at 1 it loses on recent tape)`;
+    return `DNA locked for desk runs: ${mt}/day${rr}`;
   }
 
   protected strategyName(id: string | null): string {

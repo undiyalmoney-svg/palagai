@@ -5,7 +5,7 @@
       <h1>Trade Desk</h1>
       <p class="pg-lede">
         Nifty &amp; Bank Nifty ATM options — strategy from <strong>Strat</strong> (Paper/Live assignment).
-        Defaults: <strong>Trap</strong>. Testing, Live paper, or Live money.
+        Defaults: <strong>Donch Retest</strong>. Testing, Live paper, or Live money.
       </p>
     </div>
     <div class="hero-meta">
@@ -55,10 +55,10 @@
         <strong>Active strategy</strong> — Set in <em>Strat</em> (Paper / Live per index). Card below shows the live module name.
       </li>
       <li>
-        <strong>Default (indices)</strong> — <em>Trap</em> · ≤3 trades/day · 3.5R · next-bar confirm after S/R liquidity trap (<em>Genie</em> still selectable in Strat)
+        <strong>Default (indices)</strong> — <em>Donch Retest</em> · ≤4 trades/day · Donchian-20 break→retest · OR-mid · Swing-5 trail + EOD (<em>Trap</em> / <em>Genie</em> still selectable in Strat)
       </li>
       <li>
-        <strong>Stops</strong> — SL beyond trap wick (risk band Nifty ~4–28 · Bank ~8–50) · day stop −80 pts · optional Strict −₹2,950 / Profit lock +₹5,000
+        <strong>Stops</strong> — Hard SL Nifty 30 / Bank 45 pts · day stop −60 · Swing-5 trail · optional Strict −₹2,950 / Profit lock +₹5,000
       </li>
       <li>
         <strong>Instrument</strong> — ATM options on the selected index · lots from the Lots control
@@ -67,10 +67,10 @@
         <strong>P&amp;L math</strong> — Front-week option OHLC: <em>(exit − entry) × lot × lots</em>. Missing week / stop / target → <em>est. premium</em> = <strong>Index ₹ proxy</strong> (Nifty pts×65 · Bank pts×30). Never prices a far live weekly. Raw “Index pts” mixes underlyings — don’t judge money from pts alone.
       </li>
       <li>
-        <strong>Settings tip</strong> — Max trades is DNA-locked per index (Trap = 3 · Genie = Nifty 2 / Bank 1). Trap at 1/day loses on recent tape — desk forces DNA so a stale “1” cannot stick.
+        <strong>Settings tip</strong> — Max trades is DNA-locked per index (Donch = 4 · Trap = 3 · Genie = Nifty 2 / Bank 1).
       </li>
       <li>
-        <strong>P&amp;L tip</strong> — Badge must be <em>v1.3.4 · …money</em> (hard-refresh if not). All-est rows → Option ₹ <strong>equals</strong> Index ₹. Short Jul-only windows can be red while June / 60d are green (Trap/Donch). Live money still uses Kite fills.
+        <strong>P&amp;L tip</strong> — Badge must be <em>v1.3.5 · …donch</em> (hard-refresh if not). All-est rows → Option ₹ <strong>equals</strong> Index ₹. Live money still uses Kite fills.
       </li>
     </ul>
   </aside>

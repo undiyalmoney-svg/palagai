@@ -31,7 +31,8 @@ export function dnaCapsForStrategy(
     case MANAGED_STRATEGY_IDS.SMART_PULLBACK_PRO:
       return { maxTradesPerDay: 2, targetRMultiple: 1.5 };
     case MANAGED_STRATEGY_IDS.DONCH_RETEST_OR_MID_2R:
-      return { maxTradesPerDay: 3, targetRMultiple: 2 };
+      // Owner default — ≤4t/index · Swing-5 trail (exit-lab)
+      return { maxTradesPerDay: 4, targetRMultiple: 2 };
     case MANAGED_STRATEGY_IDS.GAP_FADE_500:
       return { maxTradesPerDay: 1 };
     case MANAGED_STRATEGY_IDS.INSIDE_BREAK:

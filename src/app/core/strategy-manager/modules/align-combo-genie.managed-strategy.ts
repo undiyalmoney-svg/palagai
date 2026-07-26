@@ -37,7 +37,7 @@ import {
  *   Nifty: Pine breakout · OR-mid · 3R · SL beyond bar/swing
  *   Bank:  armed Donch retest · OR-mid · 1.5R · bias-sync to Nifty
  *
- * Selectable on Nifty, Bank, and Stocks — prior default; S/R Trap is now default for indices.
+ * Selectable on Nifty, Bank, and Stocks — prior default; Donch Retest is now default for indices.
  */
 @Injectable({ providedIn: 'root' })
 export class AlignComboGenieManagedStrategy implements IManagedStrategy {

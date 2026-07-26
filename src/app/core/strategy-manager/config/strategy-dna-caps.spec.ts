@@ -3,6 +3,16 @@ import { dnaCapsForStrategy } from './strategy-dna-caps';
 import { MANAGED_STRATEGY_IDS } from './managed-strategy-ids';
 
 describe('dnaCapsForStrategy', () => {
+  it('gives Donch default 4 trades/day', () => {
+    expect(dnaCapsForStrategy(MANAGED_STRATEGY_IDS.DONCH_RETEST_OR_MID_2R, 'nifty')).toEqual({
+      maxTradesPerDay: 4,
+      targetRMultiple: 2,
+    });
+    expect(dnaCapsForStrategy(MANAGED_STRATEGY_IDS.DONCH_RETEST_OR_MID_2R, 'bank').maxTradesPerDay).toBe(
+      4,
+    );
+  });
+
   it('gives trap max-earn 3 trades and 3.5R', () => {
     expect(dnaCapsForStrategy(MANAGED_STRATEGY_IDS.SR_TRAP_CONFIRM, 'nifty')).toEqual({
       maxTradesPerDay: 3,
