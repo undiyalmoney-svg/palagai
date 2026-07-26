@@ -67,7 +67,7 @@
         <strong>P&amp;L math</strong> — options: <em>(exit premium − entry premium) × lot size × lots</em>. Entry uses the same bar side as the strategy fill (Trap open · Genie close). Stop/target exits track index via ~0.5δ when mid-bar. Rows tagged <em>est. premium</em> = missing front-week option history (never prices a far live weekly). “Index pts” is the raw index move.
       </li>
       <li>
-        <strong>Settings tip</strong> — Max trades auto-updates from DNA (Trap = 3 · Genie = Nifty 2 / Bank 1). Raising the cap does not make trades “more sure.”
+        <strong>Settings tip</strong> — Max trades is DNA-locked per index (Trap = 3 · Genie = Nifty 2 / Bank 1). Trap at 1/day loses on recent tape — desk now forces DNA so a stale “1” cannot stick.
       </li>
       <li>
         <strong>P&amp;L tip</strong> — If badge is not <em>v1.3.1 · …pnl-v4</em>, hard-refresh. With <em>est. premium</em> rows, Option ₹ = Index ₹ proxy (Nifty×65 · Bank×30). Raw “Index pts” mixes underlyings — don’t judge money from that alone. Live money still uses Kite fills.

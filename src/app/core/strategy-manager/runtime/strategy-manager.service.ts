@@ -56,10 +56,10 @@ export class StrategyManagerService {
    */
   resolve(channel: DeskChannel, mode: ExecutionMode): ResolvedStrategies {
     const primaryId = this.assignments.getStrategyId(channel, mode);
-    const primary = this.prepareRunner(primaryId);
+    const primary = this.prepareRunner(primaryId, channel);
     if (!primary) {
       // Fail-safe: never leave the desk without a strategy — Champion.
-      const fallback = this.prepareRunner(MANAGED_STRATEGY_IDS.CHAMPION_PDHL)!;
+      const fallback = this.prepareRunner(MANAGED_STRATEGY_IDS.CHAMPION_PDHL, channel)!;
       this.logger.log({
         type: 'selected',
         strategyId: fallback.id,
@@ -82,7 +82,7 @@ export class StrategyManagerService {
     const shadowId = this.assignments.getShadowStrategyId(channel);
     let shadow: IManagedStrategy | null = null;
     if (shadowId && shadowId !== primaryId) {
-      shadow = this.prepareRunner(shadowId) ?? null;
+      shadow = this.prepareRunner(shadowId, channel) ?? null;
     }
 
     this.logger.log({
@@ -128,12 +128,16 @@ export class StrategyManagerService {
     this.assignments.setStrategy(channel, mode, strategyId);
   }
 
-  private prepareRunner(strategyId: string): IManagedStrategy | undefined {
+  private prepareRunner(
+    strategyId: string,
+    channel: DeskChannel,
+  ): IManagedStrategy | undefined {
     const mod = this.registry.getById(strategyId);
     if (!mod) {
       return undefined;
     }
-    this.assignments.hydrateModule(strategyId);
+    // Channel-aware DNA hydrate — Trap stays at 3; Genie Nifty 2 / Bank 1.
+    this.assignments.hydrateModule(strategyId, channel);
     mod.reset();
     return mod;
   }

@@ -67,7 +67,11 @@ export class StrategyManagerPageComponent {
 
   protected readonly selectedSettings = computed(() => {
     this.settingsEpoch();
-    const mod = this.selectedStrategy();
+    const id = this.selectedStrategyId();
+    const channel = this.selectedChannel();
+    // Hydrate DNA for this channel so Max trades shows Trap=3 / Genie Nifty=2·Bank=1.
+    this.assignments.hydrateModule(id, channel);
+    const mod = this.registry.getById(id);
     return mod ? mod.getSettings() : null;
   });
 
@@ -153,7 +157,7 @@ export class StrategyManagerPageComponent {
     const caps = dnaCapsForStrategy(this.selectedStrategyId(), this.selectedChannel());
     const mt = caps.maxTradesPerDay > 0 ? String(caps.maxTradesPerDay) : '∞';
     const rr = caps.targetRMultiple != null ? ` · ${caps.targetRMultiple}R` : '';
-    return `DNA auto-cap: ${mt} trades/day${rr} (applies when you set Paper/Live)`;
+    return `DNA locked for desk runs: ${mt}/day${rr} (Trap needs ≥2 — at 1 it loses on recent tape)`;
   }
 
   protected strategyName(id: string | null): string {
