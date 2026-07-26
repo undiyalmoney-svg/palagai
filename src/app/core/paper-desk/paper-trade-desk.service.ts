@@ -37,6 +37,7 @@ import {
 import { applyKiteFillPnl } from './apply-kite-fill-pnl';
 import { enrichTradesWithCharges } from './trade-charges.util';
 import { buildPaperDeskDayStats, emptyPaperDeskDayStats } from './paper-desk-day-stats';
+import { MAX_OPTION_HISTORY_TOKENS, rankTokensByFrequency } from './option-history-tokens.util';
 import { PDHL_RUPEES_PER_POINT, buildDeskRiskOverrides, rupeesPerPointForInstrument } from '../strategy-engine/strategies/pdhl-opening-range/pdhl-opening-range.evaluator';
 import { StrategyManagerService } from '../strategy-manager/runtime/strategy-manager.service';
 import { StrategyEventLogger } from '../strategy-manager/runtime/strategy-event-logger.service';
@@ -1066,14 +1067,16 @@ export class PaperTradeDeskService {
     runId?: number,
   ): Promise<Map<number, Candle[]>> {
     const map = new Map<number, Candle[]>();
-    const unique = [...new Set(tokens)].slice(0, 24);
+    // Most-traded tokens first so busy books (Trap) get real OHLC before the cap.
+    // Cap raised from 24 — old limit left most Trap weeks on "est. premium" (0.5δ).
+    const unique = rankTokensByFrequency(tokens).slice(0, MAX_OPTION_HISTORY_TOKENS);
     for (let i = 0; i < unique.length; i += 1) {
       if (runId != null) {
         this.assertActive(runId);
       }
       const token = unique[i]!;
       if (i > 0) {
-        await delay(800);
+        await delay(500);
       }
       try {
         const candles = await this.fetch5m({
@@ -1384,3 +1387,4 @@ function istNowHhMm(): string {
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
+

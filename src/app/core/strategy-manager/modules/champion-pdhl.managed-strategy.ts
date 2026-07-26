@@ -33,7 +33,7 @@ import { mergeSettings } from '../engines/index-rule.engine';
 @Injectable({ providedIn: 'root' })
 export class ChampionPdhlManagedStrategy implements IManagedStrategy {
   readonly id = MANAGED_STRATEGY_IDS.CHAMPION_PDHL;
-  readonly name = 'Champion PDHL (OR Swing Breakout)';
+  readonly name = 'Champion';
   readonly version = '1.0.0';
   readonly description =
     'Production champion: OR mid bias + swing breakout · SL caps · 1R · EMA-20 · day −60. DNA unchanged.';

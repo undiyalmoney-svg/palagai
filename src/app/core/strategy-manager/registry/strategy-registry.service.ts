@@ -41,6 +41,7 @@ export class StrategyRegistryService {
     this.modules = [
       this.srTrapConfirm,
       this.alignComboGenie,
+      this.smartPullbackPro,
       this.champion,
       this.volExpand,
       this.swing5,
@@ -49,7 +50,6 @@ export class StrategyRegistryService {
       this.insideBreak,
       this.donchRetest,
       this.swingRetest,
-      this.smartPullbackPro,
       this.gapFade500,
     ];
     for (const m of this.modules) {

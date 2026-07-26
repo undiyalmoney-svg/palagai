@@ -9,7 +9,7 @@ import { BaseIndexRuleStrategy } from './base-index-rule.strategy';
 @Injectable({ providedIn: 'root' })
 export class Swing5PrevDayManagedStrategy extends BaseIndexRuleStrategy {
   readonly id = MANAGED_STRATEGY_IDS.SWING5_PREV_DAY;
-  readonly name = 'Swing-5 + Previous Day + EOD';
+  readonly name = 'Swing Prev Day';
   readonly version = '1.0.0';
   readonly description =
     'Swing-5 breakout filtered by previous-day bullish/bearish bias; hold to EOD.';

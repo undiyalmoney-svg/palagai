@@ -12,7 +12,7 @@ import { BaseIndexRuleStrategy } from './base-index-rule.strategy';
 @Injectable({ providedIn: 'root' })
 export class SwingRetestEma50Rr2ManagedStrategy extends BaseIndexRuleStrategy {
   readonly id = MANAGED_STRATEGY_IDS.SWING_RETEST_EMA50_2R;
-  readonly name = 'Swing Retest · EMA50 · 2R';
+  readonly name = 'Swing Retest';
   readonly version = '1.0.0';
   readonly description =
     'Break swing-5 S/R, enter on retest · EMA50 · 2R · 1t. Index twin — NOT for stocks (use GAP_FADE_500).';

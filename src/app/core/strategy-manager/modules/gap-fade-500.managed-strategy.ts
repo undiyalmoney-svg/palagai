@@ -29,10 +29,10 @@ import { mergeSettings } from '../engines/index-rule.engine';
 @Injectable({ providedIn: 'root' })
 export class GapFade500ManagedStrategy implements IManagedStrategy {
   readonly id = MANAGED_STRATEGY_IDS.GAP_FADE_500;
-  readonly name = 'GAP_FADE_500 · ₹500 book';
+  readonly name = 'Gap Fade';
   readonly version = '1.0.0';
   readonly description =
-    'Stocks default: fade gap-up ≥0.3% (SELL) · stop 1.5% · EOD. Trade on Stocks Desk (max 3 by gap).';
+    'Stocks default — fade gap-up ≥0.3% · stop 1.5% · ₹500 book.';
   readonly supports: readonly DeskChannel[] = ['stocks'];
 
   readonly defaultSettings = defaultStrategySettings({

@@ -43,19 +43,19 @@ export type StocksStrategyId =
 export const STOCKS_STRATEGY_OPTIONS: Array<{ id: StocksStrategyId; label: string }> = [
   {
     id: 'GAP_FADE_500',
-    label: '₹500 book — gap-up fade 0.3% · max 3 (DEFAULT)',
+    label: 'Gap Fade (default)',
   },
   {
     id: 'ALIGN_COMBO_GENIE',
-    label: 'Align Combo · GENIE — prior-color + gap continuation (selectable)',
+    label: 'Genie',
   },
   {
     id: 'ALMOST_GREEN_MIX',
-    label: 'Almost-green mix — 0.5% gap ± TP 0.5% (split up to 3)',
+    label: 'Almost-green mix',
   },
   { id: 'FOLLOW_PRIOR_COLOR', label: 'Follow prior day colour' },
-  { id: 'GAP_DOWN_BOUNCE', label: 'Gap-down bounce 0.5%' },
-  { id: 'GAP_UP_FADE', label: 'Gap-up fade 0.5%' },
+  { id: 'GAP_DOWN_BOUNCE', label: 'Gap-down bounce' },
+  { id: 'GAP_UP_FADE', label: 'Gap-up fade' },
   { id: 'PDHL_CONT_EOD', label: 'PDHL continuation' },
   { id: 'BUY_OPEN_EOD', label: 'Buy open → EOD' },
   { id: 'SELL_OPEN_EOD', label: 'Sell open → EOD' },

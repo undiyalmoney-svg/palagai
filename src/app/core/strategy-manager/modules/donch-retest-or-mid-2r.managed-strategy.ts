@@ -14,7 +14,7 @@ import { BaseIndexRuleStrategy } from './base-index-rule.strategy';
 @Injectable({ providedIn: 'root' })
 export class DonchRetestOrMid2rManagedStrategy extends BaseIndexRuleStrategy {
   readonly id = MANAGED_STRATEGY_IDS.DONCH_RETEST_OR_MID_2R;
-  readonly name = 'Donch Retest · OR-mid · Swing-5 trail';
+  readonly name = 'Donch Retest';
   readonly version = '1.3.0';
   readonly description =
     'Break Donchian-20 S/R, enter on retest · OR-mid · Swing-5 structure trail + EOD · up to 3t/day. Index DNA — NOT for stocks (use GAP_FADE_500).';

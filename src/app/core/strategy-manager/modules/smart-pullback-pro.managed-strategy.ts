@@ -39,10 +39,10 @@ import {
 @Injectable({ providedIn: 'root' })
 export class SmartPullbackProManagedStrategy implements IManagedStrategy {
   readonly id = MANAGED_STRATEGY_IDS.SMART_PULLBACK_PRO;
-  readonly name = 'Smart PB PRO · GENIE 1+1';
+  readonly name = 'Pullback';
   readonly version = '2.1.0';
   readonly description =
-    'GENIE v3 day router (COMBO/ALONE/SKIP) + Nifty Pine·3R + Bank armed-retest·1.5R. ~₹507/day OOS, fewer reds — paper first.';
+    'Smart pullback entries (Nifty 3R · Bank 1.5R). Prefer Genie for the day router.';
   readonly supports: readonly DeskChannel[] = ['nifty', 'bank'];
 
   readonly defaultSettings = defaultStrategySettings({

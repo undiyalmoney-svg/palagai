@@ -13,7 +13,7 @@ import { BaseIndexRuleStrategy } from './base-index-rule.strategy';
 @Injectable({ providedIn: 'root' })
 export class InsideBreakManagedStrategy extends BaseIndexRuleStrategy {
   readonly id = MANAGED_STRATEGY_IDS.INSIDE_BREAK;
-  readonly name = 'Inside Break + EOD';
+  readonly name = 'Inside Break';
   readonly version = '1.0.0';
   readonly description =
     'Break of prior inside-bar range · no bias · EOD · multi-trade · day stop 60. Best green-day rate in daily ₹500 search; deep red median — paper first.';

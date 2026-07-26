@@ -10,7 +10,7 @@ describe('AlignComboGenieManagedStrategy', () => {
     const s = new AlignComboGenieManagedStrategy();
     s.initialize();
     expect(s.id).toBe(MANAGED_STRATEGY_IDS.ALIGN_COMBO_GENIE);
-    expect(s.name).toContain('Align Combo');
+    expect(s.name).toBe('Genie');
     expect(s.supports).toEqual(['nifty', 'bank', 'stocks']);
     expect(s.getSettings().extras?.['genieRouterEnabled']).toBe(true);
   });

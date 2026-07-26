@@ -9,7 +9,7 @@ import { BaseIndexRuleStrategy } from './base-index-rule.strategy';
 @Injectable({ providedIn: 'root' })
 export class Donchian20ManagedStrategy extends BaseIndexRuleStrategy {
   readonly id = MANAGED_STRATEGY_IDS.DONCHIAN_20;
-  readonly name = 'Donchian-20 + EOD';
+  readonly name = 'Donchian 20';
   readonly version = '1.0.0';
   readonly description = 'Classic 20-bar Donchian channel breakout; hold to EOD.';
   readonly supports: readonly DeskChannel[] = ['nifty', 'bank'];

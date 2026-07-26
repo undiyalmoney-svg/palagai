@@ -29,10 +29,10 @@ import {
 @Injectable({ providedIn: 'root' })
 export class SrTrapConfirmManagedStrategy implements IManagedStrategy {
   readonly id = MANAGED_STRATEGY_IDS.SR_TRAP_CONFIRM;
-  readonly name = 'S/R Trap · Confirm';
+  readonly name = 'Trap';
   readonly version = '1.0.0';
   readonly description =
-    'Default indices book: S/R liquidity trap + next-bar confirm · 3.5R · ≤3 trades/day · beats GENIE OOS.';
+    'Default · max ₹ — liquidity trap + next-bar confirm · 3.5R · ≤3 trades/day.';
   readonly supports: readonly DeskChannel[] = ['nifty', 'bank'];
 
   readonly defaultSettings = defaultStrategySettings({

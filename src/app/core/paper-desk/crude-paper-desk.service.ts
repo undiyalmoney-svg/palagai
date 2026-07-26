@@ -32,6 +32,10 @@ import { effectiveProtectiveStop } from './paper-desk-engine';
 import { applyKiteFillPnl } from './apply-kite-fill-pnl';
 import { enrichTradesWithCharges } from './trade-charges.util';
 import { buildPaperDeskDayStats, emptyPaperDeskDayStats } from './paper-desk-day-stats';
+import {
+  MAX_CRUDE_OPTION_HISTORY_TOKENS,
+  rankTokensByFrequency,
+} from './option-history-tokens.util';
 import { CRUDE_EXIT_BY, CRUDE_RUPEES_PER_POINT, resolveCrudeDayLossStopPts } from '../strategy-engine/strategies/crude-pdhl-evening/crude-pdhl-evening.evaluator';
 import {
   PaperDeskMode,
@@ -631,14 +635,14 @@ export class CrudePaperDeskService {
     runId?: number,
   ): Promise<Map<number, Candle[]>> {
     const map = new Map<number, Candle[]>();
-    const unique = [...new Set(tokens)].filter((t) => t > 0).slice(0, 12);
+    const unique = rankTokensByFrequency(tokens).slice(0, MAX_CRUDE_OPTION_HISTORY_TOKENS);
     for (let i = 0; i < unique.length; i += 1) {
       if (runId != null) {
         this.assertActive(runId);
       }
       const token = unique[i]!;
       if (i > 0) {
-        await delay(800);
+        await delay(500);
       }
       try {
         const candles = await this.fetch5m({

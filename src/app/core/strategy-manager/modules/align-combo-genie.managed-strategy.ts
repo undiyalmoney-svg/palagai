@@ -42,10 +42,10 @@ import {
 @Injectable({ providedIn: 'root' })
 export class AlignComboGenieManagedStrategy implements IManagedStrategy {
   readonly id = MANAGED_STRATEGY_IDS.ALIGN_COMBO_GENIE;
-  readonly name = 'Align Combo · GENIE';
+  readonly name = 'Genie';
   readonly version = '1.1.0';
   readonly description =
-    'GENIE router book: Nifty ≤2t · Bank ≤1t · BOTH/ALONE/SKIP · ~₹507/day OOS. Skip Tue / weak drive.';
+    'Steady book — Nifty ≤2t · Bank ≤1t · BOTH/ALONE/SKIP · skip Tue / weak drive.';
   readonly supports: readonly DeskChannel[] = ['nifty', 'bank', 'stocks'];
 
   readonly defaultSettings = defaultStrategySettings({

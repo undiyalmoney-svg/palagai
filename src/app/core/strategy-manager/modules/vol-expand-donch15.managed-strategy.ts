@@ -9,7 +9,7 @@ import { BaseIndexRuleStrategy } from './base-index-rule.strategy';
 @Injectable({ providedIn: 'root' })
 export class VolExpandDonch15ManagedStrategy extends BaseIndexRuleStrategy {
   readonly id = MANAGED_STRATEGY_IDS.VOL_EXPAND_DONCH15;
-  readonly name = 'VolExpand Donchian-15 + EMA50 + EOD';
+  readonly name = 'Vol Expand';
   readonly version = '1.2.0';
   readonly description =
     'VolExpand Donch15 + EMA50 + EOD (10:15–11:30, 1 trade/day). Regime filter available in Settings (off by default for full trade count).';

@@ -9,7 +9,7 @@ import { BaseIndexRuleStrategy } from './base-index-rule.strategy';
 @Injectable({ providedIn: 'root' })
 export class Donchian55TurtleManagedStrategy extends BaseIndexRuleStrategy {
   readonly id = MANAGED_STRATEGY_IDS.DONCHIAN_55_TURTLE;
-  readonly name = 'Donchian-55 Turtle';
+  readonly name = 'Turtle 55';
   readonly version = '1.0.0';
   readonly description =
     'Turtle-style 55-bar Donchian breakout on the desk timeframe; EOD exit, 1 trade/day.';
