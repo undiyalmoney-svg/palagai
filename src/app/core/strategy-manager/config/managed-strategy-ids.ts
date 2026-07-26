@@ -35,7 +35,7 @@ export type ManagedStrategyId =
 
 /**
  * Research-backed defaults:
- * - Nifty/Bank: Donch Retest (≤4t · Swing-5 trail · 2026 YTD Index ₹ leader)
+ * - Nifty/Bank: Donch Retest (≤3t · Swing-5 trail · 2026 YTD Index ₹ leader)
  * - Stocks: GAP_FADE_500 (same DNA as Stocks Desk)
  */
 export const DEFAULT_CHANNEL_ASSIGNMENTS = {

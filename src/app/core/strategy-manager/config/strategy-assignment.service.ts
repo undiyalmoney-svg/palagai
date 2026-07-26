@@ -13,7 +13,7 @@ import { dnaCapsForStrategy } from '../config/strategy-dna-caps';
 import { StrategySettings } from '../models/strategy-settings.model';
 import { StrategyRegistryService } from '../registry/strategy-registry.service';
 
-const STORAGE_KEY = 'palagai_strategy_assignments_v15';
+const STORAGE_KEY = 'palagai_strategy_assignments_v16';
 const LEGACY_STORAGE_KEYS = [
   'palagai_strategy_assignments_v1',
   'palagai_strategy_assignments_v2',
@@ -29,6 +29,7 @@ const LEGACY_STORAGE_KEYS = [
   'palagai_strategy_assignments_v12',
   'palagai_strategy_assignments_v13',
   'palagai_strategy_assignments_v14',
+  'palagai_strategy_assignments_v15',
 ] as const;
 
 export interface ChannelAssignment {
