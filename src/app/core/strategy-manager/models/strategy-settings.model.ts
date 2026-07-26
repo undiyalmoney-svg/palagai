@@ -35,6 +35,13 @@ export interface StrategySettings {
   instrumentType: 'index' | 'futures' | 'options' | 'equity';
   /** Day stop in points (0 = disabled). */
   dayStopPts: number;
+  /**
+   * Hard day loss cap in ₹ per lot (0 = disabled).
+   * Converted to points per instrument (Nifty ₹65/pt · Bank ₹30/pt) and used as a
+   * running budget: each entry's risk is capped to what is left, so realised day
+   * loss cannot exceed the cap. Scales with the desk Lots control.
+   */
+  dayLossCapRs: number;
   /** Target R-multiple (0 = no fixed target / EOD strategies). */
   targetRMultiple: number;
   /**
@@ -79,6 +86,7 @@ export function defaultStrategySettings(
     riskPercent: 1,
     instrumentType: 'index',
     dayStopPts: 60,
+    dayLossCapRs: 0,
     targetRMultiple: 0,
     profitProtectEnabled: false,
     profitProtectArmR: 1,

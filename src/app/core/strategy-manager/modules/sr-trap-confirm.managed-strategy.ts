@@ -23,7 +23,7 @@ import {
 } from '../engines/sr-trap-confirm.engine';
 
 /**
- * S/R Trap + Confirm — research max-earn book (doc 31). Selectable (Donch is indices default).
+ * S/R Trap + Confirm — default indices max-earn book (doc 31).
  * OOS ~₹1,049–1,109/day vs GENIE ~₹523 (index pts × lot proxy).
  */
 @Injectable({ providedIn: 'root' })
@@ -32,7 +32,7 @@ export class SrTrapConfirmManagedStrategy implements IManagedStrategy {
   readonly name = 'Trap';
   readonly version = '1.0.0';
   readonly description =
-    'Selectable · liquidity trap + next-bar confirm · 3.5R · ≤3 trades/day.';
+    'Default · liquidity trap + next-bar confirm · 3.5R · ≤3 trades/day · hard ₹1,000 day loss cap (per lot).';
   readonly supports: readonly DeskChannel[] = ['nifty', 'bank'];
 
   readonly defaultSettings = defaultStrategySettings({
@@ -45,7 +45,8 @@ export class SrTrapConfirmManagedStrategy implements IManagedStrategy {
     emaLength: 50,
     maxTradesPerDay: 3,
     instrumentType: 'futures',
-    dayStopPts: 80,
+    dayStopPts: 60,
+    dayLossCapRs: 1000,
     targetRMultiple: 3.5,
     profitProtectEnabled: false,
     regimeFilterEnabled: false,

@@ -5,7 +5,7 @@
       <h1>Trade Desk</h1>
       <p class="pg-lede">
         Nifty &amp; Bank Nifty ATM options — strategy from <strong>Strat</strong> (Paper/Live assignment).
-        Defaults: <strong>Donch Retest</strong>. Testing, Live paper, or Live money.
+        Defaults: <strong>Trap</strong>. Testing, Live paper, or Live money.
       </p>
     </div>
     <div class="hero-meta">
@@ -27,13 +27,22 @@
       <span class="as-kicker">Active now · {{ activeStrategies().modeLabel }}</span>
       @if (activeStrategies().same) {
         <strong class="as-name">{{ activeStrategies().nifty.name }}</strong>
-        <span class="as-meta">Nifty + Bank · {{ activeStrategies().nifty.maxTradesLabel }}</span>
+        <span class="as-meta"
+          >Nifty + Bank · {{ activeStrategies().nifty.maxTradesLabel }} ·
+          {{ activeStrategies().nifty.capLabel }} per index</span
+        >
       } @else {
         <strong class="as-name"
           >Nifty {{ activeStrategies().nifty.name }} · Bank {{ activeStrategies().bank.name }}</strong
         >
         <span class="as-meta"
-          >{{ activeStrategies().nifty.maxTradesLabel }} / {{ activeStrategies().bank.maxTradesLabel }}</span
+          >{{ activeStrategies().nifty.maxTradesLabel }} / {{ activeStrategies().bank.maxTradesLabel }} ·
+          {{ activeStrategies().nifty.capLabel }} / {{ activeStrategies().bank.capLabel }}</span
+        >
+      }
+      @if (activeStrategies().deskCapRs > 0) {
+        <span class="as-cap"
+          >Worst possible day: −₹{{ activeStrategies().deskCapRs.toLocaleString('en-IN') }} across both books</span
         >
       }
     </div>
@@ -73,10 +82,13 @@
         <strong>Active strategy</strong> — Banner above shows Strat Paper/Live assignment live. Per-index cards also show <em>Running · …</em> after a run.
       </li>
       <li>
-        <strong>Default (indices)</strong> — <em>Donch Retest</em> · ≤2 trades/day · tighter SL + day stop −40 · Swing-5 trail (<em>Trap</em> still selectable — wins more calendar years)
+        <strong>Default (indices)</strong> — <em>Trap</em> · ≤3 trades/day · 3.5R · next-bar confirmation after S/R liquidity trap (₹20.90L all-years Index ₹; 4/7 yearly wins)
       </li>
       <li>
-        <strong>Stops</strong> — Hard SL Nifty 22 / Bank 35 pts · day stop −40 · Strict −₹2,950 <em>on by default</em> · optional Profit lock +₹5,000
+        <strong>Risk</strong> — Trap stop beyond the sweep wick ·
+        <em>hard −₹1,000/day cap per index per lot</em>: every entry is sized to the ₹ left today, so
+        2020–2026 replay shows zero days worse than −₹999 (was −₹4,531). Cost of the rail: net
+        ₹7.40L instead of ₹20.90L. Raise or clear it in Strat → Day loss cap ₹.
       </li>
       <li>
         <strong>Instrument</strong> — ATM options on the selected index · lots from the Lots control
@@ -85,10 +97,10 @@
         <strong>P&amp;L math</strong> — Front-week option OHLC: <em>(exit − entry) × lot × lots</em>. Missing week / stop / target → <em>est. premium</em> = <strong>Index ₹ proxy</strong> (Nifty pts×65 · Bank pts×30). Never prices a far live weekly. Raw “Index pts” mixes underlyings — don’t judge money from pts alone.
       </li>
       <li>
-        <strong>Settings tip</strong> — Max trades DNA-locked (Donch = 2 · Trap = 3 · Genie = Nifty 2 / Bank 1). Strict day stop cuts stacked red days.
+        <strong>Settings tip</strong> — Max trades DNA-locked (Trap = 3 · Donch = 2 · Genie = Nifty 2 / Bank 1). Donch remains selectable for paper comparison.
       </li>
       <li>
-        <strong>P&amp;L tip</strong> — Badge must be <em>v1.3.7 · …risk</em> (hard-refresh if not). All-est rows → Option ₹ <strong>equals</strong> Index ₹. Live money still uses Kite fills.
+        <strong>P&amp;L tip</strong> — Badge must be <em>v1.3.8 · …trap</em> (hard-refresh if not). All-est rows → Option ₹ <strong>equals</strong> Index ₹. Live money still uses Kite fills.
       </li>
     </ul>
   </aside>

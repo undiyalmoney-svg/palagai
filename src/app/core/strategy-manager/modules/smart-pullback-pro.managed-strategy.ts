@@ -34,7 +34,7 @@ import {
  * Bank bias-sync via extras.genieNiftyBias when set.
  *
  * OOS GENIE: ~₹507/day · ~34% red (vs ~49% always-combo) · cov ~71%.
- * Selectable — does NOT replace Donch Retest defaults.
+ * Selectable — does NOT replace Trap defaults.
  */
 @Injectable({ providedIn: 'root' })
 export class SmartPullbackProManagedStrategy implements IManagedStrategy {

@@ -76,6 +76,17 @@
   color: #3f5a4e;
 }
 
+.as-cap {
+  display: inline-block;
+  margin-top: 2px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #fdecec;
+  color: #a12a2a;
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
 .as-link {
   font-size: 0.78rem;
   font-weight: 700;
