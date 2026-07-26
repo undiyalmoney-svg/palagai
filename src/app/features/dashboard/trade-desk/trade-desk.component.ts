@@ -36,7 +36,8 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
   protected readonly appBuildLabel = APP_BUILD_LABEL;
 
   protected readonly mode = signal<PaperDeskMode>('testing');
-  protected fromDate = shiftDays(-14);
+  /** Default 60d so short red months (e.g. early Jul) don’t hide June-scale Index ₹. */
+  protected fromDate = shiftDays(-60);
   protected toDate = todayIso();
   /** When Live + checked, places real Kite MIS orders. */
   protected realOrders = false;
@@ -302,6 +303,22 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
       },
     );
   }
+
+  /** Quick Testing ranges — short windows (e.g. Jul-only) can look “broken” vs research. */
+  protected setTestingRange(daysBack: number): void {
+    this.fromDate = shiftDays(-Math.abs(daysBack));
+    this.toDate = todayIso();
+  }
+
+  /** True when almost every row is estimated → Index ₹ proxy is the money truth. */
+  protected readonly moneyIsIndexProxy = computed(() => {
+    const t = this.resultView().totals;
+    if (!t.trades) {
+      return false;
+    }
+    const est = t.premiumEstimatedCount ?? 0;
+    return est >= t.trades;
+  });
 }
 
 function todayIso(): string {

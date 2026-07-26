@@ -220,7 +220,14 @@ export function entryPremiumEdge(
 
 function isLevelExitReason(reason: string): boolean {
   const r = reason.toLowerCase();
-  return r.includes('stop') || r.includes('target') || r.includes('sl');
+  // Word-boundary only — bare includes('sl') is too greedy.
+  return (
+    /\bstop\b/.test(r) ||
+    /\btarget\b/.test(r) ||
+    /\bsl\b/.test(r) ||
+    r.includes('stop loss') ||
+    r.includes('trail / stop')
+  );
 }
 
 /**

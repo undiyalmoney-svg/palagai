@@ -231,6 +231,25 @@ describe('enrichTradesWithOptionPremiums', () => {
     expect(out.every((t) => t.premiumEstimated)).toBe(true);
   });
 
+  it('EOD exit can use real OHLC (not forced estimate via greedy sl match)', () => {
+    const candles = new Map<number, Candle[]>([
+      [
+        111,
+        [
+          optCandle('2026-07-23T14:30:00+0530', 72, 75, 71, 74),
+          optCandle('2026-07-23T14:55:00+0530', 80, 83, 79, 82),
+        ],
+      ],
+    ]);
+    const [out] = enrichTradesWithOptionPremiums(
+      [trade({ optionEntryEdge: 'close', exitReason: 'EOD / session exit', instrumentId: 'nifty-50' })],
+      candles,
+      1,
+    );
+    expect(out!.premiumEstimated).toBe(false);
+    expect(out!.optionPnlRs).toBe(computeOptionPnl({ entryPremium: 74, exitPremium: 82, lotSize: 65, lots: 1 }));
+  });
+
   it('REGRESSION: all-estimated Nifty+Bank matches Index ₹ proxy (no green option on red money)', () => {
     const trades = [
       trade({

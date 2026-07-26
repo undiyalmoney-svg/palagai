@@ -640,6 +640,34 @@
   box-shadow: 0 10px 30px rgba(12, 31, 23, 0.06);
 }
 
+.range-presets {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding-bottom: 0.15rem;
+}
+
+.preset-btn {
+  border: 1px solid rgba(15, 118, 110, 0.35);
+  background: rgba(15, 118, 110, 0.06);
+  color: #0f766e;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 0.35rem 0.55rem;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.preset-btn:hover:not(:disabled) {
+  background: rgba(15, 118, 110, 0.14);
+}
+
+.preset-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .field {
   display: flex;
   flex-direction: column;

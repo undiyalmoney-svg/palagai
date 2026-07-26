@@ -1068,7 +1068,7 @@ export class PaperTradeDeskService {
   ): Promise<Map<number, Candle[]>> {
     const map = new Map<number, Candle[]>();
     // Most-traded tokens first so busy books (Trap) get real OHLC before the cap.
-    // Cap raised from 24 — old limit left most Trap weeks on "est. premium" (0.5δ).
+    // Cap raised from 24 — old limit left most Trap weeks on est. premium (Index ₹ proxy).
     const unique = rankTokensByFrequency(tokens).slice(0, MAX_OPTION_HISTORY_TOKENS);
     for (let i = 0; i < unique.length; i += 1) {
       if (runId != null) {

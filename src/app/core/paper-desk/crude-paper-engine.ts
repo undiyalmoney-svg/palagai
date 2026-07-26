@@ -107,8 +107,18 @@ function lookupPremium(
   return edge === 'entry' ? best.open : best.close;
 }
 
-function estimatePremiumMove(points: number): number {
-  return points * 0.5;
+/** Synthetic premium path for UI only — money = full index pts × lot (matches Index ₹ proxy). */
+function estimateOptionPnl(indexPoints: number, lotSize: number, lots: number): {
+  entry: number;
+  exit: number;
+  pnl: number;
+} {
+  const lot = lotSize > 0 ? lotSize : 1;
+  const lotMult = Math.max(1, Math.floor(lots) || 1);
+  const pnl = indexPoints * lot * lotMult;
+  const premiumMove = indexPoints * 0.5; // display-only synthetic premium
+  const entry = Math.max(10, Math.abs(premiumMove) + 20);
+  return { entry, exit: entry + premiumMove, pnl };
 }
 
 let tradeSeq = 0;
@@ -131,6 +141,7 @@ function closePaperTrade(params: {
   let optionExitPremium: number | null = null;
   let optionPnlRs: number | null = null;
   let premiumEstimated = open.premiumEstimated;
+  let optionEntryPremium = open.optionEntryPremium;
 
   if (open.option) {
     optionExitPremium = lookupPremium(
@@ -138,15 +149,15 @@ function closePaperTrade(params: {
       params.exitTime,
       'exit',
     );
-    if (open.optionEntryPremium != null && optionExitPremium != null) {
+    if (optionEntryPremium != null && optionExitPremium != null) {
       optionPnlRs =
-        (optionExitPremium - open.optionEntryPremium) * open.option.lotSize * lots;
+        (optionExitPremium - optionEntryPremium) * open.option.lotSize * lots;
       premiumEstimated = false;
     } else {
-      const estMove = estimatePremiumMove(indexPoints);
-      const entryPx = open.optionEntryPremium ?? Math.max(10, Math.abs(estMove) + 20);
-      optionExitPremium = entryPx + estMove;
-      optionPnlRs = estMove * open.option.lotSize * lots;
+      const est = estimateOptionPnl(indexPoints, open.option.lotSize, lots);
+      optionEntryPremium = optionEntryPremium ?? est.entry;
+      optionExitPremium = optionEntryPremium + indexPoints * 0.5;
+      optionPnlRs = est.pnl;
       premiumEstimated = true;
     }
   }
@@ -166,7 +177,7 @@ function closePaperTrade(params: {
     exitTime: params.exitTime,
     exitReason: params.exitReason,
     option: open.option,
-    optionEntryPremium: open.optionEntryPremium,
+    optionEntryPremium,
     optionExitPremium,
     optionPnlRs,
     premiumEstimated,
@@ -432,14 +443,14 @@ export function enrichCrudeTradesWithOptionPremiums(
         premiumEstimated: false,
       };
     }
-    const estMove = estimatePremiumMove(t.indexPoints);
-    const entryPx = entry ?? Math.max(10, Math.abs(estMove) + 20);
-    const exitPx = exit ?? entryPx + estMove;
+    const est = estimateOptionPnl(t.indexPoints, t.option.lotSize, lots);
+    const entryPx = entry ?? est.entry;
+    const exitPx = exit ?? entryPx + t.indexPoints * 0.5;
     return {
       ...t,
       optionEntryPremium: entryPx,
       optionExitPremium: exitPx,
-      optionPnlRs: (exitPx - entryPx) * t.option.lotSize * lots,
+      optionPnlRs: est.pnl,
       premiumEstimated: true,
     };
   });

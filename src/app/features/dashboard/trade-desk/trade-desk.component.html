@@ -64,13 +64,13 @@
         <strong>Instrument</strong> — ATM options on the selected index · lots from the Lots control
       </li>
       <li>
-        <strong>P&amp;L math</strong> — options: <em>(exit premium − entry premium) × lot size × lots</em>. Entry uses the same bar side as the strategy fill (Trap open · Genie close). Stop/target exits track index via ~0.5δ when mid-bar. Rows tagged <em>est. premium</em> = missing front-week option history (never prices a far live weekly). “Index pts” is the raw index move.
+        <strong>P&amp;L math</strong> — Front-week option OHLC: <em>(exit − entry) × lot × lots</em>. Missing week / stop / target → <em>est. premium</em> = <strong>Index ₹ proxy</strong> (Nifty pts×65 · Bank pts×30). Never prices a far live weekly. Raw “Index pts” mixes underlyings — don’t judge money from pts alone.
       </li>
       <li>
-        <strong>Settings tip</strong> — Max trades is DNA-locked per index (Trap = 3 · Genie = Nifty 2 / Bank 1). Trap at 1/day loses on recent tape — desk now forces DNA so a stale “1” cannot stick.
+        <strong>Settings tip</strong> — Max trades is DNA-locked per index (Trap = 3 · Genie = Nifty 2 / Bank 1). Trap at 1/day loses on recent tape — desk forces DNA so a stale “1” cannot stick.
       </li>
       <li>
-        <strong>P&amp;L tip</strong> — If badge is not <em>v1.3.1 · …pnl-v4</em>, hard-refresh. With <em>est. premium</em> rows, Option ₹ = Index ₹ proxy (Nifty×65 · Bank×30). Raw “Index pts” mixes underlyings — don’t judge money from that alone. Live money still uses Kite fills.
+        <strong>P&amp;L tip</strong> — Badge must be <em>v1.3.4 · …money</em> (hard-refresh if not). All-est rows → Option ₹ <strong>equals</strong> Index ₹. Short Jul-only windows can be red while June / 60d are green (Trap/Donch). Live money still uses Kite fills.
       </li>
     </ul>
   </aside>
@@ -85,6 +85,32 @@
         <span>To</span>
         <input type="date" [(ngModel)]="toDate" [disabled]="busy() || snapshot().running" />
       </label>
+      <div class="range-presets" role="group" aria-label="Quick date ranges">
+        <button
+          type="button"
+          class="preset-btn"
+          [disabled]="busy() || snapshot().running"
+          (click)="setTestingRange(14)"
+        >
+          14d
+        </button>
+        <button
+          type="button"
+          class="preset-btn"
+          [disabled]="busy() || snapshot().running"
+          (click)="setTestingRange(60)"
+        >
+          60d
+        </button>
+        <button
+          type="button"
+          class="preset-btn"
+          [disabled]="busy() || snapshot().running"
+          (click)="setTestingRange(120)"
+        >
+          120d
+        </button>
+      </div>
     } @else {
       <div class="live-hint">
         <strong>Today</strong>
@@ -247,10 +273,11 @@
       </div>
       <div
         class="stat"
+        [class.primary]="moneyIsIndexProxy()"
         [class.up]="resultView().totals.pointsMoneyRs > 0"
         [class.down]="resultView().totals.pointsMoneyRs < 0"
       >
-        <span title="Honest pts × lot money (Nifty×65 · Bank×30). When rows are est. premium, Option ₹ matches this."
+        <span title="Honest pts × lot money (Nifty×65 · Bank×30). When all rows are est. premium, this IS the money number."
           >Index ₹ proxy</span
         >
         <strong
@@ -258,15 +285,20 @@
           }}{{ resultView().totals.pointsMoneyRs | number: '1.0-0' }}</strong
         >
       </div>
-      <div class="stat primary" [class.up]="resultView().totals.optionNetRs > 0" [class.down]="resultView().totals.optionNetRs < 0">
+      <div
+        class="stat"
+        [class.primary]="!moneyIsIndexProxy()"
+        [class.up]="resultView().totals.optionNetRs > 0"
+        [class.down]="resultView().totals.optionNetRs < 0"
+      >
         <span
-          title="Option P&L after pnl-v3 fix: front-week OHLC only; stop/target ≈ 0.5× index; historical missing weeks = est. premium. Must not invent ₹28k on +24 index pts."
+          title="Front-week OHLC when available. All-est rows: equals Index ₹ proxy (pts × 65/30) — never invents far-week premium."
         >P&amp;L ₹ gross ({{ resultView().totals.lotsUsed }} lot{{ resultView().totals.lotsUsed > 1 ? 's' : '' }} · options)</span>
         <strong>{{ resultView().totals.optionNetRs > 0 ? '+' : '' }}{{ resultView().totals.optionNetRs | number: '1.2-2' }}</strong>
       </div>
       @if ((resultView().totals.premiumEstimatedCount ?? 0) > 0) {
         <div class="stat">
-          <span title="Trades priced with δ≈0.5 × index (no front-week option OHLC).">Est. premium rows</span>
+          <span title="No front-week option OHLC (or stop/target) — Option ₹ = Index ₹ proxy.">Est. premium rows</span>
           <strong
             >{{ resultView().totals.premiumEstimatedCount }} /
             {{ resultView().totals.trades }}</strong
