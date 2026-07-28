@@ -27,7 +27,11 @@ function niftySettings() {
     profitProtectEnabled: true,
     profitProtectArmR: 1,
     profitProtectLockR: 0,
-    extras: { profitLockArmRs: 1000, profitLockLockRs: 500 },
+    extras: {
+      profitLockArmRs: 1000,
+      profitLockLockRs: 500,
+      profitLockGivebackRs: 500,
+    },
   });
 }
 
@@ -39,8 +43,8 @@ function ctx(instrumentId = 'NIFTY 50') {
   } as Parameters<typeof srTrapExitLogic>[4];
 }
 
-describe('Trap profit drain floor', () => {
-  it('does not arm before ~₹1000 MFE (Nifty ≈15.4 pts)', () => {
+describe('Trap peak-trail drain (not wait until ₹0)', () => {
+  it('does not arm before ~₹1000 MFE', () => {
     const open: ManagedOpenPosition = {
       direction: 'BUY',
       entry: 25000,
@@ -54,7 +58,7 @@ describe('Trap profit drain floor', () => {
     expect(open.stop).toBe(24980);
   });
 
-  it('arms ₹500 lock floor once peak MFE ≥ ₹1000 and remembers peak across bars', () => {
+  it('peak ₹1400 → trail floor ~₹900 (not ₹0 or only ₹500)', () => {
     const open: ManagedOpenPosition = {
       direction: 'BUY',
       entry: 25000,
@@ -63,49 +67,41 @@ describe('Trap profit drain floor', () => {
       entryTime: '2026-07-28T10:00:00+05:30',
       peakMfePts: 0,
     };
-    // ₹1400 MFE ≈ 21.5 pts
-    const run = bar({ open: 25010, high: 25022, low: 25008, close: 25018 });
+    // 1400/65 ≈ 21.538 pts
+    const run = bar({ open: 25010, high: 25000 + 1400 / 65, low: 25008, close: 25018 });
     expect(armTrapProfitDrainFloor(run, open, niftySettings(), 'NIFTY 50')).toBe(true);
-    expect(open.stop).toBeCloseTo(25000 + 500 / 65, 5);
-    expect(open.peakMfePts).toBeGreaterThanOrEqual(21);
-
-    const pullback = bar({
-      date: '2026-07-28T10:05:00+05:30',
-      open: 25010,
-      high: 25012,
-      low: 25005,
-      close: 25006,
-    });
-    expect(armTrapProfitDrainFloor(pullback, open, niftySettings(), 'NIFTY 50')).toBe(true);
-    expect(open.stop).toBeCloseTo(25000 + 500 / 65, 5);
+    // floor = max(500, 1400-500) = 900
+    expect(open.stop).toBeCloseTo(25000 + 900 / 65, 5);
   });
 
-  it('exits at ₹500 lock (not ₹0) when profit drains after a ₹1k+ run', () => {
-    const lockPts = 500 / 65;
+  it('cuts at ~₹900 trail when +1400 starts draining — does not wait for flat', () => {
+    const floorPts = 900 / 65;
     const open: ManagedOpenPosition = {
       direction: 'BUY',
       entry: 25000,
       stop: 24980,
       target: 25070,
       entryTime: '2026-07-28T10:00:00+05:30',
-      peakMfePts: 22, // prior bar already printed ~₹1430
+      peakMfePts: 1400 / 65,
     };
-    // Drains through the lock toward a loss — must book ~₹500, not ride to −₹325
+    // Bar trades through the ₹900 floor toward flat — must exit at trail, not ₹0
     const drain = bar({
       date: '2026-07-28T10:20:00+05:30',
-      open: 25005,
-      high: 25006,
-      low: 24995,
-      close: 24995,
+      open: 25015,
+      high: 25016,
+      low: 25000 + floorPts - 1,
+      close: 25005,
     });
-    const exit = srTrapExitLogic(drain, open, [25000, 25018, 24995], niftySettings(), ctx());
+    const exit = srTrapExitLogic(drain, open, [25000, 25018, 25005], niftySettings(), ctx());
     expect(exit).not.toBeNull();
     expect(exit!.reason).toBe('Profit drained — cut & rehunt');
-    expect(exit!.exitPrice).toBeCloseTo(25000 + lockPts, 5);
-    expect(open.stop).toBeCloseTo(25000 + lockPts, 5);
+    expect(exit!.exitPrice).toBeCloseTo(25000 + floorPts, 5);
+    // Booked ~₹900, not ₹0
+    const bookedRs = (exit!.exitPrice - open.entry) * 65;
+    expect(bookedRs).toBeCloseTo(900, 0);
   });
 
-  it('SELL: same drain→rehunt after Bank ~₹1000 peak locks ₹500', () => {
+  it('SELL Bank: peak trail locks peak−giveback', () => {
     const open: ManagedOpenPosition = {
       direction: 'SELL',
       entry: 52000,
@@ -120,29 +116,16 @@ describe('Trap profit drain floor', () => {
       profitProtectEnabled: true,
       profitProtectArmR: 1,
       profitProtectLockR: 0,
-      extras: { profitLockArmRs: 1000, profitLockLockRs: 500 },
+      extras: {
+        profitLockArmRs: 1000,
+        profitLockLockRs: 500,
+        profitLockGivebackRs: 500,
+      },
     });
-    const lockPts = 500 / 30;
-    // Bank ₹/pt = 30 → arm ≈ 33.3 pts. Peak 35 pts = ₹1050
-    const run = bar({ open: 51980, high: 51990, low: 51965, close: 51970 });
+    // Peak 45 pts = ₹1350 → floor max(500, 1350-500)=850 → 850/30 pts
+    const peakPts = 45;
+    const run = bar({ open: 51980, high: 51990, low: 52000 - peakPts, close: 51970 });
     expect(armTrapProfitDrainFloor(run, open, settings, 'NIFTY BANK')).toBe(true);
-    expect(open.stop).toBeCloseTo(52000 - lockPts, 5);
-
-    const drain = bar({
-      date: '2026-07-28T11:15:00+05:30',
-      open: 51990,
-      high: 52010,
-      low: 51985,
-      close: 52008,
-    });
-    const exit = srTrapExitLogic(
-      drain,
-      open,
-      [52000, 51970, 52008],
-      settings,
-      ctx('NIFTY BANK'),
-    );
-    expect(exit?.reason).toBe('Profit drained — cut & rehunt');
-    expect(exit?.exitPrice).toBeCloseTo(52000 - lockPts, 5);
+    expect(open.stop).toBeCloseTo(52000 - 850 / 30, 5);
   });
 });

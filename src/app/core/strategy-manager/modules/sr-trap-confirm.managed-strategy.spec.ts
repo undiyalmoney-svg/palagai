@@ -15,6 +15,7 @@ describe('SrTrapConfirmManagedStrategy', () => {
     expect(s.getSettings().profitProtectLockR).toBe(0);
     expect(s.getSettings().extras['profitLockArmRs']).toBe(1000);
     expect(s.getSettings().extras['profitLockLockRs']).toBe(500);
+    expect(s.getSettings().extras['profitLockGivebackRs']).toBe(500);
     expect(s.supports).toContain('nifty');
     expect(s.supports).toContain('bank');
     expect(DEFAULT_CHANNEL_ASSIGNMENTS.nifty.paper).toBe(MANAGED_STRATEGY_IDS.SR_TRAP_CONFIRM);

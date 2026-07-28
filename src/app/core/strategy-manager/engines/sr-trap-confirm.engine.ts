@@ -281,7 +281,7 @@ export function srTrapExitLogic(
   settings: StrategySettings,
   ctx: StrategyContext,
 ): ManagedExitDecision | null {
-  // After a real green run (~₹1k+), lock ~₹500 floor + cut if profit drains → rehunt.
+  // After a real green run (~₹1k+), trail from peak (max ~₹500 giveback) → cut & rehunt.
   const armed = armTrapProfitDrainFloor(candle, open, settings, ctx.instrumentId ?? '');
   const exit = indexRuleExitLogic(
     candle,
@@ -292,7 +292,6 @@ export function srTrapExitLogic(
     seriesAt(ctx),
   );
   if (exit) {
-    // Relabel lock-floor stop-outs after a green run so the book shows drain→rehunt.
     if (armed && exit.reason === 'Stop loss hit') {
       return { ...exit, reason: 'Profit drained — cut & rehunt' };
     }
@@ -301,16 +300,13 @@ export function srTrapExitLogic(
   if (!armed) {
     return null;
   }
+  // Close has fallen through the peak-trail floor (stop already ratcheted).
   const closePts =
     open.direction === 'BUY' ? candle.close - open.entry : open.entry - candle.close;
-  const x = settings.extras ?? {};
-  const lockRs = typeof x['profitLockLockRs'] === 'number' ? x['profitLockLockRs'] : 500;
-  const rs = /bank/i.test(ctx.instrumentId ?? '') ? 30 : 65;
-  const lockPts = Math.max(0, lockRs / rs);
-  // Still open but close has drained back to/through the lock floor → cut & rehunt.
-  if (closePts <= lockPts) {
+  const stopPts = Math.abs(open.stop - open.entry);
+  if (closePts <= stopPts) {
     return {
-      exitPrice: open.direction === 'BUY' ? open.entry + lockPts : open.entry - lockPts,
+      exitPrice: open.stop,
       reason: 'Profit drained — cut & rehunt',
     };
   }
@@ -318,11 +314,10 @@ export function srTrapExitLogic(
 }
 
 /**
- * User rule: Trap often prints ~₹1k–1.4k then gives it all back (even to a loss).
- * After peak MFE ≥ armRs:
- *  1) ratchet stop to lock at least lockRs (default ₹500) — cut is not a ₹0 scratch
- *  2) BE floor at minimum so a drained winner cannot become −₹
- * Returns true when the drain floor is armed on this bar (peak already reached arm).
+ * User rule: sitting +₹1400 → ₹0 is not valid.
+ * After peak MFE ≥ armRs, trail stop from peak:
+ *   floorRs = max(lockRs, peakRs − givebackRs)
+ * So peak ₹1400 + giveback ₹500 → lock ~₹900 (not wait until flat).
  */
 export function armTrapProfitDrainFloor(
   candle: Candle,
@@ -333,12 +328,13 @@ export function armTrapProfitDrainFloor(
   const x = settings.extras ?? {};
   const armRs = typeof x['profitLockArmRs'] === 'number' ? x['profitLockArmRs'] : 1000;
   const lockRs = typeof x['profitLockLockRs'] === 'number' ? x['profitLockLockRs'] : 500;
+  const givebackRs =
+    typeof x['profitLockGivebackRs'] === 'number' ? x['profitLockGivebackRs'] : 500;
   if (!(armRs > 0)) {
     return false;
   }
   const rs = /bank/i.test(instrumentId) ? 30 : 65;
   const armPts = armRs / rs;
-  const lockPts = Math.max(0, lockRs / rs);
 
   const barMfe =
     open.direction === 'BUY' ? candle.high - open.entry : open.entry - candle.low;
@@ -349,14 +345,18 @@ export function armTrapProfitDrainFloor(
     return false;
   }
 
-  // Armed: keep at least lockRs of the run (never loosen; never allow −₹).
+  const peakRs = peak * rs;
+  const floorRs = Math.max(lockRs, peakRs - Math.max(0, givebackRs));
+  const floorPts = floorRs / rs;
+
+  // Armed: ratchet stop to peak-trail floor (never loosen).
   if (open.direction === 'BUY') {
-    const lockStop = open.entry + lockPts;
+    const lockStop = open.entry + floorPts;
     if (lockStop > open.stop) {
       open.stop = lockStop;
     }
   } else {
-    const lockStop = open.entry - lockPts;
+    const lockStop = open.entry - floorPts;
     if (lockStop < open.stop) {
       open.stop = lockStop;
     }

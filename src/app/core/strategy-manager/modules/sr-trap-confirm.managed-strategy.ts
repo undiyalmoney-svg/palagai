@@ -32,7 +32,7 @@ export class SrTrapConfirmManagedStrategy implements IManagedStrategy {
   readonly name = 'Trap';
   readonly version = '1.0.0';
   readonly description =
-    'Default · liquidity trap + next-bar confirm · 3.5R · ₹1k→lock ₹500 drain cut · ≤3 trades/day.';
+    'Default · liquidity trap + next-bar confirm · 3.5R · peak-trail ₹500 giveback · ≤3 trades/day.';
   readonly supports: readonly DeskChannel[] = ['nifty', 'bank'];
 
   readonly defaultSettings = defaultStrategySettings({
@@ -61,9 +61,13 @@ export class SrTrapConfirmManagedStrategy implements IManagedStrategy {
       maxRiskPts: 28,
       slPadPts: 2,
       minConfirmBody: 0,
-      /** After peak MFE ≥ ₹1000, lock ≥ ₹500 then cut & rehunt if drained. */
+      /**
+       * After peak MFE ≥ ₹1000, trail from peak (allow ≤ ₹500 giveback).
+       * Floor never below ₹500. Peak ₹1400 → lock ~₹900 — do not wait until ₹0.
+       */
       profitLockArmRs: 1000,
       profitLockLockRs: 500,
+      profitLockGivebackRs: 500,
     },
   });
 
