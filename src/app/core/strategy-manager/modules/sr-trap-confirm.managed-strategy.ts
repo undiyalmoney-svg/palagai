@@ -61,6 +61,9 @@ export class SrTrapConfirmManagedStrategy implements IManagedStrategy {
       maxRiskPts: 28,
       slPadPts: 2,
       minConfirmBody: 0,
+      /** Once MFE ≥ ₹1000, lock ≥ ₹500 (stops today's giveback pattern). */
+      profitLockArmRs: 1000,
+      profitLockLockRs: 500,
     },
   });
 

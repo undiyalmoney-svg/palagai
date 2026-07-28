@@ -281,6 +281,8 @@ export function srTrapExitLogic(
   settings: StrategySettings,
   ctx: StrategyContext,
 ): ManagedExitDecision | null {
+  // Doc 34 / live giveback: once MFE ≥ ₹1000, lock ≥ ₹500 so long holds don't erase winners.
+  applyTrapMoneyProfitLock(candle, open, settings, ctx.instrumentId ?? '');
   return indexRuleExitLogic(
     candle,
     open,
@@ -289,4 +291,39 @@ export function srTrapExitLogic(
     { entry: 'swing', bias: 'ema', exit: 'eod' },
     seriesAt(ctx),
   );
+}
+
+/** When index MFE reaches armRs, ratchet stop to lock at least lockRs (never loosen). */
+export function applyTrapMoneyProfitLock(
+  candle: Candle,
+  open: ManagedOpenPosition,
+  settings: StrategySettings,
+  instrumentId: string,
+): void {
+  const x = settings.extras ?? {};
+  const armRs = typeof x['profitLockArmRs'] === 'number' ? x['profitLockArmRs'] : 1000;
+  const lockRs = typeof x['profitLockLockRs'] === 'number' ? x['profitLockLockRs'] : 500;
+  if (!(armRs > 0) || lockRs < 0) {
+    return;
+  }
+  const rs = /bank/i.test(instrumentId) ? 30 : 65;
+  const armPts = armRs / rs;
+  const lockPts = lockRs / rs;
+  if (open.direction === 'BUY') {
+    const mfe = candle.high - open.entry;
+    if (mfe >= armPts) {
+      const lockStop = open.entry + lockPts;
+      if (lockStop > open.stop) {
+        open.stop = lockStop;
+      }
+    }
+  } else {
+    const mfe = open.entry - candle.low;
+    if (mfe >= armPts) {
+      const lockStop = open.entry - lockPts;
+      if (lockStop < open.stop) {
+        open.stop = lockStop;
+      }
+    }
+  }
 }
