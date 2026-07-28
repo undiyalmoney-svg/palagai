@@ -27,7 +27,7 @@ function niftySettings() {
     profitProtectEnabled: true,
     profitProtectArmR: 1,
     profitProtectLockR: 0,
-    extras: { profitLockArmRs: 1000 },
+    extras: { profitLockArmRs: 1000, profitLockLockRs: 500 },
   });
 }
 
@@ -49,13 +49,12 @@ describe('Trap profit drain floor', () => {
       entryTime: '2026-07-28T10:00:00+05:30',
       peakMfePts: 0,
     };
-    // ₹650 MFE = 10 pts — below arm
     const candle = bar({ open: 25005, high: 25010, low: 25000, close: 25008 });
     expect(armTrapProfitDrainFloor(candle, open, niftySettings(), 'NIFTY 50')).toBe(false);
     expect(open.stop).toBe(24980);
   });
 
-  it('arms BE floor once peak MFE ≥ ₹1000 and remembers peak across bars', () => {
+  it('arms ₹500 lock floor once peak MFE ≥ ₹1000 and remembers peak across bars', () => {
     const open: ManagedOpenPosition = {
       direction: 'BUY',
       entry: 25000,
@@ -67,10 +66,9 @@ describe('Trap profit drain floor', () => {
     // ₹1400 MFE ≈ 21.5 pts
     const run = bar({ open: 25010, high: 25022, low: 25008, close: 25018 });
     expect(armTrapProfitDrainFloor(run, open, niftySettings(), 'NIFTY 50')).toBe(true);
-    expect(open.stop).toBe(25000);
+    expect(open.stop).toBeCloseTo(25000 + 500 / 65, 5);
     expect(open.peakMfePts).toBeGreaterThanOrEqual(21);
 
-    // Later bar still green but smaller MFE — floor stays armed via peak
     const pullback = bar({
       date: '2026-07-28T10:05:00+05:30',
       open: 25010,
@@ -79,10 +77,11 @@ describe('Trap profit drain floor', () => {
       close: 25006,
     });
     expect(armTrapProfitDrainFloor(pullback, open, niftySettings(), 'NIFTY 50')).toBe(true);
-    expect(open.stop).toBe(25000);
+    expect(open.stop).toBeCloseTo(25000 + 500 / 65, 5);
   });
 
-  it('exits with drain reason when price revisits BE after a ₹1k+ run (user giveback case)', () => {
+  it('exits at ₹500 lock (not ₹0) when profit drains after a ₹1k+ run', () => {
+    const lockPts = 500 / 65;
     const open: ManagedOpenPosition = {
       direction: 'BUY',
       entry: 25000,
@@ -91,7 +90,7 @@ describe('Trap profit drain floor', () => {
       entryTime: '2026-07-28T10:00:00+05:30',
       peakMfePts: 22, // prior bar already printed ~₹1430
     };
-    // Drains through entry toward a loss — must not ride to −₹325
+    // Drains through the lock toward a loss — must book ~₹500, not ride to −₹325
     const drain = bar({
       date: '2026-07-28T10:20:00+05:30',
       open: 25005,
@@ -102,11 +101,11 @@ describe('Trap profit drain floor', () => {
     const exit = srTrapExitLogic(drain, open, [25000, 25018, 24995], niftySettings(), ctx());
     expect(exit).not.toBeNull();
     expect(exit!.reason).toBe('Profit drained — cut & rehunt');
-    expect(exit!.exitPrice).toBe(25000); // BE stop, not the −₹ close
-    expect(open.stop).toBe(25000);
+    expect(exit!.exitPrice).toBeCloseTo(25000 + lockPts, 5);
+    expect(open.stop).toBeCloseTo(25000 + lockPts, 5);
   });
 
-  it('SELL: same drain→rehunt after Bank ~₹1000 peak', () => {
+  it('SELL: same drain→rehunt after Bank ~₹1000 peak locks ₹500', () => {
     const open: ManagedOpenPosition = {
       direction: 'SELL',
       entry: 52000,
@@ -121,12 +120,13 @@ describe('Trap profit drain floor', () => {
       profitProtectEnabled: true,
       profitProtectArmR: 1,
       profitProtectLockR: 0,
-      extras: { profitLockArmRs: 1000 },
+      extras: { profitLockArmRs: 1000, profitLockLockRs: 500 },
     });
+    const lockPts = 500 / 30;
     // Bank ₹/pt = 30 → arm ≈ 33.3 pts. Peak 35 pts = ₹1050
     const run = bar({ open: 51980, high: 51990, low: 51965, close: 51970 });
     expect(armTrapProfitDrainFloor(run, open, settings, 'NIFTY BANK')).toBe(true);
-    expect(open.stop).toBe(52000);
+    expect(open.stop).toBeCloseTo(52000 - lockPts, 5);
 
     const drain = bar({
       date: '2026-07-28T11:15:00+05:30',
@@ -143,6 +143,6 @@ describe('Trap profit drain floor', () => {
       ctx('NIFTY BANK'),
     );
     expect(exit?.reason).toBe('Profit drained — cut & rehunt');
-    expect(exit?.exitPrice).toBe(52000);
+    expect(exit?.exitPrice).toBeCloseTo(52000 - lockPts, 5);
   });
 });

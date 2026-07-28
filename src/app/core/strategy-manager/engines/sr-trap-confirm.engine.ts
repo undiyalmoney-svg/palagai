@@ -281,7 +281,7 @@ export function srTrapExitLogic(
   settings: StrategySettings,
   ctx: StrategyContext,
 ): ManagedExitDecision | null {
-  // After a real green run (~₹1k+), BE floor + cut if profit drains → free slot for next setup.
+  // After a real green run (~₹1k+), lock ~₹500 floor + cut if profit drains → rehunt.
   const armed = armTrapProfitDrainFloor(candle, open, settings, ctx.instrumentId ?? '');
   const exit = indexRuleExitLogic(
     candle,
@@ -292,7 +292,7 @@ export function srTrapExitLogic(
     seriesAt(ctx),
   );
   if (exit) {
-    // Relabel BE stop-outs after a green run so the book shows drain→rehunt, not a "normal" SL.
+    // Relabel lock-floor stop-outs after a green run so the book shows drain→rehunt.
     if (armed && exit.reason === 'Stop loss hit') {
       return { ...exit, reason: 'Profit drained — cut & rehunt' };
     }
@@ -303,10 +303,14 @@ export function srTrapExitLogic(
   }
   const closePts =
     open.direction === 'BUY' ? candle.close - open.entry : open.entry - candle.close;
-  // Still open but close is flat/red after the run → cut & look for next opportunity.
-  if (closePts <= 0) {
+  const x = settings.extras ?? {};
+  const lockRs = typeof x['profitLockLockRs'] === 'number' ? x['profitLockLockRs'] : 500;
+  const rs = /bank/i.test(ctx.instrumentId ?? '') ? 30 : 65;
+  const lockPts = Math.max(0, lockRs / rs);
+  // Still open but close has drained back to/through the lock floor → cut & rehunt.
+  if (closePts <= lockPts) {
     return {
-      exitPrice: candle.close,
+      exitPrice: open.direction === 'BUY' ? open.entry + lockPts : open.entry - lockPts,
       reason: 'Profit drained — cut & rehunt',
     };
   }
@@ -315,7 +319,9 @@ export function srTrapExitLogic(
 
 /**
  * User rule: Trap often prints ~₹1k–1.4k then gives it all back (even to a loss).
- * After peak MFE ≥ armRs → ratchet stop to break-even so a drained winner cannot become −₹.
+ * After peak MFE ≥ armRs:
+ *  1) ratchet stop to lock at least lockRs (default ₹500) — cut is not a ₹0 scratch
+ *  2) BE floor at minimum so a drained winner cannot become −₹
  * Returns true when the drain floor is armed on this bar (peak already reached arm).
  */
 export function armTrapProfitDrainFloor(
@@ -326,11 +332,13 @@ export function armTrapProfitDrainFloor(
 ): boolean {
   const x = settings.extras ?? {};
   const armRs = typeof x['profitLockArmRs'] === 'number' ? x['profitLockArmRs'] : 1000;
+  const lockRs = typeof x['profitLockLockRs'] === 'number' ? x['profitLockLockRs'] : 500;
   if (!(armRs > 0)) {
     return false;
   }
   const rs = /bank/i.test(instrumentId) ? 30 : 65;
   const armPts = armRs / rs;
+  const lockPts = Math.max(0, lockRs / rs);
 
   const barMfe =
     open.direction === 'BUY' ? candle.high - open.entry : open.entry - candle.low;
@@ -341,13 +349,17 @@ export function armTrapProfitDrainFloor(
     return false;
   }
 
-  // Armed: never let a drained winner become a loser — BE floor.
+  // Armed: keep at least lockRs of the run (never loosen; never allow −₹).
   if (open.direction === 'BUY') {
-    if (open.entry > open.stop) {
-      open.stop = open.entry;
+    const lockStop = open.entry + lockPts;
+    if (lockStop > open.stop) {
+      open.stop = lockStop;
     }
-  } else if (open.entry < open.stop) {
-    open.stop = open.entry;
+  } else {
+    const lockStop = open.entry - lockPts;
+    if (lockStop < open.stop) {
+      open.stop = lockStop;
+    }
   }
   return true;
 }

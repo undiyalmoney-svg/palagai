@@ -599,6 +599,9 @@ export function replayPaperOnIndex(params: {
         dayNetByDate[day] = (dayNetByDate[day] ?? 0) + closed.indexPoints;
         open = null;
         lastSignal = `Closed: ${exit.reason}`;
+      } else if (enableKutty && !kuttyAlone && !isKutty) {
+        // Trap/Strat still holds the only slot — Kutty cannot enter this index.
+        lastSignal = `Strat in trade — Kutty waits for free slot`;
       }
       if (open || !deferredPrimary) {
         continue;
@@ -655,6 +658,7 @@ export function replayPaperOnIndex(params: {
           entryStrategyName = KUTTY_NAME;
           lastSignal = kSig.reason;
         } else {
+          lastSignal = kSig.reason;
           continue;
         }
       } else {
