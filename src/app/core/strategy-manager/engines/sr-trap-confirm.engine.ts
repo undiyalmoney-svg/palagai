@@ -49,8 +49,9 @@ export function recordSrTrapTradeClosed(
   state: SrTrapDayState,
   points: number,
   dayStopPts: number,
+  dayProfitLockPts = 0,
 ): void {
-  recordRuleTradeClosed(state, points, dayStopPts);
+  recordRuleTradeClosed(state, points, dayStopPts, dayProfitLockPts);
 }
 
 function num(v: unknown, fallback: number): number {

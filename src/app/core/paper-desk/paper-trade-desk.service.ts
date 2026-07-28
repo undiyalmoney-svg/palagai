@@ -38,7 +38,7 @@ import { applyKiteFillPnl } from './apply-kite-fill-pnl';
 import { enrichTradesWithCharges } from './trade-charges.util';
 import { buildPaperDeskDayStats, emptyPaperDeskDayStats } from './paper-desk-day-stats';
 import { MAX_OPTION_HISTORY_TOKENS, rankTokensByFrequency } from './option-history-tokens.util';
-import { PDHL_RUPEES_PER_POINT, buildDeskRiskOverrides, rupeesPerPointForInstrument } from '../strategy-engine/strategies/pdhl-opening-range/pdhl-opening-range.evaluator';
+import { PDHL_RUPEES_PER_POINT, buildDeskRiskOverrides, buildIndexDeskRiskSettings, rupeesPerPointForInstrument } from '../strategy-engine/strategies/pdhl-opening-range/pdhl-opening-range.evaluator';
 import { StrategyManagerService } from '../strategy-manager/runtime/strategy-manager.service';
 import { StrategyEventLogger } from '../strategy-manager/runtime/strategy-event-logger.service';
 import { ShadowBookService } from '../strategy-manager/runtime/shadow-book.service';
@@ -210,15 +210,23 @@ export class PaperTradeDeskService {
     return kind === 'nifty' ? 'nifty' : 'bank';
   }
 
-  /** Resolve Strategy Manager primary (+ hydrate Champion desk risk overrides). */
+  /** Resolve Strategy Manager primary + apply desk risk to Champion and Trap/index DNA. */
   private resolveDeskStrategy(kind: IndexOptionKind, mode: 'paper' | 'live') {
     const channel = this.channelForKind(kind);
-    this.strategyManager.applyChampionDeskOverrides(
-      this.pdhlOverridesFor(
-        kind === 'nifty' ? NIFTY_50_INSTRUMENT.id : BANK_NIFTY_INSTRUMENT.id,
-      ) ?? null,
-    );
+    const instrumentId = kind === 'nifty' ? NIFTY_50_INSTRUMENT.id : BANK_NIFTY_INSTRUMENT.id;
+    const pdhl = this.pdhlOverridesFor(instrumentId);
+    this.strategyManager.applyChampionDeskOverrides(pdhl ?? null);
     const resolved = this.strategyManager.resolve(channel, mode);
+    this.strategyManager.applyIndexDeskRiskSettings(
+      resolved.primary,
+      buildIndexDeskRiskSettings({
+        instrumentId,
+        enableNifty: this.deskRunOptions.enableNifty,
+        enableBank: this.deskRunOptions.enableBank,
+        strictDayStop: this.deskRunOptions.strictDayStop,
+        dayProfitLock: this.deskRunOptions.dayProfitLock,
+      }),
+    );
     return resolved;
   }
 

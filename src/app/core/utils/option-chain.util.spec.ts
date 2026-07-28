@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { Instrument } from '../models/instrument.model';
 import {
+  isCurrentWeeklyExpiryDay,
   isFrontWeeklyExpiry,
   nextWeeklyExpiryDate,
   resolveAtmWeeklyOption,
+  shouldRollWeeklyExpiry,
 } from './option-chain.util';
 
 function opt(partial: Partial<Instrument> & Pick<Instrument, 'tradingSymbol' | 'expiry' | 'strike'>): Instrument {
@@ -32,6 +34,36 @@ describe('isFrontWeeklyExpiry', () => {
     expect(isFrontWeeklyExpiry(asOfDay, expected, false)).toBe(true);
     const far = new Date('2026-07-30T00:00:00');
     expect(isFrontWeeklyExpiry(asOfDay, far, false)).toBe(false);
+  });
+});
+
+describe('shouldRollWeeklyExpiry', () => {
+  it('rolls all day on Thursday expiry (morning), not only after 13:00', () => {
+    const thuMorning = new Date('2026-07-02T10:00:00+05:30');
+    expect(
+      shouldRollWeeklyExpiry({ asOf: thuMorning, instruments: [], kind: 'nifty' }),
+    ).toBe(true);
+    const next = nextWeeklyExpiryDate(thuMorning, true);
+    expect(next.toISOString().slice(0, 10)).toBe('2026-07-09');
+  });
+
+  it('does not roll on a normal Monday morning', () => {
+    const mon = new Date('2026-07-27T10:00:00+05:30');
+    expect(shouldRollWeeklyExpiry({ asOf: mon, instruments: [], kind: 'nifty' })).toBe(false);
+  });
+
+  it('rolls on holiday-shifted expiry when chain lists today', () => {
+    const wed = new Date('2026-07-01T10:00:00+05:30'); // Wed
+    const chain = [
+      opt({
+        instrumentToken: 1,
+        tradingSymbol: 'NIFTY2570124500CE',
+        expiry: '2026-07-01',
+        strike: 24500,
+      }),
+    ];
+    expect(isCurrentWeeklyExpiryDay(wed, chain, 'nifty')).toBe(true);
+    expect(shouldRollWeeklyExpiry({ asOf: wed, instruments: chain, kind: 'nifty' })).toBe(true);
   });
 });
 

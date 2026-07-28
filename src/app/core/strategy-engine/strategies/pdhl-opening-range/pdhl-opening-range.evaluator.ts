@@ -227,6 +227,28 @@ export function buildDeskRiskOverrides(options: {
   return overrides;
 }
 
+/** Desk checkboxes → Trap / Donch / Genie dayStopPts + dayProfitLockPts (ephemeral run patch). */
+export function buildIndexDeskRiskSettings(options: {
+  instrumentId: string;
+  enableNifty: boolean;
+  enableBank: boolean;
+  strictDayStop: boolean;
+  dayProfitLock: boolean;
+}): { dayStopPts?: number; dayProfitLockPts?: number } | undefined {
+  const o = buildDeskRiskOverrides(options);
+  if (!o) {
+    return undefined;
+  }
+  const out: { dayStopPts?: number; dayProfitLockPts?: number } = {};
+  if (o.dailyMaxLossPts != null) {
+    out.dayStopPts = o.dailyMaxLossPts;
+  }
+  if (o.dailyProfitLockPts != null) {
+    out.dayProfitLockPts = o.dailyProfitLockPts;
+  }
+  return out;
+}
+
 export function recordPdhlTradeClosed(
   state: PdhlOrState,
   points: number,

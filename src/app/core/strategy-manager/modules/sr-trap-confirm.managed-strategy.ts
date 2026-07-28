@@ -23,8 +23,8 @@ import {
 } from '../engines/sr-trap-confirm.engine';
 
 /**
- * S/R Trap + Confirm — research max-earn book (doc 31). Selectable (Donch is indices default).
- * OOS ~₹1,049–1,109/day vs GENIE ~₹523 (index pts × lot proxy).
+ * S/R Trap + Confirm — research max-earn book (doc 31/33). Default Nifty/Bank Paper+Live.
+ * Profit protect 1R→BE (doc 33 giveback fix). OOS ~₹1,049–1,464/day index proxy.
  */
 @Injectable({ providedIn: 'root' })
 export class SrTrapConfirmManagedStrategy implements IManagedStrategy {
@@ -32,7 +32,7 @@ export class SrTrapConfirmManagedStrategy implements IManagedStrategy {
   readonly name = 'Trap';
   readonly version = '1.0.0';
   readonly description =
-    'Selectable · liquidity trap + next-bar confirm · 3.5R · ≤3 trades/day.';
+    'Default · liquidity trap + next-bar confirm · 3.5R · 1R→BE protect · ≤3 trades/day.';
   readonly supports: readonly DeskChannel[] = ['nifty', 'bank'];
 
   readonly defaultSettings = defaultStrategySettings({
@@ -46,8 +46,11 @@ export class SrTrapConfirmManagedStrategy implements IManagedStrategy {
     maxTradesPerDay: 3,
     instrumentType: 'futures',
     dayStopPts: 80,
+    dayProfitLockPts: 0,
     targetRMultiple: 3.5,
-    profitProtectEnabled: false,
+    profitProtectEnabled: true,
+    profitProtectArmR: 1,
+    profitProtectLockR: 0,
     regimeFilterEnabled: false,
     positionSizeLots: 1,
     extras: {
@@ -124,7 +127,12 @@ export class SrTrapConfirmManagedStrategy implements IManagedStrategy {
   }
 
   onTradeClosed(points: number): void {
-    recordSrTrapTradeClosed(this.state, points, this.settings.dayStopPts);
+    recordSrTrapTradeClosed(
+      this.state,
+      points,
+      this.settings.dayStopPts,
+      this.settings.dayProfitLockPts ?? 0,
+    );
   }
 
   getSettings(): StrategySettings {

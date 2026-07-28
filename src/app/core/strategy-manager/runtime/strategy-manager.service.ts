@@ -107,9 +107,29 @@ export class StrategyManagerService {
     };
   }
 
-  /** Apply Trade Desk risk checkboxes onto Champion only (additive). */
+  /** Apply Trade Desk risk checkboxes onto Champion (PDHL params) and/or index DNA settings. */
   applyChampionDeskOverrides(overrides: Partial<PdhlOrParams> | null): void {
     this.champion.setPdhlDeskOverrides(overrides);
+  }
+
+  /** Ephemeral desk day-stop / profit-lock onto the resolved primary (Trap/Donch/Genie). */
+  applyIndexDeskRiskSettings(
+    primary: IManagedStrategy,
+    settings: { dayStopPts?: number; dayProfitLockPts?: number } | null | undefined,
+  ): void {
+    if (!settings) {
+      return;
+    }
+    const patch: Partial<StrategySettings> = {};
+    if (settings.dayStopPts != null) {
+      patch.dayStopPts = settings.dayStopPts;
+    }
+    if (settings.dayProfitLockPts != null) {
+      patch.dayProfitLockPts = settings.dayProfitLockPts;
+    }
+    if (Object.keys(patch).length) {
+      primary.updateSettings(patch);
+    }
   }
 
   updateSettings(strategyId: string, partial: Partial<StrategySettings>): void {

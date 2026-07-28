@@ -102,7 +102,12 @@ export abstract class BaseIndexRuleStrategy implements IManagedStrategy {
   }
 
   onTradeClosed(points: number): void {
-    recordRuleTradeClosed(this.state, points, this.settings.dayStopPts);
+    recordRuleTradeClosed(
+      this.state,
+      points,
+      this.settings.dayStopPts,
+      this.settings.dayProfitLockPts ?? 0,
+    );
   }
 
   getSettings(): StrategySettings {

@@ -71,6 +71,55 @@ export function nextWeeklyExpiryDate(asOf: Date, rollSameDay: boolean): Date {
   return exp;
 }
 
+/**
+ * True when asOf is the current weekly expiry day for this index.
+ * Prefer chain evidence (holiday-shifted Wed/Fri); fall back to calendar Thursday.
+ */
+export function isCurrentWeeklyExpiryDay(
+  asOfDay: Date,
+  instruments: Instrument[],
+  kind: IndexOptionKind,
+): boolean {
+  const day = startOfDay(asOfDay);
+  const expiresToday = instruments.some((item) => {
+    if (!isIndexOption(item, kind)) {
+      return false;
+    }
+    if (item.instrumentType !== 'CE' && item.instrumentType !== 'PE') {
+      return false;
+    }
+    const exp = parseExpiry(item.expiry);
+    return exp != null && exp.getTime() === day.getTime();
+  });
+  if (expiresToday) {
+    return true;
+  }
+  // Synthetic / empty chain — NSE weekly is Thursday.
+  return day.getDay() === 4;
+}
+
+/**
+ * Never trade the current expiry contract on expiry day — always next weekly.
+ * Also rolls after 13:00 IST as a legacy safety net when chain is incomplete.
+ */
+export function shouldRollWeeklyExpiry(params: {
+  asOf: Date;
+  instruments: Instrument[];
+  kind: IndexOptionKind;
+}): boolean {
+  const asOfDay = startOfDay(params.asOf);
+  if (isCurrentWeeklyExpiryDay(asOfDay, params.instruments, params.kind)) {
+    return true;
+  }
+  const hhmm = params.asOf.toLocaleTimeString('en-IN', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    timeZone: 'Asia/Kolkata',
+  });
+  return hhmm >= '13:00';
+}
+
 function formatExpiryIso(d: Date): string {
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -95,25 +144,21 @@ export function buildSyntheticAtmOption(params: {
   direction: 'BUY' | 'SELL';
   spot: number;
   asOfDateTime: string;
+  /** Optional chain — used to detect holiday-shifted expiry day. */
+  instruments?: Instrument[];
 }): Instrument {
   const asOf = new Date(
     params.asOfDateTime.includes('T')
       ? params.asOfDateTime
       : params.asOfDateTime.replace(' ', 'T'),
   );
-  const hhmm = Number.isNaN(asOf.getTime())
-    ? '10:00'
-    : asOf.toLocaleTimeString('en-IN', {
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false,
-        timeZone: 'Asia/Kolkata',
-      });
-  const rollSameDay = hhmm >= '13:00';
-  const exp = nextWeeklyExpiryDate(
-    Number.isNaN(asOf.getTime()) ? new Date() : asOf,
-    rollSameDay,
-  );
+  const asOfSafe = Number.isNaN(asOf.getTime()) ? new Date() : asOf;
+  const rollSameDay = shouldRollWeeklyExpiry({
+    asOf: asOfSafe,
+    instruments: params.instruments ?? [],
+    kind: params.kind,
+  });
+  const exp = nextWeeklyExpiryDate(asOfSafe, rollSameDay);
   const name = optionName(params.kind);
   const optType = params.direction === 'BUY' ? 'CE' : 'PE';
   const strike = roundAtmStrike(params.spot, params.kind);
@@ -188,13 +233,11 @@ export function resolveAtmWeeklyOption(params: {
   }
 
   const asOfDay = startOfDay(asOf);
-  const hhmm = asOf.toLocaleTimeString('en-IN', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-    timeZone: 'Asia/Kolkata',
+  const rollSameDay = shouldRollWeeklyExpiry({
+    asOf,
+    instruments,
+    kind,
   });
-  const rollSameDay = hhmm >= '13:00';
   const optType = direction === 'BUY' ? 'CE' : 'PE';
   const strike = roundAtmStrike(spot, kind);
   const step = strikeStep(kind);
@@ -234,7 +277,7 @@ export function resolveAtmWeeklyOption(params: {
   }
 
   // Historical / missing week: synthetic + δ estimate in paper desk (do NOT use far live week).
-  const synthetic = buildSyntheticAtmOption(params);
+  const synthetic = buildSyntheticAtmOption({ ...params, instruments });
   synthetic.tradingSymbol = `${optionName(kind)} ATM ${strike} ${optType} · week ${formatExpiryLabel(expected)}`;
   return { instrument: synthetic, source: 'synthetic' };
 }

@@ -35,6 +35,11 @@ export interface StrategySettings {
   instrumentType: 'index' | 'futures' | 'options' | 'equity';
   /** Day stop in points (0 = disabled). */
   dayStopPts: number;
+  /**
+   * Day profit lock in points (0 = disabled).
+   * When day net ≥ this, stop new entries (Trade Desk checkbox can override).
+   */
+  dayProfitLockPts: number;
   /** Target R-multiple (0 = no fixed target / EOD strategies). */
   targetRMultiple: number;
   /**
@@ -79,6 +84,7 @@ export function defaultStrategySettings(
     riskPercent: 1,
     instrumentType: 'index',
     dayStopPts: 60,
+    dayProfitLockPts: 0,
     targetRMultiple: 0,
     profitProtectEnabled: false,
     profitProtectArmR: 1,

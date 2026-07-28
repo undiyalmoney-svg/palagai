@@ -7,7 +7,7 @@ export const MANAGED_STRATEGY_IDS = {
   DONCHIAN_55_TURTLE: 'donchian-55-turtle',
   /** Daily-consistency search: max green-day share (not default — fat tails). */
   INSIDE_BREAK: 'inside-break-eod',
-  /** Donch-20 retest + OR-mid + Swing-5 structure trail — **default Nifty/Bank**. */
+  /** Donch-20 retest + OR-mid + Swing-5 structure trail — selectable. */
   DONCH_RETEST_OR_MID_2R: 'donch-retest-or-mid-2r',
   /** S/R retest twin: Swing-5 retest + EMA50 + 2R. */
   SWING_RETEST_EMA50_2R: 'swing-retest-ema50-2r',
@@ -23,7 +23,7 @@ export const MANAGED_STRATEGY_IDS = {
   ALIGN_COMBO_GENIE: 'align-combo-genie',
   /**
    * S/R Trap + Confirm — liquidity sweep at swing S/R + next-bar confirm · 3.5R.
-   * Selectable (was prior indices default).
+   * **Default Nifty/Bank** Paper+Live (doc 33 RCA).
    */
   SR_TRAP_CONFIRM: 'sr-trap-confirm',
   /** Stocks Desk champion — gap-up fade ₹500 book. */
@@ -35,18 +35,18 @@ export type ManagedStrategyId =
 
 /**
  * Research-backed defaults:
- * - Nifty/Bank: Donch Retest (≤2t · tight SL/day stop · 2026 YTD Index ₹ leader)
+ * - Nifty/Bank: Trap (doc 31/33 · confirm edge · 3.5R · profit protect 1R→BE)
  * - Stocks: GAP_FADE_500 (same DNA as Stocks Desk)
  */
 export const DEFAULT_CHANNEL_ASSIGNMENTS = {
   nifty: {
-    paper: MANAGED_STRATEGY_IDS.DONCH_RETEST_OR_MID_2R,
-    live: MANAGED_STRATEGY_IDS.DONCH_RETEST_OR_MID_2R,
+    paper: MANAGED_STRATEGY_IDS.SR_TRAP_CONFIRM,
+    live: MANAGED_STRATEGY_IDS.SR_TRAP_CONFIRM,
     shadow: null as string | null,
   },
   bank: {
-    paper: MANAGED_STRATEGY_IDS.DONCH_RETEST_OR_MID_2R,
-    live: MANAGED_STRATEGY_IDS.DONCH_RETEST_OR_MID_2R,
+    paper: MANAGED_STRATEGY_IDS.SR_TRAP_CONFIRM,
+    live: MANAGED_STRATEGY_IDS.SR_TRAP_CONFIRM,
     shadow: null as string | null,
   },
   stocks: {

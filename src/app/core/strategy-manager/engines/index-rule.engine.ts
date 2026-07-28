@@ -547,10 +547,18 @@ export function mergeSettings(
   return defaultStrategySettings({ ...base, ...partial, extras: { ...base.extras, ...partial.extras } });
 }
 
-export function recordRuleTradeClosed(state: RuleDayState, points: number, dayStopPts: number): void {
+export function recordRuleTradeClosed(
+  state: RuleDayState,
+  points: number,
+  dayStopPts: number,
+  dayProfitLockPts = 0,
+): void {
   state.dayNetPts += points;
   state.tradesToday += 1;
   if (dayStopPts > 0 && state.dayNetPts <= -dayStopPts) {
+    state.dayStopped = true;
+  }
+  if (dayProfitLockPts > 0 && state.dayNetPts >= dayProfitLockPts) {
     state.dayStopped = true;
   }
 }
