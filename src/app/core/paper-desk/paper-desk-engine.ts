@@ -23,6 +23,17 @@ import {
 } from '../strategy-manager/models/strategy-module.interface';
 import { ChampionPdhlManagedStrategy } from '../strategy-manager/modules/champion-pdhl.managed-strategy';
 import { rupeesPerPointForInstrument } from '../strategy-engine/strategies/pdhl-opening-range/pdhl-opening-range.evaluator';
+import {
+  KUTTY_ID,
+  KUTTY_MARGIN_PER_TRADE_RS,
+  KUTTY_NAME,
+  canOpenKutty,
+  createKuttyDayState,
+  kuttyExitLogic,
+  recordKuttyClosed,
+  runKuttyScalp,
+  trapOwnsBar,
+} from '../strategy-manager/engines/kutty-scalp.engine';
 
 /** Tighter of hard stop and swing trail — for live SL-M / UI (paper exit keeps them separate). */
 export function effectiveProtectiveStop(open: {
@@ -58,6 +69,8 @@ export interface IndexOpenPaper {
   maeIndexPts?: number;
   entryReason?: string;
   timeline?: Array<{ at: string; event: string; detail?: string }>;
+  /** primary = Strat; kutty = background scalp (never counts as Trap day trade). */
+  source?: 'primary' | 'kutty';
 }
 
 export interface ReplayInstrumentResult {
@@ -438,6 +451,13 @@ export function replayPaperOnIndex(params: {
    * When omitted, falls back to Champion PDHL so existing callers stay safe.
    */
   strategy?: IManagedStrategy;
+  /**
+   * Background Kutty scalp (default on). Never registered in Strat UI.
+   * Skips when Trap owns the bar / margin reserve fails.
+   */
+  enableKutty?: boolean;
+  /** Shared margin ledger across Nifty+Bank legs (mutated in place). */
+  kuttyMargin?: { usedRs: number; trapOpenLegs: number };
 }): ReplayInstrumentResult {
   const {
     instrumentId,
@@ -452,6 +472,9 @@ export function replayPaperOnIndex(params: {
   } = params;
   const forceCloseOpen = params.forceCloseOpen !== false;
   const lotsMultiplier = Math.max(1, Math.floor(params.lotsMultiplier ?? 1) || 1);
+  const enableKutty = params.enableKutty !== false;
+  const kuttyMargin = params.kuttyMargin ?? { usedRs: 0, trapOpenLegs: 0 };
+  const kuttyState = createKuttyDayState();
 
   const strategy =
     params.strategy ??
@@ -490,29 +513,35 @@ export function replayPaperOnIndex(params: {
       open.mfeIndexPts = Math.max(open.mfeIndexPts ?? 0, Math.max(0, fav));
       open.maeIndexPts = Math.max(open.maeIndexPts ?? 0, Math.max(0, adv));
 
-      const managedOpen: ManagedOpenPosition = {
-        direction: open.direction,
-        entry: open.entry,
-        stop: open.stop,
-        target: open.target,
-        entryTime: open.entryTime,
-        trail: open.trail ?? null,
-      };
-      const exit = strategy.exitLogic(candle, managedOpen, closes, ctx);
-      // Profit-protect may ratchet stop; swing_trail updates separate trail.
-      if (managedOpen.stop !== open.stop) {
-        open.timeline = [
-          ...(open.timeline ?? []),
-          {
-            at: candle.date,
-            event: 'STOP_MOVED',
-            detail: `SL ${open.stop.toFixed(2)} → ${managedOpen.stop.toFixed(2)}`,
-          },
-        ];
-        open.stop = managedOpen.stop;
-      }
-      if (managedOpen.trail !== open.trail) {
-        open.trail = managedOpen.trail ?? null;
+      const isKutty = open.source === 'kutty';
+      let exit = null as ReturnType<typeof kuttyExitLogic>;
+      if (isKutty) {
+        exit = kuttyExitLogic(candle, open);
+      } else {
+        const managedOpen: ManagedOpenPosition = {
+          direction: open.direction,
+          entry: open.entry,
+          stop: open.stop,
+          target: open.target,
+          entryTime: open.entryTime,
+          trail: open.trail ?? null,
+        };
+        exit = strategy.exitLogic(candle, managedOpen, closes, ctx);
+        // Profit-protect may ratchet stop; swing_trail updates separate trail.
+        if (managedOpen.stop !== open.stop) {
+          open.timeline = [
+            ...(open.timeline ?? []),
+            {
+              at: candle.date,
+              event: 'STOP_MOVED',
+              detail: `SL ${open.stop.toFixed(2)} → ${managedOpen.stop.toFixed(2)}`,
+            },
+          ];
+          open.stop = managedOpen.stop;
+        }
+        if (managedOpen.trail !== open.trail) {
+          open.trail = managedOpen.trail ?? null;
+        }
       }
       if (exit) {
         const closed = closePaperTrade({
@@ -524,11 +553,17 @@ export function replayPaperOnIndex(params: {
           exitReason: exit.reason,
           optionCandlesByToken,
           lotsMultiplier,
-          strategyId: strategy.id,
-          strategyName: strategy.name,
+          strategyId: isKutty ? KUTTY_ID : strategy.id,
+          strategyName: isKutty ? KUTTY_NAME : strategy.name,
         });
         trades.push(closed);
-        strategy.onTradeClosed?.(closed.indexPoints, day);
+        if (isKutty) {
+          recordKuttyClosed(kuttyState);
+          kuttyMargin.usedRs = Math.max(0, kuttyMargin.usedRs - KUTTY_MARGIN_PER_TRADE_RS);
+        } else {
+          strategy.onTradeClosed?.(closed.indexPoints, day);
+          kuttyMargin.trapOpenLegs = Math.max(0, kuttyMargin.trapOpenLegs - 1);
+        }
         dayNetByDate[day] = (dayNetByDate[day] ?? 0) + closed.indexPoints;
         open = null;
         lastSignal = `Closed: ${exit.reason}`;
@@ -539,15 +574,49 @@ export function replayPaperOnIndex(params: {
     const signal = strategy.generateSignal(ctx);
     lastSignal = signal.reason;
 
-    if (signal.action !== 'BUY' && signal.action !== 'SELL') {
-      continue;
+    let entryAction = signal.action;
+    let entryPrice = signal.entryPrice;
+    let entryStop = signal.stopLoss;
+    let entryTarget = signal.target;
+    let entryReason = signal.reason;
+    let entrySource: 'primary' | 'kutty' = 'primary';
+    let entryStrategyId = strategy.id;
+    let entryStrategyName = strategy.name;
+
+    if (entryAction !== 'BUY' && entryAction !== 'SELL') {
+      // Background Kutty — only when Trap/primary does not own the bar.
+      if (
+        enableKutty &&
+        !trapOwnsBar(signal.reason) &&
+        canOpenKutty({
+          usedMarginRs: kuttyMargin.usedRs,
+          trapOpenAnywhere: kuttyMargin.trapOpenLegs > 0,
+        })
+      ) {
+        const kSig = runKuttyScalp(ctx, kuttyState, kind);
+        if (kSig.action === 'BUY' || kSig.action === 'SELL') {
+          entryAction = kSig.action;
+          entryPrice = kSig.entryPrice;
+          entryStop = kSig.stopLoss;
+          entryTarget = kSig.target;
+          entryReason = kSig.reason;
+          entrySource = 'kutty';
+          entryStrategyId = KUTTY_ID;
+          entryStrategyName = KUTTY_NAME;
+          lastSignal = kSig.reason;
+        } else {
+          continue;
+        }
+      } else {
+        continue;
+      }
     }
 
     const resolved = resolveAtmWeeklyOption({
       instruments,
       kind,
-      direction: signal.action,
-      spot: signal.entryPrice,
+      direction: entryAction,
+      spot: entryPrice,
       asOfDateTime: candle.date,
     });
 
@@ -555,7 +624,7 @@ export function replayPaperOnIndex(params: {
     if (resolved.source === 'chain' && resolved.instrument.instrumentToken > 0) {
       neededOptionTokens.add(resolved.instrument.instrumentToken);
     }
-    const fillEdge = entryPremiumEdge(signal.entryPrice, candle);
+    const fillEdge = entryPremiumEdge(entryPrice, candle);
     let optionEntryPremium: number | null = null;
     let premiumEstimated = resolved.source === 'synthetic';
 
@@ -571,10 +640,10 @@ export function replayPaperOnIndex(params: {
     }
 
     open = {
-      direction: signal.action,
-      entry: signal.entryPrice,
-      stop: signal.stopLoss,
-      target: signal.target,
+      direction: entryAction,
+      entry: entryPrice,
+      stop: entryStop,
+      target: entryTarget,
       entryTime: candle.date,
       trail: null,
       option,
@@ -583,20 +652,26 @@ export function replayPaperOnIndex(params: {
       optionEntryEdge: fillEdge,
       mfeIndexPts: 0,
       maeIndexPts: 0,
-      entryReason: signal.reason,
+      entryReason,
+      source: entrySource,
       timeline: [
         {
           at: candle.date,
           event: 'ENTRY',
-          detail: `${signal.action} @ ${signal.entryPrice.toFixed(2)} · SL ${signal.stopLoss.toFixed(2)} · T ${signal.target.toFixed(2)} · ${signal.reason}`,
+          detail: `${entryAction} @ ${entryPrice.toFixed(2)} · SL ${entryStop.toFixed(2)} · T ${entryTarget.toFixed(2)} · ${entryReason}`,
         },
       ],
     };
+    if (entrySource === 'kutty') {
+      kuttyMargin.usedRs += KUTTY_MARGIN_PER_TRADE_RS;
+    } else {
+      kuttyMargin.trapOpenLegs += 1;
+    }
     chosenOption = option;
-    chosenBias = signal.action;
-    indexSpot = signal.entryPrice;
+    chosenBias = entryAction;
+    indexSpot = entryPrice;
     chosenAsOf = candle.date;
-    lastSignal = `${signal.action} @ ${signal.entryPrice.toFixed(1)} · ${strategy.name}`;
+    lastSignal = `${entryAction} @ ${entryPrice.toFixed(1)} · ${entryStrategyName}`;
   }
 
   // Force close any open trade at last in-range bar (same as HT end-of-range)
@@ -612,6 +687,7 @@ export function replayPaperOnIndex(params: {
     if (lastIdx >= 0) {
       const candle = candles[lastIdx]!;
       const day = extractTradeDate(candle.date);
+      const isKutty = open.source === 'kutty';
       const closed = closePaperTrade({
         instrumentId,
         instrumentName,
@@ -621,11 +697,17 @@ export function replayPaperOnIndex(params: {
         exitReason: 'End of range',
         optionCandlesByToken,
         lotsMultiplier,
-        strategyId: strategy.id,
-        strategyName: strategy.name,
+        strategyId: isKutty ? KUTTY_ID : strategy.id,
+        strategyName: isKutty ? KUTTY_NAME : strategy.name,
       });
       trades.push(closed);
-      strategy.onTradeClosed?.(closed.indexPoints, day);
+      if (isKutty) {
+        recordKuttyClosed(kuttyState);
+        kuttyMargin.usedRs = Math.max(0, kuttyMargin.usedRs - KUTTY_MARGIN_PER_TRADE_RS);
+      } else {
+        strategy.onTradeClosed?.(closed.indexPoints, day);
+        kuttyMargin.trapOpenLegs = Math.max(0, kuttyMargin.trapOpenLegs - 1);
+      }
       dayNetByDate[day] = (dayNetByDate[day] ?? 0) + closed.indexPoints;
       if (closed.option) {
         chosenOption = closed.option;

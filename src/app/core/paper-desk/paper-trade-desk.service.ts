@@ -414,6 +414,7 @@ export class PaperTradeDeskService {
         const needed = new Set<number>();
         const emptyOpt = new Map<number, Candle[]>();
         const batchTrades: PaperTrade[] = [];
+        const kuttyMargin = { usedRs: 0, trapOpenLegs: 0 };
 
         for (const { instrument, kind } of active) {
           const candles = candleMap.get(instrument.id) ?? [];
@@ -431,6 +432,8 @@ export class PaperTradeDeskService {
             neededOptionTokens: needed,
             lotsMultiplier: this.lotsMultiplier,
             strategy: resolved.primary,
+            enableKutty: true,
+            kuttyMargin,
           });
           for (const t of replay.trades) {
             primaryActions.set(t.entryTime, t.direction);
@@ -792,6 +795,7 @@ export class PaperTradeDeskService {
     const emptyOpt = new Map<number, Candle[]>();
     const allTrades: PaperTrade[] = [];
     const statuses: PaperInstrumentStatus[] = [];
+    const kuttyMargin = { usedRs: 0, trapOpenLegs: 0 };
 
     for (const leg of this.liveLegs) {
       const resolved = this.resolveDeskStrategy(leg.kind, 'live');
@@ -809,6 +813,8 @@ export class PaperTradeDeskService {
         forceCloseOpen: now >= '15:15',
         lotsMultiplier: this.lotsMultiplier,
         strategy: resolved.primary,
+        enableKutty: true,
+        kuttyMargin,
       });
       for (const t of replay.trades) {
         primaryActions.set(t.entryTime, t.direction);
