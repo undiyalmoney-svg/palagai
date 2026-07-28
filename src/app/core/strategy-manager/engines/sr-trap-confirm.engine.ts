@@ -281,9 +281,9 @@ export function srTrapExitLogic(
   settings: StrategySettings,
   ctx: StrategyContext,
 ): ManagedExitDecision | null {
-  // Doc 34 / live giveback: once MFE ≥ ₹1000, lock ≥ ₹500 so long holds don't erase winners.
-  applyTrapMoneyProfitLock(candle, open, settings, ctx.instrumentId ?? '');
-  return indexRuleExitLogic(
+  // After a real green run (~₹1k+), BE floor + cut if profit drains → free slot for next setup.
+  const armed = armTrapProfitDrainFloor(candle, open, settings, ctx.instrumentId ?? '');
+  const exit = indexRuleExitLogic(
     candle,
     open,
     closes,
@@ -291,39 +291,63 @@ export function srTrapExitLogic(
     { entry: 'swing', bias: 'ema', exit: 'eod' },
     seriesAt(ctx),
   );
+  if (exit) {
+    // Relabel BE stop-outs after a green run so the book shows drain→rehunt, not a "normal" SL.
+    if (armed && exit.reason === 'Stop loss hit') {
+      return { ...exit, reason: 'Profit drained — cut & rehunt' };
+    }
+    return exit;
+  }
+  if (!armed) {
+    return null;
+  }
+  const closePts =
+    open.direction === 'BUY' ? candle.close - open.entry : open.entry - candle.close;
+  // Still open but close is flat/red after the run → cut & look for next opportunity.
+  if (closePts <= 0) {
+    return {
+      exitPrice: candle.close,
+      reason: 'Profit drained — cut & rehunt',
+    };
+  }
+  return null;
 }
 
-/** When index MFE reaches armRs, ratchet stop to lock at least lockRs (never loosen). */
-export function applyTrapMoneyProfitLock(
+/**
+ * User rule: Trap often prints ~₹1k–1.4k then gives it all back (even to a loss).
+ * After peak MFE ≥ armRs → ratchet stop to break-even so a drained winner cannot become −₹.
+ * Returns true when the drain floor is armed on this bar (peak already reached arm).
+ */
+export function armTrapProfitDrainFloor(
   candle: Candle,
   open: ManagedOpenPosition,
   settings: StrategySettings,
   instrumentId: string,
-): void {
+): boolean {
   const x = settings.extras ?? {};
   const armRs = typeof x['profitLockArmRs'] === 'number' ? x['profitLockArmRs'] : 1000;
-  const lockRs = typeof x['profitLockLockRs'] === 'number' ? x['profitLockLockRs'] : 500;
-  if (!(armRs > 0) || lockRs < 0) {
-    return;
+  if (!(armRs > 0)) {
+    return false;
   }
   const rs = /bank/i.test(instrumentId) ? 30 : 65;
   const armPts = armRs / rs;
-  const lockPts = lockRs / rs;
-  if (open.direction === 'BUY') {
-    const mfe = candle.high - open.entry;
-    if (mfe >= armPts) {
-      const lockStop = open.entry + lockPts;
-      if (lockStop > open.stop) {
-        open.stop = lockStop;
-      }
-    }
-  } else {
-    const mfe = open.entry - candle.low;
-    if (mfe >= armPts) {
-      const lockStop = open.entry - lockPts;
-      if (lockStop < open.stop) {
-        open.stop = lockStop;
-      }
-    }
+
+  const barMfe =
+    open.direction === 'BUY' ? candle.high - open.entry : open.entry - candle.low;
+  const peak = Math.max(open.peakMfePts ?? 0, Math.max(0, barMfe));
+  open.peakMfePts = peak;
+
+  if (peak < armPts) {
+    return false;
   }
+
+  // Armed: never let a drained winner become a loser — BE floor.
+  if (open.direction === 'BUY') {
+    if (open.entry > open.stop) {
+      open.stop = open.entry;
+    }
+  } else if (open.entry < open.stop) {
+    open.stop = open.entry;
+  }
+  return true;
 }

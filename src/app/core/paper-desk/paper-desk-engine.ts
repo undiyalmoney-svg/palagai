@@ -525,6 +525,7 @@ export function replayPaperOnIndex(params: {
           target: open.target,
           entryTime: open.entryTime,
           trail: open.trail ?? null,
+          peakMfePts: open.mfeIndexPts ?? 0,
         };
         exit = strategy.exitLogic(candle, managedOpen, closes, ctx);
         // Profit-protect may ratchet stop; swing_trail updates separate trail.
@@ -538,6 +539,9 @@ export function replayPaperOnIndex(params: {
             },
           ];
           open.stop = managedOpen.stop;
+        }
+        if (managedOpen.peakMfePts != null) {
+          open.mfeIndexPts = Math.max(open.mfeIndexPts ?? 0, managedOpen.peakMfePts);
         }
         if (managedOpen.trail !== open.trail) {
           open.trail = managedOpen.trail ?? null;

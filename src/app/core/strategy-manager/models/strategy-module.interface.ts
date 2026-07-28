@@ -32,6 +32,8 @@ export interface ManagedOpenPosition {
    * Ratchets via confirmed swing3; null until first swing prints.
    */
   trail?: number | null;
+  /** Running max favorable excursion in index points (desk feeds this). */
+  peakMfePts?: number;
 }
 
 export interface ManagedExitDecision {

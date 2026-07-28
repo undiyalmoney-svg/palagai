@@ -11,4 +11,6 @@ export interface OpenTrade {
   confidence: number;
   riskRewardRatio: number;
   marketRegime?: MarketRegime;
+  /** Running max favorable excursion in index points (Trap drain floor). */
+  peakMfePts?: number;
 }

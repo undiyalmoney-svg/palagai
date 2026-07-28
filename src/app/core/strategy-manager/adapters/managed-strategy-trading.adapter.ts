@@ -73,6 +73,7 @@ export class ManagedStrategyTradingAdapter implements TradingStrategy {
       stop: trade.stopLoss,
       target: trade.targetPrice,
       entryTime: trade.entryTime,
+      peakMfePts: trade.peakMfePts ?? 0,
     };
     const decision = this.module.exitLogic(
       ctx.candle5m,
@@ -80,9 +81,12 @@ export class ManagedStrategyTradingAdapter implements TradingStrategy {
       closes,
       ctx,
     );
-    // Profit-protect may tighten stop; TradeManager SL uses trade.stopLoss.
+    // Profit-protect / drain floor may tighten stop; TradeManager SL uses trade.stopLoss.
     if (managedOpen.stop !== trade.stopLoss) {
       trade.stopLoss = managedOpen.stop;
+    }
+    if (managedOpen.peakMfePts != null) {
+      trade.peakMfePts = Math.max(trade.peakMfePts ?? 0, managedOpen.peakMfePts);
     }
     if (!decision) {
       return null;
