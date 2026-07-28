@@ -138,7 +138,7 @@ export class SmartPullbackProManagedStrategy implements IManagedStrategy {
     const effective = mergeSettings(this.settings, {
       targetRMultiple: profile.targetRMultiple,
     });
-    return smartPbExitLogic(candle, open, closes, effective, seriesAt(ctx));
+    return smartPbExitLogic(candle, open, closes, effective, seriesAt(ctx), ctx.instrumentId ?? '');
   }
 
   onTradeClosed(points: number): void {

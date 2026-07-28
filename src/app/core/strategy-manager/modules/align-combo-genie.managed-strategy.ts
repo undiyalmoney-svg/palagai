@@ -69,8 +69,9 @@ export class AlignComboGenieManagedStrategy implements IManagedStrategy {
       genieRouterEnabled: true,
       /** Research: loser-only SL confirm cutoff (shared with Trap). */
       slConfirmCutoffEnabled: true,
-      slConfirmCutoffFracR: 0.7,
+      slConfirmCutoffFracR: 0.55,
       slConfirmCutoffMaxMfeR: 0.25,
+      slConfirmSoftRs: 800,
     },
   });
 
@@ -168,7 +169,7 @@ export class AlignComboGenieManagedStrategy implements IManagedStrategy {
     const effective = mergeSettings(this.settings, {
       targetRMultiple: profile.targetRMultiple,
     });
-    return smartPbExitLogic(candle, open, closes, effective, seriesAt(ctx));
+    return smartPbExitLogic(candle, open, closes, effective, seriesAt(ctx), ctx.instrumentId ?? '');
   }
 
   onTradeClosed(points: number): void {

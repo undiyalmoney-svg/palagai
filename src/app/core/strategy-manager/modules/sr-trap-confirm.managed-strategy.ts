@@ -68,10 +68,11 @@ export class SrTrapConfirmManagedStrategy implements IManagedStrategy {
       profitLockArmRs: 1000,
       profitLockLockRs: 500,
       profitLockGivebackRs: 500,
-      /** Research: loser-only SL confirm cutoff (0.7R adverse + never-green). */
+      /** Research: loser-only SL confirm (0.55R or ₹800 soft) — shrinks ~₹1k doomed SLs. */
       slConfirmCutoffEnabled: true,
-      slConfirmCutoffFracR: 0.7,
+      slConfirmCutoffFracR: 0.55,
       slConfirmCutoffMaxMfeR: 0.25,
+      slConfirmSoftRs: 800,
     },
   });
 

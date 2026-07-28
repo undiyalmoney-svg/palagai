@@ -445,26 +445,29 @@ export function applyIndexRuleProfitProtect(
 }
 
 /**
- * Research (reports/sl-confirm-cutoff): strict near-SL cuts lose money.
- * Valid rule — loser-only confirmed cutoff:
+ * Research (reports/sl-confirm-cutoff + tighter follow-up):
+ * Strict near-SL / hard ₹ caps destroy OOS net.
+ * Valid loser-only confirmed cutoff:
  *  - trade never went meaningfully green (MFE < maxMfeR × risk)
- *  - MAE ≥ fracR × risk (SL about to hit)
+ *  - AND (MAE ≥ fracR × risk  OR  adverse ₹ ≥ softRs)
  *  - close against the trade with an adverse candle body
- * → exit at close (slightly better than waiting for hard SL on doomed legs).
- * OOS Trap ~+₹7k / Genie-proxy ~+₹1k vs baseline; avg loss not worse.
+ * → exit at close (shrinks doomed full-SL hits without killing expectancy).
+ * Champion extras: fracR=0.55, softRs=800, maxMfeR=0.25.
  */
 export function applySlConfirmCutoff(
   candle: Candle,
   open: ManagedOpenPosition,
   settings: StrategySettings,
+  instrumentId = '',
 ): ManagedExitDecision | null {
   const x = settings.extras ?? {};
   if (x['slConfirmCutoffEnabled'] === false) {
     return null;
   }
-  const fracR = typeof x['slConfirmCutoffFracR'] === 'number' ? x['slConfirmCutoffFracR'] : 0.7;
+  const fracR = typeof x['slConfirmCutoffFracR'] === 'number' ? x['slConfirmCutoffFracR'] : 0.55;
   const maxMfeR =
     typeof x['slConfirmCutoffMaxMfeR'] === 'number' ? x['slConfirmCutoffMaxMfeR'] : 0.25;
+  const softRs = typeof x['slConfirmSoftRs'] === 'number' ? x['slConfirmSoftRs'] : 800;
   if (!(fracR > 0) || !(maxMfeR >= 0)) {
     return null;
   }
@@ -491,7 +494,10 @@ export function applySlConfirmCutoff(
     open.direction === 'BUY'
       ? Math.max(0, open.entry - candle.low)
       : Math.max(0, candle.high - open.entry);
-  if (mae < fracR * risk) {
+  const rs = /bank/i.test(instrumentId) ? 30 : 65;
+  const hitFrac = mae >= fracR * risk;
+  const hitSoft = softRs > 0 && mae * rs >= softRs;
+  if (!(hitFrac || hitSoft)) {
     return null;
   }
 
@@ -505,7 +511,7 @@ export function applySlConfirmCutoff(
 
   return {
     exitPrice: candle.close,
-    reason: 'SL cutoff — confirmed adverse',
+    reason: hitSoft && !hitFrac ? 'SL cutoff — soft ₹ adverse' : 'SL cutoff — confirmed adverse',
   };
 }
 

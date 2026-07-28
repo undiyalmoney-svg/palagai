@@ -284,8 +284,8 @@ export function srTrapExitLogic(
 ): ManagedExitDecision | null {
   // After a real green run (~₹1k+), trail from peak (max ~₹500 giveback) → cut & rehunt.
   const armed = armTrapProfitDrainFloor(candle, open, settings, ctx.instrumentId ?? '');
-  // Research: loser-only confirmed near-SL cutoff (never-green + 0.7R adverse confirm).
-  const cutoff = applySlConfirmCutoff(candle, open, settings);
+  // Research: loser-only confirmed near-SL cutoff (never-green + 0.55R / ₹800 soft).
+  const cutoff = applySlConfirmCutoff(candle, open, settings, ctx.instrumentId ?? '');
   if (cutoff) {
     return cutoff;
   }

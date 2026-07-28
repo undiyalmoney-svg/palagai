@@ -15,7 +15,8 @@ describe('AlignComboGenieManagedStrategy', () => {
     expect(s.supports).toEqual(['nifty', 'bank', 'stocks']);
     expect(s.getSettings().extras?.['genieRouterEnabled']).toBe(true);
     expect(s.getSettings().extras?.['slConfirmCutoffEnabled']).toBe(true);
-    expect(s.getSettings().extras?.['slConfirmCutoffFracR']).toBe(0.7);
+    expect(s.getSettings().extras?.['slConfirmCutoffFracR']).toBe(0.55);
+    expect(s.getSettings().extras?.['slConfirmSoftRs']).toBe(800);
   });
 
   it('maps screenshot-style aligned dump day to BOTH (short combo)', () => {

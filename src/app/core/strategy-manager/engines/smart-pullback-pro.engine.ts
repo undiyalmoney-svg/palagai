@@ -800,10 +800,11 @@ export function smartPbExitLogic(
   closes: number[],
   settings: StrategySettings,
   series?: Candle[],
+  instrumentId = '',
 ): ManagedExitDecision | null {
   const spec: IndexRuleSpec = { entry: 'swing_retest', bias: 'ema', exit: 'eod' };
   applyIndexRuleProfitProtect(candle, open, settings);
-  const cutoff = applySlConfirmCutoff(candle, open, settings);
+  const cutoff = applySlConfirmCutoff(candle, open, settings, instrumentId);
   if (cutoff) {
     return cutoff;
   }
