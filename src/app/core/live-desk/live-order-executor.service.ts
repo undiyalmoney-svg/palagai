@@ -4,6 +4,7 @@ import { firstValueFrom } from 'rxjs';
 import { KiteApiService } from '../kite/kite-api.service';
 import { extractKiteApiError } from '../utils/kite-error.util';
 import { PaperOptionContract } from '../paper-desk/paper-desk.models';
+import { liveOpenMatchesBroker } from './live-open-match.util';
 
 export interface LiveBrokerPosition {
   instrumentId: string;
@@ -109,6 +110,8 @@ export interface LiveOpenSignal {
   option: PaperOptionContract | null;
   optionEntryPremium: number | null;
 }
+
+export { liveOpenMatchesBroker } from './live-open-match.util';
 
 /**
  * Live money executor (addon):
@@ -321,9 +324,26 @@ export class LiveOrderExecutorService {
       current = this.positions.get(params.instrumentId) ?? current;
     }
 
-    // Open paper + open broker: amend SL if index stop moved (BE / trail) — never re-enter.
+    // Open paper + open broker:
+    //  - same leg → amend SL if index stop moved (BE / trail)
+    //  - different leg (Kutty→Strat / drain→rehunt / new option) → exit then enter
     if (open && current?.status === 'open') {
-      await this.syncProtectiveSl(params.authorization, current, open);
+      if (liveOpenMatchesBroker(current, open)) {
+        await this.syncProtectiveSl(params.authorization, current, open);
+        await this.refreshSummaryStatuses(params.authorization);
+        return;
+      }
+      this.pushEvent({
+        at: new Date().toISOString(),
+        instrumentId: params.instrumentId,
+        instrumentName: params.instrumentName,
+        action: 'EXIT',
+        detail: `Handoff — paper flipped leg · was ${current.tradingSymbol} @ ${current.entryTime} → ${open.option?.tradingSymbol ?? '?'} @ ${open.entryTime}`,
+        tradingSymbol: current.tradingSymbol,
+        quantity: current.quantity,
+      });
+      await this.placeExit(params.authorization, current);
+      await this.placeEntry(params.authorization, params.instrumentId, open);
       await this.refreshSummaryStatuses(params.authorization);
       return;
     }

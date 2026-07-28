@@ -431,70 +431,86 @@ export class PaperTradeDeskService {
         const needed = new Set<number>();
         const emptyOpt = new Map<number, Candle[]>();
         const batchTrades: PaperTrade[] = [];
-        const kuttyMargin = { usedRs: 0, trapOpenLegs: 0 };
+        /** Per-instrument entry map for shadow (full batch). */
+        const primaryActionsById = new Map<string, Map<string, string>>();
+
+        // Day-interleaved Nifty+Bank so shared Kutty margin matches Live same-day concurrency.
+        const days = chunkInclusiveDateRange(batch.fromDate, batch.toDate, 1);
+        for (const dayChunk of days) {
+          const day = dayChunk.fromDate;
+          const kuttyMargin = { usedRs: 0, trapOpenLegs: 0 };
+          for (const { instrument, kind } of active) {
+            const candles = candleMap.get(instrument.id) ?? [];
+            const resolved = this.resolveDeskStrategy(kind, 'paper');
+            const replay = replayPaperOnIndex({
+              instrumentId: instrument.id,
+              instrumentName: instrument.name,
+              kind,
+              candles,
+              fromDate: day,
+              toDate: day,
+              instruments: allInstruments,
+              optionCandlesByToken: emptyOpt,
+              neededOptionTokens: needed,
+              lotsMultiplier: this.lotsMultiplier,
+              strategy: resolved.primary,
+              enableKutty: this.deskRunOptions.enableKutty,
+              kuttyAlone: this.deskRunOptions.kuttyAlone,
+              kuttyMargin,
+            });
+            let primaryActions = primaryActionsById.get(instrument.id);
+            if (!primaryActions) {
+              primaryActions = new Map<string, string>();
+              primaryActionsById.set(instrument.id, primaryActions);
+            }
+            for (const t of replay.trades) {
+              primaryActions.set(t.entryTime, t.direction);
+              this.strategyLog.log({
+                type: 'exit',
+                strategyId: replay.strategyId,
+                strategyName: replay.strategyName,
+                channel: resolved.channel,
+                mode: 'paper',
+                message: `${t.direction} ${t.indexPoints.toFixed(1)} pts · ${t.exitReason}`,
+                data: { entry: t.entryTime, exit: t.exitTime },
+              });
+            }
+            batchTrades.push(...replay.trades);
+
+            const prev = statusAcc.get(instrument.id);
+            const batchIndexNet = Object.values(replay.dayNetByDate).reduce((a, v) => a + v, 0);
+            statusAcc.set(instrument.id, {
+              instrumentId: instrument.id,
+              instrumentName: instrument.name,
+              lastBarTime: candles.at(-1)?.date ?? prev?.lastBarTime ?? null,
+              dayNetIndexPts: (prev?.dayNetIndexPts ?? 0) + batchIndexNet,
+              dayNetOptionRs: prev?.dayNetOptionRs ?? 0,
+              chosenOption: replay.chosenOption ?? prev?.chosenOption ?? null,
+              chosenBias: replay.chosenBias ?? prev?.chosenBias ?? null,
+              indexSpot: replay.indexSpot ?? prev?.indexSpot ?? null,
+              chosenAsOf: replay.chosenAsOf ?? prev?.chosenAsOf ?? null,
+              lastSignal: replay.lastSignal || prev?.lastSignal || 'Waiting',
+              strategyId: resolved.primary.id,
+              strategyName: resolved.primary.name,
+              maxTradesPerDay: resolved.primary.getSettings().maxTradesPerDay,
+            });
+          }
+        }
 
         for (const { instrument, kind } of active) {
-          const candles = candleMap.get(instrument.id) ?? [];
           const resolved = this.resolveDeskStrategy(kind, 'paper');
-          const primaryActions = new Map<string, string>();
-          const replay = replayPaperOnIndex({
+          if (!resolved.shadow) {
+            continue;
+          }
+          this.runShadowReplay({
+            channel: resolved.channel,
+            mode: 'paper',
+            shadow: resolved.shadow,
+            primaryActions: primaryActionsById.get(instrument.id) ?? new Map(),
             instrumentId: instrument.id,
-            instrumentName: instrument.name,
-            kind,
-            candles,
+            candles: candleMap.get(instrument.id) ?? [],
             fromDate: batch.fromDate,
             toDate: batch.toDate,
-            instruments: allInstruments,
-            optionCandlesByToken: emptyOpt,
-            neededOptionTokens: needed,
-            lotsMultiplier: this.lotsMultiplier,
-            strategy: resolved.primary,
-            enableKutty: this.deskRunOptions.enableKutty,
-            kuttyAlone: this.deskRunOptions.kuttyAlone,
-            kuttyMargin,
-          });
-          for (const t of replay.trades) {
-            primaryActions.set(t.entryTime, t.direction);
-            this.strategyLog.log({
-              type: 'exit',
-              strategyId: replay.strategyId,
-              strategyName: replay.strategyName,
-              channel: resolved.channel,
-              mode: 'paper',
-              message: `${t.direction} ${t.indexPoints.toFixed(1)} pts · ${t.exitReason}`,
-              data: { entry: t.entryTime, exit: t.exitTime },
-            });
-          }
-          if (resolved.shadow) {
-            this.runShadowReplay({
-              channel: resolved.channel,
-              mode: 'paper',
-              shadow: resolved.shadow,
-              primaryActions,
-              instrumentId: instrument.id,
-              candles,
-              fromDate: batch.fromDate,
-              toDate: batch.toDate,
-            });
-          }
-          batchTrades.push(...replay.trades);
-
-          const prev = statusAcc.get(instrument.id);
-          const batchIndexNet = Object.values(replay.dayNetByDate).reduce((a, v) => a + v, 0);
-          statusAcc.set(instrument.id, {
-            instrumentId: instrument.id,
-            instrumentName: instrument.name,
-            lastBarTime: candles.at(-1)?.date ?? prev?.lastBarTime ?? null,
-            dayNetIndexPts: (prev?.dayNetIndexPts ?? 0) + batchIndexNet,
-            dayNetOptionRs: prev?.dayNetOptionRs ?? 0,
-            chosenOption: replay.chosenOption ?? prev?.chosenOption ?? null,
-            chosenBias: replay.chosenBias ?? prev?.chosenBias ?? null,
-            indexSpot: replay.indexSpot ?? prev?.indexSpot ?? null,
-            chosenAsOf: replay.chosenAsOf ?? prev?.chosenAsOf ?? null,
-            lastSignal: replay.lastSignal || prev?.lastSignal || 'Waiting',
-            strategyId: resolved.primary.id,
-            strategyName: resolved.primary.name,
-            maxTradesPerDay: resolved.primary.getSettings().maxTradesPerDay,
           });
         }
 
