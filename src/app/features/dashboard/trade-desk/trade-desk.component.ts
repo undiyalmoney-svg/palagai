@@ -60,6 +60,8 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
   protected dayProfitLock = false;
   /** Background Kutty scalp — on by default for Paper + Live (doc 34 champion). */
   protected enableKutty = true;
+  /** Kutty only — no Trap/Strat entries. Off by default. */
+  protected kuttyAlone = false;
 
   /** Testing result filter: Mon–Fri (fetch all, show selected weekdays). */
   protected readonly weekdayOptions = PAPER_WEEKDAY_OPTIONS;
@@ -156,14 +158,28 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
   }
 
   private buildRunOptions(lots: number): TradeDeskRunOptions {
+    const kuttyAlone = this.kuttyAlone;
     return {
       lots,
       enableNifty: this.enableNifty,
       enableBank: this.enableBank,
       strictDayStop: this.strictDayStop,
       dayProfitLock: this.dayProfitLock,
-      enableKutty: this.enableKutty,
+      enableKutty: kuttyAlone || this.enableKutty,
+      kuttyAlone,
     };
+  }
+
+  protected onKuttyAloneChange(): void {
+    if (this.kuttyAlone) {
+      this.enableKutty = true;
+    }
+  }
+
+  protected onEnableKuttyChange(): void {
+    if (!this.enableKutty) {
+      this.kuttyAlone = false;
+    }
   }
 
   private selectedBooksLabel(): string {
