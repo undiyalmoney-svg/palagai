@@ -54,12 +54,17 @@ export function kuttyStopPts(kind: IndexOptionKind): number {
 export function canOpenKutty(params: {
   usedMarginRs: number;
   trapOpenAnywhere: boolean;
+  /** When true (Kutty-alone desk mode), do not reserve capital for Trap. */
+  kuttyAlone?: boolean;
   capitalRs?: number;
   trapReserveRs?: number;
   kuttyMarginRs?: number;
 }): boolean {
   const capital = params.capitalRs ?? KUTTY_CAPITAL_RS;
-  const reserve = params.trapOpenAnywhere ? 0 : (params.trapReserveRs ?? KUTTY_TRAP_RESERVE_RS);
+  const reserve =
+    params.kuttyAlone || params.trapOpenAnywhere
+      ? 0
+      : (params.trapReserveRs ?? KUTTY_TRAP_RESERVE_RS);
   const need = params.kuttyMarginRs ?? KUTTY_MARGIN_PER_TRADE_RS;
   return capital - params.usedMarginRs - reserve >= need;
 }
@@ -76,10 +81,30 @@ function wait(candle: Candle, reason: string): ManagedStrategySignal {
   };
 }
 
+/** True when Strat/Trap has armed next-bar confirm — Kutty must stand down. */
 export function trapOwnsBar(trapReason: string): boolean {
   const r = trapReason.toLowerCase();
-  return r.includes('armed') || r.includes('wait confirm');
+  // Trap arm only — do not match Kutty's own "Kutty BUY armed".
+  return (
+    r.includes('trap buy armed') ||
+    r.includes('trap sell armed') ||
+    r.includes('wait confirm')
+  );
 }
+
+/** Strat wants this bar (entry or armed confirm) — Kutty must yield. */
+export function primaryNeedsBar(signal: {
+  action: string;
+  reason: string;
+}): boolean {
+  return signal.action === 'BUY' || signal.action === 'SELL' || trapOwnsBar(signal.reason);
+}
+
+export function clearKuttyPending(state: KuttyDayState): void {
+  state.pending = null;
+}
+
+export const KUTTY_YIELD_TRAP_REASON = 'Kutty yield — Trap priority';
 
 function swingHL(dayBars: Candle[], i: number): { sh: number; sl: number } {
   const start = Math.max(0, i - SWING_LB);

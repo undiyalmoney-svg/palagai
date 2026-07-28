@@ -67,8 +67,10 @@ export interface TradeDeskRunOptions {
   strictDayStop?: boolean;
   /** Combined day profit lock ≈ +₹5,000 (split if both books on). */
   dayProfitLock?: boolean;
-  /** Background Kutty scalp (not in Strat dropdown). Default off. */
+  /** Background Kutty scalp (not in Strat dropdown). Default on. */
   enableKutty?: boolean;
+  /** Kutty only — no Trap/Strat entries. Implies enableKutty. */
+  kuttyAlone?: boolean;
 }
 
 interface LiveLeg {
@@ -105,7 +107,7 @@ export class PaperTradeDeskService {
   private deskRunOptions: Required<
     Pick<
       TradeDeskRunOptions,
-      'enableNifty' | 'enableBank' | 'strictDayStop' | 'dayProfitLock' | 'enableKutty'
+      'enableNifty' | 'enableBank' | 'strictDayStop' | 'dayProfitLock' | 'enableKutty' | 'kuttyAlone'
     >
   > = {
     enableNifty: true,
@@ -113,6 +115,7 @@ export class PaperTradeDeskService {
     strictDayStop: false,
     dayProfitLock: false,
     enableKutty: true,
+    kuttyAlone: false,
   };
   private runGeneration = 0;
   private readonly maxDaysPerCall = DESK_HISTORICAL_CHUNK_DAYS;
@@ -185,12 +188,14 @@ export class PaperTradeDeskService {
     if (!enableNifty && !enableBank) {
       throw new Error('Select at least one index: Nifty 50 or Bank Nifty.');
     }
+    const kuttyAlone = !!options?.kuttyAlone;
     this.deskRunOptions = {
       enableNifty,
       enableBank,
       strictDayStop: !!options?.strictDayStop,
       dayProfitLock: !!options?.dayProfitLock,
-      enableKutty: options?.enableKutty !== false,
+      enableKutty: kuttyAlone || options?.enableKutty !== false,
+      kuttyAlone,
     };
   }
 
@@ -330,7 +335,11 @@ export class PaperTradeDeskService {
     const risk = [
       this.deskRunOptions.strictDayStop ? 'strict −₹2950' : null,
       this.deskRunOptions.dayProfitLock ? 'profit lock +₹5000' : null,
-      this.deskRunOptions.enableKutty ? 'Kutty on' : null,
+      this.deskRunOptions.kuttyAlone
+        ? 'Kutty alone'
+        : this.deskRunOptions.enableKutty
+          ? 'Kutty on'
+          : null,
     ]
       .filter(Boolean)
       .join(', ');
@@ -441,6 +450,7 @@ export class PaperTradeDeskService {
             lotsMultiplier: this.lotsMultiplier,
             strategy: resolved.primary,
             enableKutty: this.deskRunOptions.enableKutty,
+            kuttyAlone: this.deskRunOptions.kuttyAlone,
             kuttyMargin,
           });
           for (const t of replay.trades) {
@@ -822,6 +832,7 @@ export class PaperTradeDeskService {
         lotsMultiplier: this.lotsMultiplier,
         strategy: resolved.primary,
         enableKutty: this.deskRunOptions.enableKutty,
+        kuttyAlone: this.deskRunOptions.kuttyAlone,
         kuttyMargin,
       });
       for (const t of replay.trades) {

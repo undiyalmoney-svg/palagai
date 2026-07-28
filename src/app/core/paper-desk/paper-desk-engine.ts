@@ -20,6 +20,7 @@ import { applyChargesToOptionTrade } from './trade-charges.util';
 import {
   IManagedStrategy,
   ManagedOpenPosition,
+  ManagedStrategySignal,
 } from '../strategy-manager/models/strategy-module.interface';
 import { ChampionPdhlManagedStrategy } from '../strategy-manager/modules/champion-pdhl.managed-strategy';
 import { rupeesPerPointForInstrument } from '../strategy-engine/strategies/pdhl-opening-range/pdhl-opening-range.evaluator';
@@ -27,12 +28,14 @@ import {
   KUTTY_ID,
   KUTTY_MARGIN_PER_TRADE_RS,
   KUTTY_NAME,
+  KUTTY_YIELD_TRAP_REASON,
   canOpenKutty,
+  clearKuttyPending,
   createKuttyDayState,
   kuttyExitLogic,
+  primaryNeedsBar,
   recordKuttyClosed,
   runKuttyScalp,
-  trapOwnsBar,
 } from '../strategy-manager/engines/kutty-scalp.engine';
 
 /** Tighter of hard stop and swing trail — for live SL-M / UI (paper exit keeps them separate). */
@@ -454,8 +457,11 @@ export function replayPaperOnIndex(params: {
   /**
    * Background Kutty scalp (default on). Never registered in Strat UI.
    * Skips when Trap owns the bar / margin reserve fails.
+   * When `kuttyAlone`, Strat entries are skipped — Kutty is the only book.
    */
   enableKutty?: boolean;
+  /** Trade Kutty only — no Trap/Strat entries (still not in Strat dropdown). */
+  kuttyAlone?: boolean;
   /** Shared margin ledger across Nifty+Bank legs (mutated in place). */
   kuttyMargin?: { usedRs: number; trapOpenLegs: number };
 }): ReplayInstrumentResult {
@@ -472,7 +478,8 @@ export function replayPaperOnIndex(params: {
   } = params;
   const forceCloseOpen = params.forceCloseOpen !== false;
   const lotsMultiplier = Math.max(1, Math.floor(params.lotsMultiplier ?? 1) || 1);
-  const enableKutty = params.enableKutty !== false;
+  const kuttyAlone = !!params.kuttyAlone;
+  const enableKutty = kuttyAlone || params.enableKutty !== false;
   const kuttyMargin = params.kuttyMargin ?? { usedRs: 0, trapOpenLegs: 0 };
   const kuttyState = createKuttyDayState();
 
@@ -504,6 +511,9 @@ export function replayPaperOnIndex(params: {
     const closes = candles.slice(0, i + 1).map((c) => c.close);
     const ctx = buildContext(candles, i, instrumentId);
 
+    /** Trap signal already evaluated while yielding a Kutty leg — reuse (do not double-consume pending). */
+    let deferredPrimary: ManagedStrategySignal | null = null;
+
     if (open) {
       // Track MFE/MAE on every bar while open (audit / giveback analysis).
       const fav =
@@ -515,32 +525,50 @@ export function replayPaperOnIndex(params: {
 
       const isKutty = open.source === 'kutty';
       let exit = null as ReturnType<typeof kuttyExitLogic>;
-      if (isKutty) {
-        exit = kuttyExitLogic(candle, open);
-      } else {
-        const managedOpen: ManagedOpenPosition = {
-          direction: open.direction,
-          entry: open.entry,
-          stop: open.stop,
-          target: open.target,
-          entryTime: open.entryTime,
-          trail: open.trail ?? null,
-        };
-        exit = strategy.exitLogic(candle, managedOpen, closes, ctx);
-        // Profit-protect may ratchet stop; swing_trail updates separate trail.
-        if (managedOpen.stop !== open.stop) {
-          open.timeline = [
-            ...(open.timeline ?? []),
-            {
-              at: candle.date,
-              event: 'STOP_MOVED',
-              detail: `SL ${open.stop.toFixed(2)} → ${managedOpen.stop.toFixed(2)}`,
-            },
-          ];
-          open.stop = managedOpen.stop;
+
+      // Trap must never wait behind a Kutty scalp — yield the slot when Strat needs the bar.
+      if (!kuttyAlone && isKutty) {
+        const trapSig = strategy.generateSignal(ctx);
+        if (primaryNeedsBar(trapSig)) {
+          clearKuttyPending(kuttyState);
+          if (trapSig.action === 'BUY' || trapSig.action === 'SELL') {
+            // Instant handoff at Trap fill so Kutty never blocks the confirm bar.
+            exit = { exitPrice: trapSig.entryPrice, reason: KUTTY_YIELD_TRAP_REASON };
+            deferredPrimary = trapSig;
+          } else {
+            exit = { exitPrice: candle.close, reason: KUTTY_YIELD_TRAP_REASON };
+          }
         }
-        if (managedOpen.trail !== open.trail) {
-          open.trail = managedOpen.trail ?? null;
+      }
+
+      if (!exit) {
+        if (isKutty) {
+          exit = kuttyExitLogic(candle, open);
+        } else {
+          const managedOpen: ManagedOpenPosition = {
+            direction: open.direction,
+            entry: open.entry,
+            stop: open.stop,
+            target: open.target,
+            entryTime: open.entryTime,
+            trail: open.trail ?? null,
+          };
+          exit = strategy.exitLogic(candle, managedOpen, closes, ctx);
+          // Profit-protect may ratchet stop; swing_trail updates separate trail.
+          if (managedOpen.stop !== open.stop) {
+            open.timeline = [
+              ...(open.timeline ?? []),
+              {
+                at: candle.date,
+                event: 'STOP_MOVED',
+                detail: `SL ${open.stop.toFixed(2)} → ${managedOpen.stop.toFixed(2)}`,
+              },
+            ];
+            open.stop = managedOpen.stop;
+          }
+          if (managedOpen.trail !== open.trail) {
+            open.trail = managedOpen.trail ?? null;
+          }
         }
       }
       if (exit) {
@@ -568,10 +596,23 @@ export function replayPaperOnIndex(params: {
         open = null;
         lastSignal = `Closed: ${exit.reason}`;
       }
-      continue;
+      if (open || !deferredPrimary) {
+        continue;
+      }
+      // Fall through: Kutty yielded and Trap confirmed entry on this same bar.
     }
 
-    const signal = strategy.generateSignal(ctx);
+    const signal: ManagedStrategySignal = kuttyAlone
+      ? {
+          action: 'WAITING',
+          entryPrice: candle.close,
+          stopLoss: candle.close,
+          target: candle.close,
+          riskRewardRatio: 0,
+          reason: 'Kutty alone — Strat off',
+          analysis: { kuttyAlone: true },
+        }
+      : (deferredPrimary ?? strategy.generateSignal(ctx));
     lastSignal = signal.reason;
 
     let entryAction = signal.action;
@@ -584,13 +625,18 @@ export function replayPaperOnIndex(params: {
     let entryStrategyName = strategy.name;
 
     if (entryAction !== 'BUY' && entryAction !== 'SELL') {
-      // Background Kutty — only when Trap/primary does not own the bar.
+      // Background Kutty — only when Trap/primary does not own the bar (or Kutty-alone mode).
+      const stratOwns = !kuttyAlone && primaryNeedsBar(signal);
+      if (stratOwns) {
+        clearKuttyPending(kuttyState);
+        continue;
+      }
       if (
         enableKutty &&
-        !trapOwnsBar(signal.reason) &&
         canOpenKutty({
           usedMarginRs: kuttyMargin.usedRs,
           trapOpenAnywhere: kuttyMargin.trapOpenLegs > 0,
+          kuttyAlone,
         })
       ) {
         const kSig = runKuttyScalp(ctx, kuttyState, kind);
@@ -610,6 +656,9 @@ export function replayPaperOnIndex(params: {
       } else {
         continue;
       }
+    } else {
+      // Strat entry wins — drop any half-armed Kutty setup.
+      clearKuttyPending(kuttyState);
     }
 
     const resolved = resolveAtmWeeklyOption({

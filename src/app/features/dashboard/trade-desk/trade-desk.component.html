@@ -25,19 +25,24 @@
   <div class="active-strategy-bar" role="status" aria-live="polite">
     <div class="active-strategy-label">
       <span class="as-kicker">Active now · {{ activeStrategies().modeLabel }}</span>
-      @if (activeStrategies().same) {
+      @if (kuttyAlone) {
+        <strong class="as-name">Kutty alone</strong>
+        <span class="as-meta">No Trap/Strat · ₹600 TP / ₹200 SL · ≤2t/day</span>
+      } @else if (activeStrategies().same) {
         <strong class="as-name">{{ activeStrategies().nifty.name }}</strong>
-        <span class="as-meta">Nifty + Bank · {{ activeStrategies().nifty.maxTradesLabel }}</span>
+        <span class="as-meta">Nifty + Bank · {{ activeStrategies().nifty.maxTradesLabel }}{{ enableKutty ? ' · +Kutty' : '' }}</span>
       } @else {
         <strong class="as-name"
           >Nifty {{ activeStrategies().nifty.name }} · Bank {{ activeStrategies().bank.name }}</strong
         >
         <span class="as-meta"
-          >{{ activeStrategies().nifty.maxTradesLabel }} / {{ activeStrategies().bank.maxTradesLabel }}</span
+          >{{ activeStrategies().nifty.maxTradesLabel }} / {{ activeStrategies().bank.maxTradesLabel }}{{ enableKutty ? ' · +Kutty' : '' }}</span
         >
       }
     </div>
-    <a class="as-link" href="/strategy-manager">Change in Strat</a>
+    @if (!kuttyAlone) {
+      <a class="as-link" href="/strategy-manager">Change in Strat</a>
+    }
   </div>
 
   <div class="mode-switch" role="tablist" aria-label="Desk mode">
@@ -175,14 +180,27 @@
       </label>
       <label
         class="desk-check"
-        title="Background Kutty scalp · trap+confirm · ₹600 TP / ₹200 SL · ~daily income research · never blocks Trap"
+        title="Background Kutty scalp · trap+confirm · ₹600 TP / ₹200 SL · yields immediately when Trap needs the bar"
       >
         <input
           type="checkbox"
           [(ngModel)]="enableKutty"
-          [disabled]="busy() || snapshot().running"
+          [disabled]="busy() || snapshot().running || kuttyAlone"
+          (ngModelChange)="onEnableKuttyChange()"
         />
         <span>Kutty scalp</span>
+      </label>
+      <label
+        class="desk-check"
+        title="Trade Kutty only — Trap/Strat entries off. Uncheck to run Strat again (with optional Kutty background)."
+      >
+        <input
+          type="checkbox"
+          [(ngModel)]="kuttyAlone"
+          [disabled]="busy() || snapshot().running"
+          (ngModelChange)="onKuttyAloneChange()"
+        />
+        <span>Kutty alone (no Strat)</span>
       </label>
     </div>
 
