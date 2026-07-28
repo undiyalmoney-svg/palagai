@@ -190,7 +190,7 @@ export class PaperTradeDeskService {
       enableBank,
       strictDayStop: !!options?.strictDayStop,
       dayProfitLock: !!options?.dayProfitLock,
-      enableKutty: !!options?.enableKutty,
+      enableKutty: options?.enableKutty !== false,
     };
   }
 
