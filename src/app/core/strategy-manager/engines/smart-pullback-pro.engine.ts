@@ -19,6 +19,7 @@ import {
 import { StrategySettings } from '../models/strategy-settings.model';
 import {
   applyIndexRuleProfitProtect,
+  applySlConfirmCutoff,
   indexRuleExitLogic,
   IndexRuleSpec,
   RuleDayState,
@@ -792,7 +793,7 @@ export function runSmartPullbackPro(
   };
 }
 
-/** Reuse index-rule exit path (targets / profit-protect / EOD). */
+/** Reuse index-rule exit path (targets / profit-protect / EOD / SL confirm cutoff). */
 export function smartPbExitLogic(
   candle: Candle,
   open: ManagedOpenPosition,
@@ -802,6 +803,10 @@ export function smartPbExitLogic(
 ): ManagedExitDecision | null {
   const spec: IndexRuleSpec = { entry: 'swing_retest', bias: 'ema', exit: 'eod' };
   applyIndexRuleProfitProtect(candle, open, settings);
+  const cutoff = applySlConfirmCutoff(candle, open, settings);
+  if (cutoff) {
+    return cutoff;
+  }
   return indexRuleExitLogic(candle, open, closes, settings, spec, series);
 }
 

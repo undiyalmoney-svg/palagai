@@ -71,6 +71,8 @@ export interface IndexOpenPaper {
   mfeIndexPts?: number;
   /** Running max adverse excursion (index pts, ≥ 0). */
   maeIndexPts?: number;
+  /** |entry − stop| at fill — used by SL confirm cutoff after stop ratchets. */
+  initialRiskPts?: number;
   entryReason?: string;
   timeline?: Array<{ at: string; event: string; detail?: string }>;
   /** primary = Strat; kutty = background scalp (never counts as Trap day trade). */
@@ -553,6 +555,7 @@ export function replayPaperOnIndex(params: {
             entryTime: open.entryTime,
             trail: open.trail ?? null,
             peakMfePts: open.mfeIndexPts ?? 0,
+            initialRiskPts: open.initialRiskPts ?? Math.abs(open.entry - open.stop),
           };
           exit = strategy.exitLogic(candle, managedOpen, closes, ctx);
           // Profit-protect may ratchet stop; swing_trail updates separate trail.
@@ -709,6 +712,7 @@ export function replayPaperOnIndex(params: {
       optionEntryEdge: fillEdge,
       mfeIndexPts: 0,
       maeIndexPts: 0,
+      initialRiskPts: Math.abs(entryPrice - entryStop),
       entryReason,
       source: entrySource,
       timeline: [

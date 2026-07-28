@@ -21,6 +21,7 @@ import {
   RuleDayState,
   createRuleDayState,
   indexRuleExitLogic,
+  applySlConfirmCutoff,
   recordRuleTradeClosed,
 } from './index-rule.engine';
 
@@ -283,6 +284,11 @@ export function srTrapExitLogic(
 ): ManagedExitDecision | null {
   // After a real green run (~₹1k+), trail from peak (max ~₹500 giveback) → cut & rehunt.
   const armed = armTrapProfitDrainFloor(candle, open, settings, ctx.instrumentId ?? '');
+  // Research: loser-only confirmed near-SL cutoff (never-green + 0.7R adverse confirm).
+  const cutoff = applySlConfirmCutoff(candle, open, settings);
+  if (cutoff) {
+    return cutoff;
+  }
   const exit = indexRuleExitLogic(
     candle,
     open,

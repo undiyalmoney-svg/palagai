@@ -1,3 +1,4 @@
+import { describe, expect, it } from 'vitest';
 import { AlignComboGenieManagedStrategy } from './align-combo-genie.managed-strategy';
 import { MANAGED_STRATEGY_IDS } from '../config/managed-strategy-ids';
 import {
@@ -13,6 +14,8 @@ describe('AlignComboGenieManagedStrategy', () => {
     expect(s.name).toBe('Genie');
     expect(s.supports).toEqual(['nifty', 'bank', 'stocks']);
     expect(s.getSettings().extras?.['genieRouterEnabled']).toBe(true);
+    expect(s.getSettings().extras?.['slConfirmCutoffEnabled']).toBe(true);
+    expect(s.getSettings().extras?.['slConfirmCutoffFracR']).toBe(0.7);
   });
 
   it('maps screenshot-style aligned dump day to BOTH (short combo)', () => {

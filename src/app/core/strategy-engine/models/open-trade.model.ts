@@ -13,4 +13,6 @@ export interface OpenTrade {
   marketRegime?: MarketRegime;
   /** Running max favorable excursion in index points (Trap drain floor). */
   peakMfePts?: number;
+  /** Initial risk at entry (SL confirm cutoff). */
+  initialRiskPts?: number;
 }

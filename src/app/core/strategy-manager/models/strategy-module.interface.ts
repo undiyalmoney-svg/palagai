@@ -34,6 +34,8 @@ export interface ManagedOpenPosition {
   trail?: number | null;
   /** Running max favorable excursion in index points (desk feeds this). */
   peakMfePts?: number;
+  /** Initial risk |entry − stop| at fill (for SL confirm cutoff; stop may ratchet later). */
+  initialRiskPts?: number;
 }
 
 export interface ManagedExitDecision {

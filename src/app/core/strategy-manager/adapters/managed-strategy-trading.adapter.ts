@@ -74,6 +74,7 @@ export class ManagedStrategyTradingAdapter implements TradingStrategy {
       target: trade.targetPrice,
       entryTime: trade.entryTime,
       peakMfePts: trade.peakMfePts ?? 0,
+      initialRiskPts: trade.initialRiskPts ?? Math.abs(trade.entryPrice - trade.stopLoss),
     };
     const decision = this.module.exitLogic(
       ctx.candle5m,

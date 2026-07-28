@@ -444,6 +444,71 @@ export function applyIndexRuleProfitProtect(
   }
 }
 
+/**
+ * Research (reports/sl-confirm-cutoff): strict near-SL cuts lose money.
+ * Valid rule — loser-only confirmed cutoff:
+ *  - trade never went meaningfully green (MFE < maxMfeR × risk)
+ *  - MAE ≥ fracR × risk (SL about to hit)
+ *  - close against the trade with an adverse candle body
+ * → exit at close (slightly better than waiting for hard SL on doomed legs).
+ * OOS Trap ~+₹7k / Genie-proxy ~+₹1k vs baseline; avg loss not worse.
+ */
+export function applySlConfirmCutoff(
+  candle: Candle,
+  open: ManagedOpenPosition,
+  settings: StrategySettings,
+): ManagedExitDecision | null {
+  const x = settings.extras ?? {};
+  if (x['slConfirmCutoffEnabled'] === false) {
+    return null;
+  }
+  const fracR = typeof x['slConfirmCutoffFracR'] === 'number' ? x['slConfirmCutoffFracR'] : 0.7;
+  const maxMfeR =
+    typeof x['slConfirmCutoffMaxMfeR'] === 'number' ? x['slConfirmCutoffMaxMfeR'] : 0.25;
+  if (!(fracR > 0) || !(maxMfeR >= 0)) {
+    return null;
+  }
+  const risk =
+    open.initialRiskPts != null && open.initialRiskPts > 0
+      ? open.initialRiskPts
+      : Math.abs(open.entry - open.stop);
+  if (!(risk > 0)) {
+    return null;
+  }
+
+  const mfe =
+    open.direction === 'BUY'
+      ? Math.max(0, candle.high - open.entry)
+      : Math.max(0, open.entry - candle.low);
+  const peak = Math.max(open.peakMfePts ?? 0, mfe);
+  open.peakMfePts = peak;
+  // Winners / partial greens: do not soft-cut (research: hurts net).
+  if (peak >= maxMfeR * risk) {
+    return null;
+  }
+
+  const mae =
+    open.direction === 'BUY'
+      ? Math.max(0, open.entry - candle.low)
+      : Math.max(0, candle.high - open.entry);
+  if (mae < fracR * risk) {
+    return null;
+  }
+
+  const against =
+    open.direction === 'BUY' ? candle.close < open.entry : candle.close > open.entry;
+  const adverseBody =
+    open.direction === 'BUY' ? candle.close < candle.open : candle.close > candle.open;
+  if (!(against && adverseBody)) {
+    return null;
+  }
+
+  return {
+    exitPrice: candle.close,
+    reason: 'SL cutoff — confirmed adverse',
+  };
+}
+
 export function indexRuleExitLogic(
   candle: Candle,
   open: ManagedOpenPosition,

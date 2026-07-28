@@ -68,6 +68,10 @@ export class SrTrapConfirmManagedStrategy implements IManagedStrategy {
       profitLockArmRs: 1000,
       profitLockLockRs: 500,
       profitLockGivebackRs: 500,
+      /** Research: loser-only SL confirm cutoff (0.7R adverse + never-green). */
+      slConfirmCutoffEnabled: true,
+      slConfirmCutoffFracR: 0.7,
+      slConfirmCutoffMaxMfeR: 0.25,
     },
   });
 
