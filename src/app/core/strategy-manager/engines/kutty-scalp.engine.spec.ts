@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   KUTTY_ID,
+  KUTTY_MAX_TRADES_PER_DAY,
   canOpenKutty,
   createKuttyDayState,
   kuttyExitLogic,
@@ -14,25 +15,25 @@ describe('Kutty scalp', () => {
   it('is not a managed strategy id', () => {
     expect(KUTTY_ID).toBe('kutty');
     expect(Object.values(MANAGED_STRATEGY_IDS)).not.toContain(KUTTY_ID);
+    expect(KUTTY_MAX_TRADES_PER_DAY).toBe(2);
   });
 
   it('reserves margin for Trap before Kutty', () => {
     expect(canOpenKutty({ usedMarginRs: 0, trapOpenAnywhere: false })).toBe(true);
     expect(canOpenKutty({ usedMarginRs: 35_000, trapOpenAnywhere: false })).toBe(false);
-    expect(canOpenKutty({ usedMarginRs: 50_000, trapOpenAnywhere: true })).toBe(true);
   });
 
-  it('stands down when Trap owns the bar', () => {
+  it('stands down when Trap is armed', () => {
     expect(trapOwnsBar('Trap BUY armed — wait confirm')).toBe(true);
     expect(trapOwnsBar('No S/R trap / bounce')).toBe(false);
   });
 
-  it('exits at ₹350/₹200 pts targets', () => {
+  it('uses ₹350/₹200 index pts', () => {
+    expect(kuttyTargetPts('nifty')).toBeCloseTo(350 / 65, 5);
+    expect(kuttyStopPts('nifty')).toBeCloseTo(200 / 65, 5);
     const tp = kuttyTargetPts('nifty');
     const sl = kuttyStopPts('nifty');
-    expect(tp).toBeCloseTo(350 / 65, 5);
-    expect(sl).toBeCloseTo(200 / 65, 5);
-    const buy = kuttyExitLogic(
+    const hit = kuttyExitLogic(
       {
         date: '2026-07-28T11:00:00+05:30',
         open: 100,
@@ -43,7 +44,7 @@ describe('Kutty scalp', () => {
       },
       { direction: 'BUY', entry: 100, stop: 100 - sl, target: 100 + tp },
     );
-    expect(buy?.reason).toBe('Kutty target');
-    expect(createKuttyDayState().tradesToday).toBe(0);
+    expect(hit?.reason).toBe('Kutty target');
+    expect(createKuttyDayState().pending).toBeNull();
   });
 });

@@ -67,6 +67,8 @@ export interface TradeDeskRunOptions {
   strictDayStop?: boolean;
   /** Combined day profit lock ≈ +₹5,000 (split if both books on). */
   dayProfitLock?: boolean;
+  /** Background Kutty scalp (not in Strat dropdown). Default off. */
+  enableKutty?: boolean;
 }
 
 interface LiveLeg {
@@ -101,12 +103,16 @@ export class PaperTradeDeskService {
   /** Exchange lot × this — applies to Testing + Live paper option ₹ and Live money qty. */
   private lotsMultiplier = 1;
   private deskRunOptions: Required<
-    Pick<TradeDeskRunOptions, 'enableNifty' | 'enableBank' | 'strictDayStop' | 'dayProfitLock'>
+    Pick<
+      TradeDeskRunOptions,
+      'enableNifty' | 'enableBank' | 'strictDayStop' | 'dayProfitLock' | 'enableKutty'
+    >
   > = {
     enableNifty: true,
     enableBank: true,
     strictDayStop: false,
     dayProfitLock: false,
+    enableKutty: false,
   };
   private runGeneration = 0;
   private readonly maxDaysPerCall = DESK_HISTORICAL_CHUNK_DAYS;
@@ -184,6 +190,7 @@ export class PaperTradeDeskService {
       enableBank,
       strictDayStop: !!options?.strictDayStop,
       dayProfitLock: !!options?.dayProfitLock,
+      enableKutty: !!options?.enableKutty,
     };
   }
 
@@ -323,6 +330,7 @@ export class PaperTradeDeskService {
     const risk = [
       this.deskRunOptions.strictDayStop ? 'strict −₹2950' : null,
       this.deskRunOptions.dayProfitLock ? 'profit lock +₹5000' : null,
+      this.deskRunOptions.enableKutty ? 'Kutty on' : null,
     ]
       .filter(Boolean)
       .join(', ');
@@ -432,7 +440,7 @@ export class PaperTradeDeskService {
             neededOptionTokens: needed,
             lotsMultiplier: this.lotsMultiplier,
             strategy: resolved.primary,
-            enableKutty: true,
+            enableKutty: this.deskRunOptions.enableKutty,
             kuttyMargin,
           });
           for (const t of replay.trades) {
@@ -813,7 +821,7 @@ export class PaperTradeDeskService {
         forceCloseOpen: now >= '15:15',
         lotsMultiplier: this.lotsMultiplier,
         strategy: resolved.primary,
-        enableKutty: true,
+        enableKutty: this.deskRunOptions.enableKutty,
         kuttyMargin,
       });
       for (const t of replay.trades) {

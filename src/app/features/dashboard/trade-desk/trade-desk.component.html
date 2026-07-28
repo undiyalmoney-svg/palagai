@@ -173,6 +173,17 @@
         />
         <span>Day profit lock (+₹5,000)</span>
       </label>
+      <label
+        class="desk-check"
+        title="Background Kutty scalp · trap+confirm · ₹350 TP / ₹200 SL · never blocks Trap · not in Strat dropdown"
+      >
+        <input
+          type="checkbox"
+          [(ngModel)]="enableKutty"
+          [disabled]="busy() || snapshot().running"
+        />
+        <span>Kutty scalp</span>
+      </label>
     </div>
 
     @if (mode() === 'testing') {

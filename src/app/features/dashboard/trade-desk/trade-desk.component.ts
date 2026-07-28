@@ -58,6 +58,8 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
   protected strictDayStop = false;
   /** Combined day profit lock ≈ +₹5,000. */
   protected dayProfitLock = false;
+  /** Background Kutty scalp — off by default; user must enable. */
+  protected enableKutty = false;
 
   /** Testing result filter: Mon–Fri (fetch all, show selected weekdays). */
   protected readonly weekdayOptions = PAPER_WEEKDAY_OPTIONS;
@@ -160,6 +162,7 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
       enableBank: this.enableBank,
       strictDayStop: this.strictDayStop,
       dayProfitLock: this.dayProfitLock,
+      enableKutty: this.enableKutty,
     };
   }
 
