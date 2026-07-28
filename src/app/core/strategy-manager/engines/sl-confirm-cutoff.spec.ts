@@ -62,14 +62,14 @@ describe('applySlConfirmCutoff (tighter loser-only)', () => {
     expect(hit?.reason).toBe('SL cutoff — soft ₹ adverse');
   });
 
-  it('does not cut winners that dipped near SL', () => {
+  it('does not cut deep winners that dipped near SL (MFE ≥ 0.75R)', () => {
     const open: ManagedOpenPosition = {
       direction: 'BUY',
       entry: 100,
       stop: 90,
       target: 130,
       entryTime: '2026-07-28T10:00:00+05:30',
-      peakMfePts: 5,
+      peakMfePts: 8,
       initialRiskPts: 10,
     };
     const candle = {
@@ -81,5 +81,35 @@ describe('applySlConfirmCutoff (tighter loser-only)', () => {
       volume: 0,
     };
     expect(applySlConfirmCutoff(candle, open, settings(), 'NIFTY 50')).toBeNull();
+  });
+
+  it('cuts briefly-green loser when maxMfeR allows (0.5R peak, adverse)', () => {
+    const open: ManagedOpenPosition = {
+      direction: 'BUY',
+      entry: 100,
+      stop: 90,
+      target: 130,
+      entryTime: '2026-07-28T10:00:00+05:30',
+      peakMfePts: 5, // 0.5R < 0.75R
+      initialRiskPts: 10,
+    };
+    const candle = {
+      date: '2026-07-28T10:20:00+05:30',
+      open: 95,
+      high: 95.2,
+      low: 94,
+      close: 94.2,
+      volume: 0,
+    };
+    const softSettings = defaultStrategySettings({
+      extras: {
+        slConfirmCutoffEnabled: true,
+        slConfirmCutoffFracR: 0.55,
+        slConfirmCutoffMaxMfeR: 0.75,
+        slConfirmSoftRs: 700,
+      },
+    });
+    const hit = applySlConfirmCutoff(candle, open, softSettings, 'NIFTY 50');
+    expect(hit?.reason).toBe('SL cutoff — confirmed adverse');
   });
 });

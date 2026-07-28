@@ -13,6 +13,29 @@ export interface StrategyDnaCaps {
 }
 
 /**
+ * Researched peak-trail + SL soft cutoff (reports/paper-loss-giveback-cutoff).
+ * Always re-applied on desk hydrate so stale localStorage cannot keep arm₹1000.
+ */
+export const PROTECTION_DNA_EXTRAS: Record<string, number | boolean> = {
+  profitLockArmRs: 600,
+  profitLockLockRs: 300,
+  profitLockGivebackRs: 300,
+  slConfirmCutoffEnabled: true,
+  slConfirmCutoffFracR: 0.55,
+  slConfirmCutoffMaxMfeR: 0.75,
+  slConfirmSoftRs: 700,
+};
+
+/** Strategies that share the researched Trap/Genie loss-cut DNA. */
+export function usesProtectionDna(strategyId: string): boolean {
+  return (
+    strategyId === MANAGED_STRATEGY_IDS.SR_TRAP_CONFIRM ||
+    strategyId === MANAGED_STRATEGY_IDS.ALIGN_COMBO_GENIE ||
+    strategyId === MANAGED_STRATEGY_IDS.SMART_PULLBACK_PRO
+  );
+}
+
+/**
  * Channel-aware DNA from hunts / live books.
  * Trap max-earn: ≤3/index · GENIE: Nifty≤2 Bank≤1 · etc.
  */

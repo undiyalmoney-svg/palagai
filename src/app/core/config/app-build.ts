@@ -2,7 +2,7 @@
  * App release identity — bump on every main push the user must verify in UI.
  * Shown in Trade Desk “What the app trades on” card.
  */
-export const APP_VERSION = '1.3.11';
+export const APP_VERSION = '1.3.12';
 /** Short build tag for this fix train. */
-export const APP_BUILD = '2026.07.28-peaktrail-slcutoff';
+export const APP_BUILD = '2026.07.28-paper-loss-peak600';
 export const APP_BUILD_LABEL = `v${APP_VERSION} · ${APP_BUILD}`;

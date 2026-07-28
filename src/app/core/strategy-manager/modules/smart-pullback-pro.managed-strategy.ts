@@ -60,7 +60,16 @@ export class SmartPullbackProManagedStrategy implements IManagedStrategy {
     profitProtectEnabled: false,
     regimeFilterEnabled: false,
     positionSizeLots: 1,
-    extras: { ...DEFAULT_SMART_PB_EXTRAS },
+    extras: {
+      ...DEFAULT_SMART_PB_EXTRAS,
+      profitLockArmRs: 600,
+      profitLockLockRs: 300,
+      profitLockGivebackRs: 300,
+      slConfirmCutoffEnabled: true,
+      slConfirmCutoffFracR: 0.55,
+      slConfirmCutoffMaxMfeR: 0.75,
+      slConfirmSoftRs: 700,
+    },
   });
 
   private settings: StrategySettings = defaultStrategySettings();

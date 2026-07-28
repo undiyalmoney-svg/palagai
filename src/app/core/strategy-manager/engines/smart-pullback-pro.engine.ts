@@ -20,6 +20,7 @@ import { StrategySettings } from '../models/strategy-settings.model';
 import {
   applyIndexRuleProfitProtect,
   applySlConfirmCutoff,
+  armPeakTrailFloor,
   indexRuleExitLogic,
   IndexRuleSpec,
   RuleDayState,
@@ -793,7 +794,7 @@ export function runSmartPullbackPro(
   };
 }
 
-/** Reuse index-rule exit path (targets / profit-protect / EOD / SL confirm cutoff). */
+/** Reuse index-rule exit path (peak-trail / SL confirm / targets / EOD). */
 export function smartPbExitLogic(
   candle: Candle,
   open: ManagedOpenPosition,
@@ -804,11 +805,32 @@ export function smartPbExitLogic(
 ): ManagedExitDecision | null {
   const spec: IndexRuleSpec = { entry: 'swing_retest', bias: 'ema', exit: 'eod' };
   applyIndexRuleProfitProtect(candle, open, settings);
+  // Same researched peak-trail + soft cutoff as Trap (Paper+Live shared).
+  const armed = armPeakTrailFloor(candle, open, settings, instrumentId);
   const cutoff = applySlConfirmCutoff(candle, open, settings, instrumentId);
   if (cutoff) {
     return cutoff;
   }
-  return indexRuleExitLogic(candle, open, closes, settings, spec, series);
+  const exit = indexRuleExitLogic(candle, open, closes, settings, spec, series);
+  if (exit) {
+    if (armed && exit.reason === 'Stop loss hit') {
+      return { ...exit, reason: 'Profit drained — cut & rehunt' };
+    }
+    return exit;
+  }
+  if (!armed) {
+    return null;
+  }
+  const closePts =
+    open.direction === 'BUY' ? candle.close - open.entry : open.entry - candle.close;
+  const stopPts = Math.abs(open.stop - open.entry);
+  if (closePts <= stopPts) {
+    return {
+      exitPrice: open.stop,
+      reason: 'Profit drained — cut & rehunt',
+    };
+  }
+  return null;
 }
 
 export function recordSmartPbTradeClosed(

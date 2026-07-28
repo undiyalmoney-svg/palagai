@@ -445,14 +445,64 @@ export function applyIndexRuleProfitProtect(
 }
 
 /**
- * Research (reports/sl-confirm-cutoff + tighter follow-up):
+ * Research (reports/paper-loss-giveback-cutoff):
+ * After peak MFE ≥ armRs, trail stop from peak:
+ *   floorRs = max(lockRs, peakRs − givebackRs)
+ * Shared by Trap + Genie. Champion: arm ₹600 / lock ₹300 / giveback ₹300.
+ */
+export function armPeakTrailFloor(
+  candle: Candle,
+  open: ManagedOpenPosition,
+  settings: StrategySettings,
+  instrumentId: string,
+): boolean {
+  const x = settings.extras ?? {};
+  const armRs = typeof x['profitLockArmRs'] === 'number' ? x['profitLockArmRs'] : 600;
+  const lockRs = typeof x['profitLockLockRs'] === 'number' ? x['profitLockLockRs'] : 300;
+  const givebackRs =
+    typeof x['profitLockGivebackRs'] === 'number' ? x['profitLockGivebackRs'] : 300;
+  if (!(armRs > 0)) {
+    return false;
+  }
+  const rs = /bank/i.test(instrumentId) ? 30 : 65;
+  const armPts = armRs / rs;
+
+  const barMfe =
+    open.direction === 'BUY' ? candle.high - open.entry : open.entry - candle.low;
+  const peak = Math.max(open.peakMfePts ?? 0, Math.max(0, barMfe));
+  open.peakMfePts = peak;
+
+  if (peak < armPts) {
+    return false;
+  }
+
+  const peakRs = peak * rs;
+  const floorRs = Math.max(lockRs, peakRs - Math.max(0, givebackRs));
+  const floorPts = floorRs / rs;
+
+  if (open.direction === 'BUY') {
+    const lockStop = open.entry + floorPts;
+    if (lockStop > open.stop) {
+      open.stop = lockStop;
+    }
+  } else {
+    const lockStop = open.entry - floorPts;
+    if (lockStop < open.stop) {
+      open.stop = lockStop;
+    }
+  }
+  return true;
+}
+
+/**
+ * Research (reports/sl-confirm-cutoff + paper-loss-giveback-cutoff):
  * Strict near-SL / hard ₹ caps destroy OOS net.
- * Valid loser-only confirmed cutoff:
- *  - trade never went meaningfully green (MFE < maxMfeR × risk)
+ * Valid briefly-green confirmed cutoff:
+ *  - MFE < maxMfeR × risk (never / briefly green)
  *  - AND (MAE ≥ fracR × risk  OR  adverse ₹ ≥ softRs)
  *  - close against the trade with an adverse candle body
  * → exit at close (shrinks doomed full-SL hits without killing expectancy).
- * Champion extras: fracR=0.55, softRs=800, maxMfeR=0.25.
+ * Champion extras: fracR=0.55, softRs=700, maxMfeR=0.75.
  */
 export function applySlConfirmCutoff(
   candle: Candle,
@@ -466,8 +516,8 @@ export function applySlConfirmCutoff(
   }
   const fracR = typeof x['slConfirmCutoffFracR'] === 'number' ? x['slConfirmCutoffFracR'] : 0.55;
   const maxMfeR =
-    typeof x['slConfirmCutoffMaxMfeR'] === 'number' ? x['slConfirmCutoffMaxMfeR'] : 0.25;
-  const softRs = typeof x['slConfirmSoftRs'] === 'number' ? x['slConfirmSoftRs'] : 800;
+    typeof x['slConfirmCutoffMaxMfeR'] === 'number' ? x['slConfirmCutoffMaxMfeR'] : 0.75;
+  const softRs = typeof x['slConfirmSoftRs'] === 'number' ? x['slConfirmSoftRs'] : 700;
   if (!(fracR > 0) || !(maxMfeR >= 0)) {
     return null;
   }

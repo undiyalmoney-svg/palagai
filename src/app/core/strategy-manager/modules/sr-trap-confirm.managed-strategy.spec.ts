@@ -13,12 +13,13 @@ describe('SrTrapConfirmManagedStrategy', () => {
     expect(s.getSettings().profitProtectEnabled).toBe(true);
     expect(s.getSettings().profitProtectArmR).toBe(1);
     expect(s.getSettings().profitProtectLockR).toBe(0);
-    expect(s.getSettings().extras['profitLockArmRs']).toBe(1000);
-    expect(s.getSettings().extras['profitLockLockRs']).toBe(500);
-    expect(s.getSettings().extras['profitLockGivebackRs']).toBe(500);
+    expect(s.getSettings().extras['profitLockArmRs']).toBe(600);
+    expect(s.getSettings().extras['profitLockLockRs']).toBe(300);
+    expect(s.getSettings().extras['profitLockGivebackRs']).toBe(300);
     expect(s.getSettings().extras['slConfirmCutoffEnabled']).toBe(true);
     expect(s.getSettings().extras['slConfirmCutoffFracR']).toBe(0.55);
-    expect(s.getSettings().extras['slConfirmSoftRs']).toBe(800);
+    expect(s.getSettings().extras['slConfirmCutoffMaxMfeR']).toBe(0.75);
+    expect(s.getSettings().extras['slConfirmSoftRs']).toBe(700);
     expect(s.supports).toContain('nifty');
     expect(s.supports).toContain('bank');
     expect(DEFAULT_CHANNEL_ASSIGNMENTS.nifty.paper).toBe(MANAGED_STRATEGY_IDS.SR_TRAP_CONFIRM);

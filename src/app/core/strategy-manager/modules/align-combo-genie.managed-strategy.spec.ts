@@ -16,7 +16,10 @@ describe('AlignComboGenieManagedStrategy', () => {
     expect(s.getSettings().extras?.['genieRouterEnabled']).toBe(true);
     expect(s.getSettings().extras?.['slConfirmCutoffEnabled']).toBe(true);
     expect(s.getSettings().extras?.['slConfirmCutoffFracR']).toBe(0.55);
-    expect(s.getSettings().extras?.['slConfirmSoftRs']).toBe(800);
+    expect(s.getSettings().extras?.['slConfirmCutoffMaxMfeR']).toBe(0.75);
+    expect(s.getSettings().extras?.['slConfirmSoftRs']).toBe(700);
+    expect(s.getSettings().extras?.['profitLockArmRs']).toBe(600);
+    expect(s.getSettings().extras?.['profitLockGivebackRs']).toBe(300);
   });
 
   it('maps screenshot-style aligned dump day to BOTH (short combo)', () => {

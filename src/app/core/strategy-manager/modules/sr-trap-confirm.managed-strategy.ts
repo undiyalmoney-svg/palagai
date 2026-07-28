@@ -32,7 +32,7 @@ export class SrTrapConfirmManagedStrategy implements IManagedStrategy {
   readonly name = 'Trap';
   readonly version = '1.0.0';
   readonly description =
-    'Default · liquidity trap + next-bar confirm · 3.5R · peak-trail ₹500 giveback · ≤3 trades/day.';
+    'Default · liquidity trap + next-bar confirm · 3.5R · peak-trail arm₹600/gb₹300 · ≤3 trades/day.';
   readonly supports: readonly DeskChannel[] = ['nifty', 'bank'];
 
   readonly defaultSettings = defaultStrategySettings({
@@ -62,17 +62,17 @@ export class SrTrapConfirmManagedStrategy implements IManagedStrategy {
       slPadPts: 2,
       minConfirmBody: 0,
       /**
-       * After peak MFE ≥ ₹1000, trail from peak (allow ≤ ₹500 giveback).
-       * Floor never below ₹500. Peak ₹1400 → lock ~₹900 — do not wait until ₹0.
+       * Research (paper-loss-giveback-cutoff): arm earlier so ~₹800–1k peaks
+       * cannot reverse to full hard SL. Peak ₹900 → lock ~₹600 (not wait until ₹0).
        */
-      profitLockArmRs: 1000,
-      profitLockLockRs: 500,
-      profitLockGivebackRs: 500,
-      /** Research: loser-only SL confirm (0.55R or ₹800 soft) — shrinks ~₹1k doomed SLs. */
+      profitLockArmRs: 600,
+      profitLockLockRs: 300,
+      profitLockGivebackRs: 300,
+      /** Research: briefly-green SL confirm (MFE < 0.75R + 0.55R / ₹700 soft). */
       slConfirmCutoffEnabled: true,
       slConfirmCutoffFracR: 0.55,
-      slConfirmCutoffMaxMfeR: 0.25,
-      slConfirmSoftRs: 800,
+      slConfirmCutoffMaxMfeR: 0.75,
+      slConfirmSoftRs: 700,
     },
   });
 

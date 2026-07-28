@@ -22,6 +22,7 @@ import {
   createRuleDayState,
   indexRuleExitLogic,
   applySlConfirmCutoff,
+  armPeakTrailFloor,
   recordRuleTradeClosed,
 } from './index-rule.engine';
 
@@ -282,9 +283,9 @@ export function srTrapExitLogic(
   settings: StrategySettings,
   ctx: StrategyContext,
 ): ManagedExitDecision | null {
-  // After a real green run (~₹1k+), trail from peak (max ~₹500 giveback) → cut & rehunt.
-  const armed = armTrapProfitDrainFloor(candle, open, settings, ctx.instrumentId ?? '');
-  // Research: loser-only confirmed near-SL cutoff (never-green + 0.55R / ₹800 soft).
+  // Research: after ~₹600+ peak, trail (≤₹300 giveback) → cut & rehunt.
+  const armed = armPeakTrailFloor(candle, open, settings, ctx.instrumentId ?? '');
+  // Research: briefly-green SL confirm (MFE < 0.75R + 0.55R / ₹700 soft).
   const cutoff = applySlConfirmCutoff(candle, open, settings, ctx.instrumentId ?? '');
   if (cutoff) {
     return cutoff;
@@ -319,53 +320,12 @@ export function srTrapExitLogic(
   return null;
 }
 
-/**
- * User rule: sitting +₹1400 → ₹0 is not valid.
- * After peak MFE ≥ armRs, trail stop from peak:
- *   floorRs = max(lockRs, peakRs − givebackRs)
- * So peak ₹1400 + giveback ₹500 → lock ~₹900 (not wait until flat).
- */
+/** @deprecated Prefer armPeakTrailFloor — kept for existing Trap specs. */
 export function armTrapProfitDrainFloor(
   candle: Candle,
   open: ManagedOpenPosition,
   settings: StrategySettings,
   instrumentId: string,
 ): boolean {
-  const x = settings.extras ?? {};
-  const armRs = typeof x['profitLockArmRs'] === 'number' ? x['profitLockArmRs'] : 1000;
-  const lockRs = typeof x['profitLockLockRs'] === 'number' ? x['profitLockLockRs'] : 500;
-  const givebackRs =
-    typeof x['profitLockGivebackRs'] === 'number' ? x['profitLockGivebackRs'] : 500;
-  if (!(armRs > 0)) {
-    return false;
-  }
-  const rs = /bank/i.test(instrumentId) ? 30 : 65;
-  const armPts = armRs / rs;
-
-  const barMfe =
-    open.direction === 'BUY' ? candle.high - open.entry : open.entry - candle.low;
-  const peak = Math.max(open.peakMfePts ?? 0, Math.max(0, barMfe));
-  open.peakMfePts = peak;
-
-  if (peak < armPts) {
-    return false;
-  }
-
-  const peakRs = peak * rs;
-  const floorRs = Math.max(lockRs, peakRs - Math.max(0, givebackRs));
-  const floorPts = floorRs / rs;
-
-  // Armed: ratchet stop to peak-trail floor (never loosen).
-  if (open.direction === 'BUY') {
-    const lockStop = open.entry + floorPts;
-    if (lockStop > open.stop) {
-      open.stop = lockStop;
-    }
-  } else {
-    const lockStop = open.entry - floorPts;
-    if (lockStop < open.stop) {
-      open.stop = lockStop;
-    }
-  }
-  return true;
+  return armPeakTrailFloor(candle, open, settings, instrumentId);
 }
