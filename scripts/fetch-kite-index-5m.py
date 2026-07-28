@@ -28,7 +28,7 @@ INSTRUMENTS = {
     "bank": (260105, "banknifty-5m-2020-2026.json"),
 }
 FROM = datetime(2020, 1, 1, 9, 15, 0)
-TO = datetime(2026, 7, 23, 15, 30, 0)
+TO = datetime(2026, 7, 28, 15, 30, 0)
 CHUNK_DAYS = 90
 DELAY = 0.45
 

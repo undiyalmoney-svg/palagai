@@ -24,7 +24,9 @@ Those two files are the product “secret sauce.” Docs 01–03 expand them **l
 9. Use **20** for S/R · pullback · retest daily ₹500 (**Donch Retest OR-mid 1.5R+BE** default on indices).  
 10. Use **21** for stocks check — **Donch Retest is NO_GO on equities**; keep **GAP_FADE_500**.  
 11. Use **26** for **Ruler removal** — restore Donch Retest as Nifty/Bank Paper+Live default.  
-12. Use **27** for **Smart Pullback PRO** (Pine) — EMA pullback · 1.5R daily ₹ research (selectable, not default).
+12. Use **27** for **Smart Pullback PRO** (Pine) — EMA pullback · 1.5R daily ₹ research (selectable, not default).  
+13. Use **31** for **S/R Trap + Confirm** max-earn hunt (wired selectable).  
+14. Use **33** for **Trap RCA + Kutty design + Trade Desk UI defaults** (Kite 5y evidence; no trading-logic change yet).
 
 ## Not in the deploy
 Angular assets come from `src/` + `public/` only (`angular.json`).  

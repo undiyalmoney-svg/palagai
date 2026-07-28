@@ -42,9 +42,9 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
   protected readonly appBuildLabel = APP_BUILD_LABEL;
 
   protected readonly mode = signal<PaperDeskMode>('testing');
-  /** Default 60d so short red months (e.g. early Jul) don’t hide June-scale Index ₹. */
-  protected fromDate = shiftDays(-60);
-  protected toDate = todayIso();
+  /** Default both dates to yesterday so Testing opens on the last completed session. */
+  protected fromDate = yesterdayIso();
+  protected toDate = yesterdayIso();
   /** When Live + checked, places real Kite MIS orders. */
   protected realOrders = false;
   protected realOrdersAck = false;
@@ -54,8 +54,8 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
   /** Trade Desk book + risk checkboxes (Testing + Live). */
   protected enableNifty = true;
   protected enableBank = true;
-  /** Combined strict day loss ≈ −₹2,950 — on by default to cut heavy red days. */
-  protected strictDayStop = true;
+  /** Combined strict day loss ≈ −₹2,950 — off by default; user must opt in. */
+  protected strictDayStop = false;
   /** Combined day profit lock ≈ +₹5,000. */
   protected dayProfitLock = false;
 
@@ -353,6 +353,11 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
 
 function todayIso(): string {
   return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+}
+
+/** Yesterday in Asia/Kolkata calendar (used as Trade Desk Testing default). */
+function yesterdayIso(): string {
+  return shiftDays(-1);
 }
 
 function shiftDays(days: number): string {
