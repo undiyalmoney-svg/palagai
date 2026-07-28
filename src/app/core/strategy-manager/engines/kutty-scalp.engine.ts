@@ -1,7 +1,7 @@
 /**
  * Kutty — background scalp (NOT in Strat dropdown).
- * DNA (Kite OOS 2024+ hunt): S/R trap + next-bar confirm · TP ₹350 · SL ₹200
- * ~67% WR · never blocks Trap · margin-gated.
+ * DNA (doc 34 daily-profit hunt): S/R trap + next-bar confirm · TP ₹600 · SL ₹200
+ * OOS ~₹838/day · ~86% green · never blocks Trap · margin-gated.
  */
 import { Candle } from '../../models/candle.model';
 import { StrategyContext } from '../../strategy-engine/models/strategy-context.model';
@@ -17,7 +17,7 @@ import {
 
 export const KUTTY_ID = 'kutty';
 export const KUTTY_NAME = 'Kutty';
-export const KUTTY_TARGET_RS = 350;
+export const KUTTY_TARGET_RS = 600;
 export const KUTTY_STOP_RS = 200;
 export const KUTTY_CAPITAL_RS = 60_000;
 export const KUTTY_TRAP_RESERVE_RS = 30_000;

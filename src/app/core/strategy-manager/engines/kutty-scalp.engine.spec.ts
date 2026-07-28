@@ -28,8 +28,8 @@ describe('Kutty scalp', () => {
     expect(trapOwnsBar('No S/R trap / bounce')).toBe(false);
   });
 
-  it('uses ₹350/₹200 index pts', () => {
-    expect(kuttyTargetPts('nifty')).toBeCloseTo(350 / 65, 5);
+  it('uses ₹600/₹200 index pts (doc 34 champion)', () => {
+    expect(kuttyTargetPts('nifty')).toBeCloseTo(600 / 65, 5);
     expect(kuttyStopPts('nifty')).toBeCloseTo(200 / 65, 5);
     const tp = kuttyTargetPts('nifty');
     const sl = kuttyStopPts('nifty');
