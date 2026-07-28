@@ -58,8 +58,8 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
   protected strictDayStop = false;
   /** Combined day profit lock ≈ +₹5,000. */
   protected dayProfitLock = false;
-  /** Background Kutty scalp — off by default; user must enable. */
-  protected enableKutty = false;
+  /** Background Kutty scalp — on by default for Paper + Live (doc 34 champion). */
+  protected enableKutty = true;
 
   /** Testing result filter: Mon–Fri (fetch all, show selected weekdays). */
   protected readonly weekdayOptions = PAPER_WEEKDAY_OPTIONS;

@@ -112,7 +112,7 @@ export class PaperTradeDeskService {
     enableBank: true,
     strictDayStop: false,
     dayProfitLock: false,
-    enableKutty: false,
+    enableKutty: true,
   };
   private runGeneration = 0;
   private readonly maxDaysPerCall = DESK_HISTORICAL_CHUNK_DAYS;
