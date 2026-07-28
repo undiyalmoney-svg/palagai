@@ -28,14 +28,15 @@ import {
   KUTTY_ID,
   KUTTY_MARGIN_PER_TRADE_RS,
   KUTTY_NAME,
-  KUTTY_YIELD_TRAP_REASON,
+  KUTTY_YIELD_STRAT_REASON,
   canOpenKutty,
   clearKuttyPending,
   createKuttyDayState,
   kuttyExitLogic,
-  primaryNeedsBar,
   recordKuttyClosed,
   runKuttyScalp,
+  stratIsReady,
+  stratPathFree,
 } from '../strategy-manager/engines/kutty-scalp.engine';
 
 /** Tighter of hard stop and swing trail — for live SL-M / UI (paper exit keeps them separate). */
@@ -526,18 +527,17 @@ export function replayPaperOnIndex(params: {
       const isKutty = open.source === 'kutty';
       let exit = null as ReturnType<typeof kuttyExitLogic>;
 
-      // Trap must never wait behind a Kutty scalp — yield the slot when Strat needs the bar.
+      // Strat priority: if Strat is ready, Kutty waits (no new scalp).
+      // Only yield an open Kutty leg when Strat actually enters (BUY/SELL).
       if (!kuttyAlone && isKutty) {
-        const trapSig = strategy.generateSignal(ctx);
-        if (primaryNeedsBar(trapSig)) {
+        const stratSig = strategy.generateSignal(ctx);
+        if (stratIsReady(stratSig)) {
           clearKuttyPending(kuttyState);
-          if (trapSig.action === 'BUY' || trapSig.action === 'SELL') {
-            // Instant handoff at Trap fill so Kutty never blocks the confirm bar.
-            exit = { exitPrice: trapSig.entryPrice, reason: KUTTY_YIELD_TRAP_REASON };
-            deferredPrimary = trapSig;
-          } else {
-            exit = { exitPrice: candle.close, reason: KUTTY_YIELD_TRAP_REASON };
-          }
+        }
+        if (stratSig.action === 'BUY' || stratSig.action === 'SELL') {
+          // Instant handoff at Strat fill — Kutty must not block the entry bar.
+          exit = { exitPrice: stratSig.entryPrice, reason: KUTTY_YIELD_STRAT_REASON };
+          deferredPrimary = stratSig;
         }
       }
 
@@ -625,10 +625,10 @@ export function replayPaperOnIndex(params: {
     let entryStrategyName = strategy.name;
 
     if (entryAction !== 'BUY' && entryAction !== 'SELL') {
-      // Background Kutty — only when Trap/primary does not own the bar (or Kutty-alone mode).
-      const stratOwns = !kuttyAlone && primaryNeedsBar(signal);
-      if (stratOwns) {
+      // Kutty only when Strat path is free (idle). If Strat is ready/armed → wait.
+      if (!kuttyAlone && !stratPathFree(signal)) {
         clearKuttyPending(kuttyState);
+        lastSignal = `Kutty wait — Strat ready · ${signal.reason}`;
         continue;
       }
       if (

@@ -1,7 +1,7 @@
 /**
  * Kutty — background scalp (NOT in Strat dropdown).
  * DNA (doc 34 daily-profit hunt): S/R trap + next-bar confirm · TP ₹600 · SL ₹200
- * OOS ~₹838/day · ~86% green · never blocks Trap · margin-gated.
+ * OOS ~₹838/day · ~86% green · trades only when Strat path is free · waits when Strat ready.
  */
 import { Candle } from '../../models/candle.model';
 import { StrategyContext } from '../../strategy-engine/models/strategy-context.model';
@@ -81,30 +81,83 @@ function wait(candle: Candle, reason: string): ManagedStrategySignal {
   };
 }
 
-/** True when Strat/Trap has armed next-bar confirm — Kutty must stand down. */
-export function trapOwnsBar(trapReason: string): boolean {
-  const r = trapReason.toLowerCase();
-  // Trap arm only — do not match Kutty's own "Kutty BUY armed".
-  return (
-    r.includes('trap buy armed') ||
-    r.includes('trap sell armed') ||
-    r.includes('wait confirm')
-  );
+/**
+ * True when Strat (Trap or any other) is ready / owns the next bar —
+ * Kutty must wait, not open a competing scalp.
+ *
+ * Ready = entry signal, or armed/pending confirm (reason or analysis.armed).
+ */
+export function stratIsReady(signal: {
+  action: string;
+  reason: string;
+  analysis?: Record<string, unknown>;
+}): boolean {
+  if (signal.action === 'BUY' || signal.action === 'SELL') {
+    return true;
+  }
+  // Day-stopped / skipped → path is free for Kutty.
+  if (signal.action === 'SKIPPED' || signal.action === 'NO_TRADE') {
+    return false;
+  }
+  const a = signal.analysis ?? {};
+  if (a['kuttyStandDown'] === true || a['primaryReady'] === true || a['setupArmed'] === true) {
+    return true;
+  }
+  const armed = a['armed'];
+  if (armed != null && armed !== false && armed !== 0 && armed !== '') {
+    return true;
+  }
+  return stratReadyReason(signal.reason);
 }
 
-/** Strat wants this bar (entry or armed confirm) — Kutty must yield. */
+/** Path free for Kutty — Strat is idle, not armed, not entering. */
+export function stratPathFree(signal: {
+  action: string;
+  reason: string;
+  analysis?: Record<string, unknown>;
+}): boolean {
+  return !stratIsReady(signal);
+}
+
+/** @deprecated Prefer stratIsReady — Trap-specific name kept for older call sites. */
+export function trapOwnsBar(trapReason: string): boolean {
+  return stratReadyReason(trapReason);
+}
+
+/** Strat wants this bar (entry or armed) — Kutty must not open; may yield on entry. */
 export function primaryNeedsBar(signal: {
   action: string;
   reason: string;
+  analysis?: Record<string, unknown>;
 }): boolean {
-  return signal.action === 'BUY' || signal.action === 'SELL' || trapOwnsBar(signal.reason);
+  return stratIsReady(signal);
+}
+
+function stratReadyReason(reason: string): boolean {
+  const r = reason.toLowerCase();
+  // Never treat Kutty's own arm text as Strat-ready.
+  if (r.startsWith('kutty')) {
+    return false;
+  }
+  return (
+    r.includes('wait confirm') ||
+    r.includes('trap buy armed') ||
+    r.includes('trap sell armed') ||
+    /\barmed\b/.test(r) ||
+    r.includes('pending entry') ||
+    r.includes('awaiting confirm') ||
+    r.includes('setup ready')
+  );
 }
 
 export function clearKuttyPending(state: KuttyDayState): void {
   state.pending = null;
 }
 
-export const KUTTY_YIELD_TRAP_REASON = 'Kutty yield — Trap priority';
+/** Open Kutty leg closed so Strat can take its entry on the same bar. */
+export const KUTTY_YIELD_STRAT_REASON = 'Kutty yield — Strat priority';
+/** @deprecated Alias — Strat priority (Trap or any assigned strategy). */
+export const KUTTY_YIELD_TRAP_REASON = KUTTY_YIELD_STRAT_REASON;
 
 function swingHL(dayBars: Candle[], i: number): { sh: number; sl: number } {
   const start = Math.max(0, i - SWING_LB);
