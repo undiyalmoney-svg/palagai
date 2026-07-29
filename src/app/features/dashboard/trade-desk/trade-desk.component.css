@@ -224,9 +224,29 @@
   color: #075985;
 }
 
+.phase-pill[data-phase='scanning'] {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
 .phase-pill[data-phase='in_trade'] {
   background: #ccfbf1;
   color: #115e59;
+}
+
+.phase-pill[data-phase='blocked'] {
+  background: #ffe4e6;
+  color: #9f1239;
+}
+
+.phase-pill[data-phase='closed'] {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.phase-pill[data-phase='done'] {
+  background: #e2e8f0;
+  color: #334155;
 }
 
 .phase-pill[data-phase='target_hit'] {
@@ -237,6 +257,102 @@
 .phase-pill[data-phase='sl_hit'] {
   background: #fee2e2;
   color: #991b1b;
+}
+
+.live-assistant {
+  display: grid;
+  gap: 0.55rem;
+  margin: 0 0 1rem;
+  padding: 0.95rem 1.05rem;
+  border-radius: 14px;
+  border: 1px solid rgba(14, 116, 144, 0.28);
+  background: linear-gradient(145deg, rgba(224, 242, 254, 0.95), rgba(240, 253, 250, 0.88));
+  color: #0c4a6e;
+}
+
+.live-assistant[data-tone='in_trade'] {
+  border-color: rgba(15, 118, 110, 0.35);
+  background: linear-gradient(145deg, rgba(204, 251, 241, 0.95), rgba(236, 254, 255, 0.9));
+  color: #115e59;
+}
+
+.live-assistant[data-tone='blocked'] {
+  border-color: rgba(244, 63, 94, 0.35);
+  background: linear-gradient(145deg, #fff1f2, #fff7ed);
+  color: #9f1239;
+}
+
+.live-assistant[data-tone='closed'] {
+  border-color: rgba(217, 119, 6, 0.35);
+  background: linear-gradient(145deg, #fffbeb, #f8fafc);
+  color: #92400e;
+}
+
+.live-assistant[data-tone='done'] {
+  border-color: rgba(100, 116, 139, 0.3);
+  background: linear-gradient(145deg, #f8fafc, #f1f5f9);
+  color: #334155;
+}
+
+.la-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem 0.75rem;
+}
+
+.la-kicker {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: inherit;
+  opacity: 0.75;
+}
+
+.live-assistant .phase-pill {
+  margin: 0;
+}
+
+.la-detail {
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: 650;
+  line-height: 1.35;
+}
+
+.la-lines {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.la-lines li {
+  display: grid;
+  gap: 0.1rem;
+  padding: 0.45rem 0.55rem;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.55);
+  border: 1px solid rgba(15, 23, 42, 0.06);
+}
+
+.la-lines strong {
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.la-lines span {
+  font-size: 0.8rem;
+  line-height: 1.35;
+  opacity: 0.92;
+}
+
+.la-foot {
+  margin: 0;
+  font-size: 0.72rem;
+  opacity: 0.72;
 }
 
 .target-banner {
