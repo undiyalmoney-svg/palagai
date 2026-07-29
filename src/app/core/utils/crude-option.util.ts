@@ -38,6 +38,11 @@ function parseExpiry(expiry: string): Date | null {
   return Number.isNaN(d.getTime()) ? null : startOfDay(d);
 }
 
+function formatExpiryIso(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
 function isCrudeMiniOption(item: Instrument): boolean {
   if (item.exchange !== 'MCX') {
     return false;
@@ -65,30 +70,86 @@ export function countCrudeMiniOptions(instruments: Instrument[]): number {
   return instruments.filter(isCrudeMiniOption).length;
 }
 
-/** List near-ATM CRUDEOILM options for the nearest live expiry. */
+/**
+ * Unique sorted option expiry days on/after asOf.
+ */
+export function listCrudeLiveExpiries(
+  instruments: Instrument[],
+  asOfDay: Date,
+): Date[] {
+  const seen = new Set<number>();
+  const out: Date[] = [];
+  for (const item of instruments) {
+    if (!isCrudeMiniOption(item) && !isAnyCrudeOption(item)) {
+      continue;
+    }
+    const exp = parseExpiry(item.expiry);
+    if (!exp || exp < asOfDay) {
+      continue;
+    }
+    const key = exp.getTime();
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    out.push(exp);
+  }
+  out.sort((a, b) => a.getTime() - b.getTime());
+  return out;
+}
+
+/**
+ * Never trade the current expiry on expiry day — always the next contract.
+ * If asOf is an expiry present in the chain (or equals the front expiry), roll forward.
+ */
+export function resolveCrudeFrontExpiry(
+  asOfDay: Date,
+  liveExpiries: Date[],
+): Date | null {
+  if (!liveExpiries.length) {
+    return null;
+  }
+  const day = startOfDay(asOfDay);
+  // Front = first expiry >= asOf. On that day, skip to the next one.
+  if (liveExpiries[0]!.getTime() === day.getTime()) {
+    return liveExpiries[1] ?? null;
+  }
+  return liveExpiries[0]!;
+}
+
+/** True when asOf matches a listed crude option expiry (must roll). */
+export function isCrudeOptionExpiryDay(
+  asOfDay: Date,
+  instruments: Instrument[],
+): boolean {
+  const day = startOfDay(asOfDay);
+  return listCrudeLiveExpiries(instruments, day).some((e) => e.getTime() === day.getTime());
+}
+
+/** List near-ATM CRUDEOILM options for the tradeable front expiry (skips expiry day). */
 export function listCrudeOilMiniOptions(
   instruments: Instrument[],
   spot: number,
   limit = 12,
+  asOfDateTime?: string,
 ): { atm: CrudeOptionPick[]; expiry: string | null } {
-  const today = startOfDay(new Date());
-  const options = instruments.filter(isCrudeMiniOption).filter((item) => {
-    if (!item.expiry) {
-      return true;
-    }
-    return startOfDay(new Date(item.expiry)) >= today;
-  });
-
-  if (!options.length) {
+  const asOf = asOfDateTime
+    ? new Date(asOfDateTime.includes('T') ? asOfDateTime : asOfDateTime.replace(' ', 'T'))
+    : new Date();
+  const asOfDay = Number.isNaN(asOf.getTime()) ? startOfDay(new Date()) : startOfDay(asOf);
+  const live = listCrudeLiveExpiries(instruments, asOfDay);
+  const front = resolveCrudeFrontExpiry(asOfDay, live);
+  if (!front) {
     return { atm: [], expiry: null };
   }
+  const nearestExpiry = formatExpiryIso(front);
 
-  const nearestExpiry = options
-    .map((item) => item.expiry)
-    .filter(Boolean)
-    .sort()[0];
-
-  const chain = options.filter((item) => item.expiry === nearestExpiry);
+  const chain = instruments
+    .filter(isCrudeMiniOption)
+    .filter((item) => {
+      const exp = parseExpiry(item.expiry);
+      return exp != null && exp.getTime() === front.getTime();
+    });
   const atmStrike = roundCrudeStrike(spot);
 
   const picks: CrudeOptionPick[] = chain
@@ -102,7 +163,7 @@ export function listCrudeOilMiniOptions(
     })
     .slice(0, limit);
 
-  return { atm: picks, expiry: nearestExpiry ?? null };
+  return { atm: picks, expiry: nearestExpiry };
 }
 
 export function pickCrudeDirectionOption(
@@ -118,6 +179,7 @@ export function pickCrudeDirectionOption(
 /**
  * ATM CRUDEOILM CE/PE for paper + live desk.
  * Prefers mini chain; falls back to synthetic label when missing.
+ * On expiry day, always selects the **next** expiry (never same-day contract).
  */
 export function resolveAtmCrudeMiniOption(params: {
   instruments: Instrument[];
@@ -143,10 +205,19 @@ export function resolveAtmCrudeMiniOption(params: {
       return aMini - bMini;
     });
 
+  const liveExpiries = listCrudeLiveExpiries(params.instruments, asOfDay);
+  const front = resolveCrudeFrontExpiry(asOfDay, liveExpiries);
+
   const withExpiry = pool
     .map((item) => ({ item, exp: parseExpiry(item.expiry) }))
     .filter((row): row is { item: Instrument; exp: Date } => row.exp != null)
-    .filter((row) => row.exp >= asOfDay);
+    .filter((row) => {
+      if (!front) {
+        // No chain expiry map — still never pick same-day expiry.
+        return row.exp > asOfDay;
+      }
+      return row.exp.getTime() === front.getTime();
+    });
 
   const exact = withExpiry
     .filter((row) => Math.abs(row.item.strike - strike) < 0.01)
@@ -169,7 +240,12 @@ export function resolveAtmCrudeMiniOption(params: {
   }
 
   return {
-    instrument: buildSyntheticCrudeOption(params.direction, params.spot, asOfDay),
+    instrument: buildSyntheticCrudeOption(
+      params.direction,
+      params.spot,
+      asOfDay,
+      front ?? undefined,
+    ),
     source: 'synthetic',
   };
 }
@@ -195,11 +271,17 @@ function buildSyntheticCrudeOption(
   direction: 'BUY' | 'SELL',
   spot: number,
   asOfDay: Date,
+  frontExpiry?: Date,
 ): Instrument {
   const optType = direction === 'BUY' ? 'CE' : 'PE';
   const strike = roundCrudeStrike(spot);
-  const pad = (n: number) => String(n).padStart(2, '0');
-  const expiry = `${asOfDay.getFullYear()}-${pad(asOfDay.getMonth() + 1)}-${pad(asOfDay.getDate())}`;
+  // Prefer known next front; else bump one calendar day so we never label same-day expiry.
+  let exp = frontExpiry ? startOfDay(frontExpiry) : startOfDay(asOfDay);
+  if (exp.getTime() <= asOfDay.getTime()) {
+    exp = new Date(asOfDay);
+    exp.setDate(exp.getDate() + 1);
+  }
+  const expiry = formatExpiryIso(exp);
   return {
     instrumentToken: 0,
     exchangeToken: 0,

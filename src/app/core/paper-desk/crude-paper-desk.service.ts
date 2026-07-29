@@ -28,15 +28,14 @@ import {
   enrichCrudeTradesWithOptionPremiums,
   replayPaperOnCrude,
 } from './crude-paper-engine';
-import { effectiveProtectiveStop } from './paper-desk-engine';
-import { applyKiteFillPnl } from './apply-kite-fill-pnl';
-import { enrichTradesWithCharges } from './trade-charges.util';
 import { buildPaperDeskDayStats, emptyPaperDeskDayStats } from './paper-desk-day-stats';
+import { CRUDE_EXIT_BY, CRUDE_RUPEES_PER_POINT } from '../strategy-engine/strategies/crude-pdhl-evening/crude-pdhl-evening.evaluator';
 import {
-  MAX_CRUDE_OPTION_HISTORY_TOKENS,
-  rankTokensByFrequency,
-} from './option-history-tokens.util';
-import { CRUDE_EXIT_BY, CRUDE_RUPEES_PER_POINT, resolveCrudeDayLossStopPts } from '../strategy-engine/strategies/crude-pdhl-evening/crude-pdhl-evening.evaluator';
+  CrudeStrategyProfileId,
+  CrudeTradeParams,
+  resolveCrudeProfileDayLossPts,
+  resolveCrudeStrategyProfile,
+} from '../strategy-engine/strategies/crude-pdhl-evening/crude-strategy-profile';
 import {
   PaperDeskMode,
   PaperDeskSnapshot,
@@ -50,12 +49,17 @@ const HISTORICAL_TIMEOUT_MS = 45_000;
 export interface CrudeDeskRunOptions {
   lots?: number;
   realOrders?: boolean;
-  /** Stricter day loss ≈ −₹2,950 (295 pts). Off = champion −240 pts. */
+  /** Stricter day loss (profile-dependent pts). */
   strictDayStop?: boolean;
-  /** Morning ORB entries 10:00–12:00 (all-months-green on Mar–Jul sample). */
+  /** Morning ORB entries 10:00–12:00. */
   enableMorning?: boolean;
-  /** Evening PDHL entries 18:30–20:30 (optional; not all-months-green). */
+  /** Evening PDHL entries 18:30–20:30. */
   enableEvening?: boolean;
+  /**
+   * Strategy profile. Default `daily-income` (₹300–1,000/day band, 1 lot × ₹10).
+   * Use `champion` for hunt SL/TP without day profit lock.
+   */
+  strategyProfile?: CrudeStrategyProfileId;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -77,7 +81,8 @@ export class CrudePaperDeskService {
   private strictDayStop = false;
   private enableMorning = true;
   private enableEvening = true;
-  private dayLossStopPts = resolveCrudeDayLossStopPts(false);
+  private tradeParams: CrudeTradeParams = resolveCrudeStrategyProfile('champion');
+  private dayLossStopPts = this.tradeParams.dayLossStopPts;
   private runGeneration = 0;
   private readonly maxDaysPerCall = DESK_HISTORICAL_CHUNK_DAYS;
 
@@ -117,7 +122,8 @@ export class CrudePaperDeskService {
     this.strictDayStop = !!options.strictDayStop;
     this.enableMorning = options.enableMorning !== false;
     this.enableEvening = options.enableEvening !== false;
-    this.dayLossStopPts = resolveCrudeDayLossStopPts(this.strictDayStop);
+    this.tradeParams = resolveCrudeStrategyProfile(options.strategyProfile);
+    this.dayLossStopPts = resolveCrudeProfileDayLossPts(this.tradeParams, this.strictDayStop);
     if (!this.enableMorning && !this.enableEvening) {
       this.busy.set(false);
       this.snapshot.set({
@@ -196,6 +202,7 @@ export class CrudePaperDeskService {
           dayLossStopPts: this.dayLossStopPts,
           enableMorning: this.enableMorning,
           enableEvening: this.enableEvening,
+          tradeParams: this.tradeParams,
         });
         dayNetIndexPts += Object.values(replay.dayNetByDate).reduce((a, v) => a + v, 0);
         lastSignal = replay.lastSignal || lastSignal;
@@ -226,10 +233,7 @@ export class CrudePaperDeskService {
         allEnriched.push(...enriched);
       }
 
-      const sorted = enrichTradesWithCharges(
-        allEnriched.sort((a, b) => a.entryTime.localeCompare(b.entryTime)),
-        this.lotsMultiplier,
-      );
+      const sorted = allEnriched.sort((a, b) => a.entryTime.localeCompare(b.entryTime));
       const status = withLiveFields({
         instrumentId: CRUDE_OIL_MINI_INSTRUMENT.id,
         instrumentName: `${CRUDE_OIL_MINI_INSTRUMENT.name} (${future.tradingSymbol})`,
@@ -254,7 +258,7 @@ export class CrudePaperDeskService {
         marketOpen: true,
         realOrders: false,
         lastTickAt: null,
-        message: `Testing complete · ${sorted.length} paper trade(s) · ${batches.length} batch(es) · ${this.lotsMultiplier} lot(s) · ${this.windowsLabel()} · day stop −${this.dayLossStopPts} · ${this.kiteStatsLabel()}`,
+        message: `Testing complete · ${sorted.length} paper trade(s) · ${batches.length} batch(es) · ${this.lotsMultiplier} lot(s) · ${this.tradeParams.label} · ${this.windowsLabel()} · ${this.riskLabel()} · ${this.kiteStatsLabel()}`,
         statuses: [status],
         trades: sorted,
         totals: summarize(sorted, this.lotsMultiplier, CRUDE_RUPEES_PER_POINT),
@@ -291,9 +295,9 @@ export class CrudePaperDeskService {
     this.strictDayStop = !!options?.strictDayStop;
     this.enableMorning = options?.enableMorning !== false;
     this.enableEvening = options?.enableEvening !== false;
-    this.dayLossStopPts = resolveCrudeDayLossStopPts(this.strictDayStop);
-    // Soft clear — keep Nifty/Bank Trade Desk live broker state intact.
-    this.liveOrders.clearInstruments([CRUDE_OIL_MINI_INSTRUMENT.id]);
+    this.tradeParams = resolveCrudeStrategyProfile(options?.strategyProfile);
+    this.dayLossStopPts = resolveCrudeProfileDayLossPts(this.tradeParams, this.strictDayStop);
+    this.liveOrders.reset();
     this.liveOrders.setLotsMultiplier(this.lotsMultiplier);
     const today = todayIso();
     const now = istNowHhMm();
@@ -343,8 +347,8 @@ export class CrudePaperDeskService {
       marketOpen: true,
       realOrders: this.realOrders,
       message: this.realOrders
-        ? `Starting LIVE MONEY crude desk (day stop −${this.dayLossStopPts})…`
-        : `Starting live paper crude desk (day stop −${this.dayLossStopPts})…`,
+        ? `Starting LIVE MONEY crude desk (${this.tradeParams.label} · ${this.riskLabel()})…`
+        : `Starting live paper crude desk (${this.tradeParams.label} · ${this.riskLabel()})…`,
       kiteStats: this.kiteStats(),
     });
 
@@ -353,11 +357,6 @@ export class CrudePaperDeskService {
       const authorization = this.requireAuth();
       const allInstruments = await this.loadInstruments();
       this.assertActive(runId);
-      if (this.realOrders) {
-        this.patchMessage('Live money · reconciling open Kite positions…');
-        const note = await this.liveOrders.reconcileFromBroker(authorization);
-        this.patchMessage(`Live money · ${note}`);
-      }
       const future = resolveCrudeOilMiniFuturesToken(allInstruments);
       if (!future) {
         throw new Error('No live CRUDEOILM futures contract.');
@@ -465,6 +464,7 @@ export class CrudePaperDeskService {
       dayLossStopPts: this.dayLossStopPts,
       enableMorning: this.enableMorning,
       enableEvening: this.enableEvening,
+      tradeParams: this.tradeParams,
     });
 
     const optionCandles = await this.fetchOptionHistories(
@@ -490,7 +490,7 @@ export class CrudePaperDeskService {
         ? {
             direction: replay.open.direction,
             indexEntry: replay.open.entry,
-            indexStop: effectiveProtectiveStop(replay.open),
+            indexStop: replay.open.stop,
             indexTarget: replay.open.target,
             entryTime: replay.open.entryTime,
             option: replay.open.option,
@@ -506,7 +506,6 @@ export class CrudePaperDeskService {
     });
     applyLivePhase(status, enriched, true);
 
-    let displayTrades = enrichTradesWithCharges(enriched, this.lotsMultiplier);
     if (this.realOrders) {
       await this.liveOrders.syncInstrument({
         authorization,
@@ -527,11 +526,6 @@ export class CrudePaperDeskService {
       status.brokerSlTrigger = pos?.slTrigger ?? null;
       status.brokerSlOrderId = pos?.slOrderId ?? null;
       status.brokerEntryOrderId = pos?.entryOrderId ?? null;
-      displayTrades = enrichTradesWithCharges(
-        applyKiteFillPnl(displayTrades, this.liveOrders.getOrderSummary()),
-        this.lotsMultiplier,
-      );
-      status.dayNetOptionRs = displayTrades.reduce((a, t) => a + (t.optionPnlRs ?? 0), 0);
     }
 
     const moneyTag = this.realOrders ? 'LIVE MONEY' : 'Live paper';
@@ -545,9 +539,9 @@ export class CrudePaperDeskService {
       lastTickAt: new Date().toISOString(),
       message: `${moneyTag} · alive ${now} · ${status.livePhaseLabel} · ${this.kiteStatsLabel()}`,
       statuses: [status],
-      trades: displayTrades.sort((a, b) => a.entryTime.localeCompare(b.entryTime)),
-      totals: summarize(displayTrades, this.lotsMultiplier, CRUDE_RUPEES_PER_POINT),
-      dayStats: buildPaperDeskDayStats(displayTrades, 5),
+      trades: enriched.sort((a, b) => a.entryTime.localeCompare(b.entryTime)),
+      totals: summarize(enriched, this.lotsMultiplier, CRUDE_RUPEES_PER_POINT),
+      dayStats: buildPaperDeskDayStats(enriched, 5),
       kiteStats: this.kiteStats(),
       orderEvents: this.realOrders ? this.liveOrders.getEvents() : [],
       orderSummary: this.realOrders ? this.liveOrders.getOrderSummary() : [],
@@ -635,14 +629,14 @@ export class CrudePaperDeskService {
     runId?: number,
   ): Promise<Map<number, Candle[]>> {
     const map = new Map<number, Candle[]>();
-    const unique = rankTokensByFrequency(tokens).slice(0, MAX_CRUDE_OPTION_HISTORY_TOKENS);
+    const unique = [...new Set(tokens)].filter((t) => t > 0).slice(0, 12);
     for (let i = 0; i < unique.length; i += 1) {
       if (runId != null) {
         this.assertActive(runId);
       }
       const token = unique[i]!;
       if (i > 0) {
-        await delay(500);
+        await delay(800);
       }
       try {
         const candles = await this.fetch5m({
@@ -770,14 +764,29 @@ export class CrudePaperDeskService {
   }
 
   private windowsLabel(): string {
+    if (this.tradeParams.entryMode === 'trap-confirm') {
+      return `trap+confirm ${this.tradeParams.targetRMultiple}R · trail arm₹${this.tradeParams.profitLockArmRs}`;
+    }
     const parts: string[] = [];
     if (this.enableMorning) {
-      parts.push('morning ORB 10:00–12:00');
+      parts.push(`morning ORB SL${this.tradeParams.stopPts}/TP${this.tradeParams.morningTargetPts}`);
     }
     if (this.enableEvening) {
-      parts.push('evening PDHL 18:30–20:30');
+      parts.push(`evening PDHL SL${this.tradeParams.stopPts}/TP${this.tradeParams.eveningTargetPts}`);
     }
     return parts.length ? parts.join(' + ') : 'no window';
+  }
+
+  private riskLabel(): string {
+    const lock =
+      this.tradeParams.dayProfitLockPts > 0
+        ? ` · lock +${this.tradeParams.dayProfitLockPts}pts (₹${this.tradeParams.dayProfitLockPts * CRUDE_RUPEES_PER_POINT})`
+        : '';
+    const trail =
+      this.tradeParams.profitLockArmRs > 0
+        ? ` · peak-trail ₹${this.tradeParams.profitLockArmRs}`
+        : '';
+    return `day stop −${this.dayLossStopPts}pts${lock}${trail}`;
   }
 
   private kiteStatsLabel(): string {
@@ -896,18 +905,14 @@ function summarize(
 ): PaperDeskSnapshot['totals'] {
   const lots = Math.max(1, Math.floor(lotsUsed) || 1);
   const indexNetPts = trades.reduce((a, t) => a + t.indexPoints, 0);
-  const optionNetRs = trades.reduce((a, t) => a + (t.optionPnlRs ?? 0), 0);
-  const optionChargesRs = trades.reduce((a, t) => a + (t.chargesRs ?? 0), 0);
   return {
     trades: trades.length,
     wins: trades.filter((t) => t.outcome === 'WIN').length,
     losses: trades.filter((t) => t.outcome === 'LOSS').length,
     indexNetPts,
-    optionNetRs,
+    optionNetRs: trades.reduce((a, t) => a + (t.optionPnlRs ?? 0), 0),
     lotsUsed: lots,
     pointsMoneyRs: indexNetPts * rupeesPerPoint * lots,
-    optionChargesRs,
-    optionNetAfterChargesRs: Math.round((optionNetRs - optionChargesRs) * 100) / 100,
   };
 }
 
