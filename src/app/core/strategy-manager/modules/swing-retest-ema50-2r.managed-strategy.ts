@@ -27,7 +27,7 @@ export class SwingRetestEma50Rr2ManagedStrategy extends BaseIndexRuleStrategy {
     bankStopLossPts: 45,
     swingLookback: 5,
     emaLength: 50,
-    maxTradesPerDay: 1,
+    maxTradesPerDay: 0,
     instrumentType: 'futures',
     dayStopPts: 60,
     targetRMultiple: 2,

@@ -8,7 +8,7 @@ describe('SrTrapConfirmManagedStrategy', () => {
     s.initialize();
     expect(s.id).toBe(MANAGED_STRATEGY_IDS.SR_TRAP_CONFIRM);
     expect(s.name).toContain('Trap');
-    expect(s.getSettings().maxTradesPerDay).toBe(3);
+    expect(s.getSettings().maxTradesPerDay).toBe(0);
     expect(s.getSettings().targetRMultiple).toBe(3.5);
     expect(s.getSettings().profitProtectEnabled).toBe(true);
     expect(s.getSettings().profitProtectArmR).toBe(1);

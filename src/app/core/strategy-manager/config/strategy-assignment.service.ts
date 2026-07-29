@@ -115,7 +115,7 @@ export class StrategyAssignmentService {
     }
     next[channel] = cur;
     this.assignmentsSignal.set(next);
-    // Auto-sync max trades (and R) to strategy DNA whenever assignment changes.
+    // Auto-sync DNA (unlimited max trades + research R) whenever assignment changes.
     if (strategyId && (mode === 'paper' || mode === 'live')) {
       this.applyDnaCaps(strategyId, channel);
     }
@@ -123,9 +123,8 @@ export class StrategyAssignmentService {
   }
 
   /**
-   * When user switches strategy, maxTradesPerDay (and target R) snap to research DNA.
-   * Manual overrides remain possible afterward via Settings — but desk runs re-apply DNA
-   * per channel on hydrate so Genie Bank=1 cannot clobber Nifty=2 / Trap≠1.
+   * When user switches strategy, settings snap to research DNA.
+   * Max trades are always unlimited (0); target R still channel-aware.
    */
   applyDnaCaps(strategyId: string, channel: DeskChannel): void {
     const mod = this.registry.getById(strategyId);
@@ -186,8 +185,7 @@ export class StrategyAssignmentService {
 
   /**
    * Apply stored overrides onto a module before a run.
-   * When `channel` is set, DNA max-trades / R for THAT channel always win
-   * (prevents Genie bank cap=1 from starving Nifty, or Trap stuck at 1).
+   * When `channel` is set, DNA for THAT channel wins (unlimited max trades + research R).
    */
   hydrateModule(strategyId: string, channel?: DeskChannel): void {
     const mod = this.registry.getById(strategyId);

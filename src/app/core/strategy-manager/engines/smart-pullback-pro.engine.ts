@@ -243,7 +243,7 @@ export function channelProfileExtras(instrumentId: string | undefined): {
     return {
       extras: { ...BANK_OVERLAY_SMART_PB_EXTRAS },
       targetRMultiple: 1.5,
-      maxTradesPerDay: 1,
+      maxTradesPerDay: 0,
       minBarsBetweenSignals: 30,
       emaFlatPts: 25,
     };
@@ -251,7 +251,7 @@ export function channelProfileExtras(instrumentId: string | undefined): {
   return {
     extras: { ...DEFAULT_SMART_PB_EXTRAS },
     targetRMultiple: 3,
-    maxTradesPerDay: 2,
+    maxTradesPerDay: 0,
     minBarsBetweenSignals: 15,
     emaFlatPts: 10,
   };

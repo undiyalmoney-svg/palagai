@@ -69,7 +69,7 @@ export class StrategyManagerPageComponent {
     this.settingsEpoch();
     const id = this.selectedStrategyId();
     const channel = this.selectedChannel();
-    // Hydrate DNA for this channel so Max trades shows Trap=3 / Genie Nifty=2·Bank=1.
+    // Hydrate DNA for this channel (unlimited max trades + research R).
     this.assignments.hydrateModule(id, channel);
     const mod = this.registry.getById(id);
     return mod ? mod.getSettings() : null;
@@ -153,12 +153,11 @@ export class StrategyManagerPageComponent {
     this.desk.refreshLiveAfterSettingsChange();
   }
 
-  /** DNA auto-cap hint under Max trades/day. */
+  /** DNA hint under Max trades/day. */
   protected dnaMaxTradesHint(): string {
     const caps = dnaCapsForStrategy(this.selectedStrategyId(), this.selectedChannel());
-    const mt = caps.maxTradesPerDay > 0 ? String(caps.maxTradesPerDay) : '∞';
-    const rr = caps.targetRMultiple != null ? ` · ${caps.targetRMultiple}R` : '';
-    return `DNA locked for desk runs: ${mt}/day${rr}`;
+    const rr = caps.targetRMultiple != null ? ` · research ${caps.targetRMultiple}R` : '';
+    return `Max trades unlocked (∞)${rr}. Desk runs do not DNA-cap entries.`;
   }
 
   protected strategyName(id: string | null): string {

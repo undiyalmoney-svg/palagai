@@ -41,7 +41,7 @@ export class GapFade500ManagedStrategy implements IManagedStrategy {
     exitTime: '15:15',
     orEnd: '09:15',
     stopLossPts: 0,
-    maxTradesPerDay: 1,
+    maxTradesPerDay: 0,
     instrumentType: 'equity',
     dayStopPts: 0,
     targetRMultiple: 0,

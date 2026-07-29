@@ -79,7 +79,7 @@ export function defaultStrategySettings(
     donchianLength: 20,
     swingLookback: 5,
     volExpandAtrMult: 1.2,
-    maxTradesPerDay: 1,
+    maxTradesPerDay: 0,
     positionSizeLots: 1,
     riskPercent: 1,
     instrumentType: 'index',

@@ -22,7 +22,8 @@ export const KUTTY_STOP_RS = 200;
 export const KUTTY_CAPITAL_RS = 60_000;
 export const KUTTY_TRAP_RESERVE_RS = 30_000;
 export const KUTTY_MARGIN_PER_TRADE_RS = 8_000;
-export const KUTTY_MAX_TRADES_PER_DAY = 2;
+/** 0 = unlimited (no DNA day-trade cap). */
+export const KUTTY_MAX_TRADES_PER_DAY = 0;
 export const KUTTY_ENTRY_START = '10:00';
 export const KUTTY_ENTRY_END = '14:30';
 const SWING_LB = 5;
@@ -185,7 +186,7 @@ export function runKuttyScalp(
     state.tradesToday = 0;
     state.pending = null;
   }
-  if (state.tradesToday >= KUTTY_MAX_TRADES_PER_DAY) {
+  if (KUTTY_MAX_TRADES_PER_DAY > 0 && state.tradesToday >= KUTTY_MAX_TRADES_PER_DAY) {
     return wait(candle, 'Kutty max trades');
   }
 

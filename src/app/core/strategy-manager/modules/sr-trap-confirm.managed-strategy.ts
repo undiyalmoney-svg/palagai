@@ -43,7 +43,7 @@ export class SrTrapConfirmManagedStrategy implements IManagedStrategy {
     stopLossPts: 30,
     bankStopLossPts: 50,
     emaLength: 50,
-    maxTradesPerDay: 3,
+    maxTradesPerDay: 0,
     instrumentType: 'futures',
     dayStopPts: 80,
     dayProfitLockPts: 0,
