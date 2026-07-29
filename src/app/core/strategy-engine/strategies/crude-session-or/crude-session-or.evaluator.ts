@@ -1,7 +1,7 @@
 /**
  * Crude All-Green Session OR (full MCX session):
  * OR 09:00–09:30 · entries after OR through 23:00 · next-bar confirm
- * Per-trade SL/trail from profile · unlimited · no day lock · max OR width 120
+ * Per-trade SL/trail from profile · unlimited · no day lock · no OR-width skip
  * Start anytime after OR is built — not gated to 15:15.
  */
 import { Candle } from '../../../models/candle.model';
@@ -21,7 +21,8 @@ export const CRUDE_SOR_ENTRY_START = '09:00';
 export const CRUDE_SOR_ENTRY_END = '23:00';
 export const CRUDE_SOR_OR_START = '09:00';
 export const CRUDE_SOR_OR_END = '09:30';
-export const CRUDE_SOR_MAX_OR_WIDTH = 120;
+/** 0 = off — trade even when opening range is very wide. */
+export const CRUDE_SOR_MAX_OR_WIDTH = 0;
 /** 0 = unlimited. */
 export const CRUDE_SOR_MAX_TRADES_DAY = 0;
 
@@ -185,7 +186,7 @@ export function runCrudeSessionOr(params: {
     return wait(candle, 'Session OR not ready');
   }
   const width = orb.high - orb.low;
-  if (width > maxOrWidth) {
+  if (maxOrWidth > 0 && width > maxOrWidth) {
     return wait(candle, `OR too wide (${width.toFixed(1)}>${maxOrWidth})`);
   }
 

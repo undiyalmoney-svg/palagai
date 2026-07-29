@@ -20,6 +20,7 @@
 | Peak trail | Arm **₹500** · lock floor **₹240** · giveback **₹260** |
 | Stretch TP | **100 pts = ₹1,000** (trail usually exits first) |
 | Day max loss | **OFF** (after SL / drained cut → next opportunity) |
+| Max OR width | **OFF** (trade even on wide opens) |
 | Max fills | **unlimited** |
 
 ## Desk
