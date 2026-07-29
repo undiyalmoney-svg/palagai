@@ -67,17 +67,16 @@ const chain: Instrument[] = [
 ];
 
 describe('crude option expiry roll', () => {
-  it('lists live expiries on/after asOf', () => {
-    const live = listCrudeLiveExpiries(chain, new Date('2026-08-17T00:00:00'));
+  it('lists future expiries only (skips same-day)', () => {
+    const live = listCrudeLiveExpiries(chain, new Date('2026-08-17T10:00:00+05:30'));
     expect(live.map((d) => d.toISOString().slice(0, 10))).toEqual([
-      '2026-08-17',
       '2026-09-17',
       '2026-10-15',
     ]);
   });
 
   it('on expiry day, front expiry is the NEXT contract', () => {
-    const asOf = new Date('2026-08-17T10:00:00');
+    const asOf = new Date('2026-08-17T10:00:00+05:30');
     const live = listCrudeLiveExpiries(chain, asOf);
     const front = resolveCrudeFrontExpiry(asOf, live);
     expect(front?.toISOString().slice(0, 10)).toBe('2026-09-17');
@@ -85,7 +84,7 @@ describe('crude option expiry roll', () => {
   });
 
   it('before expiry day, keeps current front month', () => {
-    const asOf = new Date('2026-08-16T10:00:00');
+    const asOf = new Date('2026-08-16T10:00:00+05:30');
     const live = listCrudeLiveExpiries(chain, asOf);
     const front = resolveCrudeFrontExpiry(asOf, live);
     expect(front?.toISOString().slice(0, 10)).toBe('2026-08-17');

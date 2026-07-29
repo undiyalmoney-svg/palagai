@@ -10,6 +10,11 @@ import {
   shouldRollWeeklyExpiry,
 } from './option-chain.util';
 
+function ymd(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
 function opt(partial: Partial<Instrument> & Pick<Instrument, 'tradingSymbol' | 'expiry' | 'strike'>): Instrument {
   return {
     instrumentToken: partial.instrumentToken ?? 1,
@@ -32,13 +37,13 @@ describe('nextWeeklyExpiryDate (Nifty = Tuesday)', () => {
     // Wed 29 Jul 2026 → Tue 4 Aug 2026
     const wed = new Date('2026-07-29T10:00:00+05:30');
     const next = nextWeeklyExpiryDate(wed, false, 'nifty');
-    expect(next.toISOString().slice(0, 10)).toBe('2026-08-04');
+    expect(ymd(next)).toBe('2026-08-04');
   });
 
   it('rolls to next Tuesday when already on Tuesday expiry day', () => {
     const tue = new Date('2026-08-04T10:00:00+05:30');
     const next = nextWeeklyExpiryDate(tue, true, 'nifty');
-    expect(next.toISOString().slice(0, 10)).toBe('2026-08-11');
+    expect(ymd(next)).toBe('2026-08-11');
   });
 });
 
@@ -47,7 +52,13 @@ describe('nextMonthlyExpiryDate (Bank Nifty)', () => {
     // Wed 29 Jul 2026 — July monthly was Tue 28 Jul (passed) → Aug 25
     const wed = new Date('2026-07-29T10:00:00+05:30');
     const next = nextMonthlyExpiryDate(wed, false);
-    expect(next.toISOString().slice(0, 10)).toBe('2026-08-25');
+    expect(ymd(next)).toBe('2026-08-25');
+  });
+
+  it('on July monthly expiry day rolls to August', () => {
+    const tue = new Date('2026-07-28T10:00:00+05:30');
+    const next = nextMonthlyExpiryDate(tue, true);
+    expect(ymd(next)).toBe('2026-08-25');
   });
 });
 
@@ -58,10 +69,13 @@ describe('isFrontWeeklyExpiry', () => {
     asOfDay.setHours(0, 0, 0, 0);
     // On expiry day with roll → next Tue 4 Aug
     const expected = nextWeeklyExpiryDate(asOfDay, true, 'nifty');
-    expect(expected.toISOString().slice(0, 10)).toBe('2026-08-04');
+    expect(ymd(expected)).toBe('2026-08-04');
     expect(isFrontWeeklyExpiry(asOfDay, expected, true, 'nifty')).toBe(true);
-    const far = new Date('2026-08-25T00:00:00');
+    const far = new Date(2026, 7, 25); // Aug 25 local
     expect(isFrontWeeklyExpiry(asOfDay, far, true, 'nifty')).toBe(false);
+    // Same-day expiry never tradeable
+    const same = new Date(2026, 6, 28); // Jul 28
+    expect(isFrontWeeklyExpiry(asOfDay, same, false, 'nifty')).toBe(false);
   });
 });
 
@@ -72,12 +86,17 @@ describe('shouldRollWeeklyExpiry', () => {
       shouldRollWeeklyExpiry({ asOf: tueMorning, instruments: [], kind: 'nifty' }),
     ).toBe(true);
     const next = nextWeeklyExpiryDate(tueMorning, true, 'nifty');
-    expect(next.toISOString().slice(0, 10)).toBe('2026-08-11');
+    expect(ymd(next)).toBe('2026-08-11');
   });
 
   it('does not roll on a normal Monday morning', () => {
     const mon = new Date('2026-07-27T10:00:00+05:30');
     expect(shouldRollWeeklyExpiry({ asOf: mon, instruments: [], kind: 'nifty' })).toBe(false);
+  });
+
+  it('does not blanket-roll on Wednesday afternoon (legacy 13:00 rule removed)', () => {
+    const wedPm = new Date('2026-07-29T15:00:00+05:30');
+    expect(shouldRollWeeklyExpiry({ asOf: wedPm, instruments: [], kind: 'nifty' })).toBe(false);
   });
 
   it('rolls on holiday-shifted expiry when chain lists today', () => {
@@ -221,6 +240,65 @@ describe('resolveAtmWeeklyOption', () => {
     });
     expect(resolved.source).toBe('chain');
     expect(resolved.instrument.instrumentToken).toBe(7001);
+  });
+
+  it('on Nifty Tuesday expiry morning, skips same-day and takes next weekly', () => {
+    // Tue 28 Jul 2026 was Nifty weekly + Bank monthly expiry.
+    const chain = [
+      opt({
+        instrumentToken: 1,
+        tradingSymbol: 'NIFTY2572824500CE',
+        expiry: '2026-07-28',
+        strike: 24500,
+      }),
+      opt({
+        instrumentToken: 2,
+        tradingSymbol: 'NIFTY2580424500CE',
+        expiry: '2026-08-04',
+        strike: 24500,
+      }),
+    ];
+    const resolved = resolveAtmWeeklyOption({
+      instruments: chain,
+      kind: 'nifty',
+      direction: 'BUY',
+      spot: 24500,
+      asOfDateTime: '2026-07-28T10:05:00+05:30',
+    });
+    expect(resolved.source).toBe('chain');
+    expect(resolved.instrument.instrumentToken).toBe(2);
+    expect(resolved.instrument.expiry).toBe('2026-08-04');
+  });
+
+  it('on Bank monthly expiry morning, skips same-day and takes next monthly', () => {
+    const chain = [
+      opt({
+        instrumentToken: 11,
+        tradingSymbol: 'BANKNIFTY2572855000CE',
+        name: 'BANKNIFTY',
+        expiry: '2026-07-28',
+        strike: 55000,
+        lotSize: 30,
+      }),
+      opt({
+        instrumentToken: 12,
+        tradingSymbol: 'BANKNIFTY2582555000CE',
+        name: 'BANKNIFTY',
+        expiry: '2026-08-25',
+        strike: 55000,
+        lotSize: 30,
+      }),
+    ];
+    const resolved = resolveAtmWeeklyOption({
+      instruments: chain,
+      kind: 'banknifty',
+      direction: 'BUY',
+      spot: 55000,
+      asOfDateTime: '2026-07-28T09:30:00+05:30',
+    });
+    expect(resolved.source).toBe('chain');
+    expect(resolved.instrument.instrumentToken).toBe(12);
+    expect(resolved.instrument.expiry).toBe('2026-08-25');
   });
 });
 
