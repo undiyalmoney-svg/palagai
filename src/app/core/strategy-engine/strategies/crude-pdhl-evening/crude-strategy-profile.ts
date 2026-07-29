@@ -93,7 +93,9 @@ export const CRUDE_CHAMPION_PARAMS: CrudeTradeParams = {
 };
 
 /**
- * Daily income band for 1 lot (₹10/pt) + Trap-style peak-trail / soft cut.
+ * Daily income band for 1 lot (₹10/pt).
+ * MCX Mar–Jul 2026 hunt: peak-trail/soft cut hurt expectancy — keep OFF.
+ * Day profit lock + day loss remain the loss cutoffs.
  */
 export const CRUDE_DAILY_INCOME_PARAMS: CrudeTradeParams = {
   profileId: 'daily-income',
@@ -106,13 +108,14 @@ export const CRUDE_DAILY_INCOME_PARAMS: CrudeTradeParams = {
   strictDayLossPts: 80,
   dayProfitLockPts: 100,
   entryMode: 'orb-pdhl',
-  dailyBandLabel: 'Aim ₹300–1,000/day · lock +₹1,000 · trail + soft cut',
-  ...PROTECT_TRAP,
+  dailyBandLabel: 'Aim ₹300–1,000/day · lock +₹1,000 · day −₹500',
+  ...PROTECT_OFF,
 };
 
 /**
- * Crude Trap + Confirm — same DNA family as Nifty Trap.
- * Day loss −₹2,500 (250 pts) · peak-trail arm ₹600 · soft SL confirm.
+ * Crude Trap + Confirm — Trap DNA port (paper / research).
+ * MCX Mar–Jul 2026: does not beat Champion; peak-trail hurt — keep OFF.
+ * Day loss −₹2,500 remains.
  */
 export const CRUDE_TRAP_CONFIRM_PARAMS: CrudeTradeParams = {
   profileId: 'trap-confirm',
@@ -125,8 +128,8 @@ export const CRUDE_TRAP_CONFIRM_PARAMS: CrudeTradeParams = {
   strictDayLossPts: 295,
   dayProfitLockPts: 0,
   entryMode: 'trap-confirm',
-  dailyBandLabel: 'S/R trap + confirm · 3.5R · peak-trail · day −₹2,500',
-  ...PROTECT_TRAP,
+  dailyBandLabel: 'S/R trap + confirm · 3.5R · day −₹2,500 (research)',
+  ...PROTECT_OFF,
 };
 
 export const CRUDE_STRATEGY_PROFILES: Record<CrudeStrategyProfileId, CrudeTradeParams> = {

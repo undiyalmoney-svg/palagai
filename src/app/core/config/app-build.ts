@@ -4,5 +4,5 @@
  */
 export const APP_VERSION = '1.3.18';
 /** Short build tag for this fix train. */
-export const APP_BUILD = '2026.07.29-crude-trap-cutoffs';
+export const APP_BUILD = '2026.07.29-crude-mcx-hunt';
 export const APP_BUILD_LABEL = `v${APP_VERSION} · ${APP_BUILD}`;
