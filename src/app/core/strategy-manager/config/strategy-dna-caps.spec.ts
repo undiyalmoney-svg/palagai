@@ -3,32 +3,28 @@ import { dnaCapsForStrategy } from './strategy-dna-caps';
 import { MANAGED_STRATEGY_IDS } from './managed-strategy-ids';
 
 describe('dnaCapsForStrategy', () => {
-  it('gives Donch default 2 trades/day', () => {
+  it('unlocks max trades for every strategy (0 = unlimited)', () => {
+    const ids = Object.values(MANAGED_STRATEGY_IDS);
+    for (const id of ids) {
+      expect(dnaCapsForStrategy(id, 'nifty').maxTradesPerDay).toBe(0);
+      expect(dnaCapsForStrategy(id, 'bank').maxTradesPerDay).toBe(0);
+    }
+  });
+
+  it('keeps research R targets', () => {
     expect(dnaCapsForStrategy(MANAGED_STRATEGY_IDS.DONCH_RETEST_OR_MID_2R, 'nifty')).toEqual({
-      maxTradesPerDay: 2,
+      maxTradesPerDay: 0,
       targetRMultiple: 2,
     });
-    expect(dnaCapsForStrategy(MANAGED_STRATEGY_IDS.DONCH_RETEST_OR_MID_2R, 'bank').maxTradesPerDay).toBe(
-      2,
-    );
-  });
-
-  it('gives trap max-earn 3 trades and 3.5R', () => {
     expect(dnaCapsForStrategy(MANAGED_STRATEGY_IDS.SR_TRAP_CONFIRM, 'nifty')).toEqual({
-      maxTradesPerDay: 3,
+      maxTradesPerDay: 0,
       targetRMultiple: 3.5,
     });
-    expect(dnaCapsForStrategy(MANAGED_STRATEGY_IDS.SR_TRAP_CONFIRM, 'bank').maxTradesPerDay).toBe(
+    expect(dnaCapsForStrategy(MANAGED_STRATEGY_IDS.ALIGN_COMBO_GENIE, 'nifty').targetRMultiple).toBe(
       3,
     );
-  });
-
-  it('keeps GENIE channel caps (must not share one max across indices)', () => {
-    expect(dnaCapsForStrategy(MANAGED_STRATEGY_IDS.ALIGN_COMBO_GENIE, 'nifty').maxTradesPerDay).toBe(
-      2,
-    );
-    expect(dnaCapsForStrategy(MANAGED_STRATEGY_IDS.ALIGN_COMBO_GENIE, 'bank').maxTradesPerDay).toBe(
-      1,
+    expect(dnaCapsForStrategy(MANAGED_STRATEGY_IDS.ALIGN_COMBO_GENIE, 'bank').targetRMultiple).toBe(
+      1.5,
     );
   });
 });

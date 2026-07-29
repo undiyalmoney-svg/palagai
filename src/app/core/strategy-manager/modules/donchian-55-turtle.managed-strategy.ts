@@ -22,7 +22,7 @@ export class Donchian55TurtleManagedStrategy extends BaseIndexRuleStrategy {
     orEnd: '10:15',
     stopLossPts: 45,
     donchianLength: 55,
-    maxTradesPerDay: 1,
+    maxTradesPerDay: 0,
     instrumentType: 'futures',
     dayStopPts: 60,
     targetRMultiple: 0,

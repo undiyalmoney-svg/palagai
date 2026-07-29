@@ -45,7 +45,7 @@ export class AlignComboGenieManagedStrategy implements IManagedStrategy {
   readonly name = 'Genie';
   readonly version = '1.1.0';
   readonly description =
-    'Steady book — Nifty ≤2t · Bank ≤1t · BOTH/ALONE/SKIP · skip Tue / weak drive.';
+    'Steady book — unlimited trades · BOTH/ALONE/SKIP · skip Tue / weak drive.';
   readonly supports: readonly DeskChannel[] = ['nifty', 'bank', 'stocks'];
 
   readonly defaultSettings = defaultStrategySettings({
@@ -57,7 +57,7 @@ export class AlignComboGenieManagedStrategy implements IManagedStrategy {
     bankStopLossPts: 45,
     emaLength: 50,
     /** Nifty cap; Bank profile overrides to 1 via channelProfileExtras. */
-    maxTradesPerDay: 2,
+    maxTradesPerDay: 0,
     instrumentType: 'futures',
     dayStopPts: 60,
     targetRMultiple: 3,

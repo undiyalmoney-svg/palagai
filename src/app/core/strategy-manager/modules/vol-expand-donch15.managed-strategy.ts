@@ -25,7 +25,7 @@ export class VolExpandDonch15ManagedStrategy extends BaseIndexRuleStrategy {
     donchianLength: 15,
     emaLength: 50,
     volExpandAtrMult: 1.2,
-    maxTradesPerDay: 1,
+    maxTradesPerDay: 0,
     instrumentType: 'futures',
     dayStopPts: 60,
     targetRMultiple: 0,

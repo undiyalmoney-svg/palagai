@@ -27,7 +27,7 @@
       <span class="as-kicker">Active now · {{ activeStrategies().modeLabel }}</span>
       @if (kuttyAlone) {
         <strong class="as-name">Kutty alone</strong>
-        <span class="as-meta">No Trap/Strat · ₹600 TP / ₹200 SL · ≤2t/day</span>
+        <span class="as-meta">No Trap/Strat · ₹600 TP / ₹200 SL · ∞ trades</span>
       } @else if (activeStrategies().same) {
         <strong class="as-name">{{ activeStrategies().nifty.name }}</strong>
         <span class="as-meta">Nifty + Bank · {{ activeStrategies().nifty.maxTradesLabel }}{{ enableKutty ? ' · +Kutty' : '' }}</span>
@@ -78,7 +78,7 @@
         <strong>Active strategy</strong> — Banner above shows Strat Paper/Live assignment live. Per-index cards also show <em>Running · …</em> after a run.
       </li>
       <li>
-        <strong>Default (indices)</strong> — <em>Donch Retest</em> · ≤2 trades/day · tighter SL + day stop −40 · Swing-5 trail (<em>Trap</em> still selectable — wins more calendar years)
+        <strong>Default (indices)</strong> — <em>Donch Retest</em> · unlimited trades · tighter SL + day stop −40 · Swing-5 trail (<em>Trap</em> still selectable — wins more calendar years)
       </li>
       <li>
         <strong>Stops</strong> — Hard SL Nifty 22 / Bank 35 pts · day stop −40 · Strict −₹2,950 <em>on by default</em> · optional Profit lock +₹5,000
@@ -90,10 +90,10 @@
         <strong>P&amp;L math</strong> — Front-week option OHLC: <em>(exit − entry) × lot × lots</em>. Missing week / stop / target → <em>est. premium</em> = <strong>Index ₹ proxy</strong> (Nifty pts×65 · Bank pts×30). Never prices a far live weekly. Raw “Index pts” mixes underlyings — don’t judge money from pts alone.
       </li>
       <li>
-        <strong>Settings tip</strong> — Max trades DNA-locked (Donch = 2 · Trap = 3 · Genie = Nifty 2 / Bank 1). Strict day stop cuts stacked red days.
+        <strong>Settings tip</strong> — Max trades unlocked (∞) for every strategy. Strict day stop still cuts stacked red days.
       </li>
       <li>
-        <strong>P&amp;L tip</strong> — Badge must be <em>v1.3.14 · …live-tue-expiry</em> (hard-refresh if not). Nifty weeklies = Tuesday; Live money needs a loaded NFO chain. Peak-trail arms at ₹600 (≤₹300 giveback). All-est rows → Option ₹ <strong>equals</strong> Index ₹. Live money still uses Kite fills.
+        <strong>P&amp;L tip</strong> — Badge must be <em>v1.3.15 · …no-max-trades</em> (hard-refresh if not). Nifty weeklies = Tuesday; Live money needs a loaded NFO chain. Peak-trail arms at ₹600 (≤₹300 giveback). All-est rows → Option ₹ <strong>equals</strong> Index ₹. Live money still uses Kite fills.
       </li>
     </ul>
   </aside>

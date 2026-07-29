@@ -20,7 +20,7 @@ describe('Kutty scalp', () => {
   it('is not a managed strategy id', () => {
     expect(KUTTY_ID).toBe('kutty');
     expect(Object.values(MANAGED_STRATEGY_IDS)).not.toContain(KUTTY_ID);
-    expect(KUTTY_MAX_TRADES_PER_DAY).toBe(2);
+    expect(KUTTY_MAX_TRADES_PER_DAY).toBe(0);
     expect(KUTTY_YIELD_STRAT_REASON).toContain('Strat priority');
   });
 

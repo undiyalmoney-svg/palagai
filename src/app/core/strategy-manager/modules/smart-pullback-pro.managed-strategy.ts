@@ -53,7 +53,7 @@ export class SmartPullbackProManagedStrategy implements IManagedStrategy {
     stopLossPts: 30,
     bankStopLossPts: 45,
     emaLength: 50,
-    maxTradesPerDay: 2,
+    maxTradesPerDay: 0,
     instrumentType: 'futures',
     dayStopPts: 60,
     targetRMultiple: 3,

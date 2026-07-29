@@ -22,7 +22,7 @@ export class Swing5PrevDayManagedStrategy extends BaseIndexRuleStrategy {
     orEnd: '10:15',
     stopLossPts: 30,
     swingLookback: 5,
-    maxTradesPerDay: 1,
+    maxTradesPerDay: 0,
     instrumentType: 'futures',
     dayStopPts: 60,
     targetRMultiple: 0,
