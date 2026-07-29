@@ -25,6 +25,7 @@ import { Instrument } from '../models/instrument.model';
 import {
   IndexOptionKind,
   countIndexOptions,
+  describeOptionChainGap,
   resolveAtmWeeklyOption,
 } from '../utils/option-chain.util';
 import {
@@ -959,10 +960,22 @@ export class PaperTradeDeskService {
         s.brokerSlOrderId = pos?.slOrderId ?? null;
         s.brokerEntryOrderId = pos?.entryOrderId ?? null;
         if (s.openTrade && !s.brokerEntryOrderId) {
+          const kind: IndexOptionKind =
+            s.instrumentId === NIFTY_50_INSTRUMENT.id ? 'nifty' : 'banknifty';
+          const chainGap =
+            s.openTrade.option?.source === 'synthetic'
+              ? describeOptionChainGap({
+                  instruments: allInstruments,
+                  kind,
+                  direction: s.openTrade.direction,
+                  spot: s.openTrade.indexEntry,
+                  asOfDateTime: s.openTrade.entryTime,
+                })
+              : null;
           s.kiteBlockReason =
             this.liveOrders.getLastBlockReason(s.instrumentId) ??
-            (s.openTrade.option?.source === 'synthetic'
-              ? 'Synthetic/missing NFO option — refresh Instruments, then restart Live money'
+            (chainGap
+              ? `Synthetic/missing NFO option — ${chainGap}`
               : 'Kite entry not confirmed — see Event log');
           s.livePhaseLabel = `Signal only · not on Kite`;
         } else {
