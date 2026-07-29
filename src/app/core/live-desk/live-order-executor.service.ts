@@ -117,7 +117,7 @@ export { liveOpenMatchesBroker } from './live-open-match.util';
  * Live money executor (addon):
  * 1) MARKET BUY entry
  * 2) Protective SL-M SELL (trigger from index stop × ~0.5 delta on premium)
- * 3) Strategy exit → cancel pending SL → MARKET SELL
+ * 3) Strategy exit → cancel ALL pending SL-M for symbol (incl. ghost) → MARKET SELL
  * 4) If SL already COMPLETE → flat, no second exit
  */
 @Injectable({ providedIn: 'root' })
@@ -478,14 +478,35 @@ export class LiveOrderExecutorService {
           triggerPrice: slTrigger,
         });
       } catch (slErr) {
-        this.pushEvent({
-          at: new Date().toISOString(),
+        // Place may have succeeded on Kite while the response was lost (Failed to fetch).
+        const recoveredId = await this.adoptPendingSlFromBook(
+          authorization,
           instrumentId,
-          action: 'ERROR',
-          detail: `Entry filled but SL-M failed: ${this.formatErr(slErr)} — exit will use MARKET only`,
-          tradingSymbol: option.tradingSymbol,
+          option.tradingSymbol,
           quantity,
-        });
+        );
+        if (recoveredId) {
+          slOrderId = recoveredId;
+          this.pushEvent({
+            at: new Date().toISOString(),
+            instrumentId,
+            action: 'SL',
+            detail: `Recovered pending SL-M after place response lost (${this.formatErr(slErr)})`,
+            orderId: recoveredId,
+            tradingSymbol: option.tradingSymbol,
+            quantity,
+            triggerPrice: slTrigger,
+          });
+        } else {
+          this.pushEvent({
+            at: new Date().toISOString(),
+            instrumentId,
+            action: 'ERROR',
+            detail: `Entry filled but SL-M failed: ${this.formatErr(slErr)} — exit will cancel any pending SL then MARKET`,
+            tradingSymbol: option.tradingSymbol,
+            quantity,
+          });
+        }
       }
 
       this.positions.set(instrumentId, {
@@ -649,6 +670,34 @@ export class LiveOrderExecutorService {
       });
       return true;
     } catch (err) {
+      const recoveredId = await this.adoptPendingSlFromBook(
+        authorization,
+        pos.instrumentId,
+        pos.tradingSymbol,
+        pos.quantity,
+      );
+      if (recoveredId) {
+        const updated: LiveBrokerPosition = {
+          ...pos,
+          slOrderId: recoveredId,
+          slTrigger,
+          lastError: null,
+          status: 'open',
+        };
+        this.positions.set(pos.instrumentId, updated);
+        this.positionsBySymbol.set(pos.tradingSymbol.toUpperCase(), updated);
+        this.pushEvent({
+          at: new Date().toISOString(),
+          instrumentId: pos.instrumentId,
+          action: 'SL',
+          detail: `Recovered pending SL-M after place response lost (${this.formatErr(err)})`,
+          orderId: recoveredId,
+          tradingSymbol: pos.tradingSymbol,
+          quantity: pos.quantity,
+          triggerPrice: slTrigger,
+        });
+        return true;
+      }
       this.pushEvent({
         at: new Date().toISOString(),
         instrumentId: pos.instrumentId,
@@ -670,45 +719,123 @@ export class LiveOrderExecutorService {
   }
 
   /**
-   * Strategy exit: if SL still pending → cancel it, then MARKET SELL.
+   * If SL place response was lost, pick up a pending protective SELL SL-M for this symbol.
+   */
+  private async adoptPendingSlFromBook(
+    authorization: string,
+    instrumentId: string,
+    tradingSymbol: string,
+    quantity: number,
+  ): Promise<string | null> {
+    const orders = await this.fetchOrders(authorization);
+    const pending = findAllPendingOptionSl(orders, tradingSymbol);
+    const match =
+      pending.find((o) => Number(o.quantity ?? 0) === quantity) ?? pending[0] ?? null;
+    return match?.order_id ?? null;
+  }
+
+  /**
+   * Before MARKET exit: cancel every pending protective SL-M for this symbol.
+   * Covers known slOrderId and ghost SLs (place succeeded, response lost).
+   * Returns 'filled' when the known SL already completed (position already flat).
+   */
+  private async cancelPendingSlBeforeExit(
+    authorization: string,
+    pos: LiveBrokerPosition,
+  ): Promise<'filled' | 'cleared'> {
+    const orders = await this.fetchOrders(authorization);
+    const cancelIds = new Set<string>();
+
+    if (pos.slOrderId) {
+      const known = orders.find((o) => o.order_id === pos.slOrderId);
+      const knownStatus = (known?.status ?? (await this.getOrderStatus(authorization, pos.slOrderId))) ?? null;
+      if (knownStatus === 'COMPLETE') {
+        this.positions.set(pos.instrumentId, {
+          ...pos,
+          status: 'flat',
+          lastError: null,
+        });
+        this.positionsBySymbol.delete(pos.tradingSymbol.toUpperCase());
+        this.pushEvent({
+          at: new Date().toISOString(),
+          instrumentId: pos.instrumentId,
+          action: 'EXIT',
+          detail: `Protective SL-M already filled — no MARKET exit needed`,
+          orderId: pos.slOrderId,
+          tradingSymbol: pos.tradingSymbol,
+          quantity: pos.quantity,
+        });
+        return 'filled';
+      }
+      if (knownStatus && isCancellable(knownStatus)) {
+        cancelIds.add(pos.slOrderId);
+      }
+    }
+
+    for (const row of findAllPendingOptionSl(orders, pos.tradingSymbol)) {
+      if (row.order_id) {
+        cancelIds.add(row.order_id);
+      }
+    }
+
+    for (const orderId of cancelIds) {
+      try {
+        const status =
+          orders.find((o) => o.order_id === orderId)?.status ??
+          (await this.getOrderStatus(authorization, orderId));
+        if (status === 'COMPLETE') {
+          continue;
+        }
+        if (status && !isCancellable(status)) {
+          continue;
+        }
+        await firstValueFrom(this.kiteApi.cancelRegularOrder(authorization, orderId));
+        this.pushEvent({
+          at: new Date().toISOString(),
+          instrumentId: pos.instrumentId,
+          action: 'CANCEL_SL',
+          detail: `Cancelled pending SL-M before strategy exit (${status ?? 'book'})`,
+          orderId,
+          tradingSymbol: pos.tradingSymbol,
+          quantity: pos.quantity,
+        });
+      } catch (err) {
+        this.pushEvent({
+          at: new Date().toISOString(),
+          instrumentId: pos.instrumentId,
+          action: 'ERROR',
+          detail: `Cancel SL-M ${orderId} failed: ${this.formatErr(err)} — will still try MARKET exit`,
+          orderId,
+          tradingSymbol: pos.tradingSymbol,
+          quantity: pos.quantity,
+        });
+      }
+    }
+
+    if (cancelIds.size > 0) {
+      await delay(400);
+      this.positions.set(pos.instrumentId, {
+        ...pos,
+        slOrderId: null,
+        slTrigger: null,
+      });
+    }
+
+    return 'cleared';
+  }
+
+  /**
+   * Strategy exit: cancel any pending SL-M for the symbol, then MARKET SELL.
    * If SL already COMPLETE → already flat.
    */
   private async placeExit(authorization: string, pos: LiveBrokerPosition): Promise<void> {
     try {
-      if (pos.slOrderId) {
-        const slStatus = await this.getOrderStatus(authorization, pos.slOrderId);
-        if (slStatus === 'COMPLETE') {
-          this.positions.set(pos.instrumentId, {
-            ...pos,
-            status: 'flat',
-            lastError: null,
-          });
-          this.pushEvent({
-            at: new Date().toISOString(),
-            instrumentId: pos.instrumentId,
-            action: 'EXIT',
-            detail: `Protective SL-M already filled — no MARKET exit needed`,
-            orderId: pos.slOrderId,
-            tradingSymbol: pos.tradingSymbol,
-            quantity: pos.quantity,
-          });
-          return;
-        }
-
-        if (slStatus && isCancellable(slStatus)) {
-          await firstValueFrom(this.kiteApi.cancelRegularOrder(authorization, pos.slOrderId));
-          this.pushEvent({
-            at: new Date().toISOString(),
-            instrumentId: pos.instrumentId,
-            action: 'CANCEL_SL',
-            detail: `Cancelled pending SL-M before strategy exit (${slStatus})`,
-            orderId: pos.slOrderId,
-            tradingSymbol: pos.tradingSymbol,
-            quantity: pos.quantity,
-          });
-          await delay(300);
-        }
+      const slGate = await this.cancelPendingSlBeforeExit(authorization, pos);
+      if (slGate === 'filled') {
+        return;
       }
+      // Re-read in case cancel updated memory.
+      pos = this.positions.get(pos.instrumentId) ?? pos;
 
       const response = await firstValueFrom(
         this.kiteApi.placeRegularOrder(authorization, {
@@ -1041,8 +1168,14 @@ function isFilledOrWorking(status?: string): boolean {
 }
 
 function findPendingOptionSl(orders: KiteOrderRow[], symbol: string): KiteOrderRow | undefined {
-  return orders.find((o) => {
-    if ((o.tradingsymbol ?? '').toUpperCase() !== symbol) return false;
+  return findAllPendingOptionSl(orders, symbol)[0];
+}
+
+/** All cancellable protective SELL SL/SL-M orders for a symbol (ghost SLs included). */
+function findAllPendingOptionSl(orders: KiteOrderRow[], symbol: string): KiteOrderRow[] {
+  const sym = symbol.toUpperCase();
+  return orders.filter((o) => {
+    if ((o.tradingsymbol ?? '').toUpperCase() !== sym) return false;
     if ((o.transaction_type ?? '').toUpperCase() !== 'SELL') return false;
     const ot = (o.order_type ?? '').toUpperCase();
     if (ot !== 'SL-M' && ot !== 'SL') return false;

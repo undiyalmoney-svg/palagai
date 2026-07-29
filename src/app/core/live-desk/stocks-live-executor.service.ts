@@ -447,8 +447,13 @@ export class StocksLiveExecutorService {
   ): Promise<void> {
     const exitSide: 'BUY' | 'SELL' = leg.direction === 'BUY' ? 'SELL' : 'BUY';
     try {
+      const orders = await this.fetchOrders(authorization);
+      const cancelIds = new Set<string>();
+
       if (leg.slOrderId) {
-        const slStatus = await this.getOrderStatus(authorization, leg.slOrderId);
+        const known = orders.find((o) => o.order_id === leg.slOrderId);
+        const slStatus =
+          known?.status ?? (await this.getOrderStatus(authorization, leg.slOrderId));
         if (slStatus === 'COMPLETE') {
           this.legs.set(leg.symbol, {
             ...leg,
@@ -466,16 +471,40 @@ export class StocksLiveExecutorService {
           return;
         }
         if (slStatus && isCancellable(slStatus)) {
-          await firstValueFrom(this.kiteApi.cancelRegularOrder(authorization, leg.slOrderId));
+          cancelIds.add(leg.slOrderId);
+        }
+      }
+
+      for (const row of findAllPendingSl(orders, leg.symbol, leg.direction)) {
+        if (row.order_id) {
+          cancelIds.add(row.order_id);
+        }
+      }
+
+      for (const orderId of cancelIds) {
+        try {
+          await firstValueFrom(this.kiteApi.cancelRegularOrder(authorization, orderId));
           this.pushEvent({
             at: nowIso(),
             symbol: leg.symbol,
             action: 'CANCEL_SL',
-            detail: `Cancelled pending SL-M (${slStatus}) before exit`,
-            orderId: leg.slOrderId,
+            detail: `Cancelled pending SL-M before exit`,
+            orderId,
           });
-          await delay(300);
+        } catch (err) {
+          this.pushEvent({
+            at: nowIso(),
+            symbol: leg.symbol,
+            action: 'ERROR',
+            detail: `Cancel SL-M ${orderId} failed: ${formatErr(err)} — still trying MARKET exit`,
+            orderId,
+          });
         }
+      }
+      if (cancelIds.size > 0) {
+        await delay(400);
+        leg = { ...leg, slOrderId: null };
+        this.legs.set(leg.symbol, leg);
       }
 
       const response = await firstValueFrom(
@@ -631,9 +660,18 @@ function findPendingSl(
   symbol: string,
   positionDirection: 'BUY' | 'SELL',
 ): KiteOrderRow | undefined {
+  return findAllPendingSl(orders, symbol, positionDirection)[0];
+}
+
+function findAllPendingSl(
+  orders: KiteOrderRow[],
+  symbol: string,
+  positionDirection: 'BUY' | 'SELL',
+): KiteOrderRow[] {
   const needSide = positionDirection === 'BUY' ? 'SELL' : 'BUY';
-  return orders.find((o) => {
-    if ((o.tradingsymbol ?? '').toUpperCase() !== symbol) return false;
+  const sym = symbol.toUpperCase();
+  return orders.filter((o) => {
+    if ((o.tradingsymbol ?? '').toUpperCase() !== sym) return false;
     if ((o.transaction_type ?? '').toUpperCase() !== needSide) return false;
     const ot = (o.order_type ?? '').toUpperCase();
     if (ot !== 'SL-M' && ot !== 'SL') return false;
