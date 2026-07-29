@@ -14,7 +14,7 @@ export interface StrategyDnaCaps {
 }
 
 /**
- * Researched peak-trail + SL soft cutoff (reports/paper-loss-giveback-cutoff).
+ * Researched peak-trail + SL soft cutoff + day ₹ loss (docs 33/35 · peer hunt).
  * Always re-applied on desk hydrate so stale localStorage cannot keep arm₹1000.
  */
 export const PROTECTION_DNA_EXTRAS: Record<string, number | boolean> = {
@@ -25,6 +25,10 @@ export const PROTECTION_DNA_EXTRAS: Record<string, number | boolean> = {
   slConfirmCutoffFracR: 0.55,
   slConfirmCutoffMaxMfeR: 0.75,
   slConfirmSoftRs: 700,
+  /** Per-leg day loss ceiling (₹). Hydrate converts → dayStopPts via ₹/pt. */
+  dayLossCapRs: 2500,
+  /** Optional bank-&-quit (₹). 0 = off. Green book research uses 1000–1500 + 2R. */
+  dayBankQuitRs: 0,
 };
 
 /** Strategies that share the researched Trap/Genie loss-cut DNA. */
@@ -34,6 +38,34 @@ export function usesProtectionDna(strategyId: string): boolean {
     strategyId === MANAGED_STRATEGY_IDS.ALIGN_COMBO_GENIE ||
     strategyId === MANAGED_STRATEGY_IDS.SMART_PULLBACK_PRO
   );
+}
+
+/** Index ₹/pt used when converting day ₹ caps → pts. */
+export function indexRsPerPoint(channel: DeskChannel): number {
+  return channel === 'bank' ? 30 : 65;
+}
+
+/**
+ * Convert researched day ₹ cutoffs into dayStopPts / dayProfitLockPts for a channel.
+ */
+export function protectionDayCapsFromExtras(
+  extras: Record<string, number | boolean | string | undefined> | undefined,
+  channel: DeskChannel,
+): { dayStopPts?: number; dayProfitLockPts?: number } {
+  if (channel !== 'nifty' && channel !== 'bank') {
+    return {};
+  }
+  const rs = indexRsPerPoint(channel);
+  const out: { dayStopPts?: number; dayProfitLockPts?: number } = {};
+  const lossRs = Number(extras?.['dayLossCapRs'] ?? 0);
+  const bankRs = Number(extras?.['dayBankQuitRs'] ?? 0);
+  if (lossRs > 0) {
+    out.dayStopPts = Math.max(1, Math.round(lossRs / rs));
+  }
+  if (bankRs > 0) {
+    out.dayProfitLockPts = Math.max(1, Math.round(bankRs / rs));
+  }
+  return out;
 }
 
 /**

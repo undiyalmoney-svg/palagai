@@ -20,6 +20,8 @@ describe('AlignComboGenieManagedStrategy', () => {
     expect(s.getSettings().extras?.['slConfirmSoftRs']).toBe(700);
     expect(s.getSettings().extras?.['profitLockArmRs']).toBe(600);
     expect(s.getSettings().extras?.['profitLockGivebackRs']).toBe(300);
+    expect(s.getSettings().extras?.['dayLossCapRs']).toBe(2500);
+    expect(s.getSettings().extras?.['dayBankQuitRs']).toBe(0);
   });
 
   it('maps screenshot-style aligned dump day to BOTH (short combo)', () => {

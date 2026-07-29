@@ -75,6 +75,8 @@ export class AlignComboGenieManagedStrategy implements IManagedStrategy {
       slConfirmCutoffFracR: 0.55,
       slConfirmCutoffMaxMfeR: 0.75,
       slConfirmSoftRs: 700,
+      dayLossCapRs: 2500,
+      dayBankQuitRs: 0,
     },
   });
 
