@@ -40,7 +40,9 @@
 
 Earlier all-day-green hunt claimed ~₹27.5k / ~63% green on a similar Mar–Jul sample with paired windows. This replay prints **₹16.9k / 44% green** on the front-month merge — still the clear winner vs Trap/Daily Income, but absolute ₹ depends on contract merge / fill assumptions. Prefer paper on live CRUDEOILM before sizing up.
 
-## How to use
+## Expiry-day roll (v1.3.19)
+
+On crude **option expiry day**, ATM resolution always takes the **next** contract (never same-day expiry). Same rule as Nifty Trap weekly roll — applied in `resolveAtmCrudeMiniOption` / `listCrudeOilMiniOptions`.
 
 1. Crude Oil Desk → **Champion** (default) for researched ₹  
 2. **Daily Income** if you want a hard +₹1,000 day lock / tighter stops  
