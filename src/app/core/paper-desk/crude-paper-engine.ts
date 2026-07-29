@@ -18,6 +18,7 @@ import {
   CrudeTrapState,
   runCrudeTrapConfirm,
 } from '../strategy-engine/strategies/crude-trap-confirm/crude-trap-confirm.evaluator';
+import { runCrudeSessionOr } from '../strategy-engine/strategies/crude-session-or/crude-session-or.evaluator';
 import {
   CrudeTradeParams,
   resolveCrudeStrategyProfile,
@@ -303,12 +304,13 @@ export function replayPaperOnCrude(params: {
   } = params;
   const forceCloseOpen = params.forceCloseOpen !== false;
   const lotsMultiplier = Math.max(1, Math.floor(params.lotsMultiplier ?? 1) || 1);
-  const tradeParams = params.tradeParams ?? resolveCrudeStrategyProfile('daily-profit');
+  const tradeParams = params.tradeParams ?? resolveCrudeStrategyProfile('all-green');
   const dayLossStopPts = params.dayLossStopPts ?? tradeParams.dayLossStopPts;
   const dayProfitLockPts = tradeParams.dayProfitLockPts;
   const enableMorning = params.enableMorning !== false;
   const enableEvening = params.enableEvening !== false;
   const trapMode = tradeParams.entryMode === 'trap-confirm';
+  const sessionOrMode = tradeParams.entryMode === 'session-or';
 
   const state = trapMode ? createCrudeTrapState() : createCrudePdhlState();
   const trades: PaperTrade[] = [];
@@ -333,9 +335,11 @@ export function replayPaperOnCrude(params: {
         const bookLabel =
           open.book === 'morning'
             ? 'Morning'
-            : open.book === 'evening'
-              ? 'Evening'
-              : 'Trap';
+            : sessionOrMode
+              ? 'Afternoon'
+              : open.book === 'evening'
+                ? 'Evening'
+                : 'Trap';
         const closed = closePaperTrade({
           instrumentId,
           instrumentName,
@@ -353,6 +357,7 @@ export function replayPaperOnCrude(params: {
           dayLossStopPts,
           open.book,
           dayProfitLockPts,
+          tradeParams.firstWinLock,
         );
         dayNetByDate[day] = (dayNetByDate[day] ?? 0) + closed.indexPoints;
         open = null;
@@ -375,9 +380,35 @@ export function replayPaperOnCrude(params: {
       });
       if (trap.action === 'BUY' || trap.action === 'SELL') {
         signal = trap;
-        book = 'evening'; // shared day counters; label as trap via reason
+        book = 'evening';
       } else {
         lastSignal = trap.reason;
+      }
+    } else if (sessionOrMode) {
+      if (enableEvening) {
+        const afternoon = runCrudeSessionOr({
+          candle,
+          series: candles,
+          state,
+          dayLossStopPts,
+          dayProfitLockPts,
+          stopPts: tradeParams.stopPts,
+          targetPts: tradeParams.eveningTargetPts,
+          requireConfirm: tradeParams.requireConfirm,
+          firstWinLock: tradeParams.firstWinLock,
+          entryStart: tradeParams.eveningEntryStart,
+          entryEnd: tradeParams.eveningEntryEnd,
+          orStart: tradeParams.sessionOrStart,
+          orEnd: tradeParams.sessionOrEnd,
+          maxOrWidth: tradeParams.maxOrWidth,
+          maxTradesDay: tradeParams.maxEveningTradesDay,
+        });
+        if (afternoon.action === 'BUY' || afternoon.action === 'SELL') {
+          signal = afternoon;
+          book = 'evening';
+        } else {
+          lastSignal = afternoon.reason;
+        }
       }
     } else {
       if (enableMorning) {
@@ -409,6 +440,7 @@ export function replayPaperOnCrude(params: {
           stopPts: tradeParams.stopPts,
           targetPts: tradeParams.eveningTargetPts,
           requireConfirm: tradeParams.requireConfirm,
+          entryStart: tradeParams.eveningEntryStart,
           entryEnd: tradeParams.eveningEntryEnd,
           maxTradesDay: tradeParams.maxEveningTradesDay,
         });
@@ -475,7 +507,13 @@ export function replayPaperOnCrude(params: {
       open,
       exitPrice: last.close,
       exitTime: last.date,
-      exitReason: `${MCX_CRUDE_SESSION.sessionCloseLabel} · ${open.book === 'morning' ? 'Morning 10:00–12:00' : 'Evening 18:30–20:30'}`,
+      exitReason: `${MCX_CRUDE_SESSION.sessionCloseLabel} · ${
+        open.book === 'morning'
+          ? 'Morning 10:00–12:00'
+          : sessionOrMode
+            ? `${tradeParams.eveningEntryStart}–${tradeParams.eveningEntryEnd}`
+            : 'Evening 18:30–20:30'
+      }`,
       optionCandlesByToken,
       lotsMultiplier,
     });
@@ -486,6 +524,7 @@ export function replayPaperOnCrude(params: {
       dayLossStopPts,
       open.book,
       dayProfitLockPts,
+      tradeParams.firstWinLock,
     );
     dayNetByDate[extractTradeDate(last.date)] =
       (dayNetByDate[extractTradeDate(last.date)] ?? 0) + closed.indexPoints;

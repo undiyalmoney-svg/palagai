@@ -4,10 +4,10 @@
       <p class="pg-eyebrow">MCX · Crude Oil Mini</p>
       <h1>Crude Oil Desk</h1>
       <p class="pg-lede">
-        Default <strong>Daily Profit (Trap-style)</strong> — evening PDHL + next-bar confirm on
-        <strong>1 lot</strong> (₹10/pt): SL20 / TP40 · day lock +₹500 · day stop −₹400.
-        MCX hunt ~₹246/day · ~67% green (not guaranteed). Paper Testing &amp; Live (no real money
-        unless you tick Live money). {{ profileSlTpLabel() }}.
+        Default <strong>All-Green Afternoon</strong> — Session OR after <strong>15:15</strong> through
+        <strong>23:00</strong> on <strong>1 lot</strong> (₹10/pt): SL12 / TP24 · first-win · day lock +₹200 ·
+        day stop −₹150. MCX hunt ~<strong>90% green</strong> traded days (not every calendar day; not guaranteed).
+        Paper Testing &amp; Live (no real money unless you tick Live money). {{ profileSlTpLabel() }}.
       </p>
     </div>
     <div class="hero-meta">
@@ -64,13 +64,15 @@
         <strong>Today</strong>
         <span>{{ realOrders ? 'Real MCX NRML orders on signals' : 'Auto paper on CRUDEOILM (no real money)' }} ·
           {{
-            enableMorning && enableEvening
-              ? '10:00–12:00 + 18:30–' + activeProfile().eveningEntryEnd
-              : enableMorning
-                ? '10:00–12:00'
-                : enableEvening
-                  ? '18:30–' + activeProfile().eveningEntryEnd
-                  : 'no window'
+            activeProfile().entryMode === 'session-or' && enableEvening
+              ? activeProfile().eveningEntryStart + '–' + activeProfile().eveningEntryEnd
+              : enableMorning && enableEvening
+                ? '10:00–12:00 + ' + activeProfile().eveningEntryStart + '–' + activeProfile().eveningEntryEnd
+                : enableMorning
+                  ? '10:00–12:00'
+                  : enableEvening
+                    ? activeProfile().eveningEntryStart + '–' + activeProfile().eveningEntryEnd
+                    : 'no window'
           }}</span>
       </div>
     }
@@ -123,16 +125,33 @@
       <label
         class="desk-check"
         [attr.title]="
-          'PDHL · entries 18:30–' +
-          activeProfile().eveningEntryEnd +
-          (activeProfile().requireConfirm ? ' +confirm' : '') +
-          ' · SL' +
-          activeProfile().stopPts +
-          '/TP' +
-          activeProfile().eveningTargetPts +
-          ' · ≤' +
-          activeProfile().maxEveningTradesDay +
-          '/day · paper + live. Hold to TP/SL/23:10.'
+          activeProfile().entryMode === 'session-or'
+            ? 'Session OR ' +
+              activeProfile().sessionOrStart +
+              '–' +
+              activeProfile().sessionOrEnd +
+              ' · entries ' +
+              activeProfile().eveningEntryStart +
+              '–' +
+              activeProfile().eveningEntryEnd +
+              (activeProfile().requireConfirm ? ' +confirm' : '') +
+              (activeProfile().firstWinLock ? ' · first-win' : '') +
+              ' · SL' +
+              activeProfile().stopPts +
+              '/TP' +
+              activeProfile().eveningTargetPts
+            : 'PDHL · entries ' +
+              activeProfile().eveningEntryStart +
+              '–' +
+              activeProfile().eveningEntryEnd +
+              (activeProfile().requireConfirm ? ' +confirm' : '') +
+              ' · SL' +
+              activeProfile().stopPts +
+              '/TP' +
+              activeProfile().eveningTargetPts +
+              ' · ≤' +
+              activeProfile().maxEveningTradesDay +
+              '/day · paper + live. Hold to TP/SL/23:10.'
         "
       >
         <input
@@ -140,7 +159,13 @@
           [(ngModel)]="enableEvening"
           [disabled]="busy() || snapshot().running"
         />
-        <span>Evening 18:30–{{ activeProfile().eveningEntryEnd }}</span>
+        <span>
+          @if (activeProfile().entryMode === 'session-or') {
+            Afternoon {{ activeProfile().eveningEntryStart }}–{{ activeProfile().eveningEntryEnd }}
+          } @else {
+            Evening {{ activeProfile().eveningEntryStart }}–{{ activeProfile().eveningEntryEnd }}
+          }
+        </span>
       </label>
     </div>
 

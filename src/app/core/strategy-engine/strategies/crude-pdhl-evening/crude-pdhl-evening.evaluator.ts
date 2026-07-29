@@ -51,6 +51,8 @@ export interface CrudePdhlState {
   dayStoppedReason: string | null;
   /** Next-bar confirm for Daily Profit / Trap-style ORB·PDHL. */
   pendingConfirm: CrudePendingConfirm | null;
+  /** First-win lock (All-Green afternoon profile). */
+  wonToday: boolean;
 }
 
 export function createCrudePdhlState(): CrudePdhlState {
@@ -64,6 +66,7 @@ export function createCrudePdhlState(): CrudePdhlState {
     tradesThisMonth: 0,
     dayStoppedReason: null,
     pendingConfirm: null,
+    wonToday: false,
   };
 }
 
@@ -73,6 +76,7 @@ export function recordCrudeTradeClosed(
   dayLossStopPts: number = CRUDE_DAY_LOSS_STOP_PTS,
   book: CrudeSessionBook = 'evening',
   dayProfitLockPts: number = 0,
+  firstWinLock: boolean = false,
 ): void {
   state.dayNetPts += points;
   state.tradesToday += 1;
@@ -82,7 +86,12 @@ export function recordCrudeTradeClosed(
   } else {
     state.eveningTradesToday += 1;
   }
-  if (dayProfitLockPts > 0 && state.dayNetPts >= dayProfitLockPts) {
+  if (points > 0) {
+    state.wonToday = true;
+  }
+  if (firstWinLock && state.wonToday) {
+    state.dayStoppedReason = 'First win lock — day done';
+  } else if (dayProfitLockPts > 0 && state.dayNetPts >= dayProfitLockPts) {
     state.dayStoppedReason = `Day profit lock +${state.dayNetPts.toFixed(1)} pts`;
   } else if (state.dayNetPts <= -dayLossStopPts) {
     state.dayStoppedReason = `Day max loss ${state.dayNetPts.toFixed(1)} pts`;
@@ -174,6 +183,7 @@ export function runCrudePdhlEvening(params: {
     state.eveningTradesToday = 0;
     state.dayStoppedReason = null;
     state.pendingConfirm = null;
+    state.wonToday = false;
   }
   if (state.tradingMonth !== month) {
     state.tradingMonth = month;

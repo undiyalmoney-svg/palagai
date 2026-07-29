@@ -47,19 +47,20 @@ export class CrudeOilDeskComponent implements OnInit, OnDestroy {
   protected realOrdersAck = false;
   protected lots = 1;
   /**
-   * Default Daily Profit (Trap-style evening PDHL + confirm).
-   * Champion / Trap Confirm / Daily Income selectable.
+   * Default All-Green Afternoon (15:15–23:00 Session OR).
+   * Daily Profit / Champion / Trap Confirm / Daily Income selectable.
    */
-  protected strategyProfile: CrudeStrategyProfileId = 'daily-profit';
+  protected strategyProfile: CrudeStrategyProfileId = 'all-green';
   protected readonly strategyProfiles = [
+    CRUDE_STRATEGY_PROFILES['all-green'],
     CRUDE_STRATEGY_PROFILES['daily-profit'],
     CRUDE_STRATEGY_PROFILES.champion,
     CRUDE_STRATEGY_PROFILES['trap-confirm'],
     CRUDE_STRATEGY_PROFILES['daily-income'],
   ];
-  /** Morning ORB 10:00–12:00 (off by default for Daily Profit). */
+  /** Morning ORB 10:00–12:00 (off for All-Green / Daily Profit). */
   protected enableMorning = false;
-  /** Evening PDHL (Daily Profit default on · 18:30–21:00). */
+  /** Afternoon/Evening window (All-Green default on · 15:15–23:00). */
   protected enableEvening = true;
   /** Stricter day loss (pts depend on profile). */
   protected strictDayStop = false;
@@ -112,8 +113,11 @@ export class CrudeOilDeskComponent implements OnInit, OnDestroy {
       return `Trap+confirm ${p.targetRMultiple}R · day −₹${p.dayLossStopPts * CRUDE_RUPEES_PER_POINT}`;
     }
     const conf = p.requireConfirm ? ' +confirm' : '';
+    if (p.entryMode === 'session-or') {
+      return `Afternoon Session OR${conf} ${p.eveningEntryStart}–${p.eveningEntryEnd} · OR ${p.sessionOrStart}–${p.sessionOrEnd} · SL${p.stopPts}/TP${p.eveningTargetPts}`;
+    }
     if (p.profileId === 'daily-profit') {
-      return `Evening PDHL${conf} 18:30–${p.eveningEntryEnd} · SL${p.stopPts}/TP${p.eveningTargetPts}`;
+      return `Evening PDHL${conf} ${p.eveningEntryStart}–${p.eveningEntryEnd} · SL${p.stopPts}/TP${p.eveningTargetPts}`;
     }
     return `Morning SL${p.stopPts}/TP${p.morningTargetPts} · Evening SL${p.stopPts}/TP${p.eveningTargetPts}${conf}`;
   }

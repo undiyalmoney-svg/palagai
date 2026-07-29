@@ -56,7 +56,7 @@ export interface CrudeDeskRunOptions {
   /** Evening PDHL entries 18:30–20:30. */
   enableEvening?: boolean;
   /**
-   * Strategy profile. Default `daily-profit` (Trap-style evening PDHL + confirm).
+   * Strategy profile. Default `all-green` (afternoon Session OR 15:15–23:00).
    * Use `champion` for hunt SL/TP without day profit lock.
    */
   strategyProfile?: CrudeStrategyProfileId;
@@ -81,7 +81,7 @@ export class CrudePaperDeskService {
   private strictDayStop = false;
   private enableMorning = true;
   private enableEvening = true;
-  private tradeParams: CrudeTradeParams = resolveCrudeStrategyProfile('daily-profit');
+  private tradeParams: CrudeTradeParams = resolveCrudeStrategyProfile('all-green');
   private dayLossStopPts = this.tradeParams.dayLossStopPts;
   private runGeneration = 0;
   private readonly maxDaysPerCall = DESK_HISTORICAL_CHUNK_DAYS;
@@ -766,6 +766,11 @@ export class CrudePaperDeskService {
   private windowsLabel(): string {
     if (this.tradeParams.entryMode === 'trap-confirm') {
       return `trap+confirm ${this.tradeParams.targetRMultiple}R · trail arm₹${this.tradeParams.profitLockArmRs}`;
+    }
+    if (this.tradeParams.entryMode === 'session-or') {
+      const conf = this.tradeParams.requireConfirm ? ' +confirm' : '';
+      const fw = this.tradeParams.firstWinLock ? ' · first-win' : '';
+      return `afternoon SOR${conf}${fw} SL${this.tradeParams.stopPts}/TP${this.tradeParams.eveningTargetPts} · ${this.tradeParams.eveningEntryStart}–${this.tradeParams.eveningEntryEnd}`;
     }
     const parts: string[] = [];
     if (this.enableMorning) {

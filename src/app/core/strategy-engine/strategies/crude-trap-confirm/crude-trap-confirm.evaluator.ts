@@ -42,6 +42,7 @@ export function createCrudeTrapState(): CrudeTrapState {
     tradesThisMonth: 0,
     dayStoppedReason: null,
     pendingConfirm: null,
+    wonToday: false,
     pending: null,
   };
 }
@@ -111,6 +112,7 @@ export function runCrudeTrapConfirm(params: {
     state.eveningTradesToday = 0;
     state.dayStoppedReason = null;
     state.pendingConfirm = null;
+    state.wonToday = false;
     state.pending = null;
   }
   if (state.tradingMonth !== month) {

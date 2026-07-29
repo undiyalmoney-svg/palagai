@@ -39,7 +39,7 @@ Trap S/R port and morning+evening grids lost to **evening PDHL + next-bar confir
 
 ## Desk
 
-Crude Oil Desk → **Daily Profit (Trap-style)** (default). Champion / Trap Confirm / Daily Income still selectable.
+Crude Oil Desk → **All-Green Afternoon** is now the default (see **38**). **Daily Profit (Trap-style)** remains selectable for higher ₹/day with lower green%.
 
 ```bash
 python3 scripts/crude-daily-profit-hunt.py

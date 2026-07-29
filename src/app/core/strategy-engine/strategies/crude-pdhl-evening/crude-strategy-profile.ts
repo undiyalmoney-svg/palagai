@@ -1,7 +1,8 @@
 /**
  * Crude Oil Mini strategy profiles for the Crude Desk.
  *
- * - daily-profit: Trap-style evening PDHL + confirm · tight SL/TP · day lock (default)
+ * - all-green: afternoon Session OR 15:15–23:00 · ~90% green traded days (default)
+ * - daily-profit: Trap-style evening PDHL + confirm · tight SL/TP · day lock
  * - champion: hunt pair (larger SL/TP, no day profit lock)
  * - daily-income: sized for ~₹300–₹1,000 / day on 1 lot (₹10/pt) — weaker on MCX sample
  * - trap-confirm: S/R Trap + Confirm (Nifty Trap DNA port)
@@ -17,8 +18,17 @@ import {
   CRUDE_STRICT_DAY_LOSS_PTS,
 } from './crude-pdhl-evening.evaluator';
 import { CRUDE_TRAP_RR } from '../crude-trap-confirm/crude-trap-confirm.evaluator';
+import {
+  CRUDE_SOR_ENTRY_END,
+  CRUDE_SOR_ENTRY_START,
+  CRUDE_SOR_MAX_OR_WIDTH,
+  CRUDE_SOR_MAX_TRADES_DAY,
+  CRUDE_SOR_OR_END,
+  CRUDE_SOR_OR_START,
+} from '../crude-session-or/crude-session-or.evaluator';
 
 export type CrudeStrategyProfileId =
+  | 'all-green'
   | 'daily-profit'
   | 'champion'
   | 'daily-income'
@@ -51,20 +61,29 @@ export interface CrudeTradeParams extends CrudeProtectParams {
   strictDayLossPts: number;
   /**
    * Day profit lock (pts). 0 = off.
-   * Daily Profit: 50 pts = ₹500 at ₹10/pt.
    */
   dayProfitLockPts: number;
   /** Entry mode for desk engine. */
-  entryMode: 'orb-pdhl' | 'trap-confirm';
-  /** Next-bar confirm after PDHL/ORB signal (Daily Profit). */
+  entryMode: 'orb-pdhl' | 'trap-confirm' | 'session-or';
+  /** Next-bar confirm after signal. */
   requireConfirm: boolean;
-  /** Evening entry window end HH:MM (default 20:30). */
+  /** Stop new entries after first green close (All-Green). */
+  firstWinLock: boolean;
+  /** Evening / afternoon entry window start HH:MM. */
+  eveningEntryStart: string;
+  /** Evening / afternoon entry window end HH:MM. */
   eveningEntryEnd: string;
-  /** Max evening fills/day. */
+  /** Session OR start (session-or mode). */
+  sessionOrStart: string;
+  /** Session OR end (session-or mode). */
+  sessionOrEnd: string;
+  /** Skip wide session OR (pts). */
+  maxOrWidth: number;
+  /** Max evening/afternoon fills/day. */
   maxEveningTradesDay: number;
   /** Desk default: Morning ORB on/off when this profile is selected. */
   defaultEnableMorning: boolean;
-  /** Desk default: Evening PDHL on/off when this profile is selected. */
+  /** Desk default: Evening/Afternoon window on/off when this profile is selected. */
   defaultEnableEvening: boolean;
   /** Short UI blurb (1 lot × ₹10). */
   dailyBandLabel: string;
@@ -81,9 +100,38 @@ const PROTECT_OFF: CrudeProtectParams = {
 };
 
 /**
- * Daily Profit (Trap-style) — MCX Mar–Jul 2026 hunt winner for green% + ₹/day.
- * Evening PDHL 18:30–21:00 + next-bar confirm · SL20 / TP40 · lock +50 · stop −40.
- * ~₹246/day · ~67% green days · PF ~2.9 · worst −₹400 (1 lot). Not 100% green.
+ * All-Green aim — afternoon Session OR (15:15–23:00).
+ * MCX Mar–Jul 2026: ~90% green of traded days · ~₹154/day · PF ~3.5 · worst −₹240.
+ * Not every calendar day (flat = no setup). Not a live guarantee.
+ */
+export const CRUDE_ALL_GREEN_PARAMS: CrudeTradeParams = {
+  profileId: 'all-green',
+  label: 'All-Green Afternoon (15:15–23:00)',
+  stopPts: 12,
+  morningTargetPts: 24,
+  eveningTargetPts: 24,
+  targetRMultiple: 0,
+  dayLossStopPts: 15,
+  strictDayLossPts: 25,
+  dayProfitLockPts: 20,
+  entryMode: 'session-or',
+  requireConfirm: true,
+  firstWinLock: true,
+  eveningEntryStart: CRUDE_SOR_ENTRY_START,
+  eveningEntryEnd: CRUDE_SOR_ENTRY_END,
+  sessionOrStart: CRUDE_SOR_OR_START,
+  sessionOrEnd: CRUDE_SOR_OR_END,
+  maxOrWidth: CRUDE_SOR_MAX_OR_WIDTH,
+  maxEveningTradesDay: CRUDE_SOR_MAX_TRADES_DAY,
+  defaultEnableMorning: false,
+  defaultEnableEvening: true,
+  dailyBandLabel: '~90% green hunt · ~₹154/day · lock +₹200 · first-win · day −₹150',
+  ...PROTECT_OFF,
+};
+
+/**
+ * Daily Profit (Trap-style) — evening PDHL + confirm.
+ * ~₹246/day · ~67% green · PF ~2.9.
  */
 export const CRUDE_DAILY_PROFIT_PARAMS: CrudeTradeParams = {
   profileId: 'daily-profit',
@@ -97,7 +145,12 @@ export const CRUDE_DAILY_PROFIT_PARAMS: CrudeTradeParams = {
   dayProfitLockPts: 50,
   entryMode: 'orb-pdhl',
   requireConfirm: true,
+  firstWinLock: false,
+  eveningEntryStart: '18:30',
   eveningEntryEnd: '21:00',
+  sessionOrStart: CRUDE_SOR_OR_START,
+  sessionOrEnd: CRUDE_SOR_OR_END,
+  maxOrWidth: CRUDE_SOR_MAX_OR_WIDTH,
   maxEveningTradesDay: 2,
   defaultEnableMorning: false,
   defaultEnableEvening: true,
@@ -118,7 +171,12 @@ export const CRUDE_CHAMPION_PARAMS: CrudeTradeParams = {
   dayProfitLockPts: 0,
   entryMode: 'orb-pdhl',
   requireConfirm: false,
+  firstWinLock: false,
+  eveningEntryStart: '18:30',
   eveningEntryEnd: '20:30',
+  sessionOrStart: CRUDE_SOR_OR_START,
+  sessionOrEnd: CRUDE_SOR_OR_END,
+  maxOrWidth: CRUDE_SOR_MAX_OR_WIDTH,
   maxEveningTradesDay: 1,
   defaultEnableMorning: true,
   defaultEnableEvening: true,
@@ -128,7 +186,7 @@ export const CRUDE_CHAMPION_PARAMS: CrudeTradeParams = {
 
 /**
  * Daily income band for 1 lot (₹10/pt).
- * MCX Mar–Jul 2026 hunt: negative expectancy — prefer Daily Profit.
+ * MCX Mar–Jul 2026 hunt: negative expectancy — prefer All-Green / Daily Profit.
  */
 export const CRUDE_DAILY_INCOME_PARAMS: CrudeTradeParams = {
   profileId: 'daily-income',
@@ -142,7 +200,12 @@ export const CRUDE_DAILY_INCOME_PARAMS: CrudeTradeParams = {
   dayProfitLockPts: 100,
   entryMode: 'orb-pdhl',
   requireConfirm: false,
+  firstWinLock: false,
+  eveningEntryStart: '18:30',
   eveningEntryEnd: '20:30',
+  sessionOrStart: CRUDE_SOR_OR_START,
+  sessionOrEnd: CRUDE_SOR_OR_END,
+  maxOrWidth: CRUDE_SOR_MAX_OR_WIDTH,
   maxEveningTradesDay: 1,
   defaultEnableMorning: true,
   defaultEnableEvening: true,
@@ -152,7 +215,6 @@ export const CRUDE_DAILY_INCOME_PARAMS: CrudeTradeParams = {
 
 /**
  * Crude Trap + Confirm — Trap DNA port (paper / research).
- * MCX Mar–Jul 2026: does not beat Champion or Daily Profit.
  */
 export const CRUDE_TRAP_CONFIRM_PARAMS: CrudeTradeParams = {
   profileId: 'trap-confirm',
@@ -166,7 +228,12 @@ export const CRUDE_TRAP_CONFIRM_PARAMS: CrudeTradeParams = {
   dayProfitLockPts: 0,
   entryMode: 'trap-confirm',
   requireConfirm: true,
+  firstWinLock: false,
+  eveningEntryStart: '10:00',
   eveningEntryEnd: '22:00',
+  sessionOrStart: CRUDE_SOR_OR_START,
+  sessionOrEnd: CRUDE_SOR_OR_END,
+  maxOrWidth: CRUDE_SOR_MAX_OR_WIDTH,
   maxEveningTradesDay: 3,
   defaultEnableMorning: true,
   defaultEnableEvening: true,
@@ -175,6 +242,7 @@ export const CRUDE_TRAP_CONFIRM_PARAMS: CrudeTradeParams = {
 };
 
 export const CRUDE_STRATEGY_PROFILES: Record<CrudeStrategyProfileId, CrudeTradeParams> = {
+  'all-green': CRUDE_ALL_GREEN_PARAMS,
   'daily-profit': CRUDE_DAILY_PROFIT_PARAMS,
   champion: CRUDE_CHAMPION_PARAMS,
   'daily-income': CRUDE_DAILY_INCOME_PARAMS,
@@ -187,7 +255,7 @@ export function resolveCrudeStrategyProfile(
   if (profileId && CRUDE_STRATEGY_PROFILES[profileId]) {
     return CRUDE_STRATEGY_PROFILES[profileId];
   }
-  return CRUDE_DAILY_PROFIT_PARAMS;
+  return CRUDE_ALL_GREEN_PARAMS;
 }
 
 export function resolveCrudeProfileDayLossPts(

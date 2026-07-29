@@ -88,6 +88,7 @@ export function runCrudeMorningOrb(params: {
     state.eveningTradesToday = 0;
     state.dayStoppedReason = null;
     state.pendingConfirm = null;
+    state.wonToday = false;
   }
   if (state.tradingMonth !== month) {
     state.tradingMonth = month;
