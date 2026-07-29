@@ -689,7 +689,22 @@ export class PaperTradeDeskService {
       // Live money needs a fresh NFO dump — stale/empty cache → synthetic options → no Kite orders.
       if (this.realOrders) {
         this.patchMessage('Live money · refreshing NFO option chain for real orders…');
-        await this.instrumentStore.refreshBestEffort(true);
+        try {
+          await this.instrumentStore.refresh(true);
+        } catch (err) {
+          throw new Error(
+            `Live money needs a fresh NFO option chain. ${formatUnknownError(err, 'Instruments')} ` +
+              'Open Get Token if expired, then Settings → Refresh Instruments.',
+          );
+        }
+        const nfoCount = this.instrumentStore.indexOptionCount();
+        if (nfoCount < 50) {
+          throw new Error(
+            `Live money blocked — only ${nfoCount} index options in cache after refresh. ` +
+              'Settings → Refresh Instruments, then restart Live money.',
+          );
+        }
+        this.patchMessage(`Live money · NFO chain ready (${nfoCount} index options)`);
         this.patchMessage('Live money · reconciling open Kite positions…');
         const note = await this.liveOrders.reconcileFromBroker(authorization);
         this.patchMessage(`Live money · ${note}`);
@@ -918,19 +933,35 @@ export class PaperTradeDeskService {
     }
 
     if (this.realOrders) {
-      const allInstruments = this.instrumentStore.allInstruments();
+      let allInstruments = this.instrumentStore.allInstruments();
       for (const s of statuses) {
         // Re-resolve ATM from the live chain so we don't send synthetic labels to Kite.
         if (s.openTrade) {
           const kind: IndexOptionKind =
             s.instrumentId === NIFTY_50_INSTRUMENT.id ? 'nifty' : 'banknifty';
-          const resolved = resolveAtmWeeklyOption({
+          let resolved = resolveAtmWeeklyOption({
             instruments: allInstruments,
             kind,
             direction: s.openTrade.direction,
             spot: s.openTrade.indexEntry,
             asOfDateTime: s.openTrade.entryTime,
           });
+          // One hard refresh if still synthetic — covers stale/empty first tick.
+          if (resolved.source === 'synthetic') {
+            try {
+              await this.instrumentStore.refresh(true);
+              allInstruments = this.instrumentStore.allInstruments();
+            } catch {
+              // keep synthetic; SKIP path will explain
+            }
+            resolved = resolveAtmWeeklyOption({
+              instruments: allInstruments,
+              kind,
+              direction: s.openTrade.direction,
+              spot: s.openTrade.indexEntry,
+              asOfDateTime: s.openTrade.entryTime,
+            });
+          }
           const fresh = toOptionContract(resolved.instrument, resolved.source);
           s.openTrade = { ...s.openTrade, option: fresh };
           s.chosenOption = fresh;

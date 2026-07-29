@@ -18,8 +18,92 @@ import {
 } from '@angular/ssr/node';
 import { createHash } from 'node:crypto';
 import express from 'express';
-import { gunzipSync } from 'node:zlib';
+import { gunzipSync, gzipSync } from 'node:zlib';
 import { join } from 'node:path';
+
+/** Minimal CSV split that respects double-quoted fields (names with commas). */
+function splitCsvLine(line: string): string[] {
+  const out: string[] = [];
+  let cur = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i += 1) {
+    const ch = line[i]!;
+    if (ch === '"') {
+      if (inQuotes && line[i + 1] === '"') {
+        cur += '"';
+        i += 1;
+      } else {
+        inQuotes = !inQuotes;
+      }
+      continue;
+    }
+    if (ch === ',' && !inQuotes) {
+      out.push(cur);
+      cur = '';
+      continue;
+    }
+    cur += ch;
+  }
+  out.push(cur);
+  return out;
+}
+
+/**
+ * Full Kite instruments CSV is ~9MB — over Vercel’s serverless response limit.
+ * Keep desk-relevant rows only (NFO index opts/futs, MCX crude, NSE EQ/indices).
+ * Client still decompresses gzip via decompressIfGzip (no Content-Encoding header).
+ */
+function slimTradingInstrumentsCsv(csv: string): string {
+  const lines = csv.split(/\r?\n/);
+  if (lines.length < 2) {
+    return csv;
+  }
+  const out: string[] = [lines[0]!];
+  for (let i = 1; i < lines.length; i += 1) {
+    const line = lines[i]!;
+    if (!line) {
+      continue;
+    }
+    const cols = splitCsvLine(line);
+    if (cols.length < 12) {
+      continue;
+    }
+    const sym = (cols[2] ?? '').trim().toUpperCase();
+    const name = (cols[3] ?? '').trim().toUpperCase();
+    const itype = (cols[9] ?? '').trim().toUpperCase();
+    const exchange = (cols[11] ?? '').trim().toUpperCase();
+
+    if (exchange === 'NFO' && (itype === 'CE' || itype === 'PE' || itype === 'FUT')) {
+      if (sym.startsWith('BANKNIFTY') || name === 'BANKNIFTY') {
+        out.push(line);
+        continue;
+      }
+      if (
+        (sym.startsWith('NIFTY') || name === 'NIFTY') &&
+        !sym.startsWith('NIFTYNXT') &&
+        !sym.startsWith('FINNIFTY') &&
+        !sym.startsWith('MIDCPNIFTY')
+      ) {
+        out.push(line);
+        continue;
+      }
+    }
+    if (exchange === 'MCX' && (sym.includes('CRUDE') || name.includes('CRUDE'))) {
+      out.push(line);
+      continue;
+    }
+    if (exchange === 'NSE') {
+      if (itype === 'EQ' || itype === 'BE' || itype === 'IDX') {
+        out.push(line);
+        continue;
+      }
+      if (sym === 'NIFTY 50' || sym === 'NIFTY BANK') {
+        out.push(line);
+      }
+    }
+  }
+  return `${out.join('\n')}\n`;
+}
 
 const KITE_API_BASE_URL = 'https://api.kite.trade';
 
@@ -109,7 +193,18 @@ kiteApiRouter.use(async (req, res) => {
       } catch {
         csv = buffer.toString('utf-8');
       }
-      res.status(kiteResponse.status).type('text/csv').send(csv);
+      if (kiteResponse.status >= 400 || !csv.includes('instrument_token')) {
+        res.status(kiteResponse.status).type('text/csv').send(csv);
+        return;
+      }
+      // Slim + gzip so the payload fits Vercel (~200KB) and mobile localStorage.
+      const slim = slimTradingInstrumentsCsv(csv);
+      const gz = gzipSync(Buffer.from(slim, 'utf-8'));
+      res.status(200);
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Length', String(gz.length));
+      // Intentionally omit Content-Encoding — Angular decompressIfGzip handles magic bytes.
+      res.end(gz);
       return;
     }
 
