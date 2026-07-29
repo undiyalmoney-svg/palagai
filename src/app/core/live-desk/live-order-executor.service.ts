@@ -117,7 +117,7 @@ export { liveOpenMatchesBroker } from './live-open-match.util';
  * Live money executor (addon):
  * 1) MARKET BUY entry
  * 2) Protective SL-M SELL (trigger from index stop × ~0.5 delta on premium)
- * 3) Strategy exit → cancel pending SL → MARKET SELL
+ * 3) Strategy exit → cancel ALL pending SL-M for symbol (incl. ghost) → MARKET SELL
  * 4) If SL already COMPLETE → flat, no second exit
  */
 @Injectable({ providedIn: 'root' })
