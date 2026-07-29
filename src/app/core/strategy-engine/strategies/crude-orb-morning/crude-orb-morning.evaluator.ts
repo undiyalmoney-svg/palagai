@@ -64,9 +64,18 @@ export function runCrudeMorningOrb(params: {
   series: Candle[];
   state: CrudePdhlState;
   dayLossStopPts?: number;
+  /** Day profit lock (pts). 0 = off. */
+  dayProfitLockPts?: number;
+  /** Override stop distance (pts). Default champion 80. */
+  stopPts?: number;
+  /** Override morning target (pts). Default champion 250. */
+  targetPts?: number;
 }): CrudePdhlSignal {
   const { candle, series, state } = params;
   const dayLossStopPts = params.dayLossStopPts ?? CRUDE_DAY_LOSS_STOP_PTS;
+  const dayProfitLockPts = params.dayProfitLockPts ?? 0;
+  const stopPts = params.stopPts ?? CRUDE_STOP_PTS;
+  const targetPts = params.targetPts ?? CRUDE_MORNING_TARGET_PTS;
   const tradingDate = extractTradeDate(candle.date);
   const month = tradingDate.slice(0, 7);
   const time = extractHhMm(candle.date);
@@ -78,6 +87,7 @@ export function runCrudeMorningOrb(params: {
     state.morningTradesToday = 0;
     state.eveningTradesToday = 0;
     state.dayStoppedReason = null;
+    state.pendingConfirm = null;
   }
   if (state.tradingMonth !== month) {
     state.tradingMonth = month;
@@ -85,6 +95,10 @@ export function runCrudeMorningOrb(params: {
   }
 
   if (state.dayStoppedReason) {
+    return wait(candle, state.dayStoppedReason);
+  }
+  if (dayProfitLockPts > 0 && state.dayNetPts >= dayProfitLockPts) {
+    state.dayStoppedReason = `Day profit lock +${state.dayNetPts.toFixed(1)} pts`;
     return wait(candle, state.dayStoppedReason);
   }
   if (state.dayNetPts <= -dayLossStopPts) {
@@ -127,11 +141,10 @@ export function runCrudeMorningOrb(params: {
   }
 
   const entry = candle.close;
-  const stopLoss = action === 'BUY' ? entry - CRUDE_STOP_PTS : entry + CRUDE_STOP_PTS;
-  const target =
-    action === 'BUY' ? entry + CRUDE_MORNING_TARGET_PTS : entry - CRUDE_MORNING_TARGET_PTS;
+  const stopLoss = action === 'BUY' ? entry - stopPts : entry + stopPts;
+  const target = action === 'BUY' ? entry + targetPts : entry - targetPts;
 
-  if (state.dayNetPts - CRUDE_STOP_PTS < -dayLossStopPts) {
+  if (state.dayNetPts - stopPts < -dayLossStopPts) {
     return {
       action: 'NO_TRADE',
       entryPrice: entry,
@@ -146,6 +159,6 @@ export function runCrudeMorningOrb(params: {
     entryPrice: entry,
     stopLoss,
     target,
-    reason: `${action} morning ORB · SL ${CRUDE_STOP_PTS} / TP ${CRUDE_MORNING_TARGET_PTS} · day ${state.dayNetPts.toFixed(1)}`,
+    reason: `${action} morning ORB · SL ${stopPts} / TP ${targetPts} · day ${state.dayNetPts.toFixed(1)}`,
   };
 }

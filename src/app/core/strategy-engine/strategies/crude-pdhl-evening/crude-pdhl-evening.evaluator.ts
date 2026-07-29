@@ -35,6 +35,11 @@ export function resolveCrudeDayLossStopPts(strictDayStop?: boolean): number {
 
 export type CrudeSessionBook = 'morning' | 'evening';
 
+export interface CrudePendingConfirm {
+  dir: 1 | -1;
+  signalClose: number;
+}
+
 export interface CrudePdhlState {
   tradingDate: string | null;
   tradingMonth: string | null;
@@ -44,6 +49,8 @@ export interface CrudePdhlState {
   eveningTradesToday: number;
   tradesThisMonth: number;
   dayStoppedReason: string | null;
+  /** Next-bar confirm for Daily Profit / Trap-style ORB·PDHL. */
+  pendingConfirm: CrudePendingConfirm | null;
 }
 
 export function createCrudePdhlState(): CrudePdhlState {
@@ -56,6 +63,7 @@ export function createCrudePdhlState(): CrudePdhlState {
     eveningTradesToday: 0,
     tradesThisMonth: 0,
     dayStoppedReason: null,
+    pendingConfirm: null,
   };
 }
 
@@ -64,6 +72,7 @@ export function recordCrudeTradeClosed(
   points: number,
   dayLossStopPts: number = CRUDE_DAY_LOSS_STOP_PTS,
   book: CrudeSessionBook = 'evening',
+  dayProfitLockPts: number = 0,
 ): void {
   state.dayNetPts += points;
   state.tradesToday += 1;
@@ -73,7 +82,9 @@ export function recordCrudeTradeClosed(
   } else {
     state.eveningTradesToday += 1;
   }
-  if (state.dayNetPts <= -dayLossStopPts) {
+  if (dayProfitLockPts > 0 && state.dayNetPts >= dayProfitLockPts) {
+    state.dayStoppedReason = `Day profit lock +${state.dayNetPts.toFixed(1)} pts`;
+  } else if (state.dayNetPts <= -dayLossStopPts) {
     state.dayStoppedReason = `Day max loss ${state.dayNetPts.toFixed(1)} pts`;
   }
 }
@@ -127,9 +138,30 @@ export function runCrudePdhlEvening(params: {
   state: CrudePdhlState;
   /** Override champion day loss stop (pts). Default −240. */
   dayLossStopPts?: number;
+  /** Day profit lock (pts). 0 = off. */
+  dayProfitLockPts?: number;
+  /** Override stop distance (pts). Default champion 80. */
+  stopPts?: number;
+  /** Override evening target (pts). Default champion 150. */
+  targetPts?: number;
+  /** Next-bar confirm (Daily Profit / Trap-style). */
+  requireConfirm?: boolean;
+  /** Entry window start HH:MM (default 18:30). */
+  entryStart?: string;
+  /** Entry window end HH:MM (default 20:30; Daily Profit uses 21:00). */
+  entryEnd?: string;
+  /** Max evening fills/day (default 1; Daily Profit allows 2). */
+  maxTradesDay?: number;
 }): CrudePdhlSignal {
   const { candle, series, index, state } = params;
   const dayLossStopPts = params.dayLossStopPts ?? CRUDE_DAY_LOSS_STOP_PTS;
+  const dayProfitLockPts = params.dayProfitLockPts ?? 0;
+  const stopPts = params.stopPts ?? CRUDE_STOP_PTS;
+  const targetPts = params.targetPts ?? CRUDE_EVENING_TARGET_PTS;
+  const requireConfirm = params.requireConfirm === true;
+  const entryStart = params.entryStart ?? CRUDE_ENTRY_START;
+  const entryEnd = params.entryEnd ?? CRUDE_ENTRY_END;
+  const maxTradesDay = params.maxTradesDay ?? CRUDE_MAX_TRADES_DAY;
   const tradingDate = extractTradeDate(candle.date);
   const month = tradingDate.slice(0, 7);
   const time = extractHhMm(candle.date);
@@ -141,6 +173,7 @@ export function runCrudePdhlEvening(params: {
     state.morningTradesToday = 0;
     state.eveningTradesToday = 0;
     state.dayStoppedReason = null;
+    state.pendingConfirm = null;
   }
   if (state.tradingMonth !== month) {
     state.tradingMonth = month;
@@ -150,21 +183,57 @@ export function runCrudePdhlEvening(params: {
   if (state.dayStoppedReason) {
     return wait(candle, state.dayStoppedReason);
   }
+  if (dayProfitLockPts > 0 && state.dayNetPts >= dayProfitLockPts) {
+    state.dayStoppedReason = `Day profit lock +${state.dayNetPts.toFixed(1)} pts`;
+    return wait(candle, state.dayStoppedReason);
+  }
   if (state.dayNetPts <= -dayLossStopPts) {
     state.dayStoppedReason = `Day max loss ${state.dayNetPts.toFixed(1)} pts`;
     return wait(candle, state.dayStoppedReason);
   }
-  if (state.eveningTradesToday >= CRUDE_MAX_TRADES_DAY) {
-    return wait(candle, `Max ${CRUDE_MAX_TRADES_DAY} evening trades/day`);
+  if (state.eveningTradesToday >= maxTradesDay) {
+    return wait(candle, `Max ${maxTradesDay} evening trades/day`);
   }
   if (state.tradesThisMonth >= CRUDE_MAX_TRADES_MONTH) {
     return wait(candle, `Max ${CRUDE_MAX_TRADES_MONTH} trades/month`);
   }
-  if (time < CRUDE_ENTRY_START || time > CRUDE_ENTRY_END) {
-    return wait(
-      candle,
-      `Outside entry window (${CRUDE_ENTRY_START}–${CRUDE_ENTRY_END})`,
-    );
+
+  // Next-bar confirm → fill at this open when candle continues the break.
+  if (state.pendingConfirm) {
+    const p = state.pendingConfirm;
+    state.pendingConfirm = null;
+    if (time < entryStart || time > entryEnd) {
+      return wait(candle, 'Confirm outside entry window');
+    }
+    const bullOk = p.dir === 1 && candle.close > candle.open && candle.close > p.signalClose;
+    const bearOk = p.dir === -1 && candle.close < candle.open && candle.close < p.signalClose;
+    if (!bullOk && !bearOk) {
+      return wait(candle, 'PDHL confirm failed');
+    }
+    const action: 'BUY' | 'SELL' = p.dir === 1 ? 'BUY' : 'SELL';
+    const entry = candle.open;
+    const stopLoss = action === 'BUY' ? entry - stopPts : entry + stopPts;
+    const target = action === 'BUY' ? entry + targetPts : entry - targetPts;
+    if (state.dayNetPts - stopPts < -dayLossStopPts) {
+      return {
+        action: 'NO_TRADE',
+        entryPrice: entry,
+        stopLoss: entry,
+        target: entry,
+        reason: 'Next SL would breach day max loss',
+      };
+    }
+    return {
+      action,
+      entryPrice: entry,
+      stopLoss,
+      target,
+      reason: `${action} PDHL confirm · SL ${stopPts} / TP ${targetPts} · day ${state.dayNetPts.toFixed(1)}`,
+    };
+  }
+
+  if (time < entryStart || time > entryEnd) {
+    return wait(candle, `Outside entry window (${entryStart}–${entryEnd})`);
   }
 
   const levels = prevDayHl(series, index, tradingDate);
@@ -182,12 +251,19 @@ export function runCrudePdhlEvening(params: {
     return wait(candle, `Waiting PDHL break (${levels.pdl.toFixed(1)}–${levels.pdh.toFixed(1)})`);
   }
 
-  const entry = candle.close;
-  const stopLoss = action === 'BUY' ? entry - CRUDE_STOP_PTS : entry + CRUDE_STOP_PTS;
-  const target =
-    action === 'BUY' ? entry + CRUDE_EVENING_TARGET_PTS : entry - CRUDE_EVENING_TARGET_PTS;
+  if (requireConfirm) {
+    state.pendingConfirm = {
+      dir: action === 'BUY' ? 1 : -1,
+      signalClose: candle.close,
+    };
+    return wait(candle, `PDHL signal armed · waiting confirm (${action})`);
+  }
 
-  if (state.dayNetPts - CRUDE_STOP_PTS < -dayLossStopPts) {
+  const entry = candle.close;
+  const stopLoss = action === 'BUY' ? entry - stopPts : entry + stopPts;
+  const target = action === 'BUY' ? entry + targetPts : entry - targetPts;
+
+  if (state.dayNetPts - stopPts < -dayLossStopPts) {
     return {
       action: 'NO_TRADE',
       entryPrice: entry,
@@ -202,7 +278,7 @@ export function runCrudePdhlEvening(params: {
     entryPrice: entry,
     stopLoss,
     target,
-    reason: `${action} PDHL · SL ${CRUDE_STOP_PTS} / TP ${CRUDE_EVENING_TARGET_PTS} · day ${state.dayNetPts.toFixed(1)}`,
+    reason: `${action} PDHL · SL ${stopPts} / TP ${targetPts} · day ${state.dayNetPts.toFixed(1)}`,
   };
 }
 
