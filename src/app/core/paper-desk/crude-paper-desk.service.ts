@@ -56,7 +56,7 @@ export interface CrudeDeskRunOptions {
   /** Evening PDHL entries 18:30–20:30. */
   enableEvening?: boolean;
   /**
-   * Strategy profile. Default `all-green` (afternoon Session OR 15:15–23:00).
+   * Strategy profile. Default `all-green` (Session OR 09:00–23:00 · day −₹1,500).
    * Use `champion` for hunt SL/TP without day profit lock.
    */
   strategyProfile?: CrudeStrategyProfileId;

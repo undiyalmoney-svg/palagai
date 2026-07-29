@@ -47,7 +47,7 @@ export class CrudeOilDeskComponent implements OnInit, OnDestroy {
   protected realOrdersAck = false;
   protected lots = 1;
   /**
-   * Default All-Green Afternoon (15:15–23:00 Session OR).
+   * Default All-Green (09:00–23:00 Session OR; trade whenever desk runs).
    * Daily Profit / Champion / Trap Confirm / Daily Income selectable.
    */
   protected strategyProfile: CrudeStrategyProfileId = 'all-green';
@@ -60,7 +60,7 @@ export class CrudeOilDeskComponent implements OnInit, OnDestroy {
   ];
   /** Morning ORB 10:00–12:00 (off for All-Green / Daily Profit). */
   protected enableMorning = false;
-  /** Afternoon/Evening window (All-Green default on · 15:15–23:00). */
+  /** Session / evening window (All-Green default on · 09:00–23:00). */
   protected enableEvening = true;
   /** Stricter day loss (pts depend on profile). */
   protected strictDayStop = false;
@@ -114,7 +114,7 @@ export class CrudeOilDeskComponent implements OnInit, OnDestroy {
     }
     const conf = p.requireConfirm ? ' +confirm' : '';
     if (p.entryMode === 'session-or') {
-      return `Afternoon Session OR${conf} ${p.eveningEntryStart}–${p.eveningEntryEnd} · OR ${p.sessionOrStart}–${p.sessionOrEnd} · SL${p.stopPts}/TP${p.eveningTargetPts}`;
+      return `Session OR${conf} ${p.eveningEntryStart}–${p.eveningEntryEnd} · OR ${p.sessionOrStart}–${p.sessionOrEnd} · SL${p.stopPts}/TP${p.eveningTargetPts} · day −₹${p.dayLossStopPts * CRUDE_RUPEES_PER_POINT}`;
     }
     if (p.profileId === 'daily-profit') {
       return `Evening PDHL${conf} ${p.eveningEntryStart}–${p.eveningEntryEnd} · SL${p.stopPts}/TP${p.eveningTargetPts}`;
