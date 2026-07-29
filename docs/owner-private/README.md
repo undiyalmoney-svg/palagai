@@ -32,6 +32,6 @@ Do **not** paste these strategy rules into public chats or share the folder casu
 - **Family:** Morning ORB + Evening PDHL (champion pair from Mar–Jul 2026 hunt)
 - **Morning:** OR 09:00–10:00 · entries **10:00–12:00** · SL **80** / TP **250** · skip OR **>120** · ≤1/day
 - **Evening:** PDHL entries **18:30–20:30** · SL **80** / TP **150** · ≤1/day
-- **Exit:** SL / TP / **23:10** · **Day stop:** −240 pts (≈ −₹2,400); optional Strict −₹2,950
+- **Exit:** SL / TP / **23:10** · **Day stop:** −150 pts (≈ −₹1,500); optional Strict −₹1,800
 - **₹/pt:** 10 · **All-day-green:** not found on sample (see [05-CRUDE-HUNT-FINDINGS.md](./05-CRUDE-HUNT-FINDINGS.md))
 - **Code:** `crude-orb-morning.evaluator.ts` + `crude-pdhl-evening.evaluator.ts`

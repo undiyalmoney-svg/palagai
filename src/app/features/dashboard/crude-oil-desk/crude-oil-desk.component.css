@@ -88,6 +88,43 @@
   width: 4.5rem;
 }
 
+.profile-field {
+  min-width: 14rem;
+  flex: 1 1 14rem;
+}
+
+.profile-field select {
+  width: 100%;
+  min-height: 2.35rem;
+  padding: 0.35rem 0.55rem;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: #fff;
+  font: inherit;
+  font-size: 0.88rem;
+  color: var(--pg-ink);
+}
+
+.profile-field small {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.72rem;
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+.desk-lock-hint {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.4rem 0.65rem;
+  border-radius: 10px;
+  border: 1px solid #a7f3d0;
+  background: #ecfdf5;
+  font-size: 0.82rem;
+  font-weight: 650;
+  color: #065f46;
+}
+
 .desk-toggles {
   display: flex;
   flex-wrap: wrap;

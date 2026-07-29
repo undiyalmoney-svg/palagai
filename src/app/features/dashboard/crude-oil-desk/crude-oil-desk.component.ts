@@ -17,6 +17,11 @@ import { KiteSessionService } from '../../../core/kite/kite-session.service';
 import { LotsPreferenceService } from '../../../core/services/lots-preference.service';
 import { MCX_CRUDE_SESSION } from '../../../core/config/session.config';
 import { CRUDE_RUPEES_PER_POINT } from '../../../core/strategy-engine/strategies/crude-pdhl-evening/crude-pdhl-evening.evaluator';
+import {
+  CRUDE_STRATEGY_PROFILES,
+  CrudeStrategyProfileId,
+  resolveCrudeStrategyProfile,
+} from '../../../core/strategy-engine/strategies/crude-pdhl-evening/crude-strategy-profile';
 import { formatUnknownError } from '../../../core/utils/kite-error.util';
 import { extractTradeDate, formatDayOfWeek, formatDisplayDate } from '../../../core/utils/trade-date.util';
 
@@ -41,11 +46,23 @@ export class CrudeOilDeskComponent implements OnInit, OnDestroy {
   protected realOrders = false;
   protected realOrdersAck = false;
   protected lots = 1;
-  /** Morning ORB 10:00–12:00 (default on for paper + live). */
-  protected enableMorning = true;
-  /** Evening PDHL 18:30–20:30 (default on — both windows). */
+  /**
+   * Default All-Green Afternoon (15:15–23:00 Session OR).
+   * Daily Profit / Champion / Trap Confirm / Daily Income selectable.
+   */
+  protected strategyProfile: CrudeStrategyProfileId = 'all-green';
+  protected readonly strategyProfiles = [
+    CRUDE_STRATEGY_PROFILES['all-green'],
+    CRUDE_STRATEGY_PROFILES['daily-profit'],
+    CRUDE_STRATEGY_PROFILES.champion,
+    CRUDE_STRATEGY_PROFILES['trap-confirm'],
+    CRUDE_STRATEGY_PROFILES['daily-income'],
+  ];
+  /** Morning ORB 10:00–12:00 (off for All-Green / Daily Profit). */
+  protected enableMorning = false;
+  /** Afternoon/Evening window (All-Green default on · 15:15–23:00). */
   protected enableEvening = true;
-  /** Stricter day loss ≈ −₹2,950 (off = champion −₹2,400). */
+  /** Stricter day loss (pts depend on profile). */
   protected strictDayStop = false;
 
   /** Testing result filter: Mon–Fri. */
@@ -55,6 +72,10 @@ export class CrudeOilDeskComponent implements OnInit, OnDestroy {
   protected readonly snapshot = this.desk.snapshot;
   protected readonly busy = this.desk.busy;
   protected readonly error = signal('');
+
+  protected activeProfile() {
+    return resolveCrudeStrategyProfile(this.strategyProfile);
+  }
 
   protected readonly resultView = computed(() => {
     const snap = this.snapshot();
@@ -78,14 +99,6 @@ export class CrudeOilDeskComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.lots = this.lotsPreference.get();
-    if (this.snapshot().running) {
-      this.mode.set('live');
-      this.realOrders = this.snapshot().realOrders;
-    }
-  }
-
-  ngOnDestroy(): void {
-    // Do not stopLive — keep Crude polling while on Trade Desk / other tabs.
   }
 
   protected onLotsChange(): void {
@@ -94,12 +107,53 @@ export class CrudeOilDeskComponent implements OnInit, OnDestroy {
     this.lotsPreference.set(normalized);
   }
 
+  protected profileSlTpLabel(): string {
+    const p = this.activeProfile();
+    if (p.entryMode === 'trap-confirm') {
+      return `Trap+confirm ${p.targetRMultiple}R · day −₹${p.dayLossStopPts * CRUDE_RUPEES_PER_POINT}`;
+    }
+    const conf = p.requireConfirm ? ' +confirm' : '';
+    if (p.entryMode === 'session-or') {
+      return `Afternoon Session OR${conf} ${p.eveningEntryStart}–${p.eveningEntryEnd} · OR ${p.sessionOrStart}–${p.sessionOrEnd} · SL${p.stopPts}/TP${p.eveningTargetPts}`;
+    }
+    if (p.profileId === 'daily-profit') {
+      return `Evening PDHL${conf} ${p.eveningEntryStart}–${p.eveningEntryEnd} · SL${p.stopPts}/TP${p.eveningTargetPts}`;
+    }
+    return `Morning SL${p.stopPts}/TP${p.morningTargetPts} · Evening SL${p.stopPts}/TP${p.eveningTargetPts}${conf}`;
+  }
+
+  protected onStrategyProfileChange(): void {
+    const p = this.activeProfile();
+    this.enableMorning = p.defaultEnableMorning;
+    this.enableEvening = p.defaultEnableEvening;
+  }
+
+  protected profileRiskTitle(): string {
+    const p = this.activeProfile();
+    const rs = CRUDE_RUPEES_PER_POINT;
+    const lock =
+      p.dayProfitLockPts > 0
+        ? ` Day profit lock +₹${p.dayProfitLockPts * rs} (${p.dayProfitLockPts}pts × ₹${rs}).`
+        : '';
+    return `CRUDEOILM ₹${rs}/pt · 1 lot. Off: day stop −₹${p.dayLossStopPts * rs} (${p.dayLossStopPts}pts). On: stricter −₹${p.strictDayLossPts * rs} (${p.strictDayLossPts}pts).${lock}`;
+  }
+
+  protected strictDayStopLabel(): string {
+    const p = this.activeProfile();
+    const rs = CRUDE_RUPEES_PER_POINT;
+    return `Strict day stop (−₹${p.strictDayLossPts * rs})`;
+  }
+
   protected toggleWeekday(key: PaperWeekdayKey): void {
     this.weekdayOn.update((cur) => ({ ...cur, [key]: !cur[key] }));
   }
 
   protected isWeekdayOn(key: PaperWeekdayKey): boolean {
     return this.weekdayOn()[key];
+  }
+
+  ngOnDestroy(): void {
+    this.desk.stopLive();
   }
 
   protected setMode(mode: PaperDeskMode): void {
@@ -122,6 +176,7 @@ export class CrudeOilDeskComponent implements OnInit, OnDestroy {
       strictDayStop: this.strictDayStop,
       enableMorning: this.enableMorning,
       enableEvening: this.enableEvening,
+      strategyProfile: this.strategyProfile,
     };
   }
 
@@ -140,6 +195,7 @@ export class CrudeOilDeskComponent implements OnInit, OnDestroy {
     this.lots = lots;
     this.lotsPreference.set(lots);
     const runOpts = this.buildRunOptions(lots);
+    const profile = this.activeProfile();
 
     try {
       if (this.mode() === 'testing') {
@@ -154,11 +210,15 @@ export class CrudeOilDeskComponent implements OnInit, OnDestroy {
           return;
         }
         if (this.realOrders) {
+          const lockNote =
+            profile.dayProfitLockPts > 0
+              ? `\nDay profit lock +₹${profile.dayProfitLockPts * CRUDE_RUPEES_PER_POINT}.`
+              : '';
           const risk = this.strictDayStop
-            ? '\nStrict day stop −₹2,950 enabled.'
-            : '\nDay stop −₹2,400 (champion default).';
+            ? `\nStrict day stop −₹${profile.strictDayLossPts * CRUDE_RUPEES_PER_POINT} enabled.`
+            : `\nDay stop −₹${profile.dayLossStopPts * CRUDE_RUPEES_PER_POINT}.`;
           const ok = window.confirm(
-            `Start LIVE MONEY on Crude Oil Mini?\n\nReal Kite MCX NRML MARKET orders will be placed on ATM CRUDEOILM options (${lots} lot each) when signals fire.${risk}\n\nOrders go via DigitalOcean fixed IP.`,
+            `Start LIVE MONEY on Crude Oil Mini?\n\nProfile: ${profile.label}\nReal Kite MCX NRML MARKET orders will be placed on ATM CRUDEOILM options (${lots} lot each) when signals fire.${risk}${lockNote}\n\nOrders go via DigitalOcean fixed IP.`,
           );
           if (!ok) {
             return;
@@ -227,6 +287,7 @@ export class CrudeOilDeskComponent implements OnInit, OnDestroy {
     if (!view.trades.length) {
       return;
     }
+    const p = this.activeProfile();
     this.deskExport.exportPdf(
       {
         ...snap,
@@ -236,7 +297,7 @@ export class CrudeOilDeskComponent implements OnInit, OnDestroy {
       },
       {
         title: 'Crude Oil Desk Results',
-        subtitle: `CRUDEOILM ${[
+        subtitle: `CRUDEOILM ${p.label} · ${[
           this.enableMorning ? 'morning 10:00–12:00' : null,
           this.enableEvening ? 'evening 18:30–20:30' : null,
         ]
