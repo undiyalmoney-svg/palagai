@@ -34,6 +34,7 @@ assert(profile.eveningEntryStart === '09:00', 'entry start');
 assert(profile.eveningEntryEnd === '23:00', 'entry end');
 assert(profile.sessionOrStart === '09:00', 'OR start');
 assert(profile.sessionOrEnd === '09:30', 'OR end');
+assert(profile.maxOrWidth === 0, 'no OR-width skip');
 assert(crudePtsToRupees(profile.stopPts) === 150, 'SL ₹150');
 assert(crudePtsToRupees(profile.eveningTargetPts) === 1000, 'stretch TP ₹1000');
 assert(profile.profitLockArmRs === 500, 'trail arm ₹500');
@@ -92,6 +93,25 @@ assert(
 const peakRs = 500;
 const floorRs = Math.max(profile.profitLockLockRs, peakRs - profile.profitLockGivebackRs);
 assert(floorRs === 240, `trail floor at peak ₹500 should be ₹240, got ${floorRs}`);
+
+// Wide OR must still trade (OR-width filter off).
+const wide: Candle[] = [];
+wide.push(bar('2026-07-29T09:00:00+05:30', 7750, 7932, 7750, 7930));
+wide.push(bar('2026-07-29T09:15:00+05:30', 7930, 7947, 7900, 7920));
+wide.push(bar('2026-07-29T09:30:00+05:30', 7920, 7930, 7880, 7900));
+const wideSignal = bar('2026-07-29T09:35:00+05:30', 7940, 7960, 7935, 7955);
+wide.push(wideSignal);
+const wideState = createCrudePdhlState();
+const wideArm = runCrudeSessionOr({
+  candle: wideSignal,
+  series: wide,
+  state: wideState,
+  ...pick(),
+});
+assert(
+  wideArm.action === 'WAITING' && !!wideState.pendingConfirm,
+  `wide OR still arms, got ${wideArm.action}: ${wideArm.reason}`,
+);
 
 console.log('crude-all-green-smoke OK');
 

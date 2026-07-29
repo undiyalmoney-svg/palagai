@@ -147,7 +147,7 @@ export const CRUDE_ALL_GREEN_PARAMS: CrudeTradeParams = {
   maxEveningTradesDay: 0,
   defaultEnableMorning: false,
   defaultEnableEvening: true,
-  dailyBandLabel: 'OR 09:00–09:30 · SL₹150 · trail ₹500→₹240 · unlimited',
+  dailyBandLabel: 'OR 09:00–09:30 · SL₹150 · trail ₹500→₹240 · no OR skip',
   ...PROTECT_TRADE_CUTOFF,
 };
 

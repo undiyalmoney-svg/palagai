@@ -25,7 +25,8 @@ export const CRUDE_MORNING_OR_END = '10:00';
 /** 0 = unlimited. */
 export const CRUDE_MORNING_MAX_TRADES_DAY = 0;
 /** Skip wide opening ranges (noisy days). */
-export const CRUDE_MORNING_MAX_OR_WIDTH = 120;
+/** 0 = off — trade even when opening range is very wide. */
+export const CRUDE_MORNING_MAX_OR_WIDTH = 0;
 
 function orbRange(
   candles: Candle[],
@@ -133,7 +134,7 @@ export function runCrudeMorningOrb(params: {
     return wait(candle, 'Opening range not ready');
   }
   const orWidth = orb.high - orb.low;
-  if (orWidth > CRUDE_MORNING_MAX_OR_WIDTH) {
+  if (CRUDE_MORNING_MAX_OR_WIDTH > 0 && orWidth > CRUDE_MORNING_MAX_OR_WIDTH) {
     return wait(
       candle,
       `OR too wide (${orWidth.toFixed(0)} > ${CRUDE_MORNING_MAX_OR_WIDTH})`,
