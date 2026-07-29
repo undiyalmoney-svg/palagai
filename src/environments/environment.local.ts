@@ -4,8 +4,8 @@ export const environment = {
   defaultLots: 1,
   allowLiveMoney: true,
   orderEgressIp: '168.144.28.89',
-  appVersion: '1.3.12',
-  appBuild: '2026.07.26-mt',
+  appVersion: '1.3.14',
+  appBuild: '2026.07.29-live-tue-expiry',
   /**
    * Optional local-only session bootstrap. Fill via Get Token — do not commit real tokens.
    */
