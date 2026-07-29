@@ -125,7 +125,7 @@ export const CRUDE_ALL_GREEN_PARAMS: CrudeTradeParams = {
   maxEveningTradesDay: CRUDE_SOR_MAX_TRADES_DAY,
   defaultEnableMorning: false,
   defaultEnableEvening: true,
-  dailyBandLabel: '~90% green hunt · ~₹154/day · lock +₹200 · first-win · day −₹150',
+  dailyBandLabel: '~90% green hunt · ~₹154/day · lock +₹200 · first-win · day −₹150 (15pts × ₹10)',
   ...PROTECT_OFF,
 };
 
@@ -180,7 +180,7 @@ export const CRUDE_CHAMPION_PARAMS: CrudeTradeParams = {
   maxEveningTradesDay: 1,
   defaultEnableMorning: true,
   defaultEnableEvening: true,
-  dailyBandLabel: 'Champion SL/TP · day loss −₹1,500',
+  dailyBandLabel: 'Champion SL/TP · day loss −₹1,500 (150pts × ₹10)',
   ...PROTECT_OFF,
 };
 
@@ -237,7 +237,7 @@ export const CRUDE_TRAP_CONFIRM_PARAMS: CrudeTradeParams = {
   maxEveningTradesDay: 3,
   defaultEnableMorning: true,
   defaultEnableEvening: true,
-  dailyBandLabel: 'S/R trap + confirm · 3.5R · day −₹1,500 (research)',
+  dailyBandLabel: 'S/R trap + confirm · 3.5R · day −₹1,500 (150pts × ₹10)',
   ...PROTECT_OFF,
 };
 

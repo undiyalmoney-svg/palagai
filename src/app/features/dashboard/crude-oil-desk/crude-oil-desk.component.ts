@@ -130,16 +130,18 @@ export class CrudeOilDeskComponent implements OnInit, OnDestroy {
 
   protected profileRiskTitle(): string {
     const p = this.activeProfile();
+    const rs = CRUDE_RUPEES_PER_POINT;
     const lock =
       p.dayProfitLockPts > 0
-        ? ` Day profit lock +₹${p.dayProfitLockPts * CRUDE_RUPEES_PER_POINT}.`
+        ? ` Day profit lock +₹${p.dayProfitLockPts * rs} (${p.dayProfitLockPts}pts × ₹${rs}).`
         : '';
-    return `Off: day stop −₹${p.dayLossStopPts * CRUDE_RUPEES_PER_POINT} (−${p.dayLossStopPts} pts). On: stricter −₹${p.strictDayLossPts * CRUDE_RUPEES_PER_POINT} (−${p.strictDayLossPts} pts).${lock}`;
+    return `CRUDEOILM ₹${rs}/pt · 1 lot. Off: day stop −₹${p.dayLossStopPts * rs} (${p.dayLossStopPts}pts). On: stricter −₹${p.strictDayLossPts * rs} (${p.strictDayLossPts}pts).${lock}`;
   }
 
   protected strictDayStopLabel(): string {
     const p = this.activeProfile();
-    return `Strict day stop (−₹${p.strictDayLossPts * CRUDE_RUPEES_PER_POINT})`;
+    const rs = CRUDE_RUPEES_PER_POINT;
+    return `Strict day stop (−₹${p.strictDayLossPts * rs})`;
   }
 
   protected toggleWeekday(key: PaperWeekdayKey): void {
