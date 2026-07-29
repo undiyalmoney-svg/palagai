@@ -1,8 +1,8 @@
 /**
- * Crude afternoon Session OR (all-green aim hunt Mar–Jul 2026):
- * OR 15:15–15:45 · entries 15:15–23:00 · next-bar confirm · SL12 / TP24
- * Unlimited trades · no day loss/profit locks · max OR width 120
- * Per-trade SL cuts loss; TP aims higher (policy: high profit / low loss).
+ * Crude All-Green Session OR (full MCX session):
+ * OR 09:00–09:30 · entries after OR through 23:00 · next-bar confirm
+ * Per-trade SL/trail from profile · unlimited · no day lock · max OR width 120
+ * Start anytime after OR is built — not gated to 15:15.
  */
 import { Candle } from '../../../models/candle.model';
 import { extractTradeDate } from '../../../utils/trade-date.util';
@@ -16,10 +16,11 @@ import {
   CrudePdhlState,
 } from '../crude-pdhl-evening/crude-pdhl-evening.evaluator';
 
-export const CRUDE_SOR_ENTRY_START = '15:15';
+/** Full MCX crude desk window (entries after OR completes). */
+export const CRUDE_SOR_ENTRY_START = '09:00';
 export const CRUDE_SOR_ENTRY_END = '23:00';
-export const CRUDE_SOR_OR_START = '15:15';
-export const CRUDE_SOR_OR_END = '15:45';
+export const CRUDE_SOR_OR_START = '09:00';
+export const CRUDE_SOR_OR_END = '09:30';
 export const CRUDE_SOR_MAX_OR_WIDTH = 120;
 /** 0 = unlimited. */
 export const CRUDE_SOR_MAX_TRADES_DAY = 0;
@@ -79,8 +80,8 @@ export function runCrudeSessionOr(params: {
   const { candle, series, state } = params;
   const dayLossStopPts = params.dayLossStopPts ?? CRUDE_DAY_LOSS_STOP_PTS;
   const dayProfitLockPts = params.dayProfitLockPts ?? 0;
-  const stopPts = params.stopPts ?? 12;
-  const targetPts = params.targetPts ?? 24;
+  const stopPts = params.stopPts ?? 15;
+  const targetPts = params.targetPts ?? 100;
   const requireConfirm = params.requireConfirm !== false;
   const firstWinLock = params.firstWinLock === true;
   const entryStart = params.entryStart ?? CRUDE_SOR_ENTRY_START;

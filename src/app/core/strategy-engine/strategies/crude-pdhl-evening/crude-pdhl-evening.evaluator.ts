@@ -23,11 +23,11 @@ export const CRUDE_MAX_TRADES_DAY = 0;
 /** 0 = unlimited. */
 export const CRUDE_MAX_TRADES_MONTH = 0;
 /**
- * Day max loss (pts). **0 = off** — policy: no day loss stops on Crude.
- * Per-trade SL still cuts each trade (small loss / larger TP).
+ * Day max loss (pts). 0 = off — after a per-trade SL, keep hunting next opportunity.
+ * Per-trade cutoffs live on the profile (SL ₹ + peak-trail), not as a day lock.
  */
 export const CRUDE_DAY_LOSS_STOP_PTS = 0;
-/** Desk strict checkbox — also off (0). */
+/** Desk strict checkbox (pts). 0 = off when day stop is off. */
 export const CRUDE_STRICT_DAY_LOSS_RS = 0;
 export const CRUDE_STRICT_DAY_LOSS_PTS = 0;
 
@@ -63,7 +63,7 @@ export interface CrudePdhlState {
   dayStoppedReason: string | null;
   /** Next-bar confirm for Daily Profit / Trap-style ORB·PDHL. */
   pendingConfirm: CrudePendingConfirm | null;
-  /** First-win lock (All-Green afternoon profile). */
+  /** First-win lock (All-Green profile when enabled). */
   wonToday: boolean;
 }
 

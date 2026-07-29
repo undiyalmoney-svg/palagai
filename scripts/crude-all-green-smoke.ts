@@ -1,5 +1,6 @@
 /**
- * Smoke: All-Green Afternoon — unlimited trades, no day locks, per-trade SL/TP.
+ * Smoke: All-Green — Session OR from open, per-trade SL ₹150 + trail ₹500→₹240.
+ * No day-wide stop — after SL, next opportunity allowed.
  * Run: npx tsx scripts/crude-all-green-smoke.ts
  */
 import { Candle } from '../src/app/core/models/candle.model';
@@ -27,18 +28,23 @@ assert(profile.entryMode === 'session-or', 'session-or mode');
 assert(profile.requireConfirm === true, 'confirm');
 assert(profile.firstWinLock === false, 'no first-win');
 assert(profile.dayProfitLockPts === 0, 'no day profit lock');
-assert(profile.dayLossStopPts === 0, 'no day loss stop');
+assert(profile.dayLossStopPts === 0, 'no day-wide loss stop');
 assert(profile.maxEveningTradesDay === 0, 'unlimited trades');
-assert(profile.eveningEntryStart === '15:15', 'entry start');
+assert(profile.eveningEntryStart === '09:00', 'entry start');
 assert(profile.eveningEntryEnd === '23:00', 'entry end');
-assert(crudePtsToRupees(profile.stopPts) === 120, 'SL ₹120');
-assert(crudePtsToRupees(profile.eveningTargetPts) === 240, 'TP ₹240');
+assert(profile.sessionOrStart === '09:00', 'OR start');
+assert(profile.sessionOrEnd === '09:30', 'OR end');
+assert(crudePtsToRupees(profile.stopPts) === 150, 'SL ₹150');
+assert(crudePtsToRupees(profile.eveningTargetPts) === 1000, 'stretch TP ₹1000');
+assert(profile.profitLockArmRs === 500, 'trail arm ₹500');
+assert(profile.profitLockLockRs === 240, 'trail lock ₹240');
+assert(profile.profitLockGivebackRs === 260, 'giveback ₹260');
 
 const series: Candle[] = [];
-series.push(bar('2026-07-22T15:15:00+05:30', 7000, 7010, 6990, 7005));
-series.push(bar('2026-07-22T15:30:00+05:30', 7005, 7020, 6995, 7010));
-series.push(bar('2026-07-22T15:45:00+05:30', 7010, 7015, 6980, 6990));
-const signal = bar('2026-07-22T16:00:00+05:30', 7015, 7035, 7010, 7030);
+series.push(bar('2026-07-22T09:00:00+05:30', 7000, 7010, 6990, 7005));
+series.push(bar('2026-07-22T09:15:00+05:30', 7005, 7020, 6995, 7010));
+series.push(bar('2026-07-22T09:30:00+05:30', 7010, 7015, 6980, 6990));
+const signal = bar('2026-07-22T09:35:00+05:30', 7015, 7035, 7010, 7030);
 series.push(signal);
 
 const state = createCrudePdhlState();
@@ -51,7 +57,7 @@ const armed = runCrudeSessionOr({
 assert(armed.action === 'WAITING', `armed WAITING got ${armed.action}: ${armed.reason}`);
 assert(!!state.pendingConfirm, 'pending');
 
-const confirm = bar('2026-07-22T16:05:00+05:30', 7030, 7045, 7025, 7040);
+const confirm = bar('2026-07-22T09:40:00+05:30', 7030, 7045, 7025, 7040);
 series.push(confirm);
 const filled = runCrudeSessionOr({
   candle: confirm,
@@ -61,14 +67,15 @@ const filled = runCrudeSessionOr({
 });
 assert(filled.action === 'BUY', `BUY got ${filled.action}: ${filled.reason}`);
 assert(Math.abs(filled.entryPrice - 7030) < 0.01, `fill open ${filled.entryPrice}`);
-assert(Math.abs(filled.entryPrice - filled.stopLoss - 12) < 0.01, 'SL 12');
-assert(Math.abs(filled.target - filled.entryPrice - 24) < 0.01, 'TP 24');
+assert(Math.abs(filled.entryPrice - filled.stopLoss - 15) < 0.01, 'SL 15 pts');
+assert(Math.abs(filled.target - filled.entryPrice - 100) < 0.01, 'TP 100 pts');
 
-// Second opportunity same day must still be allowed (no first-win / max-trades).
+// After a loss, next opportunity still allowed (no day lock).
 state.tradesToday = 1;
-state.wonToday = true;
+state.dayNetPts = -15;
+state.wonToday = false;
 state.pendingConfirm = null;
-const signal2 = bar('2026-07-22T18:00:00+05:30', 7040, 7060, 7035, 7055);
+const signal2 = bar('2026-07-22T11:00:00+05:30', 7040, 7060, 7035, 7055);
 series.push(signal2);
 const again = runCrudeSessionOr({
   candle: signal2,
@@ -78,8 +85,13 @@ const again = runCrudeSessionOr({
 });
 assert(
   again.action === 'WAITING' && again.reason.includes('waiting confirm'),
-  `second signal allowed, got ${again.action}: ${again.reason}`,
+  `after SL still hunts, got ${again.action}: ${again.reason}`,
 );
+
+// Peak-trail floor math: arm ₹500 → floor max(240, peak−260).
+const peakRs = 500;
+const floorRs = Math.max(profile.profitLockLockRs, peakRs - profile.profitLockGivebackRs);
+assert(floorRs === 240, `trail floor at peak ₹500 should be ₹240, got ${floorRs}`);
 
 console.log('crude-all-green-smoke OK');
 
