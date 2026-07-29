@@ -21,12 +21,37 @@ function startOfDay(date: Date): Date {
   return copy;
 }
 
+/**
+ * Calendar day in Asia/Kolkata (avoids UTC `setHours(0)` shifting early IST mornings).
+ */
+export function istCalendarDay(date: Date): Date {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date);
+  const y = Number(parts.find((p) => p.type === 'year')?.value);
+  const m = Number(parts.find((p) => p.type === 'month')?.value);
+  const d = Number(parts.find((p) => p.type === 'day')?.value);
+  return new Date(y, m - 1, d, 0, 0, 0, 0);
+}
+
 function parseExpiry(expiry: string): Date | null {
   if (!expiry) {
     return null;
   }
+  // Prefer YYYY-MM-DD as a pure calendar date (no TZ shift).
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(expiry);
+  if (m) {
+    return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 0, 0, 0, 0);
+  }
   const d = new Date(expiry.includes('T') ? expiry : `${expiry}T00:00:00`);
   return Number.isNaN(d.getTime()) ? null : startOfDay(d);
+}
+
+function asOfCalendarDay(asOf: Date): Date {
+  return istCalendarDay(asOf);
 }
 
 function optionName(kind: IndexOptionKind): string {
@@ -74,7 +99,7 @@ export function lastTuesdayOfMonth(year: number, month: number): Date {
  * Bank Nifty: monthlies only (last Tuesday). Nifty weeklies removed for BN in Nov 2024.
  */
 export function nextMonthlyExpiryDate(asOf: Date, rollSameDay: boolean): Date {
-  const day = startOfDay(asOf);
+  const day = asOfCalendarDay(asOf);
   let year = day.getFullYear();
   let month = day.getMonth();
 
@@ -108,7 +133,7 @@ export function nextWeeklyExpiryDate(
   if (kind === 'banknifty') {
     return nextMonthlyExpiryDate(asOf, rollSameDay);
   }
-  const day = startOfDay(asOf);
+  const day = asOfCalendarDay(asOf);
   const dow = day.getDay(); // 0 Sun … 2 Tue
   let add = (NIFTY_WEEKLY_DOW - dow + 7) % 7;
   if (add === 0 && rollSameDay) {
@@ -128,7 +153,7 @@ export function isCurrentWeeklyExpiryDay(
   instruments: Instrument[],
   kind: IndexOptionKind,
 ): boolean {
-  const day = startOfDay(asOfDay);
+  const day = asOfCalendarDay(asOfDay);
   const expiresToday = instruments.some((item) => {
     if (!isIndexOption(item, kind)) {
       return false;
@@ -151,24 +176,16 @@ export function isCurrentWeeklyExpiryDay(
 
 /**
  * Never trade the current expiry contract on expiry day — always next weekly/monthly.
- * Also rolls after 13:00 IST as a legacy safety net when chain is incomplete.
+ * (Removed legacy “after 13:00 IST always roll” — that only confused non-expiry days
+ * and still left morning expiry-day gaps when chain detection failed.)
  */
 export function shouldRollWeeklyExpiry(params: {
   asOf: Date;
   instruments: Instrument[];
   kind: IndexOptionKind;
 }): boolean {
-  const asOfDay = startOfDay(params.asOf);
-  if (isCurrentWeeklyExpiryDay(asOfDay, params.instruments, params.kind)) {
-    return true;
-  }
-  const hhmm = params.asOf.toLocaleTimeString('en-IN', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-    timeZone: 'Asia/Kolkata',
-  });
-  return hhmm >= '13:00';
+  const asOfDay = asOfCalendarDay(params.asOf);
+  return isCurrentWeeklyExpiryDay(asOfDay, params.instruments, params.kind);
 }
 
 function formatExpiryIso(d: Date): string {
@@ -204,12 +221,13 @@ export function buildSyntheticAtmOption(params: {
       : params.asOfDateTime.replace(' ', 'T'),
   );
   const asOfSafe = Number.isNaN(asOf.getTime()) ? new Date() : asOf;
+  const asOfDay = asOfCalendarDay(asOfSafe);
   const rollSameDay = shouldRollWeeklyExpiry({
     asOf: asOfSafe,
     instruments: params.instruments ?? [],
     kind: params.kind,
   });
-  const exp = nextWeeklyExpiryDate(asOfSafe, rollSameDay, params.kind);
+  const exp = nextWeeklyExpiryDate(asOfDay, rollSameDay, params.kind);
   const name = optionName(params.kind);
   const optType = params.direction === 'BUY' ? 'CE' : 'PE';
   const strike = roundAtmStrike(params.spot, params.kind);
@@ -247,14 +265,13 @@ export function isFrontWeeklyExpiry(
   rollSameDay: boolean,
   kind: IndexOptionKind = 'nifty',
 ): boolean {
-  if (expiry < asOfDay) {
+  const day = asOfCalendarDay(asOfDay);
+  // Never trade same-day expiry (expiry-day → next contract).
+  if (expiry.getTime() <= day.getTime()) {
     return false;
   }
-  if (expiry.getTime() === asOfDay.getTime() && rollSameDay) {
-    return false;
-  }
-  const expected = nextWeeklyExpiryDate(asOfDay, rollSameDay, kind);
-  const toExp = daysBetween(asOfDay, expiry);
+  const expected = nextWeeklyExpiryDate(day, rollSameDay, kind);
+  const toExp = daysBetween(day, expiry);
   if (toExp < 0 || toExp > maxFrontExpiryDays(kind)) {
     return false;
   }
@@ -293,7 +310,8 @@ export function resolveAtmWeeklyOption(params: {
     };
   }
 
-  const asOfDay = startOfDay(asOf);
+  const asOfDay = asOfCalendarDay(asOf);
+  // Always roll on expiry day — never bind ATM to a same-day expiring contract.
   const rollSameDay = shouldRollWeeklyExpiry({
     asOf,
     instruments,
@@ -313,14 +331,12 @@ export function resolveAtmWeeklyOption(params: {
     .map((item) => ({ item, exp: parseExpiry(item.expiry) }))
     .filter((row): row is { item: Instrument; exp: Date } => row.exp != null)
     .filter((row) => {
-      if (row.exp < asOfDay) {
-        return false;
-      }
-      if (row.exp.getTime() === asOfDay.getTime() && rollSameDay) {
+      // Hard rule: never trade same-day or past expiry (even if roll flag missed).
+      if (row.exp.getTime() <= asOfDay.getTime()) {
         return false;
       }
       const toExp = daysBetween(asOfDay, row.exp);
-      return toExp >= 0 && toExp <= maxDays;
+      return toExp > 0 && toExp <= maxDays;
     });
 
   // Prefer calendar front (± holiday); else nearest live expiry in the window.
@@ -390,7 +406,7 @@ export function describeOptionChainGap(params: {
     instruments: params.instruments,
     kind: params.kind,
   });
-  const expected = nextWeeklyExpiryDate(startOfDay(asOf), rollSameDay, params.kind);
+  const expected = nextWeeklyExpiryDate(asOfCalendarDay(asOf), rollSameDay, params.kind);
   const strike = roundAtmStrike(params.spot, params.kind);
   const optType = params.direction === 'BUY' ? 'CE' : 'PE';
   return (
