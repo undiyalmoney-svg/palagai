@@ -20,10 +20,10 @@ export const CRUDE_ENTRY_END = '20:30';
 export const CRUDE_EXIT_BY = '23:10';
 export const CRUDE_MAX_TRADES_DAY = 1;
 export const CRUDE_MAX_TRADES_MONTH = 12;
-/** Champion default day max loss (pts) ≈ −₹2,400 at ₹10/pt. */
-export const CRUDE_DAY_LOSS_STOP_PTS = 240;
-/** Desk checkbox: stricter day loss ≈ −₹2,950 → 295 pts at ₹10/pt. */
-export const CRUDE_STRICT_DAY_LOSS_RS = 2950;
+/** Champion default day max loss (pts) ≈ −₹1,500 at ₹10/pt (was 240 / ₹2,400). */
+export const CRUDE_DAY_LOSS_STOP_PTS = 150;
+/** Desk checkbox: stricter day loss ≈ −₹1,800 → 180 pts at ₹10/pt. */
+export const CRUDE_STRICT_DAY_LOSS_RS = 1800;
 export const CRUDE_STRICT_DAY_LOSS_PTS = Math.max(
   1,
   Math.round(CRUDE_STRICT_DAY_LOSS_RS / CRUDE_RUPEES_PER_POINT),
@@ -145,7 +145,7 @@ export function runCrudePdhlEvening(params: {
   series: Candle[];
   index: number;
   state: CrudePdhlState;
-  /** Override champion day loss stop (pts). Default −240. */
+  /** Override champion day loss stop (pts). Default −150. */
   dayLossStopPts?: number;
   /** Day profit lock (pts). 0 = off. */
   dayProfitLockPts?: number;

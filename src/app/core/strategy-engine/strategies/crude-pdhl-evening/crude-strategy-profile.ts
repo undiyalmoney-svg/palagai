@@ -180,7 +180,7 @@ export const CRUDE_CHAMPION_PARAMS: CrudeTradeParams = {
   maxEveningTradesDay: 1,
   defaultEnableMorning: true,
   defaultEnableEvening: true,
-  dailyBandLabel: 'Champion SL/TP · day loss −₹2,400',
+  dailyBandLabel: 'Champion SL/TP · day loss −₹1,500',
   ...PROTECT_OFF,
 };
 
@@ -223,8 +223,8 @@ export const CRUDE_TRAP_CONFIRM_PARAMS: CrudeTradeParams = {
   morningTargetPts: 0,
   eveningTargetPts: 0,
   targetRMultiple: CRUDE_TRAP_RR,
-  dayLossStopPts: 250,
-  strictDayLossPts: 295,
+  dayLossStopPts: 150,
+  strictDayLossPts: 180,
   dayProfitLockPts: 0,
   entryMode: 'trap-confirm',
   requireConfirm: true,
@@ -237,7 +237,7 @@ export const CRUDE_TRAP_CONFIRM_PARAMS: CrudeTradeParams = {
   maxEveningTradesDay: 3,
   defaultEnableMorning: true,
   defaultEnableEvening: true,
-  dailyBandLabel: 'S/R trap + confirm · 3.5R · day −₹2,500 (research)',
+  dailyBandLabel: 'S/R trap + confirm · 3.5R · day −₹1,500 (research)',
   ...PROTECT_OFF,
 };
 

@@ -10,6 +10,14 @@
 
 > For **Crude Oil**: other strategy to raise profit %? Add loss cutoffs. Same result style as Trap.
 
+## Day loss cutoff (updated)
+
+Champion / Trap default day max loss is now **−150 pts (−₹1,500 / lot)** — not −240 (−₹2,400).
+
+MCX combined Champion replay: −150 blocks double-SL days (−₹1,600), keeps worst ≈ −₹800, and **improves** net vs −240 on this sample. Strict checkbox = −180 pts (−₹1,800).
+
+All-Green stays at −15 pts (−₹150); Daily Profit at −40 pts (−₹400).
+
 ## Short answer (MCX-validated)
 
 1. **Champion Morning ORB + Evening PDHL** is still the best book on this sample (**~₹277/day**, PF 1.56, net **₹16,900**).  
@@ -33,8 +41,8 @@
 | Profile | Entry | SL/TP | Day loss | Day lock | Peak-trail / soft |
 |---------|-------|-------|----------|----------|-------------------|
 | **Daily Profit** (see **37**) | PDHL 18:30–21:00 + confirm | 20/40 | −40 (−₹400) | +50 (+₹500) | **OFF** |
-| **Champion** | ORB 10–12 + PDHL 18:30–20:30 | 80/250 · 80/150 | −240 (−₹2,400) | off | **OFF** (hurts) |
-| **Trap Confirm** | S/R trap + confirm · 3.5R | wick risk | −250 (−₹2,500) | off | **OFF** (hurts) |
+| **Champion** | ORB 10–12 + PDHL 18:30–20:30 | 80/250 · 80/150 | −150 (−₹1,500) | off | **OFF** (hurts) |
+| **Trap Confirm** | S/R trap + confirm · 3.5R | wick risk | −150 (−₹1,500) | off | **OFF** (hurts) |
 | **Daily Income** | same ORB+PDHL | 40/80 · 40/50 | −50 (−₹500) | +100 (+₹1,000) | **OFF** |
 
 ## vs prior hunt note

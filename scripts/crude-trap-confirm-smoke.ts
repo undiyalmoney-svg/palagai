@@ -24,7 +24,7 @@ const p = resolveCrudeStrategyProfile('trap-confirm');
 assert(p.profileId === 'trap-confirm', 'profile id');
 assert(p.entryMode === 'trap-confirm', 'entry mode');
 assert(p.profitLockArmRs === 0, 'peak-trail off on MCX evidence');
-assert(p.dayLossStopPts === 250, 'day loss 250');
+assert(p.dayLossStopPts === 150, 'day loss 150');
 assert(CRUDE_TRAP_CONFIRM_PARAMS.targetRMultiple === 3.5, '3.5R');
 
 const series: Candle[] = [];

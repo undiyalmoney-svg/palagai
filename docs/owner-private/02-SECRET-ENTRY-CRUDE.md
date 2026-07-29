@@ -23,7 +23,7 @@
 | Stop | Fixed **80** pts from entry |
 | Target | Fixed **200** pts from entry |
 | Caps | ≤ **2** trades/day · ≤ **8**/month |
-| Day loss stop | −**240** pts |
+| Day loss stop | −**150** pts (−₹1,500 / lot) |
 | Force exit | **23:10** IST (also TP/SL earlier) |
 | Hold | Typically until TP/SL; max ~4h (e.g. 19:00 → 23:10) |
 | ₹/pt | **10** (`CRUDE_RUPEES_PER_POINT`) |
@@ -42,7 +42,7 @@ Does **not** change Nifty/Bank DNA.
 | 14–15 | `CRUDE_ENTRY_START/END` | 19:00 / 21:00 | Only entry hours |
 | 16 | `CRUDE_EXIT_BY` | 23:10 | Session flatten |
 | 17–18 | Max trades | 2 / day, 8 / month | Frequency caps |
-| 19 | `CRUDE_DAY_LOSS_STOP_PTS` | 240 | Soft day kill |
+| 19 | `CRUDE_DAY_LOSS_STOP_PTS` | 150 | Soft day kill |
 
 ---
 
@@ -52,7 +52,7 @@ Does **not** change Nifty/Bank DNA.
 |------:|---------|
 | 21–28 | `CrudePdhlState` — date, month, day net, trade counts, stop reason |
 | 30–39 | `createCrudePdhlState` — empty state |
-| 41–48 | `recordCrudeTradeClosed` — add points; bump day+month trade counts; stop day if ≤ −240 |
+| 41–48 | `recordCrudeTradeClosed` — add points; bump day+month trade counts; stop day if ≤ −150 |
 
 ---
 
@@ -75,7 +75,7 @@ Does **not** change Nifty/Bank DNA.
 | 103–108 | New day → reset day net / trades / stop |
 | 109–112 | New month → reset month trade count |
 | 114–116 | Day already stopped → WAITING |
-| 117–120 | Day net ≤ −240 → set stop + WAITING |
+| 117–120 | Day net ≤ −150 → set stop + WAITING |
 | 121–123 | Already 2 trades today → WAITING |
 | 124–126 | Already 8 trades this month → WAITING |
 | 127–132 | Outside 19:00–21:00 → WAITING |
@@ -83,7 +83,7 @@ Does **not** change Nifty/Bank DNA.
 | 139–144 | **Secret trigger:** close beyond PDH/PDL **and** candle colour with direction |
 | 145–147 | No break → WAITING with level text |
 | 149–151 | Entry = close; fixed SL ±80; fixed TP ±200 |
-| 153–161 | If −80 would breach day −240 → NO_TRADE |
+| 153–161 | If −80 would breach day −150 → NO_TRADE |
 | 163–170 | Return BUY/SELL with reason string |
 
 ### `wait` (172–180)
@@ -96,7 +96,7 @@ Does **not** change Nifty/Bank DNA.
 ```
 MCX 5m bar
   → day / month reset
-  → day stopped or −240?
+  → day stopped or −150?
   → trades < 2 today and < 8 this month?
   → time in 19:00–21:00?
   → PDH/PDL ready?
