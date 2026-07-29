@@ -5,6 +5,8 @@ import { KiteApiService } from '../kite/kite-api.service';
 import { KiteSessionService } from '../kite/kite-session.service';
 import { parseKiteInstrumentsCsv } from '../utils/csv.util';
 import { formatUnknownError } from '../utils/kite-error.util';
+import { slimTradingInstruments } from '../utils/trading-instruments-slim.util';
+import { countIndexOptions } from '../utils/option-chain.util';
 
 const STORAGE_KEY = 'palagai_instruments';
 const META_KEY = 'palagai_instruments_meta';
@@ -175,10 +177,13 @@ export class InstrumentStoreService {
   }
 
   private persist(list: Instrument[]): void {
-    const json = JSON.stringify(list);
+    // Prefer slim desk set in memory+storage — full dump blows mobile localStorage.
+    const slim = slimTradingInstruments(list);
+    const stored = slim.length > 0 ? slim : list;
+    const json = JSON.stringify(stored);
     const meta: InstrumentMetadata = {
       lastRefreshAt: new Date().toISOString(),
-      totalInstruments: list.length,
+      totalInstruments: stored.length,
       fileSizeBytes: new Blob([json]).size,
       status: 'ready',
     };
@@ -187,10 +192,16 @@ export class InstrumentStoreService {
       localStorage.setItem(STORAGE_KEY, json);
       localStorage.setItem(META_KEY, JSON.stringify(meta));
     } catch {
+      // Quota exceeded — keep in-memory for this session; next load will re-fetch.
       meta.status = 'ready';
     }
 
-    this.instruments.set(list);
+    this.instruments.set(stored);
     this.metadata.set(meta);
+  }
+
+  /** Index CE/PE count — Live money needs a real NFO chain, not an empty cache. */
+  indexOptionCount(): number {
+    return countIndexOptions(this.instruments());
   }
 }

@@ -393,7 +393,9 @@ export class LiveOrderExecutorService {
         at: new Date().toISOString(),
         instrumentId,
         action: 'SKIP',
-        detail: 'No tradeable chain option (synthetic/missing) — real order blocked.',
+        detail:
+          'No tradeable chain option (synthetic/missing) — real order blocked. ' +
+          'Nifty weeklies expire Tuesday; refresh Instruments then restart Live money.',
         tradingSymbol: option?.tradingSymbol,
       });
       this.positions.set(instrumentId, this.errorPos(instrumentId, open, option, 'Synthetic/missing option'));
