@@ -787,7 +787,10 @@ export class CrudePaperDeskService {
 
   private riskLabel(): string {
     const rs = CRUDE_RUPEES_PER_POINT;
-    const stopRs = this.dayLossStopPts * rs;
+    const dayStop =
+      this.dayLossStopPts > 0
+        ? `day stop −₹${this.dayLossStopPts * rs}`
+        : 'no day stop';
     const lock =
       this.tradeParams.dayProfitLockPts > 0
         ? ` · lock +₹${this.tradeParams.dayProfitLockPts * rs}`
@@ -796,8 +799,11 @@ export class CrudePaperDeskService {
       this.tradeParams.profitLockArmRs > 0
         ? ` · peak-trail ₹${this.tradeParams.profitLockArmRs}`
         : '';
-    // Always lead with ₹ — CRUDEOILM is ₹10/pt per lot.
-    return `day stop −₹${stopRs} (${this.dayLossStopPts}pts × ₹${rs}/pt)${lock}${trail}`;
+    const caps =
+      this.tradeParams.maxEveningTradesDay > 0
+        ? ` · max ${this.tradeParams.maxEveningTradesDay}/day`
+        : ' · unlimited trades';
+    return `${dayStop}${lock}${trail}${caps} · SL/TP per trade (₹${rs}/pt)`;
   }
 
   private kiteStatsLabel(): string {

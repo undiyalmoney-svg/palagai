@@ -18,19 +18,31 @@ export const CRUDE_MORNING_TARGET_PTS = 250;
 export const CRUDE_ENTRY_START = '18:30';
 export const CRUDE_ENTRY_END = '20:30';
 export const CRUDE_EXIT_BY = '23:10';
-export const CRUDE_MAX_TRADES_DAY = 1;
-export const CRUDE_MAX_TRADES_MONTH = 12;
-/** Champion default day max loss: 150 pts × ₹10 = −₹1,500 / lot (was 240 pts / ₹2,400). */
-export const CRUDE_DAY_LOSS_STOP_PTS = 150;
-/** Desk checkbox: stricter day loss 180 pts × ₹10 = −₹1,800 / lot. */
-export const CRUDE_STRICT_DAY_LOSS_RS = 1800;
-export const CRUDE_STRICT_DAY_LOSS_PTS = Math.max(
-  1,
-  Math.round(CRUDE_STRICT_DAY_LOSS_RS / CRUDE_RUPEES_PER_POINT),
-);
+/** 0 = unlimited — trade every valid Crude opportunity. */
+export const CRUDE_MAX_TRADES_DAY = 0;
+/** 0 = unlimited. */
+export const CRUDE_MAX_TRADES_MONTH = 0;
+/**
+ * Day max loss (pts). **0 = off** — policy: no day loss stops on Crude.
+ * Per-trade SL still cuts each trade (small loss / larger TP).
+ */
+export const CRUDE_DAY_LOSS_STOP_PTS = 0;
+/** Desk strict checkbox — also off (0). */
+export const CRUDE_STRICT_DAY_LOSS_RS = 0;
+export const CRUDE_STRICT_DAY_LOSS_PTS = 0;
 
 export function resolveCrudeDayLossStopPts(strictDayStop?: boolean): number {
   return strictDayStop ? CRUDE_STRICT_DAY_LOSS_PTS : CRUDE_DAY_LOSS_STOP_PTS;
+}
+
+/** Day loss / pre-trade day-risk gate active only when pts &gt; 0. */
+export function crudeDayLossActive(dayLossStopPts: number): boolean {
+  return dayLossStopPts > 0;
+}
+
+/** Trade-count cap active only when max &gt; 0 (0 = unlimited). */
+export function crudeTradeCapActive(maxTrades: number): boolean {
+  return maxTrades > 0;
 }
 
 export type CrudeSessionBook = 'morning' | 'evening';
@@ -93,7 +105,7 @@ export function recordCrudeTradeClosed(
     state.dayStoppedReason = 'First win lock — day done';
   } else if (dayProfitLockPts > 0 && state.dayNetPts >= dayProfitLockPts) {
     state.dayStoppedReason = `Day profit lock +${state.dayNetPts.toFixed(1)} pts`;
-  } else if (state.dayNetPts <= -dayLossStopPts) {
+  } else if (crudeDayLossActive(dayLossStopPts) && state.dayNetPts <= -dayLossStopPts) {
     state.dayStoppedReason = `Day max loss ${state.dayNetPts.toFixed(1)} pts`;
   }
 }
@@ -197,14 +209,14 @@ export function runCrudePdhlEvening(params: {
     state.dayStoppedReason = `Day profit lock +${state.dayNetPts.toFixed(1)} pts`;
     return wait(candle, state.dayStoppedReason);
   }
-  if (state.dayNetPts <= -dayLossStopPts) {
+  if (crudeDayLossActive(dayLossStopPts) && state.dayNetPts <= -dayLossStopPts) {
     state.dayStoppedReason = `Day max loss ${state.dayNetPts.toFixed(1)} pts`;
     return wait(candle, state.dayStoppedReason);
   }
-  if (state.eveningTradesToday >= maxTradesDay) {
+  if (crudeTradeCapActive(maxTradesDay) && state.eveningTradesToday >= maxTradesDay) {
     return wait(candle, `Max ${maxTradesDay} evening trades/day`);
   }
-  if (state.tradesThisMonth >= CRUDE_MAX_TRADES_MONTH) {
+  if (crudeTradeCapActive(CRUDE_MAX_TRADES_MONTH) && state.tradesThisMonth >= CRUDE_MAX_TRADES_MONTH) {
     return wait(candle, `Max ${CRUDE_MAX_TRADES_MONTH} trades/month`);
   }
 
@@ -224,7 +236,10 @@ export function runCrudePdhlEvening(params: {
     const entry = candle.open;
     const stopLoss = action === 'BUY' ? entry - stopPts : entry + stopPts;
     const target = action === 'BUY' ? entry + targetPts : entry - targetPts;
-    if (state.dayNetPts - stopPts < -dayLossStopPts) {
+    if (
+      crudeDayLossActive(dayLossStopPts) &&
+      state.dayNetPts - stopPts < -dayLossStopPts
+    ) {
       return {
         action: 'NO_TRADE',
         entryPrice: entry,
@@ -273,7 +288,10 @@ export function runCrudePdhlEvening(params: {
   const stopLoss = action === 'BUY' ? entry - stopPts : entry + stopPts;
   const target = action === 'BUY' ? entry + targetPts : entry - targetPts;
 
-  if (state.dayNetPts - stopPts < -dayLossStopPts) {
+  if (
+    crudeDayLossActive(dayLossStopPts) &&
+    state.dayNetPts - stopPts < -dayLossStopPts
+  ) {
     return {
       action: 'NO_TRADE',
       entryPrice: entry,

@@ -1,9 +1,8 @@
 /**
  * Crude afternoon Session OR (all-green aim hunt Mar–Jul 2026):
  * OR 15:15–15:45 · entries 15:15–23:00 · next-bar confirm · SL12 / TP24
- * first-win lock · day lock +20 · day stop −15 · ≤2/day · max OR width 120
- * MCX sample ≈ 90% green traded days · ~₹154/day · PF ~3.5 (1 lot × ₹10).
- * Not 100% green — flat days (no setup) and ~10% red traded days remain.
+ * Unlimited trades · no day loss/profit locks · max OR width 120
+ * Per-trade SL cuts loss; TP aims higher (policy: high profit / low loss).
  */
 import { Candle } from '../../../models/candle.model';
 import { extractTradeDate } from '../../../utils/trade-date.util';
@@ -11,6 +10,8 @@ import { extractHhMm } from '../../utils/market-session.util';
 import {
   CRUDE_DAY_LOSS_STOP_PTS,
   CRUDE_MAX_TRADES_MONTH,
+  crudeDayLossActive,
+  crudeTradeCapActive,
   CrudePdhlSignal,
   CrudePdhlState,
 } from '../crude-pdhl-evening/crude-pdhl-evening.evaluator';
@@ -20,7 +21,8 @@ export const CRUDE_SOR_ENTRY_END = '23:00';
 export const CRUDE_SOR_OR_START = '15:15';
 export const CRUDE_SOR_OR_END = '15:45';
 export const CRUDE_SOR_MAX_OR_WIDTH = 120;
-export const CRUDE_SOR_MAX_TRADES_DAY = 2;
+/** 0 = unlimited. */
+export const CRUDE_SOR_MAX_TRADES_DAY = 0;
 
 function sessionOr(
   candles: Candle[],
@@ -118,14 +120,17 @@ export function runCrudeSessionOr(params: {
     state.dayStoppedReason = `Day profit lock +${state.dayNetPts.toFixed(1)} pts`;
     return wait(candle, state.dayStoppedReason);
   }
-  if (state.dayNetPts <= -dayLossStopPts) {
+  if (crudeDayLossActive(dayLossStopPts) && state.dayNetPts <= -dayLossStopPts) {
     state.dayStoppedReason = `Day max loss ${state.dayNetPts.toFixed(1)} pts`;
     return wait(candle, state.dayStoppedReason);
   }
-  if (state.tradesToday >= maxTradesDay) {
+  if (crudeTradeCapActive(maxTradesDay) && state.tradesToday >= maxTradesDay) {
     return wait(candle, `Max ${maxTradesDay} afternoon trades/day`);
   }
-  if (state.tradesThisMonth >= CRUDE_MAX_TRADES_MONTH) {
+  if (
+    crudeTradeCapActive(CRUDE_MAX_TRADES_MONTH) &&
+    state.tradesThisMonth >= CRUDE_MAX_TRADES_MONTH
+  ) {
     return wait(candle, `Max ${CRUDE_MAX_TRADES_MONTH} trades/month`);
   }
 
@@ -145,7 +150,10 @@ export function runCrudeSessionOr(params: {
     const entry = candle.open;
     const stopLoss = action === 'BUY' ? entry - stopPts : entry + stopPts;
     const target = action === 'BUY' ? entry + targetPts : entry - targetPts;
-    if (state.dayNetPts - stopPts < -dayLossStopPts) {
+    if (
+      crudeDayLossActive(dayLossStopPts) &&
+      state.dayNetPts - stopPts < -dayLossStopPts
+    ) {
       return {
         action: 'NO_TRADE',
         entryPrice: entry,

@@ -1,6 +1,6 @@
 {
   "name": "palagai",
-  "version": "1.3.23",
+  "version": "1.3.24",
   "scripts": {
     "ng": "cross-env NODE_OPTIONS=\"--no-deprecation --no-warnings\" ng",
     "clean": "if exist .angular rmdir /s /q .angular && if exist node_modules\\.vite rmdir /s /q node_modules\\.vite && if exist .vite rmdir /s /q .vite && if exist dist rmdir /s /q dist && if exist .angular\\cache rmdir /s /q .angular\\cache && echo Cache cleared",

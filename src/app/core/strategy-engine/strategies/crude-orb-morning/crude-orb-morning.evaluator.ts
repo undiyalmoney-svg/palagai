@@ -12,6 +12,8 @@ import {
   CRUDE_MAX_TRADES_MONTH,
   CRUDE_MORNING_TARGET_PTS,
   CRUDE_STOP_PTS,
+  crudeDayLossActive,
+  crudeTradeCapActive,
   CrudePdhlSignal,
   CrudePdhlState,
 } from '../crude-pdhl-evening/crude-pdhl-evening.evaluator';
@@ -20,7 +22,8 @@ export const CRUDE_MORNING_ENTRY_START = '10:00';
 export const CRUDE_MORNING_ENTRY_END = '12:00';
 export const CRUDE_MORNING_OR_START = '09:00';
 export const CRUDE_MORNING_OR_END = '10:00';
-export const CRUDE_MORNING_MAX_TRADES_DAY = 1;
+/** 0 = unlimited. */
+export const CRUDE_MORNING_MAX_TRADES_DAY = 0;
 /** Skip wide opening ranges (noisy days). */
 export const CRUDE_MORNING_MAX_OR_WIDTH = 120;
 
@@ -102,14 +105,20 @@ export function runCrudeMorningOrb(params: {
     state.dayStoppedReason = `Day profit lock +${state.dayNetPts.toFixed(1)} pts`;
     return wait(candle, state.dayStoppedReason);
   }
-  if (state.dayNetPts <= -dayLossStopPts) {
+  if (crudeDayLossActive(dayLossStopPts) && state.dayNetPts <= -dayLossStopPts) {
     state.dayStoppedReason = `Day max loss ${state.dayNetPts.toFixed(1)} pts`;
     return wait(candle, state.dayStoppedReason);
   }
-  if (state.morningTradesToday >= CRUDE_MORNING_MAX_TRADES_DAY) {
+  if (
+    crudeTradeCapActive(CRUDE_MORNING_MAX_TRADES_DAY) &&
+    state.morningTradesToday >= CRUDE_MORNING_MAX_TRADES_DAY
+  ) {
     return wait(candle, `Max ${CRUDE_MORNING_MAX_TRADES_DAY} morning trade/day`);
   }
-  if (state.tradesThisMonth >= CRUDE_MAX_TRADES_MONTH) {
+  if (
+    crudeTradeCapActive(CRUDE_MAX_TRADES_MONTH) &&
+    state.tradesThisMonth >= CRUDE_MAX_TRADES_MONTH
+  ) {
     return wait(candle, `Max ${CRUDE_MAX_TRADES_MONTH} trades/month`);
   }
   if (time < CRUDE_MORNING_ENTRY_START || time > CRUDE_MORNING_ENTRY_END) {
@@ -145,7 +154,10 @@ export function runCrudeMorningOrb(params: {
   const stopLoss = action === 'BUY' ? entry - stopPts : entry + stopPts;
   const target = action === 'BUY' ? entry + targetPts : entry - targetPts;
 
-  if (state.dayNetPts - stopPts < -dayLossStopPts) {
+  if (
+    crudeDayLossActive(dayLossStopPts) &&
+    state.dayNetPts - stopPts < -dayLossStopPts
+  ) {
     return {
       action: 'NO_TRADE',
       entryPrice: entry,
