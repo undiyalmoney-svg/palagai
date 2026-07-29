@@ -30,9 +30,31 @@ function startOfDay(date: Date): Date {
   return copy;
 }
 
+/**
+ * Calendar day in Asia/Kolkata (same rule as Nifty/Bank option-chain util).
+ * Avoids UTC `setHours(0)` shifting early IST mornings onto the previous day.
+ */
+export function crudeIstCalendarDay(date: Date): Date {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date);
+  const y = Number(parts.find((p) => p.type === 'year')?.value);
+  const m = Number(parts.find((p) => p.type === 'month')?.value);
+  const d = Number(parts.find((p) => p.type === 'day')?.value);
+  return new Date(y, m - 1, d, 0, 0, 0, 0);
+}
+
 function parseExpiry(expiry: string): Date | null {
   if (!expiry) {
     return null;
+  }
+  // Prefer YYYY-MM-DD as a pure calendar date (no TZ shift).
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(expiry);
+  if (m) {
+    return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 0, 0, 0, 0);
   }
   const d = new Date(expiry.includes('T') ? expiry : `${expiry}T00:00:00`);
   return Number.isNaN(d.getTime()) ? null : startOfDay(d);
@@ -77,6 +99,7 @@ export function listCrudeLiveExpiries(
   instruments: Instrument[],
   asOfDay: Date,
 ): Date[] {
+  const day = crudeIstCalendarDay(asOfDay);
   const seen = new Set<number>();
   const out: Date[] = [];
   for (const item of instruments) {
@@ -84,7 +107,8 @@ export function listCrudeLiveExpiries(
       continue;
     }
     const exp = parseExpiry(item.expiry);
-    if (!exp || exp < asOfDay) {
+    // Hard rule (same as Nifty/Bank): never keep same-day or past expiry.
+    if (!exp || exp.getTime() <= day.getTime()) {
       continue;
     }
     const key = exp.getTime();
@@ -100,7 +124,7 @@ export function listCrudeLiveExpiries(
 
 /**
  * Never trade the current expiry on expiry day — always the next contract.
- * If asOf is an expiry present in the chain (or equals the front expiry), roll forward.
+ * `listCrudeLiveExpiries` already drops same-day/past; front = earliest remaining.
  */
 export function resolveCrudeFrontExpiry(
   asOfDay: Date,
@@ -108,11 +132,6 @@ export function resolveCrudeFrontExpiry(
 ): Date | null {
   if (!liveExpiries.length) {
     return null;
-  }
-  const day = startOfDay(asOfDay);
-  // Front = first expiry >= asOf. On that day, skip to the next one.
-  if (liveExpiries[0]!.getTime() === day.getTime()) {
-    return liveExpiries[1] ?? null;
   }
   return liveExpiries[0]!;
 }
@@ -122,8 +141,15 @@ export function isCrudeOptionExpiryDay(
   asOfDay: Date,
   instruments: Instrument[],
 ): boolean {
-  const day = startOfDay(asOfDay);
-  return listCrudeLiveExpiries(instruments, day).some((e) => e.getTime() === day.getTime());
+  const day = crudeIstCalendarDay(asOfDay);
+  // Check raw chain for an expiry matching today (before the same-day filter).
+  return instruments.some((item) => {
+    if (!isCrudeMiniOption(item) && !isAnyCrudeOption(item)) {
+      return false;
+    }
+    const exp = parseExpiry(item.expiry);
+    return exp != null && exp.getTime() === day.getTime();
+  });
 }
 
 /** List near-ATM CRUDEOILM options for the tradeable front expiry (skips expiry day). */
@@ -136,7 +162,9 @@ export function listCrudeOilMiniOptions(
   const asOf = asOfDateTime
     ? new Date(asOfDateTime.includes('T') ? asOfDateTime : asOfDateTime.replace(' ', 'T'))
     : new Date();
-  const asOfDay = Number.isNaN(asOf.getTime()) ? startOfDay(new Date()) : startOfDay(asOf);
+  const asOfDay = Number.isNaN(asOf.getTime())
+    ? crudeIstCalendarDay(new Date())
+    : crudeIstCalendarDay(asOf);
   const live = listCrudeLiveExpiries(instruments, asOfDay);
   const front = resolveCrudeFrontExpiry(asOfDay, live);
   if (!front) {
@@ -194,7 +222,9 @@ export function resolveAtmCrudeMiniOption(params: {
       ? params.asOfDateTime
       : params.asOfDateTime.replace(' ', 'T'),
   );
-  const asOfDay = Number.isNaN(asOf.getTime()) ? startOfDay(new Date()) : startOfDay(asOf);
+  const asOfDay = Number.isNaN(asOf.getTime())
+    ? crudeIstCalendarDay(new Date())
+    : crudeIstCalendarDay(asOf);
 
   const pool = params.instruments
     .filter((item) => isCrudeMiniOption(item) || isAnyCrudeOption(item))
@@ -212,9 +242,12 @@ export function resolveAtmCrudeMiniOption(params: {
     .map((item) => ({ item, exp: parseExpiry(item.expiry) }))
     .filter((row): row is { item: Instrument; exp: Date } => row.exp != null)
     .filter((row) => {
+      // Hard rule: never same-day or past expiry (even if front map missed).
+      if (row.exp.getTime() <= asOfDay.getTime()) {
+        return false;
+      }
       if (!front) {
-        // No chain expiry map — still never pick same-day expiry.
-        return row.exp > asOfDay;
+        return true;
       }
       return row.exp.getTime() === front.getTime();
     });
@@ -276,9 +309,10 @@ function buildSyntheticCrudeOption(
   const optType = direction === 'BUY' ? 'CE' : 'PE';
   const strike = roundCrudeStrike(spot);
   // Prefer known next front; else bump one calendar day so we never label same-day expiry.
-  let exp = frontExpiry ? startOfDay(frontExpiry) : startOfDay(asOfDay);
-  if (exp.getTime() <= asOfDay.getTime()) {
-    exp = new Date(asOfDay);
+  const day = crudeIstCalendarDay(asOfDay);
+  let exp = frontExpiry ? crudeIstCalendarDay(frontExpiry) : day;
+  if (exp.getTime() <= day.getTime()) {
+    exp = new Date(day);
     exp.setDate(exp.getDate() + 1);
   }
   const expiry = formatExpiryIso(exp);
