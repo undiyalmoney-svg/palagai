@@ -114,7 +114,7 @@ export class CrudeOilDeskComponent implements OnInit, OnDestroy {
     }
     const conf = p.requireConfirm ? ' +confirm' : '';
     if (p.entryMode === 'session-or') {
-      return `Session OR${conf} ${p.eveningEntryStart}–${p.eveningEntryEnd} · OR ${p.sessionOrStart}–${p.sessionOrEnd} · SL${p.stopPts}/TP${p.eveningTargetPts} · day −₹${p.dayLossStopPts * CRUDE_RUPEES_PER_POINT}`;
+      return `Session OR${conf} ${p.eveningEntryStart}–${p.eveningEntryEnd} · OR ${p.sessionOrStart}–${p.sessionOrEnd} · SL₹${p.stopPts * CRUDE_RUPEES_PER_POINT} · trail ₹${p.profitLockArmRs}→₹${p.profitLockLockRs}`;
     }
     if (p.profileId === 'daily-profit') {
       return `Evening PDHL${conf} ${p.eveningEntryStart}–${p.eveningEntryEnd} · SL${p.stopPts}/TP${p.eveningTargetPts}`;

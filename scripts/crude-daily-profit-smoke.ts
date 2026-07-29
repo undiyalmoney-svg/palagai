@@ -1,5 +1,5 @@
 /**
- * Smoke: Daily Profit crude — confirm + SL/TP, unlimited, day loss −₹1,500.
+ * Smoke: Daily Profit crude — confirm + SL/TP, unlimited, no day-wide stop.
  * Run: npx tsx scripts/crude-daily-profit-smoke.ts
  */
 import { Candle } from '../src/app/core/models/candle.model';
@@ -28,7 +28,7 @@ assert(profile.profileId === 'daily-profit', 'profile id');
 assert(profile.requireConfirm === true, 'confirm on');
 assert(profile.eveningEntryEnd === '21:00', 'entry to 21:00');
 assert(profile.dayProfitLockPts === 0, 'no day lock');
-assert(profile.dayLossStopPts === 150, 'day loss 150 pts');
+assert(profile.dayLossStopPts === 0, 'no day-wide loss stop');
 assert(profile.maxEveningTradesDay === 0, 'unlimited');
 assert(crudePtsToRupees(profile.eveningTargetPts) === 400, 'TP ₹400');
 assert(crudePtsToRupees(profile.stopPts) === 200, 'SL ₹200');

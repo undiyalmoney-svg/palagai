@@ -1,5 +1,5 @@
 /**
- * Smoke: Daily Income crude profile — SL/TP sizing, unlimited, day loss −₹1,500.
+ * Smoke: Daily Income crude profile — SL/TP sizing, unlimited, no day-wide stop.
  * Run: npx tsx scripts/crude-daily-income-smoke.ts
  */
 import { Candle } from '../src/app/core/models/candle.model';
@@ -27,7 +27,7 @@ function assert(cond: boolean, msg: string): void {
 const profile = resolveCrudeStrategyProfile('daily-income');
 assert(profile.profileId === 'daily-income', 'profile id');
 assert(profile.dayProfitLockPts === 0, 'no day profit lock');
-assert(profile.dayLossStopPts === 150, 'day loss 150 pts');
+assert(profile.dayLossStopPts === 0, 'no day-wide loss stop');
 assert(profile.maxEveningTradesDay === 0, 'unlimited');
 assert(crudePtsToRupees(profile.morningTargetPts) === 800, 'morning TP ₹800');
 assert(crudePtsToRupees(profile.eveningTargetPts) === 500, 'evening TP ₹500');

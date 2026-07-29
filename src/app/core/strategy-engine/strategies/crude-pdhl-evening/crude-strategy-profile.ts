@@ -1,10 +1,10 @@
 /**
  * Crude Oil Mini strategy profiles for the Crude Desk.
  *
- * - all-green: Session OR 09:00–09:30 · entries →23:00 · day −₹1,500 (default)
- * - daily-profit: Trap-style evening PDHL + confirm · tight SL/TP · day lock
- * - champion: hunt pair (larger SL/TP, no day profit lock)
- * - daily-income: sized for ~₹300–₹1,000 / day on 1 lot (₹10/pt) — weaker on MCX sample
+ * - all-green: Session OR 09:00–09:30 · entries →23:00 · per-trade SL/trail (default)
+ * - daily-profit: Trap-style evening PDHL + confirm · tight SL/TP
+ * - champion: hunt pair (larger SL/TP)
+ * - daily-income: sized for ~₹300–₹1,000 / day on 1 lot (₹10/pt)
  * - trap-confirm: S/R Trap + Confirm (Nifty Trap DNA port)
  *
  * Live without real money = Live tab with "Live money" unchecked (paper fills).
@@ -22,7 +22,6 @@ import {
   CRUDE_SOR_ENTRY_END,
   CRUDE_SOR_ENTRY_START,
   CRUDE_SOR_MAX_OR_WIDTH,
-  CRUDE_SOR_MAX_TRADES_DAY,
   CRUDE_SOR_OR_END,
   CRUDE_SOR_OR_START,
 } from '../crude-session-or/crude-session-or.evaluator';
@@ -55,7 +54,7 @@ export interface CrudeTradeParams extends CrudeProtectParams {
   eveningTargetPts: number;
   /** Trap profile: R-multiple target (0 = use fixed morning/evening targets). */
   targetRMultiple: number;
-  /** Day max loss (pts). */
+  /** Day max loss (pts). 0 = off (hunt next trade after SL). */
   dayLossStopPts: number;
   /** Stricter day max loss when desk checkbox is on. */
   strictDayLossPts: number;
@@ -100,15 +99,39 @@ const PROTECT_OFF: CrudeProtectParams = {
 };
 
 /**
+ * Per-trade protect (1 lot × ₹10/pt):
+ * - Loss to ₹150 → stop that trade, hunt next
+ * - Profit peaks ₹500 → arm trail; giveback to ₹240 floor → cut & rehunt
+ */
+const PROTECT_TRADE_CUTOFF: CrudeProtectParams = {
+  profitLockArmRs: 500,
+  profitLockLockRs: 240,
+  profitLockGivebackRs: 260,
+  slConfirmCutoffEnabled: false,
+  slConfirmCutoffFracR: 0.55,
+  slConfirmCutoffMaxMfeR: 0.75,
+  slConfirmSoftRs: 700,
+};
+
+/** All-Green per-trade SL ₹150 (= 15 pts). */
+export const CRUDE_ALL_GREEN_STOP_PTS = 15;
+/**
+ * Stretch target above trail arm so peak-trail can manage the exit
+ * (hard TP ₹1,000; trail usually cuts earlier after ₹500 peak).
+ */
+export const CRUDE_ALL_GREEN_TARGET_PTS = 100;
+
+/**
  * All-Green — Session OR from market open; trade whenever desk is running.
- * OR 09:00–09:30 · entries after OR → 23:00 · SL12 / TP24 · day loss −₹1,500.
+ * OR 09:00–09:30 · entries after OR → 23:00 · per-trade SL ₹150 · trail ₹500→₹240.
+ * No day-wide stop — after SL / drained cut, look for next opportunity.
  */
 export const CRUDE_ALL_GREEN_PARAMS: CrudeTradeParams = {
   profileId: 'all-green',
   label: 'All-Green (09:00–23:00)',
-  stopPts: 12,
-  morningTargetPts: 24,
-  eveningTargetPts: 24,
+  stopPts: CRUDE_ALL_GREEN_STOP_PTS,
+  morningTargetPts: CRUDE_ALL_GREEN_TARGET_PTS,
+  eveningTargetPts: CRUDE_ALL_GREEN_TARGET_PTS,
   targetRMultiple: 0,
   dayLossStopPts: CRUDE_DAY_LOSS_STOP_PTS,
   strictDayLossPts: CRUDE_STRICT_DAY_LOSS_PTS,
@@ -124,13 +147,13 @@ export const CRUDE_ALL_GREEN_PARAMS: CrudeTradeParams = {
   maxEveningTradesDay: 0,
   defaultEnableMorning: false,
   defaultEnableEvening: true,
-  dailyBandLabel: 'OR 09:00–09:30 · SL₹120/TP₹240 · unlimited · day −₹1,500',
-  ...PROTECT_OFF,
+  dailyBandLabel: 'OR 09:00–09:30 · SL₹150 · trail ₹500→₹240 · unlimited',
+  ...PROTECT_TRADE_CUTOFF,
 };
 
 /**
  * Daily Profit (Trap-style) — evening PDHL + confirm.
- * Unlimited · day loss −₹1,500 · per-trade SL20 / TP40.
+ * Unlimited · no day lock · per-trade SL20 / TP40.
  */
 export const CRUDE_DAILY_PROFIT_PARAMS: CrudeTradeParams = {
   profileId: 'daily-profit',
@@ -153,11 +176,11 @@ export const CRUDE_DAILY_PROFIT_PARAMS: CrudeTradeParams = {
   maxEveningTradesDay: 0,
   defaultEnableMorning: false,
   defaultEnableEvening: true,
-  dailyBandLabel: 'Eve PDHL+confirm · SL₹200/TP₹400 · unlimited · day −₹1,500',
+  dailyBandLabel: 'Eve PDHL+confirm · SL₹200/TP₹400 · unlimited · no day stop',
   ...PROTECT_OFF,
 };
 
-/** Champion pair — larger swings; unlimited trades; day loss −₹1,500. */
+/** Champion pair — larger swings; unlimited trades; no day stop. */
 export const CRUDE_CHAMPION_PARAMS: CrudeTradeParams = {
   profileId: 'champion',
   label: 'Champion (hunt pair)',
@@ -179,13 +202,13 @@ export const CRUDE_CHAMPION_PARAMS: CrudeTradeParams = {
   maxEveningTradesDay: 0,
   defaultEnableMorning: true,
   defaultEnableEvening: true,
-  dailyBandLabel: 'Champion SL80/TP250·150 · unlimited · day −₹1,500',
+  dailyBandLabel: 'Champion SL80/TP250·150 · unlimited · no day stop',
   ...PROTECT_OFF,
 };
 
 /**
  * Daily income band for 1 lot (₹10/pt).
- * Unlimited · day loss −₹1,500 · per-trade SL/TP.
+ * Unlimited · no day stop · per-trade SL/TP.
  */
 export const CRUDE_DAILY_INCOME_PARAMS: CrudeTradeParams = {
   profileId: 'daily-income',
@@ -208,13 +231,13 @@ export const CRUDE_DAILY_INCOME_PARAMS: CrudeTradeParams = {
   maxEveningTradesDay: 0,
   defaultEnableMorning: true,
   defaultEnableEvening: true,
-  dailyBandLabel: 'SL40 / TP80·50 · unlimited · day −₹1,500',
+  dailyBandLabel: 'SL40 / TP80·50 · unlimited · no day stop',
   ...PROTECT_OFF,
 };
 
 /**
  * Crude Trap + Confirm — Trap DNA port (paper / research).
- * Unlimited · day loss −₹1,500 · per-trade wick SL / 3.5R TP.
+ * Unlimited · no day stop · per-trade wick SL / 3.5R TP.
  */
 export const CRUDE_TRAP_CONFIRM_PARAMS: CrudeTradeParams = {
   profileId: 'trap-confirm',
@@ -237,7 +260,7 @@ export const CRUDE_TRAP_CONFIRM_PARAMS: CrudeTradeParams = {
   maxEveningTradesDay: 0,
   defaultEnableMorning: true,
   defaultEnableEvening: true,
-  dailyBandLabel: 'S/R trap + confirm · 3.5R · unlimited · day −₹1,500',
+  dailyBandLabel: 'S/R trap + confirm · 3.5R · unlimited · no day stop',
   ...PROTECT_OFF,
 };
 

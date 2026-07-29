@@ -6,8 +6,9 @@
       <p class="pg-lede">
         Default <strong>All-Green</strong> — Session OR <strong>09:00–09:30</strong>, entries through
         <strong>23:00</strong> whenever the desk is running · <strong>1 lot</strong> (₹10/pt):
-        SL₹120 / TP₹240 · unlimited trades · <strong>day loss −₹1,500</strong> (strict −₹1,800).
-        Paper Testing &amp; Live (no real money unless you tick Live money). {{ profileSlTpLabel() }}.
+        <strong>SL ₹150</strong> then hunt next · peak trail <strong>₹500 → lock ₹240</strong>
+        (no day-wide stop). Paper Testing &amp; Live (no real money unless you tick Live money).
+        {{ profileSlTpLabel() }}.
       </p>
     </div>
     <div class="hero-meta">
@@ -169,21 +170,34 @@
       </label>
     </div>
 
-    <div class="desk-toggles" role="group" aria-label="Day risk">
-      <label class="desk-check" [attr.title]="profileRiskTitle()">
-        <input
-          type="checkbox"
-          [(ngModel)]="strictDayStop"
-          [disabled]="busy() || snapshot().running"
-        />
-        <span>{{ strictDayStopLabel() }}</span>
-      </label>
-      @if (activeProfile().dayProfitLockPts > 0) {
-        <span class="desk-lock-hint" title="Stops new entries after day net hits lock (1 lot × ₹10/pt).">
-          Day lock +₹{{ activeProfile().dayProfitLockPts * 10 }}
+    @if (activeProfile().dayLossStopPts > 0 || activeProfile().strictDayLossPts > 0) {
+      <div class="desk-toggles" role="group" aria-label="Day risk">
+        <label class="desk-check" [attr.title]="profileRiskTitle()">
+          <input
+            type="checkbox"
+            [(ngModel)]="strictDayStop"
+            [disabled]="busy() || snapshot().running"
+          />
+          <span>{{ strictDayStopLabel() }}</span>
+        </label>
+        @if (activeProfile().dayProfitLockPts > 0) {
+          <span class="desk-lock-hint" title="Stops new entries after day net hits lock (1 lot × ₹10/pt).">
+            Day lock +₹{{ activeProfile().dayProfitLockPts * 10 }}
+          </span>
+        }
+      </div>
+    } @else if (activeProfile().profitLockArmRs > 0) {
+      <div class="desk-toggles" role="group" aria-label="Trade risk">
+        <span
+          class="desk-lock-hint"
+          title="Per-trade only: SL cuts the trade, then next opportunity. Peak trail arms and locks profit."
+        >
+          Per-trade · SL ₹{{ activeProfile().stopPts * 10 }} · trail arm ₹{{
+            activeProfile().profitLockArmRs
+          }}→₹{{ activeProfile().profitLockLockRs }}
         </span>
-      }
-    </div>
+      </div>
+    }
 
     @if (mode() === 'testing') {
       <div class="weekday-filter" role="group" aria-label="Result weekdays">

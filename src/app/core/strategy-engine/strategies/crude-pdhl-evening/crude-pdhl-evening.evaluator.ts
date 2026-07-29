@@ -23,16 +23,13 @@ export const CRUDE_MAX_TRADES_DAY = 0;
 /** 0 = unlimited. */
 export const CRUDE_MAX_TRADES_MONTH = 0;
 /**
- * Day max loss cutoff: 150 pts × ₹10 = −₹1,500 / lot.
- * Per-trade SL still cuts each trade (small loss / larger TP).
+ * Day max loss (pts). 0 = off — after a per-trade SL, keep hunting next opportunity.
+ * Per-trade cutoffs live on the profile (SL ₹ + peak-trail), not as a day lock.
  */
-export const CRUDE_DAY_LOSS_STOP_PTS = 150;
-/** Desk strict checkbox: 180 pts × ₹10 = −₹1,800 / lot. */
-export const CRUDE_STRICT_DAY_LOSS_RS = 1800;
-export const CRUDE_STRICT_DAY_LOSS_PTS = Math.max(
-  1,
-  Math.round(CRUDE_STRICT_DAY_LOSS_RS / CRUDE_RUPEES_PER_POINT),
-);
+export const CRUDE_DAY_LOSS_STOP_PTS = 0;
+/** Desk strict checkbox (pts). 0 = off when day stop is off. */
+export const CRUDE_STRICT_DAY_LOSS_RS = 0;
+export const CRUDE_STRICT_DAY_LOSS_PTS = 0;
 
 export function resolveCrudeDayLossStopPts(strictDayStop?: boolean): number {
   return strictDayStop ? CRUDE_STRICT_DAY_LOSS_PTS : CRUDE_DAY_LOSS_STOP_PTS;

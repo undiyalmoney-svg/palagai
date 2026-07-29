@@ -1,7 +1,7 @@
 /**
  * Crude All-Green Session OR (full MCX session):
- * OR 09:00–09:30 · entries after OR through 23:00 · next-bar confirm · SL12 / TP24
- * Unlimited trades · day loss cutoff on · max OR width 120
+ * OR 09:00–09:30 · entries after OR through 23:00 · next-bar confirm
+ * Per-trade SL/trail from profile · unlimited · no day lock · max OR width 120
  * Start anytime after OR is built — not gated to 15:15.
  */
 import { Candle } from '../../../models/candle.model';
@@ -80,8 +80,8 @@ export function runCrudeSessionOr(params: {
   const { candle, series, state } = params;
   const dayLossStopPts = params.dayLossStopPts ?? CRUDE_DAY_LOSS_STOP_PTS;
   const dayProfitLockPts = params.dayProfitLockPts ?? 0;
-  const stopPts = params.stopPts ?? 12;
-  const targetPts = params.targetPts ?? 24;
+  const stopPts = params.stopPts ?? 15;
+  const targetPts = params.targetPts ?? 100;
   const requireConfirm = params.requireConfirm !== false;
   const firstWinLock = params.firstWinLock === true;
   const entryStart = params.entryStart ?? CRUDE_SOR_ENTRY_START;
