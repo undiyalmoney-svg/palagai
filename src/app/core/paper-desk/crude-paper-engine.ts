@@ -5,6 +5,7 @@ import { extractTradeDate } from '../utils/trade-date.util';
 import { extractHhMm } from '../strategy-engine/utils/market-session.util';
 import {
   CRUDE_EXIT_BY,
+  CRUDE_RUPEES_PER_POINT,
   CrudeSessionBook,
   createCrudePdhlState,
   CrudePdhlState,
@@ -12,6 +13,15 @@ import {
   runCrudePdhlEvening,
 } from '../strategy-engine/strategies/crude-pdhl-evening/crude-pdhl-evening.evaluator';
 import { runCrudeMorningOrb } from '../strategy-engine/strategies/crude-orb-morning/crude-orb-morning.evaluator';
+import {
+  createCrudeTrapState,
+  CrudeTrapState,
+  runCrudeTrapConfirm,
+} from '../strategy-engine/strategies/crude-trap-confirm/crude-trap-confirm.evaluator';
+import {
+  CrudeTradeParams,
+  resolveCrudeStrategyProfile,
+} from '../strategy-engine/strategies/crude-pdhl-evening/crude-strategy-profile';
 import {
   resolveAtmCrudeMiniOption,
   toCrudePaperOption,
@@ -31,6 +41,9 @@ export interface CrudeOpenPaper {
   option: PaperOptionContract | null;
   optionEntryPremium: number | null;
   premiumEstimated: boolean;
+  /** Peak favorable excursion (pts) for Trap-style peak-trail. */
+  peakMfePts?: number;
+  riskPts?: number;
 }
 
 export interface CrudeReplayResult {
@@ -47,22 +60,105 @@ export interface CrudeReplayResult {
   chosenAsOf: string | null;
 }
 
+function applyCrudePeakTrail(
+  candle: Candle,
+  open: CrudeOpenPaper,
+  tradeParams: CrudeTradeParams,
+): boolean {
+  const armRs = tradeParams.profitLockArmRs;
+  if (!(armRs > 0)) {
+    return false;
+  }
+  const rs = CRUDE_RUPEES_PER_POINT;
+  const armPts = armRs / rs;
+  const barMfe =
+    open.direction === 'BUY' ? candle.high - open.entry : open.entry - candle.low;
+  const peak = Math.max(open.peakMfePts ?? 0, Math.max(0, barMfe));
+  open.peakMfePts = peak;
+  if (peak < armPts) {
+    return false;
+  }
+  const peakRs = peak * rs;
+  const floorRs = Math.max(
+    tradeParams.profitLockLockRs,
+    peakRs - Math.max(0, tradeParams.profitLockGivebackRs),
+  );
+  const floorPts = floorRs / rs;
+  if (open.direction === 'BUY') {
+    const lockStop = open.entry + floorPts;
+    if (lockStop > open.stop) {
+      open.stop = lockStop;
+      return true;
+    }
+  } else {
+    const lockStop = open.entry - floorPts;
+    if (lockStop < open.stop) {
+      open.stop = lockStop;
+      return true;
+    }
+  }
+  return false;
+}
+
+function applyCrudeSoftCutoff(
+  candle: Candle,
+  open: CrudeOpenPaper,
+  tradeParams: CrudeTradeParams,
+): { exitPrice: number; reason: string } | null {
+  if (!tradeParams.slConfirmCutoffEnabled) {
+    return null;
+  }
+  const risk0 = open.riskPts ?? Math.abs(open.entry - open.stop);
+  if (!(risk0 > 0)) {
+    return null;
+  }
+  const rs = CRUDE_RUPEES_PER_POINT;
+  const mfe = open.peakMfePts ?? 0;
+  const mae =
+    open.direction === 'BUY' ? open.entry - candle.low : candle.high - open.entry;
+  const against =
+    open.direction === 'BUY' ? candle.close < open.entry : candle.close > open.entry;
+  const conf =
+    open.direction === 'BUY' ? candle.close < candle.open : candle.close > candle.open;
+  if (mfe >= tradeParams.slConfirmCutoffMaxMfeR * risk0) {
+    return null;
+  }
+  const hitFrac = mae >= tradeParams.slConfirmCutoffFracR * risk0;
+  const hitSoft = tradeParams.slConfirmSoftRs > 0 && mae * rs >= tradeParams.slConfirmSoftRs;
+  if ((hitFrac || hitSoft) && against && conf) {
+    return { exitPrice: candle.close, reason: 'SL cutoff — confirmed adverse' };
+  }
+  return null;
+}
+
 function checkFuturesExit(
   candle: Candle,
   open: CrudeOpenPaper,
+  tradeParams: CrudeTradeParams,
 ): { exitPrice: number; reason: string } | null {
   const time = extractHhMm(candle.date);
+  const armed = applyCrudePeakTrail(candle, open, tradeParams);
+  const soft = applyCrudeSoftCutoff(candle, open, tradeParams);
+  if (soft) {
+    return soft;
+  }
 
   if (open.direction === 'BUY') {
     if (candle.low <= open.stop) {
-      return { exitPrice: open.stop, reason: 'Stop loss hit' };
+      return {
+        exitPrice: open.stop,
+        reason: armed ? 'Profit drained — cut & rehunt' : 'Stop loss hit',
+      };
     }
     if (candle.high >= open.target) {
       return { exitPrice: open.target, reason: 'Target hit' };
     }
   } else {
     if (candle.high >= open.stop) {
-      return { exitPrice: open.stop, reason: 'Stop loss hit' };
+      return {
+        exitPrice: open.stop,
+        reason: armed ? 'Profit drained — cut & rehunt' : 'Stop loss hit',
+      };
     }
     if (candle.low <= open.target) {
       return { exitPrice: open.target, reason: 'Target hit' };
@@ -107,18 +203,8 @@ function lookupPremium(
   return edge === 'entry' ? best.open : best.close;
 }
 
-/** Synthetic premium path for UI only — money = full index pts × lot (matches Index ₹ proxy). */
-function estimateOptionPnl(indexPoints: number, lotSize: number, lots: number): {
-  entry: number;
-  exit: number;
-  pnl: number;
-} {
-  const lot = lotSize > 0 ? lotSize : 1;
-  const lotMult = Math.max(1, Math.floor(lots) || 1);
-  const pnl = indexPoints * lot * lotMult;
-  const premiumMove = indexPoints * 0.5; // display-only synthetic premium
-  const entry = Math.max(10, Math.abs(premiumMove) + 20);
-  return { entry, exit: entry + premiumMove, pnl };
+function estimatePremiumMove(points: number): number {
+  return points * 0.5;
 }
 
 let tradeSeq = 0;
@@ -141,7 +227,6 @@ function closePaperTrade(params: {
   let optionExitPremium: number | null = null;
   let optionPnlRs: number | null = null;
   let premiumEstimated = open.premiumEstimated;
-  let optionEntryPremium = open.optionEntryPremium;
 
   if (open.option) {
     optionExitPremium = lookupPremium(
@@ -149,15 +234,15 @@ function closePaperTrade(params: {
       params.exitTime,
       'exit',
     );
-    if (optionEntryPremium != null && optionExitPremium != null) {
+    if (open.optionEntryPremium != null && optionExitPremium != null) {
       optionPnlRs =
-        (optionExitPremium - optionEntryPremium) * open.option.lotSize * lots;
+        (optionExitPremium - open.optionEntryPremium) * open.option.lotSize * lots;
       premiumEstimated = false;
     } else {
-      const est = estimateOptionPnl(indexPoints, open.option.lotSize, lots);
-      optionEntryPremium = optionEntryPremium ?? est.entry;
-      optionExitPremium = optionEntryPremium + indexPoints * 0.5;
-      optionPnlRs = est.pnl;
+      const estMove = estimatePremiumMove(indexPoints);
+      const entryPx = open.optionEntryPremium ?? Math.max(10, Math.abs(estMove) + 20);
+      optionExitPremium = entryPx + estMove;
+      optionPnlRs = estMove * open.option.lotSize * lots;
       premiumEstimated = true;
     }
   }
@@ -177,7 +262,7 @@ function closePaperTrade(params: {
     exitTime: params.exitTime,
     exitReason: params.exitReason,
     option: open.option,
-    optionEntryPremium,
+    optionEntryPremium: open.optionEntryPremium,
     optionExitPremium,
     optionPnlRs,
     premiumEstimated,
@@ -197,12 +282,14 @@ export function replayPaperOnCrude(params: {
   neededOptionTokens: Set<number>;
   forceCloseOpen?: boolean;
   lotsMultiplier?: number;
-  /** Day max loss in futures pts (default champion −240). */
+  /** Day max loss in futures pts (default from profile). */
   dayLossStopPts?: number;
   /** Morning ORB 10:00–12:00. Default true. */
   enableMorning?: boolean;
   /** Evening PDHL 18:30–20:30. Default true. */
   enableEvening?: boolean;
+  /** Strategy profile (default daily-income for Live paper band). */
+  tradeParams?: CrudeTradeParams;
 }): CrudeReplayResult {
   const {
     instrumentId,
@@ -216,11 +303,14 @@ export function replayPaperOnCrude(params: {
   } = params;
   const forceCloseOpen = params.forceCloseOpen !== false;
   const lotsMultiplier = Math.max(1, Math.floor(params.lotsMultiplier ?? 1) || 1);
-  const dayLossStopPts = params.dayLossStopPts;
+  const tradeParams = params.tradeParams ?? resolveCrudeStrategyProfile('champion');
+  const dayLossStopPts = params.dayLossStopPts ?? tradeParams.dayLossStopPts;
+  const dayProfitLockPts = tradeParams.dayProfitLockPts;
   const enableMorning = params.enableMorning !== false;
   const enableEvening = params.enableEvening !== false;
+  const trapMode = tradeParams.entryMode === 'trap-confirm';
 
-  const state = createCrudePdhlState();
+  const state = trapMode ? createCrudeTrapState() : createCrudePdhlState();
   const trades: PaperTrade[] = [];
   const dayNetByDate: Record<string, number> = {};
   let open: CrudeOpenPaper | null = null;
@@ -238,20 +328,32 @@ export function replayPaperOnCrude(params: {
     }
 
     if (open) {
-      const exit = checkFuturesExit(candle, open);
+      const exit = checkFuturesExit(candle, open, tradeParams);
       if (exit) {
+        const bookLabel =
+          open.book === 'morning'
+            ? 'Morning'
+            : open.book === 'evening'
+              ? 'Evening'
+              : 'Trap';
         const closed = closePaperTrade({
           instrumentId,
           instrumentName,
           open,
           exitPrice: exit.exitPrice,
           exitTime: candle.date,
-          exitReason: `${exit.reason} · ${open.book === 'morning' ? 'Morning 10:00–12:00' : 'Evening 18:30–20:30'}`,
+          exitReason: `${exit.reason} · ${bookLabel}`,
           optionCandlesByToken,
           lotsMultiplier,
         });
         trades.push(closed);
-        recordCrudeTradeClosed(state, closed.indexPoints, dayLossStopPts, open.book);
+        recordCrudeTradeClosed(
+          state,
+          closed.indexPoints,
+          dayLossStopPts,
+          open.book,
+          dayProfitLockPts,
+        );
         dayNetByDate[day] = (dayNetByDate[day] ?? 0) + closed.indexPoints;
         open = null;
         lastSignal = `Closed: ${exit.reason}`;
@@ -262,34 +364,57 @@ export function replayPaperOnCrude(params: {
     let signal: ReturnType<typeof runCrudeMorningOrb> | null = null;
     let book: CrudeSessionBook = 'morning';
 
-    if (enableMorning) {
-      const morning = runCrudeMorningOrb({
+    if (trapMode) {
+      const trap = runCrudeTrapConfirm({
         candle,
         series: candles,
-        state,
+        state: state as CrudeTrapState,
         dayLossStopPts,
+        dayProfitLockPts,
+        targetRMultiple: tradeParams.targetRMultiple || undefined,
       });
-      if (morning.action === 'BUY' || morning.action === 'SELL') {
-        signal = morning;
-        book = 'morning';
+      if (trap.action === 'BUY' || trap.action === 'SELL') {
+        signal = trap;
+        book = 'evening'; // shared day counters; label as trap via reason
       } else {
-        lastSignal = morning.reason;
+        lastSignal = trap.reason;
       }
-    }
+    } else {
+      if (enableMorning) {
+        const morning = runCrudeMorningOrb({
+          candle,
+          series: candles,
+          state,
+          dayLossStopPts,
+          dayProfitLockPts,
+          stopPts: tradeParams.stopPts,
+          targetPts: tradeParams.morningTargetPts,
+        });
+        if (morning.action === 'BUY' || morning.action === 'SELL') {
+          signal = morning;
+          book = 'morning';
+        } else {
+          lastSignal = morning.reason;
+        }
+      }
 
-    if (!signal && enableEvening) {
-      const evening = runCrudePdhlEvening({
-        candle,
-        series: candles,
-        index: i,
-        state,
-        dayLossStopPts,
-      });
-      if (evening.action === 'BUY' || evening.action === 'SELL') {
-        signal = evening;
-        book = 'evening';
-      } else {
-        lastSignal = evening.reason;
+      if (!signal && enableEvening) {
+        const evening = runCrudePdhlEvening({
+          candle,
+          series: candles,
+          index: i,
+          state,
+          dayLossStopPts,
+          dayProfitLockPts,
+          stopPts: tradeParams.stopPts,
+          targetPts: tradeParams.eveningTargetPts,
+        });
+        if (evening.action === 'BUY' || evening.action === 'SELL') {
+          signal = evening;
+          book = 'evening';
+        } else {
+          lastSignal = evening.reason;
+        }
       }
     }
 
@@ -333,6 +458,8 @@ export function replayPaperOnCrude(params: {
       option,
       optionEntryPremium: entryPremium,
       premiumEstimated: entryPremium == null,
+      peakMfePts: 0,
+      riskPts: Math.abs(signal.entryPrice - signal.stopLoss),
     };
     lastSignal = `${signal.action} @ ${signal.entryPrice.toFixed(1)} · ${option.tradingSymbol}`;
   }
@@ -350,7 +477,13 @@ export function replayPaperOnCrude(params: {
       lotsMultiplier,
     });
     trades.push(closed);
-    recordCrudeTradeClosed(state, closed.indexPoints, dayLossStopPts, open.book);
+    recordCrudeTradeClosed(
+      state,
+      closed.indexPoints,
+      dayLossStopPts,
+      open.book,
+      dayProfitLockPts,
+    );
     dayNetByDate[extractTradeDate(last.date)] =
       (dayNetByDate[extractTradeDate(last.date)] ?? 0) + closed.indexPoints;
     open = null;
@@ -443,14 +576,14 @@ export function enrichCrudeTradesWithOptionPremiums(
         premiumEstimated: false,
       };
     }
-    const est = estimateOptionPnl(t.indexPoints, t.option.lotSize, lots);
-    const entryPx = entry ?? est.entry;
-    const exitPx = exit ?? entryPx + t.indexPoints * 0.5;
+    const estMove = estimatePremiumMove(t.indexPoints);
+    const entryPx = entry ?? Math.max(10, Math.abs(estMove) + 20);
+    const exitPx = exit ?? entryPx + estMove;
     return {
       ...t,
       optionEntryPremium: entryPx,
       optionExitPremium: exitPx,
-      optionPnlRs: est.pnl,
+      optionPnlRs: (exitPx - entryPx) * t.option.lotSize * lots,
       premiumEstimated: true,
     };
   });
