@@ -9,13 +9,16 @@ import { extractHhMm } from '../../utils/market-session.util';
 import {
   CRUDE_DAY_LOSS_STOP_PTS,
   CRUDE_MAX_TRADES_MONTH,
+  crudeDayLossActive,
+  crudeTradeCapActive,
   CrudePdhlSignal,
   CrudePdhlState,
 } from '../crude-pdhl-evening/crude-pdhl-evening.evaluator';
 
 export const CRUDE_TRAP_ENTRY_START = '10:00';
 export const CRUDE_TRAP_ENTRY_END = '22:00';
-export const CRUDE_TRAP_MAX_TRADES_DAY = 3;
+/** 0 = unlimited. */
+export const CRUDE_TRAP_MAX_TRADES_DAY = 0;
 export const CRUDE_TRAP_SWING_LB = 5;
 export const CRUDE_TRAP_PIERCE = 8;
 export const CRUDE_TRAP_SL_PAD = 2;
@@ -127,14 +130,17 @@ export function runCrudeTrapConfirm(params: {
     state.dayStoppedReason = `Day profit lock +${state.dayNetPts.toFixed(1)} pts`;
     return wait(candle, state.dayStoppedReason);
   }
-  if (state.dayNetPts <= -dayLossStopPts) {
+  if (crudeDayLossActive(dayLossStopPts) && state.dayNetPts <= -dayLossStopPts) {
     state.dayStoppedReason = `Day max loss ${state.dayNetPts.toFixed(1)} pts`;
     return wait(candle, state.dayStoppedReason);
   }
-  if (state.tradesToday >= maxDay) {
+  if (crudeTradeCapActive(maxDay) && state.tradesToday >= maxDay) {
     return wait(candle, `Max ${maxDay} trap trades/day`);
   }
-  if (state.tradesThisMonth >= CRUDE_MAX_TRADES_MONTH) {
+  if (
+    crudeTradeCapActive(CRUDE_MAX_TRADES_MONTH) &&
+    state.tradesThisMonth >= CRUDE_MAX_TRADES_MONTH
+  ) {
     return wait(candle, `Max ${CRUDE_MAX_TRADES_MONTH} trades/month`);
   }
 
@@ -162,7 +168,7 @@ export function runCrudeTrapConfirm(params: {
     if (risk < CRUDE_TRAP_MIN_RISK || risk > CRUDE_TRAP_MAX_RISK) {
       return wait(candle, `Risk ${risk.toFixed(1)} outside ${CRUDE_TRAP_MIN_RISK}–${CRUDE_TRAP_MAX_RISK}`);
     }
-    if (state.dayNetPts - risk < -dayLossStopPts) {
+    if (crudeDayLossActive(dayLossStopPts) && state.dayNetPts - risk < -dayLossStopPts) {
       return {
         action: 'NO_TRADE',
         entryPrice: fill,

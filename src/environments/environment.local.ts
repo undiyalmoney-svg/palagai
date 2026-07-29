@@ -5,7 +5,7 @@ export const environment = {
   allowLiveMoney: true,
   orderEgressIp: '168.144.28.89',
   appVersion: '1.3.17',
-  appBuild: '2026.07.29-expiry-roll-all',
+  appBuild: '2026.07.29-crude-unlimited',
   /**
    * Optional local-only session bootstrap. Fill via Get Token — do not commit real tokens.
    */
