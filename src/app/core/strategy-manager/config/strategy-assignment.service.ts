@@ -9,7 +9,12 @@ import {
   DEFAULT_CHANNEL_ASSIGNMENTS,
   MANAGED_STRATEGY_IDS,
 } from '../config/managed-strategy-ids';
-import { dnaCapsForStrategy, PROTECTION_DNA_EXTRAS, usesProtectionDna } from '../config/strategy-dna-caps';
+import {
+  dnaCapsForStrategy,
+  PROTECTION_DNA_EXTRAS,
+  protectionDayCapsFromExtras,
+  usesProtectionDna,
+} from '../config/strategy-dna-caps';
 import { StrategySettings } from '../models/strategy-settings.model';
 import { StrategyRegistryService } from '../registry/strategy-registry.service';
 
@@ -140,6 +145,7 @@ export class StrategyAssignmentService {
     }
     if (usesProtectionDna(strategyId)) {
       patch.extras = { ...PROTECTION_DNA_EXTRAS };
+      Object.assign(patch, protectionDayCapsFromExtras(PROTECTION_DNA_EXTRAS, channel));
     }
     // Persist under channel-scoped key so Nifty/Bank DNA do not overwrite each other.
     const key = settingsKey(strategyId, channel);
@@ -149,6 +155,7 @@ export class StrategyAssignmentService {
         ...(merged.extras ?? {}),
         ...PROTECTION_DNA_EXTRAS,
       };
+      Object.assign(merged, protectionDayCapsFromExtras(merged.extras, channel));
     }
     this.settingsMap[key] = merged;
     mod.initialize(merged);
@@ -207,12 +214,13 @@ export class StrategyAssignmentService {
     if (caps.targetRMultiple != null) {
       merged.targetRMultiple = caps.targetRMultiple;
     }
-    // Force researched peak-trail / soft cutoff (stale arm₹1000 must not stick).
+    // Force researched peak-trail / soft cutoff / day ₹ loss (stale arm₹1000 must not stick).
     if (usesProtectionDna(strategyId)) {
       merged.extras = {
         ...(merged.extras ?? {}),
         ...PROTECTION_DNA_EXTRAS,
       };
+      Object.assign(merged, protectionDayCapsFromExtras(merged.extras, channel));
     }
     mod.initialize(merged);
   }

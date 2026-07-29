@@ -20,6 +20,8 @@ describe('SrTrapConfirmManagedStrategy', () => {
     expect(s.getSettings().extras['slConfirmCutoffFracR']).toBe(0.55);
     expect(s.getSettings().extras['slConfirmCutoffMaxMfeR']).toBe(0.75);
     expect(s.getSettings().extras['slConfirmSoftRs']).toBe(700);
+    expect(s.getSettings().extras['dayLossCapRs']).toBe(2500);
+    expect(s.getSettings().extras['dayBankQuitRs']).toBe(0);
     expect(s.supports).toContain('nifty');
     expect(s.supports).toContain('bank');
     expect(DEFAULT_CHANNEL_ASSIGNMENTS.nifty.paper).toBe(MANAGED_STRATEGY_IDS.SR_TRAP_CONFIRM);

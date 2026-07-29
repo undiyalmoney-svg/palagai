@@ -1,30 +1,36 @@
 import { describe, expect, it } from 'vitest';
-import { dnaCapsForStrategy } from './strategy-dna-caps';
-import { MANAGED_STRATEGY_IDS } from './managed-strategy-ids';
+import {
+  indexRsPerPoint,
+  protectionDayCapsFromExtras,
+  PROTECTION_DNA_EXTRAS,
+} from './strategy-dna-caps';
 
-describe('dnaCapsForStrategy', () => {
-  it('unlocks max trades for every strategy (0 = unlimited)', () => {
-    const ids = Object.values(MANAGED_STRATEGY_IDS);
-    for (const id of ids) {
-      expect(dnaCapsForStrategy(id, 'nifty').maxTradesPerDay).toBe(0);
-      expect(dnaCapsForStrategy(id, 'bank').maxTradesPerDay).toBe(0);
-    }
+describe('protectionDayCapsFromExtras', () => {
+  it('maps dayLossCapRs ₹2500 → Nifty/Bank dayStopPts', () => {
+    const extras = { ...PROTECTION_DNA_EXTRAS };
+    expect(protectionDayCapsFromExtras(extras, 'nifty')).toEqual({
+      dayStopPts: Math.round(2500 / 65),
+    });
+    expect(protectionDayCapsFromExtras(extras, 'bank')).toEqual({
+      dayStopPts: Math.round(2500 / 30),
+    });
   });
 
-  it('keeps research R targets', () => {
-    expect(dnaCapsForStrategy(MANAGED_STRATEGY_IDS.DONCH_RETEST_OR_MID_2R, 'nifty')).toEqual({
-      maxTradesPerDay: 0,
-      targetRMultiple: 2,
-    });
-    expect(dnaCapsForStrategy(MANAGED_STRATEGY_IDS.SR_TRAP_CONFIRM, 'nifty')).toEqual({
-      maxTradesPerDay: 0,
-      targetRMultiple: 3.5,
-    });
-    expect(dnaCapsForStrategy(MANAGED_STRATEGY_IDS.ALIGN_COMBO_GENIE, 'nifty').targetRMultiple).toBe(
-      3,
+  it('maps dayBankQuitRs when set', () => {
+    const caps = protectionDayCapsFromExtras(
+      { dayLossCapRs: 2500, dayBankQuitRs: 1000 },
+      'nifty',
     );
-    expect(dnaCapsForStrategy(MANAGED_STRATEGY_IDS.ALIGN_COMBO_GENIE, 'bank').targetRMultiple).toBe(
-      1.5,
-    );
+    expect(caps.dayStopPts).toBe(Math.round(2500 / 65));
+    expect(caps.dayProfitLockPts).toBe(Math.round(1000 / 65));
+  });
+
+  it('ignores stocks channel', () => {
+    expect(protectionDayCapsFromExtras(PROTECTION_DNA_EXTRAS, 'stocks')).toEqual({});
+  });
+
+  it('uses researched ₹/pt scales', () => {
+    expect(indexRsPerPoint('nifty')).toBe(65);
+    expect(indexRsPerPoint('bank')).toBe(30);
   });
 });

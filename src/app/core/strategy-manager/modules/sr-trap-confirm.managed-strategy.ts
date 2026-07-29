@@ -32,7 +32,7 @@ export class SrTrapConfirmManagedStrategy implements IManagedStrategy {
   readonly name = 'Trap';
   readonly version = '1.0.0';
   readonly description =
-    'Default · liquidity trap + next-bar confirm · 3.5R · peak-trail arm₹600/gb₹300 · ≤3 trades/day.';
+    'Default · liquidity trap + next-bar confirm · 3.5R · peak-trail arm₹600/gb₹300 · day loss −₹2500.';
   readonly supports: readonly DeskChannel[] = ['nifty', 'bank'];
 
   readonly defaultSettings = defaultStrategySettings({
@@ -73,6 +73,9 @@ export class SrTrapConfirmManagedStrategy implements IManagedStrategy {
       slConfirmCutoffFracR: 0.55,
       slConfirmCutoffMaxMfeR: 0.75,
       slConfirmSoftRs: 700,
+      /** Doc 35 peer hunt — day ₹ loss cap (hydrate → dayStopPts). */
+      dayLossCapRs: 2500,
+      dayBankQuitRs: 0,
     },
   });
 

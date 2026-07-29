@@ -27,7 +27,8 @@ Those two files are the product “secret sauce.” Docs 01–03 expand them **l
 12. Use **27** for **Smart Pullback PRO** (Pine) — EMA pullback · 1.5R daily ₹ research (selectable, not default).  
 13. Use **31** for **S/R Trap + Confirm** max-earn hunt (wired selectable).  
 14. Use **33** for **Trap RCA + Kutty design + Trade Desk UI defaults** (Kite 5y evidence; no trading-logic change yet).  
-15. Use **34** for **Kutty daily-profit champion** (TP ₹600 / SL ₹200 · ~₹838/day OOS).
+15. Use **34** for **Kutty daily-profit champion** (TP ₹600 / SL ₹200 · ~₹838/day OOS).  
+16. Use **35** for **Trap peer hunt + day ₹ loss cutoffs** (no peer beats Trap; day −₹2500 wired).
 
 ## Not in the deploy
 Angular assets come from `src/` + `public/` only (`angular.json`).  
