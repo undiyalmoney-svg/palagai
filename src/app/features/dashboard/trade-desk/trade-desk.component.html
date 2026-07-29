@@ -93,7 +93,7 @@
         <strong>Settings tip</strong> — Max trades unlocked (∞) for every strategy. Strict day stop still cuts stacked red days.
       </li>
       <li>
-        <strong>P&amp;L tip</strong> — Badge must be <em>v1.3.15 · …no-max-trades</em> (hard-refresh if not). Nifty weeklies = Tuesday; Live money needs a loaded NFO chain. Peak-trail arms at ₹600 (≤₹300 giveback). All-est rows → Option ₹ <strong>equals</strong> Index ₹. Live money still uses Kite fills.
+        <strong>P&amp;L tip</strong> — Badge must be <em>v1.3.16 · …live-assistant</em> (hard-refresh if not). Nifty weeklies = Tuesday; Live money needs a loaded NFO chain. Peak-trail arms at ₹600 (≤₹300 giveback). All-est rows → Option ₹ <strong>equals</strong> Index ₹. Live money still uses Kite fills.
       </li>
     </ul>
   </aside>
@@ -277,6 +277,27 @@
       <span class="sep">·</span>
       <span>{{ snapshot().realOrders ? 'Live money' : 'Live paper' }}</span>
     </div>
+  }
+
+  @if (liveAssistant(); as assist) {
+    <aside class="live-assistant" role="status" aria-live="polite" [attr.data-tone]="assist.tone">
+      <div class="la-head">
+        <span class="la-kicker">Live assistant</span>
+        <span class="phase-pill" [attr.data-phase]="assist.tone">{{ assist.headline }}</span>
+      </div>
+      <p class="la-detail">{{ assist.detail }}</p>
+      @if (assist.lines.length) {
+        <ul class="la-lines">
+          @for (line of assist.lines; track line.name) {
+            <li>
+              <strong>{{ line.name }}</strong>
+              <span>{{ line.text }}</span>
+            </li>
+          }
+        </ul>
+      }
+      <p class="la-foot">Updates every live tick (~60s) · keep this tab open</p>
+    </aside>
   }
 
   @if (mode() === 'live' && snapshot().running && hasOpenTrade()) {
@@ -648,7 +669,11 @@
             </div>
           } @else if (s.livePhase === 'waiting') {
             <p class="waiting-copy">
-              Scanning for {{ s.strategyName || 'assigned strategy' }} entry…
+              @if (s.lastSignal && s.lastSignal !== 'Waiting') {
+                {{ s.instrumentName }} · {{ s.lastSignal }}
+              } @else {
+                Scanning for {{ s.strategyName || 'assigned strategy' }} — no setup yet
+              }
             </p>
           } @else if (s.lastExitReason) {
             <p class="waiting-copy">Last exit: {{ s.lastExitReason }} · {{ fmtTime(s.lastExitTime) }}</p>

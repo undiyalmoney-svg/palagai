@@ -6,6 +6,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { PaperTradeDeskService, TradeDeskRunOptions } from '../../../core/paper-desk/paper-trade-desk.service';
 import { PaperDeskExportService } from '../../../core/paper-desk/paper-desk-export.service';
 import { PaperDeskMode } from '../../../core/paper-desk/paper-desk.models';
+import { buildLiveAssistant } from '../../../core/paper-desk/live-assistant.util';
 import {
   PAPER_WEEKDAY_OPTIONS,
   PaperWeekdayKey,
@@ -261,6 +262,24 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
   protected hasKiteBlockEvents(): boolean {
     return this.snapshot().orderEvents.some((e) => e.action === 'SKIP' || e.action === 'ERROR');
   }
+
+  /**
+   * Plain-language “what’s happening now” for Live — scanning, flat/no setup,
+   * waiting for entry, in trade, or Kite blocked.
+   */
+  protected readonly liveAssistant = computed(() => {
+    const snap = this.snapshot();
+    if (this.mode() !== 'live') {
+      return null;
+    }
+    return buildLiveAssistant({
+      running: snap.running,
+      marketOpen: snap.marketOpen,
+      realOrders: snap.realOrders,
+      message: snap.message,
+      statuses: snap.statuses,
+    });
+  });
 
   protected marketLiveSummary(): string {
     const open = this.snapshot().statuses.filter((s) => s.openTrade);
