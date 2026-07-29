@@ -28,7 +28,6 @@ export class DashboardComponent {
     { label: 'Strategy Manager', shortLabel: 'Strat', route: '/dashboard/strategy-manager', icon: 'tune' },
     { label: 'Crude Oil Mini', shortLabel: 'Crude', route: '/dashboard/crude-oil', icon: 'water_drop' },
     { label: 'Stocks Desk', shortLabel: 'Stocks', route: '/dashboard/stocks', icon: 'show_chart' },
-    { label: 'Data Store', shortLabel: 'Data', route: '/dashboard/data-store', icon: 'storage' },
     { label: 'Order Test', shortLabel: 'Orders', route: '/dashboard/order-test', icon: 'bolt' },
     { label: 'Get Token', shortLabel: 'Token', route: '/dashboard/get-token', icon: 'vpn_key' },
   ];
