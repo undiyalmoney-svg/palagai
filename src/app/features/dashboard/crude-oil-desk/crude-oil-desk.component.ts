@@ -42,7 +42,7 @@ export class CrudeOilDeskComponent implements OnInit, OnDestroy {
   protected readonly mode = signal<PaperDeskMode>('testing');
   protected fromDate = shiftDays(-14);
   protected toDate = todayIso();
-  /** When Live + checked, places real Kite MCX NRML orders. */
+  /** When Live + checked, places real Kite MCX MIS orders. */
   protected realOrders = false;
   protected realOrdersAck = false;
   protected lots = 1;
@@ -218,7 +218,7 @@ export class CrudeOilDeskComponent implements OnInit, OnDestroy {
             ? `\nStrict day stop −₹${profile.strictDayLossPts * CRUDE_RUPEES_PER_POINT} enabled.`
             : `\nDay stop −₹${profile.dayLossStopPts * CRUDE_RUPEES_PER_POINT}.`;
           const ok = window.confirm(
-            `Start LIVE MONEY on Crude Oil Mini?\n\nProfile: ${profile.label}\nReal Kite MCX NRML MARKET orders will be placed on ATM CRUDEOILM options (${lots} lot each) when signals fire.${risk}${lockNote}\n\nOrders go via DigitalOcean fixed IP.`,
+            `Start LIVE MONEY on Crude Oil Mini?\n\nProfile: ${profile.label}\nReal Kite MCX MIS MARKET orders will be placed on ATM CRUDEOILM options (${lots} lot each) when signals fire.${risk}${lockNote}\n\nOrders go via DigitalOcean fixed IP.`,
           );
           if (!ok) {
             return;

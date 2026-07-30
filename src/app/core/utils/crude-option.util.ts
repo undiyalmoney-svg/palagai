@@ -296,7 +296,7 @@ export function toCrudePaperOption(
     lotSize: instrument.lotSize > 0 ? instrument.lotSize : 10,
     source,
     exchange: 'MCX',
-    product: 'NRML',
+    product: 'MIS',
   };
 }
 
