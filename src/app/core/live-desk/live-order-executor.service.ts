@@ -6,6 +6,7 @@ import { extractKiteApiError } from '../utils/kite-error.util';
 import { PaperOptionContract } from '../paper-desk/paper-desk.models';
 import { liveOpenMatchesBroker } from './live-open-match.util';
 import { resolveExitSellQty } from './live-exit-guard.util';
+import { computeProtectiveSlTrigger } from './option-sl-premium.util';
 
 export interface LiveBrokerPosition {
   instrumentId: string;
@@ -276,8 +277,12 @@ export class LiveOrderExecutorService {
         });
 
         if (!pos.slOrderId && entryAvg > 0) {
-          // Protective SL ~ half of a default 30pt index risk if unknown
-          const slTrigger = roundOptionTick(Math.max(0.05, entryAvg - 15));
+          // Protective SL from default ~30pt index risk when unknown
+          const slTrigger = computeProtectiveSlTrigger({
+            fillPremium: entryAvg,
+            indexRiskPts: exchange === 'MCX' ? 15 : 30,
+            exchange,
+          });
           const ok = await this.placeSlOnly(authorization, pos, slTrigger);
           if (ok) slPlaced += 1;
         }
@@ -464,7 +469,18 @@ export class LiveOrderExecutorService {
         exchange,
       );
       const indexRisk = Math.abs(open.indexEntry - open.indexStop);
-      const slTrigger = roundOptionTick(Math.max(0.05, fillPremium - indexRisk * 0.5));
+      const ltp = await this.resolveOptionLtp(
+        authorization,
+        option.tradingSymbol,
+        exchange,
+        fillPremium,
+      );
+      const slTrigger = computeProtectiveSlTrigger({
+        fillPremium,
+        indexRiskPts: indexRisk,
+        exchange,
+        ltp,
+      });
 
       let slOrderId: string | null = null;
       try {
@@ -490,7 +506,7 @@ export class LiveOrderExecutorService {
           at: new Date().toISOString(),
           instrumentId,
           action: 'SL',
-          detail: `SL-M SELL ${quantity} ${option.tradingSymbol} trigger ${slTrigger} (index risk ${indexRisk.toFixed(1)}→~${(indexRisk * 0.5).toFixed(1)} prem)`,
+          detail: `SL-M SELL ${quantity} ${option.tradingSymbol} trigger ${slTrigger} (index risk ${indexRisk.toFixed(1)} · ${exchange} Δ)`,
           orderId: slOrderId,
           tradingSymbol: option.tradingSymbol,
           quantity,
@@ -575,7 +591,11 @@ export class LiveOrderExecutorService {
     if (fillPremium <= 0) return;
 
     const indexRisk = Math.abs(open.indexEntry - open.indexStop);
-    const nextTrigger = roundOptionTick(Math.max(0.05, fillPremium - indexRisk * 0.5));
+    const nextTrigger = computeProtectiveSlTrigger({
+      fillPremium,
+      indexRiskPts: indexRisk,
+      exchange: pos.exchange,
+    });
     const prevTrigger = pos.slTrigger ?? 0;
 
     // Only tighten / move when meaningfully different (≥ 1 tick).
@@ -1148,6 +1168,27 @@ export class LiveOrderExecutorService {
       return fallback;
     }
     return 1;
+  }
+
+  private async resolveOptionLtp(
+    authorization: string,
+    tradingSymbol: string,
+    exchange: 'NFO' | 'MCX',
+    fallback: number | null,
+  ): Promise<number | null> {
+    try {
+      const key = `${exchange}:${tradingSymbol}`;
+      const quote = (await firstValueFrom(
+        this.kiteApi.getQuotes(authorization, [key]),
+      )) as KiteQuoteBook;
+      const ltp = quote.data?.[key]?.last_price;
+      if (ltp && ltp > 0) {
+        return ltp;
+      }
+    } catch {
+      // fall through
+    }
+    return fallback != null && fallback > 0 ? fallback : null;
   }
 
   private async getOrderStatus(

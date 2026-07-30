@@ -260,6 +260,51 @@ export class CrudeOilDeskComponent implements OnInit, OnDestroy {
       .join('  |  ');
   }
 
+  /** Always-on live strip: waiting reason or open trade levels. */
+  protected liveActivitySummary(): string {
+    const snap = this.snapshot();
+    const open = this.marketLiveSummary();
+    if (open) {
+      return open;
+    }
+    const s = snap.statuses[0];
+    if (!s) {
+      return `${this.activeProfile().label} · starting…`;
+    }
+    if (s.lastExitReason) {
+      return `Last exit: ${s.lastExitReason} · ${this.fmtTime(s.lastExitTime)} · now ${s.livePhaseLabel}`;
+    }
+    if (s.lastSignal && s.lastSignal !== 'Waiting') {
+      return `${s.livePhaseLabel} · ${s.lastSignal}`;
+    }
+    return `${s.livePhaseLabel} · ${this.activeProfile().label}`;
+  }
+
+  protected optionStopPremium(open: {
+    indexEntry: number;
+    indexStop: number;
+    optionEntryPremium: number | null;
+  }): number | null {
+    if (open.optionEntryPremium == null || open.optionEntryPremium <= 0) {
+      return null;
+    }
+    const indexRisk = Math.abs(open.indexEntry - open.indexStop);
+    // MCX crude ≈ 1.0Δ
+    return Math.max(0.05, Math.round((open.optionEntryPremium - indexRisk) / 0.05) * 0.05);
+  }
+
+  protected optionTargetPremium(open: {
+    indexEntry: number;
+    indexTarget: number;
+    optionEntryPremium: number | null;
+  }): number | null {
+    if (open.optionEntryPremium == null || open.optionEntryPremium <= 0) {
+      return null;
+    }
+    const indexReward = Math.abs(open.indexTarget - open.indexEntry);
+    return Math.max(0.05, Math.round((open.optionEntryPremium + indexReward) / 0.05) * 0.05);
+  }
+
   protected fmtTime(ts: string | null | undefined): string {
     if (!ts) {
       return '—';
