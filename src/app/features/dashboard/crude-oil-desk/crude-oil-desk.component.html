@@ -268,13 +268,206 @@
     </div>
   }
 
-  @if (mode() === 'live' && snapshot().running && hasOpenTrade()) {
-    <div class="market-live-bar" role="status" [class.money]="snapshot().realOrders">
+  @if (mode() === 'live' && snapshot().running) {
+    <div
+      class="market-live-bar"
+      role="status"
+      [class.money]="snapshot().realOrders"
+      [class.waiting]="!hasOpenTrade()"
+    >
       <span class="market-pulse" aria-hidden="true"></span>
       <div class="market-live-copy">
-        <strong>{{ snapshot().realOrders ? 'ON MARKET · TRADE LIVE' : 'PAPER TRADE LIVE' }}</strong>
-        <span>{{ marketLiveSummary() }}</span>
+        <strong>
+          @if (hasOpenTrade() && snapshot().realOrders) {
+            ON MARKET · CRUDE LIVE
+          } @else if (hasOpenTrade()) {
+            PAPER TRADE LIVE
+          } @else {
+            CRUDE LIVE · WATCHING
+          }
+        </strong>
+        <span>{{ liveActivitySummary() }}</span>
       </div>
+    </div>
+
+    <div class="status-grid live-now-grid">
+      @for (s of snapshot().statuses; track s.instrumentId) {
+        <article
+          class="status-card live-now-card"
+          [class.has-open]="!!s.openTrade"
+          [class.phase-waiting]="s.livePhase === 'waiting'"
+          [class.phase-trade]="s.livePhase === 'in_trade'"
+          [class.phase-target]="s.livePhase === 'target_hit'"
+          [class.phase-sl]="s.livePhase === 'sl_hit'"
+        >
+          <header>
+            <h2>{{ s.instrumentName }}</h2>
+            <p>{{ s.lastSignal || '—' }}</p>
+            <p class="strategy-running">Running · {{ activeProfile().label }}</p>
+          </header>
+
+          <div class="phase-pill" [attr.data-phase]="s.livePhase">{{ s.livePhaseLabel }}</div>
+
+          @if (s.livePhase === 'target_hit') {
+            <div class="target-banner" role="status">
+              <strong>Target achieved</strong>
+              <span>{{ s.lastExitReason }} · {{ fmtTime(s.lastExitTime) }}</span>
+            </div>
+          }
+
+          @if (s.openTrade; as o) {
+            <div
+              class="trade-live-panel"
+              role="status"
+              [class.blocked]="snapshot().realOrders && !s.brokerEntryOrderId"
+            >
+              <div class="trade-live-head">
+                <strong>
+                  @if (snapshot().realOrders && s.brokerEntryOrderId) {
+                    Live on Kite
+                  } @else if (snapshot().realOrders) {
+                    Desk signal · NOT on Kite
+                  } @else {
+                    Trade open (paper)
+                  }
+                </strong>
+                <span>
+                  {{ o.direction }} {{ o.option?.tradingSymbol ?? 'ATM option' }}
+                  @if (snapshot().realOrders && s.brokerEntryOrderId) {
+                    · waiting for target / SL / cutoff
+                  }
+                </span>
+              </div>
+
+              @if (s.kiteBlockReason) {
+                <div class="kite-block-banner" role="alert">
+                  <strong>Kite order blocked</strong>
+                  <span>{{ s.kiteBlockReason }}</span>
+                </div>
+              }
+
+              <div class="levels-block">
+                <p class="levels-caption">Futures levels</p>
+                <div class="levels-row levels-row-live">
+                  <div>
+                    <span>Entry</span>
+                    <strong>{{ o.indexEntry | number: '1.1-1' }}</strong>
+                  </div>
+                  <div>
+                    <span>SL</span>
+                    <strong class="sl">{{ o.indexStop | number: '1.1-1' }}</strong>
+                  </div>
+                  <div>
+                    <span>Target</span>
+                    <strong class="tgt">{{ o.indexTarget | number: '1.1-1' }}</strong>
+                  </div>
+                </div>
+              </div>
+
+              <div class="levels-block">
+                <p class="levels-caption">Option prices</p>
+                <div class="levels-row levels-row-live">
+                  <div>
+                    <span>Entry</span>
+                    <strong>
+                      @if (o.optionEntryPremium != null) {
+                        {{ o.optionEntryPremium | number: '1.2-2' }}
+                      } @else {
+                        —
+                      }
+                    </strong>
+                  </div>
+                  <div>
+                    <span>SL-M</span>
+                    <strong class="sl">
+                      @if (s.brokerSlTrigger != null) {
+                        {{ s.brokerSlTrigger | number: '1.2-2' }}
+                      } @else if (optionStopPremium(o); as stopPrem) {
+                        {{ stopPrem | number: '1.2-2' }}
+                      } @else {
+                        —
+                      }
+                    </strong>
+                  </div>
+                  <div>
+                    <span>Target</span>
+                    <strong class="tgt">
+                      @if (optionTargetPremium(o); as tgtPrem) {
+                        {{ tgtPrem | number: '1.2-2' }}
+                      } @else {
+                        —
+                      }
+                    </strong>
+                  </div>
+                </div>
+                <small class="levels-note">MCX protective SL uses ~1.0Δ (futures pts ≈ premium pts)</small>
+              </div>
+
+              @if (s.brokerEntryOrderId || s.brokerSlTrigger != null) {
+                <div class="broker-live-meta">
+                  @if (s.brokerEntryOrderId) {
+                    <span>Entry order {{ s.brokerEntryOrderId }}</span>
+                  }
+                  @if (s.brokerSlOrderId) {
+                    <span>SL order {{ s.brokerSlOrderId }}</span>
+                  }
+                </div>
+              }
+            </div>
+          } @else if (s.livePhase === 'waiting') {
+            <p class="waiting-copy">
+              @if (s.lastSignal && s.lastSignal !== 'Waiting') {
+                {{ s.instrumentName }} · {{ s.lastSignal }}
+              } @else {
+                Watching Session OR / entry window — no setup yet
+              }
+            </p>
+          } @else if (s.lastExitReason) {
+            <p class="waiting-copy">Last exit: {{ s.lastExitReason }} · {{ fmtTime(s.lastExitTime) }}</p>
+          }
+
+          <div class="chosen-option" [class.missing]="!s.chosenOption" [class.synthetic]="s.chosenOption?.source === 'synthetic'">
+            <span class="chosen-label">Chosen option</span>
+            @if (s.chosenOption; as opt) {
+              <strong class="chosen-symbol">{{ opt.tradingSymbol }}</strong>
+              <div class="chosen-meta">
+                @if (s.chosenBias) {
+                  <span class="dir" [attr.data-dir]="s.chosenBias">{{ s.chosenBias }} → {{ opt.optionType }}</span>
+                }
+                <span>Strike {{ opt.strike | number: '1.0-0' }}</span>
+                <span>Exp {{ opt.expiry || '—' }}</span>
+                <span>Lot {{ opt.lotSize }}</span>
+                <span>MCX · {{ opt.product || 'NRML' }}</span>
+              </div>
+              @if (s.indexSpot != null) {
+                <small>ATM vs futures {{ s.indexSpot | number: '1.1-1' }} · as of {{ fmtTime(s.chosenAsOf) }}</small>
+              }
+            } @else {
+              <strong class="chosen-symbol muted">No option resolved yet</strong>
+              <small>Needs CRUDEOILM futures + instruments (Settings → Refresh)</small>
+            }
+          </div>
+
+          <div class="status-metrics">
+            <div>
+              <span>Day futures</span>
+              <strong [class.up]="s.dayNetIndexPts > 0" [class.down]="s.dayNetIndexPts < 0">
+                {{ s.dayNetIndexPts > 0 ? '+' : '' }}{{ s.dayNetIndexPts | number: '1.1-1' }}
+              </strong>
+            </div>
+            <div>
+              <span>Day option ₹</span>
+              <strong [class.up]="s.dayNetOptionRs > 0" [class.down]="s.dayNetOptionRs < 0">
+                {{ s.dayNetOptionRs > 0 ? '+' : '' }}{{ s.dayNetOptionRs | number: '1.0-0' }}
+              </strong>
+            </div>
+            <div>
+              <span>Closed</span>
+              <strong>{{ s.tradesToday }}</strong>
+            </div>
+          </div>
+        </article>
+      }
     </div>
   }
 
@@ -451,6 +644,7 @@
     }
 
     <div class="status-grid">
+      @if (!(mode() === 'live' && snapshot().running)) {
       @for (s of snapshot().statuses; track s.instrumentId) {
         <article
           class="status-card"
@@ -536,6 +730,7 @@
             </div>
           </div>
         </article>
+      }
       }
     </div>
   }

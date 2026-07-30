@@ -232,6 +232,87 @@
   color: #14532d;
 }
 
+.kite-block-banner {
+  display: grid;
+  gap: 0.2rem;
+  margin: 0 0 0.65rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 10px;
+  border: 1px solid #fca5a5;
+  background: #fff1f2;
+  color: #9f1239;
+}
+
+.kite-block-banner strong {
+  font-size: 0.85rem;
+}
+
+.kite-block-banner span {
+  font-size: 0.8rem;
+}
+
+.trade-live-panel.blocked {
+  border-color: #fca5a5;
+  background: #fff7f7;
+}
+
+.levels-block {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.levels-caption {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 650;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.levels-note {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.72rem;
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+.broker-live-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.75rem;
+  font-size: 0.72rem;
+  color: var(--muted);
+  word-break: break-all;
+}
+
+.status-card header .strategy-running {
+  margin-top: 0.35rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--accent, #0f6e56);
+}
+
+.live-now-grid {
+  margin: 0 0 1rem;
+}
+
+.live-now-card {
+  border-width: 2px;
+}
+
+.market-live-bar.waiting {
+  border-color: #93c5fd;
+  background: linear-gradient(135deg, #eff6ff 0%, #f0f9ff 100%);
+  color: #1e3a8a;
+}
+
+.market-live-bar.waiting .market-pulse {
+  background: #2563eb;
+  box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.45);
+}
+
 .market-live-bar {
   display: flex;
   align-items: flex-start;

@@ -526,6 +526,19 @@ export class CrudePaperDeskService {
       status.brokerSlTrigger = pos?.slTrigger ?? null;
       status.brokerSlOrderId = pos?.slOrderId ?? null;
       status.brokerEntryOrderId = pos?.entryOrderId ?? null;
+      if (status.openTrade && pos?.entryPremium != null && pos.entryPremium > 0) {
+        status.openTrade = {
+          ...status.openTrade,
+          optionEntryPremium: pos.entryPremium,
+        };
+      }
+      if (status.openTrade && !status.brokerEntryOrderId) {
+        status.kiteBlockReason =
+          this.liveOrders.getLastBlockReason(status.instrumentId) ??
+          'Live money signal not yet on Kite — check Event log / Instruments';
+      } else {
+        status.kiteBlockReason = null;
+      }
     }
 
     const moneyTag = this.realOrders ? 'LIVE MONEY' : 'Live paper';
