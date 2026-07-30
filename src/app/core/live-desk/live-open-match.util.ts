@@ -1,7 +1,7 @@
 import type { PaperOptionContract } from '../paper-desk/paper-desk.models';
 
 export interface LiveOpenMatchPos {
-  status: 'open' | 'flat' | 'error';
+  status: 'open' | 'exiting' | 'flat' | 'error';
   tradingSymbol: string;
   entryTime: string;
   direction: 'BUY' | 'SELL';
