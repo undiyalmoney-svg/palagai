@@ -5,6 +5,7 @@ import { KiteApiService } from '../kite/kite-api.service';
 import { extractKiteApiError } from '../utils/kite-error.util';
 import { PaperOptionContract } from '../paper-desk/paper-desk.models';
 import { liveOpenMatchesBroker } from './live-open-match.util';
+import { resolveExitSellQty } from './live-exit-guard.util';
 
 export interface LiveBrokerPosition {
   instrumentId: string;
@@ -18,7 +19,8 @@ export interface LiveBrokerPosition {
   entryPremium: number | null;
   slTrigger: number | null;
   entryTime: string;
-  status: 'open' | 'flat' | 'error';
+  /** open = live long; exiting = close in flight; flat/error = done. */
+  status: 'open' | 'exiting' | 'flat' | 'error';
   lastError: string | null;
   exchange: 'NFO' | 'MCX';
   product: 'MIS' | 'NRML';
@@ -75,6 +77,8 @@ interface KiteOrderRow {
   product?: string;
   quantity?: number;
   tag?: string;
+  order_timestamp?: string;
+  exchange_timestamp?: string;
 }
 
 interface KiteOrdersBook {
@@ -115,10 +119,10 @@ export { liveOpenMatchesBroker } from './live-open-match.util';
 
 /**
  * Live money executor (addon):
- * 1) MARKET BUY entry
- * 2) Protective SL-M SELL (trigger from index stop × ~0.5 delta on premium)
- * 3) Strategy exit → cancel ALL pending SL-M for symbol (incl. ghost) → MARKET SELL
- * 4) If SL already COMPLETE → flat, no second exit
+ * 1) MARKET BUY entry (CE/PE long only — never short entry)
+ * 2) Protective SL-M SELL (Kite exits if SL hits; we do not double-exit)
+ * 3) Cutoff / target → cancel pending SL-M → MARKET SELL only to close broker long
+ * 4) If SL already COMPLETE or broker qty=0 → flat, no second SELL (no naked short)
  */
 @Injectable({ providedIn: 'root' })
 export class LiveOrderExecutorService {
@@ -132,12 +136,15 @@ export class LiveOrderExecutorService {
   private readonly instrumentNames = new Map<string, string>();
   /** Number of lots (exchange lot size × this). Testing never uses this. */
   private lotsMultiplier = 1;
+  /** Symbols with an exit in flight — blocks duplicate SELL (naked short). */
+  private readonly exitingSymbols = new Set<string>();
 
   reset(): void {
     this.positions.clear();
     this.positionsBySymbol.clear();
     this.events.length = 0;
     this.summary.clear();
+    this.exitingSymbols.clear();
   }
 
   /**
@@ -149,7 +156,9 @@ export class LiveOrderExecutorService {
     for (const id of idSet) {
       const pos = this.positions.get(id);
       if (pos?.tradingSymbol) {
-        this.positionsBySymbol.delete(pos.tradingSymbol.toUpperCase());
+        const sym = pos.tradingSymbol.toUpperCase();
+        this.positionsBySymbol.delete(sym);
+        this.exitingSymbols.delete(sym);
       }
       this.positions.delete(id);
       this.summary.delete(id);
@@ -314,6 +323,16 @@ export class LiveOrderExecutorService {
     }
 
     let current = this.positions.get(params.instrumentId) ?? null;
+
+    // Exit already in flight for this leg/symbol — wait for next tick; never second SELL.
+    if (
+      current?.status === 'exiting' ||
+      (current?.tradingSymbol &&
+        this.exitingSymbols.has(current.tradingSymbol.toUpperCase()))
+    ) {
+      await this.refreshSummaryStatuses(params.authorization);
+      return;
+    }
 
     if (current?.status === 'open') {
       const slState = await this.refreshSlState(params.authorization, current);
@@ -825,17 +844,91 @@ export class LiveOrderExecutorService {
   }
 
   /**
-   * Strategy exit: cancel any pending SL-M for the symbol, then MARKET SELL.
-   * If SL already COMPLETE → already flat.
+   * Cutoff / target exit: cancel pending SL-M, then MARKET SELL only if broker still long.
+   * Never naked-shorts CE/PE. Concurrent duplicate exits are blocked per symbol.
    */
   private async placeExit(authorization: string, pos: LiveBrokerPosition): Promise<void> {
+    const sym = pos.tradingSymbol.toUpperCase();
+    const latest = this.positions.get(pos.instrumentId) ?? pos;
+    if (latest.status !== 'open') {
+      return;
+    }
+    if (this.exitingSymbols.has(sym)) {
+      this.pushEvent({
+        at: new Date().toISOString(),
+        instrumentId: pos.instrumentId,
+        action: 'SKIP',
+        detail: `Exit already in flight for ${pos.tradingSymbol} — skip duplicate SELL`,
+        tradingSymbol: pos.tradingSymbol,
+        quantity: pos.quantity,
+      });
+      return;
+    }
+
+    this.exitingSymbols.add(sym);
+    const exitingPos: LiveBrokerPosition = { ...latest, status: 'exiting', lastError: null };
+    this.positions.set(pos.instrumentId, exitingPos);
+    this.positionsBySymbol.set(sym, exitingPos);
+
     try {
-      const slGate = await this.cancelPendingSlBeforeExit(authorization, pos);
+      const slGate = await this.cancelPendingSlBeforeExit(authorization, exitingPos);
       if (slGate === 'filled') {
         return;
       }
-      // Re-read in case cancel updated memory.
-      pos = this.positions.get(pos.instrumentId) ?? pos;
+      // Re-read in case cancel / SL fill updated memory.
+      pos = this.positions.get(pos.instrumentId) ?? exitingPos;
+      if (pos.status === 'flat') {
+        return;
+      }
+
+      const brokerLongQty = await this.readBrokerLongQty(authorization, pos);
+      let sellQty: number | null;
+      if (brokerLongQty == null) {
+        // Positions API failed — only skip if order book already shows a completed close.
+        if (await this.hasCompletedCloseSell(authorization, pos)) {
+          this.positions.set(pos.instrumentId, {
+            ...pos,
+            slOrderId: null,
+            status: 'flat',
+            lastError: null,
+          });
+          this.positionsBySymbol.delete(sym);
+          this.pushEvent({
+            at: new Date().toISOString(),
+            instrumentId: pos.instrumentId,
+            action: 'EXIT',
+            detail: `Close already COMPLETE in order book for ${pos.tradingSymbol} — skip duplicate SELL`,
+            tradingSymbol: pos.tradingSymbol,
+            quantity: pos.quantity,
+          });
+          return;
+        }
+        sellQty = Math.max(0, Math.floor(pos.quantity) || 0) || null;
+      } else {
+        sellQty = resolveExitSellQty(brokerLongQty, pos.quantity);
+        if (sellQty == null) {
+          this.positions.set(pos.instrumentId, {
+            ...pos,
+            slOrderId: null,
+            status: 'flat',
+            lastError: null,
+          });
+          this.positionsBySymbol.delete(sym);
+          this.pushEvent({
+            at: new Date().toISOString(),
+            instrumentId: pos.instrumentId,
+            action: 'EXIT',
+            detail:
+              `Already flat at broker (${pos.tradingSymbol} long qty ${brokerLongQty}) — skip SELL (no naked short)`,
+            tradingSymbol: pos.tradingSymbol,
+            quantity: pos.quantity,
+          });
+          return;
+        }
+      }
+      if (sellQty == null) {
+        return;
+      }
 
       const response = await firstValueFrom(
         this.kiteApi.placeRegularOrder(authorization, {
@@ -843,7 +936,7 @@ export class LiveOrderExecutorService {
           tradingsymbol: pos.tradingSymbol,
           transaction_type: 'SELL',
           order_type: 'MARKET',
-          quantity: String(pos.quantity),
+          quantity: String(sellQty),
           product: pos.product ?? 'MIS',
           validity: 'DAY',
           market_protection: '-1',
@@ -856,25 +949,27 @@ export class LiveOrderExecutorService {
       }
       this.positions.set(pos.instrumentId, {
         ...pos,
+        quantity: sellQty,
         slOrderId: null,
         exitOrderId: orderId,
         status: 'flat',
         lastError: null,
       });
-      this.positionsBySymbol.delete(pos.tradingSymbol.toUpperCase());
+      this.positionsBySymbol.delete(sym);
       this.pushEvent({
         at: new Date().toISOString(),
         instrumentId: pos.instrumentId,
         action: 'EXIT',
-        detail: `SELL ${pos.quantity} ${pos.tradingSymbol} ${pos.product ?? 'MIS'} MARKET (strategy exit)`,
+        detail: `SELL ${sellQty} ${pos.tradingSymbol} ${pos.product ?? 'MIS'} MARKET (close long · cutoff/target)`,
         orderId,
         tradingSymbol: pos.tradingSymbol,
-        quantity: pos.quantity,
+        quantity: sellQty,
       });
     } catch (err) {
       const message = this.formatErr(err);
+      const cur = this.positions.get(pos.instrumentId) ?? pos;
       this.positions.set(pos.instrumentId, {
-        ...pos,
+        ...cur,
         status: 'error',
         lastError: message,
       });
@@ -886,6 +981,76 @@ export class LiveOrderExecutorService {
         tradingSymbol: pos.tradingSymbol,
         quantity: pos.quantity,
       });
+    } finally {
+      this.exitingSymbols.delete(sym);
+    }
+  }
+
+  /** Net long qty at broker for this option (same symbol + product). null = API failed. */
+  private async readBrokerLongQty(
+    authorization: string,
+    pos: LiveBrokerPosition,
+  ): Promise<number | null> {
+    try {
+      const book = (await firstValueFrom(
+        this.kiteApi.getPositions(authorization),
+      )) as KitePositionsBook;
+      const rows = [...(book.data?.net ?? []), ...(book.data?.day ?? [])];
+      const sym = pos.tradingSymbol.toUpperCase();
+      const product = (pos.product ?? 'MIS').toUpperCase();
+      let best = 0;
+      for (const row of rows) {
+        if ((row.tradingsymbol ?? '').toUpperCase() !== sym) {
+          continue;
+        }
+        if ((row.product ?? '').toUpperCase() !== product) {
+          continue;
+        }
+        const qty = Number(row.quantity ?? 0);
+        if (qty > best) {
+          best = qty;
+        }
+      }
+      return best;
+    } catch {
+      return null;
+    }
+  }
+
+  /** True if a PALAGAI close SELL already COMPLETE for this leg (after entry). */
+  private async hasCompletedCloseSell(
+    authorization: string,
+    pos: LiveBrokerPosition,
+  ): Promise<boolean> {
+    if (pos.exitOrderId) {
+      return true;
+    }
+    try {
+      const orders = await this.fetchOrders(authorization);
+      const sym = pos.tradingSymbol.toUpperCase();
+      const entryMs = Date.parse(pos.entryTime) || 0;
+      return orders.some((o) => {
+        if ((o.tradingsymbol ?? '').toUpperCase() !== sym) {
+          return false;
+        }
+        if ((o.transaction_type ?? '').toUpperCase() !== 'SELL') {
+          return false;
+        }
+        if ((o.status ?? '').toUpperCase() !== 'COMPLETE') {
+          return false;
+        }
+        if (!isPalagaiTag(o.tag)) {
+          return false;
+        }
+        if (!(Number(o.quantity ?? 0) > 0)) {
+          return false;
+        }
+        const ts = Date.parse(o.order_timestamp || o.exchange_timestamp || '') || 0;
+        // Only count closes from this leg (after entry), not earlier same-day trades.
+        return entryMs <= 0 || ts >= entryMs - 2000;
+      });
+    } catch {
+      return false;
     }
   }
 

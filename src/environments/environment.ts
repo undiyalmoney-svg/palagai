@@ -16,5 +16,5 @@ export const environment = {
   orderEgressIp: '168.144.28.89',
   /** Must match src/app/core/config/app-build.ts — shown in UI. */
   appVersion: '1.3.17',
-  appBuild: '2026.07.29-crude-no-or-skip',
+  appBuild: '2026.07.30-live-exit-guard',
 };
