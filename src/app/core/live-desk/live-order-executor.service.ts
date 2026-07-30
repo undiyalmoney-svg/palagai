@@ -282,6 +282,7 @@ export class LiveOrderExecutorService {
             fillPremium: entryAvg,
             indexRiskPts: exchange === 'MCX' ? 15 : 30,
             exchange,
+            tradingSymbol: symbol,
           });
           const ok = await this.placeSlOnly(authorization, pos, slTrigger);
           if (ok) slPlaced += 1;
@@ -429,8 +430,16 @@ export class LiveOrderExecutorService {
     // qty = exchange lot size × configured lots (Live money only).
     const lotSize = Math.max(1, option.lotSize || 1);
     const quantity = lotSize * this.lotsMultiplier;
-    const exchange = option.exchange ?? 'NFO';
-    const product = option.product ?? 'MIS';
+    const symUpper = option.tradingSymbol.toUpperCase();
+    const exchange: 'NFO' | 'MCX' =
+      option.exchange ??
+      (symUpper.startsWith('CRUDEOIL') || symUpper.startsWith('NATURALGAS') || symUpper.startsWith('NATGAS')
+        ? 'MCX'
+        : 'NFO');
+    // Crude/energy options: prefer MIS (Zerodha allows MIS on energy MCX options).
+    const product =
+      option.product ??
+      (exchange === 'MCX' ? 'MIS' : 'MIS');
     try {
       const response = await firstValueFrom(
         this.kiteApi.placeRegularOrder(authorization, {
@@ -479,6 +488,7 @@ export class LiveOrderExecutorService {
         fillPremium,
         indexRiskPts: indexRisk,
         exchange,
+        tradingSymbol: option.tradingSymbol,
         ltp,
       });
 
@@ -595,6 +605,7 @@ export class LiveOrderExecutorService {
       fillPremium,
       indexRiskPts: indexRisk,
       exchange: pos.exchange,
+      tradingSymbol: pos.tradingSymbol,
     });
     const prevTrigger = pos.slTrigger ?? 0;
 

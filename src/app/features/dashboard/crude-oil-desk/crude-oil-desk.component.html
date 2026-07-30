@@ -63,7 +63,7 @@
     } @else {
       <div class="live-hint">
         <strong>Today</strong>
-        <span>{{ realOrders ? 'Real MCX NRML orders on signals' : 'Auto paper on CRUDEOILM (no real money)' }} ·
+        <span>{{ realOrders ? 'Real MCX MIS orders on signals' : 'Auto paper on CRUDEOILM (no real money)' }} ·
           {{
             activeProfile().entryMode === 'session-or' && enableEvening
               ? activeProfile().eveningEntryStart + '–' + activeProfile().eveningEntryEnd
@@ -400,7 +400,7 @@
                     </strong>
                   </div>
                 </div>
-                <small class="levels-note">MCX protective SL uses ~1.0Δ (futures pts ≈ premium pts)</small>
+                <small class="levels-note">MCX protective SL uses ~1.0Δ + min ~25pt cushion (not the old 7.5pt Nifty-style gap)</small>
               </div>
 
               @if (s.brokerEntryOrderId || s.brokerSlTrigger != null) {
@@ -437,7 +437,7 @@
                 <span>Strike {{ opt.strike | number: '1.0-0' }}</span>
                 <span>Exp {{ opt.expiry || '—' }}</span>
                 <span>Lot {{ opt.lotSize }}</span>
-                <span>MCX · {{ opt.product || 'NRML' }}</span>
+                <span>MCX · {{ opt.product || 'MIS' }}</span>
               </div>
               @if (s.indexSpot != null) {
                 <small>ATM vs futures {{ s.indexSpot | number: '1.1-1' }} · as of {{ fmtTime(s.chosenAsOf) }}</small>
@@ -700,7 +700,7 @@
                 <span>Strike {{ opt.strike | number: '1.0-0' }}</span>
                 <span>Exp {{ opt.expiry || '—' }}</span>
                 <span>Lot {{ opt.lotSize }}</span>
-                <span>MCX · {{ opt.product || 'NRML' }}</span>
+                <span>MCX · {{ opt.product || 'MIS' }}</span>
               </div>
               @if (s.indexSpot != null) {
                 <small>ATM vs futures {{ s.indexSpot | number: '1.1-1' }} · as of {{ fmtTime(s.chosenAsOf) }}</small>
@@ -863,7 +863,7 @@
       <li><strong>Sessions</strong> — Morning 10:00–12:00 ORB (≤1/day) and Evening 18:30–20:30 PDHL (≤1/day). Both on by default.</li>
       <li><strong>Hold</strong> — until TP/SL, or force-flat at 23:10. Window end only stops new entries.</li>
       <li><strong>Testing</strong> — From/To dates + Result days filter · Download PDF for profits.</li>
-      <li><strong>Live money</strong> — tick the box + confirm; MCX NRML MARKET entry + protective SL-M.</li>
+      <li><strong>Live money</strong> — tick the box + confirm; MCX MIS MARKET entry + protective SL-M.</li>
       <li>ATM CRUDEOILM CE on BUY / PE on SELL · Option ₹ / order qty scales with Lots · Nifty/Bank desk separate.</li>
     </ul>
   </aside>
