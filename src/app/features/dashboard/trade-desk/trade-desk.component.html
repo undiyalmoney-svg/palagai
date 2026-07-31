@@ -810,7 +810,7 @@
       <div class="trades-head">
         <h3>Live order summary</h3>
         <p>
-          Full Kite session book — Nifty 50 &amp; Bank Nifty · {{ lots }} lot each · statuses refresh every tick
+          Full Kite session book — Nifty ×{{ niftyLots }} · Bank ×{{ bankLots }} · Crude ×{{ crudeLots }} · statuses refresh every tick
         </p>
       </div>
       @if (snapshot().orderSummary.length) {
@@ -992,9 +992,8 @@
       <li><strong>Live money</strong> — tick the box + confirm; MARKET entry + protective SL-M; strategy exit cancels SL then MARKET sell.</li>
       <li><strong>Kite 5m limit</strong> — max {{ snapshot().kiteStats.maxDaysPerCall }} calendar days (~3 months) per historical call; longer ranges auto-chunk.</li>
       <li>
-        ATM weekly CE on BUY / PE on SELL · {{ lots }} lot · champion DNA: 1R · EMA-20 · default day stop −60 · no day
-        profit lock · Nifty SL cap 30 / Bank 45. Optional: Strict day stop (−₹2,950) · Day profit lock (+₹5,000) · pick
-        Nifty and/or Bank.
+        ATM weekly CE on BUY / PE on SELL · lots per book (Nifty / Bank / Crude) · Strat for indices · Crude All-Green.
+        Index until 15:15 · Crude continues on MCX. Optional: Strict day stop (−₹2,950) · Day profit lock (+₹5,000).
       </li>
       <li><strong>PDF</strong> — Download PDF after Testing for totals, best/worst days, weekday rollup, and trades.</li>
     </ul>
