@@ -348,23 +348,70 @@ export class LiveOrderExecutorService {
 
     let current = this.positions.get(params.instrumentId) ?? null;
 
-    // Exit already in flight for this leg/symbol — wait for next tick; never second SELL.
-    if (
-      current?.status === 'exiting' ||
-      (current?.tradingSymbol &&
-        this.exitingSymbols.has(current.tradingSymbol.toUpperCase()))
+    // Exit already in flight — wait only while the lock is held. If status is stuck
+    // on 'exiting' after the lock cleared (bug / API fail), recover so the next
+    // paper signal can placeEntry (otherwise the book is dead until Live restart).
+    if (current?.status === 'exiting') {
+      const sym = (current.tradingSymbol || '').toUpperCase();
+      if (sym && this.exitingSymbols.has(sym)) {
+        await this.refreshSummaryStatuses(params.authorization);
+        return;
+      }
+      const brokerQty = sym
+        ? await this.readBrokerLongQty(params.authorization, current)
+        : 0;
+      if (brokerQty != null && brokerQty > 0) {
+        // Still long at broker — finish the exit next, don't start a second SELL race.
+        await this.refreshSummaryStatuses(params.authorization);
+        return;
+      }
+      this.positions.set(params.instrumentId, {
+        ...current,
+        status: 'flat',
+        lastError: null,
+      });
+      if (sym) {
+        this.positionsBySymbol.delete(sym);
+      }
+      this.pushEvent({
+        at: new Date().toISOString(),
+        instrumentId: params.instrumentId,
+        instrumentName: params.instrumentName,
+        action: 'EXIT',
+        detail: `Recovered stuck exiting state for ${current.tradingSymbol || params.instrumentId} — marked flat for re-entry`,
+        tradingSymbol: current.tradingSymbol,
+        quantity: current.quantity,
+      });
+      current = this.positions.get(params.instrumentId) ?? null;
+    } else if (
+      current?.tradingSymbol &&
+      this.exitingSymbols.has(current.tradingSymbol.toUpperCase())
     ) {
       await this.refreshSummaryStatuses(params.authorization);
       return;
     }
 
     if (current?.status === 'open') {
+      const beforeSl = current;
       const slState = await this.refreshSlState(params.authorization, current);
       if (slState === 'filled') {
         await this.refreshSummaryStatuses(params.authorization);
-        return;
+        current = this.positions.get(params.instrumentId) ?? null;
+        // Paper may still show the SL'd leg open for one bar — do not re-buy it.
+        const closedSym = (beforeSl.tradingSymbol || '').toUpperCase();
+        const openSym = (open?.option?.tradingSymbol || '').toUpperCase();
+        const sameLeg =
+          !!open &&
+          !!closedSym &&
+          closedSym === openSym &&
+          (!beforeSl.entryTime || beforeSl.entryTime === open.entryTime);
+        if (sameLeg || !open) {
+          return;
+        }
+        // Different / newer paper signal — fall through to placeEntry on flat.
+      } else {
+        current = this.positions.get(params.instrumentId) ?? current;
       }
-      current = this.positions.get(params.instrumentId) ?? current;
     }
 
     // Open paper + open broker:
@@ -977,6 +1024,24 @@ export class LiveOrderExecutorService {
         }
       }
       if (sellQty == null) {
+        // Positions API failed and remembered qty is 0 — never leave status 'exiting'
+        // (that permanently blocks placeEntry until Live restart).
+        this.positions.set(pos.instrumentId, {
+          ...pos,
+          slOrderId: null,
+          status: 'flat',
+          lastError: null,
+        });
+        this.positionsBySymbol.delete(sym);
+        this.pushEvent({
+          at: new Date().toISOString(),
+          instrumentId: pos.instrumentId,
+          action: 'EXIT',
+          detail:
+            `No sell qty for ${pos.tradingSymbol} (broker qty unknown · remembered 0) — marked flat`,
+          tradingSymbol: pos.tradingSymbol,
+          quantity: pos.quantity,
+        });
         return;
       }
 
@@ -1033,6 +1098,24 @@ export class LiveOrderExecutorService {
       });
     } finally {
       this.exitingSymbols.delete(sym);
+      // Safety net: never leave a book stuck on 'exiting' after the lock is gone.
+      const cur = this.positions.get(pos.instrumentId);
+      if (cur?.status === 'exiting') {
+        this.positions.set(pos.instrumentId, {
+          ...cur,
+          status: 'flat',
+          lastError: null,
+        });
+        this.positionsBySymbol.delete(sym);
+        this.pushEvent({
+          at: new Date().toISOString(),
+          instrumentId: pos.instrumentId,
+          action: 'EXIT',
+          detail: `Exit path left ${pos.tradingSymbol} stuck exiting — forced flat for re-entry`,
+          tradingSymbol: pos.tradingSymbol,
+          quantity: pos.quantity,
+        });
+      }
     }
   }
 

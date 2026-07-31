@@ -8,6 +8,6 @@ export const environment = {
   defaultLots: 1,
   allowLiveMoney: true,
   orderEgressIp: '168.144.28.89',
-  appVersion: '1.3.31',
-  appBuild: '2026.07.31-three-books',
+  appVersion: '1.3.32',
+  appBuild: '2026.07.31-live-reentry',
 };
