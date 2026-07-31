@@ -48,16 +48,23 @@ export function filterTradesByWeekdays(
 
 export function summarizePaperTrades(
   trades: PaperTrade[],
-  lotsUsed: number,
+  lotsUsedOrResolver: number | ((instrumentId: string) => number),
   rupeesPerPoint: number,
 ): PaperDeskSnapshot['totals'] {
-  const lots = Math.max(1, Math.floor(lotsUsed) || 1);
+  const lotsFor =
+    typeof lotsUsedOrResolver === 'function'
+      ? lotsUsedOrResolver
+      : () => Math.max(1, Math.floor(lotsUsedOrResolver) || 1);
+  const displayLots =
+    typeof lotsUsedOrResolver === 'function'
+      ? Math.max(1, ...trades.map((t) => lotsFor(t.instrumentId)), 1)
+      : Math.max(1, Math.floor(lotsUsedOrResolver) || 1);
   const indexNetPts = trades.reduce((a, t) => a + t.indexPoints, 0);
   const optionNetRs = trades.reduce((a, t) => a + (t.optionPnlRs ?? 0), 0);
   const optionChargesRs = trades.reduce((a, t) => a + (t.chargesRs ?? 0), 0);
   const pointsMoneyRs = trades.reduce((a, t) => {
     const rpp = rupeesPerPointForInstrument(t.instrumentId) || rupeesPerPoint;
-    return a + t.indexPoints * rpp * lots;
+    return a + t.indexPoints * rpp * lotsFor(t.instrumentId);
   }, 0);
   return {
     trades: trades.length,
@@ -65,7 +72,7 @@ export function summarizePaperTrades(
     losses: trades.filter((t) => t.outcome === 'LOSS').length,
     indexNetPts,
     optionNetRs,
-    lotsUsed: lots,
+    lotsUsed: displayLots,
     pointsMoneyRs,
     optionChargesRs,
     optionNetAfterChargesRs: Math.round((optionNetRs - optionChargesRs) * 100) / 100,
@@ -77,7 +84,7 @@ export function summarizePaperTrades(
 export function buildWeekdayFilteredView(
   trades: PaperTrade[],
   selection: PaperWeekdaySelection,
-  lotsUsed: number,
+  lotsUsedOrResolver: number | ((instrumentId: string) => number),
   rupeesPerPoint: number,
 ): {
   trades: PaperTrade[];
@@ -89,7 +96,7 @@ export function buildWeekdayFilteredView(
   const names = PAPER_WEEKDAY_OPTIONS.filter((o) => selection[o.key]).map((o) => o.short);
   return {
     trades: filtered,
-    totals: summarizePaperTrades(filtered, lotsUsed, rupeesPerPoint),
+    totals: summarizePaperTrades(filtered, lotsUsedOrResolver, rupeesPerPoint),
     dayStats: filtered.length ? buildPaperDeskDayStats(filtered) : emptyPaperDeskDayStats(),
     weekdayLabel: names.length ? names.join(', ') : 'none',
   };

@@ -137,6 +137,8 @@ export class LiveOrderExecutorService {
   private readonly instrumentNames = new Map<string, string>();
   /** Number of lots (exchange lot size × this). Testing never uses this. */
   private lotsMultiplier = 1;
+  /** Per-desk-instrument lots so Nifty / Bank / Crude can differ on one Live run. */
+  private readonly lotsByInstrument = new Map<string, number>();
   /** Symbols with an exit in flight — blocks duplicate SELL (naked short). */
   private readonly exitingSymbols = new Set<string>();
 
@@ -146,6 +148,7 @@ export class LiveOrderExecutorService {
     this.events.length = 0;
     this.summary.clear();
     this.exitingSymbols.clear();
+    this.lotsByInstrument.clear();
   }
 
   /**
@@ -163,6 +166,7 @@ export class LiveOrderExecutorService {
       }
       this.positions.delete(id);
       this.summary.delete(id);
+      this.lotsByInstrument.delete(id);
     }
     for (let i = this.events.length - 1; i >= 0; i -= 1) {
       if (idSet.has(this.events[i]!.instrumentId)) {
@@ -173,6 +177,15 @@ export class LiveOrderExecutorService {
 
   setLotsMultiplier(lots: number): void {
     this.lotsMultiplier = Math.max(1, Math.floor(lots) || 1);
+  }
+
+  /** Per-instrument lots for mixed Trade Desk books (overrides global multiplier). */
+  setLotsForInstrument(instrumentId: string, lots: number): void {
+    this.lotsByInstrument.set(instrumentId, Math.max(1, Math.floor(lots) || 1));
+  }
+
+  private lotsFor(instrumentId: string): number {
+    return this.lotsByInstrument.get(instrumentId) ?? this.lotsMultiplier;
   }
 
   getPositions(): LiveBrokerPosition[] {
@@ -305,8 +318,13 @@ export class LiveOrderExecutorService {
     instrumentId: string;
     instrumentName: string;
     open: LiveOpenSignal | null;
+    /** Optional per-book lots (Nifty / Bank / Crude can differ). */
+    lots?: number;
   }): Promise<void> {
     this.instrumentNames.set(params.instrumentId, params.instrumentName);
+    if (params.lots != null) {
+      this.setLotsForInstrument(params.instrumentId, params.lots);
+    }
     const open = params.open;
 
     // Remap adopted orphan → desk instrument when symbols match.
@@ -429,7 +447,8 @@ export class LiveOrderExecutorService {
 
     // qty = exchange lot size × configured lots (Live money only).
     const lotSize = Math.max(1, option.lotSize || 1);
-    const quantity = lotSize * this.lotsMultiplier;
+    const lotsMult = this.lotsFor(instrumentId);
+    const quantity = lotSize * lotsMult;
     const symUpper = option.tradingSymbol.toUpperCase();
     const exchange: 'NFO' | 'MCX' =
       option.exchange ??
@@ -463,7 +482,7 @@ export class LiveOrderExecutorService {
         at: new Date().toISOString(),
         instrumentId,
         action: 'ENTRY',
-        detail: `BUY ${quantity} ${option.tradingSymbol} ${product} MARKET (${this.lotsMultiplier} lot × ${lotSize})`,
+        detail: `BUY ${quantity} ${option.tradingSymbol} ${product} MARKET (${lotsMult} lot × ${lotSize})`,
         orderId: entryOrderId,
         tradingSymbol: option.tradingSymbol,
         quantity,

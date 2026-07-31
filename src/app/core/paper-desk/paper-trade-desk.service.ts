@@ -7,9 +7,11 @@ import { KiteSessionService } from '../kite/kite-session.service';
 import { InstrumentStoreService } from '../services/instrument-store.service';
 import {
   BANK_NIFTY_INSTRUMENT,
+  CRUDE_OIL_MINI_INSTRUMENT,
   NIFTY_50_INSTRUMENT,
   TesterInstrument,
 } from '../constants/instruments.const';
+import { MCX_CRUDE_SESSION } from '../config/session.config';
 import {
   assertKiteHistoricalSuccess,
   extractKiteApiError,
@@ -35,11 +37,26 @@ import {
   replayPaperOnIndex,
   toOptionContract,
 } from './paper-desk-engine';
+import {
+  enrichCrudeTradesWithOptionPremiums,
+  replayPaperOnCrude,
+} from './crude-paper-engine';
 import { applyKiteFillPnl } from './apply-kite-fill-pnl';
 import { enrichTradesWithCharges } from './trade-charges.util';
 import { buildPaperDeskDayStats, emptyPaperDeskDayStats } from './paper-desk-day-stats';
 import { MAX_OPTION_HISTORY_TOKENS, rankTokensByFrequency } from './option-history-tokens.util';
 import { PDHL_RUPEES_PER_POINT, buildDeskRiskOverrides, buildIndexDeskRiskSettings, rupeesPerPointForInstrument } from '../strategy-engine/strategies/pdhl-opening-range/pdhl-opening-range.evaluator';
+import { CRUDE_EXIT_BY } from '../strategy-engine/strategies/crude-pdhl-evening/crude-pdhl-evening.evaluator';
+import {
+  resolveCrudeProfileDayLossPts,
+  resolveCrudeStrategyProfile,
+} from '../strategy-engine/strategies/crude-pdhl-evening/crude-strategy-profile';
+import { resolveCrudeOilMiniFuturesToken } from '../utils/instrument-resolver.util';
+import {
+  countCrudeMiniOptions,
+  resolveAtmCrudeMiniOption,
+  toCrudePaperOption,
+} from '../utils/crude-option.util';
 import { StrategyManagerService } from '../strategy-manager/runtime/strategy-manager.service';
 import { StrategyEventLogger } from '../strategy-manager/runtime/strategy-event-logger.service';
 import { ShadowBookService } from '../strategy-manager/runtime/shadow-book.service';
@@ -60,13 +77,20 @@ import {
 import { LiveOrderExecutorService } from '../live-desk/live-order-executor.service';
 
 export interface TradeDeskRunOptions {
+  /** Legacy single lots — used as fallback when per-book lots omitted. */
   lots?: number;
+  /** Per-book lots (exchange lot × this). */
+  niftyLots?: number;
+  bankLots?: number;
+  crudeLots?: number;
   realOrders?: boolean;
   enableNifty?: boolean;
   enableBank?: boolean;
-  /** Combined strict day loss ≈ −₹2,950 (split if both books on). */
+  /** Crude Oil Mini All-Green parallel book on Trade Desk. Default on from UI. */
+  enableCrude?: boolean;
+  /** Combined strict day loss ≈ −₹2,950 (split if both index books on). */
   strictDayStop?: boolean;
-  /** Combined day profit lock ≈ +₹5,000 (split if both books on). */
+  /** Combined day profit lock ≈ +₹5,000 (split if both index books on). */
   dayProfitLock?: boolean;
   /** Background Kutty scalp (not in Strat dropdown). Default on. */
   enableKutty?: boolean;
@@ -80,6 +104,12 @@ interface LiveLeg {
   candles: Candle[];
   processedThrough: number;
   resultTrades: PaperTrade[];
+}
+
+interface CrudeLiveState {
+  futuresToken: number;
+  futuresSymbol: string;
+  candles: Candle[];
 }
 
 @Injectable({ providedIn: 'root' })
@@ -99,20 +129,33 @@ export class PaperTradeDeskService {
 
   private liveTimer: ReturnType<typeof setInterval> | null = null;
   private liveLegs: LiveLeg[] = [];
+  private crudeLive: CrudeLiveState | null = null;
+  /** Last index statuses kept after 15:30 while Crude continues. */
+  private lastIndexStatuses: PaperInstrumentStatus[] = [];
   private liveTrades: PaperTrade[] = [];
   private historicalCalls = 0;
   private lastRangeDays = 0;
   private realOrders = false;
-  /** Exchange lot × this — applies to Testing + Live paper option ₹ and Live money qty. */
+  /** Fallback lots (legacy). Prefer per-book lots below. */
   private lotsMultiplier = 1;
+  private niftyLots = 1;
+  private bankLots = 1;
+  private crudeLots = 1;
   private deskRunOptions: Required<
     Pick<
       TradeDeskRunOptions,
-      'enableNifty' | 'enableBank' | 'strictDayStop' | 'dayProfitLock' | 'enableKutty' | 'kuttyAlone'
+      | 'enableNifty'
+      | 'enableBank'
+      | 'enableCrude'
+      | 'strictDayStop'
+      | 'dayProfitLock'
+      | 'enableKutty'
+      | 'kuttyAlone'
     >
   > = {
     enableNifty: true,
     enableBank: true,
+    enableCrude: true,
     strictDayStop: false,
     dayProfitLock: false,
     enableKutty: true,
@@ -186,18 +229,90 @@ export class PaperTradeDeskService {
   private normalizeDeskOptions(options?: TradeDeskRunOptions): void {
     const enableNifty = options?.enableNifty !== false;
     const enableBank = options?.enableBank !== false;
-    if (!enableNifty && !enableBank) {
-      throw new Error('Select at least one index: Nifty 50 or Bank Nifty.');
+    const enableCrude = options?.enableCrude !== false;
+    if (!enableNifty && !enableBank && !enableCrude) {
+      throw new Error('Select at least one book: Nifty 50, Bank Nifty, or Crude Oil Mini.');
     }
     const kuttyAlone = !!options?.kuttyAlone;
     this.deskRunOptions = {
       enableNifty,
       enableBank,
+      enableCrude,
       strictDayStop: !!options?.strictDayStop,
       dayProfitLock: !!options?.dayProfitLock,
       enableKutty: kuttyAlone || options?.enableKutty !== false,
       kuttyAlone,
     };
+    const fallback = Math.max(1, Math.floor(options?.lots ?? 1) || 1);
+    this.lotsMultiplier = fallback;
+    this.niftyLots = Math.max(1, Math.floor(options?.niftyLots ?? fallback) || 1);
+    this.bankLots = Math.max(1, Math.floor(options?.bankLots ?? fallback) || 1);
+    this.crudeLots = Math.max(1, Math.floor(options?.crudeLots ?? fallback) || 1);
+  }
+
+  private lotsForInstrument(instrumentId: string): number {
+    if (instrumentId === NIFTY_50_INSTRUMENT.id) {
+      return this.niftyLots;
+    }
+    if (instrumentId === BANK_NIFTY_INSTRUMENT.id) {
+      return this.bankLots;
+    }
+    if (instrumentId === CRUDE_OIL_MINI_INSTRUMENT.id) {
+      return this.crudeLots;
+    }
+    return this.lotsMultiplier;
+  }
+
+  private applyBookLotsToLiveOrders(): void {
+    if (this.deskRunOptions.enableNifty) {
+      this.liveOrders.setLotsForInstrument(NIFTY_50_INSTRUMENT.id, this.niftyLots);
+    }
+    if (this.deskRunOptions.enableBank) {
+      this.liveOrders.setLotsForInstrument(BANK_NIFTY_INSTRUMENT.id, this.bankLots);
+    }
+    if (this.deskRunOptions.enableCrude) {
+      this.liveOrders.setLotsForInstrument(CRUDE_OIL_MINI_INSTRUMENT.id, this.crudeLots);
+    }
+  }
+
+  /** Apply charge estimates with per-book lots (Nifty / Bank / Crude may differ). */
+  private enrichMixedLots(trades: PaperTrade[]): PaperTrade[] {
+    const byId = new Map<string, PaperTrade[]>();
+    for (const t of trades) {
+      const list = byId.get(t.instrumentId) ?? [];
+      list.push(t);
+      byId.set(t.instrumentId, list);
+    }
+    const out: PaperTrade[] = [];
+    for (const [id, list] of byId) {
+      out.push(...enrichTradesWithCharges(list, this.lotsForInstrument(id)));
+    }
+    return out;
+  }
+
+  private premiumEnrichMixed(
+    indexTrades: PaperTrade[],
+    crudeTrades: PaperTrade[],
+    optionCandles: Map<number, Candle[]>,
+  ): PaperTrade[] {
+    const byId = new Map<string, PaperTrade[]>();
+    for (const t of indexTrades) {
+      const list = byId.get(t.instrumentId) ?? [];
+      list.push(t);
+      byId.set(t.instrumentId, list);
+    }
+    const enrichedIndex: PaperTrade[] = [];
+    for (const [id, list] of byId) {
+      enrichedIndex.push(
+        ...enrichTradesWithOptionPremiums(list, optionCandles, this.lotsForInstrument(id)),
+      );
+    }
+    const enrichedCrude = enrichCrudeTradesWithOptionPremiums(
+      crudeTrades,
+      optionCandles,
+      this.crudeLots,
+    );
+    return [...enrichedIndex, ...enrichedCrude];
   }
 
   private activeInstruments(): Array<{ instrument: TesterInstrument; kind: IndexOptionKind }> {
@@ -328,8 +443,9 @@ export class PaperTradeDeskService {
 
   private deskOptionsLabel(): string {
     const books = [
-      this.deskRunOptions.enableNifty ? 'Nifty' : null,
-      this.deskRunOptions.enableBank ? 'Bank' : null,
+      this.deskRunOptions.enableNifty ? `Nifty×${this.niftyLots}` : null,
+      this.deskRunOptions.enableBank ? `Bank×${this.bankLots}` : null,
+      this.deskRunOptions.enableCrude ? `Crude×${this.crudeLots}` : null,
     ]
       .filter(Boolean)
       .join('+');
@@ -341,6 +457,7 @@ export class PaperTradeDeskService {
         : this.deskRunOptions.enableKutty
           ? 'Kutty on'
           : null,
+      this.deskRunOptions.enableCrude ? 'Crude All-Green' : null,
     ]
       .filter(Boolean)
       .join(', ');
@@ -358,7 +475,6 @@ export class PaperTradeDeskService {
     const options: TradeDeskRunOptions =
       typeof lotsOrOptions === 'number' ? { lots: lotsOrOptions } : lotsOrOptions;
     this.normalizeDeskOptions(options);
-    this.lotsMultiplier = Math.max(1, Math.floor(options.lots ?? 1) || 1);
     this.busy.set(true);
     const batches = chunkInclusiveDateRange(fromDate, toDate, DESK_HISTORICAL_CHUNK_DAYS);
     this.snapshot.set({
@@ -377,10 +493,26 @@ export class PaperTradeDeskService {
     try {
       this.assertActive(runId);
       const authorization = this.requireAuth();
-      const allInstruments = await this.loadOptionInstruments();
+      const allInstruments = await this.loadOptionInstruments({
+        requireCrude: this.deskRunOptions.enableCrude,
+      });
       this.assertActive(runId);
 
       const active = this.activeInstruments();
+      let crudeFuture: { instrumentToken: number; tradingSymbol: string } | null = null;
+      if (this.deskRunOptions.enableCrude) {
+        const resolvedFuture = resolveCrudeOilMiniFuturesToken(allInstruments);
+        if (!resolvedFuture) {
+          throw new Error('No live CRUDEOILM futures contract. Settings → Refresh Instruments.');
+        }
+        crudeFuture = {
+          instrumentToken: resolvedFuture.instrumentToken,
+          tradingSymbol: resolvedFuture.tradingSymbol,
+        };
+      }
+      const crudeTradeParams = resolveCrudeStrategyProfile('all-green');
+      const crudeDayLossPts = resolveCrudeProfileDayLossPts(crudeTradeParams, false);
+
       const allEnriched: PaperTrade[] = [];
       const statusAcc = new Map<
         string,
@@ -405,7 +537,7 @@ export class PaperTradeDeskService {
         this.assertActive(runId);
         const batch = batches[b]!;
         this.patchMessage(
-          `Batch ${b + 1}/${batches.length}: ${batch.fromDate} → ${batch.toDate} · loading indices…`,
+          `Batch ${b + 1}/${batches.length}: ${batch.fromDate} → ${batch.toDate} · loading books…`,
         );
         const lookbackFrom = shiftDate(batch.fromDate, -12);
         const candleMap = new Map<string, Candle[]>();
@@ -429,9 +561,28 @@ export class PaperTradeDeskService {
           candleMap.set(instrument.id, candles);
         }
 
+        let crudeCandles: Candle[] = [];
+        if (crudeFuture) {
+          this.assertActive(runId);
+          if (active.length > 0 || b > 0) {
+            await delay(1500);
+          }
+          this.patchMessage(
+            `Batch ${b + 1}/${batches.length}: loading ${crudeFuture.tradingSymbol} 5m…`,
+          );
+          crudeCandles = await this.fetch5m({
+            instrumentToken: crudeFuture.instrumentToken,
+            from: `${lookbackFrom} 09:00:00`,
+            to: `${batch.toDate} 23:30:00`,
+            authorization,
+            runId,
+          });
+        }
+
         const needed = new Set<number>();
         const emptyOpt = new Map<number, Candle[]>();
-        const batchTrades: PaperTrade[] = [];
+        const batchIndexTrades: PaperTrade[] = [];
+        let batchCrudeTrades: PaperTrade[] = [];
         /** Per-instrument entry map for shadow (full batch). */
         const primaryActionsById = new Map<string, Map<string, string>>();
 
@@ -453,7 +604,7 @@ export class PaperTradeDeskService {
               instruments: allInstruments,
               optionCandlesByToken: emptyOpt,
               neededOptionTokens: needed,
-              lotsMultiplier: this.lotsMultiplier,
+              lotsMultiplier: this.lotsForInstrument(instrument.id),
               strategy: resolved.primary,
               enableKutty: this.deskRunOptions.enableKutty,
               kuttyAlone: this.deskRunOptions.kuttyAlone,
@@ -476,7 +627,7 @@ export class PaperTradeDeskService {
                 data: { entry: t.entryTime, exit: t.exitTime },
               });
             }
-            batchTrades.push(...replay.trades);
+            batchIndexTrades.push(...replay.trades);
 
             const prev = statusAcc.get(instrument.id);
             const batchIndexNet = Object.values(replay.dayNetByDate).reduce((a, v) => a + v, 0);
@@ -496,6 +647,42 @@ export class PaperTradeDeskService {
               maxTradesPerDay: resolved.primary.getSettings().maxTradesPerDay,
             });
           }
+        }
+
+        if (crudeFuture) {
+          const crudeReplay = replayPaperOnCrude({
+            instrumentId: CRUDE_OIL_MINI_INSTRUMENT.id,
+            instrumentName: `${CRUDE_OIL_MINI_INSTRUMENT.name} (${crudeFuture.tradingSymbol})`,
+            candles: crudeCandles,
+            fromDate: batch.fromDate,
+            toDate: batch.toDate,
+            instruments: allInstruments,
+            optionCandlesByToken: emptyOpt,
+            neededOptionTokens: needed,
+            lotsMultiplier: this.crudeLots,
+            dayLossStopPts: crudeDayLossPts,
+            enableMorning: crudeTradeParams.defaultEnableMorning,
+            enableEvening: crudeTradeParams.defaultEnableEvening,
+            tradeParams: crudeTradeParams,
+          });
+          batchCrudeTrades = crudeReplay.trades;
+          const prev = statusAcc.get(CRUDE_OIL_MINI_INSTRUMENT.id);
+          const batchIndexNet = Object.values(crudeReplay.dayNetByDate).reduce((a, v) => a + v, 0);
+          statusAcc.set(CRUDE_OIL_MINI_INSTRUMENT.id, {
+            instrumentId: CRUDE_OIL_MINI_INSTRUMENT.id,
+            instrumentName: `${CRUDE_OIL_MINI_INSTRUMENT.name} (${crudeFuture.tradingSymbol})`,
+            lastBarTime: crudeCandles.at(-1)?.date ?? prev?.lastBarTime ?? null,
+            dayNetIndexPts: (prev?.dayNetIndexPts ?? 0) + batchIndexNet,
+            dayNetOptionRs: prev?.dayNetOptionRs ?? 0,
+            chosenOption: crudeReplay.chosenOption ?? prev?.chosenOption ?? null,
+            chosenBias: crudeReplay.chosenBias ?? prev?.chosenBias ?? null,
+            indexSpot: crudeReplay.indexSpot ?? prev?.indexSpot ?? null,
+            chosenAsOf: crudeReplay.chosenAsOf ?? prev?.chosenAsOf ?? null,
+            lastSignal: crudeReplay.lastSignal || prev?.lastSignal || 'Waiting',
+            strategyId: 'crude-all-green',
+            strategyName: crudeTradeParams.label,
+            maxTradesPerDay: crudeTradeParams.maxEveningTradesDay,
+          });
         }
 
         for (const { instrument, kind } of active) {
@@ -527,13 +714,14 @@ export class PaperTradeDeskService {
           batch.toDate,
           authorization,
           runId,
+          this.deskRunOptions.enableCrude ? '23:30:00' : '15:30:00',
         );
         this.assertActive(runId);
 
-        const enriched = enrichTradesWithOptionPremiums(
-          batchTrades,
+        const enriched = this.premiumEnrichMixed(
+          batchIndexTrades,
+          batchCrudeTrades,
           optionCandles,
-          this.lotsMultiplier,
         );
         allEnriched.push(...enriched);
 
@@ -566,25 +754,26 @@ export class PaperTradeDeskService {
         return status;
       });
 
-      const sorted = enrichTradesWithCharges(
+      const sorted = this.enrichMixedLots(
         allEnriched.sort((a, b) => a.entryTime.localeCompare(b.entryTime)),
-        this.lotsMultiplier,
       );
       this.strategyPerf.recordMany(
-        sorted.map((t) => ({
-          strategyId: t.strategyId ?? 'unknown',
-          channel:
-            t.instrumentId === NIFTY_50_INSTRUMENT.id
-              ? ('nifty' as DeskChannel)
-              : ('bank' as DeskChannel),
-          mode: 'paper' as const,
-          direction: t.direction,
-          entryTime: t.entryTime,
-          exitTime: t.exitTime,
-          points: t.indexPoints,
-          exitReason: t.exitReason,
-          instrumentId: t.instrumentId,
-        })),
+        sorted
+          .filter((t) => t.instrumentId !== CRUDE_OIL_MINI_INSTRUMENT.id)
+          .map((t) => ({
+            strategyId: t.strategyId ?? 'unknown',
+            channel:
+              t.instrumentId === NIFTY_50_INSTRUMENT.id
+                ? ('nifty' as DeskChannel)
+                : ('bank' as DeskChannel),
+            mode: 'paper' as const,
+            direction: t.direction,
+            entryTime: t.entryTime,
+            exitTime: t.exitTime,
+            points: t.indexPoints,
+            exitReason: t.exitReason,
+            instrumentId: t.instrumentId,
+          })),
       );
       const dayStats = buildPaperDeskDayStats(sorted);
 
@@ -596,10 +785,10 @@ export class PaperTradeDeskService {
         marketOpen: true,
         realOrders: false,
         lastTickAt: null,
-        message: `Testing complete · ${sorted.length} paper trade(s) · ${batches.length} batch(es) · ${this.lotsMultiplier} lot(s) · ${this.deskOptionsLabel()} · ${this.kiteStatsLabel()}`,
+        message: `Testing complete · ${sorted.length} paper trade(s) · ${batches.length} batch(es) · ${this.deskOptionsLabel()} · ${this.kiteStatsLabel()}`,
         statuses,
         trades: sorted,
-        totals: summarize(sorted, this.lotsMultiplier, PDHL_RUPEES_PER_POINT),
+        totals: summarize(sorted, (id) => this.lotsForInstrument(id), this.lotsMultiplier),
         dayStats,
         kiteStats: this.kiteStats(),
         orderEvents: [],
@@ -630,28 +819,42 @@ export class PaperTradeDeskService {
     this.resetKiteStats();
     this.normalizeDeskOptions(options);
     this.realOrders = !!environment.allowLiveMoney && !!options?.realOrders;
-    this.lotsMultiplier = Math.max(1, Math.floor(options?.lots ?? 1) || 1);
     const active = this.activeInstruments();
-    // Soft clear — keep Crude (or other desk) live broker state intact.
-    this.liveOrders.clearInstruments(active.map((i) => i.instrument.id));
+    const clearIds = [
+      ...active.map((i) => i.instrument.id),
+      ...(this.deskRunOptions.enableCrude ? [CRUDE_OIL_MINI_INSTRUMENT.id] : []),
+    ];
+    // Soft clear — never wipe the other desk's open SL / adopt map.
+    this.liveOrders.clearInstruments(clearIds);
     this.liveOrders.setLotsMultiplier(this.lotsMultiplier);
+    this.applyBookLotsToLiveOrders();
     const today = todayIso();
     const now = istNowHhMm();
+    const anyIndex = this.deskRunOptions.enableNifty || this.deskRunOptions.enableBank;
+    const indexOpen = now >= '09:15' && now <= '15:30';
+    const crudeOpen =
+      now >= MCX_CRUDE_SESSION.marketOpen && now <= MCX_CRUDE_SESSION.marketClose;
+    const canRun = (anyIndex && indexOpen) || (this.deskRunOptions.enableCrude && crudeOpen);
 
-    if (now < '09:15' || now > '15:30') {
+    if (!canRun) {
       try {
         const allInstruments = await this.loadOptionInstruments({
           patchStatus: false,
           requireMinimum: false,
+          requireCrude: this.deskRunOptions.enableCrude,
         });
-        // Show what ATM contracts would be (using last index close if available)
-        const statuses = await this.previewChosenInstruments(today, allInstruments, active);
+        const statuses = await this.previewChosenInstruments(
+          today,
+          allInstruments,
+          active,
+          this.deskRunOptions.enableCrude,
+        );
         this.snapshot.set({
           ...emptySnapshot('live'),
           fromDate: today,
           toDate: today,
           marketOpen: false,
-          message: `Live paper only 09:15–15:30 IST (now ${now}). Showing today’s ATM picks below — use Testing to run after hours.`,
+          message: `Outside hours for selected books (now ${now}). Index 09:15–15:30 · Crude ${MCX_CRUDE_SESSION.marketOpen}–${MCX_CRUDE_SESSION.marketClose}. Showing ATM picks — use Testing after hours.`,
           statuses,
           kiteStats: this.kiteStats(),
         });
@@ -661,7 +864,7 @@ export class PaperTradeDeskService {
           fromDate: today,
           toDate: today,
           marketOpen: false,
-          message: `Live paper only 09:15–15:30 IST (now ${now}). ${formatUnknownError(err, 'Preview')}`,
+          message: `Outside hours (now ${now}). ${formatUnknownError(err, 'Preview')}`,
           kiteStats: this.kiteStats(),
         });
       }
@@ -685,9 +888,12 @@ export class PaperTradeDeskService {
     try {
       this.assertActive(runId);
       const authorization = this.requireAuth();
-      await this.loadOptionInstruments({ patchStatus: false });
+      const allInstruments = await this.loadOptionInstruments({
+        patchStatus: false,
+        requireCrude: this.deskRunOptions.enableCrude,
+      });
       // Live money needs a fresh NFO dump — stale/empty cache → synthetic options → no Kite orders.
-      if (this.realOrders) {
+      if (this.realOrders && anyIndex) {
         this.patchMessage('Live money · refreshing NFO option chain for real orders…');
         try {
           await this.instrumentStore.refresh(true);
@@ -705,6 +911,8 @@ export class PaperTradeDeskService {
           );
         }
         this.patchMessage(`Live money · NFO chain ready (${nfoCount} index options)`);
+      }
+      if (this.realOrders) {
         this.patchMessage('Live money · reconciling open Kite positions…');
         const note = await this.liveOrders.reconcileFromBroker(authorization);
         this.patchMessage(`Live money · ${note}`);
@@ -713,28 +921,54 @@ export class PaperTradeDeskService {
       const lookbackFrom = shiftDate(today, -12);
 
       this.liveLegs = [];
+      this.crudeLive = null;
+      this.lastIndexStatuses = [];
       this.liveTrades = [];
 
-      for (let i = 0; i < active.length; i += 1) {
-        this.assertActive(runId);
-        const row = active[i]!;
-        if (i > 0) {
+      if (anyIndex && indexOpen) {
+        for (let i = 0; i < active.length; i += 1) {
+          this.assertActive(runId);
+          const row = active[i]!;
+          if (i > 0) {
+            await delay(1500);
+          }
+          const candles = await this.fetch5m({
+            instrumentToken: row.instrument.instrumentToken,
+            from: `${lookbackFrom} 09:00:00`,
+            to: `${today} 15:30:00`,
+            authorization,
+            runId,
+          });
+          this.liveLegs.push({
+            instrument: row.instrument,
+            kind: row.kind,
+            candles,
+            processedThrough: -1,
+            resultTrades: [],
+          });
+        }
+      }
+
+      if (this.deskRunOptions.enableCrude && crudeOpen) {
+        const future = resolveCrudeOilMiniFuturesToken(allInstruments);
+        if (!future) {
+          throw new Error('No live CRUDEOILM futures contract.');
+        }
+        if (this.liveLegs.length) {
           await delay(1500);
         }
         const candles = await this.fetch5m({
-          instrumentToken: row.instrument.instrumentToken,
+          instrumentToken: future.instrumentToken,
           from: `${lookbackFrom} 09:00:00`,
-          to: `${today} 15:30:00`,
+          to: `${today} 23:30:00`,
           authorization,
           runId,
         });
-        this.liveLegs.push({
-          instrument: row.instrument,
-          kind: row.kind,
+        this.crudeLive = {
+          futuresToken: future.instrumentToken,
+          futuresSymbol: future.tradingSymbol,
           candles,
-          processedThrough: -1,
-          resultTrades: [],
-        });
+        };
       }
 
       await this.tickLive(true);
@@ -787,7 +1021,21 @@ export class PaperTradeDeskService {
   private async tickLive(initial: boolean): Promise<void> {
     const today = todayIso();
     const now = istNowHhMm();
-    if (now > '15:30') {
+    const crudeEnabled = this.deskRunOptions.enableCrude && !!this.crudeLive;
+    const anyIndexLegs = this.liveLegs.length > 0;
+
+    if (crudeEnabled) {
+      if (now > MCX_CRUDE_SESSION.marketClose) {
+        this.snapshot.update((s) => ({
+          ...s,
+          marketOpen: false,
+          running: false,
+          message: `Market closed (after ${MCX_CRUDE_SESSION.marketClose}). Live desk stopped.`,
+        }));
+        this.stopLive();
+        return;
+      }
+    } else if (now > '15:30') {
       this.snapshot.update((s) => ({
         ...s,
         marketOpen: false,
@@ -797,104 +1045,198 @@ export class PaperTradeDeskService {
       this.stopLive();
       return;
     }
-    if (now < '09:15') {
+
+    const indexSessionActive = anyIndexLegs && now >= '09:15' && now <= '15:30';
+    const crudeSessionActive =
+      crudeEnabled &&
+      now >= MCX_CRUDE_SESSION.marketOpen &&
+      now <= MCX_CRUDE_SESSION.marketClose;
+
+    if (!indexSessionActive && !crudeSessionActive) {
       this.snapshot.update((s) => ({
         ...s,
         marketOpen: false,
-        message: `Waiting for open (09:15). Now ${now}`,
+        message: `Waiting for open. Now ${now}`,
       }));
       return;
     }
 
     const authorization = this.requireAuth();
-    const allInstruments = this.instrumentStore.allInstruments();
+    let allInstruments = this.instrumentStore.allInstruments();
 
-    for (let i = 0; i < this.liveLegs.length; i += 1) {
-      const leg = this.liveLegs[i]!;
-      if (!initial && i > 0) {
-        await delay(1200);
-      }
-      try {
-        // Warm-up (~12d) is loaded in startLive; later ticks only refresh today and merge
-        // so we never approach Kite's 100-day 5m cap during live polling.
-        if (initial && leg.candles.length) {
-          // already warm
-        } else if (initial) {
-          leg.candles = await this.fetch5m({
-            instrumentToken: leg.instrument.instrumentToken,
-            from: `${shiftDate(today, -12)} 09:00:00`,
-            to: `${today} 15:30:00`,
-            authorization,
-          });
-        } else {
-          const todayBars = await this.fetch5m({
-            instrumentToken: leg.instrument.instrumentToken,
-            from: `${today} 09:00:00`,
-            to: `${today} 15:30:00`,
-            authorization,
-          });
-          const prior = leg.candles.filter((c) => datePart(c.date) !== today);
-          leg.candles = [...prior, ...todayBars];
+    if (indexSessionActive) {
+      for (let i = 0; i < this.liveLegs.length; i += 1) {
+        const leg = this.liveLegs[i]!;
+        if (!initial && i > 0) {
+          await delay(1200);
         }
+        try {
+          if (initial && leg.candles.length) {
+            // already warm
+          } else if (initial) {
+            leg.candles = await this.fetch5m({
+              instrumentToken: leg.instrument.instrumentToken,
+              from: `${shiftDate(today, -12)} 09:00:00`,
+              to: `${today} 15:30:00`,
+              authorization,
+            });
+          } else {
+            const todayBars = await this.fetch5m({
+              instrumentToken: leg.instrument.instrumentToken,
+              from: `${today} 09:00:00`,
+              to: `${today} 15:30:00`,
+              authorization,
+            });
+            const prior = leg.candles.filter((c) => datePart(c.date) !== today);
+            leg.candles = [...prior, ...todayBars];
+          }
+        } catch {
+          // keep previous candles
+        }
+      }
+    }
+
+    if (crudeSessionActive && this.crudeLive && !initial) {
+      try {
+        if (this.liveLegs.length) {
+          await delay(1200);
+        }
+        const todayBars = await this.fetch5m({
+          instrumentToken: this.crudeLive.futuresToken,
+          from: `${today} 09:00:00`,
+          to: `${today} 23:30:00`,
+          authorization,
+        });
+        const prior = this.crudeLive.candles.filter((c) => datePart(c.date) !== today);
+        this.crudeLive.candles = [...prior, ...todayBars];
       } catch {
-        // keep previous candles
+        // keep previous
       }
     }
 
     const needed = new Set<number>();
     const emptyOpt = new Map<number, Candle[]>();
-    const allTrades: PaperTrade[] = [];
+    const indexTrades: PaperTrade[] = [];
+    let crudeTrades: PaperTrade[] = [];
     const statuses: PaperInstrumentStatus[] = [];
     const kuttyMargin = { usedRs: 0, trapOpenLegs: 0 };
 
-    for (const leg of this.liveLegs) {
-      const resolved = this.resolveDeskStrategy(leg.kind, 'live');
-      const primaryActions = new Map<string, string>();
-      const replay = replayPaperOnIndex({
-        instrumentId: leg.instrument.id,
-        instrumentName: leg.instrument.name,
-        kind: leg.kind,
-        candles: leg.candles,
+    if (indexSessionActive) {
+      for (const leg of this.liveLegs) {
+        const resolved = this.resolveDeskStrategy(leg.kind, 'live');
+        const primaryActions = new Map<string, string>();
+        const replay = replayPaperOnIndex({
+          instrumentId: leg.instrument.id,
+          instrumentName: leg.instrument.name,
+          kind: leg.kind,
+          candles: leg.candles,
+          fromDate: today,
+          toDate: today,
+          instruments: allInstruments,
+          optionCandlesByToken: emptyOpt,
+          neededOptionTokens: needed,
+          forceCloseOpen: now >= '15:15',
+          lotsMultiplier: this.lotsForInstrument(leg.instrument.id),
+          strategy: resolved.primary,
+          enableKutty: this.deskRunOptions.enableKutty,
+          kuttyAlone: this.deskRunOptions.kuttyAlone,
+          kuttyMargin,
+        });
+        for (const t of replay.trades) {
+          primaryActions.set(t.entryTime, t.direction);
+        }
+        if (resolved.shadow) {
+          this.runShadowReplay({
+            channel: resolved.channel,
+            mode: 'live',
+            shadow: resolved.shadow,
+            primaryActions,
+            instrumentId: leg.instrument.id,
+            candles: leg.candles,
+            fromDate: today,
+            toDate: today,
+          });
+        }
+        indexTrades.push(...replay.trades);
+        statuses.push(
+          withLiveFields({
+            instrumentId: leg.instrument.id,
+            instrumentName: leg.instrument.name,
+            lastBarTime: leg.candles.at(-1)?.date ?? null,
+            dayNetIndexPts: replay.trades.reduce((a, t) => a + t.indexPoints, 0),
+            dayNetOptionRs: 0,
+            openTrade: replay.open
+              ? {
+                  direction: replay.open.direction,
+                  indexEntry: replay.open.entry,
+                  indexStop: effectiveProtectiveStop(replay.open),
+                  indexTarget: replay.open.target,
+                  entryTime: replay.open.entryTime,
+                  option: replay.open.option,
+                  optionEntryPremium: replay.open.optionEntryPremium,
+                }
+              : null,
+            chosenOption: replay.chosenOption,
+            chosenBias: replay.chosenBias,
+            indexSpot: replay.indexSpot,
+            chosenAsOf: replay.chosenAsOf,
+            lastSignal:
+              now >= '15:15' && !replay.open
+                ? 'Index session closed (15:15) — no new entries'
+                : replay.lastSignal,
+            tradesToday: replay.trades.length,
+            strategyId: resolved.primary.id,
+            strategyName: resolved.primary.name,
+            maxTradesPerDay: resolved.primary.getSettings().maxTradesPerDay,
+          }),
+        );
+      }
+      this.lastIndexStatuses = statuses.map((s) => ({ ...s }));
+    } else if (anyIndexLegs && this.lastIndexStatuses.length) {
+      for (const s of this.lastIndexStatuses) {
+        statuses.push({
+          ...s,
+          openTrade: null,
+          lastSignal: 'Index session closed (15:15) · Crude continues',
+          livePhase: s.livePhase === 'in_trade' ? 'exited' : s.livePhase,
+          livePhaseLabel:
+            s.livePhase === 'in_trade' ? 'Index session closed' : s.livePhaseLabel,
+        });
+      }
+    }
+
+    if (crudeSessionActive && this.crudeLive) {
+      const crudeTradeParams = resolveCrudeStrategyProfile('all-green');
+      const crudeDayLossPts = resolveCrudeProfileDayLossPts(crudeTradeParams, false);
+      const replay = replayPaperOnCrude({
+        instrumentId: CRUDE_OIL_MINI_INSTRUMENT.id,
+        instrumentName: `${CRUDE_OIL_MINI_INSTRUMENT.name} (${this.crudeLive.futuresSymbol})`,
+        candles: this.crudeLive.candles,
         fromDate: today,
         toDate: today,
         instruments: allInstruments,
         optionCandlesByToken: emptyOpt,
         neededOptionTokens: needed,
-        forceCloseOpen: now >= '15:15',
-        lotsMultiplier: this.lotsMultiplier,
-        strategy: resolved.primary,
-        enableKutty: this.deskRunOptions.enableKutty,
-        kuttyAlone: this.deskRunOptions.kuttyAlone,
-        kuttyMargin,
+        forceCloseOpen: now >= CRUDE_EXIT_BY,
+        lotsMultiplier: this.crudeLots,
+        dayLossStopPts: crudeDayLossPts,
+        enableMorning: crudeTradeParams.defaultEnableMorning,
+        enableEvening: crudeTradeParams.defaultEnableEvening,
+        tradeParams: crudeTradeParams,
       });
-      for (const t of replay.trades) {
-        primaryActions.set(t.entryTime, t.direction);
-      }
-      if (resolved.shadow) {
-        this.runShadowReplay({
-          channel: resolved.channel,
-          mode: 'live',
-          shadow: resolved.shadow,
-          primaryActions,
-          instrumentId: leg.instrument.id,
-          candles: leg.candles,
-          fromDate: today,
-          toDate: today,
-        });
-      }
-      allTrades.push(...replay.trades);
+      crudeTrades = replay.trades;
       statuses.push(
         withLiveFields({
-          instrumentId: leg.instrument.id,
-          instrumentName: leg.instrument.name,
-          lastBarTime: leg.candles.at(-1)?.date ?? null,
+          instrumentId: CRUDE_OIL_MINI_INSTRUMENT.id,
+          instrumentName: `${CRUDE_OIL_MINI_INSTRUMENT.name} (${this.crudeLive.futuresSymbol})`,
+          lastBarTime: this.crudeLive.candles.at(-1)?.date ?? null,
           dayNetIndexPts: replay.trades.reduce((a, t) => a + t.indexPoints, 0),
           dayNetOptionRs: 0,
           openTrade: replay.open
             ? {
                 direction: replay.open.direction,
                 indexEntry: replay.open.entry,
-                indexStop: effectiveProtectiveStop(replay.open),
+                indexStop: replay.open.stop,
                 indexTarget: replay.open.target,
                 entryTime: replay.open.entryTime,
                 option: replay.open.option,
@@ -907,9 +1249,9 @@ export class PaperTradeDeskService {
           chosenAsOf: replay.chosenAsOf,
           lastSignal: replay.lastSignal,
           tradesToday: replay.trades.length,
-          strategyId: resolved.primary.id,
-          strategyName: resolved.primary.name,
-          maxTradesPerDay: resolved.primary.getSettings().maxTradesPerDay,
+          strategyId: 'crude-all-green',
+          strategyName: crudeTradeParams.label,
+          maxTradesPerDay: crudeTradeParams.maxEveningTradesDay,
         }),
       );
     }
@@ -919,10 +1261,11 @@ export class PaperTradeDeskService {
       shiftDate(today, -5),
       today,
       authorization,
+      undefined,
+      crudeEnabled ? '23:30:00' : '15:30:00',
     );
-    let enriched = enrichTradesWithCharges(
-      enrichTradesWithOptionPremiums(allTrades, optionCandles, this.lotsMultiplier),
-      this.lotsMultiplier,
+    let enriched = this.enrichMixedLots(
+      this.premiumEnrichMixed(indexTrades, crudeTrades, optionCandles),
     );
 
     for (const s of statuses) {
@@ -933,10 +1276,9 @@ export class PaperTradeDeskService {
     }
 
     if (this.realOrders) {
-      let allInstruments = this.instrumentStore.allInstruments();
+      allInstruments = this.instrumentStore.allInstruments();
       for (const s of statuses) {
-        // Re-resolve ATM from the live chain so we don't send synthetic labels to Kite.
-        if (s.openTrade) {
+        if (s.openTrade && s.instrumentId !== CRUDE_OIL_MINI_INSTRUMENT.id) {
           const kind: IndexOptionKind =
             s.instrumentId === NIFTY_50_INSTRUMENT.id ? 'nifty' : 'banknifty';
           let resolved = resolveAtmWeeklyOption({
@@ -946,7 +1288,6 @@ export class PaperTradeDeskService {
             spot: s.openTrade.indexEntry,
             asOfDateTime: s.openTrade.entryTime,
           });
-          // One hard refresh if still synthetic — covers stale/empty first tick.
           if (resolved.source === 'synthetic') {
             try {
               await this.instrumentStore.refresh(true);
@@ -966,12 +1307,24 @@ export class PaperTradeDeskService {
           s.openTrade = { ...s.openTrade, option: fresh };
           s.chosenOption = fresh;
           s.chosenBias = s.openTrade.direction;
+        } else if (s.openTrade && s.instrumentId === CRUDE_OIL_MINI_INSTRUMENT.id) {
+          const resolved = resolveAtmCrudeMiniOption({
+            instruments: allInstruments,
+            direction: s.openTrade.direction,
+            spot: s.openTrade.indexEntry,
+            asOfDateTime: s.openTrade.entryTime,
+          });
+          const fresh = toCrudePaperOption(resolved.instrument, resolved.source);
+          s.openTrade = { ...s.openTrade, option: fresh };
+          s.chosenOption = fresh;
+          s.chosenBias = s.openTrade.direction;
         }
 
         await this.liveOrders.syncInstrument({
           authorization,
           instrumentId: s.instrumentId,
           instrumentName: s.instrumentName,
+          lots: this.lotsForInstrument(s.instrumentId),
           open: s.openTrade
             ? {
                 direction: s.openTrade.direction,
@@ -991,43 +1344,44 @@ export class PaperTradeDeskService {
         s.brokerSlOrderId = pos?.slOrderId ?? null;
         s.brokerEntryOrderId = pos?.entryOrderId ?? null;
         if (s.openTrade && !s.brokerEntryOrderId) {
-          const kind: IndexOptionKind =
-            s.instrumentId === NIFTY_50_INSTRUMENT.id ? 'nifty' : 'banknifty';
-          const chainGap =
-            s.openTrade.option?.source === 'synthetic'
-              ? describeOptionChainGap({
-                  instruments: allInstruments,
-                  kind,
-                  direction: s.openTrade.direction,
-                  spot: s.openTrade.indexEntry,
-                  asOfDateTime: s.openTrade.entryTime,
-                })
-              : null;
-          s.kiteBlockReason =
-            this.liveOrders.getLastBlockReason(s.instrumentId) ??
-            (chainGap
-              ? `Synthetic/missing NFO option — ${chainGap}`
-              : 'Kite entry not confirmed — see Event log');
+          if (s.instrumentId !== CRUDE_OIL_MINI_INSTRUMENT.id) {
+            const kind: IndexOptionKind =
+              s.instrumentId === NIFTY_50_INSTRUMENT.id ? 'nifty' : 'banknifty';
+            const chainGap =
+              s.openTrade.option?.source === 'synthetic'
+                ? describeOptionChainGap({
+                    instruments: allInstruments,
+                    kind,
+                    direction: s.openTrade.direction,
+                    spot: s.openTrade.indexEntry,
+                    asOfDateTime: s.openTrade.entryTime,
+                  })
+                : null;
+            s.kiteBlockReason =
+              this.liveOrders.getLastBlockReason(s.instrumentId) ??
+              (chainGap
+                ? `Synthetic/missing NFO option — ${chainGap}`
+                : 'Kite entry not confirmed — see Event log');
+          } else {
+            s.kiteBlockReason =
+              this.liveOrders.getLastBlockReason(s.instrumentId) ??
+              'Kite entry not confirmed — see Event log';
+          }
           s.livePhaseLabel = `Signal only · not on Kite`;
         } else {
           s.kiteBlockReason = null;
-        }
-        if (pos?.status === 'open' && s.livePhase === 'waiting') {
-          // broker still open while paper flat — rare race; keep in_trade label
         }
         if (pos?.status === 'flat' && s.lastExitReason?.toLowerCase().includes('target')) {
           s.livePhase = 'target_hit';
           s.livePhaseLabel = 'Target achieved';
         }
-        // Open row entry premium: show Kite fill when available (display only).
         if (s.openTrade && pos?.entryPremium != null && pos.entryPremium > 0) {
           s.openTrade = { ...s.openTrade, optionEntryPremium: pos.entryPremium };
         }
       }
 
-      // Kite Positions formula: (exitAvg − entryAvg) × qty — calc only, no flow change.
       enriched = applyKiteFillPnl(enriched, this.liveOrders.getOrderSummary());
-      enriched = enrichTradesWithCharges(enriched);
+      enriched = this.enrichMixedLots(enriched);
       for (const s of statuses) {
         const mine = enriched.filter((t) => t.instrumentId === s.instrumentId);
         s.dayNetOptionRs = mine.reduce((a, t) => a + (t.optionPnlRs ?? 0), 0);
@@ -1043,8 +1397,12 @@ export class PaperTradeDeskService {
     this.liveTrades = enriched;
     const moneyTag = this.realOrders ? 'LIVE MONEY' : 'Live paper';
     const waiting = statuses.filter((s) => s.livePhase === 'waiting').length;
-    const inTrade = statuses.filter((s) => s.openTrade && (!this.realOrders || !!s.brokerEntryOrderId)).length;
-    const blocked = statuses.filter((s) => !!s.kiteBlockReason && !!s.openTrade && !s.brokerEntryOrderId).length;
+    const inTrade = statuses.filter(
+      (s) => s.openTrade && (!this.realOrders || !!s.brokerEntryOrderId),
+    ).length;
+    const blocked = statuses.filter(
+      (s) => !!s.kiteBlockReason && !!s.openTrade && !s.brokerEntryOrderId,
+    ).length;
     const targets = statuses.filter((s) => s.livePhase === 'target_hit').length;
     const openBits = statuses
       .filter((s) => s.openTrade && (!this.realOrders || !!s.brokerEntryOrderId))
@@ -1055,12 +1413,16 @@ export class PaperTradeDeskService {
     const blockedBits = statuses
       .filter((s) => s.openTrade && this.realOrders && !s.brokerEntryOrderId)
       .map((s) => `${s.instrumentName}: ${s.kiteBlockReason ?? 'blocked'}`);
-    const openMsg = openBits.length
-      ? ` · ON KITE: ${openBits.join(' · ')}`
-      : '';
+    const openMsg = openBits.length ? ` · ON KITE: ${openBits.join(' · ')}` : '';
     const blockedMsg = blockedBits.length
       ? ` · NOT ON KITE (${blocked}): ${blockedBits.join(' · ')}`
       : '';
+    const clockMsg =
+      crudeEnabled && now >= '15:15'
+        ? ' · Index closed · Crude continues'
+        : crudeEnabled
+          ? ' · Index→15:15 · Crude→23:10'
+          : '';
     this.snapshot.set({
       mode: 'live',
       running: true,
@@ -1069,10 +1431,10 @@ export class PaperTradeDeskService {
       marketOpen: true,
       realOrders: this.realOrders,
       lastTickAt: new Date().toISOString(),
-      message: `${moneyTag} · alive ${now} · waiting ${waiting} · in trade ${inTrade}${targets ? ` · target hit ${targets}` : ''}${openMsg}${blockedMsg} · ${this.kiteStatsLabel()}`,
+      message: `${moneyTag} · alive ${now}${clockMsg} · waiting ${waiting} · in trade ${inTrade}${targets ? ` · target hit ${targets}` : ''}${openMsg}${blockedMsg} · ${this.kiteStatsLabel()}`,
       statuses,
       trades: enriched.sort((a, b) => b.entryTime.localeCompare(a.entryTime)),
-      totals: summarize(enriched, this.lotsMultiplier, PDHL_RUPEES_PER_POINT),
+      totals: summarize(enriched, (id) => this.lotsForInstrument(id), this.lotsMultiplier),
       dayStats: buildPaperDeskDayStats(enriched),
       kiteStats: this.kiteStats(),
       orderEvents: this.liveOrders.getEvents(),
@@ -1084,6 +1446,7 @@ export class PaperTradeDeskService {
     today: string,
     allInstruments: Instrument[],
     activeRows: Array<{ instrument: TesterInstrument; kind: IndexOptionKind }> = this.instruments,
+    includeCrude = false,
   ): Promise<PaperInstrumentStatus[]> {
     const authorization = this.kiteSession.getAuthorizationHeader();
     const statuses: PaperInstrumentStatus[] = [];
@@ -1149,6 +1512,62 @@ export class PaperTradeDeskService {
       );
     }
 
+    if (includeCrude) {
+      const future = resolveCrudeOilMiniFuturesToken(allInstruments);
+      let spot: number | null = null;
+      let asOf = `${today} 15:15:00`;
+      let symbol = CRUDE_OIL_MINI_INSTRUMENT.tradingSymbol;
+      if (future && authorization) {
+        symbol = future.tradingSymbol;
+        try {
+          if (activeRows.length) {
+            await delay(1200);
+          }
+          const candles = await this.fetch5m({
+            instrumentToken: future.instrumentToken,
+            from: `${shiftDate(today, -5)} 09:00:00`,
+            to: `${today} 23:30:00`,
+            authorization,
+          });
+          const last = candles.at(-1);
+          if (last) {
+            spot = last.close;
+            asOf = last.date;
+          }
+        } catch {
+          // preview without spot
+        }
+      }
+      const resolved = resolveAtmCrudeMiniOption({
+        instruments: allInstruments,
+        direction: 'BUY',
+        spot: spot ?? 7600,
+        asOfDateTime: asOf,
+      });
+      const chosenOption = toCrudePaperOption(resolved.instrument, resolved.source);
+      statuses.push(
+        withLiveFields({
+          instrumentId: CRUDE_OIL_MINI_INSTRUMENT.id,
+          instrumentName: `${CRUDE_OIL_MINI_INSTRUMENT.name} (${symbol})`,
+          lastBarTime: asOf,
+          dayNetIndexPts: 0,
+          dayNetOptionRs: 0,
+          openTrade: null,
+          chosenOption,
+          chosenBias: 'BUY',
+          indexSpot: spot ?? chosenOption.strike,
+          chosenAsOf: asOf,
+          lastSignal:
+            spot != null
+              ? `Preview ATM @ ${spot.toFixed(1)} · All-Green`
+              : 'Preview ATM (spot fallback) · All-Green',
+          tradesToday: 0,
+          strategyId: 'crude-all-green',
+          strategyName: 'All-Green (09:00–23:00)',
+        }),
+      );
+    }
+
     return statuses;
   }
 
@@ -1158,6 +1577,7 @@ export class PaperTradeDeskService {
     toDate: string,
     authorization: string,
     runId?: number,
+    endTime: string = '15:30:00',
   ): Promise<Map<number, Candle[]>> {
     const map = new Map<number, Candle[]>();
     // Most-traded tokens first so busy books (Trap) get real OHLC before the cap.
@@ -1175,7 +1595,7 @@ export class PaperTradeDeskService {
         const candles = await this.fetch5m({
           instrumentToken: token,
           from: `${fromDate} 09:00:00`,
-          to: `${toDate} 15:30:00`,
+          to: `${toDate} ${endTime}`,
           authorization,
           runId,
         });
@@ -1282,14 +1702,18 @@ export class PaperTradeDeskService {
   private async loadOptionInstruments(options?: {
     patchStatus?: boolean;
     requireMinimum?: boolean;
+    requireCrude?: boolean;
   }): Promise<Instrument[]> {
     const patchStatus = options?.patchStatus !== false;
     const requireMinimum = options?.requireMinimum !== false;
+    const requireCrude = !!options?.requireCrude;
+    const needIndex =
+      this.deskRunOptions.enableNifty || this.deskRunOptions.enableBank || !requireCrude;
 
     await this.instrumentStore.ensureLoaded();
     let allInstruments = this.instrumentStore.allInstruments();
 
-    if (countIndexOptions(allInstruments) < 100) {
+    if (needIndex && countIndexOptions(allInstruments) < 100) {
       if (patchStatus) {
         this.patchMessage('Refreshing NFO option instruments…');
       }
@@ -1308,10 +1732,25 @@ export class PaperTradeDeskService {
       }
     }
 
+    if (requireCrude && countCrudeMiniOptions(allInstruments) < 20) {
+      if (patchStatus) {
+        this.patchMessage('Refreshing MCX crude instruments…');
+      }
+      const refreshed = await this.instrumentStore.refreshBestEffort(true);
+      allInstruments = this.instrumentStore.allInstruments();
+      if (!refreshed && requireMinimum && countCrudeMiniOptions(allInstruments) < 5) {
+        throw new Error(
+          'Could not load MCX crude options. Check internet, then Settings → Refresh Instruments.',
+        );
+      }
+    }
+
     if (patchStatus) {
-      this.patchMessage(
-        `Instruments ready · ${countIndexOptions(allInstruments)} index options in cache`,
-      );
+      const bits = [
+        needIndex ? `${countIndexOptions(allInstruments)} index options` : null,
+        requireCrude ? `${countCrudeMiniOptions(allInstruments)} crude options` : null,
+      ].filter(Boolean);
+      this.patchMessage(`Instruments ready · ${bits.join(' · ')}`);
     }
 
     return allInstruments;
@@ -1438,28 +1877,34 @@ function isCancelledError(err: unknown): boolean {
 
 function summarize(
   trades: PaperTrade[],
-  lotsUsed: number = 1,
+  lotsUsedOrResolver: number | ((instrumentId: string) => number) = 1,
   rupeesPerPoint: number = PDHL_RUPEES_PER_POINT,
 ): PaperDeskSnapshot['totals'] {
-  const lots = Math.max(1, Math.floor(lotsUsed) || 1);
+  const lotsFor =
+    typeof lotsUsedOrResolver === 'function'
+      ? lotsUsedOrResolver
+      : () => Math.max(1, Math.floor(lotsUsedOrResolver) || 1);
+  const displayLots =
+    typeof lotsUsedOrResolver === 'function'
+      ? Math.max(1, ...trades.map((t) => lotsFor(t.instrumentId)), 1)
+      : Math.max(1, Math.floor(lotsUsedOrResolver) || 1);
   const indexNetPts = trades.reduce((a, t) => a + t.indexPoints, 0);
   const optionNetRs = trades.reduce((a, t) => a + (t.optionPnlRs ?? 0), 0);
   const optionChargesRs = trades.reduce((a, t) => a + (t.chargesRs ?? 0), 0);
-  // Prefer per-instrument ₹/pt when present (Nifty 65 / Bank 30).
+  // Prefer per-instrument ₹/pt (Nifty 65 / Bank 30 / Crude 10) × per-book lots.
   const pointsMoneyRs = trades.reduce((a, t) => {
-    const rpp = rupeesPerPointForInstrument(t.instrumentId);
-    return a + t.indexPoints * rpp * lots;
+    const rpp = rupeesPerPointForInstrument(t.instrumentId) || rupeesPerPoint;
+    return a + t.indexPoints * rpp * lotsFor(t.instrumentId);
   }, 0);
-  // Fallback blend when no trades: keep legacy single rate.
   const pointsFallback =
-    trades.length === 0 ? 0 : pointsMoneyRs || indexNetPts * rupeesPerPoint * lots;
+    trades.length === 0 ? 0 : pointsMoneyRs || indexNetPts * rupeesPerPoint * displayLots;
   return {
     trades: trades.length,
     wins: trades.filter((t) => t.outcome === 'WIN').length,
     losses: trades.filter((t) => t.outcome === 'LOSS').length,
     indexNetPts,
     optionNetRs,
-    lotsUsed: lots,
+    lotsUsed: displayLots,
     pointsMoneyRs: pointsFallback,
     optionChargesRs,
     optionNetAfterChargesRs: Math.round((optionNetRs - optionChargesRs) * 100) / 100,

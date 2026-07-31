@@ -259,6 +259,21 @@
   color: #991b1b;
 }
 
+.lots-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem 0.75rem;
+  align-items: flex-end;
+}
+
+.lots-row .lots-field {
+  min-width: 5.5rem;
+}
+
+.lots-row .lots-field input {
+  width: 4.5rem;
+}
+
 .live-assistant {
   display: grid;
   gap: 0.55rem;
@@ -343,10 +358,54 @@
   font-weight: 800;
 }
 
+.la-line-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.35rem 0.75rem;
+}
+
+.la-line-head em {
+  font-style: normal;
+  font-size: 0.7rem;
+  font-weight: 700;
+  opacity: 0.7;
+}
+
 .la-lines span {
   font-size: 0.8rem;
   line-height: 1.35;
   opacity: 0.92;
+}
+
+.la-clock {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.35;
+  opacity: 0.88;
+}
+
+.la-next {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 650;
+  line-height: 1.4;
+  padding: 0.45rem 0.55rem;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.62);
+  border: 1px solid rgba(15, 23, 42, 0.06);
+}
+
+.la-next span {
+  display: inline-block;
+  margin-right: 0.35rem;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  opacity: 0.7;
 }
 
 .la-foot {

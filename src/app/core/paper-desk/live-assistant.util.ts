@@ -11,6 +11,8 @@ export type LiveAssistantTone =
 export interface LiveAssistantLine {
   name: string;
   text: string;
+  /** Optional lots label (e.g. "1 lot"). */
+  meta?: string;
 }
 
 export interface LiveAssistantView {
@@ -18,6 +20,10 @@ export interface LiveAssistantView {
   headline: string;
   detail: string;
   lines: LiveAssistantLine[];
+  /** Clock rules for mixed index + crude desks. */
+  clockNote?: string;
+  /** Plain-language next action. */
+  nextAction?: string;
 }
 
 export function isQuietSignal(lastSignal: string | null | undefined): boolean {
@@ -49,6 +55,9 @@ export function describeStatusForAssistant(
     return `Exited · ${s.lastExitReason || 'closed'} · scanning again`;
   }
   const signal = (s.lastSignal || '').trim();
+  if (/index session closed|session closed/i.test(signal)) {
+    return signal;
+  }
   if (isQuietSignal(signal)) {
     return `Scanning ${strat} — no trigger yet (quiet / flat vs rules)`;
   }
@@ -61,12 +70,71 @@ export function describeStatusForAssistant(
   return `Watching ${strat}: ${signal}`;
 }
 
+function isCrudeStatus(s: PaperInstrumentStatus): boolean {
+  const id = (s.instrumentId || '').toLowerCase();
+  const name = (s.instrumentName || '').toLowerCase();
+  return id.includes('crude') || name.includes('crude');
+}
+
+function buildClockNote(params: {
+  nowHhMm?: string;
+  hasIndex: boolean;
+  hasCrude: boolean;
+}): string | undefined {
+  if (!params.hasIndex && !params.hasCrude) {
+    return undefined;
+  }
+  if (params.hasIndex && params.hasCrude) {
+    return 'Clock · Index books until 15:15 · Crude All-Green continues on MCX to ~23:10';
+  }
+  if (params.hasCrude) {
+    return 'Clock · Crude All-Green · entries ~09:00–23:00 · force exit ~23:10';
+  }
+  return 'Clock · Index books 09:15–15:15 · no new entries after session exit';
+}
+
+function buildNextAction(params: {
+  tone: LiveAssistantTone;
+  realOrders: boolean;
+  statuses: PaperInstrumentStatus[];
+  hasCrude: boolean;
+  nowHhMm?: string;
+}): string {
+  const now = params.nowHhMm ?? '';
+  if (params.tone === 'blocked') {
+    return 'Fix the Kite block (Instruments / Event log), then wait for the next tick.';
+  }
+  if (params.tone === 'in_trade') {
+    return params.realOrders
+      ? 'Managing open Kite leg(s) — protective SL is live; desk exits cancel SL then SELL the long.'
+      : 'Managing paper leg(s) — watching target, SL, protect rules, and session exit.';
+  }
+  if (params.hasCrude && now >= '15:15' && now <= '23:15') {
+    const crude = params.statuses.find(isCrudeStatus);
+    if (crude?.openTrade) {
+      return 'Index session stopped · Crude still in trade through MCX evening.';
+    }
+    return 'Index session stopped · Crude All-Green still scanning MCX evening.';
+  }
+  if (params.tone === 'closed') {
+    return 'Start again when a selected book is inside its market hours.';
+  }
+  if (params.tone === 'done') {
+    return 'No open trade — desk keeps scanning while hours remain.';
+  }
+  return 'Waiting for the next clean entry on an enabled book.';
+}
+
 export function buildLiveAssistant(params: {
   running: boolean;
   marketOpen: boolean;
   realOrders: boolean;
   message: string;
   statuses: PaperInstrumentStatus[];
+  /** Optional IST HH:mm for clock copy. */
+  nowHhMm?: string;
+  /** Optional lots labels keyed by instrument id or name fragment. */
+  lotsByBook?: { nifty?: number; bank?: number; crude?: number };
 }): LiveAssistantView | null {
   if (!params.running) {
     return null;
@@ -74,54 +142,119 @@ export function buildLiveAssistant(params: {
 
   const money = params.realOrders ? 'Live money' : 'Live paper';
   const statuses = params.statuses;
+  const hasCrude = statuses.some(isCrudeStatus);
+  const hasIndex = statuses.some((s) => !isCrudeStatus(s));
+  const clockNote = buildClockNote({
+    nowHhMm: params.nowHhMm,
+    hasIndex,
+    hasCrude,
+  });
+
+  const lotsMeta = (s: PaperInstrumentStatus): string | undefined => {
+    const lots = params.lotsByBook;
+    if (!lots) {
+      return undefined;
+    }
+    if (isCrudeStatus(s) && lots.crude != null) {
+      return `${lots.crude} lot${lots.crude > 1 ? 's' : ''}`;
+    }
+    const id = (s.instrumentId || '').toLowerCase();
+    if ((id.includes('bank') || s.instrumentName.toLowerCase().includes('bank')) && lots.bank != null) {
+      return `${lots.bank} lot${lots.bank > 1 ? 's' : ''}`;
+    }
+    if (lots.nifty != null) {
+      return `${lots.nifty} lot${lots.nifty > 1 ? 's' : ''}`;
+    }
+    return undefined;
+  };
+
   const lines = statuses.map((s) => ({
     name: s.instrumentName,
     text: describeStatusForAssistant(s, params.realOrders),
+    meta: lotsMeta(s),
   }));
 
   if (!params.marketOpen) {
-    return {
+    const view: LiveAssistantView = {
       tone: 'closed',
       headline: 'Outside market hours',
       detail:
         params.message ||
-        'Live desk only runs 09:15–15:30 IST. Start again when the cash market is open.',
+        (hasCrude
+          ? 'No selected book is inside hours right now (Index 09:15–15:30 · Crude ~09:00–23:15).'
+          : 'Live desk only runs 09:15–15:30 IST. Start again when the cash market is open.'),
       lines,
+      clockNote,
     };
+    view.nextAction = buildNextAction({
+      tone: view.tone,
+      realOrders: params.realOrders,
+      statuses,
+      hasCrude,
+      nowHhMm: params.nowHhMm,
+    });
+    return view;
   }
 
   const blocked = statuses.filter(
     (s) => !!s.openTrade && params.realOrders && !s.brokerEntryOrderId && !!s.kiteBlockReason,
   );
   if (blocked.length) {
-    return {
+    const view: LiveAssistantView = {
       tone: 'blocked',
       headline: 'Signal found — not on Kite yet',
       detail: `${money}: desk has a trade idea but the broker entry is blocked. Check Event log / refresh Instruments.`,
       lines,
+      clockNote,
     };
+    view.nextAction = buildNextAction({
+      tone: view.tone,
+      realOrders: params.realOrders,
+      statuses,
+      hasCrude,
+      nowHhMm: params.nowHhMm,
+    });
+    return view;
   }
 
   const onBroker = statuses.filter(
     (s) => !!s.openTrade && (!params.realOrders || !!s.brokerEntryOrderId),
   );
   if (onBroker.length) {
-    return {
+    const view: LiveAssistantView = {
       tone: 'in_trade',
       headline: params.realOrders ? 'In trade on Kite' : 'In paper trade',
       detail: `${money}: managing open leg(s) — watching target, SL, protect rules, and session exit.`,
       lines,
+      clockNote,
     };
+    view.nextAction = buildNextAction({
+      tone: view.tone,
+      realOrders: params.realOrders,
+      statuses,
+      hasCrude,
+      nowHhMm: params.nowHhMm,
+    });
+    return view;
   }
 
   const deskOnly = statuses.filter((s) => !!s.openTrade);
   if (deskOnly.length) {
-    return {
+    const view: LiveAssistantView = {
       tone: 'waiting',
       headline: 'Entry signal — confirming',
       detail: `${money}: strategy fired; waiting for the next tick / broker confirm.`,
       lines,
+      clockNote,
     };
+    view.nextAction = buildNextAction({
+      tone: view.tone,
+      realOrders: params.realOrders,
+      statuses,
+      hasCrude,
+      nowHhMm: params.nowHhMm,
+    });
+    return view;
   }
 
   const done = statuses.filter(
@@ -131,29 +264,56 @@ export function buildLiveAssistant(params: {
 
   if (waiting.length && done.length === statuses.length - waiting.length) {
     const quiet = waiting.every((s) => isQuietSignal(s.lastSignal));
-    return {
+    const view: LiveAssistantView = {
       tone: quiet ? 'scanning' : 'waiting',
       headline: quiet ? 'Scanning — no setup yet' : 'Looking for entry',
       detail: quiet
         ? `${money}: desk is alive and scanning each tick. Market has not given a strategy trigger yet (looks quiet / flat vs rules).`
         : `${money}: scanning each tick for ${waiting.map((s) => s.strategyName || 'strategy').join(' / ')}. Setup filters are active — waiting for a clean entry.`,
       lines,
+      clockNote,
     };
+    view.nextAction = buildNextAction({
+      tone: view.tone,
+      realOrders: params.realOrders,
+      statuses,
+      hasCrude,
+      nowHhMm: params.nowHhMm,
+    });
+    return view;
   }
 
   if (done.length && !waiting.length) {
-    return {
+    const view: LiveAssistantView = {
       tone: 'done',
       headline: 'Session legs closed',
       detail: `${money}: no open trade right now. Desk keeps scanning if still inside hours.`,
       lines,
+      clockNote,
     };
+    view.nextAction = buildNextAction({
+      tone: view.tone,
+      realOrders: params.realOrders,
+      statuses,
+      hasCrude,
+      nowHhMm: params.nowHhMm,
+    });
+    return view;
   }
 
-  return {
+  const view: LiveAssistantView = {
     tone: 'scanning',
     headline: 'Live desk running',
     detail: `${money}: scanning for opportunities on each tick (about every 60s).`,
     lines,
+    clockNote,
   };
+  view.nextAction = buildNextAction({
+    tone: view.tone,
+    realOrders: params.realOrders,
+    statuses,
+    hasCrude,
+    nowHhMm: params.nowHhMm,
+  });
+  return view;
 }

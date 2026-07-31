@@ -297,8 +297,10 @@ export class CrudePaperDeskService {
     this.dayLossStopPts = resolveCrudeProfileDayLossPts(this.tradeParams, this.strictDayStop);
     this.enableMorning = options?.enableMorning ?? this.tradeParams.defaultEnableMorning;
     this.enableEvening = options?.enableEvening ?? this.tradeParams.defaultEnableEvening;
-    this.liveOrders.reset();
+    // Soft clear — keep Trade Desk Nifty/Bank live broker state intact.
+    this.liveOrders.clearInstruments([CRUDE_OIL_MINI_INSTRUMENT.id]);
     this.liveOrders.setLotsMultiplier(this.lotsMultiplier);
+    this.liveOrders.setLotsForInstrument(CRUDE_OIL_MINI_INSTRUMENT.id, this.lotsMultiplier);
     const today = todayIso();
     const now = istNowHhMm();
 
