@@ -1,0 +1,35 @@
+import { HttpInterceptorFn } from '@angular/common/http';
+import { inject } from '@angular/core';
+import { AuthService } from './auth.service';
+
+/** Attach site or admin Bearer token for Order-API auth/live/pnl/vault calls. */
+export const authTokenInterceptor: HttpInterceptorFn = (req, next) => {
+  const auth = inject(AuthService);
+  const url = req.url;
+  const needsSite =
+    url.includes('/api/auth/me') ||
+    url.includes('/api/auth/vault') ||
+    url.includes('/api/live') ||
+    url.includes('/api/pnl');
+  const needsAdmin = url.includes('/api/auth/admin/');
+
+  if (needsAdmin) {
+    const t = auth.getAdminToken();
+    if (t && !url.includes('/api/auth/admin/login')) {
+      return next(
+        req.clone({ setHeaders: { Authorization: `Bearer ${t}` } }),
+      );
+    }
+  }
+
+  if (needsSite) {
+    const t = auth.getToken();
+    if (t) {
+      return next(
+        req.clone({ setHeaders: { Authorization: `Bearer ${t}` } }),
+      );
+    }
+  }
+
+  return next(req);
+};

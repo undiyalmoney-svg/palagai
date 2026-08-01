@@ -19,7 +19,6 @@ import { KiteSessionService } from '../../../core/kite/kite-session.service';
 import { LotsPreferenceService } from '../../../core/services/lots-preference.service';
 import { formatUnknownError } from '../../../core/utils/kite-error.util';
 import { extractTradeDate, formatDayOfWeek, formatDisplayDate } from '../../../core/utils/trade-date.util';
-import { APP_BUILD_LABEL } from '../../../core/config/app-build';
 import { StrategyAssignmentService } from '../../../core/strategy-manager/config/strategy-assignment.service';
 import { StrategyRegistryService } from '../../../core/strategy-manager/registry/strategy-registry.service';
 import { dnaCapsForStrategy } from '../../../core/strategy-manager/config/strategy-dna-caps';
@@ -39,8 +38,6 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
   private readonly lotsPreference = inject(LotsPreferenceService);
   private readonly assignments = inject(StrategyAssignmentService);
   private readonly registry = inject(StrategyRegistryService);
-
-  protected readonly appBuildLabel = APP_BUILD_LABEL;
 
   protected readonly mode = signal<PaperDeskMode>('testing');
   /** Default both dates to yesterday so Testing opens on the last completed session. */

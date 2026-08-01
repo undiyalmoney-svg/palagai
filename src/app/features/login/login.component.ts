@@ -48,17 +48,22 @@ export class LoginComponent {
     const { username, password } = this.loginForm.getRawValue();
     this.isLoading.set(true);
 
-    await new Promise((resolve) => setTimeout(resolve, 600));
+    const result = await this.authService.login(username, password);
 
-    const isValid = this.authService.login(username, password);
-
-    if (isValid) {
-      const next = peekKiteRequestToken()
-        ? ['/dashboard/get-token']
-        : ['/dashboard/trade-desk'];
+    if (result.ok) {
+      await this.authService.refreshMe();
+      const u = this.authService.currentUser();
+      let next = ['/dashboard/trade-desk'];
+      if (peekKiteRequestToken()) {
+        next = ['/dashboard/get-token'];
+      } else if (u && !this.authService.hasModule('trade')) {
+        if (this.authService.hasModule('crude')) next = ['/dashboard/crude-oil'];
+        else if (this.authService.hasModule('auto')) next = ['/dashboard/auto-trader'];
+        else if (this.authService.hasModule('token')) next = ['/dashboard/get-token'];
+      }
       await this.router.navigate(next);
     } else {
-      this.errorMessage.set('Invalid username or password');
+      this.errorMessage.set(result.message);
     }
 
     this.isLoading.set(false);

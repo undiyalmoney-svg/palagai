@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { authGuard, guestGuard } from './core/auth/auth.guard';
+import { authGuard, guestGuard, moduleGuard, adminGuard } from './core/auth/auth.guard';
 import { stashKiteRequestToken } from './core/kite/kite-request-token.util';
 import { LoginComponent } from './features/login/login.component';
 import { DashboardComponent } from './features/dashboard/dashboard.component';
@@ -8,11 +8,12 @@ import { OrderTestComponent } from './features/dashboard/order-test/order-test.c
 import { GetTokenComponent } from './features/dashboard/get-token/get-token.component';
 import { SettingsComponent } from './features/dashboard/settings/settings.component';
 import { CrudeOilDeskComponent } from './features/dashboard/crude-oil-desk/crude-oil-desk.component';
-// Stocks Desk hidden for now — Auto Trader takes the nav slot.
-// import { StocksDeskComponent } from './features/dashboard/stocks-desk/stocks-desk.component';
 import { AutoTraderComponent } from './features/dashboard/auto-trader/auto-trader.component';
 import { PnlRecordsComponent } from './features/dashboard/pnl-records/pnl-records.component';
 import { StrategyManagerPageComponent } from './features/dashboard/strategy-manager/strategy-manager-page.component';
+import { VaultPageComponent } from './features/dashboard/vault/vault-page.component';
+import { AdminLoginComponent } from './features/admin/admin-login.component';
+import { AdminPageComponent } from './features/admin/admin-page.component';
 
 export const routes: Routes = [
   {
@@ -33,6 +34,15 @@ export const routes: Routes = [
     component: LoginComponent,
   },
   {
+    path: 'admin/login',
+    component: AdminLoginComponent,
+  },
+  {
+    path: 'admin',
+    canActivate: [adminGuard],
+    component: AdminPageComponent,
+  },
+  {
     path: 'dashboard',
     canActivate: [authGuard],
     component: DashboardComponent,
@@ -44,6 +54,7 @@ export const routes: Routes = [
       },
       {
         path: 'trade-desk',
+        canActivate: [moduleGuard('trade')],
         component: TradeDeskComponent,
       },
       {
@@ -53,31 +64,39 @@ export const routes: Routes = [
       { path: 'orders', redirectTo: 'pnl-records', pathMatch: 'full' },
       {
         path: 'pnl-records',
+        canActivate: [moduleGuard('pnl')],
         component: PnlRecordsComponent,
       },
       {
         path: 'crude-oil',
+        canActivate: [moduleGuard('crude')],
         component: CrudeOilDeskComponent,
       },
-      // { path: 'stocks', component: StocksDeskComponent },
       { path: 'stocks', redirectTo: 'auto-trader', pathMatch: 'full' },
       {
         path: 'auto-trader',
+        canActivate: [moduleGuard('auto')],
         component: AutoTraderComponent,
       },
       {
         path: 'strategy-manager',
+        canActivate: [moduleGuard('strat')],
         component: StrategyManagerPageComponent,
       },
       {
         path: 'get-token',
+        canActivate: [moduleGuard('token')],
         component: GetTokenComponent,
+      },
+      {
+        path: 'vault',
+        canActivate: [moduleGuard('vault')],
+        component: VaultPageComponent,
       },
       {
         path: 'settings',
         component: SettingsComponent,
       },
-      // Removed tabs — keep old URLs from breaking
       { path: 'historical-tester', redirectTo: 'trade-desk', pathMatch: 'full' },
       { path: 'strategy', redirectTo: 'trade-desk', pathMatch: 'full' },
       { path: 'strategies', redirectTo: 'trade-desk', pathMatch: 'full' },

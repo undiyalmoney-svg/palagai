@@ -306,6 +306,9 @@ async function proxyOrderBackendJson(
   if (typeof req.headers['content-type'] === 'string') {
     headers['Content-Type'] = req.headers['content-type'];
   }
+  if (typeof req.headers['x-vault-password'] === 'string') {
+    headers['X-Vault-Password'] = req.headers['x-vault-password'];
+  }
 
   const init: RequestInit = {
     method: req.method,
@@ -349,6 +352,13 @@ pnlApiRouter.use((req, res) => {
   void proxyOrderBackendJson('/pnl', 'pnl', req, res);
 });
 app.use('/api/pnl', pnlApiRouter);
+
+const authApiRouter = express.Router();
+authApiRouter.use(express.json());
+authApiRouter.use((req, res) => {
+  void proxyOrderBackendJson('/auth', 'auth', req, res);
+});
+app.use('/api/auth', authApiRouter);
 
 /**
  * Serve static files from /browser

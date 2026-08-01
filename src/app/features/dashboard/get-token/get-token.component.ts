@@ -13,6 +13,7 @@ import { extractKiteApiError } from '../../../core/utils/kite-error.util';
 import { KiteCredentialsService } from '../../../core/kite/kite-credentials.service';
 import { KiteApiService } from '../../../core/kite/kite-api.service';
 import { KiteSessionService, KiteSession } from '../../../core/kite/kite-session.service';
+import { AuthService } from '../../../core/auth/auth.service';
 import {
   captureKiteRequestTokenFromLocation,
   consumeKiteRequestToken,
@@ -53,6 +54,7 @@ export class GetTokenComponent implements OnInit {
   private readonly kiteApiService = inject(KiteApiService);
   private readonly kiteCredentialsService = inject(KiteCredentialsService);
   private readonly kiteSessionService = inject(KiteSessionService);
+  private readonly authService = inject(AuthService);
 
   protected readonly isRedirecting = signal(false);
   protected readonly isGeneratingChecksum = signal(false);
@@ -168,6 +170,12 @@ export class GetTokenComponent implements OnInit {
       this.setCredentialsFormEditable(false);
       this.isEditingCredentials.set(false);
     } else {
+      const adminKey = this.authService.currentUser()?.kiteApiKey?.trim();
+      if (adminKey) {
+        this.credentialsForm.patchValue({ apiKey: adminKey });
+        this.prefillStepForms(adminKey, '');
+        this.manualTokenForm.patchValue({ apiKey: adminKey });
+      }
       this.setCredentialsFormEditable(true);
       this.isEditingCredentials.set(true);
     }

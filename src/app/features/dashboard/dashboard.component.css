@@ -31,6 +31,18 @@
   );
 }
 
+.header-clock {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 1.25rem 0.45rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  color: var(--pg-muted);
+  text-align: right;
+}
+
 .palagai-header-inner {
   max-width: 1200px;
   margin: 0 auto;
@@ -232,6 +244,12 @@
 
   .logout-btn span {
     display: none;
+  }
+
+  .header-clock {
+    padding: 0 0.85rem 0.4rem;
+    text-align: center;
+    font-size: 0.72rem;
   }
 
   .palagai-main {

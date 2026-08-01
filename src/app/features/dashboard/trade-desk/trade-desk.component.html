@@ -79,39 +79,6 @@
     </button>
   </div>
 
-  <aside class="trading-basis" aria-label="How the desk decides trades">
-    <div class="trading-basis-head">
-      <h2 class="trading-basis-title">What the app trades on</h2>
-      <span class="build-chip" [attr.title]="'Hard-refresh if this build looks stale'">{{ appBuildLabel }}</span>
-    </div>
-    <ul class="trading-basis-list">
-      <li>
-        <strong>Active strategy</strong> — Banner above shows Strat Paper/Live assignment live. Per-index cards also show <em>Running · …</em> after a run.
-      </li>
-      <li>
-        <strong>Default (indices)</strong> — <em>Donch Retest</em> · unlimited trades · tighter SL + day stop −40 · Swing-5 trail (<em>Trap</em> still selectable — wins more calendar years)
-      </li>
-      <li>
-        <strong>Stops</strong> — Hard SL Nifty 22 / Bank 35 pts · day stop −40 · Strict −₹2,950 <em>on by default</em> · optional Profit lock +₹5,000
-      </li>
-      <li>
-        <strong>Books</strong> — Nifty 50 · Bank Nifty · Crude Oil Mini (All-Green only on this desk). Separate lots per book. Dedicated <em>/crude-oil</em> page still available.
-      </li>
-      <li>
-        <strong>Hours</strong> — All three from ~09:15. At <em>15:15</em> index books stop (session exit / no new entries). Crude continues on MCX until ~23:10.
-      </li>
-      <li>
-        <strong>P&amp;L math</strong> — Front-week option OHLC: <em>(exit − entry) × lot × lots</em>. Missing week / stop / target → <em>est. premium</em> = <strong>Index ₹ proxy</strong> (Nifty×65 · Bank×30 · Crude×10). Raw “Index pts” mixes underlyings — don’t judge money from pts alone.
-      </li>
-      <li>
-        <strong>Settings tip</strong> — Max trades unlocked (∞) for every strategy. Strict day stop still cuts stacked red days.
-      </li>
-      <li>
-        <strong>P&amp;L tip</strong> — Badge must be <em>v1.3.17 · …cancel-sl-exit</em> (hard-refresh if not). Nifty weeklies = Tuesday; Live money needs a loaded NFO chain. Peak-trail arms at ₹600 (≤₹300 giveback). All-est rows → Option ₹ <strong>equals</strong> Index ₹. Live money still uses Kite fills.
-      </li>
-    </ul>
-  </aside>
-
   <div class="control-bar">
     @if (mode() === 'testing') {
       <label class="field">
@@ -986,19 +953,4 @@
       </div>
     </div>
   }
-
-  <aside class="rules">
-    <h4>How it runs</h4>
-    <ul>
-      <li><strong>Testing</strong> — pick dates, Start loads candles in ~3-month batches and combines results (works for 1–5 year ranges).</li>
-      <li><strong>Live paper</strong> — Start auto-polls during 09:15–15:30; after hours use Testing.</li>
-      <li><strong>Live money</strong> — tick the box + confirm; MARKET entry + protective SL-M; strategy exit cancels SL then MARKET sell.</li>
-      <li><strong>Kite 5m limit</strong> — max {{ snapshot().kiteStats.maxDaysPerCall }} calendar days (~3 months) per historical call; longer ranges auto-chunk.</li>
-      <li>
-        ATM weekly CE on BUY / PE on SELL · lots per book (Nifty / Bank / Crude) · Strat for indices · Crude All-Green.
-        Index until 15:15 · Crude continues on MCX. Optional: Strict day stop (−₹2,950) · Day profit lock (+₹5,000).
-      </li>
-      <li><strong>PDF</strong> — Download PDF after Testing for totals, best/worst days, weekday rollup, and trades.</li>
-    </ul>
-  </aside>
 </section>

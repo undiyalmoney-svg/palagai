@@ -34,5 +34,14 @@
       "^/api/pnl": "/pnl"
     },
     "logLevel": "debug"
+  },
+  "/api/auth": {
+    "target": "http://168.144.28.89:3000",
+    "secure": false,
+    "changeOrigin": true,
+    "pathRewrite": {
+      "^/api/auth": "/auth"
+    },
+    "logLevel": "debug"
   }
 }

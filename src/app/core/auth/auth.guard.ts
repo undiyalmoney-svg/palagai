@@ -1,50 +1,45 @@
 import { inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
 import { AuthService } from './auth.service';
-import {
-  captureKiteRequestTokenFromLocation,
-  peekKiteRequestToken,
-  stashKiteRequestToken,
-} from '../kite/kite-request-token.util';
+import { SiteModule } from './auth.constants';
 
-function stashTokenFromRoute(route: { queryParamMap: { get(name: string): string | null } }): void {
-  const queryToken = route.queryParamMap.get('request_token');
-  if (queryToken) {
-    stashKiteRequestToken(queryToken);
-  } else {
-    captureKiteRequestTokenFromLocation();
-  }
-}
-
-export const authGuard: CanActivateFn = (route, state) => {
+export const authGuard: CanActivateFn = () => {
   const authService = inject(AuthService);
   const router = inject(Router);
-  stashTokenFromRoute(route);
-
-  // Allow Kite OAuth return URL without app login so live redirect works.
-  if (state.url.startsWith('/dashboard/get-token')) {
-    return true;
-  }
-
   if (authService.isAuthenticated()) {
     return true;
   }
-
   return router.createUrlTree(['/login']);
 };
 
-export const guestGuard: CanActivateFn = (route) => {
+export const guestGuard: CanActivateFn = () => {
   const authService = inject(AuthService);
   const router = inject(Router);
-  stashTokenFromRoute(route);
-
   if (!authService.isAuthenticated()) {
     return true;
   }
-
-  if (peekKiteRequestToken()) {
-    return router.createUrlTree(['/dashboard/get-token']);
-  }
-
   return router.createUrlTree(['/dashboard']);
+};
+
+export const moduleGuard = (mod: SiteModule): CanActivateFn => {
+  return () => {
+    const auth = inject(AuthService);
+    const router = inject(Router);
+    if (!auth.isAuthenticated()) {
+      return router.createUrlTree(['/login']);
+    }
+    if (auth.hasModule(mod)) {
+      return true;
+    }
+    return router.createUrlTree(['/dashboard']);
+  };
+};
+
+export const adminGuard: CanActivateFn = () => {
+  const auth = inject(AuthService);
+  const router = inject(Router);
+  if (auth.isAdminSession()) {
+    return true;
+  }
+  return router.createUrlTree(['/admin/login']);
 };

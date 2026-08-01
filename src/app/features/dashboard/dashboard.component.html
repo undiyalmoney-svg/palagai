@@ -10,7 +10,7 @@
       </a>
 
       <nav class="palagai-nav" aria-label="Main">
-        @for (item of navItems; track item.route) {
+        @for (item of navItems(); track item.route) {
           <a
             [href]="item.route"
             [routerLink]="item.route"
@@ -29,6 +29,7 @@
         <span>Logout</span>
       </button>
     </div>
+    <div class="header-clock" aria-live="polite">{{ clockLabel() }}</div>
   </header>
 
   <main class="palagai-main">
@@ -36,7 +37,7 @@
   </main>
 
   <nav class="mobile-tabbar" aria-label="Mobile menu">
-    @for (item of navItems; track item.route) {
+    @for (item of navItems(); track item.route) {
       <a
         class="tab-item"
         [href]="item.route"
