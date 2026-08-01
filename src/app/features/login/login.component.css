@@ -1,27 +1,24 @@
+/* True viewport center — independent of parent height / mobile chrome */
 :host {
-  display: grid;
-  place-items: center;
-  width: 100%;
-  min-height: 100vh;
-  min-height: 100dvh;
-  min-height: -webkit-fill-available;
+  display: block;
 }
 
 .login-page {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
   box-sizing: border-box;
   width: 100%;
-  max-width: 100%;
-  min-height: 100vh;
-  min-height: 100dvh;
-  min-height: -webkit-fill-available;
-  display: grid;
-  place-items: center;
+  height: 100%;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   padding:
     max(1.25rem, env(safe-area-inset-top, 0px))
     max(1.25rem, env(safe-area-inset-right, 0px))
     max(1.25rem, env(safe-area-inset-bottom, 0px))
     max(1.25rem, env(safe-area-inset-left, 0px));
-  margin: 0;
   background:
     radial-gradient(ellipse 80% 60% at 20% 0%, var(--pg-bull-glow), transparent 50%),
     radial-gradient(ellipse 70% 50% at 90% 10%, var(--pg-bear-glow), transparent 45%),
@@ -41,8 +38,7 @@
 
 .login-card {
   width: min(100%, 420px);
-  justify-self: center;
-  align-self: center;
+  flex: 0 0 auto;
   margin: 0;
   padding: 2.25rem 2rem;
   border-radius: var(--pg-radius-lg);

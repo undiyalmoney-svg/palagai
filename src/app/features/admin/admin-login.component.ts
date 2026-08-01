@@ -33,17 +33,22 @@ import { AuthService } from '../../core/auth/auth.service';
   styles: `
     :host {
       display: block;
-      min-height: 100dvh;
     }
     .wrap {
+      position: fixed;
+      inset: 0;
       box-sizing: border-box;
-      min-height: 100dvh;
-      max-width: 420px;
-      margin: 0 auto;
-      padding: max(1.5rem, env(safe-area-inset-top)) 1.25rem;
       display: flex;
       flex-direction: column;
+      align-items: center;
       justify-content: center;
+      padding: max(1.5rem, env(safe-area-inset-top)) 1.25rem;
+      margin: 0;
+      max-width: none;
+      width: 100%;
+    }
+    .wrap > * {
+      width: min(100%, 420px);
     }
     .full {
       width: 100%;
