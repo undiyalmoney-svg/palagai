@@ -26,39 +26,41 @@
     </div>
   </header>
 
-  <div class="active-strategy-bar" role="status" aria-live="polite">
-    <div class="active-strategy-label">
-      <span class="as-kicker">Active now · {{ activeStrategies().modeLabel }}</span>
-      @if (showKutty() && kuttyAlone) {
-        <strong class="as-name">Kutty alone{{ enableCrude && showCrude() ? ' + Crude All-Green' : '' }}</strong>
-        <span class="as-meta">No Trap/Strat · ₹600 TP / ₹200 SL · ∞ trades</span>
-      } @else if (activeStrategies().same) {
-        <strong class="as-name"
-          >{{ activeStrategies().nifty.name
-          }}{{ enableCrude && showCrude() ? ' · Crude All-Green' : '' }}</strong
-        >
-        <span class="as-meta"
-          >Nifty + Bank · {{ activeStrategies().nifty.maxTradesLabel
-          }}{{ showKutty() && enableKutty ? ' · +Kutty' : ''
-          }}{{ enableCrude && showCrude() ? ' · Crude →23:10' : '' }}</span
-        >
-      } @else {
-        <strong class="as-name"
-          >Nifty {{ activeStrategies().nifty.name }} · Bank {{ activeStrategies().bank.name
-          }}{{ enableCrude && showCrude() ? ' · Crude All-Green' : '' }}</strong
-        >
-        <span class="as-meta"
-          >{{ activeStrategies().nifty.maxTradesLabel }} /
-          {{ activeStrategies().bank.maxTradesLabel
-          }}{{ showKutty() && enableKutty ? ' · +Kutty' : ''
-          }}{{ enableCrude && showCrude() ? ' · Crude →23:10' : '' }}</span
-        >
+  @if (showKutty()) {
+    <div class="active-strategy-bar" role="status" aria-live="polite">
+      <div class="active-strategy-label">
+        <span class="as-kicker">Active now · {{ activeStrategies().modeLabel }}</span>
+        @if (kuttyAlone) {
+          <strong class="as-name">Kutty alone{{ enableCrude && showCrude() ? ' + Crude All-Green' : '' }}</strong>
+          <span class="as-meta">No Trap/Strat · ₹600 TP / ₹200 SL · ∞ trades</span>
+        } @else if (activeStrategies().same) {
+          <strong class="as-name"
+            >{{ activeStrategies().nifty.name
+            }}{{ enableCrude && showCrude() ? ' · Crude All-Green' : '' }}</strong
+          >
+          <span class="as-meta"
+            >Nifty + Bank · {{ activeStrategies().nifty.maxTradesLabel
+            }}{{ enableKutty ? ' · +Kutty' : ''
+            }}{{ enableCrude && showCrude() ? ' · Crude →23:10' : '' }}</span
+          >
+        } @else {
+          <strong class="as-name"
+            >Nifty {{ activeStrategies().nifty.name }} · Bank {{ activeStrategies().bank.name
+            }}{{ enableCrude && showCrude() ? ' · Crude All-Green' : '' }}</strong
+          >
+          <span class="as-meta"
+            >{{ activeStrategies().nifty.maxTradesLabel }} /
+            {{ activeStrategies().bank.maxTradesLabel
+            }}{{ enableKutty ? ' · +Kutty' : ''
+            }}{{ enableCrude && showCrude() ? ' · Crude →23:10' : '' }}</span
+          >
+        }
+      </div>
+      @if (!kuttyAlone) {
+        <a class="as-link" href="/strategy-manager">Change in Strat</a>
       }
     </div>
-    @if (!(showKutty() && kuttyAlone)) {
-      <a class="as-link" href="/strategy-manager">Change in Strat</a>
-    }
-  </div>
+  }
 
   <div class="mode-switch" role="tablist" aria-label="Desk mode">
     <button
