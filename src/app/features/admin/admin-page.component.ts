@@ -24,7 +24,7 @@ const FRIEND_MODS: SiteModule[] = ['trade', 'crude', 'auto', 'token', 'test'];
       </header>
 
       @if (message()) {
-        <p class="msg">{{ message() }}</p>
+        <p class="msg" [class.err]="messageIsError()" role="status">{{ message() }}</p>
       }
 
       <article class="card">
@@ -96,22 +96,18 @@ const FRIEND_MODS: SiteModule[] = ['trade', 'crude', 'auto', 'token', 'test'];
             }
             <label class="wide">Note <input [(ngModel)]="u.note" [disabled]="busy()" /></label>
             <div class="actions">
-              <button mat-stroked-button type="button" (click)="saveUser(u)" [disabled]="busy()">
+              <button mat-flat-button color="primary" type="button" (click)="saveUser(u)" [disabled]="busy()">
                 Save
               </button>
               @if (u.role !== 'owner') {
                 <button mat-stroked-button type="button" (click)="toggleBlock(u)" [disabled]="busy()">
                   {{ u.blocked ? 'Unblock' : 'Block' }}
                 </button>
-                <button
-                  mat-stroked-button
-                  color="warn"
-                  type="button"
-                  (click)="deleteUser(u)"
-                  [disabled]="busy()"
-                >
-                  Delete
+                <button class="btn-delete" type="button" (click)="deleteUser(u)" [disabled]="busy()">
+                  Delete user
                 </button>
+              } @else {
+                <span class="hint">Owner cannot be deleted</span>
               }
             </div>
           </div>
@@ -204,13 +200,45 @@ const FRIEND_MODS: SiteModule[] = ['trade', 'crude', 'auto', 'token', 'test'];
     }
     .actions {
       display: flex;
+      flex-wrap: wrap;
       gap: 0.5rem;
       margin-top: 0.5rem;
+      align-items: center;
+    }
+    .btn-delete {
+      appearance: none;
+      border: 1px solid #b91c1c;
+      background: #dc2626;
+      color: #fff;
+      font-weight: 700;
+      font-size: 0.9rem;
+      padding: 0.55rem 1rem;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    .btn-delete:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .btn-delete:hover:not(:disabled) {
+      background: #b91c1c;
     }
     .msg {
+      position: sticky;
+      top: 0.5rem;
+      z-index: 5;
       color: #0b6b3a;
       font-weight: 600;
       margin-bottom: 0.75rem;
+      padding: 0.75rem 1rem;
+      background: #dcfce7;
+      border: 1px solid #86efac;
+      border-radius: 10px;
+    }
+    .msg.err {
+      color: #b42318;
+      background: #fee2e2;
+      border-color: #fecaca;
     }
     .hint {
       margin: 0.5rem 0 0;
@@ -226,6 +254,7 @@ export class AdminPageComponent implements OnInit {
   protected readonly users = signal<SiteUser[]>([]);
   protected readonly busy = signal(false);
   protected readonly message = signal('');
+  protected readonly messageIsError = signal(false);
 
   protected newUsername = '';
   protected newPassword = '';
@@ -251,23 +280,34 @@ export class AdminPageComponent implements OnInit {
     u.modules = modules;
   }
 
-  protected async reload(): Promise<void> {
+  private flash(text: string, isError = false): void {
+    this.message.set(text);
+    this.messageIsError.set(isError);
+  }
+
+  protected async reload(keepMessage?: string): Promise<void> {
     this.busy.set(true);
-    this.message.set('');
+    if (!keepMessage) {
+      this.message.set('');
+      this.messageIsError.set(false);
+    }
     try {
       const res = await firstValueFrom(
         this.http.get<{ users: SiteUser[] }>('/api/auth/admin/users'),
       );
       this.users.set(res.users || []);
-      if (!(res.users || []).length) {
-        this.message.set('No users yet — create one below.');
+      if (keepMessage) {
+        this.flash(keepMessage, false);
+      } else if (!(res.users || []).length) {
+        this.flash('No users yet — create one below.');
       }
     } catch (err: unknown) {
       const status = (err as { status?: number })?.status;
-      this.message.set(
+      this.flash(
         status === 401 || status === 403
           ? 'Admin session expired — sign in again'
           : 'Failed to load users — check Order-API /auth is running',
+        true,
       );
     } finally {
       this.busy.set(false);
@@ -277,8 +317,9 @@ export class AdminPageComponent implements OnInit {
   protected async create(): Promise<void> {
     this.busy.set(true);
     this.message.set('');
+    this.messageIsError.set(false);
     if (!String(this.newKiteKey || '').trim()) {
-      this.message.set('Kite API key required for friends');
+      this.flash('Kite API key required for friends', true);
       this.busy.set(false);
       return;
     }
@@ -296,11 +337,10 @@ export class AdminPageComponent implements OnInit {
       this.newPassword = '';
       this.newKiteKey = '';
       this.newNote = '';
-      this.message.set('User created');
-      await this.reload();
+      await this.reload('User created');
     } catch (err: unknown) {
       const e = err as { error?: { message?: string } };
-      this.message.set(e?.error?.message || 'Create failed');
+      this.flash(e?.error?.message || 'Create failed', true);
     } finally {
       this.busy.set(false);
     }
@@ -308,13 +348,14 @@ export class AdminPageComponent implements OnInit {
 
   protected async saveUser(u: SiteUser): Promise<void> {
     if (u.role !== 'owner' && !String(u.kiteApiKey || '').trim()) {
-      this.message.set('Kite API key required for friends');
+      this.flash('Kite API key required for friends', true);
       return;
     }
     if (!String(u.password || '').trim() || String(u.password).trim().length < 6) {
-      this.message.set('Password min 6 chars');
+      this.flash('Password min 6 chars', true);
       return;
     }
+    const name = u.username;
     this.busy.set(true);
     try {
       const body: Record<string, unknown> = {
@@ -327,11 +368,10 @@ export class AdminPageComponent implements OnInit {
         body['kiteApiKey'] = u.kiteApiKey;
       }
       await firstValueFrom(this.http.patch(`/api/auth/admin/users/${u.id}`, body));
-      this.message.set(`Saved ${u.username}`);
-      await this.reload();
+      await this.reload(`Saved ${name}`);
     } catch (err: unknown) {
       const e = err as { error?: { message?: string } };
-      this.message.set(e?.error?.message || 'Save failed');
+      this.flash(e?.error?.message || 'Save failed', true);
     } finally {
       this.busy.set(false);
     }
@@ -339,16 +379,17 @@ export class AdminPageComponent implements OnInit {
 
   protected async toggleBlock(u: SiteUser): Promise<void> {
     this.busy.set(true);
+    const name = u.username;
+    const nextBlocked = !u.blocked;
     try {
       await firstValueFrom(
         this.http.patch(`/api/auth/admin/users/${u.id}`, {
-          blocked: !u.blocked,
+          blocked: nextBlocked,
         }),
       );
-      this.message.set(u.blocked ? `Unblocked ${u.username}` : `Blocked ${u.username}`);
-      await this.reload();
+      await this.reload(nextBlocked ? `Blocked ${name}` : `Unblocked ${name}`);
     } catch {
-      this.message.set('Block update failed');
+      this.flash('Block update failed', true);
     } finally {
       this.busy.set(false);
     }
@@ -356,21 +397,20 @@ export class AdminPageComponent implements OnInit {
 
   protected async deleteUser(u: SiteUser): Promise<void> {
     if (u.role === 'owner') {
-      this.message.set('Cannot delete owner');
+      this.flash('Cannot delete owner', true);
       return;
     }
     if (!confirm(`Delete user “${u.username}”? This cannot be undone.`)) {
       return;
     }
+    const name = u.username;
     this.busy.set(true);
-    this.message.set('');
     try {
       await firstValueFrom(this.http.delete(`/api/auth/admin/users/${u.id}`));
-      this.message.set(`Deleted ${u.username}`);
-      await this.reload();
+      await this.reload(`Deleted ${name}`);
     } catch (err: unknown) {
       const e = err as { error?: { message?: string } };
-      this.message.set(e?.error?.message || 'Delete failed');
+      this.flash(e?.error?.message || 'Delete failed', true);
     } finally {
       this.busy.set(false);
     }
