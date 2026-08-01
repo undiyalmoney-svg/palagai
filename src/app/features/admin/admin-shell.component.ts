@@ -56,12 +56,27 @@ import { PgIconComponent } from '../../shared/ui/icon/pg-icon.component';
       color: var(--pg-ink);
     }
     .sidebar {
+      position: fixed;
+      left: 0;
+      top: 0;
+      width: 220px;
+      height: 100dvh;
       background: #fff;
       border-right: 1px solid var(--pg-line);
       padding: 1.15rem 0.85rem;
       display: flex;
       flex-direction: column;
       gap: 1rem;
+      overflow-y: auto;
+      z-index: 40;
+      box-sizing: border-box;
+    }
+    .workspace {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      grid-column: 2;
+      min-height: 100dvh;
     }
     .brand {
       display: flex;
@@ -129,11 +144,6 @@ import { PgIconComponent } from '../../shared/ui/icon/pg-icon.component';
     .side-logout {
       width: 100%;
     }
-    .workspace {
-      min-width: 0;
-      display: flex;
-      flex-direction: column;
-    }
     .topbar {
       display: flex;
       align-items: center;
@@ -159,15 +169,21 @@ import { PgIconComponent } from '../../shared/ui/icon/pg-icon.component';
     main {
       min-width: 0;
       padding: 1.25rem 1.5rem 2rem;
-      max-width: var(--pg-content-max);
+      max-width: none;
     }
     @media (max-width: 800px) {
       .shell {
         grid-template-columns: 1fr;
       }
       .sidebar {
+        position: relative;
+        width: 100%;
+        height: auto;
         border-right: none;
         border-bottom: 1px solid var(--pg-line);
+      }
+      .workspace {
+        grid-column: 1;
       }
       nav {
         flex-direction: row;

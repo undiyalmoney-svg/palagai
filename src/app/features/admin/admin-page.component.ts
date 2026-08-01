@@ -54,74 +54,116 @@ const CUSTOMER_MODS: SiteModule[] = ['trade', 'crude', 'auto', 'token', 'test', 
         </button>
       </article>
 
-      <article class="card">
-        <h2>All users</h2>
-        @for (u of users(); track u.id) {
-          <div class="user" [class.blocked]="u.blocked">
-            <div class="user-head">
-              <span class="role">{{ roleLabel(u) }}</span>
-              @if (u.blocked) {
-                <em>BLOCKED</em>
+      <article class="card table-card">
+        <div class="table-head">
+          <h2>All users</h2>
+          <span class="count">{{ users().length }} total</span>
+        </div>
+        <div class="table-wrap">
+          <table class="users-table">
+            <thead>
+              <tr>
+                <th>Role</th>
+                <th>Username</th>
+                <th>Password</th>
+                <th>Modules</th>
+                <th>Kite API key</th>
+                <th>Note</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (u of users(); track u.id) {
+                <tr [class.blocked]="u.blocked">
+                  <td>
+                    <span class="role-pill" [class.devil]="u.role === 'owner'">{{ roleLabel(u) }}</span>
+                  </td>
+                  <td>
+                    <input class="cell-input" [(ngModel)]="u.username" [disabled]="busy()" autocomplete="off" />
+                  </td>
+                  <td>
+                    <input
+                      class="cell-input"
+                      [(ngModel)]="u.password"
+                      type="text"
+                      [disabled]="busy()"
+                      autocomplete="off"
+                    />
+                  </td>
+                  <td>
+                    <div class="mods compact">
+                      @for (m of customerMods; track m) {
+                        <label>
+                          <input
+                            type="checkbox"
+                            [checked]="u.modules.includes(m)"
+                            [disabled]="u.role === 'owner' || busy()"
+                            (change)="toggleUser(u, m, $event)"
+                          />
+                          {{ modLabel(m) }}
+                        </label>
+                      }
+                    </div>
+                  </td>
+                  <td>
+                    @if (u.role === 'owner') {
+                      <span class="muted">Local Get Token</span>
+                    } @else {
+                      <input
+                        class="cell-input mono"
+                        [(ngModel)]="u.kiteApiKey"
+                        [disabled]="busy()"
+                        autocomplete="off"
+                      />
+                    }
+                  </td>
+                  <td>
+                    <input class="cell-input" [(ngModel)]="u.note" [disabled]="busy()" />
+                  </td>
+                  <td>
+                    @if (u.blocked) {
+                      <span class="status blocked">Blocked</span>
+                    } @else {
+                      <span class="status ok">Active</span>
+                    }
+                  </td>
+                  <td>
+                    <div class="actions">
+                      <button
+                        mat-flat-button
+                        color="primary"
+                        type="button"
+                        (click)="saveUser(u)"
+                        [disabled]="busy()"
+                      >
+                        Save
+                      </button>
+                      @if (u.role !== 'owner') {
+                        <button mat-stroked-button type="button" (click)="toggleBlock(u)" [disabled]="busy()">
+                          {{ u.blocked ? 'Unblock' : 'Block' }}
+                        </button>
+                        <button class="btn-delete" type="button" (click)="deleteUser(u)" [disabled]="busy()">
+                          Delete
+                        </button>
+                      }
+                    </div>
+                  </td>
+                </tr>
+              } @empty {
+                <tr>
+                  <td colspan="8" class="empty">No users yet — create a customer above.</td>
+                </tr>
               }
-            </div>
-            <div class="row">
-              <label
-                >Username
-                <input [(ngModel)]="u.username" [disabled]="busy()" autocomplete="off"
-              /></label>
-              <label
-                >Password
-                <input [(ngModel)]="u.password" type="text" [disabled]="busy()" autocomplete="off"
-              /></label>
-            </div>
-            <div class="mods">
-              @for (m of customerMods; track m) {
-                <label>
-                  <input
-                    type="checkbox"
-                    [checked]="u.modules.includes(m)"
-                    [disabled]="u.role === 'owner'"
-                    (change)="toggleUser(u, m, $event)"
-                  />
-                  {{ modLabel(m) }}
-                </label>
-              }
-            </div>
-            @if (u.role === 'owner') {
-              <p class="hint">Devil uses local Get Token credentials — no API key stored here.</p>
-            } @else {
-              <label class="wide"
-                >Kite API key
-                <input [(ngModel)]="u.kiteApiKey" [disabled]="busy()" autocomplete="off"
-              /></label>
-              @if (u.kiteApiKey) {
-                <p class="saved-key">Saved key: <code>{{ u.kiteApiKey }}</code></p>
-              }
-            }
-            <label class="wide">Note <input [(ngModel)]="u.note" [disabled]="busy()" /></label>
-            <div class="actions">
-              <button mat-flat-button color="primary" type="button" (click)="saveUser(u)" [disabled]="busy()">
-                Save
-              </button>
-              @if (u.role !== 'owner') {
-                <button mat-stroked-button type="button" (click)="toggleBlock(u)" [disabled]="busy()">
-                  {{ u.blocked ? 'Unblock' : 'Block' }}
-                </button>
-                <button class="btn-delete" type="button" (click)="deleteUser(u)" [disabled]="busy()">
-                  Delete customer
-                </button>
-              } @else {
-                <span class="hint">Devil cannot be deleted</span>
-              }
-            </div>
-          </div>
-        }
+            </tbody>
+          </table>
+        </div>
       </article>
     </section>
   `,
   styles: `
     .admin {
-      max-width: 960px;
+      max-width: none;
       margin: 0;
       padding: 0;
       color: var(--pg-ink);
@@ -134,19 +176,15 @@ const CUSTOMER_MODS: SiteModule[] = ['trade', 'crude', 'auto', 'token', 'test', 
       margin: 0;
       font-size: 1.5rem;
       letter-spacing: -0.03em;
-      color: var(--pg-ink);
     }
     header p {
       margin: 0.4rem 0 0;
       color: var(--pg-muted);
+      max-width: 48rem;
     }
-    h2,
-    p,
-    label,
-    strong,
-    span,
-    em {
-      color: inherit;
+    h2 {
+      margin: 0 0 1rem;
+      font-size: 1.05rem;
     }
     .card {
       background: #fff;
@@ -155,6 +193,25 @@ const CUSTOMER_MODS: SiteModule[] = ['trade', 'crude', 'auto', 'token', 'test', 
       padding: 1.5rem 1.65rem;
       margin-bottom: 1rem;
       box-shadow: var(--pg-shadow-soft);
+    }
+    .table-card {
+      padding: 1.15rem 1.15rem 1.25rem;
+    }
+    .table-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      margin-bottom: 0.85rem;
+      padding: 0 0.35rem;
+    }
+    .table-head h2 {
+      margin: 0;
+    }
+    .count {
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--pg-muted);
     }
     .row {
       display: grid;
@@ -173,7 +230,6 @@ const CUSTOMER_MODS: SiteModule[] = ['trade', 'crude', 'auto', 'token', 'test', 
       flex-direction: column;
       gap: 0.25rem;
       font-size: 0.85rem;
-      color: var(--pg-ink);
     }
     input {
       padding: 0.65rem 0.85rem;
@@ -182,6 +238,7 @@ const CUSTOMER_MODS: SiteModule[] = ['trade', 'crude', 'auto', 'token', 'test', 
       color: var(--pg-ink);
       background: #fff;
       min-height: 42px;
+      font: inherit;
     }
     input:focus {
       outline: none;
@@ -198,33 +255,121 @@ const CUSTOMER_MODS: SiteModule[] = ['trade', 'crude', 'auto', 'token', 'test', 
       flex-direction: row;
       align-items: center;
       gap: 0.35rem;
+      white-space: nowrap;
     }
-    .user {
-      border-top: 1px solid #eee;
-      padding: 0.85rem 0;
+    .mods.compact {
+      margin: 0;
+      gap: 0.35rem 0.55rem;
+      max-width: 16rem;
     }
-    .user.blocked {
-      opacity: 0.7;
+    .mods.compact label {
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: var(--pg-muted);
+    }
+    .table-wrap {
+      overflow: auto;
+      border: 1px solid var(--pg-line);
+      border-radius: 16px;
+      background: #fff;
+    }
+    .users-table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 1100px;
+      font-size: 0.85rem;
+    }
+    .users-table thead th {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      background: var(--pg-bg-muted);
+      color: var(--pg-muted);
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      text-align: left;
+      padding: 0.85rem 0.75rem;
+      border-bottom: 1px solid var(--pg-line);
+      white-space: nowrap;
+    }
+    .users-table tbody td {
+      padding: 0.75rem;
+      border-bottom: 1px solid var(--pg-line);
+      vertical-align: top;
+    }
+    .users-table tbody tr:last-child td {
+      border-bottom: none;
+    }
+    .users-table tbody tr:hover {
+      background: #f8fafb;
+    }
+    .users-table tbody tr.blocked {
       background: #fff6f6;
     }
-    .user-head {
-      display: flex;
-      gap: 0.75rem;
-      align-items: center;
-      margin-bottom: 0.5rem;
+    .cell-input {
+      width: 100%;
+      min-width: 7.5rem;
+      min-height: 36px;
+      padding: 0.4rem 0.55rem;
+      border-radius: 10px;
+      font-size: 0.82rem;
     }
-    .role {
-      font-weight: 700;
-      text-transform: uppercase;
+    .cell-input.mono {
+      font-family: var(--pg-font-mono);
       font-size: 0.75rem;
-      letter-spacing: 0.04em;
+      min-width: 10rem;
+    }
+    .role-pill {
+      display: inline-flex;
+      padding: 0.28rem 0.55rem;
+      border-radius: 999px;
+      background: var(--pg-bg-muted);
+      border: 1px solid var(--pg-line);
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      color: var(--pg-muted);
+      white-space: nowrap;
+    }
+    .role-pill.devil {
+      background: var(--pg-bull-soft);
+      border-color: #b7ebd0;
+      color: var(--pg-bull-deep);
+    }
+    .status {
+      display: inline-flex;
+      padding: 0.28rem 0.55rem;
+      border-radius: 999px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .status.ok {
+      background: var(--pg-bull-soft);
+      color: var(--pg-bull-deep);
+    }
+    .status.blocked {
+      background: var(--pg-bear-soft);
+      color: var(--pg-bear-deep);
+    }
+    .muted {
+      color: var(--pg-muted);
+      font-size: 0.78rem;
+    }
+    .empty {
+      text-align: center;
+      color: var(--pg-muted);
+      padding: 1.5rem !important;
     }
     .actions {
       display: flex;
       flex-wrap: wrap;
-      gap: 0.5rem;
-      margin-top: 0.5rem;
+      gap: 0.4rem;
       align-items: center;
+      min-width: 12rem;
     }
     .btn-delete {
       appearance: none;
@@ -232,8 +377,8 @@ const CUSTOMER_MODS: SiteModule[] = ['trade', 'crude', 'auto', 'token', 'test', 
       background: #dc2626;
       color: #fff;
       font-weight: 700;
-      font-size: 0.9rem;
-      padding: 0.55rem 1rem;
+      font-size: 0.8rem;
+      padding: 0.45rem 0.75rem;
       border-radius: 8px;
       cursor: pointer;
     }
@@ -261,22 +406,10 @@ const CUSTOMER_MODS: SiteModule[] = ['trade', 'crude', 'auto', 'token', 'test', 
       background: #fee2e2;
       border-color: #fecaca;
     }
-    .hint {
-      margin: 0.5rem 0 0;
-      font-size: 0.85rem;
-      color: #5a6f66;
-    }
-    .saved-key {
-      margin: 0.35rem 0 0;
-      font-size: 0.85rem;
-      color: #0c1f17;
-    }
-    .saved-key code {
-      font-family: ui-monospace, monospace;
-      background: #e8f5ef;
-      padding: 0.15rem 0.4rem;
-      border-radius: 4px;
-      word-break: break-all;
+    @media (max-width: 720px) {
+      .row {
+        grid-template-columns: 1fr;
+      }
     }
   `,
 })

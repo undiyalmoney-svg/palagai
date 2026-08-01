@@ -17,8 +17,10 @@
 }
 
 .sidebar {
-  position: sticky;
+  position: fixed;
+  left: 0;
   top: 0;
+  width: var(--pg-sidebar-w);
   height: 100dvh;
   display: flex;
   flex-direction: column;
@@ -27,19 +29,28 @@
   background: #fff;
   border-right: 1px solid var(--pg-line);
   z-index: 40;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
   transition:
+    transform 180ms ease,
     opacity 180ms ease,
+    width 180ms ease,
     padding 180ms ease,
     border-color 180ms ease;
 }
 
 .shell.sidebar-collapsed .sidebar {
+  transform: translateX(-100%);
   opacity: 0;
-  padding-left: 0;
-  padding-right: 0;
-  border-right-color: transparent;
   pointer-events: none;
+}
+
+.workspace {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  grid-column: 2;
 }
 
 .brand {
@@ -134,13 +145,6 @@
 
 .scrim {
   display: none;
-}
-
-.workspace {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  min-height: 100dvh;
 }
 
 .topbar {
@@ -369,11 +373,8 @@
     grid-template-columns: 1fr;
   }
 
-  .shell.sidebar-collapsed .sidebar {
-    opacity: 1;
-    padding: 1.15rem 0.85rem;
-    border-right-color: var(--pg-line);
-    pointer-events: auto;
+  .workspace {
+    grid-column: 1;
   }
 
   .sidebar {
@@ -381,14 +382,23 @@
     left: 0;
     top: 0;
     width: min(280px, 86vw);
+    height: 100dvh;
     transform: translateX(-105%);
-    transition: transform 180ms ease;
-    box-shadow: none;
     opacity: 1;
+    pointer-events: auto;
+    box-shadow: none;
+    transition: transform 180ms ease;
+  }
+
+  .shell.sidebar-collapsed .sidebar {
+    transform: translateX(-105%);
+    opacity: 1;
+    pointer-events: none;
   }
 
   .shell.sidebar-open .sidebar {
     transform: none;
+    pointer-events: auto;
     box-shadow: 16px 0 40px rgba(15, 23, 42, 0.12);
   }
 
