@@ -1,6 +1,6 @@
 import { Injectable, PLATFORM_ID, inject, signal } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import {
   ADMIN_TOKEN_KEY,
@@ -121,20 +121,53 @@ export class AuthService {
     this.user.set(null);
   }
 
-  async adminLogin(username: string, password: string): Promise<boolean> {
+  async adminLogin(
+    username: string,
+    password: string,
+  ): Promise<{ ok: true } | { ok: false; message: string }> {
     try {
       const res = await firstValueFrom(
-        this.http.post<{ token: string }>(`${this.apiBase}/admin/login`, {
-          username,
-          password,
-        }),
+        this.http.post<{ status?: string; token?: string; message?: string }>(
+          `${this.apiBase}/admin/login`,
+          {
+            username: String(username || '').trim(),
+            password: String(password || ''),
+          },
+        ),
       );
+      if (!res?.token) {
+        return {
+          ok: false,
+          message: 'Auth API returned no token — is Order-API /auth deployed?',
+        };
+      }
       if (isPlatformBrowser(this.platformId)) {
         localStorage.setItem(ADMIN_TOKEN_KEY, res.token);
       }
-      return true;
-    } catch {
-      return false;
+      return { ok: true };
+    } catch (err: unknown) {
+      const status = err instanceof HttpErrorResponse ? err.status : undefined;
+      const body = err instanceof HttpErrorResponse ? err.error : null;
+      const apiMsg =
+        typeof body === 'string'
+          ? body
+          : body && typeof body === 'object' && 'message' in body
+            ? String((body as { message?: unknown }).message || '')
+            : '';
+      if (status === 401) {
+        return { ok: false, message: apiMsg || 'Invalid admin credentials' };
+      }
+      if (status === 404 || status === 502 || status === 0) {
+        return {
+          ok: false,
+          message:
+            'Admin API unreachable. Pull+restart Order-API on droplet and wait for Vercel deploy.',
+        };
+      }
+      return {
+        ok: false,
+        message: apiMsg || (err instanceof Error ? err.message : 'Admin login failed'),
+      };
     }
   }
 

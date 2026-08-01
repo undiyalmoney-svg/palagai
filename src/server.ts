@@ -110,6 +110,8 @@ const KITE_API_BASE_URL = 'https://api.kite.trade';
 const browserDistFolder = join(import.meta.dirname, '../browser');
 
 const app = express();
+app.use(express.json({ limit: '2mb' }));
+app.use(express.urlencoded({ extended: true }));
 const angularApp = new AngularNodeAppEngine();
 
 function asFormRecord(body: unknown): Record<string, string> {
@@ -297,8 +299,23 @@ async function proxyOrderBackendJson(
   req: express.Request,
   res: express.Response,
 ): Promise<void> {
-  const suffix = req.url === '/' ? '' : req.url;
-  const targetUrl = `${ORDER_BACKEND_BASE}${upstreamPathPrefix}${suffix}`;
+  // Use originalUrl so Vercel/Express mount stripping cannot drop /admin/login.
+  const original = String(req.originalUrl || req.url || '/');
+  const qIndex = original.indexOf('?');
+  const pathOnly = qIndex >= 0 ? original.slice(0, qIndex) : original;
+  const query = qIndex >= 0 ? original.slice(qIndex) : '';
+  let upstreamPath = pathOnly;
+  if (pathOnly.startsWith('/api/auth')) {
+    upstreamPath = pathOnly.replace(/^\/api\/auth/, '/auth');
+  } else if (pathOnly.startsWith('/api/live')) {
+    upstreamPath = pathOnly.replace(/^\/api\/live/, '/live');
+  } else if (pathOnly.startsWith('/api/pnl')) {
+    upstreamPath = pathOnly.replace(/^\/api\/pnl/, '/pnl');
+  } else {
+    const suffix = req.url === '/' ? '' : req.url;
+    upstreamPath = `${upstreamPathPrefix}${suffix}`;
+  }
+  const targetUrl = `${ORDER_BACKEND_BASE}${upstreamPath}${query}`;
   const headers: Record<string, string> = {};
   if (typeof req.headers.authorization === 'string') {
     headers['Authorization'] = req.headers.authorization;
@@ -317,7 +334,13 @@ async function proxyOrderBackendJson(
 
   if (req.method !== 'GET' && req.method !== 'HEAD' && req.method !== 'DELETE') {
     headers['Content-Type'] = headers['Content-Type'] || 'application/json';
-    init.body = JSON.stringify(req.body ?? {});
+    if (typeof req.body === 'string') {
+      init.body = req.body;
+    } else if (Buffer.isBuffer(req.body)) {
+      init.body = req.body.toString('utf8');
+    } else {
+      init.body = JSON.stringify(req.body ?? {});
+    }
   }
 
   try {
