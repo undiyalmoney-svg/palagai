@@ -1,6 +1,7 @@
 import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { PaperTradeDeskService, TradeDeskRunOptions } from '../../../core/paper-desk/paper-trade-desk.service';
@@ -29,7 +30,7 @@ import { UiDialogService } from '../../../shared/ui/dialog/ui-dialog.service';
 @Component({
   selector: 'app-trade-desk',
   standalone: true,
-  imports: [FormsModule, DecimalPipe, MatButtonModule, MatProgressSpinnerModule],
+  imports: [FormsModule, DecimalPipe, MatButtonModule, MatProgressSpinnerModule, RouterLink],
   templateUrl: './trade-desk.component.html',
   styleUrl: './trade-desk.component.css',
 })
