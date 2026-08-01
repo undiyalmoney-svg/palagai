@@ -93,7 +93,11 @@ export class AuthService {
           ? String((body as { code?: unknown }).code || '')
           : '';
       if (code === 'BLOCKED' || status === 403) {
-        return { ok: false, message: 'Contact admin', blocked: true };
+        const blockedMsg =
+          (body && typeof body === 'object' && 'adminMessage' in body
+            ? String((body as { adminMessage?: unknown }).adminMessage || '').trim()
+            : '') || apiMsg || 'Contact admin';
+        return { ok: false, message: blockedMsg, blocked: true };
       }
       return {
         ok: false,

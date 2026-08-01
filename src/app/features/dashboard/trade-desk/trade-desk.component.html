@@ -26,18 +26,6 @@
     </div>
   </header>
 
-  @if (adminNotice()) {
-    <div class="admin-notice" role="status">
-      <div class="admin-notice-copy">
-        <strong>Message from admin</strong>
-        <p>{{ adminNotice() }}</p>
-      </div>
-      <button type="button" class="admin-notice-close" (click)="dismissNotice()" aria-label="Close message">
-        <app-pg-icon name="x" [size]="18" />
-      </button>
-    </div>
-  }
-
   @if (showKutty()) {
     <div class="active-strategy-bar" role="status" aria-live="polite">
       <div class="active-strategy-label">

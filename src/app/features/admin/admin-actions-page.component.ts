@@ -91,13 +91,26 @@ export class AdminActionsPageComponent implements OnInit {
 
   protected async saveMessage(u: SiteUser): Promise<void> {
     this.busy.set(true);
+    const wanted = this.draftFor(u).trim();
     try {
-      await firstValueFrom(
-        this.http.patch(`/api/auth/admin/users/${u.id}`, {
-          adminMessage: this.draftFor(u),
+      const res = await firstValueFrom(
+        this.http.patch<{ user?: SiteUser }>(`/api/auth/admin/users/${u.id}`, {
+          adminMessage: wanted,
         }),
       );
-      await this.reload(`Message saved for ${u.username}`);
+      const saved = String(res?.user?.adminMessage || '').trim();
+      if (wanted && saved !== wanted) {
+        this.flash(
+          'Message NOT stored — Order-API on the droplet is outdated. SSH in, git pull, then pm2 restart trading-backend.',
+          true,
+        );
+        return;
+      }
+      await this.reload(
+        wanted
+          ? `Message saved for ${u.username} — customer will see it after refresh / re-login`
+          : `Message cleared for ${u.username}`,
+      );
     } catch (err: unknown) {
       const e = err as { error?: { message?: string } };
       this.flash(e?.error?.message || 'Save message failed', true);

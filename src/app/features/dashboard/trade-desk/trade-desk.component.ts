@@ -26,19 +26,11 @@ import { StrategyRegistryService } from '../../../core/strategy-manager/registry
 import { dnaCapsForStrategy } from '../../../core/strategy-manager/config/strategy-dna-caps';
 import { DeskChannel } from '../../../core/strategy-manager/models/desk-channel.model';
 import { UiDialogService } from '../../../shared/ui/dialog/ui-dialog.service';
-import { PgIconComponent } from '../../../shared/ui/icon/pg-icon.component';
 
 @Component({
   selector: 'app-trade-desk',
   standalone: true,
-  imports: [
-    FormsModule,
-    DecimalPipe,
-    MatButtonModule,
-    MatProgressSpinnerModule,
-    RouterLink,
-    PgIconComponent,
-  ],
+  imports: [FormsModule, DecimalPipe, MatButtonModule, MatProgressSpinnerModule, RouterLink],
   templateUrl: './trade-desk.component.html',
   styleUrl: './trade-desk.component.css',
 })
@@ -83,11 +75,6 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
   );
   /** Crude controls only if user has crude module (owner always has it). */
   protected readonly showCrude = computed(() => this.auth.hasModule('crude'));
-
-  /** Admin notice shown under Trade Desk header (dismissible). */
-  protected readonly adminNotice = computed(() =>
-    String(this.auth.currentUser()?.adminMessage || '').trim(),
-  );
 
   /** Testing result filter: Mon–Fri (fetch all, show selected weekdays). */
   protected readonly weekdayOptions = PAPER_WEEKDAY_OPTIONS;
@@ -200,10 +187,6 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
 
   protected isWeekdayOn(key: PaperWeekdayKey): boolean {
     return this.weekdayOn()[key];
-  }
-
-  protected dismissNotice(): void {
-    void this.auth.dismissAdminMessage();
   }
 
   protected setMode(mode: PaperDeskMode): void {
