@@ -68,10 +68,6 @@
           @if (profileOpen()) {
             <div class="profile-menu" role="menu">
               <div class="profile-meta">Signed in as <strong>{{ username() }}</strong></div>
-              <button type="button" role="menuitem" (click)="go('/dashboard/settings')">
-                <app-pg-icon name="settings" [size]="16" />
-                Settings
-              </button>
               <button type="button" role="menuitem" class="danger" (click)="logout()">
                 <app-pg-icon name="log-out" [size]="16" />
                 Sign out

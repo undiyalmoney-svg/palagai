@@ -5,11 +5,10 @@ import { SiteModule } from './auth.constants';
 
 const MODULE_HOME: Array<{ module: SiteModule; path: string }> = [
   { module: 'trade', path: '/dashboard/trade-desk' },
+  { module: 'strat', path: '/dashboard/strategy-manager' },
   { module: 'crude', path: '/dashboard/crude-oil' },
   { module: 'auto', path: '/dashboard/auto-trader' },
   { module: 'token', path: '/dashboard/get-token' },
-  { module: 'test', path: '/dashboard/order-test' },
-  { module: 'strat', path: '/dashboard/strategy-manager' },
 ];
 
 /** First desk the user is allowed to open. */

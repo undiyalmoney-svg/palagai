@@ -72,25 +72,11 @@ export class DashboardComponent implements OnInit, OnDestroy {
       module: 'auto',
     },
     {
-      label: 'Orders',
-      shortLabel: 'Orders',
-      route: '/dashboard/order-test',
-      icon: 'flask',
-      module: 'test',
-    },
-    {
       label: 'Token',
       shortLabel: 'Token',
       route: '/dashboard/get-token',
       icon: 'key',
       module: 'token',
-    },
-    {
-      label: 'Settings',
-      shortLabel: 'Settings',
-      route: '/dashboard/settings',
-      icon: 'settings',
-      module: null,
     },
   ];
 
