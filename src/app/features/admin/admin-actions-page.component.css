@@ -72,7 +72,14 @@
 table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 960px;
+  min-width: 860px;
+}
+
+.stack-col {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
 }
 
 th {
@@ -224,4 +231,73 @@ tr.blocked td {
   color: #b91c1c;
   background: #fef2f2;
   border-color: #fecaca;
+}
+
+@media (max-width: 760px) {
+  .search {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .table-shell {
+    padding: 12px;
+  }
+
+  .table-scroll {
+    border: none;
+    overflow: visible;
+  }
+
+  table {
+    min-width: 0;
+  }
+
+  table,
+  table tbody,
+  table tr,
+  table td {
+    display: block;
+    width: 100%;
+  }
+
+  table thead {
+    display: none;
+  }
+
+  table tbody tr {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 14px;
+    padding: 12px;
+    margin-bottom: 12px;
+  }
+
+  table tbody tr:hover td {
+    background: transparent;
+  }
+
+  table td {
+    padding: 8px 0;
+    border-bottom: none;
+    display: grid;
+    grid-template-columns: 110px 1fr;
+    align-items: start;
+    gap: 8px;
+  }
+
+  table td::before {
+    content: attr(data-label);
+    font-size: 12px;
+    font-weight: 600;
+    color: #6b7280;
+    padding-top: 6px;
+  }
+
+  .msg-box {
+    min-width: 0;
+  }
+
+  .actions {
+    min-width: 0;
+  }
 }

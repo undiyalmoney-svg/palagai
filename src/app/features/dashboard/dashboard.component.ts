@@ -133,10 +133,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
     return u.role === 'owner' ? `Devil · ${u.username}` : u.username;
   });
 
-  protected readonly adminNotice = computed(() =>
-    String(this.authService.currentUser()?.adminMessage || '').trim(),
-  );
-
   protected readonly liveBadge = computed(() => {
     const u = this.authService.currentUser();
     if (!u) return { label: 'Offline', tone: 'gray' as const };
@@ -198,10 +194,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   protected toggleSidebar(): void {
     this.sidebarOpen.update((v) => !v);
-  }
-
-  protected dismissNotice(): void {
-    void this.authService.dismissAdminMessage();
   }
 
   private isMobileViewport(): boolean {

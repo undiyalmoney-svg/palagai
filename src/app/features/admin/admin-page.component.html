@@ -77,51 +77,56 @@
     <div class="table-scroll">
       <table class="users-table">
         <colgroup>
-          <col class="col-role" />
-          <col class="col-user" />
-          <col class="col-pass" />
+          <col class="col-role-status" />
+          <col class="col-creds" />
           <col class="col-mods" />
           <col class="col-key" />
           <col class="col-note" />
-          <col class="col-status" />
           <col class="col-actions" />
         </colgroup>
         <thead>
           <tr>
-            <th>Role</th>
-            <th>Username</th>
-            <th>Password</th>
+            <th>Role / Status</th>
+            <th>User / Password</th>
             <th>Modules</th>
             <th>Kite API Key</th>
             <th>Note</th>
-            <th>Status</th>
             <th>Actions</th>
           </tr>
         </thead>
         <tbody>
           @for (u of filteredUsers(); track u.id) {
             <tr class="user-row" [class.is-blocked]="u.blocked">
-              <td data-label="Role">
-                <span class="role-badge" [attr.data-role]="u.role === 'owner' ? 'devil' : 'customer'">
-                  {{ roleLabel(u) }}
-                </span>
+              <td data-label="Role / Status">
+                <div class="stack-col">
+                  <span class="role-badge" [attr.data-role]="u.role === 'owner' ? 'devil' : 'customer'">
+                    {{ roleLabel(u) }}
+                  </span>
+                  <span class="status-badge" [attr.data-status]="u.blocked ? 'blocked' : 'active'">
+                    {{ u.blocked ? 'Blocked' : 'Active' }}
+                  </span>
+                </div>
               </td>
-              <td data-label="Username">
-                <input
-                  class="field"
-                  [(ngModel)]="u.username"
-                  [disabled]="busy()"
-                  autocomplete="off"
-                />
-              </td>
-              <td data-label="Password">
-                <input
-                  class="field"
-                  [(ngModel)]="u.password"
-                  type="text"
-                  [disabled]="busy()"
-                  autocomplete="off"
-                />
+              <td data-label="User / Password">
+                <div class="stack-col creds">
+                  <input
+                    class="field"
+                    [(ngModel)]="u.username"
+                    [disabled]="busy()"
+                    autocomplete="off"
+                    aria-label="Username"
+                    placeholder="Username"
+                  />
+                  <input
+                    class="field"
+                    [(ngModel)]="u.password"
+                    type="text"
+                    [disabled]="busy()"
+                    autocomplete="off"
+                    aria-label="Password"
+                    placeholder="Password"
+                  />
+                </div>
               </td>
               <td data-label="Modules">
                 <div class="mod-chips">
@@ -158,11 +163,6 @@
               <td data-label="Note">
                 <input class="field" [(ngModel)]="u.note" [disabled]="busy()" />
               </td>
-              <td data-label="Status">
-                <span class="status-badge" [attr.data-status]="u.blocked ? 'blocked' : 'active'">
-                  {{ u.blocked ? 'Blocked' : 'Active' }}
-                </span>
-              </td>
               <td data-label="Actions">
                 <div class="row-actions">
                   <button type="button" class="btn btn-save" (click)="saveUser(u)" [disabled]="busy()">
@@ -173,7 +173,7 @@
             </tr>
           } @empty {
             <tr>
-              <td colspan="8" class="empty">No users match your filters.</td>
+              <td colspan="6" class="empty">No users match your filters.</td>
             </tr>
           }
         </tbody>

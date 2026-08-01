@@ -38,8 +38,7 @@
       <table>
         <thead>
           <tr>
-            <th>Role</th>
-            <th>Username</th>
+            <th>Role / User</th>
             <th>Payment</th>
             <th>Payment note</th>
             <th>Updated</th>
@@ -49,13 +48,15 @@
         <tbody>
           @for (u of filteredUsers(); track u.id) {
             <tr>
-              <td>
-                <span class="role" [attr.data-role]="u.role === 'owner' ? 'devil' : 'customer'">
-                  {{ roleLabel(u) }}
-                </span>
+              <td data-label="Role / User">
+                <div class="stack-col">
+                  <span class="role" [attr.data-role]="u.role === 'owner' ? 'devil' : 'customer'">
+                    {{ roleLabel(u) }}
+                  </span>
+                  <span class="name">{{ u.username }}</span>
+                </div>
               </td>
-              <td class="name">{{ u.username }}</td>
-              <td>
+              <td data-label="Payment">
                 <select
                   class="pay-select"
                   [attr.data-pay]="statusFor(u)"
@@ -68,7 +69,7 @@
                   <option value="unpaid">Unpaid</option>
                 </select>
               </td>
-              <td>
+              <td data-label="Payment note">
                 <input
                   class="note"
                   [ngModel]="noteFor(u)"
@@ -77,8 +78,10 @@
                   placeholder="Optional note"
                 />
               </td>
-              <td class="muted">{{ u.paymentUpdatedAt ? (u.paymentUpdatedAt | date: 'medium') : '—' }}</td>
-              <td>
+              <td class="muted" data-label="Updated">
+                {{ u.paymentUpdatedAt ? (u.paymentUpdatedAt | date: 'medium') : '—' }}
+              </td>
+              <td data-label="Actions">
                 <button type="button" class="btn save" (click)="savePayment(u)" [disabled]="busy()">
                   Save
                 </button>
@@ -86,7 +89,7 @@
             </tr>
           } @empty {
             <tr>
-              <td colspan="6" class="empty">No users match.</td>
+              <td colspan="5" class="empty">No users match.</td>
             </tr>
           }
         </tbody>

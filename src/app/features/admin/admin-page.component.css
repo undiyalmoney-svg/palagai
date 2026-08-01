@@ -214,17 +214,14 @@
   border-collapse: separate;
   border-spacing: 0;
   table-layout: fixed;
-  min-width: 1180px;
+  min-width: 1080px;
 }
 
-.col-role {
-  width: 100px;
+.col-role-status {
+  width: 120px;
 }
-.col-user {
-  width: 140px;
-}
-.col-pass {
-  width: 140px;
+.col-creds {
+  width: 180px;
 }
 .col-mods {
   width: 320px;
@@ -235,11 +232,23 @@
 .col-note {
   width: 140px;
 }
-.col-status {
-  width: 96px;
-}
 .col-actions {
-  width: 220px;
+  width: 120px;
+}
+
+.stack-col {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.stack-col.creds {
+  width: 100%;
+}
+
+.stack-col.creds .field {
+  width: 100%;
 }
 
 .users-table thead th {
@@ -259,8 +268,8 @@
 }
 
 .users-table tbody td {
-  height: 84px;
-  max-height: 84px;
+  height: 96px;
+  max-height: 96px;
   padding: 0 12px;
   border-bottom: 1px solid #e5e7eb;
   vertical-align: middle;
@@ -450,8 +459,8 @@
   }
 
   .users-table tbody td {
-    height: 80px;
-    max-height: 80px;
+    height: 96px;
+    max-height: 96px;
     padding: 0 10px;
   }
 }
@@ -510,8 +519,8 @@
     padding: 8px 0;
     border-bottom: none;
     display: grid;
-    grid-template-columns: 100px 1fr;
-    align-items: center;
+    grid-template-columns: 110px 1fr;
+    align-items: start;
     gap: 8px;
   }
 
@@ -520,6 +529,7 @@
     font-size: 12px;
     font-weight: 600;
     color: #6b7280;
+    padding-top: 6px;
   }
 
   .users-table tbody td[data-label='Modules'] {
@@ -528,6 +538,14 @@
 
   .users-table tbody td[data-label='Modules']::before {
     padding-top: 8px;
+  }
+
+  .stack-col {
+    width: 100%;
+  }
+
+  .stack-col.creds .field {
+    height: 40px;
   }
 
   .mod-chips {
