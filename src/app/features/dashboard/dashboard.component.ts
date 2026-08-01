@@ -187,6 +187,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.sidebarOpen.update((v) => !v);
   }
 
+  private isMobileViewport(): boolean {
+    return typeof window !== 'undefined' && window.matchMedia('(max-width: 1024px)').matches;
+  }
+
   protected toggleProfile(): void {
     this.profileOpen.update((v) => !v);
   }
