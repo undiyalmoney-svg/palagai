@@ -33,8 +33,10 @@
 
 .header-clock {
   max-width: 1200px;
+  width: 100%;
   margin: 0 auto;
-  padding: 0 1.25rem 0.45rem;
+  padding: 0.55rem 1.25rem 0;
+  box-sizing: border-box;
   font-size: 0.78rem;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
@@ -247,7 +249,7 @@
   }
 
   .header-clock {
-    padding: 0 0.85rem 0.4rem;
+    padding: 0.45rem 0.85rem 0;
     text-align: center;
     font-size: 0.72rem;
   }
