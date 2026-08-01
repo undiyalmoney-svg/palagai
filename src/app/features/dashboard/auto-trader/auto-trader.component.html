@@ -66,7 +66,13 @@
         <span>Real money (MIS via static-IP Order-API)</span>
       </label>
       <div class="at-actions">
-        <button mat-flat-button color="primary" type="button" (click)="start()" [disabled]="busy()">
+        <button
+          mat-flat-button
+          color="primary"
+          type="button"
+          (click)="start()"
+          [disabled]="busy() || status().status === 'running'"
+        >
           Start Server Live
         </button>
         <button mat-stroked-button type="button" (click)="stop()" [disabled]="busy()">Stop</button>
@@ -124,8 +130,12 @@
 
   <article class="at-card events">
     <h2>Recent events</h2>
+    <p class="at-hint">
+      Phase 1 scaffold: you should see START / HEARTBEAT / AUTH. Strategy ENTRY / EXIT / SKIP are not
+      wired yet — green RUNNING only means the worker heartbeat is alive.
+    </p>
     @if (!(status().events?.length)) {
-      <p class="at-hint">No events yet — worker will append ENTRY / EXIT / SKIP / ERROR here.</p>
+      <p class="at-hint">No events yet — press Start, then Refresh (heartbeat every ~60s).</p>
     } @else {
       <ul>
         @for (e of status().events!; track e.at + e.action + e.detail) {

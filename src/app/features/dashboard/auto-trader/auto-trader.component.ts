@@ -151,10 +151,12 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
           realOrders: this.realOrders,
         }),
       );
-      this.note.set('Server Live start requested.');
+      this.note.set(
+        'Server Live start requested. Heartbeats only for now — strategy ENTRY/EXIT not wired yet.',
+      );
       await this.refreshStatus();
     } catch (err) {
-      this.note.set(`Start failed: ${String(err)}`);
+      this.note.set(`Start failed: ${formatUnknownError(err, 'Start')}`);
     } finally {
       this.busy.set(false);
     }
@@ -167,7 +169,7 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
       this.note.set('Stop requested.');
       await this.refreshStatus();
     } catch (err) {
-      this.note.set(`Stop failed: ${String(err)}`);
+      this.note.set(`Stop failed: ${formatUnknownError(err, 'Stop')}`);
     } finally {
       this.busy.set(false);
     }
@@ -192,7 +194,7 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
       this.note.set('Kite token pushed to server (encrypted in Mongo).');
       await this.refreshStatus();
     } catch (err) {
-      this.note.set(`Auth push failed: ${String(err)}`);
+      this.note.set(`Auth push failed: ${formatUnknownError(err, 'Auth')}`);
     } finally {
       this.busy.set(false);
     }
