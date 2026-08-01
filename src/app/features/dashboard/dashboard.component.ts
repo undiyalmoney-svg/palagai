@@ -52,7 +52,21 @@ export class DashboardComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.tickClock();
     this.clockTimer = setInterval(() => this.tickClock(), 1000);
-    void this.authService.refreshMe();
+    void this.bootAuth();
+  }
+
+  private async bootAuth(): Promise<void> {
+    const ok = await this.authService.refreshMeStrict();
+    if (!ok) {
+      void this.router.navigateByUrl('/login');
+      return;
+    }
+    // If somehow landed with empty outlet path, go to first desk.
+    const url = this.router.url.replace(/\?.*$/, '');
+    if (url === '/dashboard' || url === '/dashboard/') {
+      const { firstDashboardPath } = await import('../../core/auth/auth.guard');
+      void this.router.navigateByUrl(firstDashboardPath(this.authService));
+    }
   }
 
   ngOnDestroy(): void {
@@ -65,6 +79,13 @@ export class DashboardComponent implements OnInit, OnDestroy {
   protected go(route: string, event?: Event): void {
     event?.preventDefault();
     void this.router.navigateByUrl(route);
+  }
+
+  protected goHome(event?: Event): void {
+    event?.preventDefault();
+    void import('../../core/auth/auth.guard').then(({ firstDashboardPath }) => {
+      void this.router.navigateByUrl(firstDashboardPath(this.authService));
+    });
   }
 
   protected logout(): void {

@@ -67,9 +67,12 @@ export class AuthService {
     }
   }
 
-  async refreshMe(): Promise<void> {
+  async refreshMe(): Promise<boolean> {
     const token = this.getToken();
-    if (!token) return;
+    if (!token) {
+      this.logout();
+      return false;
+    }
     try {
       const res = await firstValueFrom(
         this.http.get<{ user: SiteUser }>(`${this.apiBase}/me`, {
@@ -77,8 +80,35 @@ export class AuthService {
         }),
       );
       this.persistSite(token, res.user);
+      return true;
     } catch {
+      // Keep local session if API briefly unreachable — only clear on 401.
+      return this.isAuthenticated();
+    }
+  }
+
+  /** Force re-login when token is rejected. */
+  async refreshMeStrict(): Promise<boolean> {
+    const token = this.getToken();
+    if (!token) {
       this.logout();
+      return false;
+    }
+    try {
+      const res = await firstValueFrom(
+        this.http.get<{ user: SiteUser }>(`${this.apiBase}/me`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+      );
+      this.persistSite(token, res.user);
+      return true;
+    } catch (err: unknown) {
+      const status = (err as { status?: number })?.status;
+      if (status === 401 || status === 403) {
+        this.logout();
+        return false;
+      }
+      return this.isAuthenticated();
     }
   }
 

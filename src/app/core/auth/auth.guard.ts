@@ -1,7 +1,27 @@
 import { inject } from '@angular/core';
-import { CanActivateFn, Router } from '@angular/router';
+import { CanActivateFn, Router, UrlTree } from '@angular/router';
 import { AuthService } from './auth.service';
 import { SiteModule } from './auth.constants';
+
+const MODULE_HOME: Array<{ module: SiteModule; path: string }> = [
+  { module: 'trade', path: '/dashboard/trade-desk' },
+  { module: 'crude', path: '/dashboard/crude-oil' },
+  { module: 'auto', path: '/dashboard/auto-trader' },
+  { module: 'token', path: '/dashboard/get-token' },
+  { module: 'strat', path: '/dashboard/strategy-manager' },
+  { module: 'pnl', path: '/dashboard/pnl-records' },
+  { module: 'vault', path: '/dashboard/vault' },
+];
+
+/** First desk the user is allowed to open. */
+export function firstDashboardPath(auth: AuthService): string {
+  for (const row of MODULE_HOME) {
+    if (auth.hasModule(row.module)) {
+      return row.path;
+    }
+  }
+  return '/dashboard/home';
+}
 
 export const authGuard: CanActivateFn = () => {
   const authService = inject(AuthService);
@@ -18,11 +38,20 @@ export const guestGuard: CanActivateFn = () => {
   if (!authService.isAuthenticated()) {
     return true;
   }
-  return router.createUrlTree(['/dashboard']);
+  return router.parseUrl(firstDashboardPath(authService));
+};
+
+export const dashboardIndexGuard: CanActivateFn = () => {
+  const auth = inject(AuthService);
+  const router = inject(Router);
+  if (!auth.isAuthenticated()) {
+    return router.createUrlTree(['/login']);
+  }
+  return router.parseUrl(firstDashboardPath(auth));
 };
 
 export const moduleGuard = (mod: SiteModule): CanActivateFn => {
-  return () => {
+  return (): boolean | UrlTree => {
     const auth = inject(AuthService);
     const router = inject(Router);
     if (!auth.isAuthenticated()) {
@@ -31,7 +60,8 @@ export const moduleGuard = (mod: SiteModule): CanActivateFn => {
     if (auth.hasModule(mod)) {
       return true;
     }
-    return router.createUrlTree(['/dashboard']);
+    // Never bounce to /dashboard (that re-enters trade-desk and loops blank).
+    return router.parseUrl(firstDashboardPath(auth));
   };
 };
 

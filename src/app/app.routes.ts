@@ -1,8 +1,15 @@
 import { Routes } from '@angular/router';
-import { authGuard, guestGuard, moduleGuard, adminGuard } from './core/auth/auth.guard';
+import {
+  authGuard,
+  guestGuard,
+  moduleGuard,
+  adminGuard,
+  dashboardIndexGuard,
+} from './core/auth/auth.guard';
 import { stashKiteRequestToken } from './core/kite/kite-request-token.util';
 import { LoginComponent } from './features/login/login.component';
 import { DashboardComponent } from './features/dashboard/dashboard.component';
+import { DashboardHomeComponent } from './features/dashboard/dashboard-home.component';
 import { TradeDeskComponent } from './features/dashboard/trade-desk/trade-desk.component';
 import { OrderTestComponent } from './features/dashboard/order-test/order-test.component';
 import { GetTokenComponent } from './features/dashboard/get-token/get-token.component';
@@ -49,8 +56,13 @@ export const routes: Routes = [
     children: [
       {
         path: '',
-        redirectTo: 'trade-desk',
         pathMatch: 'full',
+        canActivate: [dashboardIndexGuard],
+        component: DashboardHomeComponent,
+      },
+      {
+        path: 'home',
+        component: DashboardHomeComponent,
       },
       {
         path: 'trade-desk',
