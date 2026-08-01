@@ -40,6 +40,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     { label: 'Strategy Manager', shortLabel: 'Strat', route: '/dashboard/strategy-manager', icon: 'tune', module: 'strat' },
     { label: 'Crude Oil Mini', shortLabel: 'Crude', route: '/dashboard/crude-oil', icon: 'water_drop', module: 'crude' },
     { label: 'Auto Trader', shortLabel: 'Auto', route: '/dashboard/auto-trader', icon: 'smart_toy', module: 'auto' },
+    { label: 'Order Test', shortLabel: 'Test', route: '/dashboard/order-test', icon: 'science', module: 'test' },
     { label: 'Get Token', shortLabel: 'Token', route: '/dashboard/get-token', icon: 'vpn_key', module: 'token' },
   ];
 

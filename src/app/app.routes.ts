@@ -77,6 +77,7 @@ export const routes: Routes = [
       },
       {
         path: 'order-test',
+        canActivate: [moduleGuard('test')],
         component: OrderTestComponent,
       },
       { path: 'orders', redirectTo: '/admin/pnl', pathMatch: 'full' },

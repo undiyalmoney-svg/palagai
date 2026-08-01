@@ -5,7 +5,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { firstValueFrom } from 'rxjs';
 import { SiteModule, SiteUser } from '../../core/auth/auth.constants';
 
-const FRIEND_MODS: SiteModule[] = ['trade', 'crude', 'auto', 'token'];
+const FRIEND_MODS: SiteModule[] = ['trade', 'crude', 'auto', 'token', 'test'];
 
 @Component({
   selector: 'app-admin-page',
@@ -225,7 +225,7 @@ export class AdminPageComponent implements OnInit {
   protected newPassword = '';
   protected newKiteKey = '';
   protected newNote = '';
-  protected newMods: SiteModule[] = ['trade', 'crude', 'token'];
+  protected newMods: SiteModule[] = ['trade', 'crude', 'token', 'test'];
 
   ngOnInit(): void {
     void this.reload();

@@ -8,6 +8,7 @@ const MODULE_HOME: Array<{ module: SiteModule; path: string }> = [
   { module: 'crude', path: '/dashboard/crude-oil' },
   { module: 'auto', path: '/dashboard/auto-trader' },
   { module: 'token', path: '/dashboard/get-token' },
+  { module: 'test', path: '/dashboard/order-test' },
   { module: 'strat', path: '/dashboard/strategy-manager' },
 ];
 

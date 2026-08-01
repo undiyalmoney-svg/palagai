@@ -3,6 +3,7 @@ export type SiteModule =
   | 'crude'
   | 'auto'
   | 'token'
+  | 'test'
   | 'strat'
   | 'pnl'
   | 'vault';
