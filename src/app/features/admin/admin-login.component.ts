@@ -31,10 +31,19 @@ import { AuthService } from '../../core/auth/auth.service';
     </section>
   `,
   styles: `
+    :host {
+      display: block;
+      min-height: 100dvh;
+    }
     .wrap {
+      box-sizing: border-box;
+      min-height: 100dvh;
       max-width: 420px;
-      margin: 3rem auto;
-      padding: 1.5rem;
+      margin: 0 auto;
+      padding: max(1.5rem, env(safe-area-inset-top)) 1.25rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
     }
     .full {
       width: 100%;

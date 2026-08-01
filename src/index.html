@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <title>Palagai — Trade Desk</title>
   <base href="/">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="description" content="Palagai — OR Swing Breakout desk for Nifty, Bank Nifty &amp; more">
   <meta name="theme-color" content="#ffffff">
   <link rel="icon" type="image/png" sizes="192x192" href="/icon-192x192.png">
@@ -12,9 +12,54 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <style>
+    /* Shown only until Angular boots — prevents blank / URL flash on mobile */
+    .pg-boot {
+      box-sizing: border-box;
+      min-height: 100vh;
+      min-height: 100dvh;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.75rem;
+      padding: 1.5rem;
+      font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+      color: #0c1f17;
+      background: #fff;
+    }
+    .pg-boot-mark {
+      width: 52px;
+      height: 52px;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(145deg, #16a34a, #15803d);
+      color: #fff;
+      font-weight: 800;
+      font-size: 1.35rem;
+    }
+    .pg-boot strong {
+      font-family: 'Space Grotesk', system-ui, sans-serif;
+      font-size: 1.25rem;
+      letter-spacing: -0.03em;
+    }
+    .pg-boot span {
+      font-size: 0.85rem;
+      color: #5a6f66;
+    }
+  </style>
 </head>
 <body>
-  <app-root></app-root>
+  <app-root>
+    <div class="pg-boot" aria-busy="true">
+      <div class="pg-boot-mark" aria-hidden="true">P</div>
+      <strong>Palagai</strong>
+      <span>Loading…</span>
+    </div>
+  </app-root>
   <noscript>Please enable JavaScript to continue using this application.</noscript>
 </body>
 </html>

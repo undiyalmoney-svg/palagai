@@ -1,6 +1,13 @@
-/* App Container */
+/* App root fills viewport so login can center correctly */
+:host {
+  display: block;
+  min-height: 100%;
+  min-height: 100dvh;
+}
+
 .app-container {
   position: relative;
   width: 100%;
   min-height: 100vh;
+  min-height: 100dvh;
 }
