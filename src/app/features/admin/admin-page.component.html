@@ -1,0 +1,191 @@
+<section class="users-page">
+  <div class="toolbar">
+    <div class="toolbar-left">
+      <h1>Users</h1>
+      <span class="total-pill">{{ filteredUsers().length }} / {{ users().length }} users</span>
+    </div>
+    <div class="toolbar-right">
+      <label class="search">
+        <span class="sr-only">Search</span>
+        <input
+          type="search"
+          [(ngModel)]="searchQuery"
+          (ngModelChange)="onFilterChange()"
+          placeholder="Search username, note, key…"
+          autocomplete="off"
+        />
+      </label>
+      <select class="filter" [(ngModel)]="roleFilter" (ngModelChange)="onFilterChange()" aria-label="Role filter">
+        <option value="all">All roles</option>
+        <option value="owner">Devil</option>
+        <option value="customer">Customer</option>
+      </select>
+      <select class="filter" [(ngModel)]="statusFilter" (ngModelChange)="onFilterChange()" aria-label="Status filter">
+        <option value="all">All status</option>
+        <option value="active">Active</option>
+        <option value="blocked">Blocked</option>
+      </select>
+      <button type="button" class="btn btn-primary" (click)="showCreate.set(!showCreate())">
+        {{ showCreate() ? 'Close' : 'Add User' }}
+      </button>
+    </div>
+  </div>
+
+  @if (message()) {
+    <p class="msg" [class.err]="messageIsError()" role="status">{{ message() }}</p>
+  }
+
+  @if (showCreate()) {
+    <article class="create-panel">
+      <h2>New customer user</h2>
+      <div class="create-grid">
+        <label>
+          <span>Username</span>
+          <input class="field" [(ngModel)]="newUsername" autocomplete="off" />
+        </label>
+        <label>
+          <span>Password</span>
+          <input class="field" [(ngModel)]="newPassword" type="text" autocomplete="off" />
+        </label>
+        <label class="span-2">
+          <span>Kite API key</span>
+          <input class="field" [(ngModel)]="newKiteKey" autocomplete="off" />
+        </label>
+        <label class="span-2">
+          <span>Note</span>
+          <input class="field" [(ngModel)]="newNote" autocomplete="off" />
+        </label>
+      </div>
+      <div class="mod-chips create-mods">
+        @for (m of customerMods; track m) {
+          <label class="mod-chip" [class.on]="newMods.includes(m)">
+            <input type="checkbox" [checked]="newMods.includes(m)" (change)="toggleNew(m, $event)" />
+            <span class="check" aria-hidden="true">{{ newMods.includes(m) ? '✓' : '' }}</span>
+            {{ modLabel(m) }}
+          </label>
+        }
+      </div>
+      <div class="create-actions">
+        <button type="button" class="btn btn-primary" (click)="create()" [disabled]="busy()">
+          Create customer
+        </button>
+      </div>
+    </article>
+  }
+
+  <div class="table-shell">
+    <div class="table-scroll">
+      <table class="users-table">
+        <colgroup>
+          <col class="col-role" />
+          <col class="col-user" />
+          <col class="col-pass" />
+          <col class="col-mods" />
+          <col class="col-key" />
+          <col class="col-note" />
+          <col class="col-status" />
+          <col class="col-actions" />
+        </colgroup>
+        <thead>
+          <tr>
+            <th>Role</th>
+            <th>Username</th>
+            <th>Password</th>
+            <th>Modules</th>
+            <th>Kite API Key</th>
+            <th>Note</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (u of filteredUsers(); track u.id) {
+            <tr class="user-row" [class.is-blocked]="u.blocked">
+              <td data-label="Role">
+                <span class="role-badge" [attr.data-role]="u.role === 'owner' ? 'devil' : 'customer'">
+                  {{ roleLabel(u) }}
+                </span>
+              </td>
+              <td data-label="Username">
+                <input
+                  class="field"
+                  [(ngModel)]="u.username"
+                  [disabled]="busy()"
+                  autocomplete="off"
+                />
+              </td>
+              <td data-label="Password">
+                <input
+                  class="field"
+                  [(ngModel)]="u.password"
+                  type="text"
+                  [disabled]="busy()"
+                  autocomplete="off"
+                />
+              </td>
+              <td data-label="Modules">
+                <div class="mod-chips">
+                  @for (m of customerMods; track m) {
+                    <label
+                      class="mod-chip"
+                      [class.on]="u.modules.includes(m)"
+                      [class.locked]="u.role === 'owner'"
+                    >
+                      <input
+                        type="checkbox"
+                        [checked]="u.modules.includes(m)"
+                        [disabled]="u.role === 'owner' || busy()"
+                        (change)="toggleUser(u, m, $event)"
+                      />
+                      <span class="check" aria-hidden="true">{{ u.modules.includes(m) ? '✓' : '' }}</span>
+                      {{ modLabel(m) }}
+                    </label>
+                  }
+                </div>
+              </td>
+              <td data-label="Kite API Key">
+                @if (u.role === 'owner') {
+                  <span class="muted">Local Get Token</span>
+                } @else {
+                  <input
+                    class="field mono"
+                    [(ngModel)]="u.kiteApiKey"
+                    [disabled]="busy()"
+                    autocomplete="off"
+                  />
+                }
+              </td>
+              <td data-label="Note">
+                <input class="field" [(ngModel)]="u.note" [disabled]="busy()" />
+              </td>
+              <td data-label="Status">
+                <span class="status-badge" [attr.data-status]="u.blocked ? 'blocked' : 'active'">
+                  {{ u.blocked ? 'Blocked' : 'Active' }}
+                </span>
+              </td>
+              <td data-label="Actions">
+                <div class="row-actions">
+                  <button type="button" class="btn btn-save" (click)="saveUser(u)" [disabled]="busy()">
+                    Save
+                  </button>
+                  @if (u.role !== 'owner') {
+                    <button type="button" class="btn btn-block" (click)="toggleBlock(u)" [disabled]="busy()">
+                      {{ u.blocked ? 'Unblock' : 'Block' }}
+                    </button>
+                    <button type="button" class="btn btn-danger" (click)="deleteUser(u)" [disabled]="busy()">
+                      Delete
+                    </button>
+                  }
+                </div>
+              </td>
+            </tr>
+          } @empty {
+            <tr>
+              <td colspan="8" class="empty">No users match your filters.</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
