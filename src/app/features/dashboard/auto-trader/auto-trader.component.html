@@ -131,8 +131,8 @@
   <article class="at-card events">
     <h2>Recent events</h2>
     <p class="at-hint">
-      Phase 1 scaffold: you should see START / HEARTBEAT / AUTH. Strategy ENTRY / EXIT / SKIP are not
-      wired yet — green RUNNING only means the worker heartbeat is alive.
+      Worker ticks every ~60s. Expect DATA (warm), SIGNAL (Trap/Genie/All-Green), then ENTRY / SL /
+      EXIT when real money is on. Do not run Trade Desk Local Live on the same books at the same time.
     </p>
     @if (!(status().events?.length)) {
       <p class="at-hint">No events yet — press Start, then Refresh (heartbeat every ~60s).</p>

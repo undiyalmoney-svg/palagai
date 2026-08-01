@@ -82,7 +82,7 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
     message: 'Not connected yet',
   });
   protected readonly note = signal(
-    'Server Live brain runs on DigitalOcean. Chrome can close. Local Live on Trade Desk is unchanged.',
+    'Server Live runs Trap / Genie / All-Green on DigitalOcean every 60s. Push Kite token, then Start. Uncheck real money first to watch SIGNAL events.',
   );
 
   ngOnInit(): void {
@@ -152,7 +152,7 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
         }),
       );
       this.note.set(
-        'Server Live start requested. Heartbeats only for now — strategy ENTRY/EXIT not wired yet.',
+        'Server Live started — strategy worker on DO (60s). Watch Recent events for DATA / SIGNAL / ENTRY.',
       );
       await this.refreshStatus();
     } catch (err) {
