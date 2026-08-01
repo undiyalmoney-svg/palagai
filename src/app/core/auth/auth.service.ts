@@ -18,6 +18,7 @@ export class AuthService {
 
   private readonly authenticated = signal(false);
   private readonly user = signal<SiteUser | null>(null);
+  private readonly adminAuthenticated = signal(false);
 
   readonly isAuthenticated = this.authenticated.asReadonly();
   readonly currentUser = this.user.asReadonly();
@@ -142,14 +143,16 @@ export class AuthService {
     username: string,
     password: string,
   ): Promise<{ ok: true } | { ok: false; message: string }> {
+    const user = String(username || '').trim();
+    const pass = String(password || '')
+      .replace(/^\uFEFF/, '')
+      .replace(/[\u200B-\u200D\uFEFF]/g, '')
+      .trim();
     try {
       const res = await firstValueFrom(
         this.http.post<{ status?: string; token?: string; message?: string }>(
           `${this.apiBase}/admin/login`,
-          {
-            username: String(username || '').trim(),
-            password: String(password || ''),
-          },
+          { username: user, password: pass },
         ),
       );
       if (!res?.token) {
@@ -158,9 +161,7 @@ export class AuthService {
           message: 'Auth API returned no token — is Order-API /auth deployed?',
         };
       }
-      if (isPlatformBrowser(this.platformId)) {
-        localStorage.setItem(ADMIN_TOKEN_KEY, res.token);
-      }
+      this.persistAdmin(res.token);
       return { ok: true };
     } catch (err: unknown) {
       const status = err instanceof HttpErrorResponse ? err.status : undefined;
@@ -192,14 +193,18 @@ export class AuthService {
     if (isPlatformBrowser(this.platformId)) {
       localStorage.removeItem(ADMIN_TOKEN_KEY);
     }
+    this.adminAuthenticated.set(false);
   }
 
   isAdminSession(): boolean {
-    return !!this.getAdminToken();
+    return this.adminAuthenticated() || !!this.getAdminToken();
   }
 
   private hydrate(): void {
     if (!isPlatformBrowser(this.platformId)) return;
+    if (localStorage.getItem(ADMIN_TOKEN_KEY)) {
+      this.adminAuthenticated.set(true);
+    }
     const token = localStorage.getItem(AUTH_TOKEN_KEY);
     const raw = localStorage.getItem(AUTH_USER_KEY);
     if (!token || !raw) return;
@@ -210,6 +215,13 @@ export class AuthService {
     } catch {
       this.logout();
     }
+  }
+
+  private persistAdmin(token: string): void {
+    if (isPlatformBrowser(this.platformId)) {
+      localStorage.setItem(ADMIN_TOKEN_KEY, token);
+    }
+    this.adminAuthenticated.set(true);
   }
 
   private persistSite(token: string, user: SiteUser): void {

@@ -46,6 +46,7 @@ export const routes: Routes = [
   },
   {
     path: 'admin',
+    pathMatch: 'full',
     canActivate: [adminGuard],
     component: AdminPageComponent,
   },

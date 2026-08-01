@@ -214,7 +214,7 @@ export class VaultPageComponent {
       );
       this.secrets.set(res.secrets || []);
       if (res.logins) this.logins.set(res.logins);
-      this.message.set('Defaults seeded (Devil / angel / IP / Mongo keys)');
+      this.message.set('Defaults seeded (Devil / Admin / IP / Mongo keys)');
     } catch {
       this.message.set('Seed failed');
     } finally {

@@ -20,7 +20,7 @@ import { AuthService } from '../../core/auth/auth.service';
   template: `
     <section class="wrap">
       <h1>Admin</h1>
-      <p>Separate from site login. Username: <strong>angel</strong></p>
+      <p>Separate from site login. Username: <strong>Admin</strong></p>
       @if (error()) {
         <p class="err">{{ error() }}</p>
       }
@@ -102,7 +102,7 @@ export class AdminLoginComponent {
   protected readonly error = signal('');
   protected readonly hide = signal(true);
   protected readonly form = this.fb.nonNullable.group({
-    username: ['angel', Validators.required],
+    username: ['Admin', Validators.required],
     password: ['', Validators.required],
   });
 
@@ -122,7 +122,7 @@ export class AdminLoginComponent {
     const result = await this.auth.adminLogin(username, password);
     this.busy.set(false);
     if (result.ok) {
-      await this.router.navigateByUrl('/admin');
+      await this.router.navigateByUrl('/admin', { replaceUrl: true });
     } else {
       this.error.set(result.message);
     }

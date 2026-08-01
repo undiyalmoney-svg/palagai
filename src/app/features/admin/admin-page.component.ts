@@ -96,6 +96,10 @@ const FRIEND_MODS: SiteModule[] = ['trade', 'crude', 'auto', 'token'];
       max-width: 900px;
       margin: 0 auto;
       padding: 1.25rem;
+      color: #0c1f17;
+      background: #f4faf7;
+      min-height: 100dvh;
+      box-sizing: border-box;
     }
     header {
       display: flex;
@@ -104,9 +108,12 @@ const FRIEND_MODS: SiteModule[] = ['trade', 'crude', 'auto', 'token'];
       align-items: flex-start;
       margin-bottom: 1rem;
     }
+    h1, h2, p, label, strong, span, em {
+      color: #0c1f17;
+    }
     .card {
       background: #fff;
-      border: 1px solid #ddd;
+      border: 1px solid #dfeae4;
       border-radius: 12px;
       padding: 1rem;
       margin-bottom: 1rem;
@@ -129,6 +136,8 @@ const FRIEND_MODS: SiteModule[] = ['trade', 'crude', 'auto', 'token'];
       padding: 0.45rem 0.55rem;
       border: 1px solid #ccc;
       border-radius: 6px;
+      color: #0c1f17;
+      background: #fff;
     }
     .mods {
       display: flex;
@@ -161,6 +170,8 @@ const FRIEND_MODS: SiteModule[] = ['trade', 'crude', 'auto', 'token'];
     }
     .msg {
       color: #0b6b3a;
+      font-weight: 600;
+      margin-bottom: 0.75rem;
     }
   `,
 })
@@ -200,13 +211,26 @@ export class AdminPageComponent implements OnInit {
 
   protected async reload(): Promise<void> {
     this.busy.set(true);
+    this.message.set('');
     try {
       const res = await firstValueFrom(
         this.http.get<{ users: SiteUser[] }>('/api/auth/admin/users'),
       );
       this.users.set(res.users || []);
-    } catch {
-      this.message.set('Failed to load users — re-login admin');
+      if (!(res.users || []).length) {
+        this.message.set('No users yet — create one below.');
+      }
+    } catch (err: unknown) {
+      const status = (err as { status?: number })?.status;
+      this.message.set(
+        status === 401 || status === 403
+          ? 'Admin session expired — sign in again'
+          : 'Failed to load users — check Order-API /auth is running',
+      );
+      if (status === 401 || status === 403) {
+        this.auth.adminLogout();
+        await this.router.navigateByUrl('/admin/login');
+      }
     } finally {
       this.busy.set(false);
     }
