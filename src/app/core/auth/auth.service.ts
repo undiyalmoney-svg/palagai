@@ -46,23 +46,40 @@ export class AuthService {
   async login(username: string, password: string): Promise<
     { ok: true } | { ok: false; message: string; blocked?: boolean }
   > {
+    const user = String(username || '').trim();
+    const pass = String(password || '')
+      .replace(/^\uFEFF/, '')
+      .replace(/[\u200B-\u200D\uFEFF]/g, '')
+      .trim();
     try {
       const res = await firstValueFrom(
         this.http.post<{ status: string; token: string; user: SiteUser }>(
           `${this.apiBase}/login`,
-          { username, password },
+          { username: user, password: pass },
         ),
       );
+      if (!res?.token || !res?.user) {
+        return { ok: false, message: 'Login failed — empty response from auth API' };
+      }
       this.persistSite(res.token, res.user);
       return { ok: true };
     } catch (err: unknown) {
-      const e = err as { error?: { message?: string; code?: string }; status?: number };
-      if (e?.error?.code === 'BLOCKED' || e?.status === 403) {
+      const status = err instanceof HttpErrorResponse ? err.status : undefined;
+      const body = err instanceof HttpErrorResponse ? err.error : null;
+      const apiMsg =
+        body && typeof body === 'object' && 'message' in body
+          ? String((body as { message?: unknown }).message || '')
+          : '';
+      const code =
+        body && typeof body === 'object' && 'code' in body
+          ? String((body as { code?: unknown }).code || '')
+          : '';
+      if (code === 'BLOCKED' || status === 403) {
         return { ok: false, message: 'Contact admin', blocked: true };
       }
       return {
         ok: false,
-        message: e?.error?.message || 'Invalid username or password',
+        message: apiMsg || 'Invalid username or password',
       };
     }
   }

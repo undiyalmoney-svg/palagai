@@ -1,6 +1,6 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { Router } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -12,7 +12,6 @@ import { AuthService } from '../../core/auth/auth.service';
   standalone: true,
   imports: [
     ReactiveFormsModule,
-    RouterLink,
     MatButtonModule,
     MatFormFieldModule,
     MatInputModule,
@@ -21,11 +20,7 @@ import { AuthService } from '../../core/auth/auth.service';
   template: `
     <section class="wrap">
       <h1>Admin</h1>
-      <p>
-        Not the site login. Go to
-        <a routerLink="/login">/login</a> for Devil.
-        Here username is <strong>angel</strong>.
-      </p>
+      <p>Separate from site login. Username: <strong>angel</strong></p>
       @if (error()) {
         <p class="err">{{ error() }}</p>
       }
@@ -35,7 +30,7 @@ import { AuthService } from '../../core/auth/auth.service';
           <input
             matInput
             formControlName="username"
-            autocomplete="off"
+            autocomplete="username"
             autocapitalize="off"
             spellcheck="false"
           />
@@ -46,7 +41,8 @@ import { AuthService } from '../../core/auth/auth.service';
             matInput
             [type]="hide() ? 'password' : 'text'"
             formControlName="password"
-            autocomplete="new-password"
+            autocomplete="current-password"
+            (paste)="onPaste($event)"
           />
           <button
             mat-icon-button
@@ -87,13 +83,13 @@ import { AuthService } from '../../core/auth/auth.service';
       display: block;
       margin-bottom: 0.75rem;
     }
+    .full input {
+      user-select: text;
+      -webkit-user-select: text;
+    }
     .err {
       color: #b42318;
       white-space: pre-wrap;
-    }
-    a {
-      color: inherit;
-      text-decoration: underline;
     }
   `,
 })
@@ -109,6 +105,14 @@ export class AdminLoginComponent {
     username: ['angel', Validators.required],
     password: ['', Validators.required],
   });
+
+  protected onPaste(event: ClipboardEvent): void {
+    const text = event.clipboardData?.getData('text');
+    if (text == null) return;
+    event.preventDefault();
+    this.form.controls.password.setValue(text.replace(/^\uFEFF/, '').trim());
+    this.form.controls.password.markAsDirty();
+  }
 
   protected async submit(): Promise<void> {
     this.error.set('');
