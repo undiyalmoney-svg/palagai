@@ -331,7 +331,11 @@
       @if (assist.nextAction) {
         <p class="la-next"><span>Next</span> {{ assist.nextAction }}</p>
       }
-      <p class="la-foot">Updates every live tick (~60s) · keep this tab open · /crude-oil page still separate</p>
+      <p class="la-foot">
+        Updates every live tick (~60s) · keep this tab open{{
+          showCrude() ? ' · /crude-oil page still separate' : ''
+        }}
+      </p>
     </aside>
   }
 
