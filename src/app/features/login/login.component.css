@@ -81,16 +81,8 @@
 .login-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 0.75rem;
   margin: 0.15rem 0 0.85rem;
-}
-
-.forgot {
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: var(--pg-bull);
-  opacity: 0.85;
 }
 
 .error-banner {
