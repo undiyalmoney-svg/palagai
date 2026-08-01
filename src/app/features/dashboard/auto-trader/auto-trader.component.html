@@ -1,0 +1,141 @@
+<section class="auto-trader">
+  <header class="at-hero">
+    <div>
+      <p class="at-kicker">Server Live · DigitalOcean</p>
+      <h1>Auto Trader</h1>
+      <p class="at-sub">
+        Keeps scanning after Chrome / Wi‑Fi dies. Trade Desk Local Live is unchanged.
+      </p>
+    </div>
+    <div class="at-status" [class.ok]="status().status === 'running'" [class.warn]="status().stale">
+      <strong>{{ status().status }}</strong>
+      <span>
+        @if (status().lastHeartbeatAt) {
+          last tick {{ status().heartbeatAgeSec ?? '?' }}s ago
+        } @else {
+          no heartbeat
+        }
+      </span>
+    </div>
+  </header>
+
+  <p class="at-note">{{ note() }}</p>
+
+  <div class="at-grid">
+    <article class="at-card">
+      <h2>Books</h2>
+      <label class="at-check">
+        <input type="checkbox" [(ngModel)]="enableNifty" [disabled]="busy() || status().status === 'running'" />
+        <span>Nifty 50 · <em>Trap (fixed)</em></span>
+      </label>
+      <label class="at-lots">
+        Lots
+        <input type="number" min="1" [(ngModel)]="niftyLots" [disabled]="busy() || status().status === 'running'" />
+      </label>
+
+      <label class="at-check">
+        <input type="checkbox" [(ngModel)]="enableBank" [disabled]="busy() || status().status === 'running'" />
+        <span>Bank Nifty</span>
+      </label>
+      <label class="at-select">
+        Bank strategy
+        <select [(ngModel)]="bankStrategy" [disabled]="busy() || !enableBank || status().status === 'running'">
+          <option value="trap">Trap</option>
+          <option value="genie">Genie</option>
+        </select>
+      </label>
+      <label class="at-lots">
+        Lots
+        <input type="number" min="1" [(ngModel)]="bankLots" [disabled]="busy() || status().status === 'running'" />
+      </label>
+
+      <label class="at-check">
+        <input type="checkbox" [(ngModel)]="enableCrude" [disabled]="busy() || status().status === 'running'" />
+        <span>Crude Oil Mini · <em>All-Green (fixed)</em></span>
+      </label>
+      <label class="at-lots">
+        Lots
+        <input type="number" min="1" [(ngModel)]="crudeLots" [disabled]="busy() || status().status === 'running'" />
+      </label>
+    </article>
+
+    <article class="at-card">
+      <h2>Controls</h2>
+      <label class="at-check danger">
+        <input type="checkbox" [(ngModel)]="realOrders" [disabled]="busy() || status().status === 'running'" />
+        <span>Real money (MIS via static-IP Order-API)</span>
+      </label>
+      <div class="at-actions">
+        <button mat-flat-button color="primary" type="button" (click)="start()" [disabled]="busy()">
+          Start Server Live
+        </button>
+        <button mat-stroked-button type="button" (click)="stop()" [disabled]="busy()">Stop</button>
+        <button mat-stroked-button type="button" (click)="refreshStatus()" [disabled]="busy()">Refresh</button>
+      </div>
+      <div class="at-actions">
+        <button mat-stroked-button type="button" (click)="pushKiteAuth()" [disabled]="busy()">
+          Push Kite token to server
+        </button>
+      </div>
+      <p class="at-hint">
+        Fixed DNA: Nifty = Trap · Crude = All-Green. Only Bank is selectable (Trap / Genie).
+      </p>
+      @if (status().message) {
+        <p class="at-msg">{{ status().message }}</p>
+      }
+    </article>
+  </div>
+
+  <article class="at-card order-check">
+    <h2>Order path check</h2>
+    <p class="at-hint">
+      Confirms browser → Order-API (static IP) → Kite still works. Uses existing order routes only —
+      no changes to Kite handlers. Test symbol: <strong>NSE:RELIANCE</strong> MIS.
+    </p>
+    <label class="at-lots">
+      Test qty
+      <input type="number" min="1" [(ngModel)]="testQty" [disabled]="orderBusy()" />
+    </label>
+    <div class="at-actions">
+      <button mat-stroked-button type="button" (click)="pingOrderApi()" [disabled]="orderBusy()">
+        1 · Ping Order-API
+      </button>
+      <button mat-flat-button color="warn" type="button" (click)="placeTestBuy()" [disabled]="orderBusy()">
+        2 · Test BUY
+      </button>
+      <button mat-stroked-button type="button" (click)="placeTestSell()" [disabled]="orderBusy()">
+        3 · Test SELL
+      </button>
+    </div>
+    @if (lastTestOrderId()) {
+      <p class="at-msg">Last test order id: <code>{{ lastTestOrderId() }}</code></p>
+    }
+    @if (orderCheckLog().length) {
+      <ul class="order-log">
+        @for (line of orderCheckLog(); track line.at + line.message) {
+          <li [class.ok]="line.level === 'ok'" [class.err]="line.level === 'err'">
+            <time>{{ line.at }}</time>
+            <span>{{ line.message }}</span>
+          </li>
+        }
+      </ul>
+    }
+  </article>
+
+  <article class="at-card events">
+    <h2>Recent events</h2>
+    @if (!(status().events?.length)) {
+      <p class="at-hint">No events yet — worker will append ENTRY / EXIT / SKIP / ERROR here.</p>
+    } @else {
+      <ul>
+        @for (e of status().events!; track e.at + e.action + e.detail) {
+          <li>
+            <time>{{ e.at }}</time>
+            <strong>{{ e.action }}</strong>
+            <span>{{ e.detail }}</span>
+          </li>
+        }
+      </ul>
+    }
+  </article>
+</section>

@@ -16,5 +16,23 @@
       "^/api/order-kite": "/api/kite"
     },
     "logLevel": "debug"
+  },
+  "/api/live": {
+    "target": "http://127.0.0.1:3000",
+    "secure": false,
+    "changeOrigin": true,
+    "pathRewrite": {
+      "^/api/live": "/live"
+    },
+    "logLevel": "debug"
+  },
+  "/api/pnl": {
+    "target": "http://127.0.0.1:3000",
+    "secure": false,
+    "changeOrigin": true,
+    "pathRewrite": {
+      "^/api/pnl": "/pnl"
+    },
+    "logLevel": "debug"
   }
 }

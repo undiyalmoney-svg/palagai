@@ -1,0 +1,175 @@
+.auto-trader {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 1.25rem 1rem 2.5rem;
+  display: grid;
+  gap: 1rem;
+}
+
+.at-hero {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.at-kicker {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #3f5a4e;
+}
+
+.at-hero h1 {
+  margin: 0.2rem 0;
+  font-size: 1.75rem;
+}
+
+.at-sub {
+  margin: 0;
+  color: #4a5c54;
+  max-width: 36rem;
+}
+
+.at-status {
+  min-width: 10rem;
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  background: #f3f1ea;
+  display: grid;
+  gap: 0.25rem;
+}
+
+.at-status strong {
+  text-transform: uppercase;
+  font-size: 0.85rem;
+}
+
+.at-status.ok {
+  background: #e7f6ec;
+  color: #1f6b3a;
+}
+
+.at-status.warn {
+  background: #fdecec;
+  color: #a12a2a;
+}
+
+.at-note,
+.at-msg,
+.at-hint {
+  margin: 0;
+  color: #4a5c54;
+  font-size: 0.92rem;
+}
+
+.order-check .order-log {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.35rem;
+  max-height: 14rem;
+  overflow: auto;
+  font-size: 0.82rem;
+}
+
+.order-check .order-log li {
+  display: grid;
+  grid-template-columns: 5rem 1fr;
+  gap: 0.45rem;
+  padding: 0.35rem 0;
+  border-bottom: 1px solid #eef2ef;
+}
+
+.order-check .order-log li.ok {
+  color: #1f6b3a;
+}
+
+.order-check .order-log li.err {
+  color: #a12a2a;
+}
+
+.order-check code {
+  font-size: 0.85em;
+}
+
+.at-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1rem;
+}
+
+.at-card {
+  background: #fff;
+  border: 1px solid #d9e2dc;
+  border-radius: 14px;
+  padding: 1rem 1.1rem;
+  display: grid;
+  gap: 0.7rem;
+}
+
+.at-card h2 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.at-check,
+.at-lots,
+.at-select {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-weight: 600;
+}
+
+.at-lots input,
+.at-select select {
+  margin-left: auto;
+  width: 7rem;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid #c9d5ce;
+  border-radius: 8px;
+}
+
+.at-check em {
+  font-style: normal;
+  color: #2f6b4f;
+  font-weight: 700;
+}
+
+.at-check.danger span {
+  color: #a12a2a;
+}
+
+.at-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.events ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.events li {
+  display: grid;
+  grid-template-columns: 11rem 5rem 1fr;
+  gap: 0.5rem;
+  font-size: 0.86rem;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid #eef2ef;
+}
+
+@media (max-width: 720px) {
+  .events li {
+    grid-template-columns: 1fr;
+  }
+}

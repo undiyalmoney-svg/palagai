@@ -1,0 +1,98 @@
+<section class="pnl-page">
+  <header class="pnl-hero">
+    <div>
+      <p class="pnl-kicker">Manual ledger · MongoDB</p>
+      <h1>P/L records</h1>
+      <p class="pnl-sub">One total ₹ per day. Enter losses as negative (e.g. -1200).</p>
+    </div>
+    @if (summary(); as s) {
+      <div class="pnl-summary">
+        <div>
+          <span>Total</span>
+          <strong [class.green]="s.totalRs > 0" [class.red]="s.totalRs < 0"
+            >₹{{ s.totalRs | number: '1.0-0' }}</strong
+          >
+        </div>
+        <div>
+          <span>Days</span>
+          <strong>{{ s.days }}</strong>
+        </div>
+        <div>
+          <span>Green / Red</span>
+          <strong>{{ s.greenDays }} / {{ s.redDays }}</strong>
+        </div>
+      </div>
+    }
+  </header>
+
+  @if (message()) {
+    <p class="pnl-msg">{{ message() }}</p>
+  }
+
+  <article class="pnl-card">
+    <h2>Add / update day</h2>
+    <div class="pnl-form">
+      <label>
+        Date
+        <input type="date" [(ngModel)]="date" [disabled]="busy()" />
+      </label>
+      <label>
+        Day P/L ₹
+        <input
+          type="number"
+          step="1"
+          [(ngModel)]="amountRs"
+          placeholder="e.g. 2500 or -800"
+          [disabled]="busy()"
+        />
+      </label>
+      <label class="wide">
+        Note (optional)
+        <input type="text" [(ngModel)]="note" maxlength="500" [disabled]="busy()" />
+      </label>
+    </div>
+    <div class="pnl-actions">
+      <button mat-flat-button color="primary" type="button" (click)="save()" [disabled]="busy()">
+        Save to Mongo
+      </button>
+      <button mat-stroked-button type="button" (click)="refresh()" [disabled]="busy()">Refresh</button>
+    </div>
+  </article>
+
+  <article class="pnl-card">
+    <h2>History</h2>
+    @if (!sorted().length) {
+      <p class="pnl-empty">No records yet.</p>
+    } @else {
+      <div class="pnl-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>P/L ₹</th>
+              <th>Note</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of sorted(); track row.date) {
+              <tr>
+                <td>{{ row.date }}</td>
+                <td [class.green]="row.amountRs > 0" [class.red]="row.amountRs < 0">
+                  ₹{{ row.amountRs | number: '1.0-0' }}
+                </td>
+                <td>{{ row.note || '—' }}</td>
+                <td class="ops">
+                  <button type="button" class="linkish" (click)="edit(row)" [disabled]="busy()">Edit</button>
+                  <button type="button" class="linkish danger" (click)="remove(row.date)" [disabled]="busy()">
+                    Delete
+                  </button>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </article>
+</section>

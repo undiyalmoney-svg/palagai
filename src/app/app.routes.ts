@@ -8,7 +8,10 @@ import { OrderTestComponent } from './features/dashboard/order-test/order-test.c
 import { GetTokenComponent } from './features/dashboard/get-token/get-token.component';
 import { SettingsComponent } from './features/dashboard/settings/settings.component';
 import { CrudeOilDeskComponent } from './features/dashboard/crude-oil-desk/crude-oil-desk.component';
-import { StocksDeskComponent } from './features/dashboard/stocks-desk/stocks-desk.component';
+// Stocks Desk hidden for now — Auto Trader takes the nav slot.
+// import { StocksDeskComponent } from './features/dashboard/stocks-desk/stocks-desk.component';
+import { AutoTraderComponent } from './features/dashboard/auto-trader/auto-trader.component';
+import { PnlRecordsComponent } from './features/dashboard/pnl-records/pnl-records.component';
 import { StrategyManagerPageComponent } from './features/dashboard/strategy-manager/strategy-manager-page.component';
 
 export const routes: Routes = [
@@ -47,13 +50,20 @@ export const routes: Routes = [
         path: 'order-test',
         component: OrderTestComponent,
       },
+      { path: 'orders', redirectTo: 'pnl-records', pathMatch: 'full' },
+      {
+        path: 'pnl-records',
+        component: PnlRecordsComponent,
+      },
       {
         path: 'crude-oil',
         component: CrudeOilDeskComponent,
       },
+      // { path: 'stocks', component: StocksDeskComponent },
+      { path: 'stocks', redirectTo: 'auto-trader', pathMatch: 'full' },
       {
-        path: 'stocks',
-        component: StocksDeskComponent,
+        path: 'auto-trader',
+        component: AutoTraderComponent,
       },
       {
         path: 'strategy-manager',
