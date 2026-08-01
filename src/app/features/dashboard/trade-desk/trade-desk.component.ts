@@ -19,6 +19,7 @@ import { KiteSessionService } from '../../../core/kite/kite-session.service';
 import { LotsPreferenceService } from '../../../core/services/lots-preference.service';
 import { formatUnknownError } from '../../../core/utils/kite-error.util';
 import { extractTradeDate, formatDayOfWeek, formatDisplayDate } from '../../../core/utils/trade-date.util';
+import { AuthService } from '../../../core/auth/auth.service';
 import { StrategyAssignmentService } from '../../../core/strategy-manager/config/strategy-assignment.service';
 import { StrategyRegistryService } from '../../../core/strategy-manager/registry/strategy-registry.service';
 import { dnaCapsForStrategy } from '../../../core/strategy-manager/config/strategy-dna-caps';
@@ -36,6 +37,7 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
   private readonly deskExport = inject(PaperDeskExportService);
   private readonly kiteSession = inject(KiteSessionService);
   private readonly lotsPreference = inject(LotsPreferenceService);
+  private readonly auth = inject(AuthService);
   private readonly assignments = inject(StrategyAssignmentService);
   private readonly registry = inject(StrategyRegistryService);
 
@@ -59,10 +61,17 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
   protected strictDayStop = false;
   /** Combined day profit lock ≈ +₹5,000. */
   protected dayProfitLock = false;
-  /** Background Kutty scalp — on by default for Paper + Live (doc 34 champion). */
+  /** Background Kutty scalp — owner only in UI; friends always off. */
   protected enableKutty = true;
   /** Kutty only — no Trap/Strat entries. Off by default. */
   protected kuttyAlone = false;
+
+  /** Owner (Devil) sees Kutty controls; friends do not. */
+  protected readonly showKutty = computed(
+    () => this.auth.currentUser()?.role === 'owner',
+  );
+  /** Crude controls only if user has crude module (owner always has it). */
+  protected readonly showCrude = computed(() => this.auth.hasModule('crude'));
 
   /** Testing result filter: Mon–Fri (fetch all, show selected weekdays). */
   protected readonly weekdayOptions = PAPER_WEEKDAY_OPTIONS;
@@ -128,6 +137,14 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
     this.niftyLots = preferred;
     this.bankLots = preferred;
     this.crudeLots = preferred;
+    // Friends: no Kutty. Crude only if module granted.
+    if (!this.showKutty()) {
+      this.enableKutty = false;
+      this.kuttyAlone = false;
+    }
+    if (!this.showCrude()) {
+      this.enableCrude = false;
+    }
     // Live continues in the root desk service across tab switches — restore UI mode.
     if (this.snapshot().running) {
       this.mode.set('live');
@@ -184,7 +201,9 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
   }
 
   private buildRunOptions(): TradeDeskRunOptions {
-    const kuttyAlone = this.kuttyAlone;
+    const kuttyAlone = this.showKutty() && this.kuttyAlone;
+    const enableKutty = this.showKutty() && (kuttyAlone || this.enableKutty);
+    const enableCrude = this.showCrude() && this.enableCrude;
     return {
       lots: this.niftyLots,
       niftyLots: this.niftyLots,
@@ -192,10 +211,10 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
       crudeLots: this.crudeLots,
       enableNifty: this.enableNifty,
       enableBank: this.enableBank,
-      enableCrude: this.enableCrude,
+      enableCrude,
       strictDayStop: this.strictDayStop,
       dayProfitLock: this.dayProfitLock,
-      enableKutty: kuttyAlone || this.enableKutty,
+      enableKutty,
       kuttyAlone,
     };
   }
@@ -216,7 +235,9 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
     const parts = [
       this.enableNifty ? `Nifty 50 ×${this.niftyLots}` : null,
       this.enableBank ? `Bank Nifty ×${this.bankLots}` : null,
-      this.enableCrude ? `Crude Oil Mini ×${this.crudeLots} (All-Green)` : null,
+      this.enableCrude && this.showCrude()
+        ? `Crude Oil Mini ×${this.crudeLots} (All-Green)`
+        : null,
     ].filter(Boolean);
     return parts.join(' + ') || 'none';
   }
@@ -227,8 +248,12 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
       this.error.set('No Kite session. Open Get Token and paste your access token, then try again.');
       return;
     }
-    if (!this.enableNifty && !this.enableBank && !this.enableCrude) {
-      this.error.set('Select at least one: Nifty 50, Bank Nifty, or Crude Oil Mini.');
+    if (!this.enableNifty && !this.enableBank && !(this.enableCrude && this.showCrude())) {
+      this.error.set(
+        this.showCrude()
+          ? 'Select at least one: Nifty 50, Bank Nifty, or Crude Oil Mini.'
+          : 'Select at least one: Nifty 50 or Bank Nifty.',
+      );
       return;
     }
 
@@ -254,7 +279,9 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
           const riskBits = [
             this.strictDayStop ? 'strict day stop −₹2,950' : null,
             this.dayProfitLock ? 'day profit lock +₹5,000' : null,
-            this.enableCrude ? 'Crude All-Green continues past 15:15' : null,
+            this.enableCrude && this.showCrude()
+              ? 'Crude All-Green continues past 15:15'
+              : null,
           ]
             .filter(Boolean)
             .join(', ');
@@ -411,7 +438,9 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
       },
       {
         title: 'Trade Desk Results',
-        subtitle: `Nifty / Bank / Crude paper · days ${view.weekdayLabel}`,
+        subtitle: this.showCrude()
+          ? `Nifty / Bank / Crude paper · days ${view.weekdayLabel}`
+          : `Nifty / Bank paper · days ${view.weekdayLabel}`,
       },
     );
   }

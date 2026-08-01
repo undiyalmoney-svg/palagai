@@ -4,8 +4,12 @@
       <p class="pg-eyebrow">Strategy Manager → Trade Desk</p>
       <h1>Trade Desk</h1>
       <p class="pg-lede">
-        Nifty, Bank Nifty &amp; Crude Oil Mini — Strat for indices; Crude fixed <strong>All-Green</strong>.
-        Index until 15:15 · Crude continues on MCX evening.
+        @if (showCrude()) {
+          Nifty, Bank Nifty &amp; Crude Oil Mini — Strat for indices; Crude fixed
+          <strong>All-Green</strong>. Index until 15:15 · Crude continues on MCX evening.
+        } @else {
+          Nifty &amp; Bank Nifty — Strat for indices. Session until 15:15.
+        }
       </p>
     </div>
     <div class="hero-meta">
@@ -25,33 +29,33 @@
   <div class="active-strategy-bar" role="status" aria-live="polite">
     <div class="active-strategy-label">
       <span class="as-kicker">Active now · {{ activeStrategies().modeLabel }}</span>
-      @if (kuttyAlone) {
-        <strong class="as-name">Kutty alone{{ enableCrude ? ' + Crude All-Green' : '' }}</strong>
+      @if (showKutty() && kuttyAlone) {
+        <strong class="as-name">Kutty alone{{ enableCrude && showCrude() ? ' + Crude All-Green' : '' }}</strong>
         <span class="as-meta">No Trap/Strat · ₹600 TP / ₹200 SL · ∞ trades</span>
       } @else if (activeStrategies().same) {
         <strong class="as-name"
           >{{ activeStrategies().nifty.name
-          }}{{ enableCrude ? ' · Crude All-Green' : '' }}</strong
+          }}{{ enableCrude && showCrude() ? ' · Crude All-Green' : '' }}</strong
         >
         <span class="as-meta"
           >Nifty + Bank · {{ activeStrategies().nifty.maxTradesLabel
-          }}{{ enableKutty ? ' · +Kutty' : ''
-          }}{{ enableCrude ? ' · Crude →23:10' : '' }}</span
+          }}{{ showKutty() && enableKutty ? ' · +Kutty' : ''
+          }}{{ enableCrude && showCrude() ? ' · Crude →23:10' : '' }}</span
         >
       } @else {
         <strong class="as-name"
           >Nifty {{ activeStrategies().nifty.name }} · Bank {{ activeStrategies().bank.name
-          }}{{ enableCrude ? ' · Crude All-Green' : '' }}</strong
+          }}{{ enableCrude && showCrude() ? ' · Crude All-Green' : '' }}</strong
         >
         <span class="as-meta"
           >{{ activeStrategies().nifty.maxTradesLabel }} /
           {{ activeStrategies().bank.maxTradesLabel
-          }}{{ enableKutty ? ' · +Kutty' : ''
-          }}{{ enableCrude ? ' · Crude →23:10' : '' }}</span
+          }}{{ showKutty() && enableKutty ? ' · +Kutty' : ''
+          }}{{ enableCrude && showCrude() ? ' · Crude →23:10' : '' }}</span
         >
       }
     </div>
-    @if (!kuttyAlone) {
+    @if (!(showKutty() && kuttyAlone)) {
       <a class="as-link" href="/strategy-manager">Change in Strat</a>
     }
   </div>
@@ -75,7 +79,9 @@
       (click)="setMode('live')"
     >
       <span class="mode-title">Live</span>
-      <span class="mode-sub">Today · Index→15:15 · Crude→23:10</span>
+      <span class="mode-sub"
+        >Today · Index→15:15{{ showCrude() ? ' · Crude→23:10' : '' }}</span
+      >
     </button>
   </div>
 
@@ -145,17 +151,19 @@
           [disabled]="busy() || snapshot().running || !enableBank"
         />
       </label>
-      <label class="field lots-field">
-        <span>Crude lots</span>
-        <input
-          type="number"
-          min="1"
-          step="1"
-          [(ngModel)]="crudeLots"
-          (ngModelChange)="onLotsChange('crude')"
-          [disabled]="busy() || snapshot().running || !enableCrude"
-        />
-      </label>
+      @if (showCrude()) {
+        <label class="field lots-field">
+          <span>Crude lots</span>
+          <input
+            type="number"
+            min="1"
+            step="1"
+            [(ngModel)]="crudeLots"
+            (ngModelChange)="onLotsChange('crude')"
+            [disabled]="busy() || snapshot().running || !enableCrude"
+          />
+        </label>
+      }
     </div>
 
     <div class="desk-toggles" role="group" aria-label="Books and day risk">
@@ -167,10 +175,12 @@
         <input type="checkbox" [(ngModel)]="enableBank" [disabled]="busy() || snapshot().running" />
         <span>Bank Nifty</span>
       </label>
-      <label class="desk-check" title="All-Green Session OR · continues past 15:15 on MCX">
-        <input type="checkbox" [(ngModel)]="enableCrude" [disabled]="busy() || snapshot().running" />
-        <span>Crude Oil Mini</span>
-      </label>
+      @if (showCrude()) {
+        <label class="desk-check" title="All-Green Session OR · continues past 15:15 on MCX">
+          <input type="checkbox" [(ngModel)]="enableCrude" [disabled]="busy() || snapshot().running" />
+          <span>Crude Oil Mini</span>
+        </label>
+      }
       <label class="desk-check" title="Stops new entries after about −₹2,950 day loss (split if both books on)">
         <input
           type="checkbox"
@@ -187,30 +197,32 @@
         />
         <span>Day profit lock (+₹5,000)</span>
       </label>
-      <label
-        class="desk-check"
-        title="Background Kutty · only when Strat path is free · waits if Trap/Strat is armed or entering · yields on Strat entry"
-      >
-        <input
-          type="checkbox"
-          [(ngModel)]="enableKutty"
-          [disabled]="busy() || snapshot().running || kuttyAlone"
-          (ngModelChange)="onEnableKuttyChange()"
-        />
-        <span>Kutty scalp</span>
-      </label>
-      <label
-        class="desk-check"
-        title="Trade Kutty only — Trap/Strat entries off. Uncheck to run Strat again (with optional Kutty background)."
-      >
-        <input
-          type="checkbox"
-          [(ngModel)]="kuttyAlone"
-          [disabled]="busy() || snapshot().running"
-          (ngModelChange)="onKuttyAloneChange()"
-        />
-        <span>Kutty alone (no Strat)</span>
-      </label>
+      @if (showKutty()) {
+        <label
+          class="desk-check"
+          title="Background Kutty · only when Strat path is free · waits if Trap/Strat is armed or entering · yields on Strat entry"
+        >
+          <input
+            type="checkbox"
+            [(ngModel)]="enableKutty"
+            [disabled]="busy() || snapshot().running || kuttyAlone"
+            (ngModelChange)="onEnableKuttyChange()"
+          />
+          <span>Kutty scalp</span>
+        </label>
+        <label
+          class="desk-check"
+          title="Trade Kutty only — Trap/Strat entries off. Uncheck to run Strat again (with optional Kutty background)."
+        >
+          <input
+            type="checkbox"
+            [(ngModel)]="kuttyAlone"
+            [disabled]="busy() || snapshot().running"
+            (ngModelChange)="onKuttyAloneChange()"
+          />
+          <span>Kutty alone (no Strat)</span>
+        </label>
+      }
     </div>
 
     @if (mode() === 'testing') {
@@ -238,7 +250,8 @@
           [disabled]="busy() || snapshot().running"
         />
         <span
-          >Live money — real Kite MIS (N×{{ niftyLots }} · B×{{ bankLots }} · C×{{ crudeLots }})</span
+          >Live money — real Kite MIS (N×{{ niftyLots }} · B×{{ bankLots
+          }}{{ showCrude() ? ' · C×' + crudeLots : '' }})</span
         >
       </label>
       @if (realOrders) {
@@ -777,7 +790,8 @@
       <div class="trades-head">
         <h3>Live order summary</h3>
         <p>
-          Full Kite session book — Nifty ×{{ niftyLots }} · Bank ×{{ bankLots }} · Crude ×{{ crudeLots }} · statuses refresh every tick
+          Full Kite session book — Nifty ×{{ niftyLots }} · Bank ×{{ bankLots
+          }}{{ showCrude() ? ' · Crude ×' + crudeLots : '' }} · statuses refresh every tick
         </p>
       </div>
       @if (snapshot().orderSummary.length) {
