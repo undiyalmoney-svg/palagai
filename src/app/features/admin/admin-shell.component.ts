@@ -48,10 +48,13 @@ import { PgIconComponent } from '../../shared/ui/icon/pg-icon.component';
     </div>
   `,
   styles: `
+    :host {
+      display: block;
+      min-height: 100dvh;
+    }
     .shell {
       min-height: 100dvh;
-      display: grid;
-      grid-template-columns: 220px minmax(0, 1fr);
+      display: block;
       background: var(--pg-bg);
       color: var(--pg-ink);
     }
@@ -59,30 +62,31 @@ import { PgIconComponent } from '../../shared/ui/icon/pg-icon.component';
       position: fixed;
       left: 0;
       top: 0;
+      bottom: 0;
       width: 220px;
-      height: 100dvh;
       background: #fff;
       border-right: 1px solid var(--pg-line);
       padding: 1.15rem 0.85rem;
       display: flex;
       flex-direction: column;
       gap: 1rem;
-      overflow-y: auto;
-      z-index: 40;
+      overflow: hidden;
+      z-index: 100;
       box-sizing: border-box;
     }
     .workspace {
       min-width: 0;
+      min-height: 100dvh;
+      margin-left: 220px;
       display: flex;
       flex-direction: column;
-      grid-column: 2;
-      min-height: 100dvh;
     }
     .brand {
       display: flex;
       gap: 0.7rem;
       align-items: center;
       padding: 0.35rem 0.55rem 0.5rem;
+      flex-shrink: 0;
     }
     .mark {
       width: 34px;
@@ -108,6 +112,7 @@ import { PgIconComponent } from '../../shared/ui/icon/pg-icon.component';
       flex-direction: column;
       gap: 0.25rem;
       flex: 1;
+      min-height: 0;
     }
     nav a {
       text-decoration: none;
@@ -127,7 +132,7 @@ import { PgIconComponent } from '../../shared/ui/icon/pg-icon.component';
       align-items: center;
       justify-content: center;
       gap: 0.5rem;
-      border: 1px solid var(--pg-line);
+      border: 1px solid #fecdd3;
       background: #fff;
       border-radius: 12px;
       padding: 0.65rem 0.9rem;
@@ -136,7 +141,7 @@ import { PgIconComponent } from '../../shared/ui/icon/pg-icon.component';
       font-size: 0.85rem;
       color: var(--pg-bear-deep);
       cursor: pointer;
-      border-color: #fecdd3;
+      flex-shrink: 0;
     }
     .logout:hover {
       background: var(--pg-bear-soft);
@@ -172,18 +177,18 @@ import { PgIconComponent } from '../../shared/ui/icon/pg-icon.component';
       max-width: none;
     }
     @media (max-width: 800px) {
-      .shell {
-        grid-template-columns: 1fr;
-      }
       .sidebar {
-        position: relative;
+        position: sticky;
+        top: 0;
         width: 100%;
         height: auto;
+        bottom: auto;
         border-right: none;
         border-bottom: 1px solid var(--pg-line);
+        overflow: visible;
       }
       .workspace {
-        grid-column: 1;
+        margin-left: 0;
       }
       nav {
         flex-direction: row;
