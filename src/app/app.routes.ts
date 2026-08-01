@@ -20,6 +20,7 @@ import { PnlRecordsComponent } from './features/dashboard/pnl-records/pnl-record
 import { StrategyManagerPageComponent } from './features/dashboard/strategy-manager/strategy-manager-page.component';
 import { VaultPageComponent } from './features/dashboard/vault/vault-page.component';
 import { AdminLoginComponent } from './features/admin/admin-login.component';
+import { AdminShellComponent } from './features/admin/admin-shell.component';
 import { AdminPageComponent } from './features/admin/admin-page.component';
 
 export const routes: Routes = [
@@ -46,9 +47,13 @@ export const routes: Routes = [
   },
   {
     path: 'admin',
-    pathMatch: 'full',
     canActivate: [adminGuard],
-    component: AdminPageComponent,
+    component: AdminShellComponent,
+    children: [
+      { path: '', pathMatch: 'full', component: AdminPageComponent },
+      { path: 'vault', component: VaultPageComponent },
+      { path: 'pnl', component: PnlRecordsComponent },
+    ],
   },
   {
     path: 'dashboard',
@@ -74,12 +79,8 @@ export const routes: Routes = [
         path: 'order-test',
         component: OrderTestComponent,
       },
-      { path: 'orders', redirectTo: 'pnl-records', pathMatch: 'full' },
-      {
-        path: 'pnl-records',
-        canActivate: [moduleGuard('pnl')],
-        component: PnlRecordsComponent,
-      },
+      { path: 'orders', redirectTo: '/admin/pnl', pathMatch: 'full' },
+      { path: 'pnl-records', redirectTo: '/admin/pnl', pathMatch: 'full' },
       {
         path: 'crude-oil',
         canActivate: [moduleGuard('crude')],
@@ -101,11 +102,7 @@ export const routes: Routes = [
         canActivate: [moduleGuard('token')],
         component: GetTokenComponent,
       },
-      {
-        path: 'vault',
-        canActivate: [moduleGuard('vault')],
-        component: VaultPageComponent,
-      },
+      { path: 'vault', redirectTo: '/admin/vault', pathMatch: 'full' },
       {
         path: 'settings',
         component: SettingsComponent,

@@ -26,7 +26,7 @@ interface VaultLogin {
   template: `
     <section class="vault">
       <h1>Vault</h1>
-      <p>Owner only. Unlock with vault password (not stored in Mongo). Secrets are encrypted in Mongo.</p>
+      <p>Admin only. Unlock with vault password (not stored in Mongo). Secrets are encrypted in Mongo.</p>
 
       <label
         >Vault password

@@ -9,8 +9,6 @@ const MODULE_HOME: Array<{ module: SiteModule; path: string }> = [
   { module: 'auto', path: '/dashboard/auto-trader' },
   { module: 'token', path: '/dashboard/get-token' },
   { module: 'strat', path: '/dashboard/strategy-manager' },
-  { module: 'pnl', path: '/dashboard/pnl-records' },
-  { module: 'vault', path: '/dashboard/vault' },
 ];
 
 /** First desk the user is allowed to open. */

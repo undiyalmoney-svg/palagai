@@ -1,10 +1,8 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { firstValueFrom } from 'rxjs';
-import { AuthService } from '../../core/auth/auth.service';
 import { SiteModule, SiteUser } from '../../core/auth/auth.constants';
 
 const FRIEND_MODS: SiteModule[] = ['trade', 'crude', 'auto', 'token'];
@@ -17,10 +15,12 @@ const FRIEND_MODS: SiteModule[] = ['trade', 'crude', 'auto', 'token'];
     <section class="admin">
       <header>
         <div>
-          <h1>Admin · Users</h1>
-          <p>Create friends, set modules, block access. Kite API key required for friends only — not for Devil.</p>
+          <h1>Users</h1>
+          <p>
+            Create friends, edit username/password, set modules, block access. Kite API key
+            required for friends — not for Devil.
+          </p>
         </div>
-        <button mat-stroked-button type="button" (click)="logout()">Admin logout</button>
       </header>
 
       @if (message()) {
@@ -30,8 +30,10 @@ const FRIEND_MODS: SiteModule[] = ['trade', 'crude', 'auto', 'token'];
       <article class="card">
         <h2>New user</h2>
         <div class="row">
-          <label>Username <input [(ngModel)]="newUsername" /></label>
-          <label>Password <input [(ngModel)]="newPassword" type="text" autocomplete="off" /></label>
+          <label>Username <input [(ngModel)]="newUsername" autocomplete="off" /></label>
+          <label
+            >Password <input [(ngModel)]="newPassword" type="text" autocomplete="off"
+          /></label>
           <label class="wide"
             >Kite API key (required for friends)
             <input [(ngModel)]="newKiteKey" autocomplete="off"
@@ -56,11 +58,23 @@ const FRIEND_MODS: SiteModule[] = ['trade', 'crude', 'auto', 'token'];
         @for (u of users(); track u.id) {
           <div class="user" [class.blocked]="u.blocked">
             <div class="user-head">
-              <strong>{{ u.username }}</strong>
-              <span>{{ u.role }}</span>
+              <span class="role">{{ u.role }}</span>
               @if (u.blocked) {
                 <em>BLOCKED</em>
               }
+            </div>
+            <div class="row">
+              <label
+                >Username
+                <input
+                  [(ngModel)]="u.username"
+                  [disabled]="u.role === 'owner' || busy()"
+                  autocomplete="off"
+              /></label>
+              <label
+                >Password
+                <input [(ngModel)]="u.password" type="text" [disabled]="busy()" autocomplete="off"
+              /></label>
             </div>
             <div class="mods">
               @for (m of friendMods; track m) {
@@ -80,9 +94,10 @@ const FRIEND_MODS: SiteModule[] = ['trade', 'crude', 'auto', 'token'];
             } @else {
               <label class="wide"
                 >Kite API key
-                <input [(ngModel)]="u.kiteApiKey" (change)="saveUser(u)" [disabled]="busy()" autocomplete="off"
+                <input [(ngModel)]="u.kiteApiKey" [disabled]="busy()" autocomplete="off"
               /></label>
             }
+            <label class="wide">Note <input [(ngModel)]="u.note" [disabled]="busy()" /></label>
             <div class="actions">
               <button mat-stroked-button type="button" (click)="saveUser(u)" [disabled]="busy()">
                 Save
@@ -104,18 +119,18 @@ const FRIEND_MODS: SiteModule[] = ['trade', 'crude', 'auto', 'token'];
       margin: 0 auto;
       padding: 1.25rem;
       color: #0c1f17;
-      background: #f4faf7;
-      min-height: 100dvh;
       box-sizing: border-box;
     }
     header {
-      display: flex;
-      justify-content: space-between;
-      gap: 1rem;
-      align-items: flex-start;
       margin-bottom: 1rem;
     }
-    h1, h2, p, label, strong, span, em {
+    h1,
+    h2,
+    p,
+    label,
+    strong,
+    span,
+    em {
       color: #0c1f17;
     }
     .card {
@@ -132,6 +147,10 @@ const FRIEND_MODS: SiteModule[] = ['trade', 'crude', 'auto', 'token'];
     }
     .wide {
       grid-column: 1 / -1;
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      font-size: 0.85rem;
     }
     label {
       display: flex;
@@ -169,6 +188,13 @@ const FRIEND_MODS: SiteModule[] = ['trade', 'crude', 'auto', 'token'];
       display: flex;
       gap: 0.75rem;
       align-items: center;
+      margin-bottom: 0.5rem;
+    }
+    .role {
+      font-weight: 700;
+      text-transform: uppercase;
+      font-size: 0.75rem;
+      letter-spacing: 0.04em;
     }
     .actions {
       display: flex;
@@ -189,8 +215,6 @@ const FRIEND_MODS: SiteModule[] = ['trade', 'crude', 'auto', 'token'];
 })
 export class AdminPageComponent implements OnInit {
   private readonly http = inject(HttpClient);
-  private readonly auth = inject(AuthService);
-  private readonly router = inject(Router);
 
   protected readonly friendMods = FRIEND_MODS;
   protected readonly users = signal<SiteUser[]>([]);
@@ -239,10 +263,6 @@ export class AdminPageComponent implements OnInit {
           ? 'Admin session expired — sign in again'
           : 'Failed to load users — check Order-API /auth is running',
       );
-      if (status === 401 || status === 403) {
-        this.auth.adminLogout();
-        await this.router.navigateByUrl('/admin/login');
-      }
     } finally {
       this.busy.set(false);
     }
@@ -281,23 +301,26 @@ export class AdminPageComponent implements OnInit {
   }
 
   protected async saveUser(u: SiteUser): Promise<void> {
-    if (u.role === 'owner') {
-      this.message.set('Devil has no stored API key');
+    if (u.role !== 'owner' && !String(u.kiteApiKey || '').trim()) {
+      this.message.set('Kite API key required for friends');
       return;
     }
-    if (!String(u.kiteApiKey || '').trim()) {
-      this.message.set('Kite API key required for friends');
+    if (!String(u.password || '').trim() || String(u.password).trim().length < 6) {
+      this.message.set('Password min 6 chars');
       return;
     }
     this.busy.set(true);
     try {
-      await firstValueFrom(
-        this.http.patch(`/api/auth/admin/users/${u.id}`, {
-          modules: u.modules,
-          kiteApiKey: u.kiteApiKey,
-          note: u.note,
-        }),
-      );
+      const body: Record<string, unknown> = {
+        username: u.username,
+        password: u.password,
+        modules: u.modules,
+        note: u.note,
+      };
+      if (u.role !== 'owner') {
+        body['kiteApiKey'] = u.kiteApiKey;
+      }
+      await firstValueFrom(this.http.patch(`/api/auth/admin/users/${u.id}`, body));
       this.message.set(`Saved ${u.username}`);
       await this.reload();
     } catch (err: unknown) {
@@ -323,10 +346,5 @@ export class AdminPageComponent implements OnInit {
     } finally {
       this.busy.set(false);
     }
-  }
-
-  protected logout(): void {
-    this.auth.adminLogout();
-    void this.router.navigateByUrl('/admin/login');
   }
 }

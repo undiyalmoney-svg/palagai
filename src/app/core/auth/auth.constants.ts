@@ -10,6 +10,8 @@ export type SiteModule =
 export interface SiteUser {
   id: string;
   username: string;
+  /** Present on admin user list only (for edit/display) */
+  password?: string;
   role: 'owner' | 'friend' | string;
   modules: SiteModule[];
   blocked?: boolean;

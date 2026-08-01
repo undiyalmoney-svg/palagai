@@ -6,12 +6,13 @@ import { AuthService } from './auth.service';
 export const authTokenInterceptor: HttpInterceptorFn = (req, next) => {
   const auth = inject(AuthService);
   const url = req.url;
+  const needsAdmin =
+    url.includes('/api/auth/admin/') ||
+    url.includes('/api/auth/vault') ||
+    url.includes('/api/pnl');
   const needsSite =
     url.includes('/api/auth/me') ||
-    url.includes('/api/auth/vault') ||
-    url.includes('/api/live') ||
-    url.includes('/api/pnl');
-  const needsAdmin = url.includes('/api/auth/admin/');
+    url.includes('/api/live');
 
   if (needsAdmin) {
     const t = auth.getAdminToken();
