@@ -45,13 +45,6 @@
         }
       </mat-form-field>
 
-      <div class="login-row">
-        <label class="ui-check">
-          <input type="checkbox" [(ngModel)]="rememberMe" [ngModelOptions]="{ standalone: true }" />
-          <span>Remember me</span>
-        </label>
-      </div>
-
       @if (errorMessage()) {
         <div class="error-banner" role="alert">
           <mat-icon>error_outline</mat-icon>
