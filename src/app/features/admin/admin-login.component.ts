@@ -17,40 +17,43 @@ import { AuthService } from '../../core/auth/auth.service';
   ],
   template: `
     <section class="wrap">
-      <h1>Admin portal</h1>
-      <p>
-        Create / block site users and set modules. This is
-        <strong>not</strong> the trading desk login.
-      </p>
-      @if (error()) {
-        <p class="err">{{ error() }}</p>
-      }
-      <form [formGroup]="form" (ngSubmit)="submit()" autocomplete="off">
-        <mat-form-field appearance="outline" class="full">
-          <mat-label>Admin username</mat-label>
-          <input
-            matInput
-            formControlName="username"
-            autocomplete="username"
-            autocapitalize="off"
-            spellcheck="false"
-          />
-        </mat-form-field>
-        <mat-form-field appearance="outline" class="full">
-          <mat-label>Admin password</mat-label>
-          <input
-            matInput
-            type="text"
-            formControlName="password"
-            autocomplete="off"
-            spellcheck="false"
-            (paste)="onPaste($event)"
-          />
-        </mat-form-field>
-        <button mat-flat-button color="primary" type="submit" [disabled]="busy()">
-          Admin sign in
-        </button>
-      </form>
+      <div class="card">
+        <div class="mark">A</div>
+        <h1>Admin portal</h1>
+        <p>
+          Create / block site users and set modules. This is
+          <strong>not</strong> the trading desk login.
+        </p>
+        @if (error()) {
+          <p class="err">{{ error() }}</p>
+        }
+        <form [formGroup]="form" (ngSubmit)="submit()" autocomplete="off">
+          <mat-form-field appearance="outline" class="full">
+            <mat-label>Admin username</mat-label>
+            <input
+              matInput
+              formControlName="username"
+              autocomplete="username"
+              autocapitalize="off"
+              spellcheck="false"
+            />
+          </mat-form-field>
+          <mat-form-field appearance="outline" class="full">
+            <mat-label>Admin password</mat-label>
+            <input
+              matInput
+              type="text"
+              formControlName="password"
+              autocomplete="off"
+              spellcheck="false"
+              (paste)="onPaste($event)"
+            />
+          </mat-form-field>
+          <button mat-flat-button color="primary" type="submit" class="submit" [disabled]="busy()">
+            Admin sign in
+          </button>
+        </form>
+      </div>
     </section>
   `,
   styles: `
@@ -62,16 +65,45 @@ import { AuthService } from '../../core/auth/auth.service';
       inset: 0;
       box-sizing: border-box;
       display: flex;
-      flex-direction: column;
       align-items: center;
       justify-content: center;
       padding: max(1.5rem, env(safe-area-inset-top)) 1.25rem;
       margin: 0;
-      max-width: none;
-      width: 100%;
+      background: var(--pg-bg);
     }
-    .wrap > * {
+    .card {
       width: min(100%, 420px);
+      padding: 2rem 1.85rem;
+      border-radius: 22px;
+      border: 1px solid var(--pg-line);
+      background: #fff;
+      box-shadow: var(--pg-shadow);
+      text-align: center;
+    }
+    .mark {
+      width: 48px;
+      height: 48px;
+      margin: 0 auto 1rem;
+      border-radius: 14px;
+      display: grid;
+      place-items: center;
+      background: var(--pg-bull);
+      color: #fff;
+      font-weight: 800;
+      font-size: 1.2rem;
+    }
+    h1 {
+      margin: 0 0 0.35rem;
+      font-size: 1.45rem;
+      letter-spacing: -0.03em;
+    }
+    p {
+      color: var(--pg-muted);
+      font-size: 0.9rem;
+      margin: 0 0 1.25rem;
+    }
+    form {
+      text-align: left;
     }
     .full {
       width: 100%;
@@ -82,9 +114,19 @@ import { AuthService } from '../../core/auth/auth.service';
       user-select: text;
       -webkit-user-select: text;
     }
+    .submit {
+      width: 100%;
+      min-height: 48px;
+      border-radius: 12px !important;
+    }
     .err {
-      color: #b42318;
+      color: var(--pg-bear-deep);
       white-space: pre-wrap;
+      background: var(--pg-bear-soft);
+      border: 1px solid #fecdd3;
+      border-radius: 12px;
+      padding: 0.75rem 1rem;
+      text-align: left;
     }
   `,
 })

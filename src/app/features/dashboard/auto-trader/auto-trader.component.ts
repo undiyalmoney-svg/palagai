@@ -7,6 +7,7 @@ import { environment } from '../../../../environments/environment';
 import { KiteSessionService } from '../../../core/kite/kite-session.service';
 import { KiteApiService } from '../../../core/kite/kite-api.service';
 import { formatUnknownError } from '../../../core/utils/kite-error.util';
+import { UiDialogService } from '../../../shared/ui/dialog/ui-dialog.service';
 
 type BankStrategy = 'trap' | 'genie';
 type RunStatus = 'running' | 'stopping' | 'stopped' | 'error' | 'unknown';
@@ -49,6 +50,7 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
   private readonly http = inject(HttpClient);
   private readonly kiteSession = inject(KiteSessionService);
   private readonly kiteApi = inject(KiteApiService);
+  private readonly uiDialog = inject(UiDialogService);
   private pollTimer: ReturnType<typeof setInterval> | null = null;
 
   /** Same-origin proxy → DO Order-API /live (new paths only). */
@@ -126,11 +128,16 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
 
   protected async start(): Promise<void> {
     if (this.realOrders) {
-      const ok = window.confirm(
-        'Start SERVER LIVE with REAL MONEY?\n\nOrders go via DigitalOcean static IP Order-API.\nChrome can close — worker keeps scanning.\n\nNifty = Trap · Bank = ' +
+      const ok = await this.uiDialog.confirm({
+        title: 'Start server live with real money?',
+        message:
+          'Orders go via DigitalOcean static IP Order-API.\nChrome can close — worker keeps scanning.\n\nNifty = Trap · Bank = ' +
           (this.bankStrategy === 'genie' ? 'Genie' : 'Trap') +
           ' · Crude = All-Green',
-      );
+        confirmLabel: 'Start live',
+        cancelLabel: 'Cancel',
+        tone: 'danger',
+      });
       if (!ok) {
         return;
       }
@@ -217,9 +224,13 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
   /** 2) Real MARKET BUY smoke — same /api/order-kite path as Trade Desk. */
   protected async placeTestBuy(): Promise<void> {
     const qty = Math.max(1, Math.floor(Number(this.testQty)) || 1);
-    const ok = window.confirm(
-      `Place REAL test MARKET BUY?\n\n${this.testExchange}:${this.testSymbol}\nQty ${qty} · MIS\n\nUses existing Order-API (static IP). Flatten with Test SELL after.`,
-    );
+    const ok = await this.uiDialog.confirm({
+      title: 'Place real test MARKET BUY?',
+      message: `${this.testExchange}:${this.testSymbol}\nQty ${qty} · MIS\n\nUses existing Order-API (static IP). Flatten with Test SELL after.`,
+      confirmLabel: 'Place buy',
+      cancelLabel: 'Cancel',
+      tone: 'danger',
+    });
     if (!ok) {
       return;
     }
@@ -262,9 +273,13 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
   /** 3) Flatten the smoke buy. */
   protected async placeTestSell(): Promise<void> {
     const qty = Math.max(1, Math.floor(Number(this.testQty)) || 1);
-    const ok = window.confirm(
-      `Place REAL test MARKET SELL?\n\n${this.testExchange}:${this.testSymbol}\nQty ${qty} · MIS\n\nUse to flatten the test buy.`,
-    );
+    const ok = await this.uiDialog.confirm({
+      title: 'Place real test MARKET SELL?',
+      message: `${this.testExchange}:${this.testSymbol}\nQty ${qty} · MIS\n\nUse to flatten the test buy.`,
+      confirmLabel: 'Place sell',
+      cancelLabel: 'Cancel',
+      tone: 'danger',
+    });
     if (!ok) {
       return;
     }

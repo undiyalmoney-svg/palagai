@@ -1,0 +1,268 @@
+/* Palagai UI kit — reusable SaaS primitives (CSS-first) */
+
+.ui-card {
+  background: var(--pg-bg-elevated);
+  border: 1px solid var(--pg-line);
+  border-radius: var(--pg-radius-lg);
+  box-shadow: var(--pg-shadow-soft);
+  padding: 1.5rem 1.75rem;
+}
+
+.ui-card-sm {
+  padding: 1.15rem 1.25rem;
+}
+
+.ui-section-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--pg-ink);
+}
+
+.ui-section-desc {
+  margin: 0.3rem 0 0;
+  font-size: 0.85rem;
+  color: var(--pg-muted);
+  line-height: 1.45;
+}
+
+.ui-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0.85rem;
+}
+
+.ui-stat-card {
+  background: var(--pg-bg-elevated);
+  border: 1px solid var(--pg-line);
+  border-radius: var(--pg-radius);
+  box-shadow: var(--pg-shadow-soft);
+  padding: 1.15rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+  transition: box-shadow var(--pg-ease), transform var(--pg-ease);
+}
+
+.ui-stat-card:hover {
+  box-shadow: var(--pg-shadow);
+}
+
+.ui-stat-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--pg-muted);
+}
+
+.ui-stat-value {
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--pg-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.ui-btn {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  min-height: 42px;
+  padding: 0.55rem 1.1rem;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  font-family: var(--pg-font);
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  transition:
+    background var(--pg-ease),
+    border-color var(--pg-ease),
+    box-shadow var(--pg-ease),
+    transform var(--pg-ease),
+    color var(--pg-ease);
+}
+
+.ui-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.ui-btn:not(:disabled):hover {
+  transform: translateY(-1px);
+}
+
+.ui-btn:not(:disabled):active {
+  transform: none;
+}
+
+.ui-btn-primary {
+  background: var(--pg-bull);
+  color: #fff;
+  box-shadow: 0 1px 2px rgba(15, 157, 88, 0.25);
+}
+
+.ui-btn-primary:not(:disabled):hover {
+  background: var(--pg-bull-deep);
+}
+
+.ui-btn-secondary {
+  background: #fff;
+  color: var(--pg-ink);
+  border-color: var(--pg-line-strong);
+}
+
+.ui-btn-secondary:not(:disabled):hover {
+  background: var(--pg-bg-muted);
+  border-color: var(--pg-line-strong);
+}
+
+.ui-btn-danger {
+  background: #fff;
+  color: var(--pg-bear-deep);
+  border-color: #fecdd3;
+}
+
+.ui-btn-danger:not(:disabled):hover {
+  background: var(--pg-bear-soft);
+}
+
+.ui-btn-ghost {
+  background: transparent;
+  color: var(--pg-muted);
+  border-color: transparent;
+}
+
+.ui-btn-ghost:not(:disabled):hover {
+  background: var(--pg-bg-muted);
+  color: var(--pg-ink);
+}
+
+.ui-input,
+.ui-select,
+.ui-textarea {
+  width: 100%;
+  min-height: 44px;
+  padding: 0.65rem 0.9rem;
+  border-radius: 12px;
+  border: 1px solid var(--pg-line);
+  background: #fff;
+  color: var(--pg-ink);
+  font-family: var(--pg-font);
+  font-size: 0.9rem;
+  transition: border-color var(--pg-ease), box-shadow var(--pg-ease);
+}
+
+.ui-input:focus,
+.ui-select:focus,
+.ui-textarea:focus {
+  outline: none;
+  border-color: var(--pg-bull);
+  box-shadow: 0 0 0 3px var(--pg-bull-glow);
+}
+
+.ui-label {
+  display: block;
+  margin-bottom: 0.4rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--pg-muted);
+}
+
+.ui-table-wrap {
+  overflow: auto;
+  border: 1px solid var(--pg-line);
+  border-radius: var(--pg-radius-lg);
+  background: #fff;
+  box-shadow: var(--pg-shadow-soft);
+}
+
+.ui-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.ui-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--pg-bg-muted);
+  color: var(--pg-muted);
+  font-size: 0.7rem;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-align: left;
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid var(--pg-line);
+  white-space: nowrap;
+}
+
+.ui-table tbody td {
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid var(--pg-line);
+  color: var(--pg-ink);
+  vertical-align: middle;
+}
+
+.ui-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.ui-table tbody tr {
+  transition: background var(--pg-ease);
+}
+
+.ui-table tbody tr:hover {
+  background: #f8fafb;
+}
+
+.ui-field-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: flex-end;
+}
+
+.ui-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--pg-ink);
+  cursor: pointer;
+  user-select: none;
+}
+
+.ui-check input[type='checkbox'] {
+  width: 1.05rem;
+  height: 1.05rem;
+  accent-color: var(--pg-bull);
+  border-radius: 4px;
+}
+
+/* Custom dialog panel overrides (MatDialog) */
+.ui-dialog-panel {
+  border-radius: 20px !important;
+  border: 1px solid var(--pg-line) !important;
+  box-shadow: 0 24px 64px rgba(15, 23, 42, 0.16) !important;
+  overflow: hidden !important;
+  padding: 0 !important;
+}
+
+.ui-dialog-backdrop {
+  background: rgba(15, 23, 42, 0.42) !important;
+  backdrop-filter: none !important;
+}
+
+.cdk-overlay-pane.ui-dialog-pane {
+  max-width: calc(100vw - 2rem) !important;
+}

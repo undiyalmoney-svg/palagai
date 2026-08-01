@@ -24,6 +24,7 @@ import { StrategyAssignmentService } from '../../../core/strategy-manager/config
 import { StrategyRegistryService } from '../../../core/strategy-manager/registry/strategy-registry.service';
 import { dnaCapsForStrategy } from '../../../core/strategy-manager/config/strategy-dna-caps';
 import { DeskChannel } from '../../../core/strategy-manager/models/desk-channel.model';
+import { UiDialogService } from '../../../shared/ui/dialog/ui-dialog.service';
 
 @Component({
   selector: 'app-trade-desk',
@@ -38,6 +39,7 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
   private readonly kiteSession = inject(KiteSessionService);
   private readonly lotsPreference = inject(LotsPreferenceService);
   private readonly auth = inject(AuthService);
+  private readonly uiDialog = inject(UiDialogService);
   private readonly assignments = inject(StrategyAssignmentService);
   private readonly registry = inject(StrategyRegistryService);
 
@@ -285,9 +287,13 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
           ]
             .filter(Boolean)
             .join(', ');
-          const ok = window.confirm(
-            `Start LIVE MONEY?\n\nReal Kite MIS MARKET orders on ATM options for: ${this.selectedBooksLabel()}.\n${riskBits ? `Risk: ${riskBits}.\n` : ''}\nOrders go via DigitalOcean fixed IP.`,
-          );
+          const ok = await this.uiDialog.confirm({
+            title: 'Start live money?',
+            message: `Real Kite MIS MARKET orders on ATM options for: ${this.selectedBooksLabel()}.\n${riskBits ? `Risk: ${riskBits}.\n` : ''}\nOrders go via DigitalOcean fixed IP.`,
+            confirmLabel: 'Start live',
+            cancelLabel: 'Cancel',
+            tone: 'danger',
+          });
           if (!ok) {
             return;
           }

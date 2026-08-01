@@ -8,6 +8,7 @@ import { KiteSessionService } from '../../../core/kite/kite-session.service';
 import { LotsPreferenceService } from '../../../core/services/lots-preference.service';
 import { formatUnknownError } from '../../../core/utils/kite-error.util';
 import { environment } from '../../../../environments/environment';
+import { UiDialogService } from '../../../shared/ui/dialog/ui-dialog.service';
 
 interface LogLine {
   at: string;
@@ -26,6 +27,7 @@ export class OrderTestComponent implements OnInit {
   private readonly kiteApi = inject(KiteApiService);
   private readonly kiteSession = inject(KiteSessionService);
   private readonly lotsPreference = inject(LotsPreferenceService);
+  private readonly uiDialog = inject(UiDialogService);
 
   protected readonly busy = signal(false);
   protected readonly logs = signal<LogLine[]>([]);
@@ -68,9 +70,13 @@ export class OrderTestComponent implements OnInit {
 
   protected async placeBuy(): Promise<void> {
     const qty = Math.max(1, Math.floor(Number(this.quantity)) || 1);
-    const ok = window.confirm(
-      `Place REAL MARKET BUY?\n\n${this.exchange}:${this.symbol}\nQty ${qty} · ${this.product}\n\nThis verifies the DigitalOcean IP with Kite.`,
-    );
+    const ok = await this.uiDialog.confirm({
+      title: 'Place real market BUY?',
+      message: `${this.exchange}:${this.symbol}\nQty ${qty} · ${this.product}\n\nThis verifies the DigitalOcean IP with Kite.`,
+      confirmLabel: 'Place buy',
+      cancelLabel: 'Cancel',
+      tone: 'danger',
+    });
     if (!ok) {
       return;
     }
@@ -117,9 +123,13 @@ export class OrderTestComponent implements OnInit {
 
   protected async placeSell(): Promise<void> {
     const qty = Math.max(1, Math.floor(Number(this.quantity)) || 1);
-    const ok = window.confirm(
-      `Place REAL MARKET SELL?\n\n${this.exchange}:${this.symbol}\nQty ${qty} · ${this.product}\n\nUse this to flatten the IP-test buy.`,
-    );
+    const ok = await this.uiDialog.confirm({
+      title: 'Place real market SELL?',
+      message: `${this.exchange}:${this.symbol}\nQty ${qty} · ${this.product}\n\nUse this to flatten the IP-test buy.`,
+      confirmLabel: 'Place sell',
+      cancelLabel: 'Cancel',
+      tone: 'danger',
+    });
     if (!ok) {
       return;
     }

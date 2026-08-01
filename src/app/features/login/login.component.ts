@@ -1,5 +1,5 @@
 import { Component, inject, signal } from '@angular/core';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -14,6 +14,7 @@ import { peekKiteRequestToken } from '../../core/kite/kite-request-token.util';
   standalone: true,
   imports: [
     ReactiveFormsModule,
+    FormsModule,
     MatButtonModule,
     MatFormFieldModule,
     MatInputModule,
@@ -31,6 +32,8 @@ export class LoginComponent {
   protected readonly isLoading = signal(false);
   protected readonly errorMessage = signal('');
   protected readonly hidePassword = signal(true);
+  /** UI-only; not wired to auth persistence. */
+  protected rememberMe = true;
 
   protected readonly loginForm = this.formBuilder.nonNullable.group({
     username: ['', [Validators.required]],

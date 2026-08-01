@@ -1,41 +1,93 @@
-<div class="palagai-shell">
-  <header class="palagai-header">
-    <div class="palagai-header-inner">
-      <a class="brand" href="/dashboard" (click)="goHome($event)">
-        <span class="brand-mark" aria-hidden="true">P</span>
-        <span class="brand-text">
-          <strong>Palagai</strong>
-          <small>Trade with clarity</small>
-        </span>
-      </a>
+<div class="shell" [class.sidebar-open]="sidebarOpen()">
+  <aside class="sidebar" aria-label="Primary">
+    <a class="brand" href="/dashboard" (click)="goHome($event)">
+      <span class="brand-mark" aria-hidden="true">P</span>
+      <span class="brand-text">
+        <strong>Palagai</strong>
+        <small>Trading desk</small>
+      </span>
+    </a>
 
-      <nav class="palagai-nav" aria-label="Main">
-        @for (item of navItems(); track item.route) {
-          <a
-            [href]="item.route"
-            [routerLink]="item.route"
-            routerLinkActive="active"
-            [routerLinkActiveOptions]="{ exact: true }"
-            (click)="go(item.route, $event)"
-          >
-            <mat-icon>{{ item.icon }}</mat-icon>
-            <span>{{ item.label }}</span>
-          </a>
-        }
-      </nav>
+    <nav class="side-nav">
+      @for (item of navItems(); track item.route) {
+        <a
+          class="nav-link"
+          [href]="item.route"
+          [routerLink]="item.route"
+          routerLinkActive="active"
+          [routerLinkActiveOptions]="{ exact: true }"
+          (click)="go(item.route, $event)"
+        >
+          <app-pg-icon [name]="item.icon" [size]="18" />
+          <span>{{ item.label }}</span>
+        </a>
+      }
+    </nav>
 
-      <button mat-stroked-button type="button" class="logout-btn" (click)="logout()">
-        <mat-icon>logout</mat-icon>
+    <div class="side-foot">
+      <button type="button" class="nav-link logout" (click)="logout()">
+        <app-pg-icon name="log-out" [size]="18" />
         <span>Logout</span>
       </button>
     </div>
-  </header>
+  </aside>
 
-  <div class="header-clock" aria-live="polite">{{ clockLabel() }}</div>
+  @if (sidebarOpen()) {
+    <button type="button" class="scrim" aria-label="Close menu" (click)="toggleSidebar()"></button>
+  }
 
-  <main class="palagai-main">
-    <router-outlet />
-  </main>
+  <div class="workspace">
+    <header class="topbar">
+      <div class="topbar-left">
+        <button type="button" class="icon-btn menu-btn" (click)="toggleSidebar()" aria-label="Open menu">
+          <app-pg-icon name="menu" [size]="20" />
+        </button>
+        <div class="page-heading">
+          <h1>{{ pageTitle() }}</h1>
+          @if (pageSubtitle()) {
+            <p>{{ pageSubtitle() }}</p>
+          }
+        </div>
+      </div>
+
+      <div class="topbar-right">
+        <div class="clock" aria-live="polite">
+          <app-pg-icon name="calendar" [size]="15" />
+          <span>{{ clockLabel() }}</span>
+        </div>
+        <span class="live-badge" [attr.data-tone]="liveBadge().tone">
+          <span class="dot" aria-hidden="true"></span>
+          {{ liveBadge().label }}
+        </span>
+
+        <div class="profile" [class.open]="profileOpen()">
+          <button type="button" class="profile-btn" (click)="toggleProfile()" aria-haspopup="menu">
+            <span class="avatar" aria-hidden="true">{{ username().charAt(0).toUpperCase() }}</span>
+            <span class="profile-name">{{ username() }}</span>
+          </button>
+          @if (profileOpen()) {
+            <div class="profile-menu" role="menu">
+              <div class="profile-meta">Signed in as <strong>{{ username() }}</strong></div>
+              <button type="button" role="menuitem" (click)="go('/dashboard/settings')">
+                <app-pg-icon name="settings" [size]="16" />
+                Settings
+              </button>
+              <button type="button" role="menuitem" class="danger" (click)="logout()">
+                <app-pg-icon name="log-out" [size]="16" />
+                Sign out
+              </button>
+            </div>
+          }
+        </div>
+      </div>
+    </header>
+
+    <main class="content">
+      <div class="content-inner">
+        <router-outlet />
+      </div>
+    </main>
+  </div>
 
   <nav class="mobile-tabbar" aria-label="Mobile menu">
     @for (item of navItems(); track item.route) {
@@ -47,15 +99,9 @@
         [routerLinkActiveOptions]="{ exact: true }"
         (click)="go(item.route, $event)"
       >
-        <mat-icon>{{ item.icon }}</mat-icon>
+        <app-pg-icon [name]="item.icon" [size]="18" />
         <span class="tab-label">{{ item.shortLabel }}</span>
       </a>
     }
   </nav>
-
-  <footer class="palagai-footer">
-    <span class="bull-dot" aria-hidden="true"></span>
-    <span>Bull · Bear · Same rules every session</span>
-    <span class="bear-dot" aria-hidden="true"></span>
-  </footer>
 </div>

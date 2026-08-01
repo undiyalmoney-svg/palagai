@@ -1,4 +1,5 @@
 @import './styles/palagai-theme.css';
+@import './styles/ui-kit.css';
 
 *,
 *::before,
@@ -14,7 +15,5 @@ body {
 }
 
 html {
-  /* Avoid mobile 100vh jump behind browser chrome */
   height: -webkit-fill-available;
 }
-

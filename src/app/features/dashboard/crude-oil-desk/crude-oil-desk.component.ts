@@ -24,6 +24,7 @@ import {
 } from '../../../core/strategy-engine/strategies/crude-pdhl-evening/crude-strategy-profile';
 import { formatUnknownError } from '../../../core/utils/kite-error.util';
 import { extractTradeDate, formatDayOfWeek, formatDisplayDate } from '../../../core/utils/trade-date.util';
+import { UiDialogService } from '../../../shared/ui/dialog/ui-dialog.service';
 
 @Component({
   selector: 'app-crude-oil-desk',
@@ -37,6 +38,7 @@ export class CrudeOilDeskComponent implements OnInit, OnDestroy {
   private readonly deskExport = inject(PaperDeskExportService);
   private readonly kiteSession = inject(KiteSessionService);
   private readonly lotsPreference = inject(LotsPreferenceService);
+  private readonly uiDialog = inject(UiDialogService);
 
   protected readonly session = MCX_CRUDE_SESSION;
   protected readonly mode = signal<PaperDeskMode>('testing');
@@ -217,9 +219,13 @@ export class CrudeOilDeskComponent implements OnInit, OnDestroy {
           const risk = this.strictDayStop
             ? `\nStrict day stop −₹${profile.strictDayLossPts * CRUDE_RUPEES_PER_POINT} enabled.`
             : `\nDay stop −₹${profile.dayLossStopPts * CRUDE_RUPEES_PER_POINT}.`;
-          const ok = window.confirm(
-            `Start LIVE MONEY on Crude Oil Mini?\n\nProfile: ${profile.label}\nReal Kite MCX MIS MARKET orders will be placed on ATM CRUDEOILM options (${lots} lot each) when signals fire.${risk}${lockNote}\n\nOrders go via DigitalOcean fixed IP.`,
-          );
+          const ok = await this.uiDialog.confirm({
+            title: 'Start live money on Crude Oil Mini?',
+            message: `Profile: ${profile.label}\nReal Kite MCX MIS MARKET orders will be placed on ATM CRUDEOILM options (${lots} lot each) when signals fire.${risk}${lockNote}\n\nOrders go via DigitalOcean fixed IP.`,
+            confirmLabel: 'Start live',
+            cancelLabel: 'Cancel',
+            tone: 'danger',
+          });
           if (!ok) {
             return;
           }

@@ -5,6 +5,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { DecimalPipe } from '@angular/common';
 import { firstValueFrom } from 'rxjs';
 import { environment } from '../../../../environments/environment';
+import { UiDialogService } from '../../../shared/ui/dialog/ui-dialog.service';
 
 interface PnlRecord {
   date: string;
@@ -30,6 +31,7 @@ interface PnlSummary {
 })
 export class PnlRecordsComponent implements OnInit {
   private readonly http = inject(HttpClient);
+  private readonly uiDialog = inject(UiDialogService);
   private readonly apiBase =
     (environment as { pnlApiBaseUrl?: string }).pnlApiBaseUrl || '/api/pnl';
 
@@ -99,7 +101,14 @@ export class PnlRecordsComponent implements OnInit {
   }
 
   protected async remove(date: string): Promise<void> {
-    if (!window.confirm(`Delete P/L for ${date}?`)) {
+    const ok = await this.uiDialog.confirm({
+      title: 'Delete P/L record?',
+      message: `Delete P/L for ${date}? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+      tone: 'danger',
+    });
+    if (!ok) {
       return;
     }
     this.busy.set(true);

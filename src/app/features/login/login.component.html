@@ -2,26 +2,34 @@
   <div class="login-card">
     <div class="login-header">
       <div class="brand-mark">P</div>
-      <h1>Palagai</h1>
-      <p>Trading desk login — users created by Admin (or owner Devil)</p>
+      <h1>Welcome back</h1>
+      <p>Sign in to Palagai — your trading desk.</p>
     </div>
 
     <form class="login-form" [formGroup]="loginForm" (ngSubmit)="onSubmit()">
-      <mat-form-field appearance="outline" class="full-width">
-        <mat-label>Username</mat-label>
-        <input matInput formControlName="username" autocomplete="username" />
+      <label class="ui-label" for="login-username">Username</label>
+      <mat-form-field appearance="outline" class="full-width" subscriptSizing="dynamic">
+        <input
+          id="login-username"
+          matInput
+          formControlName="username"
+          autocomplete="username"
+          placeholder="Enter username"
+        />
         @if (loginForm.controls.username.touched && loginForm.controls.username.hasError('required')) {
           <mat-error>Username is required</mat-error>
         }
       </mat-form-field>
 
-      <mat-form-field appearance="outline" class="full-width">
-        <mat-label>Password</mat-label>
+      <label class="ui-label" for="login-password">Password</label>
+      <mat-form-field appearance="outline" class="full-width" subscriptSizing="dynamic">
         <input
+          id="login-password"
           matInput
           [type]="hidePassword() ? 'password' : 'text'"
           formControlName="password"
           autocomplete="current-password"
+          placeholder="Enter password"
         />
         <button
           mat-icon-button
@@ -36,6 +44,14 @@
           <mat-error>Password is required</mat-error>
         }
       </mat-form-field>
+
+      <div class="login-row">
+        <label class="ui-check">
+          <input type="checkbox" [(ngModel)]="rememberMe" [ngModelOptions]="{ standalone: true }" />
+          <span>Remember me</span>
+        </label>
+        <span class="forgot">Forgot password?</span>
+      </div>
 
       @if (errorMessage()) {
         <div class="error-banner" role="alert">
@@ -54,7 +70,7 @@
         @if (isLoading()) {
           <span class="submit-inner">
             <mat-spinner diameter="18"></mat-spinner>
-            <span>Signing in...</span>
+            <span>Signing in…</span>
           </span>
         } @else {
           <span class="submit-inner">Sign in</span>

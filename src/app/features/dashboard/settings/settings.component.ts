@@ -54,7 +54,10 @@ export class SettingsComponent {
   protected confirmAction(title: string, message: string, action: () => void | Promise<void>): void {
     const ref = this.dialog.open(ConfirmDialogComponent, {
       data: { title, message },
-      width: '400px',
+      width: '440px',
+      maxWidth: '92vw',
+      panelClass: ['ui-dialog-panel'],
+      backdropClass: 'ui-dialog-backdrop',
     });
     ref.afterClosed().subscribe((confirmed) => {
       if (confirmed) {

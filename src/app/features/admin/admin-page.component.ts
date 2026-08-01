@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { firstValueFrom } from 'rxjs';
 import { SiteModule, SiteUser } from '../../core/auth/auth.constants';
+import { UiDialogService } from '../../shared/ui/dialog/ui-dialog.service';
 
 const FRIEND_MODS: SiteModule[] = ['trade', 'crude', 'auto', 'token', 'test'];
 
@@ -120,30 +121,40 @@ const FRIEND_MODS: SiteModule[] = ['trade', 'crude', 'auto', 'token', 'test'];
   `,
   styles: `
     .admin {
-      max-width: 900px;
-      margin: 0 auto;
-      padding: 1.25rem;
-      color: #0c1f17;
+      max-width: 960px;
+      margin: 0;
+      padding: 0;
+      color: var(--pg-ink);
       box-sizing: border-box;
     }
     header {
-      margin-bottom: 1rem;
+      margin-bottom: 1.25rem;
     }
-    h1,
+    h1 {
+      margin: 0;
+      font-size: 1.5rem;
+      letter-spacing: -0.03em;
+      color: var(--pg-ink);
+    }
+    header p {
+      margin: 0.4rem 0 0;
+      color: var(--pg-muted);
+    }
     h2,
     p,
     label,
     strong,
     span,
     em {
-      color: #0c1f17;
+      color: inherit;
     }
     .card {
       background: #fff;
-      border: 1px solid #dfeae4;
-      border-radius: 12px;
-      padding: 1rem;
+      border: 1px solid var(--pg-line);
+      border-radius: 20px;
+      padding: 1.5rem 1.65rem;
       margin-bottom: 1rem;
+      box-shadow: var(--pg-shadow-soft);
     }
     .row {
       display: grid;
@@ -162,13 +173,20 @@ const FRIEND_MODS: SiteModule[] = ['trade', 'crude', 'auto', 'token', 'test'];
       flex-direction: column;
       gap: 0.25rem;
       font-size: 0.85rem;
+      color: var(--pg-ink);
     }
     input {
-      padding: 0.45rem 0.55rem;
-      border: 1px solid #ccc;
-      border-radius: 6px;
-      color: #0c1f17;
+      padding: 0.65rem 0.85rem;
+      border: 1px solid var(--pg-line);
+      border-radius: 12px;
+      color: var(--pg-ink);
       background: #fff;
+      min-height: 42px;
+    }
+    input:focus {
+      outline: none;
+      border-color: var(--pg-bull);
+      box-shadow: 0 0 0 3px var(--pg-bull-glow);
     }
     .mods {
       display: flex;
@@ -264,6 +282,7 @@ const FRIEND_MODS: SiteModule[] = ['trade', 'crude', 'auto', 'token', 'test'];
 })
 export class AdminPageComponent implements OnInit {
   private readonly http = inject(HttpClient);
+  private readonly uiDialog = inject(UiDialogService);
 
   protected readonly friendMods = FRIEND_MODS;
   protected readonly users = signal<SiteUser[]>([]);
@@ -415,7 +434,14 @@ export class AdminPageComponent implements OnInit {
       this.flash('Cannot delete owner', true);
       return;
     }
-    if (!confirm(`Delete user “${u.username}”? This cannot be undone.`)) {
+    const ok = await this.uiDialog.confirm({
+      title: 'Delete user?',
+      message: `Delete user “${u.username}”? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+      tone: 'danger',
+    });
+    if (!ok) {
       return;
     }
     const name = u.username;

@@ -1,10 +1,10 @@
 .sm-page {
-  --sm-ink: #1a2332;
-  --sm-muted: #5c6b7a;
-  --sm-line: rgba(26, 35, 50, 0.12);
-  --sm-panel: rgba(255, 255, 255, 0.72);
-  --sm-accent: #0f6e56;
-  --sm-wash: linear-gradient(160deg, #e8f0ec 0%, #f3efe6 45%, #dce6f0 100%);
+  --sm-ink: var(--pg-ink);
+  --sm-muted: var(--pg-muted);
+  --sm-line: var(--pg-line);
+  --sm-panel: #fff;
+  --sm-accent: var(--pg-bull);
+  --sm-wash: transparent;
   min-height: 100%;
   min-width: 0;
   max-width: 100%;
@@ -12,7 +12,7 @@
   padding: 0 0 1.5rem;
   color: var(--sm-ink);
   background: transparent;
-  font-family: "Source Serif 4", "Iowan Old Style", "Palatino Linotype", Palatino, serif;
+  font-family: var(--pg-font);
   overflow-x: clip;
 }
 

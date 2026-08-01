@@ -1,34 +1,29 @@
 import { Component, inject } from '@angular/core';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 
-export interface ConfirmDialogData {
+export interface UiAlertDialogData {
   title: string;
   message: string;
-  confirmLabel?: string;
-  cancelLabel?: string;
-  tone?: 'default' | 'danger' | 'warning';
+  okLabel?: string;
 }
 
-/** Legacy confirm dialog — same premium UI as UiConfirmDialog. */
 @Component({
-  selector: 'app-confirm-dialog',
+  selector: 'app-ui-alert-dialog',
   standalone: true,
   imports: [MatDialogModule],
   template: `
-    <div class="dlg" [attr.data-tone]="data.tone || 'danger'">
+    <div class="dlg">
       <div class="dlg-icon" aria-hidden="true">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M12 9v4m0 4h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" />
+          <circle cx="12" cy="12" r="10" />
+          <path d="M12 16v-4m0-4h.01" />
         </svg>
       </div>
       <h2 class="dlg-title">{{ data.title }}</h2>
       <p class="dlg-msg">{{ data.message }}</p>
       <div class="dlg-actions">
-        <button type="button" class="ui-btn ui-btn-secondary" (click)="close(false)">
-          {{ data.cancelLabel || 'Cancel' }}
-        </button>
-        <button type="button" class="ui-btn ui-btn-danger" (click)="close(true)">
-          {{ data.confirmLabel || 'Confirm' }}
+        <button type="button" class="ui-btn ui-btn-primary" (click)="close()">
+          {{ data.okLabel || 'OK' }}
         </button>
       </div>
     </div>
@@ -44,8 +39,8 @@ export interface ConfirmDialogData {
       display: grid;
       place-items: center;
       margin-bottom: 1rem;
-      background: var(--pg-bear-soft);
-      color: var(--pg-bear-deep);
+      background: var(--pg-info-soft);
+      color: var(--pg-info);
     }
     .dlg-icon svg {
       width: 22px;
@@ -67,17 +62,15 @@ export interface ConfirmDialogData {
     .dlg-actions {
       display: flex;
       justify-content: flex-end;
-      flex-wrap: wrap;
-      gap: 0.65rem;
       margin-top: 1.5rem;
     }
   `,
 })
-export class ConfirmDialogComponent {
-  protected readonly data = inject<ConfirmDialogData>(MAT_DIALOG_DATA);
-  private readonly dialogRef = inject(MatDialogRef<ConfirmDialogComponent>);
+export class UiAlertDialogComponent {
+  protected readonly data = inject<UiAlertDialogData>(MAT_DIALOG_DATA);
+  private readonly dialogRef = inject(MatDialogRef<UiAlertDialogComponent, void>);
 
-  protected close(value: boolean): void {
-    this.dialogRef.close(value);
+  protected close(): void {
+    this.dialogRef.close();
   }
 }

@@ -1,54 +1,58 @@
 /**
- * Palagai — market candle theme (bull green / bear red)
- * UI-only tokens; no logic changes.
+ * Palagai — premium SaaS design tokens (UI only).
  */
 :root {
-  /* Surfaces */
-  --pg-bg: #ffffff;
+  --pg-bg: #fafbfc;
   --pg-bg-elevated: #ffffff;
-  --pg-bg-muted: #f4faf7;
-  --pg-ink: #0c1f17;
-  --pg-muted: #5a6f66;
-  --pg-line: #dfeae4;
-  --pg-line-strong: #c6d8cf;
+  --pg-bg-muted: #f4f6f8;
+  --pg-bg-soft: #eef7f2;
+  --pg-ink: #0f172a;
+  --pg-muted: #64748b;
+  --pg-line: #e8ecef;
+  --pg-line-strong: #d5dbe1;
 
-  /* Market candle colors */
-  --pg-bull: #16a34a;
-  --pg-bull-deep: #15803d;
-  --pg-bull-soft: #dcfce7;
-  --pg-bull-glow: rgba(22, 163, 74, 0.18);
-  --pg-bear: #dc2626;
-  --pg-bear-deep: #b91c1c;
-  --pg-bear-soft: #fee2e2;
-  --pg-bear-glow: rgba(220, 38, 38, 0.14);
+  --pg-bull: #0f9d58;
+  --pg-bull-deep: #0b7a44;
+  --pg-bull-soft: #e8f8ef;
+  --pg-bull-glow: rgba(15, 157, 88, 0.12);
+  --pg-bear: #e11d48;
+  --pg-bear-deep: #be123c;
+  --pg-bear-soft: #fff1f2;
+  --pg-bear-glow: rgba(225, 29, 72, 0.1);
 
-  /* Brand / chrome */
-  --pg-brand: #0d3d2e;
-  --pg-brand-mid: #145c44;
-  --pg-brand-light: #1a7a5a;
-  --pg-accent: #0f766e;
-  --pg-warn: #d97706;
+  --pg-brand: #0f9d58;
+  --pg-brand-mid: #0f9d58;
+  --pg-brand-light: #34b574;
+  --pg-accent: #0f9d58;
+  --pg-warn: #ea580c;
+  --pg-warn-soft: #fff7ed;
+  --pg-info: #2563eb;
+  --pg-info-soft: #eff6ff;
 
-  /* Shape */
   --pg-radius-sm: 10px;
   --pg-radius: 16px;
-  --pg-radius-lg: 22px;
-  --pg-shadow: 0 12px 40px rgba(12, 31, 23, 0.08);
-  --pg-shadow-soft: 0 4px 18px rgba(12, 31, 23, 0.06);
+  --pg-radius-lg: 20px;
+  --pg-radius-xl: 22px;
+  --pg-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+  --pg-shadow-soft: 0 2px 8px rgba(15, 23, 42, 0.04);
+  --pg-shadow-hover: 0 12px 28px rgba(15, 23, 42, 0.08);
 
-  /* Typography */
-  --pg-font: 'Plus Jakarta Sans', system-ui, sans-serif;
-  --pg-font-display: 'Space Grotesk', 'Plus Jakarta Sans', system-ui, sans-serif;
+  --pg-font: 'Inter', system-ui, -apple-system, sans-serif;
+  --pg-font-display: 'Inter', system-ui, -apple-system, sans-serif;
   --pg-font-mono: 'JetBrains Mono', ui-monospace, monospace;
 
-  /* Aliases used by Trade Desk */
+  --pg-sidebar-w: 248px;
+  --pg-header-h: 64px;
+  --pg-content-max: 1500px;
+  --pg-ease: 160ms ease;
+
   --ink: var(--pg-ink);
   --muted: var(--pg-muted);
   --line: var(--pg-line);
   --paper: var(--pg-bg-muted);
   --card: var(--pg-bg-elevated);
   --accent: var(--pg-accent);
-  --accent-deep: var(--pg-brand-mid);
+  --accent-deep: var(--pg-bull-deep);
   --buy: var(--pg-bull-deep);
   --sell: var(--pg-bear-deep);
 }
@@ -61,27 +65,14 @@ body {
   margin: 0;
   min-height: 100%;
   font-family: var(--pg-font);
-  font-size: 15px;
-  font-weight: 500;
-  letter-spacing: -0.01em;
+  font-size: 14px;
+  font-weight: 400;
+  letter-spacing: -0.011em;
   line-height: 1.5;
   color: var(--pg-ink);
-  background:
-    radial-gradient(900px 420px at 0% -10%, var(--pg-bull-glow), transparent 55%),
-    radial-gradient(780px 360px at 100% 0%, var(--pg-bear-glow), transparent 54%),
-    repeating-linear-gradient(
-      135deg,
-      rgba(22, 163, 74, 0.045) 0px,
-      rgba(22, 163, 74, 0.045) 1px,
-      transparent 1px,
-      transparent 22px,
-      rgba(220, 38, 38, 0.04) 22px,
-      rgba(220, 38, 38, 0.04) 23px,
-      transparent 23px,
-      transparent 46px
-    ),
-    var(--pg-bg);
+  background: var(--pg-bg);
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 /* Shared page shell */
@@ -91,73 +82,72 @@ body {
 .order-test {
   box-sizing: border-box;
   width: 100%;
-  max-width: 1120px;
+  max-width: none;
   min-width: 0;
-  margin: 0 auto;
-  padding: 0 0 2.5rem;
+  margin: 0;
+  padding: 0 0 2rem;
   color: var(--pg-ink);
   font-family: var(--pg-font);
   overflow-x: clip;
+  animation: pg-fade-in var(--pg-ease);
+}
+
+@keyframes pg-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 .pg-page-hero,
 .tab-panel > .pg-page-hero,
 .settings-page > header,
-.order-test .hero {
+.order-test .hero,
+.desk > .hero,
+.at-hero,
+.sm-hero,
+.pnl-hero {
   display: flex;
   flex-wrap: wrap;
   justify-content: space-between;
   align-items: flex-start;
   gap: 1rem;
-  margin-bottom: 1.35rem;
-  padding: 1.4rem 1.5rem;
-  border-radius: var(--pg-radius-lg);
-  border: 1px solid transparent;
-  background:
-    linear-gradient(#fff, #fff) padding-box,
-    linear-gradient(90deg, var(--pg-bull), var(--pg-accent), var(--pg-bear)) border-box;
-  color: var(--pg-ink);
-  box-shadow: 0 14px 40px rgba(12, 31, 23, 0.08);
+  margin-bottom: 1.5rem;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
   position: relative;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .pg-page-hero::before,
 .tab-panel > .pg-page-hero::before,
 .settings-page > header::before,
 .order-test .hero::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  opacity: 0.75;
-  background:
-    repeating-linear-gradient(
-      90deg,
-      rgba(22, 163, 74, 0.07) 0px,
-      rgba(22, 163, 74, 0.07) 2px,
-      transparent 2px,
-      transparent 28px,
-      rgba(220, 38, 38, 0.06) 28px,
-      rgba(220, 38, 38, 0.06) 30px,
-      transparent 30px,
-      transparent 56px
-    );
-  mask-image: radial-gradient(620px 260px at 12% 20%, #000 25%, transparent 72%);
+  content: none;
 }
 
 .pg-page-hero h1,
 .pg-page-hero h2,
 .settings-page header h2,
-.order-test .hero h1 {
+.order-test .hero h1,
+.desk .hero h1,
+.at-hero h1,
+.sm-hero h1,
+.pnl-hero h1 {
   margin: 0;
   font-family: var(--pg-font-display);
-  font-size: clamp(1.75rem, 4vw, 2.35rem);
+  font-size: clamp(1.5rem, 2.4vw, 1.85rem);
   font-weight: 700;
-  letter-spacing: -0.04em;
-  line-height: 1.08;
+  letter-spacing: -0.035em;
+  line-height: 1.15;
   color: var(--pg-ink);
-  position: relative;
 }
 
 .pg-eyebrow,
@@ -165,23 +155,26 @@ body {
 .order-test .eyebrow {
   margin: 0 0 0.35rem;
   font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.1em;
+  font-weight: 600;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--pg-bull-deep);
-  position: relative;
+  color: var(--pg-muted);
 }
 
 .pg-lede,
 .pg-page-hero .tab-description,
 .settings-page header p,
-.order-test .lede {
-  margin: 0.5rem 0 0;
-  max-width: 40rem;
-  font-size: 0.95rem;
+.order-test .lede,
+.desk .hero .pg-lede,
+.at-hero p,
+.sm-hero p,
+.pnl-hero p {
+  margin: 0.4rem 0 0;
+  max-width: 42rem;
+  font-size: 0.9rem;
   line-height: 1.55;
   color: var(--pg-muted);
-  position: relative;
+  font-weight: 450;
 }
 
 .tab-description code {
@@ -194,28 +187,21 @@ body {
   border: 1px solid var(--pg-line);
 }
 
-.tab-panel .tab-description {
-  margin-bottom: 0;
-}
-
-.tab-panel > .tab-description {
-  margin-bottom: 1.25rem;
-}
-
 .pg-card,
 .step-card,
 .status-card:not(.phase-trade):not(.has-open),
 .actions-card,
 .settings-page .status-card,
-.settings-page .actions-card {
-  padding: 1.25rem 1.35rem;
-  border-radius: var(--pg-radius);
-  border: 1px solid transparent;
-  background:
-    linear-gradient(var(--pg-bg-elevated), var(--pg-bg-elevated)) padding-box,
-    linear-gradient(90deg, rgba(22, 163, 74, 0.55), rgba(13, 148, 136, 0.45), rgba(220, 38, 38, 0.55)) border-box;
-  box-shadow: 0 10px 35px rgba(12, 31, 23, 0.08);
+.settings-page .actions-card,
+.desk .status-card,
+.desk .actions-card {
+  padding: 1.5rem 1.75rem;
+  border-radius: var(--pg-radius-lg);
+  border: 1px solid var(--pg-line);
+  background: var(--pg-bg-elevated);
+  box-shadow: var(--pg-shadow-soft);
   position: relative;
+  transition: box-shadow var(--pg-ease), border-color var(--pg-ease);
 }
 
 .pg-card::after,
@@ -224,44 +210,48 @@ body {
 .actions-card::after,
 .settings-page .status-card::after,
 .settings-page .actions-card::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  border-radius: inherit;
-  opacity: 0.7;
-  background:
-    linear-gradient(180deg, rgba(22, 163, 74, 0.07), transparent 42%),
-    linear-gradient(0deg, rgba(220, 38, 38, 0.06), transparent 40%);
-  mask-image: radial-gradient(520px 260px at 20% 0%, #000 30%, transparent 70%);
+  content: none;
 }
 
 .pg-badge {
   display: inline-flex;
   align-items: center;
-  padding: 0.32rem 0.72rem;
+  gap: 0.35rem;
+  padding: 0.28rem 0.65rem;
   border-radius: 999px;
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.03em;
+  font-size: 0.7rem;
+  font-weight: 650;
+  letter-spacing: 0.02em;
 }
 
 .pg-badge-bull {
   background: var(--pg-bull-soft);
   color: var(--pg-bull-deep);
-  border: 1px solid #86efac;
+  border: 1px solid #b7ebd0;
 }
 
 .pg-badge-bear {
   background: var(--pg-bear-soft);
   color: var(--pg-bear-deep);
-  border: 1px solid #fecaca;
+  border: 1px solid #fecdd3;
 }
 
 .pg-badge-neutral {
   background: var(--pg-bg-muted);
-  color: var(--pg-ink);
+  color: var(--pg-muted);
   border: 1px solid var(--pg-line);
+}
+
+.pg-badge-info {
+  background: var(--pg-info-soft);
+  color: var(--pg-info);
+  border: 1px solid #bfdbfe;
+}
+
+.pg-badge-warn {
+  background: var(--pg-warn-soft);
+  color: var(--pg-warn);
+  border: 1px solid #fed7aa;
 }
 
 .pg-up {
@@ -272,25 +262,26 @@ body {
   color: var(--pg-bear-deep) !important;
 }
 
-/* Material buttons — market tint */
 .mat-mdc-unelevated-button.mat-primary,
-.mat-mdc-raised-button.mat-primary {
-  --mdc-filled-button-container-color: var(--pg-brand-mid);
+.mat-mdc-raised-button.mat-primary,
+.mat-mdc-flat-button.mat-primary {
+  --mdc-filled-button-container-color: var(--pg-bull);
   --mdc-filled-button-label-text-color: #fff;
+  border-radius: 12px !important;
 }
 
 .mat-mdc-outlined-button {
   --mdc-outlined-button-outline-color: var(--pg-line-strong);
+  border-radius: 12px !important;
 }
 
-/* Form fields */
 .mat-mdc-form-field {
   --mdc-outlined-text-field-outline-color: var(--pg-line);
-  --mdc-outlined-text-field-focus-outline-color: var(--pg-brand-mid);
+  --mdc-outlined-text-field-focus-outline-color: var(--pg-bull);
   --mdc-outlined-text-field-hover-outline-color: var(--pg-line-strong);
+  --mdc-outlined-text-field-container-shape: 12px;
 }
 
-/* Scrollbar (webkit) */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;

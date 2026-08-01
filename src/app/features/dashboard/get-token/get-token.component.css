@@ -17,19 +17,19 @@
 }
 
 .credentials-card {
-  border-color: var(--pg-line-strong);
-  background: linear-gradient(180deg, var(--pg-bg-elevated) 0%, var(--pg-bg-muted) 100%);
+  border-color: var(--pg-line);
+  background: #fff;
 }
 
 .session-card {
   margin-bottom: 1.25rem;
-  border-color: #86efac !important;
-  background: linear-gradient(180deg, #fff 0%, var(--pg-bull-soft) 100%) !important;
+  border-color: #b7ebd0 !important;
+  background: #fff !important;
 }
 
 .manual-token-card {
-  border-color: #fcd34d !important;
-  background: linear-gradient(180deg, #fff 0%, #fffbeb 100%) !important;
+  border-color: #fed7aa !important;
+  background: #fff !important;
 }
 
 .whitelist-card {

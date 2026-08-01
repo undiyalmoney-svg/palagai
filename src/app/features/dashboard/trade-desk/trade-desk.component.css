@@ -3,19 +3,25 @@
   color: var(--pg-ink);
   box-sizing: border-box;
   width: 100%;
-  max-width: 1120px;
+  max-width: none;
   min-width: 0;
-  margin: 0 auto;
-  padding: 0 0 2.5rem;
+  margin: 0;
+  padding: 0 0 2rem;
   overflow-x: clip;
 }
 
 .desk .hero.pg-page-hero {
-  margin-bottom: 1.35rem;
+  margin-bottom: 1.25rem;
+  padding: 1.25rem 1.5rem;
+  border-radius: var(--pg-radius-lg);
+  border: 1px solid var(--pg-line);
+  background: #fff;
+  box-shadow: var(--pg-shadow-soft);
 }
 
 .desk .hero-copy h1 {
   margin: 0;
+  font-size: 1.25rem;
 }
 
 .hero-meta {
@@ -41,10 +47,11 @@
   justify-content: space-between;
   gap: 0.75rem 1.25rem;
   margin: 0 0 1rem;
-  padding: 0.85rem 1.1rem;
-  border-radius: 14px;
-  border: 1px solid rgba(15, 118, 110, 0.28);
-  background: linear-gradient(135deg, rgba(15, 118, 110, 0.1), rgba(22, 163, 74, 0.06));
+  padding: 1rem 1.25rem;
+  border-radius: var(--pg-radius-lg);
+  border: 1px solid var(--pg-line);
+  background: #fff;
+  box-shadow: var(--pg-shadow-soft);
 }
 
 .active-strategy-label {
@@ -60,20 +67,20 @@
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: #0f766e;
+  color: var(--pg-muted);
 }
 
 .as-name {
-  font-size: 1.15rem;
-  font-weight: 800;
-  color: #0c1f17;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--pg-ink);
   letter-spacing: -0.02em;
 }
 
 .as-meta {
   font-size: 0.82rem;
-  font-weight: 600;
-  color: #3f5a4e;
+  font-weight: 550;
+  color: var(--pg-muted);
 }
 
 .as-link {
