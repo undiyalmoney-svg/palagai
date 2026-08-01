@@ -6,7 +6,7 @@ import { firstValueFrom } from 'rxjs';
 import { SiteModule, SiteUser } from '../../core/auth/auth.constants';
 import { UiDialogService } from '../../shared/ui/dialog/ui-dialog.service';
 
-const FRIEND_MODS: SiteModule[] = ['trade', 'crude', 'auto', 'token', 'test'];
+const CUSTOMER_MODS: SiteModule[] = ['trade', 'crude', 'auto', 'token', 'test', 'strat'];
 
 @Component({
   selector: 'app-admin-page',
@@ -18,8 +18,8 @@ const FRIEND_MODS: SiteModule[] = ['trade', 'crude', 'auto', 'token', 'test'];
         <div>
           <h1>Users</h1>
           <p>
-            Create friends, edit username/password for everyone, set modules, block or delete
-            friends. Kite API key required for friends — not for owner.
+            Create customer users, edit username/password, set modules, block or delete customers.
+            Kite API key is required for customers — not for Devil (owner).
           </p>
         </div>
       </header>
@@ -29,37 +29,37 @@ const FRIEND_MODS: SiteModule[] = ['trade', 'crude', 'auto', 'token', 'test'];
       }
 
       <article class="card">
-        <h2>New user</h2>
+        <h2>New customer user</h2>
         <div class="row">
           <label>Username <input [(ngModel)]="newUsername" autocomplete="off" /></label>
           <label
             >Password <input [(ngModel)]="newPassword" type="text" autocomplete="off"
           /></label>
           <label class="wide"
-            >Kite API key (required for friends)
+            >Kite API key (required for customers)
             <input [(ngModel)]="newKiteKey" autocomplete="off"
           /></label>
           <label class="wide">Note <input [(ngModel)]="newNote" /></label>
         </div>
         <div class="mods">
-          @for (m of friendMods; track m) {
+          @for (m of customerMods; track m) {
             <label>
               <input type="checkbox" [checked]="newMods.includes(m)" (change)="toggleNew(m, $event)" />
-              {{ m }}
+              {{ modLabel(m) }}
             </label>
           }
         </div>
         <button mat-flat-button color="primary" type="button" (click)="create()" [disabled]="busy()">
-          Create user
+          Create customer
         </button>
       </article>
 
       <article class="card">
-        <h2>Users</h2>
+        <h2>All users</h2>
         @for (u of users(); track u.id) {
           <div class="user" [class.blocked]="u.blocked">
             <div class="user-head">
-              <span class="role">{{ u.role }}</span>
+              <span class="role">{{ roleLabel(u) }}</span>
               @if (u.blocked) {
                 <em>BLOCKED</em>
               }
@@ -75,7 +75,7 @@ const FRIEND_MODS: SiteModule[] = ['trade', 'crude', 'auto', 'token', 'test'];
               /></label>
             </div>
             <div class="mods">
-              @for (m of friendMods; track m) {
+              @for (m of customerMods; track m) {
                 <label>
                   <input
                     type="checkbox"
@@ -83,12 +83,12 @@ const FRIEND_MODS: SiteModule[] = ['trade', 'crude', 'auto', 'token', 'test'];
                     [disabled]="u.role === 'owner'"
                     (change)="toggleUser(u, m, $event)"
                   />
-                  {{ m }}
+                  {{ modLabel(m) }}
                 </label>
               }
             </div>
             @if (u.role === 'owner') {
-              <p class="hint">Owner uses local Get Token credentials — no API key stored here.</p>
+              <p class="hint">Devil uses local Get Token credentials — no API key stored here.</p>
             } @else {
               <label class="wide"
                 >Kite API key
@@ -108,10 +108,10 @@ const FRIEND_MODS: SiteModule[] = ['trade', 'crude', 'auto', 'token', 'test'];
                   {{ u.blocked ? 'Unblock' : 'Block' }}
                 </button>
                 <button class="btn-delete" type="button" (click)="deleteUser(u)" [disabled]="busy()">
-                  Delete user
+                  Delete customer
                 </button>
               } @else {
-                <span class="hint">Owner cannot be deleted</span>
+                <span class="hint">Devil cannot be deleted</span>
               }
             </div>
           </div>
@@ -284,7 +284,7 @@ export class AdminPageComponent implements OnInit {
   private readonly http = inject(HttpClient);
   private readonly uiDialog = inject(UiDialogService);
 
-  protected readonly friendMods = FRIEND_MODS;
+  protected readonly customerMods = CUSTOMER_MODS;
   protected readonly users = signal<SiteUser[]>([]);
   protected readonly busy = signal(false);
   protected readonly message = signal('');
@@ -298,6 +298,24 @@ export class AdminPageComponent implements OnInit {
 
   ngOnInit(): void {
     void this.reload();
+  }
+
+  protected modLabel(m: SiteModule): string {
+    const map: Record<SiteModule, string> = {
+      trade: 'Trade',
+      crude: 'Crude',
+      auto: 'Auto',
+      token: 'Token',
+      test: 'Test',
+      strat: 'Strategy',
+      pnl: 'P/L',
+      vault: 'Vault',
+    };
+    return map[m] || m;
+  }
+
+  protected roleLabel(u: SiteUser): string {
+    return u.role === 'owner' ? 'Devil' : 'Customer';
   }
 
   protected toggleNew(m: SiteModule, ev: Event): void {
@@ -353,7 +371,7 @@ export class AdminPageComponent implements OnInit {
     this.message.set('');
     this.messageIsError.set(false);
     if (!String(this.newKiteKey || '').trim()) {
-      this.flash('Kite API key required for friends', true);
+      this.flash('Kite API key required for customers', true);
       this.busy.set(false);
       return;
     }
@@ -382,7 +400,7 @@ export class AdminPageComponent implements OnInit {
 
   protected async saveUser(u: SiteUser): Promise<void> {
     if (u.role !== 'owner' && !String(u.kiteApiKey || '').trim()) {
-      this.flash('Kite API key required for friends', true);
+      this.flash('Kite API key required for customers', true);
       return;
     }
     if (!String(u.password || '').trim() || String(u.password).trim().length < 6) {
@@ -431,7 +449,7 @@ export class AdminPageComponent implements OnInit {
 
   protected async deleteUser(u: SiteUser): Promise<void> {
     if (u.role === 'owner') {
-      this.flash('Cannot delete owner', true);
+      this.flash('Cannot delete Devil', true);
       return;
     }
     const ok = await this.uiDialog.confirm({

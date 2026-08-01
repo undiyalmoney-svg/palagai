@@ -25,14 +25,26 @@ import { PgIconComponent } from '../../shared/ui/icon/pg-icon.component';
           <a routerLink="/admin/vault" routerLinkActive="active">Vault</a>
           <a routerLink="/admin/pnl" routerLinkActive="active">P/L</a>
         </nav>
-        <button type="button" class="logout" (click)="logout()">
+        <button type="button" class="logout side-logout" (click)="logout()">
           <app-pg-icon name="log-out" [size]="16" />
-          Admin logout
+          Logout
         </button>
       </aside>
-      <main>
-        <router-outlet />
-      </main>
+      <div class="workspace">
+        <header class="topbar">
+          <div>
+            <h1>Admin</h1>
+            <p>Manage Devil, customer users, vault and P/L</p>
+          </div>
+          <button type="button" class="logout top-logout" (click)="logout()">
+            <app-pg-icon name="log-out" [size]="16" />
+            Logout
+          </button>
+        </header>
+        <main>
+          <router-outlet />
+        </main>
+      </div>
     </div>
   `,
   styles: `
@@ -98,16 +110,51 @@ import { PgIconComponent } from '../../shared/ui/icon/pg-icon.component';
     .logout {
       display: inline-flex;
       align-items: center;
+      justify-content: center;
       gap: 0.5rem;
       border: 1px solid var(--pg-line);
       background: #fff;
       border-radius: 12px;
-      padding: 0.65rem 0.8rem;
+      padding: 0.65rem 0.9rem;
       font: inherit;
-      font-weight: 600;
+      font-weight: 650;
       font-size: 0.85rem;
-      color: var(--pg-muted);
+      color: var(--pg-bear-deep);
       cursor: pointer;
+      border-color: #fecdd3;
+    }
+    .logout:hover {
+      background: var(--pg-bear-soft);
+    }
+    .side-logout {
+      width: 100%;
+    }
+    .workspace {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+    }
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 0.95rem 1.5rem;
+      background: #fff;
+      border-bottom: 1px solid var(--pg-line);
+      position: sticky;
+      top: 0;
+      z-index: 20;
+    }
+    .topbar h1 {
+      margin: 0;
+      font-size: 1.1rem;
+      letter-spacing: -0.02em;
+    }
+    .topbar p {
+      margin: 0.15rem 0 0;
+      font-size: 0.8rem;
+      color: var(--pg-muted);
     }
     main {
       min-width: 0;
@@ -126,6 +173,12 @@ import { PgIconComponent } from '../../shared/ui/icon/pg-icon.component';
         flex-direction: row;
         flex-wrap: wrap;
       }
+      .side-logout {
+        width: auto;
+      }
+      .topbar p {
+        display: none;
+      }
     }
   `,
 })
@@ -137,7 +190,7 @@ export class AdminShellComponent {
   protected async logout(): Promise<void> {
     const ok = await this.uiDialog.confirm({
       title: 'Admin logout?',
-      message: 'You will need to sign in again to manage users, vault, and P/L.',
+      message: 'You will need to sign in again to manage Devil, customers, vault, and P/L.',
       confirmLabel: 'Logout',
       cancelLabel: 'Stay',
     });

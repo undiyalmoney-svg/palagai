@@ -68,6 +68,33 @@
   line-height: 1.45;
 }
 
+.switch-banner {
+  margin: 0 0 1.25rem;
+  padding: 1rem 1.05rem;
+  border-radius: 14px;
+  border: 1px solid var(--pg-line);
+  background: var(--pg-bg-muted);
+  text-align: left;
+}
+
+.switch-banner p {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--pg-muted);
+  line-height: 1.45;
+}
+
+.switch-banner strong {
+  color: var(--pg-ink);
+}
+
+.switch-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  margin-top: 0.85rem;
+}
+
 .login-form {
   display: flex;
   flex-direction: column;

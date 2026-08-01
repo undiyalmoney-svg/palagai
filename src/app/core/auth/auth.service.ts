@@ -9,11 +9,15 @@ import {
   SiteModule,
   SiteUser,
 } from './auth.constants';
+import { KiteSessionService } from '../kite/kite-session.service';
+import { KiteCredentialsService } from '../kite/kite-credentials.service';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private readonly platformId = inject(PLATFORM_ID);
   private readonly http = inject(HttpClient);
+  private readonly kiteSession = inject(KiteSessionService);
+  private readonly kiteCredentials = inject(KiteCredentialsService);
   private readonly apiBase = '/api/auth';
 
   private readonly authenticated = signal(false);
@@ -25,6 +29,16 @@ export class AuthService {
 
   constructor() {
     this.hydrate();
+  }
+
+  /** Devil (owner) vs customer (friend) helpers for UI copy. */
+  isDevil(): boolean {
+    return this.user()?.role === 'owner';
+  }
+
+  isCustomer(): boolean {
+    const u = this.user();
+    return !!u && u.role !== 'owner';
   }
 
   hasModule(mod: SiteModule): boolean {
@@ -62,6 +76,9 @@ export class AuthService {
       if (!res?.token || !res?.user) {
         return { ok: false, message: 'Login failed — empty response from auth API' };
       }
+      // Switching account (Devil ↔ customer): drop previous in-memory kite before binding.
+      this.kiteSession.detach();
+      this.kiteCredentials.detach();
       this.persistSite(res.token, res.user);
       return { ok: true };
     } catch (err: unknown) {
@@ -137,6 +154,8 @@ export class AuthService {
     }
     this.authenticated.set(false);
     this.user.set(null);
+    this.kiteSession.detach();
+    this.kiteCredentials.detach();
   }
 
   async adminLogin(
@@ -207,11 +226,16 @@ export class AuthService {
     }
     const token = localStorage.getItem(AUTH_TOKEN_KEY);
     const raw = localStorage.getItem(AUTH_USER_KEY);
-    if (!token || !raw) return;
+    if (!token || !raw) {
+      this.kiteSession.detach();
+      this.kiteCredentials.detach();
+      return;
+    }
     try {
       const user = JSON.parse(raw) as SiteUser;
       this.authenticated.set(true);
       this.user.set(user);
+      this.bindKiteForUser(user);
     } catch {
       this.logout();
     }
@@ -231,5 +255,11 @@ export class AuthService {
     }
     this.authenticated.set(true);
     this.user.set(user);
+    this.bindKiteForUser(user);
+  }
+
+  private bindKiteForUser(user: SiteUser): void {
+    this.kiteSession.bindSiteUser(user.id);
+    this.kiteCredentials.bindSiteUser(user.id);
   }
 }

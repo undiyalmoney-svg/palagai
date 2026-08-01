@@ -101,10 +101,10 @@ export class GetTokenComponent implements OnInit {
     },
   ];
 
-  /** Owner (Devil) sees static IP; friends do not. */
+  /** Owner (Devil) sees static IP; customers do not. */
   protected readonly copyOptions = computed(() => {
-    const isOwner = this.authService.currentUser()?.role === 'owner';
-    return this.allCopyOptions.filter((o) => isOwner || o.id !== 'public-ip');
+    const isDevil = this.authService.currentUser()?.role === 'owner';
+    return this.allCopyOptions.filter((o) => isDevil || o.id !== 'public-ip');
   });
 
   protected readonly selectedCopyOption = computed(() => {

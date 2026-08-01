@@ -8,6 +8,7 @@ const MODULE_HOME: Array<{ module: SiteModule; path: string }> = [
   { module: 'strat', path: '/dashboard/strategy-manager' },
   { module: 'crude', path: '/dashboard/crude-oil' },
   { module: 'auto', path: '/dashboard/auto-trader' },
+  { module: 'test', path: '/dashboard/order-test' },
   { module: 'token', path: '/dashboard/get-token' },
 ];
 
@@ -31,12 +32,8 @@ export const authGuard: CanActivateFn = () => {
 };
 
 export const guestGuard: CanActivateFn = () => {
-  const authService = inject(AuthService);
-  const router = inject(Router);
-  if (!authService.isAuthenticated()) {
-    return true;
-  }
-  return router.parseUrl(firstDashboardPath(authService));
+  // Always allow /login so a customer can sign in even if Devil's session is still on this browser.
+  return true;
 };
 
 export const dashboardIndexGuard: CanActivateFn = () => {

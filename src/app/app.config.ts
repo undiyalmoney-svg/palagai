@@ -13,6 +13,7 @@ import { provideHttpClient, withFetch, withInterceptors } from '@angular/common/
 
 import { routes } from './app.routes';
 import { KiteSessionService } from './core/kite/kite-session.service';
+import { AuthService } from './core/auth/auth.service';
 import { authTokenInterceptor } from './core/auth/auth-token.interceptor';
 import { environment } from '../environments/environment';
 
@@ -30,12 +31,17 @@ export const appConfig: ApplicationConfig = {
       useFactory: () => {
         const platformId = inject(PLATFORM_ID);
         const kiteSession = inject(KiteSessionService);
+        const auth = inject(AuthService);
         const dev = (environment as {
           devKiteSession?: { apiKey: string; accessToken: string };
         }).devKiteSession;
 
         return () => {
           if (!isPlatformBrowser(platformId) || !dev?.apiKey?.trim() || !dev?.accessToken?.trim()) {
+            return;
+          }
+          // Never inject shared dev Kite into a customer session.
+          if (!auth.isDevil()) {
             return;
           }
           if (kiteSession.hasSession()) {

@@ -73,6 +73,13 @@ export class DashboardComponent implements OnInit, OnDestroy {
       module: 'auto',
     },
     {
+      label: 'Test',
+      shortLabel: 'Test',
+      route: '/dashboard/order-test',
+      icon: 'flask',
+      module: 'test',
+    },
+    {
       label: 'Token',
       shortLabel: 'Token',
       route: '/dashboard/get-token',
@@ -120,9 +127,11 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.allNav.filter((item) => item.module == null || this.authService.hasModule(item.module)),
   );
 
-  protected readonly username = computed(
-    () => this.authService.currentUser()?.username ?? 'User',
-  );
+  protected readonly username = computed(() => {
+    const u = this.authService.currentUser();
+    if (!u) return 'User';
+    return u.role === 'owner' ? `Devil · ${u.username}` : u.username;
+  });
 
   protected readonly liveBadge = computed(() => {
     const u = this.authService.currentUser();
