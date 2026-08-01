@@ -1,18 +1,21 @@
 :host {
-  display: block;
-  min-height: 100%;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  min-height: 100vh;
   min-height: 100dvh;
+  min-height: -webkit-fill-available;
 }
 
 .login-page {
   box-sizing: border-box;
   width: 100%;
+  max-width: 100%;
   min-height: 100vh;
   min-height: 100dvh;
   min-height: -webkit-fill-available;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: grid;
+  place-items: center;
   padding:
     max(1.25rem, env(safe-area-inset-top, 0px))
     max(1.25rem, env(safe-area-inset-right, 0px))
@@ -37,9 +40,10 @@
 }
 
 .login-card {
-  width: 100%;
-  max-width: 420px;
-  margin: 0 auto;
+  width: min(100%, 420px);
+  justify-self: center;
+  align-self: center;
+  margin: 0;
   padding: 2.25rem 2rem;
   border-radius: var(--pg-radius-lg);
   border: 1px solid transparent;
@@ -97,6 +101,7 @@
   color: var(--pg-muted);
   font-size: 0.95rem;
   line-height: 1.4;
+  text-align: center;
 }
 
 .login-form {
@@ -168,14 +173,9 @@
 }
 
 @media (max-width: 480px) {
-  .login-page {
-    align-items: center;
-    justify-content: center;
-  }
-
   .login-card {
     padding: 1.75rem 1.25rem;
-    max-width: 100%;
+    width: min(100%, 400px);
   }
 
   .login-header h1 {
