@@ -103,10 +103,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
     }).format(now);
     const time = new Intl.DateTimeFormat('en-IN', {
       timeZone: 'Asia/Kolkata',
-      hour: '2-digit',
+      hour: 'numeric',
       minute: '2-digit',
       second: '2-digit',
-      hour12: false,
+      hour12: true,
     }).format(now);
     this.clockLabel.set(`${date} · ${time} IST`);
   }
