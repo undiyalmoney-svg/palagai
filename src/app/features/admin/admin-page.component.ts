@@ -18,7 +18,7 @@ const FRIEND_MODS: SiteModule[] = ['trade', 'crude', 'auto', 'token'];
       <header>
         <div>
           <h1>Admin · Users</h1>
-          <p>Create friends, set modules, block access, store Kite API key.</p>
+          <p>Create friends, set modules, block access. Kite API key required for friends only — not for Devil.</p>
         </div>
         <button mat-stroked-button type="button" (click)="logout()">Admin logout</button>
       </header>
@@ -31,8 +31,11 @@ const FRIEND_MODS: SiteModule[] = ['trade', 'crude', 'auto', 'token'];
         <h2>New user</h2>
         <div class="row">
           <label>Username <input [(ngModel)]="newUsername" /></label>
-          <label>Password <input [(ngModel)]="newPassword" type="password" /></label>
-          <label class="wide">Kite API key <input [(ngModel)]="newKiteKey" /></label>
+          <label>Password <input [(ngModel)]="newPassword" type="text" autocomplete="off" /></label>
+          <label class="wide"
+            >Kite API key (required for friends)
+            <input [(ngModel)]="newKiteKey" autocomplete="off"
+          /></label>
           <label class="wide">Note <input [(ngModel)]="newNote" /></label>
         </div>
         <div class="mods">
@@ -72,10 +75,14 @@ const FRIEND_MODS: SiteModule[] = ['trade', 'crude', 'auto', 'token'];
                 </label>
               }
             </div>
-            <label class="wide"
-              >Kite API key
-              <input [(ngModel)]="u.kiteApiKey" (change)="saveUser(u)" [disabled]="busy()"
-            /></label>
+            @if (u.role === 'owner') {
+              <p class="hint">Devil uses local Get Token credentials — no API key stored here.</p>
+            } @else {
+              <label class="wide"
+                >Kite API key
+                <input [(ngModel)]="u.kiteApiKey" (change)="saveUser(u)" [disabled]="busy()" autocomplete="off"
+              /></label>
+            }
             <div class="actions">
               <button mat-stroked-button type="button" (click)="saveUser(u)" [disabled]="busy()">
                 Save
@@ -173,6 +180,11 @@ const FRIEND_MODS: SiteModule[] = ['trade', 'crude', 'auto', 'token'];
       font-weight: 600;
       margin-bottom: 0.75rem;
     }
+    .hint {
+      margin: 0.5rem 0 0;
+      font-size: 0.85rem;
+      color: #5a6f66;
+    }
   `,
 })
 export class AdminPageComponent implements OnInit {
@@ -239,6 +251,11 @@ export class AdminPageComponent implements OnInit {
   protected async create(): Promise<void> {
     this.busy.set(true);
     this.message.set('');
+    if (!String(this.newKiteKey || '').trim()) {
+      this.message.set('Kite API key required for friends');
+      this.busy.set(false);
+      return;
+    }
     try {
       await firstValueFrom(
         this.http.post('/api/auth/admin/users', {
@@ -264,6 +281,14 @@ export class AdminPageComponent implements OnInit {
   }
 
   protected async saveUser(u: SiteUser): Promise<void> {
+    if (u.role === 'owner') {
+      this.message.set('Devil has no stored API key');
+      return;
+    }
+    if (!String(u.kiteApiKey || '').trim()) {
+      this.message.set('Kite API key required for friends');
+      return;
+    }
     this.busy.set(true);
     try {
       await firstValueFrom(
@@ -275,8 +300,9 @@ export class AdminPageComponent implements OnInit {
       );
       this.message.set(`Saved ${u.username}`);
       await this.reload();
-    } catch {
-      this.message.set('Save failed');
+    } catch (err: unknown) {
+      const e = err as { error?: { message?: string } };
+      this.message.set(e?.error?.message || 'Save failed');
     } finally {
       this.busy.set(false);
     }

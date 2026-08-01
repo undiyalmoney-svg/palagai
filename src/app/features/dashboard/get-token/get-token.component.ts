@@ -170,7 +170,10 @@ export class GetTokenComponent implements OnInit {
       this.setCredentialsFormEditable(false);
       this.isEditingCredentials.set(false);
     } else {
-      const adminKey = this.authService.currentUser()?.kiteApiKey?.trim();
+      // Friends: prefill API key from Admin. Devil/owner: use local Get Token only.
+      const u = this.authService.currentUser();
+      const adminKey =
+        u?.role !== 'owner' ? u?.kiteApiKey?.trim() : '';
       if (adminKey) {
         this.credentialsForm.patchValue({ apiKey: adminKey });
         this.prefillStepForms(adminKey, '');

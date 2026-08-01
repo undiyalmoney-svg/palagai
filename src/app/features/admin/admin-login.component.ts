@@ -4,7 +4,6 @@ import { Router } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
-import { MatIconModule } from '@angular/material/icon';
 import { AuthService } from '../../core/auth/auth.service';
 
 @Component({
@@ -15,7 +14,6 @@ import { AuthService } from '../../core/auth/auth.service';
     MatButtonModule,
     MatFormFieldModule,
     MatInputModule,
-    MatIconModule,
   ],
   template: `
     <section class="wrap">
@@ -42,20 +40,12 @@ import { AuthService } from '../../core/auth/auth.service';
           <mat-label>Admin password</mat-label>
           <input
             matInput
-            [type]="hide() ? 'password' : 'text'"
+            type="text"
             formControlName="password"
-            autocomplete="current-password"
+            autocomplete="off"
+            spellcheck="false"
             (paste)="onPaste($event)"
           />
-          <button
-            mat-icon-button
-            matSuffix
-            type="button"
-            (click)="hide.set(!hide())"
-            [attr.aria-label]="hide() ? 'Show password' : 'Hide password'"
-          >
-            <mat-icon>{{ hide() ? 'visibility' : 'visibility_off' }}</mat-icon>
-          </button>
         </mat-form-field>
         <button mat-flat-button color="primary" type="submit" [disabled]="busy()">
           Admin sign in
@@ -105,7 +95,6 @@ export class AdminLoginComponent {
 
   protected readonly busy = signal(false);
   protected readonly error = signal('');
-  protected readonly hide = signal(true);
   protected readonly form = this.fb.nonNullable.group({
     username: ['Admin', Validators.required],
     password: ['', Validators.required],
