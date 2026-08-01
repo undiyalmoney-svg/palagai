@@ -39,7 +39,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
   protected readonly clockLabel = signal('');
   protected readonly pageTitle = signal('Trade Desk');
   protected readonly pageSubtitle = signal('Manage live trading, testing and paper trading.');
-  protected readonly sidebarOpen = signal(false);
+  /** Desktop starts open; mobile starts closed (set in ngOnInit). */
+  protected readonly sidebarOpen = signal(true);
   protected readonly profileOpen = signal(false);
 
   private readonly allNav: NavItem[] = [
@@ -133,11 +134,17 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.tickClock();
     this.clockTimer = setInterval(() => this.tickClock(), 1000);
     this.syncTitle(this.router.url);
+    if (this.isMobileViewport()) {
+      this.sidebarOpen.set(false);
+    }
     this.navSub = this.router.events
       .pipe(filter((e): e is NavigationEnd => e instanceof NavigationEnd))
       .subscribe((e) => {
         this.syncTitle(e.urlAfterRedirects);
-        this.sidebarOpen.set(false);
+        // Only auto-close the drawer on mobile; desktop collapse is user-controlled.
+        if (this.isMobileViewport()) {
+          this.sidebarOpen.set(false);
+        }
         this.profileOpen.set(false);
       });
     void this.bootAuth();

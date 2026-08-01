@@ -1,4 +1,4 @@
-<div class="shell" [class.sidebar-open]="sidebarOpen()">
+<div class="shell" [class.sidebar-open]="sidebarOpen()" [class.sidebar-collapsed]="!sidebarOpen()">
   <aside class="sidebar" aria-label="Primary">
     <a class="brand" href="/dashboard" (click)="goHome($event)">
       <span class="brand-mark" aria-hidden="true">P</span>
@@ -39,8 +39,14 @@
   <div class="workspace">
     <header class="topbar">
       <div class="topbar-left">
-        <button type="button" class="icon-btn menu-btn" (click)="toggleSidebar()" aria-label="Open menu">
-          <app-pg-icon name="menu" [size]="20" />
+        <button
+          type="button"
+          class="icon-btn menu-btn"
+          (click)="toggleSidebar()"
+          [attr.aria-label]="sidebarOpen() ? 'Close menu' : 'Open menu'"
+          [attr.aria-expanded]="sidebarOpen()"
+        >
+          <app-pg-icon [name]="sidebarOpen() ? 'x' : 'menu'" [size]="20" />
         </button>
         <div class="page-heading">
           <h1>{{ pageTitle() }}</h1>
