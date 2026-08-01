@@ -22,6 +22,8 @@ import { PgIconComponent } from '../../shared/ui/icon/pg-icon.component';
           <a routerLink="/admin" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">
             Users
           </a>
+          <a routerLink="/admin/actions" routerLinkActive="active">Actions</a>
+          <a routerLink="/admin/payments" routerLinkActive="active">Payments</a>
           <a routerLink="/admin/vault" routerLinkActive="active">Vault</a>
           <a routerLink="/admin/pnl" routerLinkActive="active">P/L</a>
         </nav>
@@ -34,7 +36,7 @@ import { PgIconComponent } from '../../shared/ui/icon/pg-icon.component';
         <header class="topbar">
           <div>
             <h1>Admin</h1>
-            <p>Manage Devil, customer users, vault and P/L</p>
+            <p>Manage Devil, customers, actions, payments, vault and P/L</p>
           </div>
           <button type="button" class="logout top-logout" (click)="logout()">
             <app-pg-icon name="log-out" [size]="16" />

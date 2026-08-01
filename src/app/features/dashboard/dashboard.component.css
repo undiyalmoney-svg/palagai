@@ -161,6 +161,56 @@
   border-bottom: 1px solid var(--pg-line);
 }
 
+.admin-notice {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.85rem;
+  margin: 0.85rem 1.5rem 0;
+  padding: 0.9rem 1rem;
+  border-radius: 14px;
+  border: 1px solid #bfdbfe;
+  background: #eff6ff;
+  color: #1e3a8a;
+}
+
+.admin-notice-copy {
+  min-width: 0;
+}
+
+.admin-notice-copy strong {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-bottom: 0.25rem;
+}
+
+.admin-notice-copy p {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
+.admin-notice-close {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  border: 1px solid #bfdbfe;
+  background: #fff;
+  color: #1e40af;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.admin-notice-close:hover {
+  background: #dbeafe;
+}
+
 .topbar-left,
 .topbar-right {
   display: flex;

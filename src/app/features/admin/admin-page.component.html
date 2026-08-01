@@ -168,14 +168,6 @@
                   <button type="button" class="btn btn-save" (click)="saveUser(u)" [disabled]="busy()">
                     Save
                   </button>
-                  @if (u.role !== 'owner') {
-                    <button type="button" class="btn btn-block" (click)="toggleBlock(u)" [disabled]="busy()">
-                      {{ u.blocked ? 'Unblock' : 'Block' }}
-                    </button>
-                    <button type="button" class="btn btn-danger" (click)="deleteUser(u)" [disabled]="busy()">
-                      Delete
-                    </button>
-                  }
                 </div>
               </td>
             </tr>

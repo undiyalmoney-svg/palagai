@@ -1,0 +1,96 @@
+<section class="page">
+  <div class="toolbar">
+    <div class="toolbar-left">
+      <h1>Payments</h1>
+      <span class="pill">{{ counts().total }} users</span>
+      <span class="pill ok">{{ counts().paid }} paid</span>
+      <span class="pill warn">{{ counts().pending }} pending</span>
+      <span class="pill bad">{{ counts().unpaid }} unpaid</span>
+    </div>
+    <div class="toolbar-right">
+      <input
+        class="search"
+        type="search"
+        [(ngModel)]="searchQuery"
+        (ngModelChange)="onFilterChange()"
+        placeholder="Search users…"
+        autocomplete="off"
+      />
+      <select class="filter" [(ngModel)]="statusFilter" (ngModelChange)="onFilterChange()">
+        <option value="all">All status</option>
+        <option value="paid">Paid</option>
+        <option value="pending">Pending</option>
+        <option value="unpaid">Unpaid</option>
+      </select>
+    </div>
+  </div>
+
+  <p class="lede">
+    Track whether each customer has paid. Stored in MongoDB on the user document — no separate collection needed.
+  </p>
+
+  @if (message()) {
+    <p class="msg" [class.err]="messageIsError()" role="status">{{ message() }}</p>
+  }
+
+  <div class="table-shell">
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Role</th>
+            <th>Username</th>
+            <th>Payment</th>
+            <th>Payment note</th>
+            <th>Updated</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (u of filteredUsers(); track u.id) {
+            <tr>
+              <td>
+                <span class="role" [attr.data-role]="u.role === 'owner' ? 'devil' : 'customer'">
+                  {{ roleLabel(u) }}
+                </span>
+              </td>
+              <td class="name">{{ u.username }}</td>
+              <td>
+                <select
+                  class="pay-select"
+                  [attr.data-pay]="statusFor(u)"
+                  [ngModel]="statusFor(u)"
+                  (ngModelChange)="setStatus(u, $event)"
+                  [disabled]="busy()"
+                >
+                  <option value="paid">Paid</option>
+                  <option value="pending">Pending</option>
+                  <option value="unpaid">Unpaid</option>
+                </select>
+              </td>
+              <td>
+                <input
+                  class="note"
+                  [ngModel]="noteFor(u)"
+                  (ngModelChange)="setNote(u, $event)"
+                  [disabled]="busy()"
+                  placeholder="Optional note"
+                />
+              </td>
+              <td class="muted">{{ u.paymentUpdatedAt ? (u.paymentUpdatedAt | date: 'medium') : '—' }}</td>
+              <td>
+                <button type="button" class="btn save" (click)="savePayment(u)" [disabled]="busy()">
+                  Save
+                </button>
+              </td>
+            </tr>
+          } @empty {
+            <tr>
+              <td colspan="6" class="empty">No users match.</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>

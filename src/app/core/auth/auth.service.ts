@@ -147,6 +147,26 @@ export class AuthService {
     }
   }
 
+  /** Dismiss admin notice for the current site user. */
+  async dismissAdminMessage(): Promise<void> {
+    const token = this.getToken();
+    if (!token) return;
+    try {
+      const res = await firstValueFrom(
+        this.http.post<{ user: SiteUser }>(
+          `${this.apiBase}/me/dismiss-message`,
+          {},
+          { headers: { Authorization: `Bearer ${token}` } },
+        ),
+      );
+      if (res?.user) {
+        this.persistSite(token, res.user);
+      }
+    } catch {
+      // Ignore — banner can stay until next refresh.
+    }
+  }
+
   logout(): void {
     if (isPlatformBrowser(this.platformId)) {
       localStorage.removeItem(AUTH_TOKEN_KEY);

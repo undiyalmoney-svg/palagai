@@ -18,6 +18,12 @@ export interface SiteUser {
   blocked?: boolean;
   kiteApiKey?: string;
   note?: string;
+  /** Admin → user notice (empty if none / dismissed) */
+  adminMessage?: string;
+  adminMessageAt?: string | null;
+  paymentStatus?: 'paid' | 'unpaid' | 'pending' | string;
+  paymentNote?: string;
+  paymentUpdatedAt?: string | null;
 }
 
 export const AUTH_SESSION_KEY = 'palagai_auth_session';

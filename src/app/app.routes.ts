@@ -22,6 +22,8 @@ import { VaultPageComponent } from './features/dashboard/vault/vault-page.compon
 import { AdminLoginComponent } from './features/admin/admin-login.component';
 import { AdminShellComponent } from './features/admin/admin-shell.component';
 import { AdminPageComponent } from './features/admin/admin-page.component';
+import { AdminActionsPageComponent } from './features/admin/admin-actions-page.component';
+import { AdminPaymentsPageComponent } from './features/admin/admin-payments-page.component';
 
 export const routes: Routes = [
   {
@@ -51,6 +53,8 @@ export const routes: Routes = [
     component: AdminShellComponent,
     children: [
       { path: '', pathMatch: 'full', component: AdminPageComponent },
+      { path: 'actions', component: AdminActionsPageComponent },
+      { path: 'payments', component: AdminPaymentsPageComponent },
       { path: 'vault', component: VaultPageComponent },
       { path: 'pnl', component: PnlRecordsComponent },
     ],

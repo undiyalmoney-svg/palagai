@@ -1,0 +1,88 @@
+<section class="page">
+  <div class="toolbar">
+    <div class="toolbar-left">
+      <h1>Actions</h1>
+      <span class="pill">{{ filteredUsers().length }} users</span>
+    </div>
+    <div class="toolbar-right">
+      <input
+        class="search"
+        type="search"
+        [(ngModel)]="searchQuery"
+        (ngModelChange)="onFilterChange()"
+        placeholder="Search users…"
+        autocomplete="off"
+      />
+    </div>
+  </div>
+
+  <p class="lede">
+    Send a notice to a customer, block/unblock access, or delete. Notices appear on their desk (and on login if blocked).
+  </p>
+
+  @if (message()) {
+    <p class="msg" [class.err]="messageIsError()" role="status">{{ message() }}</p>
+  }
+
+  <div class="table-shell">
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Role</th>
+            <th>Username</th>
+            <th>Status</th>
+            <th>Message to user</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (u of filteredUsers(); track u.id) {
+            <tr [class.blocked]="u.blocked">
+              <td>
+                <span class="role" [attr.data-role]="u.role === 'owner' ? 'devil' : 'customer'">
+                  {{ roleLabel(u) }}
+                </span>
+              </td>
+              <td class="name">{{ u.username }}</td>
+              <td>
+                <span class="status" [attr.data-status]="u.blocked ? 'blocked' : 'active'">
+                  {{ u.blocked ? 'Blocked' : 'Active' }}
+                </span>
+              </td>
+              <td>
+                <textarea
+                  class="msg-box"
+                  rows="3"
+                  [ngModel]="draftFor(u)"
+                  (ngModelChange)="setDraft(u, $event)"
+                  [disabled]="busy()"
+                  placeholder="Optional notice shown to this user…"
+                ></textarea>
+              </td>
+              <td>
+                <div class="actions">
+                  <button type="button" class="btn save" (click)="saveMessage(u)" [disabled]="busy()">
+                    Save message
+                  </button>
+                  @if (u.role !== 'owner') {
+                    <button type="button" class="btn block" (click)="toggleBlock(u)" [disabled]="busy()">
+                      {{ u.blocked ? 'Unblock' : 'Block' }}
+                    </button>
+                    <button type="button" class="btn danger" (click)="deleteUser(u)" [disabled]="busy()">
+                      Delete
+                    </button>
+                  }
+                </div>
+              </td>
+            </tr>
+          } @empty {
+            <tr>
+              <td colspan="5" class="empty">No users found.</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
