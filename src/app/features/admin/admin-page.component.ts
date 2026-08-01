@@ -453,8 +453,8 @@ export class AdminPageComponent implements OnInit {
       return;
     }
     const ok = await this.uiDialog.confirm({
-      title: 'Delete user?',
-      message: `Delete user “${u.username}”? This cannot be undone.`,
+      title: 'Delete customer?',
+      message: `Delete customer “${u.username}”? This cannot be undone.`,
       confirmLabel: 'Delete',
       cancelLabel: 'Cancel',
       tone: 'danger',
