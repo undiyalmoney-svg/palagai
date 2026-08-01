@@ -19,8 +19,11 @@ import { AuthService } from '../../core/auth/auth.service';
   ],
   template: `
     <section class="wrap">
-      <h1>Admin</h1>
-      <p>Separate from site login. Username: <strong>Admin</strong></p>
+      <h1>Admin portal</h1>
+      <p>
+        Create / block site users and set modules. This is
+        <strong>not</strong> the trading desk login.
+      </p>
       @if (error()) {
         <p class="err">{{ error() }}</p>
       }
@@ -36,7 +39,7 @@ import { AuthService } from '../../core/auth/auth.service';
           />
         </mat-form-field>
         <mat-form-field appearance="outline" class="full">
-          <mat-label>Password</mat-label>
+          <mat-label>Admin password</mat-label>
           <input
             matInput
             [type]="hide() ? 'password' : 'text'"
@@ -54,7 +57,9 @@ import { AuthService } from '../../core/auth/auth.service';
             <mat-icon>{{ hide() ? 'visibility' : 'visibility_off' }}</mat-icon>
           </button>
         </mat-form-field>
-        <button mat-flat-button color="primary" type="submit" [disabled]="busy()">Sign in</button>
+        <button mat-flat-button color="primary" type="submit" [disabled]="busy()">
+          Admin sign in
+        </button>
       </form>
     </section>
   `,
