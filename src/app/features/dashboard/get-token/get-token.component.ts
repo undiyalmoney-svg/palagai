@@ -71,9 +71,10 @@ export class GetTokenComponent implements OnInit {
   protected readonly hideAccessToken = signal(true);
   protected readonly autoExchangeNote = signal('');
   protected readonly copyMessage = signal('');
-  protected readonly selectedCopyId = signal('public-ip');
+  protected readonly selectedCopyId = signal('redirect-prod');
+  protected readonly assignedApiKey = signal('');
 
-  protected readonly copyOptions: CopyOption[] = [
+  private readonly allCopyOptions: CopyOption[] = [
     {
       id: 'public-ip',
       label: 'Public IP (order backend)',
@@ -100,9 +101,16 @@ export class GetTokenComponent implements OnInit {
     },
   ];
 
+  /** Owner (Devil) sees static IP; friends do not. */
+  protected readonly copyOptions = computed(() => {
+    const isOwner = this.authService.currentUser()?.role === 'owner';
+    return this.allCopyOptions.filter((o) => isOwner || o.id !== 'public-ip');
+  });
+
   protected readonly selectedCopyOption = computed(() => {
+    const opts = this.copyOptions();
     const id = this.selectedCopyId();
-    const opt = this.copyOptions.find((o) => o.id === id) ?? this.copyOptions[0]!;
+    const opt = opts.find((o) => o.id === id) ?? opts[0]!;
     if (opt.id === 'page-url') {
       const href =
         isPlatformBrowser(this.platformId) && typeof window !== 'undefined'
@@ -112,6 +120,10 @@ export class GetTokenComponent implements OnInit {
     }
     return opt;
   });
+
+  protected readonly isOwner = computed(
+    () => this.authService.currentUser()?.role === 'owner',
+  );
 
   protected readonly todaySession = computed(() => {
     const session = this.kiteSessionService.storedSession();
@@ -160,25 +172,41 @@ export class GetTokenComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    void this.bootCredentials();
+  }
+
+  private async bootCredentials(): Promise<void> {
+    await this.authService.refreshMe();
+    const u = this.authService.currentUser();
+    const fromAdmin =
+      u?.role !== 'owner' ? String(u?.kiteApiKey || '').trim() : '';
+    this.assignedApiKey.set(fromAdmin);
+
+    if (u?.role === 'owner') {
+      this.selectedCopyId.set('public-ip');
+    } else {
+      this.selectedCopyId.set('redirect-prod');
+    }
+
     const stored = this.kiteCredentialsService.getCredentials();
     this.hasStoredCredentials.set(stored !== null);
 
     if (stored) {
-      this.credentialsForm.patchValue(stored);
-      this.prefillStepForms(stored.apiKey, stored.apiSecret);
-      this.manualTokenForm.patchValue({ apiKey: stored.apiKey });
+      // Friends: keep Admin-assigned API key visible/preferred over stale local key
+      const apiKey = fromAdmin || stored.apiKey;
+      const apiSecret = stored.apiSecret;
+      this.credentialsForm.patchValue({ apiKey, apiSecret });
+      this.prefillStepForms(apiKey, apiSecret);
+      this.manualTokenForm.patchValue({ apiKey });
       this.setCredentialsFormEditable(false);
       this.isEditingCredentials.set(false);
+    } else if (fromAdmin) {
+      this.credentialsForm.patchValue({ apiKey: fromAdmin, apiSecret: '' });
+      this.prefillStepForms(fromAdmin, '');
+      this.manualTokenForm.patchValue({ apiKey: fromAdmin });
+      this.setCredentialsFormEditable(true);
+      this.isEditingCredentials.set(true);
     } else {
-      // Friends: prefill API key from Admin. Devil/owner: use local Get Token only.
-      const u = this.authService.currentUser();
-      const adminKey =
-        u?.role !== 'owner' ? u?.kiteApiKey?.trim() : '';
-      if (adminKey) {
-        this.credentialsForm.patchValue({ apiKey: adminKey });
-        this.prefillStepForms(adminKey, '');
-        this.manualTokenForm.patchValue({ apiKey: adminKey });
-      }
       this.setCredentialsFormEditable(true);
       this.isEditingCredentials.set(true);
     }

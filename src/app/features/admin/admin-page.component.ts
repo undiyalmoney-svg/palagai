@@ -93,6 +93,9 @@ const FRIEND_MODS: SiteModule[] = ['trade', 'crude', 'auto', 'token', 'test'];
                 >Kite API key
                 <input [(ngModel)]="u.kiteApiKey" [disabled]="busy()" autocomplete="off"
               /></label>
+              @if (u.kiteApiKey) {
+                <p class="saved-key">Saved key: <code>{{ u.kiteApiKey }}</code></p>
+              }
             }
             <label class="wide">Note <input [(ngModel)]="u.note" [disabled]="busy()" /></label>
             <div class="actions">
@@ -244,6 +247,18 @@ const FRIEND_MODS: SiteModule[] = ['trade', 'crude', 'auto', 'token', 'test'];
       margin: 0.5rem 0 0;
       font-size: 0.85rem;
       color: #5a6f66;
+    }
+    .saved-key {
+      margin: 0.35rem 0 0;
+      font-size: 0.85rem;
+      color: #0c1f17;
+    }
+    .saved-key code {
+      font-family: ui-monospace, monospace;
+      background: #e8f5ef;
+      padding: 0.15rem 0.4rem;
+      border-radius: 4px;
+      word-break: break-all;
     }
   `,
 })

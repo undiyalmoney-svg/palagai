@@ -12,10 +12,20 @@
   <article class="step-card whitelist-card">
     <div class="step-header">
       <span class="step-badge">Kite</span>
-      <h3>Public IP &amp; Redirect URLs</h3>
+      <h3>
+        @if (isOwner()) {
+          Public IP &amp; Redirect URLs
+        } @else {
+          Redirect URLs
+        }
+      </h3>
     </div>
     <p class="step-description">
-      Pick a value to copy into the Kite developer console (IP whitelist or Redirect URL).
+      @if (isOwner()) {
+        Pick a value to copy into the Kite developer console (IP whitelist or Redirect URL).
+      } @else {
+        Copy a Redirect URL for your Kite app. IP whitelist is managed by Admin.
+      }
     </p>
 
     <div class="copy-row">
@@ -25,7 +35,7 @@
           [ngModel]="selectedCopyId()"
           (ngModelChange)="selectedCopyId.set($event); copyMessage.set('')"
         >
-          @for (opt of copyOptions; track opt.id) {
+          @for (opt of copyOptions(); track opt.id) {
             <mat-option [value]="opt.id">{{ opt.label }}</mat-option>
           }
         </mat-select>
@@ -49,6 +59,20 @@
       </div>
     }
   </article>
+
+  @if (assignedApiKey()) {
+    <article class="step-card">
+      <div class="step-header">
+        <span class="step-badge">Admin</span>
+        <h3>Your API Key</h3>
+      </div>
+      <p class="step-description">Assigned by Admin — use this on Get Token steps below.</p>
+      <div class="result-block session-field">
+        <span class="result-label">API Key</span>
+        <pre class="result-output">{{ assignedApiKey() }}</pre>
+      </div>
+    </article>
+  }
 
   @if (autoExchangeNote()) {
     <p class="banner info" role="status">{{ autoExchangeNote() }}</p>
