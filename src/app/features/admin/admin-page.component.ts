@@ -17,8 +17,8 @@ const FRIEND_MODS: SiteModule[] = ['trade', 'crude', 'auto', 'token', 'test'];
         <div>
           <h1>Users</h1>
           <p>
-            Create friends, edit username/password, set modules, block access. Kite API key
-            required for friends — not for Devil.
+            Create friends, edit username/password for everyone, set modules, block or delete
+            friends. Kite API key required for friends — not for owner.
           </p>
         </div>
       </header>
@@ -66,10 +66,7 @@ const FRIEND_MODS: SiteModule[] = ['trade', 'crude', 'auto', 'token', 'test'];
             <div class="row">
               <label
                 >Username
-                <input
-                  [(ngModel)]="u.username"
-                  [disabled]="u.role === 'owner' || busy()"
-                  autocomplete="off"
+                <input [(ngModel)]="u.username" [disabled]="busy()" autocomplete="off"
               /></label>
               <label
                 >Password
@@ -90,7 +87,7 @@ const FRIEND_MODS: SiteModule[] = ['trade', 'crude', 'auto', 'token', 'test'];
               }
             </div>
             @if (u.role === 'owner') {
-              <p class="hint">Devil uses local Get Token credentials — no API key stored here.</p>
+              <p class="hint">Owner uses local Get Token credentials — no API key stored here.</p>
             } @else {
               <label class="wide"
                 >Kite API key
@@ -105,6 +102,15 @@ const FRIEND_MODS: SiteModule[] = ['trade', 'crude', 'auto', 'token', 'test'];
               @if (u.role !== 'owner') {
                 <button mat-stroked-button type="button" (click)="toggleBlock(u)" [disabled]="busy()">
                   {{ u.blocked ? 'Unblock' : 'Block' }}
+                </button>
+                <button
+                  mat-stroked-button
+                  color="warn"
+                  type="button"
+                  (click)="deleteUser(u)"
+                  [disabled]="busy()"
+                >
+                  Delete
                 </button>
               }
             </div>
@@ -343,6 +349,28 @@ export class AdminPageComponent implements OnInit {
       await this.reload();
     } catch {
       this.message.set('Block update failed');
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  protected async deleteUser(u: SiteUser): Promise<void> {
+    if (u.role === 'owner') {
+      this.message.set('Cannot delete owner');
+      return;
+    }
+    if (!confirm(`Delete user “${u.username}”? This cannot be undone.`)) {
+      return;
+    }
+    this.busy.set(true);
+    this.message.set('');
+    try {
+      await firstValueFrom(this.http.delete(`/api/auth/admin/users/${u.id}`));
+      this.message.set(`Deleted ${u.username}`);
+      await this.reload();
+    } catch (err: unknown) {
+      const e = err as { error?: { message?: string } };
+      this.message.set(e?.error?.message || 'Delete failed');
     } finally {
       this.busy.set(false);
     }
