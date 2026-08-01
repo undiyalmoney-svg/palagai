@@ -288,6 +288,69 @@ orderKiteRouter.use(async (req, res) => {
 app.use('/api/order-kite', orderKiteRouter);
 
 /**
+ * Forward Auto Trader (/live) and P/L records (/pnl) to the same Order-API droplet.
+ * Same-origin in prod (avoids mixed content); local ng serve uses proxy.conf.json.
+ */
+async function proxyOrderBackendJson(
+  upstreamPathPrefix: string,
+  logLabel: string,
+  req: express.Request,
+  res: express.Response,
+): Promise<void> {
+  const suffix = req.url === '/' ? '' : req.url;
+  const targetUrl = `${ORDER_BACKEND_BASE}${upstreamPathPrefix}${suffix}`;
+  const headers: Record<string, string> = {};
+  if (typeof req.headers.authorization === 'string') {
+    headers['Authorization'] = req.headers.authorization;
+  }
+  if (typeof req.headers['content-type'] === 'string') {
+    headers['Content-Type'] = req.headers['content-type'];
+  }
+
+  const init: RequestInit = {
+    method: req.method,
+    headers,
+  };
+
+  if (req.method !== 'GET' && req.method !== 'HEAD' && req.method !== 'DELETE') {
+    headers['Content-Type'] = headers['Content-Type'] || 'application/json';
+    init.body = JSON.stringify(req.body ?? {});
+  }
+
+  try {
+    const upstream = await fetch(targetUrl, init);
+    const responseText = await upstream.text();
+    let responseBody: unknown = responseText;
+    try {
+      responseBody = JSON.parse(responseText);
+    } catch {
+      // keep text
+    }
+    res.status(upstream.status).send(responseBody);
+  } catch (err) {
+    console.error(`[${logLabel} proxy]`, err);
+    res.status(502).json({
+      status: 'error',
+      message: `Failed to reach order backend at ${ORDER_BACKEND_BASE}${upstreamPathPrefix}`,
+    });
+  }
+}
+
+const liveApiRouter = express.Router();
+liveApiRouter.use(express.json());
+liveApiRouter.use((req, res) => {
+  void proxyOrderBackendJson('/live', 'live', req, res);
+});
+app.use('/api/live', liveApiRouter);
+
+const pnlApiRouter = express.Router();
+pnlApiRouter.use(express.json());
+pnlApiRouter.use((req, res) => {
+  void proxyOrderBackendJson('/pnl', 'pnl', req, res);
+});
+app.use('/api/pnl', pnlApiRouter);
+
+/**
  * Serve static files from /browser
  */
 app.use(

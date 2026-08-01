@@ -60,7 +60,9 @@ export class PnlRecordsComponent implements OnInit {
       this.summary.set(res.summary || null);
       this.message.set('');
     } catch {
-      this.message.set('P/L API unreachable. Start Order-API locally (Mongo Atlas).');
+      this.message.set(
+        'P/L API unreachable. Check Order-API on droplet (Mongo) and /api/pnl proxy.',
+      );
     } finally {
       this.busy.set(false);
     }

@@ -18,7 +18,7 @@
     "logLevel": "debug"
   },
   "/api/live": {
-    "target": "http://127.0.0.1:3000",
+    "target": "http://168.144.28.89:3000",
     "secure": false,
     "changeOrigin": true,
     "pathRewrite": {
@@ -27,7 +27,7 @@
     "logLevel": "debug"
   },
   "/api/pnl": {
-    "target": "http://127.0.0.1:3000",
+    "target": "http://168.144.28.89:3000",
     "secure": false,
     "changeOrigin": true,
     "pathRewrite": {
