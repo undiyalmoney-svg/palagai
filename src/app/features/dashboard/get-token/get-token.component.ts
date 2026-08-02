@@ -76,6 +76,8 @@ export class GetTokenComponent {
   protected readonly copyMessage = signal('');
   protected readonly selectedCopyId = signal('redirect-prod');
   protected readonly assignedApiKey = signal('');
+  /** Shown when Admin key ≠ saved local key (would break Kite checksum if merged). */
+  protected readonly credentialPairWarning = signal('');
 
   private readonly allCopyOptions: CopyOption[] = [
     {
@@ -180,20 +182,40 @@ export class GetTokenComponent {
     });
   }
 
-  /** Refresh /me, sync Admin API key into localStorage + forms, then exchange Kite redirect if any. */
+  /**
+   * Refresh /me, load a matching Key+Secret pair, then exchange Kite redirect if any.
+   * Never mix Admin API key with a Secret from a different Kite app (checksum fails).
+   */
   private async bootAndMaybeExchange(): Promise<void> {
     await this.bootCredentials();
+    const pair = this.resolveMatchingCredentialPair();
+    await this.bootstrapFromKiteRedirect(pair.apiKey, pair.apiSecret);
+  }
+
+  /**
+   * Kite checksum = sha256(api_key + request_token + api_secret).
+   * Key and Secret must be the same Kite app pair — never Admin key + old secret.
+   */
+  private resolveMatchingCredentialPair(): { apiKey: string; apiSecret: string } {
     const stored = this.kiteCredentialsService.reloadForActiveUser();
-    const apiKey =
-      this.assignedApiKey() ||
-      stored?.apiKey ||
-      sanitizeKiteCredential(this.credentialsForm.controls.apiKey.value) ||
-      '';
-    const apiSecret =
-      stored?.apiSecret ||
-      sanitizeKiteCredential(this.credentialsForm.controls.apiSecret.value) ||
-      '';
-    await this.bootstrapFromKiteRedirect(apiKey, apiSecret);
+    const formKey = sanitizeKiteCredential(this.credentialsForm.controls.apiKey.value);
+    const formSecret = sanitizeKiteCredential(
+      this.credentialsForm.controls.apiSecret.value,
+    );
+    const adminKey = sanitizeKiteCredential(this.assignedApiKey());
+
+    // Prefer a complete local matching pair (what Step 1 Login used before).
+    if (stored?.apiKey && stored?.apiSecret) {
+      return { apiKey: stored.apiKey, apiSecret: stored.apiSecret };
+    }
+    if (formKey && formSecret) {
+      return { apiKey: formKey, apiSecret: formSecret };
+    }
+    // Admin key alone is only a prefill — secret must still come from the user.
+    if (adminKey && formSecret) {
+      return { apiKey: adminKey, apiSecret: formSecret };
+    }
+    return { apiKey: adminKey || formKey || '', apiSecret: formSecret || '' };
   }
 
   private async bootCredentials(): Promise<void> {
@@ -208,6 +230,7 @@ export class GetTokenComponent {
 
     const fromAdmin = String(u?.kiteApiKey || '').trim();
     this.assignedApiKey.set(fromAdmin);
+    this.credentialPairWarning.set('');
 
     if (u?.role === 'owner') {
       this.selectedCopyId.set('public-ip');
@@ -215,27 +238,27 @@ export class GetTokenComponent {
       this.selectedCopyId.set('redirect-prod');
     }
 
-    let stored = this.kiteCredentialsService.reloadForActiveUser();
-
-    // Admin-assigned key from DB → localStorage (keep existing secret).
-    if (fromAdmin && stored?.apiSecret) {
-      if (stored.apiKey !== fromAdmin) {
-        this.kiteCredentialsService.saveCredentials({
-          apiKey: fromAdmin,
-          apiSecret: stored.apiSecret,
-        });
-        stored = this.kiteCredentialsService.getCredentials();
-      }
-    }
-
+    const stored = this.kiteCredentialsService.reloadForActiveUser();
     this.hasStoredCredentials.set(stored !== null);
 
-    if (stored) {
-      const apiKey = fromAdmin || stored.apiKey;
-      const apiSecret = stored.apiSecret;
-      this.credentialsForm.patchValue({ apiKey, apiSecret });
-      this.prefillStepForms(apiKey, apiSecret);
-      this.manualTokenForm.patchValue({ apiKey });
+    // Never overwrite local Key with Admin Key while keeping the old Secret —
+    // that mismatched pair is what produces Kite "Invalid checksum".
+    if (fromAdmin && stored?.apiKey && stored.apiKey !== fromAdmin) {
+      this.credentialPairWarning.set(
+        `Admin API key (${maskKey(fromAdmin)}) differs from your saved Key (${maskKey(stored.apiKey)}). ` +
+          `Using your saved matching Key + Secret so OAuth works. ` +
+          `To switch apps: Edit credentials and paste the new Key and its Secret together.`,
+      );
+    }
+
+    if (stored?.apiKey && stored?.apiSecret) {
+      // Always use the matching local pair for Login + auto-exchange.
+      this.credentialsForm.patchValue({
+        apiKey: stored.apiKey,
+        apiSecret: stored.apiSecret,
+      });
+      this.prefillStepForms(stored.apiKey, stored.apiSecret);
+      this.manualTokenForm.patchValue({ apiKey: stored.apiKey });
       this.setCredentialsFormEditable(false);
       this.isEditingCredentials.set(false);
     } else if (fromAdmin) {
@@ -456,16 +479,19 @@ export class GetTokenComponent {
     this.step2Form.patchValue({ requestToken });
     this.step3Form.patchValue({ requestToken });
 
+    // Prefer the explicit pair passed in (from resolveMatchingCredentialPair).
+    // Do NOT fall back to Admin key + a different local secret.
+    const stored = this.kiteCredentialsService.getCredentials();
     const key = sanitizeKiteCredential(
       apiKey ||
-        this.assignedApiKey() ||
-        this.kiteCredentialsService.getCredentials()?.apiKey ||
+        stored?.apiKey ||
         this.credentialsForm.controls.apiKey.value ||
+        this.assignedApiKey() ||
         '',
     );
     const secret = sanitizeKiteCredential(
       apiSecret ||
-        this.kiteCredentialsService.getCredentials()?.apiSecret ||
+        (stored?.apiKey === key ? stored.apiSecret : '') ||
         this.credentialsForm.controls.apiSecret.value ||
         '',
     );
@@ -601,7 +627,11 @@ export class GetTokenComponent {
               ' Request tokens are one-time and expire in a few minutes — click Step 1 Login again for a fresh token.';
           } else if (/checksum/i.test(kiteMessage)) {
             hint =
-              ' Re-save your API Key and API Secret from the Kite developer console (must be the matching pair), then login again.';
+              ' API Key and API Secret are from different Kite apps (or one is wrong). ' +
+              'Edit credentials → paste both from the same Kite developer app → Save → click Login again. ' +
+              'Do not mix an Admin-assigned Key with an old Secret.';
+            this.isEditingCredentials.set(true);
+            this.setCredentialsFormEditable(true);
           }
           this.tokenExchangeError.set(`${kiteMessage}.${hint}`.replace(/\.\./g, '.'));
           this.autoExchangeNote.set('');
@@ -642,4 +672,10 @@ export class GetTokenComponent {
     }
     return sessionDate.toDateString() === new Date().toDateString();
   }
+}
+
+function maskKey(key: string): string {
+  const k = String(key || '').trim();
+  if (k.length <= 8) return k ? `${k.slice(0, 2)}…` : '—';
+  return `${k.slice(0, 4)}…${k.slice(-4)}`;
 }
