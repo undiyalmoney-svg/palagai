@@ -31,12 +31,11 @@ export const routes: Routes = [
     path: '',
     pathMatch: 'full',
     redirectTo: ({ queryParams }) => {
-      const requestToken = queryParams['request_token'];
-      if (typeof requestToken === 'string' && requestToken.trim()) {
-        const t = requestToken.trim();
-        stashKiteRequestToken(t);
-        // Keep token in the URL so SSR → client does not drop it.
-        return `/kite-callback?request_token=${encodeURIComponent(t)}`;
+      const raw = queryParams['request_token'];
+      const requestToken = (Array.isArray(raw) ? raw[0] : raw)?.toString().trim();
+      if (requestToken) {
+        stashKiteRequestToken(requestToken);
+        return `/kite-callback?request_token=${encodeURIComponent(requestToken)}`;
       }
       return '/login';
     },

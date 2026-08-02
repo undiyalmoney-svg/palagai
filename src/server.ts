@@ -114,19 +114,70 @@ app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: true }));
 
 /**
+ * Vercel rewrites /foo?request_token=… → /api and often clears req.query.
+ * Pull the token from originalUrl / forwarded headers as well.
+ */
+function extractKiteRequestToken(req: express.Request): string {
+  const fromQuery = req.query?.['request_token'];
+  if (typeof fromQuery === 'string' && fromQuery.trim()) {
+    return fromQuery.trim();
+  }
+  if (Array.isArray(fromQuery) && fromQuery[0]) {
+    return String(fromQuery[0]).trim();
+  }
+
+  const candidates = [
+    String(req.originalUrl || ''),
+    String(req.url || ''),
+    String(req.headers['x-forwarded-uri'] || ''),
+    String(req.headers['x-invoke-path'] || ''),
+    // Vercel sometimes sends only the query string here.
+    String(req.headers['x-invoke-query'] || '')
+      ? `/?${String(req.headers['x-invoke-query'])}`
+      : '',
+  ];
+  for (const raw of candidates) {
+    if (!raw) continue;
+    try {
+      const qIndex = raw.indexOf('?');
+      const query = qIndex >= 0 ? raw.slice(qIndex + 1) : raw.includes('=') ? raw : '';
+      if (!query) continue;
+      const token = new URLSearchParams(query).get('request_token')?.trim() || '';
+      if (token) {
+        return token;
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+  return '';
+}
+
+function requestPathname(req: express.Request): string {
+  const raw = String(
+    req.headers['x-forwarded-uri'] ||
+      req.originalUrl ||
+      req.url ||
+      '/',
+  );
+  try {
+    const path = raw.startsWith('http')
+      ? new URL(raw).pathname
+      : raw.split('?')[0] || '/';
+    return path;
+  } catch {
+    return String(req.path || '/');
+  }
+}
+
+/**
  * Kite OAuth returns with ?request_token=…
- * SSR has no localStorage — Angular auth guards would bounce to /login.
+ * SSR has no localStorage — Angular auth guards bounce to /login.
  * Force a public /kite-callback hop and mirror the token into a cookie.
  */
 app.use((req, res, next) => {
   try {
-    const raw = req.query?.['request_token'];
-    const token =
-      typeof raw === 'string'
-        ? raw.trim()
-        : Array.isArray(raw)
-          ? String(raw[0] ?? '').trim()
-          : '';
+    const token = extractKiteRequestToken(req);
     if (!token) {
       next();
       return;
@@ -136,13 +187,13 @@ app.use((req, res, next) => {
       'Set-Cookie',
       `palagai_pending_kite_request_token=${encodeURIComponent(token)}; Path=/; Max-Age=900; SameSite=Lax${secure ? '; Secure' : ''}`,
     );
-    const path = String(req.path || '');
+    const path = requestPathname(req);
     // Already on public callback — let Angular render it.
     if (path === '/kite-callback' || path.endsWith('/kite-callback')) {
       next();
       return;
     }
-    // Any other path (/, /dashboard/get-token, …) → public callback (never SSR /login).
+    // Any other path (/, /api, /dashboard/get-token, …) → public callback (never SSR /login).
     res.redirect(302, `/kite-callback?request_token=${encodeURIComponent(token)}`);
     return;
   } catch {

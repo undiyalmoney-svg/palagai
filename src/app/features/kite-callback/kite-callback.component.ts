@@ -73,8 +73,10 @@ export class KiteCallbackComponent {
       return;
     }
 
-    // NEVER send OAuth return to /login — Get Token completes the exchange.
+    // Keep request_token in the URL so Get Token guards/SSR cannot miss it.
     this.message = 'Kite code saved. Opening Get Token…';
-    void this.router.navigateByUrl('/dashboard/get-token');
+    void this.router.navigateByUrl(
+      `/dashboard/get-token?request_token=${encodeURIComponent(pending)}`,
+    );
   }
 }

@@ -5,6 +5,7 @@ import { SiteModule } from './auth.constants';
 import {
   hasPendingKiteOAuth,
   peekKiteRequestToken,
+  stashKiteRequestToken,
   stashKiteRequestTokenFromUrl,
 } from '../kite/kite-request-token.util';
 
@@ -29,34 +30,21 @@ export function firstDashboardPath(auth: AuthService): string {
 
 function allowGetTokenDuringKiteOAuth(
   authService: AuthService,
-  router: Router,
   stateUrl: string,
   urlToken: string | null,
-): boolean | UrlTree {
+): boolean {
   authService.ensureHydratedFromStorage();
 
-  // Legacy Kite redirect URL still hits /dashboard/get-token?request_token=
-  if (urlToken && stateUrl.includes('/dashboard/get-token')) {
-    if (authService.isAuthenticated() || !!authService.getToken()) {
-      authService.ensureHydratedFromStorage();
-      return true;
-    }
-    // Public peel — client callback then returns to Get Token (never /login).
-    return router.parseUrl(`/kite-callback?request_token=${encodeURIComponent(urlToken)}`);
+  // Kite OAuth return — never bounce this page to /login.
+  if (urlToken) {
+    return true;
   }
 
-  if (!stateUrl.includes('/dashboard/get-token')) {
-    return false;
-  }
-
-  // Get Token during/after OAuth: allow when site session exists in localStorage
-  // even if SSR left auth signals false.
   if (authService.isAuthenticated() || !!authService.getToken()) {
     authService.ensureHydratedFromStorage();
     return true;
   }
 
-  // Pending kite code in cookie/storage — allow Get Token shell; page hydrates auth.
   if (hasPendingKiteOAuth(stateUrl) || !!peekKiteRequestToken()) {
     return true;
   }
@@ -64,24 +52,38 @@ function allowGetTokenDuringKiteOAuth(
   return false;
 }
 
-export const authGuard: CanActivateFn = (_route, state) => {
-  const token = stashKiteRequestTokenFromUrl(state.url);
+function isGetTokenUrl(url: string, routePath?: string | null): boolean {
+  return (
+    url.includes('/dashboard/get-token') ||
+    url.includes('get-token') ||
+    routePath === 'get-token'
+  );
+}
+
+export const authGuard: CanActivateFn = (route, state) => {
   const authService = inject(AuthService);
   const router = inject(Router);
 
+  // state.url sometimes drops query under Vercel SSR — also read the route snapshot.
+  const fromState = stashKiteRequestTokenFromUrl(state.url);
+  const fromRoute =
+    route.queryParamMap.get('request_token')?.trim() ||
+    route.firstChild?.queryParamMap.get('request_token')?.trim() ||
+    null;
+  if (fromRoute) {
+    stashKiteRequestToken(fromRoute);
+  }
+  const token = fromState || fromRoute;
+
   authService.ensureHydratedFromStorage();
 
-  const getTokenGate = allowGetTokenDuringKiteOAuth(
-    authService,
-    router,
-    state.url,
-    token,
-  );
-  if (getTokenGate !== false) {
-    return getTokenGate;
+  const childPath = route.firstChild?.routeConfig?.path ?? null;
+  if (isGetTokenUrl(state.url, childPath)) {
+    if (allowGetTokenDuringKiteOAuth(authService, state.url, token)) {
+      return true;
+    }
   }
 
-  // Any other dashboard URL with a live request_token → public callback (not login).
   if (token) {
     return router.parseUrl(`/kite-callback?request_token=${encodeURIComponent(token)}`);
   }
@@ -93,7 +95,6 @@ export const authGuard: CanActivateFn = (_route, state) => {
     }
   }
 
-  // Pending OAuth but landed elsewhere → force Get Token, never login.
   if (hasPendingKiteOAuth(state.url) || !!peekKiteRequestToken()) {
     return router.parseUrl('/dashboard/get-token');
   }
@@ -130,35 +131,29 @@ export const dashboardIndexGuard: CanActivateFn = () => {
 };
 
 export const moduleGuard = (mod: SiteModule): CanActivateFn => {
-  return (_route, state): boolean | UrlTree => {
-    const token = stashKiteRequestTokenFromUrl(state.url);
+  return (route, state): boolean | UrlTree => {
     const auth = inject(AuthService);
     const router = inject(Router);
+
+    const fromState = stashKiteRequestTokenFromUrl(state.url);
+    const fromRoute =
+      route.queryParamMap.get('request_token')?.trim() ||
+      route.parent?.queryParamMap.get('request_token')?.trim() ||
+      null;
+    if (fromRoute) {
+      stashKiteRequestToken(fromRoute);
+    }
+    const token = fromState || fromRoute;
 
     auth.ensureHydratedFromStorage();
 
     if (mod === 'token') {
-      const gate = allowGetTokenDuringKiteOAuth(auth, router, state.url, token);
-      if (gate !== false) {
-        // Authenticated path still needs module; pending-oauth allow is enough.
-        if (gate === true) {
-          if (!auth.isAuthenticated() && !auth.getToken()) {
-            return true; // pending kite — show Get Token
-          }
-          auth.ensureHydratedFromStorage();
-          if (auth.hasModule('token') || auth.isDevil()) {
-            return true;
-          }
-          // Has session but no token module — still allow during pending kite.
-          if (hasPendingKiteOAuth(state.url) || !!peekKiteRequestToken()) {
-            return true;
-          }
-        }
-        return gate;
+      if (allowGetTokenDuringKiteOAuth(auth, state.url, token)) {
+        return true;
       }
     }
 
-    if (token && state.url.includes('/dashboard/get-token')) {
+    if (token) {
       return router.parseUrl(`/kite-callback?request_token=${encodeURIComponent(token)}`);
     }
 
