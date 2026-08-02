@@ -86,6 +86,13 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
   protected readonly note = signal(
     'Server Live runs Trap / Genie / All-Green on DigitalOcean every 60s. Push Kite token, then Start. Uncheck real money first to watch SIGNAL events.',
   );
+  /** Visual tone for the note banner: info (default) | ok | err */
+  protected readonly noteTone = signal<'info' | 'ok' | 'err'>('info');
+  /** Last auth-push result shown under the Push button. */
+  protected readonly authPushStatus = signal<{
+    ok: boolean;
+    message: string;
+  } | null>(null);
 
   ngOnInit(): void {
     void this.refreshStatus();
@@ -158,11 +165,13 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
           realOrders: this.realOrders,
         }),
       );
+      this.noteTone.set('ok');
       this.note.set(
         'Server Live started — strategy worker on DO (60s). Watch Recent events for DATA / SIGNAL / ENTRY.',
       );
       await this.refreshStatus();
     } catch (err) {
+      this.noteTone.set('err');
       this.note.set(`Start failed: ${formatUnknownError(err, 'Start')}`);
     } finally {
       this.busy.set(false);
@@ -173,9 +182,11 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
     this.busy.set(true);
     try {
       await firstValueFrom(this.http.post(`${this.liveApiBase}/stop`, {}));
+      this.noteTone.set('info');
       this.note.set('Stop requested.');
       await this.refreshStatus();
     } catch (err) {
+      this.noteTone.set('err');
       this.note.set(`Stop failed: ${formatUnknownError(err, 'Stop')}`);
     } finally {
       this.busy.set(false);
@@ -187,21 +198,55 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
     const apiKey = session?.data.api_key;
     const accessToken = session?.data.access_token;
     if (!apiKey || !accessToken) {
-      this.note.set('No Kite session in this browser. Open Get Token first.');
+      const msg = 'No Kite session in this browser. Open Get Token first, then push again.';
+      this.noteTone.set('err');
+      this.note.set(msg);
+      this.authPushStatus.set({ ok: false, message: msg });
+      await this.uiDialog.alert({
+        title: 'Auth push failed',
+        message: msg,
+        okLabel: 'OK',
+      });
       return;
     }
     this.busy.set(true);
+    this.authPushStatus.set(null);
     try {
-      await firstValueFrom(
-        this.http.put(`${this.liveApiBase}/auth`, {
-          apiKey,
-          accessToken,
-        }),
+      const res = await firstValueFrom(
+        this.http.put<{ ok?: boolean; updatedAt?: string; message?: string }>(
+          `${this.liveApiBase}/auth`,
+          {
+            apiKey,
+            accessToken,
+          },
+        ),
       );
-      this.note.set('Kite token pushed to server (encrypted in Mongo).');
+      const when = res?.updatedAt
+        ? new Date(res.updatedAt).toLocaleTimeString()
+        : new Date().toLocaleTimeString();
+      const msg = `Auth push successful · Kite token stored on droplet (encrypted) · ${when}`;
+      this.noteTone.set('ok');
+      this.note.set(msg);
+      this.authPushStatus.set({ ok: true, message: msg });
       await this.refreshStatus();
+      await this.uiDialog.alert({
+        title: 'Auth push successful',
+        message:
+          'Kite API key + access token were saved on the DigitalOcean server.\n\nYou can Start Server Live now. Chrome can close — the worker keeps the token.',
+        okLabel: 'OK',
+      });
     } catch (err) {
-      this.note.set(`Auth push failed: ${formatUnknownError(err, 'Auth')}`);
+      const detail = formatUnknownError(err, 'Auth');
+      const msg = `Auth push failed: ${detail}`;
+      this.noteTone.set('err');
+      this.note.set(msg);
+      this.authPushStatus.set({ ok: false, message: msg });
+      await this.uiDialog.alert({
+        title: 'Auth push failed',
+        message:
+          `${detail}\n\nCheck: signed in to Palagai, Get Token session is active, and Order-API /live is up on the droplet.`,
+        okLabel: 'OK',
+      });
     } finally {
       this.busy.set(false);
     }
