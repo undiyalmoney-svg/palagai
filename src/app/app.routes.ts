@@ -7,6 +7,7 @@ import {
   dashboardIndexGuard,
 } from './core/auth/auth.guard';
 import { stashKiteRequestToken } from './core/kite/kite-request-token.util';
+import { KiteCallbackComponent } from './features/kite-callback/kite-callback.component';
 import { LoginComponent } from './features/login/login.component';
 import { DashboardComponent } from './features/dashboard/dashboard.component';
 import { DashboardHomeComponent } from './features/dashboard/dashboard-home.component';
@@ -14,7 +15,7 @@ import { TradeDeskComponent } from './features/dashboard/trade-desk/trade-desk.c
 import { OrderTestComponent } from './features/dashboard/order-test/order-test.component';
 import { GetTokenComponent } from './features/dashboard/get-token/get-token.component';
 import { SettingsComponent } from './features/dashboard/settings/settings.component';
-import { CrudeOilDeskComponent } from './features/dashboard/crude-oil-desk/crude-oil-desk.component';
+import { ExperimentsPageComponent } from './features/dashboard/experiments/experiments-page.component';
 import { AutoTraderComponent } from './features/dashboard/auto-trader/auto-trader.component';
 import { PnlRecordsComponent } from './features/dashboard/pnl-records/pnl-records.component';
 import { StrategyManagerPageComponent } from './features/dashboard/strategy-manager/strategy-manager-page.component';
@@ -32,11 +33,17 @@ export const routes: Routes = [
     redirectTo: ({ queryParams }) => {
       const requestToken = queryParams['request_token'];
       if (typeof requestToken === 'string' && requestToken.trim()) {
-        stashKiteRequestToken(requestToken);
-        return '/dashboard/get-token';
+        const t = requestToken.trim();
+        stashKiteRequestToken(t);
+        // Keep token in the URL so SSR → client does not drop it.
+        return `/kite-callback?request_token=${encodeURIComponent(t)}`;
       }
       return '/login';
     },
+  },
+  {
+    path: 'kite-callback',
+    component: KiteCallbackComponent,
   },
   {
     path: 'login',
@@ -89,9 +96,9 @@ export const routes: Routes = [
       {
         path: 'crude-oil',
         canActivate: [moduleGuard('crude')],
-        component: CrudeOilDeskComponent,
+        component: ExperimentsPageComponent,
       },
-      { path: 'stocks', redirectTo: 'auto-trader', pathMatch: 'full' },
+      { path: 'stocks', redirectTo: 'crude-oil', pathMatch: 'full' },
       {
         path: 'auto-trader',
         canActivate: [moduleGuard('auto')],

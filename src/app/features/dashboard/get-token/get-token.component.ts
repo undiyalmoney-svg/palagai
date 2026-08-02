@@ -84,14 +84,20 @@ export class GetTokenComponent implements OnInit {
     {
       id: 'redirect-prod',
       label: 'Redirect URL (production)',
-      value: 'https://palagai.app/dashboard/get-token',
-      hint: 'Add as Redirect URL in Kite developer app',
+      value: 'https://palagai.app/kite-callback',
+      hint: 'Add as Redirect URL in Kite developer app (required)',
     },
     {
       id: 'redirect-local',
       label: 'Redirect URL (local)',
-      value: 'http://localhost:4200/',
-      hint: 'Local ng serve redirect for Kite login',
+      value: 'http://localhost:4200/kite-callback',
+      hint: 'Local ng serve — must match Kite app redirect for local tests',
+    },
+    {
+      id: 'redirect-prod-legacy',
+      label: 'Redirect URL (legacy get-token)',
+      value: 'https://palagai.app/dashboard/get-token',
+      hint: 'Old URL still works — prefer /kite-callback',
     },
     {
       id: 'page-url',
@@ -115,7 +121,7 @@ export class GetTokenComponent implements OnInit {
       const href =
         isPlatformBrowser(this.platformId) && typeof window !== 'undefined'
           ? (window.location.href.split('?')[0] ?? window.location.origin)
-          : 'https://palagai.app/dashboard/get-token';
+          : 'https://palagai.app/kite-callback';
       return { ...opt, value: href };
     }
     return opt;

@@ -24,11 +24,15 @@ export function firstDashboardPath(auth: AuthService): string {
 }
 
 export const authGuard: CanActivateFn = (_route, state) => {
-  // Kite redirects to /dashboard/get-token?request_token=… — stash before any /login bounce.
-  stashKiteRequestTokenFromUrl(state.url);
-
+  const token = stashKiteRequestTokenFromUrl(state.url);
   const authService = inject(AuthService);
   const router = inject(Router);
+
+  // Peel Kite OAuth off the authed tree — public /kite-callback keeps the token.
+  if (token && state.url.includes('/dashboard/get-token')) {
+    return router.parseUrl(`/kite-callback?request_token=${encodeURIComponent(token)}`);
+  }
+
   if (authService.isAuthenticated()) {
     return true;
   }
@@ -51,10 +55,14 @@ export const dashboardIndexGuard: CanActivateFn = () => {
 
 export const moduleGuard = (mod: SiteModule): CanActivateFn => {
   return (_route, state): boolean | UrlTree => {
-    stashKiteRequestTokenFromUrl(state.url);
-
+    const token = stashKiteRequestTokenFromUrl(state.url);
     const auth = inject(AuthService);
     const router = inject(Router);
+
+    if (token && state.url.includes('/dashboard/get-token')) {
+      return router.parseUrl(`/kite-callback?request_token=${encodeURIComponent(token)}`);
+    }
+
     if (!auth.isAuthenticated()) {
       return router.createUrlTree(['/login']);
     }
