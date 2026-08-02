@@ -6,8 +6,8 @@ export const environment = {
   defaultLots: 1,
   allowLiveMoney: true,
   orderEgressIp: '168.144.28.89',
-  appVersion: '1.3.34',
-  appBuild: '2026.08.02-creds-exchange',
+  appVersion: '1.3.35',
+  appBuild: '2026.08.02-checksum-pair',
   /**
    * Optional local-only session bootstrap. Fill via Get Token — do not commit real tokens.
    */

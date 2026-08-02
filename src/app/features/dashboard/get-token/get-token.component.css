@@ -189,6 +189,16 @@
   font-size: 0.92rem;
 }
 
+.banner.warn {
+  margin: 0 0 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: var(--pg-radius-sm);
+  border: 1px solid #fdba74;
+  background: var(--pg-warn-soft);
+  color: #9a3412;
+  font-size: 0.92rem;
+}
+
 .result-block {
   margin-top: 1.25rem;
   padding: 1rem;

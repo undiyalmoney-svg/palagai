@@ -68,9 +68,10 @@
       </div>
       <p class="step-description">
         @if (isOwner()) {
-          Saved in Admin for Devil — used on Get Token steps below.
+          Saved in Admin for Devil. OAuth still uses your matching Key + Secret pair below
+          (Key and Secret must be from the same Kite app).
         } @else {
-          Assigned by Admin — use this on Get Token steps below.
+          Assigned by Admin — paste the matching API Secret below, then Save before Kite Login.
         }
       </p>
       <div class="result-block session-field">
@@ -78,6 +79,10 @@
         <pre class="result-output">{{ assignedApiKey() }}</pre>
       </div>
     </article>
+  }
+
+  @if (credentialPairWarning()) {
+    <p class="banner warn" role="status">{{ credentialPairWarning() }}</p>
   }
 
   @if (autoExchangeNote()) {
