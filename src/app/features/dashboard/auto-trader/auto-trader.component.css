@@ -108,6 +108,24 @@
   border: 1px solid #fecdd3;
 }
 
+/* Start: green only when idle/ready — not while already running. */
+.at-start-btn.ready {
+  --mdc-filled-button-container-color: #0f9d58;
+  --mdc-filled-button-label-text-color: #fff;
+  background: #0f9d58 !important;
+  color: #fff !important;
+}
+
+.at-start-btn.running,
+.at-start-btn:disabled {
+  --mdc-filled-button-container-color: #d8e0da;
+  --mdc-filled-button-label-text-color: #5a6f66;
+  --mdc-filled-button-disabled-container-color: #d8e0da;
+  --mdc-filled-button-disabled-label-text-color: #5a6f66;
+  background: #d8e0da !important;
+  color: #5a6f66 !important;
+}
+
 .order-check .order-log {
   list-style: none;
   margin: 0;

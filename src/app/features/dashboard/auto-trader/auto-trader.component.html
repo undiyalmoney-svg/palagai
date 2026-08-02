@@ -70,12 +70,14 @@
       <div class="at-actions">
         <button
           mat-flat-button
-          color="primary"
           type="button"
+          class="at-start-btn"
+          [class.ready]="status().status !== 'running' && !busy()"
+          [class.running]="status().status === 'running'"
           (click)="start()"
           [disabled]="busy() || status().status === 'running'"
         >
-          Start Server Live
+          {{ status().status === 'running' ? 'Running…' : 'Start Server Live' }}
         </button>
         <button mat-stroked-button type="button" (click)="stop()" [disabled]="busy()">Stop</button>
         <button mat-stroked-button type="button" (click)="refreshStatus()" [disabled]="busy()">Refresh</button>
