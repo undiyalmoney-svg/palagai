@@ -18,6 +18,7 @@ import {
   captureKiteRequestTokenFromLocation,
   clearPendingKiteRequestToken,
   consumeKiteRequestToken,
+  peekKiteRequestToken,
   setKiteBoundUsername,
   stashKiteRequestToken,
 } from '../../../core/kite/kite-request-token.util';
@@ -182,13 +183,21 @@ export class GetTokenComponent {
   /** Refresh /me, sync Admin API key into localStorage + forms, then exchange Kite redirect if any. */
   private async bootAndMaybeExchange(): Promise<void> {
     await this.bootCredentials();
-    const stored = this.kiteCredentialsService.getCredentials();
-    const apiKey = this.assignedApiKey() || stored?.apiKey || '';
-    const apiSecret = stored?.apiSecret || '';
+    const stored = this.kiteCredentialsService.reloadForActiveUser();
+    const apiKey =
+      this.assignedApiKey() ||
+      stored?.apiKey ||
+      sanitizeKiteCredential(this.credentialsForm.controls.apiKey.value) ||
+      '';
+    const apiSecret =
+      stored?.apiSecret ||
+      sanitizeKiteCredential(this.credentialsForm.controls.apiSecret.value) ||
+      '';
     await this.bootstrapFromKiteRedirect(apiKey, apiSecret);
   }
 
   private async bootCredentials(): Promise<void> {
+    this.authService.ensureHydratedFromStorage();
     await this.authService.refreshMe();
     const u = this.authService.currentUser();
     if (u?.id) {
@@ -206,7 +215,7 @@ export class GetTokenComponent {
       this.selectedCopyId.set('redirect-prod');
     }
 
-    let stored = this.kiteCredentialsService.getCredentials();
+    let stored = this.kiteCredentialsService.reloadForActiveUser();
 
     // Admin-assigned key from DB → localStorage (keep existing secret).
     if (fromAdmin && stored?.apiSecret) {
@@ -273,7 +282,7 @@ export class GetTokenComponent {
     this.setCredentialsFormEditable(false);
   }
 
-  protected onSaveCredentials(): void {
+  protected async onSaveCredentials(): Promise<void> {
     if (this.credentialsForm.invalid) {
       this.credentialsForm.markAllAsTouched();
       return;
@@ -284,6 +293,7 @@ export class GetTokenComponent {
     this.credentialsSaveMessage.set('');
 
     try {
+      this.authService.ensureHydratedFromStorage();
       const u = this.authService.currentUser();
       if (u?.id) {
         this.kiteCredentialsService.bindSiteUser(u.id);
@@ -295,6 +305,16 @@ export class GetTokenComponent {
       this.isEditingCredentials.set(false);
       this.setCredentialsFormEditable(false);
       this.credentialsSaveMessage.set('API credentials saved locally for this Palagai user.');
+
+      // If Kite redirect already dropped a request_token, exchange now.
+      const pending =
+        peekKiteRequestToken() ||
+        sanitizeKiteCredential(this.step2Form.controls.requestToken.value);
+      if (pending) {
+        stashKiteRequestToken(pending);
+        this.tokenExchangeError.set('');
+        await this.bootstrapFromKiteRedirect(apiKey.trim(), apiSecret.trim());
+      }
     } catch (err) {
       this.hasStoredCredentials.set(false);
       this.isEditingCredentials.set(true);
@@ -424,32 +444,63 @@ export class GetTokenComponent {
       stashKiteRequestToken(queryToken);
     }
 
-    const requestToken = consumeKiteRequestToken();
+    // Peek first — only consume when we actually start the exchange.
+    // Otherwise a missing secret would burn a one-time request_token.
+    const requestToken =
+      peekKiteRequestToken() ||
+      sanitizeKiteCredential(this.step2Form.controls.requestToken.value);
     if (!requestToken) {
       return;
     }
 
     this.step2Form.patchValue({ requestToken });
     this.step3Form.patchValue({ requestToken });
+
+    const key = sanitizeKiteCredential(
+      apiKey ||
+        this.assignedApiKey() ||
+        this.kiteCredentialsService.getCredentials()?.apiKey ||
+        this.credentialsForm.controls.apiKey.value ||
+        '',
+    );
+    const secret = sanitizeKiteCredential(
+      apiSecret ||
+        this.kiteCredentialsService.getCredentials()?.apiSecret ||
+        this.credentialsForm.controls.apiSecret.value ||
+        '',
+    );
+
+    if (!key || !secret) {
+      stashKiteRequestToken(requestToken);
+      this.isEditingCredentials.set(true);
+      this.setCredentialsFormEditable(true);
+      if (key) {
+        this.credentialsForm.patchValue({ apiKey: key });
+        this.prefillStepForms(key, '');
+      }
+      this.autoExchangeNote.set('');
+      this.tokenExchangeError.set(
+        !key && !secret
+          ? 'Kite code captured, but API Key + Secret are missing. Paste both above → Save — exchange will retry automatically (don’t click Kite Login again).'
+          : !secret
+            ? `Kite code captured · API Key ready (${key.slice(0, 4)}…) but Secret is missing. Paste API Secret above → Save — exchange retries automatically.`
+            : 'Kite code captured, but API Key is missing. Save credentials above — exchange retries automatically.',
+      );
+      return;
+    }
+
+    // Ready to exchange — consume pending token now.
+    consumeKiteRequestToken();
     this.autoExchangeNote.set(
       'Captured request_token from Kite redirect. Exchanging for access token…',
     );
+    this.tokenExchangeError.set('');
 
     await this.router.navigate([], {
       relativeTo: this.route,
       queryParams: {},
       replaceUrl: true,
     });
-
-    const key = sanitizeKiteCredential(apiKey ?? '');
-    const secret = sanitizeKiteCredential(apiSecret ?? '');
-    if (!key || !secret) {
-      this.tokenExchangeError.set(
-        'Request token captured, but API Key/Secret are not saved yet. Save credentials above, then generate checksum and exchange.',
-      );
-      this.autoExchangeNote.set('');
-      return;
-    }
 
     try {
       this.isGeneratingChecksum.set(true);
@@ -470,6 +521,8 @@ export class GetTokenComponent {
     } catch {
       this.isGeneratingChecksum.set(false);
       this.autoExchangeNote.set('');
+      // Keep token for one retry after user fixes credentials.
+      stashKiteRequestToken(requestToken);
       this.tokenExchangeError.set('Failed to generate checksum from redirect token.');
     }
   }

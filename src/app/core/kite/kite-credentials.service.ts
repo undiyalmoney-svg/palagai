@@ -18,7 +18,11 @@ export class KiteCredentialsService {
 
   readonly storedCredentials = this.credentials.asReadonly();
 
-  /** Load credentials for this Palagai user only (Devil vs customer isolation). */
+  /**
+   * Load credentials for this Palagai user only (Devil vs customer isolation).
+   * Migrates legacy unscoped `palagai_kite_credentials` into the per-user key
+   * instead of deleting it (that wipe caused OAuth “Key/Secret not saved”).
+   */
   bindSiteUser(siteUserId: string | null | undefined): void {
     const id = String(siteUserId || '').trim();
     if (!id) {
@@ -30,13 +34,23 @@ export class KiteCredentialsService {
       return;
     }
     this.activeSiteUserId = id;
-    const scoped = this.readKey(this.keyFor(id));
+
+    let scoped = this.readKey(this.keyFor(id));
+    if (!scoped) {
+      const legacy = this.readKey(LEGACY_STORAGE_KEY);
+      if (legacy?.apiKey && legacy?.apiSecret) {
+        const migrated: KiteCredentials = { ...legacy, siteUserId: id };
+        this.persistToKey(this.keyFor(id), migrated);
+        scoped = migrated;
+      }
+    }
+
     if (scoped) {
       this.credentials.set({ ...scoped, siteUserId: id });
       this.purgeLegacy();
       return;
     }
-    this.purgeLegacy();
+
     this.credentials.set(null);
   }
 
@@ -48,13 +62,21 @@ export class KiteCredentialsService {
     return this.credentials();
   }
 
+  /** Force re-read from localStorage for the bound user (or migrate legacy). */
+  reloadForActiveUser(): KiteCredentials | null {
+    if (!this.activeSiteUserId) {
+      return this.credentials();
+    }
+    const id = this.activeSiteUserId;
+    this.activeSiteUserId = null; // allow bind to re-run
+    this.bindSiteUser(id);
+    return this.credentials();
+  }
+
   saveCredentials(credentials: KiteCredentials): void {
     const trimmed: KiteCredentials = {
-      apiKey: credentials.apiKey.replace(/^\uFEFF/, '').replace(/[\u200B-\u200D\uFEFF]/g, '').trim(),
-      apiSecret: credentials.apiSecret
-        .replace(/^\uFEFF/, '')
-        .replace(/[\u200B-\u200D\uFEFF]/g, '')
-        .trim(),
+      apiKey: sanitize(credentials.apiKey),
+      apiSecret: sanitize(credentials.apiSecret),
       siteUserId: this.activeSiteUserId || undefined,
     };
     if (!trimmed.apiKey || !trimmed.apiSecret) {
@@ -89,7 +111,11 @@ export class KiteCredentialsService {
 
   private purgeLegacy(): void {
     if (!isPlatformBrowser(this.platformId)) return;
-    localStorage.removeItem(LEGACY_STORAGE_KEY);
+    try {
+      localStorage.removeItem(LEGACY_STORAGE_KEY);
+    } catch {
+      // ignore
+    }
   }
 
   private persistToKey(key: string, credentials: KiteCredentials): void {
@@ -103,14 +129,20 @@ export class KiteCredentialsService {
       const raw = localStorage.getItem(key);
       if (!raw) return null;
       const parsed = JSON.parse(raw) as Partial<KiteCredentials>;
-      if (!parsed.apiKey?.trim() || !parsed.apiSecret?.trim()) return null;
+      const apiKey = sanitize(parsed.apiKey ?? '');
+      const apiSecret = sanitize(parsed.apiSecret ?? '');
+      if (!apiKey || !apiSecret) return null;
       return {
-        apiKey: parsed.apiKey.trim(),
-        apiSecret: parsed.apiSecret.trim(),
+        apiKey,
+        apiSecret,
         siteUserId: parsed.siteUserId,
       };
     } catch {
       return null;
     }
   }
+}
+
+function sanitize(value: string): string {
+  return value.replace(/^\uFEFF/, '').replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
 }
