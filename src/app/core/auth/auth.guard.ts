@@ -2,7 +2,11 @@ import { inject } from '@angular/core';
 import { CanActivateFn, Router, UrlTree } from '@angular/router';
 import { AuthService } from './auth.service';
 import { SiteModule } from './auth.constants';
-import { stashKiteRequestTokenFromUrl } from '../kite/kite-request-token.util';
+import {
+  hasPendingKiteOAuth,
+  peekKiteRequestToken,
+  stashKiteRequestTokenFromUrl,
+} from '../kite/kite-request-token.util';
 
 const MODULE_HOME: Array<{ module: SiteModule; path: string }> = [
   { module: 'trade', path: '/dashboard/trade-desk' },
@@ -23,48 +27,105 @@ export function firstDashboardPath(auth: AuthService): string {
   return '/dashboard/home';
 }
 
+function allowGetTokenDuringKiteOAuth(
+  authService: AuthService,
+  router: Router,
+  stateUrl: string,
+  urlToken: string | null,
+): boolean | UrlTree {
+  authService.ensureHydratedFromStorage();
+
+  // Legacy Kite redirect URL still hits /dashboard/get-token?request_token=
+  if (urlToken && stateUrl.includes('/dashboard/get-token')) {
+    if (authService.isAuthenticated() || !!authService.getToken()) {
+      authService.ensureHydratedFromStorage();
+      return true;
+    }
+    // Public peel — client callback then returns to Get Token (never /login).
+    return router.parseUrl(`/kite-callback?request_token=${encodeURIComponent(urlToken)}`);
+  }
+
+  if (!stateUrl.includes('/dashboard/get-token')) {
+    return false;
+  }
+
+  // Get Token during/after OAuth: allow when site session exists in localStorage
+  // even if SSR left auth signals false.
+  if (authService.isAuthenticated() || !!authService.getToken()) {
+    authService.ensureHydratedFromStorage();
+    return true;
+  }
+
+  // Pending kite code in cookie/storage — allow Get Token shell; page hydrates auth.
+  if (hasPendingKiteOAuth(stateUrl) || !!peekKiteRequestToken()) {
+    return true;
+  }
+
+  return false;
+}
+
 export const authGuard: CanActivateFn = (_route, state) => {
   const token = stashKiteRequestTokenFromUrl(state.url);
   const authService = inject(AuthService);
   const router = inject(Router);
 
-  // After full-page Kite return, rehydrate from localStorage before deciding.
   authService.ensureHydratedFromStorage();
 
-  // Peel unauthenticated OAuth onto public /kite-callback.
-  // If already signed in, stay on Get Token (request_token already stashed).
-  if (token && state.url.includes('/dashboard/get-token')) {
-    if (authService.isAuthenticated()) {
-      return true;
-    }
+  const getTokenGate = allowGetTokenDuringKiteOAuth(
+    authService,
+    router,
+    state.url,
+    token,
+  );
+  if (getTokenGate !== false) {
+    return getTokenGate;
+  }
+
+  // Any other dashboard URL with a live request_token → public callback (not login).
+  if (token) {
     return router.parseUrl(`/kite-callback?request_token=${encodeURIComponent(token)}`);
   }
 
-  if (authService.isAuthenticated()) {
-    return true;
-  }
-
-  // Pending Kite code in localStorage + site token → hydrate again and allow Get Token.
-  if (state.url.includes('/dashboard/get-token') && authService.getToken()) {
-    if (authService.ensureHydratedFromStorage()) {
+  if (authService.isAuthenticated() || !!authService.getToken()) {
+    authService.ensureHydratedFromStorage();
+    if (authService.isAuthenticated()) {
       return true;
     }
+  }
+
+  // Pending OAuth but landed elsewhere → force Get Token, never login.
+  if (hasPendingKiteOAuth(state.url) || !!peekKiteRequestToken()) {
+    return router.parseUrl('/dashboard/get-token');
   }
 
   return router.createUrlTree(['/login']);
 };
 
 export const guestGuard: CanActivateFn = () => {
-  // Always allow /login so a customer can sign in even if Devil's session is still on this browser.
+  const auth = inject(AuthService);
+  const router = inject(Router);
+  auth.ensureHydratedFromStorage();
+  // If Devil is signed in and Kite just returned, don't trap on login.
+  if (
+    (auth.isAuthenticated() || !!auth.getToken()) &&
+    (hasPendingKiteOAuth() || !!peekKiteRequestToken())
+  ) {
+    return router.parseUrl('/dashboard/get-token');
+  }
   return true;
 };
 
 export const dashboardIndexGuard: CanActivateFn = () => {
   const auth = inject(AuthService);
   const router = inject(Router);
-  if (!auth.isAuthenticated()) {
+  auth.ensureHydratedFromStorage();
+  if (hasPendingKiteOAuth() || !!peekKiteRequestToken()) {
+    return router.parseUrl('/dashboard/get-token');
+  }
+  if (!auth.isAuthenticated() && !auth.getToken()) {
     return router.createUrlTree(['/login']);
   }
+  auth.ensureHydratedFromStorage();
   return router.parseUrl(firstDashboardPath(auth));
 };
 
@@ -76,21 +137,43 @@ export const moduleGuard = (mod: SiteModule): CanActivateFn => {
 
     auth.ensureHydratedFromStorage();
 
-    if (token && state.url.includes('/dashboard/get-token')) {
-      if (auth.isAuthenticated()) {
-        // fall through to module check
-      } else {
-        return router.parseUrl(`/kite-callback?request_token=${encodeURIComponent(token)}`);
+    if (mod === 'token') {
+      const gate = allowGetTokenDuringKiteOAuth(auth, router, state.url, token);
+      if (gate !== false) {
+        // Authenticated path still needs module; pending-oauth allow is enough.
+        if (gate === true) {
+          if (!auth.isAuthenticated() && !auth.getToken()) {
+            return true; // pending kite — show Get Token
+          }
+          auth.ensureHydratedFromStorage();
+          if (auth.hasModule('token') || auth.isDevil()) {
+            return true;
+          }
+          // Has session but no token module — still allow during pending kite.
+          if (hasPendingKiteOAuth(state.url) || !!peekKiteRequestToken()) {
+            return true;
+          }
+        }
+        return gate;
       }
     }
 
+    if (token && state.url.includes('/dashboard/get-token')) {
+      return router.parseUrl(`/kite-callback?request_token=${encodeURIComponent(token)}`);
+    }
+
     if (!auth.isAuthenticated()) {
-      return router.createUrlTree(['/login']);
+      if (auth.getToken() && auth.ensureHydratedFromStorage()) {
+        // continue
+      } else if (hasPendingKiteOAuth(state.url) || !!peekKiteRequestToken()) {
+        return router.parseUrl('/dashboard/get-token');
+      } else {
+        return router.createUrlTree(['/login']);
+      }
     }
     if (auth.hasModule(mod)) {
       return true;
     }
-    // Never bounce to /dashboard (that re-enters trade-desk and loops blank).
     return router.parseUrl(firstDashboardPath(auth));
   };
 };

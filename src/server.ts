@@ -114,9 +114,9 @@ app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: true }));
 
 /**
- * Kite OAuth returns to /dashboard/get-token?request_token=…
- * SSR auth often bounces to /login first (no browser storage on server).
- * Mirror the token into a short-lived cookie so the client can finish exchange.
+ * Kite OAuth returns with ?request_token=…
+ * SSR has no localStorage — Angular auth guards would bounce to /login.
+ * Force a public /kite-callback hop and mirror the token into a cookie.
  */
 app.use((req, res, next) => {
   try {
@@ -127,13 +127,24 @@ app.use((req, res, next) => {
         : Array.isArray(raw)
           ? String(raw[0] ?? '').trim()
           : '';
-    if (token) {
-      const secure = req.secure || req.headers['x-forwarded-proto'] === 'https';
-      res.append(
-        'Set-Cookie',
-        `palagai_pending_kite_request_token=${encodeURIComponent(token)}; Path=/; Max-Age=900; SameSite=Lax${secure ? '; Secure' : ''}`,
-      );
+    if (!token) {
+      next();
+      return;
     }
+    const secure = req.secure || req.headers['x-forwarded-proto'] === 'https';
+    res.append(
+      'Set-Cookie',
+      `palagai_pending_kite_request_token=${encodeURIComponent(token)}; Path=/; Max-Age=900; SameSite=Lax${secure ? '; Secure' : ''}`,
+    );
+    const path = String(req.path || '');
+    // Already on public callback — let Angular render it.
+    if (path === '/kite-callback' || path.endsWith('/kite-callback')) {
+      next();
+      return;
+    }
+    // Any other path (/, /dashboard/get-token, …) → public callback (never SSR /login).
+    res.redirect(302, `/kite-callback?request_token=${encodeURIComponent(token)}`);
+    return;
   } catch {
     /* ignore */
   }

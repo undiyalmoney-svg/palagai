@@ -3,20 +3,15 @@ import { isPlatformBrowser } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
 import {
-  AUTH_TOKEN_KEY,
-  AUTH_USER_KEY,
-} from '../../core/auth/auth.constants';
-import {
   captureKiteRequestTokenFromLocation,
-  getKiteBoundUsername,
   peekKiteRequestToken,
   stashKiteRequestToken,
 } from '../../core/kite/kite-request-token.util';
 
 /**
  * Public Kite OAuth landing (no auth guard).
- * Must use afterNextRender — under SSR, ngOnInit runs on the server and
- * isPlatformBrowser early-return never navigates; hydration won't re-run it.
+ * Always finishes on Get Token when a request_token is present — never /login.
+ * (Login was killing Devil's OAuth: SSR + consume race bounced mid-flow.)
  */
 @Component({
   selector: 'app-kite-callback',
@@ -68,48 +63,18 @@ export class KiteCallbackComponent {
       stashKiteRequestToken(fromQuery);
     }
 
-    const pending = peekKiteRequestToken();
+    // Rehydrate Devil/customer from localStorage before entering the authed tree.
     this.auth.ensureHydratedFromStorage();
 
-    // Always prefer Get Token when Palagai session exists (Devil or customer).
-    if (this.hasPalagaiSession()) {
-      this.message = pending
-        ? 'Kite code saved. Opening Get Token…'
-        : 'Opening Get Token…';
+    const pending = peekKiteRequestToken();
+    if (!pending) {
+      this.message = 'No Kite code found. Opening Get Token…';
       void this.router.navigateByUrl('/dashboard/get-token');
       return;
     }
 
-    if (pending) {
-      this.message = 'Sign in to finish linking Kite…';
-      void this.router.navigateByUrl('/login');
-      return;
-    }
-
-    this.message = 'No Kite request_token found. Open Get Token and login to Kite again.';
-    void this.router.navigateByUrl('/login');
-  }
-
-  /** True when Palagai login is already on this browser. */
-  private hasPalagaiSession(): boolean {
-    if (this.auth.ensureHydratedFromStorage()) {
-      return true;
-    }
-    if (!isPlatformBrowser(this.platformId)) {
-      return false;
-    }
-    // Direct localStorage fallback (SSR hydrate can leave signals false).
-    try {
-      const token = localStorage.getItem(AUTH_TOKEN_KEY)?.trim();
-      const raw = localStorage.getItem(AUTH_USER_KEY)?.trim();
-      if (token && raw) {
-        this.auth.ensureHydratedFromStorage();
-        return this.auth.isAuthenticated() || !!(getKiteBoundUsername() && token);
-      }
-    } catch {
-      /* ignore */
-    }
-    const bound = getKiteBoundUsername();
-    return !!(bound && this.auth.getToken());
+    // NEVER send OAuth return to /login — Get Token completes the exchange.
+    this.message = 'Kite code saved. Opening Get Token…';
+    void this.router.navigateByUrl('/dashboard/get-token');
   }
 }

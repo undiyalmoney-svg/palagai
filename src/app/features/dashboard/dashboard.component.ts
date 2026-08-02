@@ -170,29 +170,23 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   private async bootAuth(): Promise<void> {
     const { peekKiteRequestToken } = await import('../../core/kite/kite-request-token.util');
-    const pendingKite = !!peekKiteRequestToken();
     const onGetToken = this.router.url.includes('/dashboard/get-token');
+    const pendingKite = !!peekKiteRequestToken();
 
-    // Soft refresh while finishing Kite OAuth — never wipe the pending request_token.
     this.authService.ensureHydratedFromStorage();
-    const ok = pendingKite
-      ? await this.authService.refreshMe()
-      : await this.authService.refreshMeStrict();
-    if (!ok) {
-      // Mid-OAuth: never bounce to login — stay on / get to Get Token so exchange can finish.
-      if (pendingKite) {
-        if (!onGetToken) {
-          void this.router.navigateByUrl('/dashboard/get-token');
-        }
-        return;
-      }
-      void this.router.navigateByUrl('/login');
-      return;
-    }
-    if (pendingKite) {
-      if (!onGetToken) {
+
+    // Get Token / mid-OAuth: never bounce to login (consume race used to trip this).
+    if (onGetToken || pendingKite) {
+      await this.authService.refreshMe();
+      if (pendingKite && !onGetToken) {
         void this.router.navigateByUrl('/dashboard/get-token');
       }
+      return;
+    }
+
+    const ok = await this.authService.refreshMeStrict();
+    if (!ok) {
+      void this.router.navigateByUrl('/login');
       return;
     }
     const url = this.router.url.replace(/\?.*$/, '');

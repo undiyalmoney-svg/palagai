@@ -1,5 +1,5 @@
 /** Survives Palagai login bounce after Kite OAuth redirect. */
-const PENDING_REQUEST_TOKEN_KEY = 'palagai_pending_kite_request_token';
+export const PENDING_REQUEST_TOKEN_KEY = 'palagai_pending_kite_request_token';
 
 /** Last Palagai username that owned the Kite access token. */
 export const KITE_BOUND_USERNAME_KEY = 'palagai_kite_username';
@@ -119,6 +119,14 @@ export function peekKiteRequestToken(): string | null {
     }
   }
   return readCookie(PENDING_REQUEST_TOKEN_KEY)?.trim() || null;
+}
+
+/** True if a Kite OAuth request_token is waiting (URL / storage / cookie). */
+export function hasPendingKiteOAuth(url?: string | null): boolean {
+  if (url && /[?&]request_token=/.test(url)) {
+    return true;
+  }
+  return !!peekKiteRequestToken();
 }
 
 /** Stash request_token from a router URL (e.g. /dashboard/get-token?request_token=…). */
