@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
@@ -7,7 +7,10 @@ import { MatInputModule } from '@angular/material/input';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { AuthService } from '../../core/auth/auth.service';
-import { peekKiteRequestToken } from '../../core/kite/kite-request-token.util';
+import {
+  captureKiteRequestTokenFromLocation,
+  peekKiteRequestToken,
+} from '../../core/kite/kite-request-token.util';
 import { firstDashboardPath } from '../../core/auth/auth.guard';
 
 @Component({
@@ -24,7 +27,7 @@ import { firstDashboardPath } from '../../core/auth/auth.guard';
   templateUrl: './login.component.html',
   styleUrl: './login.component.css',
 })
-export class LoginComponent {
+export class LoginComponent implements OnInit {
   private readonly authService = inject(AuthService);
   private readonly router = inject(Router);
   private readonly formBuilder = inject(FormBuilder);
@@ -45,7 +48,19 @@ export class LoginComponent {
     password: ['', [Validators.required]],
   });
 
+  ngOnInit(): void {
+    // Kite redirect may land on /login after SSR auth bounce — resume Get Token.
+    captureKiteRequestTokenFromLocation();
+    if (this.authService.isAuthenticated() && peekKiteRequestToken()) {
+      void this.router.navigateByUrl('/dashboard/get-token');
+    }
+  }
+
   protected continueAsExisting(): void {
+    if (peekKiteRequestToken()) {
+      void this.router.navigateByUrl('/dashboard/get-token');
+      return;
+    }
     void this.router.navigateByUrl(firstDashboardPath(this.authService));
   }
 

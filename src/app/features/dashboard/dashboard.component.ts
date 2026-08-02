@@ -59,8 +59,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
       module: 'strat',
     },
     {
-      label: 'Crude',
-      shortLabel: 'Crude',
+      label: 'Experiments',
+      shortLabel: 'Expt',
       route: '/dashboard/crude-oil',
       icon: 'droplet',
       module: 'crude',
@@ -98,8 +98,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
       subtitle: 'Assign and configure strategies for paper and live desks.',
     },
     '/dashboard/crude-oil': {
-      title: 'Crude Oil Mini',
-      subtitle: 'MCX crude desk — testing and live paper in one place.',
+      title: 'Experiments',
+      subtitle: 'Paper lab — Crude / Nat Gas Mini / Top 50 stocks for new DNAs.',
     },
     '/dashboard/auto-trader': {
       title: 'Auto Trader',
@@ -125,6 +125,11 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   protected readonly navItems = computed(() =>
     this.allNav.filter((item) => item.module == null || this.authService.hasModule(item.module)),
+  );
+
+  /** Bottom tab bar on phone/tablet — Token stays in the side menu only. */
+  protected readonly mobileTabItems = computed(() =>
+    this.navItems().filter((item) => item.route !== '/dashboard/get-token'),
   );
 
   protected readonly username = computed(() => {
@@ -164,9 +169,20 @@ export class DashboardComponent implements OnInit, OnDestroy {
   }
 
   private async bootAuth(): Promise<void> {
+    const { peekKiteRequestToken } = await import('../../core/kite/kite-request-token.util');
+    const pendingKite = !!peekKiteRequestToken();
+    const onGetToken = this.router.url.includes('/dashboard/get-token');
+
     const ok = await this.authService.refreshMeStrict();
     if (!ok) {
       void this.router.navigateByUrl('/login');
+      return;
+    }
+    // Session OK + pending Kite token → finish exchange on Get Token (don't wander to Trade Desk).
+    if (pendingKite) {
+      if (!onGetToken) {
+        void this.router.navigateByUrl('/dashboard/get-token');
+      }
       return;
     }
     const url = this.router.url.replace(/\?.*$/, '');

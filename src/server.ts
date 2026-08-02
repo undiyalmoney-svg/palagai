@@ -112,6 +112,34 @@ const browserDistFolder = join(import.meta.dirname, '../browser');
 const app = express();
 app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: true }));
+
+/**
+ * Kite OAuth returns to /dashboard/get-token?request_token=…
+ * SSR auth often bounces to /login first (no browser storage on server).
+ * Mirror the token into a short-lived cookie so the client can finish exchange.
+ */
+app.use((req, res, next) => {
+  try {
+    const raw = req.query?.['request_token'];
+    const token =
+      typeof raw === 'string'
+        ? raw.trim()
+        : Array.isArray(raw)
+          ? String(raw[0] ?? '').trim()
+          : '';
+    if (token) {
+      const secure = req.secure || req.headers['x-forwarded-proto'] === 'https';
+      res.append(
+        'Set-Cookie',
+        `palagai_pending_kite_request_token=${encodeURIComponent(token)}; Path=/; Max-Age=900; SameSite=Lax${secure ? '; Secure' : ''}`,
+      );
+    }
+  } catch {
+    /* ignore */
+  }
+  next();
+});
+
 const angularApp = new AngularNodeAppEngine();
 
 function asFormRecord(body: unknown): Record<string, string> {

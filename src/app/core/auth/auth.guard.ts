@@ -2,6 +2,7 @@ import { inject } from '@angular/core';
 import { CanActivateFn, Router, UrlTree } from '@angular/router';
 import { AuthService } from './auth.service';
 import { SiteModule } from './auth.constants';
+import { stashKiteRequestTokenFromUrl } from '../kite/kite-request-token.util';
 
 const MODULE_HOME: Array<{ module: SiteModule; path: string }> = [
   { module: 'trade', path: '/dashboard/trade-desk' },
@@ -22,7 +23,10 @@ export function firstDashboardPath(auth: AuthService): string {
   return '/dashboard/home';
 }
 
-export const authGuard: CanActivateFn = () => {
+export const authGuard: CanActivateFn = (_route, state) => {
+  // Kite redirects to /dashboard/get-token?request_token=… — stash before any /login bounce.
+  stashKiteRequestTokenFromUrl(state.url);
+
   const authService = inject(AuthService);
   const router = inject(Router);
   if (authService.isAuthenticated()) {
@@ -46,7 +50,9 @@ export const dashboardIndexGuard: CanActivateFn = () => {
 };
 
 export const moduleGuard = (mod: SiteModule): CanActivateFn => {
-  return (): boolean | UrlTree => {
+  return (_route, state): boolean | UrlTree => {
+    stashKiteRequestTokenFromUrl(state.url);
+
     const auth = inject(AuthService);
     const router = inject(Router);
     if (!auth.isAuthenticated()) {
