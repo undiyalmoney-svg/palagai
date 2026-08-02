@@ -28,8 +28,15 @@ export const authGuard: CanActivateFn = (_route, state) => {
   const authService = inject(AuthService);
   const router = inject(Router);
 
-  // Peel Kite OAuth off the authed tree — public /kite-callback keeps the token.
+  // After full-page Kite return, rehydrate from localStorage before deciding.
+  authService.ensureHydratedFromStorage();
+
+  // Peel unauthenticated OAuth onto public /kite-callback.
+  // If already signed in, stay on Get Token (request_token already stashed).
   if (token && state.url.includes('/dashboard/get-token')) {
+    if (authService.isAuthenticated()) {
+      return true;
+    }
     return router.parseUrl(`/kite-callback?request_token=${encodeURIComponent(token)}`);
   }
 
@@ -59,8 +66,14 @@ export const moduleGuard = (mod: SiteModule): CanActivateFn => {
     const auth = inject(AuthService);
     const router = inject(Router);
 
+    auth.ensureHydratedFromStorage();
+
     if (token && state.url.includes('/dashboard/get-token')) {
-      return router.parseUrl(`/kite-callback?request_token=${encodeURIComponent(token)}`);
+      if (auth.isAuthenticated()) {
+        // fall through to module check
+      } else {
+        return router.parseUrl(`/kite-callback?request_token=${encodeURIComponent(token)}`);
+      }
     }
 
     if (!auth.isAuthenticated()) {

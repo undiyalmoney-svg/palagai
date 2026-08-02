@@ -139,6 +139,23 @@ export class KiteSessionService {
     this.session.set(null);
   }
 
+  /** Wipe every stored Kite access token (e.g. different Palagai username logged in). */
+  clearAllSessions(): void {
+    if (isPlatformBrowser(this.platformId)) {
+      const toRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && (key === LEGACY_STORAGE_KEY || key.startsWith(STORAGE_PREFIX))) {
+          toRemove.push(key);
+        }
+      }
+      for (const key of toRemove) {
+        localStorage.removeItem(key);
+      }
+    }
+    this.session.set(null);
+  }
+
   /** Drop active memory without deleting other users' stored sessions. */
   detach(): void {
     this.activeSiteUserId = null;

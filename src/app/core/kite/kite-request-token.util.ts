@@ -1,4 +1,16 @@
+/** Survives Palagai login bounce after Kite OAuth redirect. */
 const PENDING_REQUEST_TOKEN_KEY = 'palagai_pending_kite_request_token';
+
+/** Last Palagai username that owned the Kite access token. */
+export const KITE_BOUND_USERNAME_KEY = 'palagai_kite_username';
+
+function canUseLocalStorage(): boolean {
+  try {
+    return typeof localStorage !== 'undefined';
+  } catch {
+    return false;
+  }
+}
 
 function canUseSessionStorage(): boolean {
   try {
@@ -52,11 +64,14 @@ function clearCookie(name: string): void {
   }
 }
 
-/** Persist Kite request_token across SSR → /login bounces (sessionStorage + cookie). */
+/** Persist Kite request_token across /login bounce (localStorage + session + cookie). */
 export function stashKiteRequestToken(token: string | null | undefined): void {
   const trimmed = token?.trim();
   if (!trimmed) {
     return;
+  }
+  if (canUseLocalStorage()) {
+    localStorage.setItem(PENDING_REQUEST_TOKEN_KEY, trimmed);
   }
   if (canUseSessionStorage()) {
     sessionStorage.setItem(PENDING_REQUEST_TOKEN_KEY, trimmed);
@@ -64,20 +79,39 @@ export function stashKiteRequestToken(token: string | null | undefined): void {
   writeCookie(PENDING_REQUEST_TOKEN_KEY, trimmed, 900);
 }
 
+/** Drop pending request_token only (e.g. before a fresh Kite Redirect). */
+export function clearPendingKiteRequestToken(): void {
+  if (canUseLocalStorage()) {
+    localStorage.removeItem(PENDING_REQUEST_TOKEN_KEY);
+  }
+  if (canUseSessionStorage()) {
+    sessionStorage.removeItem(PENDING_REQUEST_TOKEN_KEY);
+  }
+  clearCookie(PENDING_REQUEST_TOKEN_KEY);
+}
+
 export function consumeKiteRequestToken(): string | null {
   let token = '';
-  if (canUseSessionStorage()) {
+  if (canUseLocalStorage()) {
+    token = localStorage.getItem(PENDING_REQUEST_TOKEN_KEY)?.trim() ?? '';
+  }
+  if (!token && canUseSessionStorage()) {
     token = sessionStorage.getItem(PENDING_REQUEST_TOKEN_KEY)?.trim() ?? '';
-    sessionStorage.removeItem(PENDING_REQUEST_TOKEN_KEY);
   }
   if (!token) {
     token = readCookie(PENDING_REQUEST_TOKEN_KEY)?.trim() ?? '';
   }
-  clearCookie(PENDING_REQUEST_TOKEN_KEY);
+  clearPendingKiteRequestToken();
   return token || null;
 }
 
 export function peekKiteRequestToken(): string | null {
+  if (canUseLocalStorage()) {
+    const fromLocal = localStorage.getItem(PENDING_REQUEST_TOKEN_KEY)?.trim();
+    if (fromLocal) {
+      return fromLocal;
+    }
+  }
   if (canUseSessionStorage()) {
     const fromSession = sessionStorage.getItem(PENDING_REQUEST_TOKEN_KEY)?.trim();
     if (fromSession) {
@@ -119,6 +153,13 @@ export function captureKiteRequestTokenFromLocation(): string | null {
       stashKiteRequestToken(fromQuery);
       return fromQuery;
     }
+    const fromLocal = canUseLocalStorage()
+      ? localStorage.getItem(PENDING_REQUEST_TOKEN_KEY)?.trim() || null
+      : null;
+    if (fromLocal) {
+      stashKiteRequestToken(fromLocal);
+      return fromLocal;
+    }
     const fromCookie = readCookie(PENDING_REQUEST_TOKEN_KEY)?.trim() || null;
     if (fromCookie) {
       stashKiteRequestToken(fromCookie);
@@ -127,4 +168,24 @@ export function captureKiteRequestTokenFromLocation(): string | null {
   } catch {
     return null;
   }
+}
+
+export function getKiteBoundUsername(): string | null {
+  if (!canUseLocalStorage()) return null;
+  return localStorage.getItem(KITE_BOUND_USERNAME_KEY)?.trim() || null;
+}
+
+export function setKiteBoundUsername(username: string | null | undefined): void {
+  if (!canUseLocalStorage()) return;
+  const name = String(username || '').trim();
+  if (!name) {
+    localStorage.removeItem(KITE_BOUND_USERNAME_KEY);
+    return;
+  }
+  localStorage.setItem(KITE_BOUND_USERNAME_KEY, name);
+}
+
+export function clearKiteBoundUsername(): void {
+  if (!canUseLocalStorage()) return;
+  localStorage.removeItem(KITE_BOUND_USERNAME_KEY);
 }

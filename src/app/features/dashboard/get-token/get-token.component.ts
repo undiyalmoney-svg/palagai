@@ -16,7 +16,9 @@ import { KiteSessionService, KiteSession } from '../../../core/kite/kite-session
 import { AuthService } from '../../../core/auth/auth.service';
 import {
   captureKiteRequestTokenFromLocation,
+  clearPendingKiteRequestToken,
   consumeKiteRequestToken,
+  setKiteBoundUsername,
   stashKiteRequestToken,
 } from '../../../core/kite/kite-request-token.util';
 import { environment } from '../../../../environments/environment';
@@ -298,6 +300,14 @@ export class GetTokenComponent {
       return;
     }
 
+    // Fresh Kite login — drop pending request_token + old access token to avoid mix-ups.
+    clearPendingKiteRequestToken();
+    this.kiteSessionService.clearSession();
+    this.sessionSavedMessage.set('');
+    this.tokenExchangeResult.set('');
+    this.tokenExchangeError.set('');
+    this.autoExchangeNote.set('');
+
     const apiKey = sanitizeKiteCredential(this.step1Form.controls.apiKey.value);
     this.isRedirecting.set(true);
     window.location.href = `${KITE_LOGIN_URL}${encodeURIComponent(apiKey)}`;
@@ -375,6 +385,11 @@ export class GetTokenComponent {
     if (!saved) {
       this.manualTokenError.set('Could not save — check API key and access token.');
       return;
+    }
+
+    const siteUser = this.authService.currentUser();
+    if (siteUser?.username) {
+      setKiteBoundUsername(siteUser.username);
     }
 
     this.manualTokenMessage.set(
@@ -474,6 +489,10 @@ export class GetTokenComponent {
           }
           const saved = this.kiteSessionService.saveFromTokenResponse(response);
           if (saved) {
+            const siteUser = this.authService.currentUser();
+            if (siteUser?.username) {
+              setKiteBoundUsername(siteUser.username);
+            }
             const creds = this.kiteCredentialsService.getCredentials();
             const sessionApiKey =
               this.kiteSessionService.getSession()?.data.api_key?.trim() || '';

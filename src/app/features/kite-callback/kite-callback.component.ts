@@ -4,13 +4,15 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
 import {
   captureKiteRequestTokenFromLocation,
+  getKiteBoundUsername,
   peekKiteRequestToken,
   stashKiteRequestToken,
 } from '../../core/kite/kite-request-token.util';
 
 /**
  * Public Kite OAuth landing (no auth guard).
- * Stashes request_token, then sends the user to Get Token (if signed in) or Login.
+ * Stashes request_token, then → Get Token when a Palagai session/username
+ * is already in localStorage; only → Login when nobody is signed in.
  */
 @Component({
   selector: 'app-kite-callback',
@@ -59,15 +61,31 @@ export class KiteCallbackComponent implements OnInit {
     const pending = peekKiteRequestToken();
     if (!pending) {
       this.message = 'No Kite request_token found. Open Get Token and login to Kite again.';
-      void this.router.navigateByUrl('/dashboard/get-token');
+      void this.router.navigateByUrl(
+        this.hasPalagaiSession() ? '/dashboard/get-token' : '/login',
+      );
       return;
     }
 
     this.message = 'Kite code saved. Finishing…';
-    if (this.auth.isAuthenticated()) {
+
+    // Username / site session already in localStorage → skip login, go exchange on Get Token.
+    if (this.hasPalagaiSession()) {
       void this.router.navigateByUrl('/dashboard/get-token');
-    } else {
-      void this.router.navigateByUrl('/login');
+      return;
     }
+
+    this.message = 'Sign in to finish linking Kite…';
+    void this.router.navigateByUrl('/login');
+  }
+
+  /** True when Palagai login (or bound username + token) is already on this browser. */
+  private hasPalagaiSession(): boolean {
+    if (this.auth.ensureHydratedFromStorage()) {
+      return true;
+    }
+    // Bound username from a prior Get Token / login — only trust if site token still exists.
+    const bound = getKiteBoundUsername();
+    return !!(bound && this.auth.getToken());
   }
 }

@@ -11,6 +11,10 @@ import {
 } from './auth.constants';
 import { KiteSessionService } from '../kite/kite-session.service';
 import { KiteCredentialsService } from '../kite/kite-credentials.service';
+import {
+  getKiteBoundUsername,
+  setKiteBoundUsername,
+} from '../kite/kite-request-token.util';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
@@ -53,6 +57,19 @@ export class AuthService {
     return localStorage.getItem(AUTH_TOKEN_KEY);
   }
 
+  /**
+   * Re-read Palagai session from localStorage (needed after full-page Kite return / SSR).
+   * Returns true when a site session is present.
+   */
+  ensureHydratedFromStorage(): boolean {
+    if (!isPlatformBrowser(this.platformId)) return this.authenticated();
+    if (this.authenticated() && this.user()) {
+      return true;
+    }
+    this.hydrate();
+    return this.authenticated();
+  }
+
   getAdminToken(): string | null {
     if (!isPlatformBrowser(this.platformId)) return null;
     return localStorage.getItem(ADMIN_TOKEN_KEY);
@@ -76,6 +93,17 @@ export class AuthService {
       if (!res?.token || !res?.user) {
         return { ok: false, message: 'Login failed — empty response from auth API' };
       }
+      // Different Palagai username → drop prior Kite access token (avoid cross-account bleed).
+      const nextName = String(res.user.username || '').trim();
+      const prevName = getKiteBoundUsername();
+      if (
+        prevName &&
+        nextName &&
+        prevName.toLowerCase() !== nextName.toLowerCase()
+      ) {
+        this.kiteSession.clearAllSessions();
+      }
+      setKiteBoundUsername(nextName || null);
       // Switching account (Devil ↔ customer): drop previous in-memory kite before binding.
       this.kiteSession.detach();
       this.kiteCredentials.detach();
@@ -178,6 +206,8 @@ export class AuthService {
     }
     this.authenticated.set(false);
     this.user.set(null);
+    // Keep kite username + pending request_token so login can resume OAuth;
+    // only detach in-memory kite handles.
     this.kiteSession.detach();
     this.kiteCredentials.detach();
   }
@@ -279,6 +309,10 @@ export class AuthService {
     }
     this.authenticated.set(true);
     this.user.set(user);
+    const name = String(user.username || '').trim();
+    if (name) {
+      setKiteBoundUsername(name);
+    }
     this.bindKiteForUser(user);
   }
 

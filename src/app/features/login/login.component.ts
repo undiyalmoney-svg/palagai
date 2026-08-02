@@ -51,6 +51,7 @@ export class LoginComponent implements OnInit {
   ngOnInit(): void {
     // Kite redirect may land on /login after SSR auth bounce — resume Get Token.
     captureKiteRequestTokenFromLocation();
+    this.authService.ensureHydratedFromStorage();
     if (this.authService.isAuthenticated() && peekKiteRequestToken()) {
       void this.router.navigateByUrl('/dashboard/get-token');
     }
