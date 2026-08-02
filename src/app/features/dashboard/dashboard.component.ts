@@ -174,10 +174,18 @@ export class DashboardComponent implements OnInit, OnDestroy {
     const onGetToken = this.router.url.includes('/dashboard/get-token');
 
     // Soft refresh while finishing Kite OAuth — never wipe the pending request_token.
+    this.authService.ensureHydratedFromStorage();
     const ok = pendingKite
       ? await this.authService.refreshMe()
       : await this.authService.refreshMeStrict();
     if (!ok) {
+      // Mid-OAuth: never bounce to login — stay on / get to Get Token so exchange can finish.
+      if (pendingKite) {
+        if (!onGetToken) {
+          void this.router.navigateByUrl('/dashboard/get-token');
+        }
+        return;
+      }
       void this.router.navigateByUrl('/login');
       return;
     }

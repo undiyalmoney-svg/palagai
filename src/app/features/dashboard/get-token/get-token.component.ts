@@ -483,14 +483,19 @@ export class GetTokenComponent {
         next: (response) => {
           this.tokenExchangeResult.set(JSON.stringify(response, null, 2));
           const siteUser = this.authService.currentUser();
-          if (siteUser?.id) {
-            this.kiteCredentialsService.bindSiteUser(siteUser.id);
-            this.kiteSessionService.bindSiteUser(siteUser.id);
+          if (!siteUser?.id) {
+            this.tokenExchangeError.set(
+              'Kite OK, but Palagai user id is missing — cannot save access token. Sign in again.',
+            );
+            this.autoExchangeNote.set('');
+            this.isExchangingToken.set(false);
+            return;
           }
+          this.kiteCredentialsService.bindSiteUser(siteUser.id);
+          this.kiteSessionService.bindSiteUser(siteUser.id);
           const saved = this.kiteSessionService.saveFromTokenResponse(response);
           if (saved) {
-            const siteUser = this.authService.currentUser();
-            if (siteUser?.username) {
+            if (siteUser.username) {
               setKiteBoundUsername(siteUser.username);
             }
             const creds = this.kiteCredentialsService.getCredentials();
@@ -511,12 +516,12 @@ export class GetTokenComponent {
               this.isEditingCredentials.set(false);
             }
             this.sessionSavedMessage.set(
-              'Access token saved locally. Trade Desk / Historical Tester are ready.',
+              `Access token saved locally as palagai_kite_session:${siteUser.id}`,
             );
             this.autoExchangeNote.set('Kite login complete.');
           } else {
             this.tokenExchangeError.set(
-              'Kite responded but no access_token was found. Check the JSON below.',
+              'Kite responded but access token was not saved to localStorage. Check the JSON below, then try again.',
             );
             this.autoExchangeNote.set('');
           }

@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, afterNextRender, computed, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
@@ -27,7 +27,7 @@ import { firstDashboardPath } from '../../core/auth/auth.guard';
   templateUrl: './login.component.html',
   styleUrl: './login.component.css',
 })
-export class LoginComponent implements OnInit {
+export class LoginComponent {
   private readonly authService = inject(AuthService);
   private readonly router = inject(Router);
   private readonly formBuilder = inject(FormBuilder);
@@ -48,8 +48,14 @@ export class LoginComponent implements OnInit {
     password: ['', [Validators.required]],
   });
 
-  ngOnInit(): void {
-    // Kite redirect may land on /login after SSR auth bounce — resume Get Token.
+  constructor() {
+    // Browser-only: SSR ngOnInit cannot read localStorage / navigate reliably.
+    afterNextRender(() => {
+      this.resumeKiteIfPossible();
+    });
+  }
+
+  private resumeKiteIfPossible(): void {
     captureKiteRequestTokenFromLocation();
     this.authService.ensureHydratedFromStorage();
     if (this.authService.isAuthenticated() && peekKiteRequestToken()) {

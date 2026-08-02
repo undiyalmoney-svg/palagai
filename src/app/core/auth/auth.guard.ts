@@ -43,6 +43,14 @@ export const authGuard: CanActivateFn = (_route, state) => {
   if (authService.isAuthenticated()) {
     return true;
   }
+
+  // Pending Kite code in localStorage + site token → hydrate again and allow Get Token.
+  if (state.url.includes('/dashboard/get-token') && authService.getToken()) {
+    if (authService.ensureHydratedFromStorage()) {
+      return true;
+    }
+  }
+
   return router.createUrlTree(['/login']);
 };
 

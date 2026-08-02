@@ -93,10 +93,14 @@ export class KiteSessionService {
     if (parsed?.status !== 'success' || !parsed.data?.access_token || !parsed.data?.api_key) {
       return false;
     }
+    if (!this.activeSiteUserId) {
+      // Cannot persist without a Palagai user scope (Devil or customer).
+      return false;
+    }
     const session: KiteSession = {
       data: parsed.data,
       savedAt: new Date().toISOString(),
-      siteUserId: this.activeSiteUserId || undefined,
+      siteUserId: this.activeSiteUserId,
     };
     this.persist(session);
     this.session.set(session);
@@ -114,6 +118,9 @@ export class KiteSessionService {
     if (!apiKey || !accessToken) {
       return false;
     }
+    if (!this.activeSiteUserId) {
+      return false;
+    }
     const session: KiteSession = {
       data: {
         user_id: params.userId?.trim() || 'manual',
@@ -122,7 +129,7 @@ export class KiteSessionService {
         login_time: new Date().toISOString(),
       },
       savedAt: new Date().toISOString(),
-      siteUserId: this.activeSiteUserId || undefined,
+      siteUserId: this.activeSiteUserId,
     };
     this.persist(session);
     this.session.set(session);
