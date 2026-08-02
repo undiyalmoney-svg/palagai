@@ -62,6 +62,7 @@ export class GetTokenComponent implements OnInit {
   protected readonly hasStoredCredentials = signal(false);
   protected readonly hideApiSecret = signal(true);
   protected readonly credentialsSaveMessage = signal('');
+  protected readonly credentialsSaveOk = signal(true);
   protected readonly checksumResult = signal('');
   protected readonly tokenExchangeResult = signal('');
   protected readonly tokenExchangeError = signal('');
@@ -87,8 +88,8 @@ export class GetTokenComponent implements OnInit {
     {
       id: 'redirect-local',
       label: 'Redirect URL (local)',
-      value: 'http://localhost:4200/',
-      hint: 'Local ng serve redirect for Kite login',
+      value: 'http://localhost:4200/dashboard/get-token',
+      hint: 'Must match Kite app Redirect URL — do NOT use bare localhost:4200/',
     },
     {
       id: 'page-url',
@@ -152,15 +153,22 @@ export class GetTokenComponent implements OnInit {
 
   constructor() {
     afterNextRender(() => {
-      const stored = this.kiteCredentialsService.getCredentials();
+      // Re-read after hydration — SSR always starts with null credentials.
+      const stored = this.kiteCredentialsService.reloadFromStorage();
+      this.applyStoredCredentialsToUi(stored);
       void this.bootstrapFromKiteRedirect(stored?.apiKey, stored?.apiSecret);
     });
   }
 
   ngOnInit(): void {
-    const stored = this.kiteCredentialsService.getCredentials();
-    this.hasStoredCredentials.set(stored !== null);
+    const stored = isPlatformBrowser(this.platformId)
+      ? this.kiteCredentialsService.reloadFromStorage()
+      : this.kiteCredentialsService.getCredentials();
+    this.applyStoredCredentialsToUi(stored);
+  }
 
+  private applyStoredCredentialsToUi(stored: { apiKey: string; apiSecret: string } | null): void {
+    this.hasStoredCredentials.set(stored !== null);
     if (stored) {
       this.credentialsForm.patchValue(stored);
       this.prefillStepForms(stored.apiKey, stored.apiSecret);
@@ -190,6 +198,7 @@ export class GetTokenComponent implements OnInit {
   protected onEditCredentials(): void {
     this.isEditingCredentials.set(true);
     this.credentialsSaveMessage.set('');
+    this.credentialsSaveOk.set(true);
     this.setCredentialsFormEditable(true);
   }
 
@@ -215,14 +224,28 @@ export class GetTokenComponent implements OnInit {
     this.isSavingCredentials.set(true);
     this.credentialsSaveMessage.set('');
 
-    this.kiteCredentialsService.saveCredentials({ apiKey, apiSecret });
-    this.hasStoredCredentials.set(true);
-    this.prefillStepForms(apiKey.trim(), apiSecret.trim());
-    this.manualTokenForm.patchValue({ apiKey: apiKey.trim() });
-    this.isEditingCredentials.set(false);
-    this.setCredentialsFormEditable(false);
-    this.credentialsSaveMessage.set('API credentials saved locally.');
-    this.isSavingCredentials.set(false);
+    try {
+      this.kiteCredentialsService.saveCredentials({ apiKey, apiSecret });
+      const verified = this.kiteCredentialsService.reloadFromStorage();
+      if (!verified) {
+        throw new Error('Saved credentials could not be re-read from storage.');
+      }
+      this.applyStoredCredentialsToUi(verified);
+      this.credentialsSaveOk.set(true);
+      this.credentialsSaveMessage.set(
+        `API credentials saved · key ${maskKey(verified.apiKey)} (reloaded OK).`,
+      );
+    } catch (err) {
+      this.hasStoredCredentials.set(false);
+      this.isEditingCredentials.set(true);
+      this.setCredentialsFormEditable(true);
+      this.credentialsSaveOk.set(false);
+      this.credentialsSaveMessage.set(
+        err instanceof Error ? err.message : 'Could not save API credentials.',
+      );
+    } finally {
+      this.isSavingCredentials.set(false);
+    }
   }
 
   protected onRedirect(): void {
@@ -334,6 +357,11 @@ export class GetTokenComponent implements OnInit {
       return;
     }
 
+    // Prefer freshly reloaded storage over constructor args (SSR may have been null).
+    const stored = this.kiteCredentialsService.reloadFromStorage();
+    const key = sanitizeKiteCredential(apiKey ?? stored?.apiKey ?? '');
+    const secret = sanitizeKiteCredential(apiSecret ?? stored?.apiSecret ?? '');
+
     this.step2Form.patchValue({ requestToken });
     this.step3Form.patchValue({ requestToken });
     this.autoExchangeNote.set(
@@ -346,13 +374,13 @@ export class GetTokenComponent implements OnInit {
       replaceUrl: true,
     });
 
-    const key = sanitizeKiteCredential(apiKey ?? '');
-    const secret = sanitizeKiteCredential(apiSecret ?? '');
     if (!key || !secret) {
       this.tokenExchangeError.set(
         'Request token captured, but API Key/Secret are not saved yet. Save credentials above, then generate checksum and exchange.',
       );
       this.autoExchangeNote.set('');
+      this.isEditingCredentials.set(true);
+      this.setCredentialsFormEditable(true);
       return;
     }
 
@@ -439,10 +467,11 @@ export class GetTokenComponent implements OnInit {
   }
 
   private setCredentialsFormEditable(editable: boolean): void {
-    if (editable) {
-      this.credentialsForm.enable({ emitEvent: false });
-    } else {
-      this.credentialsForm.disable({ emitEvent: false });
+    // Use enable/disable carefully: disabled password fields often render blank
+    // in browsers, so keep controls enabled and gate edits via readonly in the template.
+    this.credentialsForm.enable({ emitEvent: false });
+    if (!editable) {
+      // no-op — template binds [readonly]="!isEditingCredentials()"
     }
   }
 
@@ -463,4 +492,12 @@ export class GetTokenComponent implements OnInit {
     }
     return sessionDate.toDateString() === new Date().toDateString();
   }
+}
+
+function maskKey(apiKey: string): string {
+  const key = apiKey.trim();
+  if (key.length <= 8) {
+    return '••••';
+  }
+  return `${key.slice(0, 4)}…${key.slice(-4)}`;
 }

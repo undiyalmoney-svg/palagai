@@ -23,18 +23,32 @@ export class KiteCredentialsService {
     return this.credentials();
   }
 
+  /** Re-read localStorage (call after hydration / on Get Token open). */
+  reloadFromStorage(): KiteCredentials | null {
+    const stored = this.readFromStorage();
+    this.credentials.set(stored);
+    return stored;
+  }
+
   saveCredentials(credentials: KiteCredentials): void {
     const trimmed: KiteCredentials = {
-      apiKey: credentials.apiKey.replace(/^\uFEFF/, '').replace(/[\u200B-\u200D\uFEFF]/g, '').trim(),
-      apiSecret: credentials.apiSecret.replace(/^\uFEFF/, '').replace(/[\u200B-\u200D\uFEFF]/g, '').trim(),
+      apiKey: sanitizeCredential(credentials.apiKey),
+      apiSecret: sanitizeCredential(credentials.apiSecret),
     };
+    if (!trimmed.apiKey || !trimmed.apiSecret) {
+      throw new Error('API Key and API Secret are both required.');
+    }
     this.persistToStorage(trimmed);
     this.credentials.set(trimmed);
   }
 
   clearCredentials(): void {
     if (isPlatformBrowser(this.platformId)) {
-      localStorage.removeItem(STORAGE_KEY);
+      try {
+        localStorage.removeItem(STORAGE_KEY);
+      } catch {
+        // ignore
+      }
     }
     this.credentials.set(null);
   }
@@ -51,14 +65,13 @@ export class KiteCredentialsService {
       }
 
       const parsed = JSON.parse(raw) as Partial<KiteCredentials>;
-      if (!parsed.apiKey?.trim() || !parsed.apiSecret?.trim()) {
+      const apiKey = sanitizeCredential(parsed.apiKey ?? '');
+      const apiSecret = sanitizeCredential(parsed.apiSecret ?? '');
+      if (!apiKey || !apiSecret) {
         return null;
       }
 
-      return {
-        apiKey: parsed.apiKey.trim(),
-        apiSecret: parsed.apiSecret.trim(),
-      };
+      return { apiKey, apiSecret };
     } catch {
       return null;
     }
@@ -69,6 +82,30 @@ export class KiteCredentialsService {
       return;
     }
 
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(credentials));
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(credentials));
+      // Verify round-trip so silent quota / private-mode failures surface.
+      const verify = localStorage.getItem(STORAGE_KEY);
+      if (!verify) {
+        throw new Error('localStorage write did not stick');
+      }
+      const parsed = JSON.parse(verify) as Partial<KiteCredentials>;
+      if (
+        sanitizeCredential(parsed.apiKey ?? '') !== credentials.apiKey ||
+        sanitizeCredential(parsed.apiSecret ?? '') !== credentials.apiSecret
+      ) {
+        throw new Error('localStorage verify mismatch');
+      }
+    } catch (err) {
+      const message =
+        err instanceof Error && /quota|storage/i.test(err.message)
+          ? 'Browser storage is full — clear Instruments cache in Settings, then save API credentials again.'
+          : 'Could not save API credentials to browser storage. Check private mode / site data permissions.';
+      throw new Error(message);
+    }
   }
+}
+
+function sanitizeCredential(value: string): string {
+  return value.replace(/^\uFEFF/, '').replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
 }

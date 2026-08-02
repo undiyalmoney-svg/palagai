@@ -111,16 +111,23 @@
       </div>
       <p class="step-description">
         @if (hasStoredCredentials() && !isEditingCredentials()) {
-          Credentials are stored in your browser. Click Edit to update them.
+          Credentials are stored in this browser (localStorage). Click Edit to update them. Use eye
+          icon to reveal Secret.
         } @else {
           Enter and save your API Key and API Secret. They will be prefilled in the steps below.
+          Save <strong>before</strong> Kite Login so redirect can auto-exchange.
         }
       </p>
 
       <form class="step-form" [formGroup]="credentialsForm" (ngSubmit)="onSaveCredentials()">
         <mat-form-field appearance="outline" class="full-width">
           <mat-label>API Key</mat-label>
-          <input matInput formControlName="apiKey" autocomplete="off" />
+          <input
+            matInput
+            formControlName="apiKey"
+            autocomplete="off"
+            [readonly]="!isEditingCredentials()"
+          />
           @if (
             credentialsForm.controls.apiKey.touched &&
             credentialsForm.controls.apiKey.hasError('required')
@@ -136,6 +143,7 @@
             formControlName="apiSecret"
             [type]="hideApiSecret() ? 'password' : 'text'"
             autocomplete="off"
+            [readonly]="!isEditingCredentials()"
           />
           <button
             mat-icon-button
@@ -182,7 +190,11 @@
       </form>
 
       @if (credentialsSaveMessage()) {
-        <div class="result-block success inline-message">
+        <div
+          class="result-block inline-message"
+          [class.success]="credentialsSaveOk()"
+          [class.error]="!credentialsSaveOk()"
+        >
           <span>{{ credentialsSaveMessage() }}</span>
         </div>
       }

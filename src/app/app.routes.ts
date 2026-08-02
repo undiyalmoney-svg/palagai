@@ -18,8 +18,9 @@ export const routes: Routes = [
     redirectTo: ({ queryParams }) => {
       const requestToken = queryParams['request_token'];
       if (typeof requestToken === 'string' && requestToken.trim()) {
+        // Keep token on the URL — sessionStorage stash is a no-op during SSR.
         stashKiteRequestToken(requestToken);
-        return '/dashboard/get-token';
+        return `/dashboard/get-token?request_token=${encodeURIComponent(requestToken.trim())}`;
       }
       return '/login';
     },

@@ -38,6 +38,16 @@ export const guestGuard: CanActivateFn = (route) => {
   const router = inject(Router);
   stashTokenFromRoute(route);
 
+  // Bad Kite redirect_uri / prerender bounce often lands on /login?request_token=…
+  // Send straight to Get Token (authGuard allows this path without app login).
+  const queryToken = route.queryParamMap.get('request_token')?.trim();
+  if (queryToken) {
+    stashKiteRequestToken(queryToken);
+    return router.createUrlTree(['/dashboard/get-token'], {
+      queryParams: { request_token: queryToken },
+    });
+  }
+
   if (!authService.isAuthenticated()) {
     return true;
   }
