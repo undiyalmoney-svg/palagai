@@ -1,6 +1,26 @@
 {
   "version": 2,
   "buildCommand": "npm run build",
+  "redirects": [
+    {
+      "source": "/",
+      "has": [{ "type": "query", "key": "request_token" }],
+      "destination": "/kite-callback",
+      "permanent": false
+    },
+    {
+      "source": "/dashboard/get-token",
+      "has": [{ "type": "query", "key": "request_token" }],
+      "destination": "/kite-callback",
+      "permanent": false
+    },
+    {
+      "source": "/dashboard/:path*",
+      "has": [{ "type": "query", "key": "request_token" }],
+      "destination": "/kite-callback",
+      "permanent": false
+    }
+  ],
   "rewrites": [
     { "source": "/", "destination": "/api" },
     { "source": "/(.*)", "destination": "/api" }
