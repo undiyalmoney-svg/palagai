@@ -1,12 +1,12 @@
 import { Component, OnInit, PLATFORM_ID, inject } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
-import { AuthService } from '../../../core/auth/auth.service';
+import { AuthService } from '../../core/auth/auth.service';
 import {
   captureKiteRequestTokenFromLocation,
   peekKiteRequestToken,
   stashKiteRequestToken,
-} from '../../../core/kite/kite-request-token.util';
+} from '../../core/kite/kite-request-token.util';
 
 /**
  * Public Kite OAuth landing (no auth guard).
