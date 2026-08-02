@@ -176,10 +176,8 @@ export class AdminPageComponent implements OnInit {
         password: u.password,
         modules: u.modules,
         note: u.note,
+        kiteApiKey: String(u.kiteApiKey || '').trim(),
       };
-      if (u.role !== 'owner') {
-        body['kiteApiKey'] = u.kiteApiKey;
-      }
       await firstValueFrom(this.http.patch(`/api/auth/admin/users/${u.id}`, body));
       await this.reload(`Saved ${name}`);
     } catch (err: unknown) {

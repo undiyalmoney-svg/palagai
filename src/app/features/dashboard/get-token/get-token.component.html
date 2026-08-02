@@ -66,7 +66,13 @@
         <span class="step-badge">Admin</span>
         <h3>Your API Key</h3>
       </div>
-      <p class="step-description">Assigned by Admin — use this on Get Token steps below.</p>
+      <p class="step-description">
+        @if (isOwner()) {
+          Saved in Admin for Devil — used on Get Token steps below.
+        } @else {
+          Assigned by Admin — use this on Get Token steps below.
+        }
+      </p>
       <div class="result-block session-field">
         <span class="result-label">API Key</span>
         <pre class="result-output">{{ assignedApiKey() }}</pre>

@@ -149,16 +149,13 @@
                 </div>
               </td>
               <td data-label="Kite API Key">
-                @if (u.role === 'owner') {
-                  <span class="muted">Local Get Token</span>
-                } @else {
-                  <input
-                    class="field mono"
-                    [(ngModel)]="u.kiteApiKey"
-                    [disabled]="busy()"
-                    autocomplete="off"
-                  />
-                }
+                <input
+                  class="field mono"
+                  [(ngModel)]="u.kiteApiKey"
+                  [disabled]="busy()"
+                  autocomplete="off"
+                  [attr.placeholder]="u.role === 'owner' ? 'Devil Kite API key' : 'Customer Kite API key'"
+                />
               </td>
               <td data-label="Note">
                 <input class="field" [(ngModel)]="u.note" [disabled]="busy()" />

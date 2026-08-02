@@ -197,8 +197,7 @@ export class GetTokenComponent {
       this.kiteSessionService.bindSiteUser(u.id);
     }
 
-    const fromAdmin =
-      u?.role !== 'owner' ? String(u?.kiteApiKey || '').trim() : '';
+    const fromAdmin = String(u?.kiteApiKey || '').trim();
     this.assignedApiKey.set(fromAdmin);
 
     if (u?.role === 'owner') {
