@@ -283,14 +283,28 @@ export class GetTokenComponent {
     this.isSavingCredentials.set(true);
     this.credentialsSaveMessage.set('');
 
-    this.kiteCredentialsService.saveCredentials({ apiKey, apiSecret });
-    this.hasStoredCredentials.set(true);
-    this.prefillStepForms(apiKey.trim(), apiSecret.trim());
-    this.manualTokenForm.patchValue({ apiKey: apiKey.trim() });
-    this.isEditingCredentials.set(false);
-    this.setCredentialsFormEditable(false);
-    this.credentialsSaveMessage.set('API credentials saved locally.');
-    this.isSavingCredentials.set(false);
+    try {
+      const u = this.authService.currentUser();
+      if (u?.id) {
+        this.kiteCredentialsService.bindSiteUser(u.id);
+      }
+      this.kiteCredentialsService.saveCredentials({ apiKey, apiSecret });
+      this.hasStoredCredentials.set(true);
+      this.prefillStepForms(apiKey.trim(), apiSecret.trim());
+      this.manualTokenForm.patchValue({ apiKey: apiKey.trim() });
+      this.isEditingCredentials.set(false);
+      this.setCredentialsFormEditable(false);
+      this.credentialsSaveMessage.set('API credentials saved locally for this Palagai user.');
+    } catch (err) {
+      this.hasStoredCredentials.set(false);
+      this.isEditingCredentials.set(true);
+      this.setCredentialsFormEditable(true);
+      this.credentialsSaveMessage.set(
+        err instanceof Error ? err.message : 'Could not save API credentials.',
+      );
+    } finally {
+      this.isSavingCredentials.set(false);
+    }
   }
 
   protected onRedirect(): void {

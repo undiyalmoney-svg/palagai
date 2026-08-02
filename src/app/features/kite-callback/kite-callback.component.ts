@@ -73,10 +73,10 @@ export class KiteCallbackComponent {
       return;
     }
 
-    // Keep request_token in the URL so Get Token guards/SSR cannot miss it.
+    // Token is already in sessionStorage. Do NOT put request_token back on the
+    // Get Token URL — Vercel edge redirects ?request_token= → /kite-callback and
+    // can bounce the flow (or look like a login loop).
     this.message = 'Kite code saved. Opening Get Token…';
-    void this.router.navigateByUrl(
-      `/dashboard/get-token?request_token=${encodeURIComponent(pending)}`,
-    );
+    void this.router.navigateByUrl('/dashboard/get-token');
   }
 }

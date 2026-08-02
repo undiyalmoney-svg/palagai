@@ -102,11 +102,21 @@ export const authGuard: CanActivateFn = (route, state) => {
   return router.createUrlTree(['/login']);
 };
 
-export const guestGuard: CanActivateFn = () => {
+export const guestGuard: CanActivateFn = (route) => {
   const auth = inject(AuthService);
   const router = inject(Router);
   auth.ensureHydratedFromStorage();
-  // If Devil is signed in and Kite just returned, don't trap on login.
+
+  // Bad redirect / edge bounce sometimes lands on /login?request_token=…
+  const queryToken = route.queryParamMap.get('request_token')?.trim();
+  if (queryToken) {
+    stashKiteRequestToken(queryToken);
+    return router.parseUrl(
+      `/kite-callback?request_token=${encodeURIComponent(queryToken)}`,
+    );
+  }
+
+  // If Devil/customer is signed in and Kite just returned, don't trap on login.
   if (
     (auth.isAuthenticated() || !!auth.getToken()) &&
     (hasPendingKiteOAuth() || !!peekKiteRequestToken())

@@ -160,12 +160,16 @@ export class AdminPageComponent implements OnInit {
   }
 
   protected async saveUser(u: SiteUser): Promise<void> {
-    if (u.role !== 'owner' && !String(u.kiteApiKey || '').trim()) {
+    const kiteKey = String(u.kiteApiKey || '').trim();
+    if (u.role !== 'owner' && !kiteKey) {
       this.flash('Kite API key required for customers', true);
       return;
     }
-    if (!String(u.password || '').trim() || String(u.password).trim().length < 6) {
-      this.flash('Password min 6 chars', true);
+    // Password is optional on edit — list API often returns empty password.
+    // Only send a new password when Admin typed one (min 6).
+    const newPassword = String(u.password || '').trim();
+    if (newPassword && newPassword.length < 6) {
+      this.flash('New password must be at least 6 characters (or leave blank to keep)', true);
       return;
     }
     const name = u.username;
@@ -173,13 +177,32 @@ export class AdminPageComponent implements OnInit {
     try {
       const body: Record<string, unknown> = {
         username: u.username,
-        password: u.password,
         modules: u.modules,
-        note: u.note,
-        kiteApiKey: String(u.kiteApiKey || '').trim(),
+        note: u.note ?? '',
+        kiteApiKey: kiteKey,
       };
-      await firstValueFrom(this.http.patch(`/api/auth/admin/users/${u.id}`, body));
-      await this.reload(`Saved ${name}`);
+      if (newPassword) {
+        body['password'] = newPassword;
+      }
+      const res = await firstValueFrom(
+        this.http.patch<{ user?: SiteUser; message?: string }>(
+          `/api/auth/admin/users/${u.id}`,
+          body,
+        ),
+      );
+      await this.reload();
+      const after = this.users().find((x) => x.id === u.id);
+      const savedKey = String(after?.kiteApiKey || res?.user?.kiteApiKey || '').trim();
+      if (kiteKey && savedKey !== kiteKey) {
+        this.flash(
+          `Saved ${name}, but Kite API key did not reload from server — check Order-API /auth`,
+          true,
+        );
+      } else if (kiteKey) {
+        this.flash(`Saved ${name} · Kite key ${maskKey(kiteKey)}`, false);
+      } else {
+        this.flash(`Saved ${name}`, false);
+      }
     } catch (err: unknown) {
       const e = err as { error?: { message?: string } };
       this.flash(e?.error?.message || 'Save failed', true);
@@ -233,4 +256,12 @@ export class AdminPageComponent implements OnInit {
       this.busy.set(false);
     }
   }
+}
+
+function maskKey(apiKey: string): string {
+  const key = apiKey.trim();
+  if (key.length <= 8) {
+    return '••••';
+  }
+  return `${key.slice(0, 4)}…${key.slice(-4)}`;
 }

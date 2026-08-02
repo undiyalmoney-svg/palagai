@@ -57,7 +57,12 @@ export class KiteCredentialsService {
         .trim(),
       siteUserId: this.activeSiteUserId || undefined,
     };
-    if (!this.activeSiteUserId) return;
+    if (!trimmed.apiKey || !trimmed.apiSecret) {
+      throw new Error('API Key and API Secret are both required.');
+    }
+    if (!this.activeSiteUserId) {
+      throw new Error('Sign in to Palagai first — API credentials are saved per user.');
+    }
     this.persistToKey(this.keyFor(this.activeSiteUserId), trimmed);
     this.purgeLegacy();
     this.credentials.set(trimmed);

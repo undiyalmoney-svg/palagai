@@ -9,6 +9,12 @@
       "permanent": false
     },
     {
+      "source": "/login",
+      "has": [{ "type": "query", "key": "request_token" }],
+      "destination": "/kite-callback",
+      "permanent": false
+    },
+    {
       "source": "/dashboard/get-token",
       "has": [{ "type": "query", "key": "request_token" }],
       "destination": "/kite-callback",
