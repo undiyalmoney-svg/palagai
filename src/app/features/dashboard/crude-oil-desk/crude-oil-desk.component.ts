@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, Input, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -16,7 +16,7 @@ import {
 import { KiteSessionService } from '../../../core/kite/kite-session.service';
 import { LotsPreferenceService } from '../../../core/services/lots-preference.service';
 import { MCX_CRUDE_SESSION } from '../../../core/config/session.config';
-import { CRUDE_RUPEES_PER_POINT } from '../../../core/strategy-engine/strategies/crude-pdhl-evening/crude-pdhl-evening.evaluator';
+import { McxMiniAssetId, mcxMiniAsset } from '../../../core/config/mcx-mini-asset';
 import {
   CRUDE_STRATEGY_PROFILES,
   CrudeStrategyProfileId,
@@ -32,13 +32,30 @@ import { UiDialogService } from '../../../shared/ui/dialog/ui-dialog.service';
   imports: [FormsModule, DecimalPipe, MatButtonModule, MatProgressSpinnerModule],
   templateUrl: './crude-oil-desk.component.html',
   styleUrl: './crude-oil-desk.component.css',
+  /** Own paper desk instance so Crude + Nat Gas tabs don't share snapshot. */
+  providers: [CrudePaperDeskService],
 })
 export class CrudeOilDeskComponent implements OnInit, OnDestroy {
+  /** Experiments book: crude (default) or natgas. */
+  @Input()
+  set miniAsset(v: McxMiniAssetId) {
+    const next: McxMiniAssetId = v === 'natgas' ? 'natgas' : 'crude';
+    this.miniAssetSig.set(next);
+    this.desk.setMiniAsset(next);
+  }
+  get miniAsset(): McxMiniAssetId {
+    return this.miniAssetSig();
+  }
+  /** Hide outer hero when nested under Experiments shell. */
+  @Input() embedded = false;
+
   private readonly desk = inject(CrudePaperDeskService);
   private readonly deskExport = inject(PaperDeskExportService);
   private readonly kiteSession = inject(KiteSessionService);
   private readonly lotsPreference = inject(LotsPreferenceService);
   private readonly uiDialog = inject(UiDialogService);
+
+  private readonly miniAssetSig = signal<McxMiniAssetId>('crude');
 
   protected readonly session = MCX_CRUDE_SESSION;
   protected readonly mode = signal<PaperDeskMode>('testing');
@@ -75,6 +92,9 @@ export class CrudeOilDeskComponent implements OnInit, OnDestroy {
   protected readonly busy = this.desk.busy;
   protected readonly error = signal('');
 
+  protected readonly asset = computed(() => mcxMiniAsset(this.miniAssetSig()));
+  protected readonly rsPerPoint = computed(() => this.asset().rupeesPerPoint || 10);
+
   protected activeProfile() {
     return resolveCrudeStrategyProfile(this.strategyProfile);
   }
@@ -94,12 +114,13 @@ export class CrudeOilDeskComponent implements OnInit, OnDestroy {
       snap.trades,
       this.weekdayOn(),
       snap.totals.lotsUsed || this.lots,
-      CRUDE_RUPEES_PER_POINT,
+      this.rsPerPoint(),
     );
     return { ...view, filtered: true };
   });
 
   ngOnInit(): void {
+    this.desk.setMiniAsset(this.miniAssetSig());
     this.lots = this.lotsPreference.get();
   }
 
@@ -111,12 +132,13 @@ export class CrudeOilDeskComponent implements OnInit, OnDestroy {
 
   protected profileSlTpLabel(): string {
     const p = this.activeProfile();
+    const rs = this.rsPerPoint();
     if (p.entryMode === 'trap-confirm') {
-      return `Trap+confirm ${p.targetRMultiple}R · day −₹${p.dayLossStopPts * CRUDE_RUPEES_PER_POINT}`;
+      return `Trap+confirm ${p.targetRMultiple}R · day −₹${p.dayLossStopPts * rs}`;
     }
     const conf = p.requireConfirm ? ' +confirm' : '';
     if (p.entryMode === 'session-or') {
-      return `Session OR${conf} ${p.eveningEntryStart}–${p.eveningEntryEnd} · OR ${p.sessionOrStart}–${p.sessionOrEnd} · SL₹${p.stopPts * CRUDE_RUPEES_PER_POINT} · trail ₹${p.profitLockArmRs}→₹${p.profitLockLockRs}`;
+      return `Session OR${conf} ${p.eveningEntryStart}–${p.eveningEntryEnd} · OR ${p.sessionOrStart}–${p.sessionOrEnd} · SL₹${p.stopPts * rs} · trail ₹${p.profitLockArmRs}→₹${p.profitLockLockRs}`;
     }
     if (p.profileId === 'daily-profit') {
       return `Evening PDHL${conf} ${p.eveningEntryStart}–${p.eveningEntryEnd} · SL${p.stopPts}/TP${p.eveningTargetPts}`;
@@ -132,17 +154,17 @@ export class CrudeOilDeskComponent implements OnInit, OnDestroy {
 
   protected profileRiskTitle(): string {
     const p = this.activeProfile();
-    const rs = CRUDE_RUPEES_PER_POINT;
+    const rs = this.rsPerPoint();
     const lock =
       p.dayProfitLockPts > 0
         ? ` Day profit lock +₹${p.dayProfitLockPts * rs} (${p.dayProfitLockPts}pts × ₹${rs}).`
         : '';
-    return `CRUDEOILM ₹${rs}/pt · 1 lot. Off: day stop −₹${p.dayLossStopPts * rs} (${p.dayLossStopPts}pts). On: stricter −₹${p.strictDayLossPts * rs} (${p.strictDayLossPts}pts).${lock}`;
+    return `${this.asset().futPrefix} ₹${rs}/pt · 1 lot. Off: day stop −₹${p.dayLossStopPts * rs} (${p.dayLossStopPts}pts). On: stricter −₹${p.strictDayLossPts * rs} (${p.strictDayLossPts}pts).${lock}`;
   }
 
   protected strictDayStopLabel(): string {
     const p = this.activeProfile();
-    const rs = CRUDE_RUPEES_PER_POINT;
+    const rs = this.rsPerPoint();
     return `Strict day stop (−₹${p.strictDayLossPts * rs})`;
   }
 
@@ -214,14 +236,14 @@ export class CrudeOilDeskComponent implements OnInit, OnDestroy {
         if (this.realOrders) {
           const lockNote =
             profile.dayProfitLockPts > 0
-              ? `\nDay profit lock +₹${profile.dayProfitLockPts * CRUDE_RUPEES_PER_POINT}.`
+              ? `\nDay profit lock +₹${profile.dayProfitLockPts * this.rsPerPoint()}.`
               : '';
           const risk = this.strictDayStop
-            ? `\nStrict day stop −₹${profile.strictDayLossPts * CRUDE_RUPEES_PER_POINT} enabled.`
-            : `\nDay stop −₹${profile.dayLossStopPts * CRUDE_RUPEES_PER_POINT}.`;
+            ? `\nStrict day stop −₹${profile.strictDayLossPts * this.rsPerPoint()} enabled.`
+            : `\nDay stop −₹${profile.dayLossStopPts * this.rsPerPoint()}.`;
           const ok = await this.uiDialog.confirm({
             title: 'Start live money on Crude Oil Mini?',
-            message: `Profile: ${profile.label}\nReal Kite MCX MIS MARKET orders will be placed on ATM CRUDEOILM options (${lots} lot each) when signals fire.${risk}${lockNote}\n\nOrders go via DigitalOcean fixed IP.`,
+            message: `Profile: ${profile.label}\nReal Kite MCX MIS MARKET orders will be placed on ATM ${this.asset().futPrefix} options (${lots} lot each) when signals fire.${risk}${lockNote}\n\nOrders go via DigitalOcean fixed IP.`,
             confirmLabel: 'Start live',
             cancelLabel: 'Cancel',
             tone: 'danger',
@@ -348,7 +370,7 @@ export class CrudeOilDeskComponent implements OnInit, OnDestroy {
       },
       {
         title: 'Crude Oil Desk Results',
-        subtitle: `CRUDEOILM ${p.label} · ${[
+        subtitle: `${this.asset().futPrefix} ${p.label} · ${[
           this.enableMorning ? 'morning 10:00–12:00' : null,
           this.enableEvening ? 'evening 18:30–20:30' : null,
         ]

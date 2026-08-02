@@ -1,11 +1,11 @@
-import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
+import { Component, Input, OnDestroy, OnInit, inject, signal } from '@angular/core';
 import { DecimalPipe, PercentPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { StocksPaperDeskService } from '../../../core/paper-desk/stocks-paper-desk.service';
 import { StocksWatchlistService } from '../../../core/services/stocks-watchlist.service';
-import { StocksMoversService } from '../../../core/services/stocks-movers.service';
+import { StocksMoversService, STOCKS_SCAN_UNIVERSE } from '../../../core/services/stocks-movers.service';
 import { InstrumentStoreService } from '../../../core/services/instrument-store.service';
 import { KiteSessionService } from '../../../core/kite/kite-session.service';
 import { KiteApiService } from '../../../core/kite/kite-api.service';
@@ -32,6 +32,10 @@ const DESK_STRATEGY_KEY = 'palagai_stocks_desk_strategy_v1';
   styleUrl: './stocks-desk.component.css',
 })
 export class StocksDeskComponent implements OnInit, OnDestroy {
+  @Input() embedded = false;
+  /** Experiments: expose Top 50 seed + DNA lab copy. */
+  @Input() experimentsMode = false;
+
   private readonly desk = inject(StocksPaperDeskService);
   private readonly watch = inject(StocksWatchlistService);
   private readonly moversSvc = inject(StocksMoversService);
@@ -52,6 +56,8 @@ export class StocksDeskComponent implements OnInit, OnDestroy {
   protected readonly error = signal('');
   protected readonly resolveHint = signal('');
   protected readonly moversBusy = signal(false);
+  protected readonly top50Busy = signal(false);
+  protected readonly top50Hint = signal('');
 
   protected readonly snapshot = this.desk.snapshot;
   protected readonly busy = this.desk.busy;
@@ -61,6 +67,7 @@ export class StocksDeskComponent implements OnInit, OnDestroy {
   protected readonly capitalRs = STOCKS_CAPITAL_RS;
   protected readonly dayLossRs = STOCKS_DAY_LOSS_RS;
   protected readonly maxLegsCap = STOCKS_MAX_LEGS;
+  protected readonly top50Count = STOCKS_SCAN_UNIVERSE.length;
 
   async ngOnInit(): Promise<void> {
     try {
@@ -83,6 +90,53 @@ export class StocksDeskComponent implements OnInit, OnDestroy {
     this.strategyId = 'GAP_FADE_500';
     persistDeskStrategy(this.strategyId);
     this.resolveHint.set('Restored treasure watchlist · strategy GAP_FADE_500.');
+  }
+
+  /** Seed watchlist with liquid Nifty-ish Top 50 for Experiments DNA hunts. */
+  protected async loadTop50(): Promise<void> {
+    this.top50Busy.set(true);
+    this.top50Hint.set('');
+    this.error.set('');
+    try {
+      await this.instruments.refreshBestEffort(true);
+      const seeded: Array<{
+        symbol: string;
+        name: string;
+        instrumentToken: number;
+        strategyId?: string;
+      }> = [];
+      let missed = 0;
+      for (const sym of STOCKS_SCAN_UNIVERSE) {
+        const hit = this.instruments.findNseEquityExact(sym);
+        if (!hit?.instrumentToken) {
+          missed += 1;
+          continue;
+        }
+        seeded.push({
+          symbol: hit.tradingSymbol.toUpperCase(),
+          name: hit.name || hit.tradingSymbol,
+          instrumentToken: hit.instrumentToken,
+          strategyId: 'GAP_FADE_500',
+        });
+      }
+      if (!seeded.length) {
+        throw new Error(
+          'Could not resolve Top 50 tokens — Settings → Refresh Instruments (or Get Token), then retry.',
+        );
+      }
+      this.watch.applyTreasure(seeded);
+      this.strategyId = 'GAP_FADE_500';
+      persistDeskStrategy(this.strategyId);
+      this.top50Hint.set(
+        `Loaded ${seeded.length}/${STOCKS_SCAN_UNIVERSE.length} Top 50 names` +
+          (missed ? ` · ${missed} unresolved` : '') +
+          ' · enabled for paper Testing.',
+      );
+    } catch (err: unknown) {
+      this.error.set(formatUnknownError(err));
+    } finally {
+      this.top50Busy.set(false);
+    }
   }
 
   protected onStrategyChange(id: StocksStrategyId): void {

@@ -104,7 +104,7 @@
   </div>
 
   <nav class="mobile-tabbar" aria-label="Mobile menu">
-    @for (item of navItems(); track item.route) {
+    @for (item of mobileTabItems(); track item.route) {
       <a
         class="tab-item"
         [href]="item.route"

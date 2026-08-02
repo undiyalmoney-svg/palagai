@@ -1,27 +1,34 @@
-<section class="desk pg-page">
-  <header class="hero pg-page-hero">
-    <div class="hero-copy">
-      <p class="pg-eyebrow">NSE · Equity MIS</p>
-      <h1>Stocks Desk</h1>
-      <p class="pg-lede">
-        Default: <strong>Gap Fade</strong> (₹500/day research book). Capital
-        <strong>₹{{ capitalRs | number: '1.0-0' }}</strong>
-        · up to {{ maxLegsCap }} legs · treasure watchlist + optional top movers.
-      </p>
+<section class="desk pg-page" [class.embedded]="embedded">
+  @if (!embedded) {
+    <header class="hero pg-page-hero">
+      <div class="hero-copy">
+        <p class="pg-eyebrow">NSE · Equity MIS</p>
+        <h1>Stocks Desk</h1>
+        <p class="pg-lede">
+          Default: <strong>Gap Fade</strong> (₹500/day research book). Capital
+          <strong>₹{{ capitalRs | number: '1.0-0' }}</strong>
+          · up to {{ maxLegsCap }} legs · treasure watchlist + optional top movers.
+        </p>
+      </div>
+      <div class="hero-meta">
+        <span class="pg-badge pg-badge-neutral" [class.pg-badge-bull]="mode() === 'live'">{{
+          mode() === 'live' ? (realOrders ? 'Live money' : 'Live paper') : 'Backtest'
+        }}</span>
+        <span
+          class="pg-badge"
+          [class.pg-badge-bear]="realOrders && mode() === 'live'"
+          [class.pg-badge-neutral]="!(realOrders && mode() === 'live')"
+        >
+          {{ realOrders && mode() === 'live' ? 'REAL ORDERS' : 'Paper only' }}
+        </span>
+      </div>
+    </header>
+  } @else {
+    <div class="embedded-banner" role="note">
+      <strong>Stocks Top {{ top50Count }}</strong>
+      <span>Paper DNA lab · load the universe, then Testing From→To</span>
     </div>
-    <div class="hero-meta">
-      <span class="pg-badge pg-badge-neutral" [class.pg-badge-bull]="mode() === 'live'">{{
-        mode() === 'live' ? (realOrders ? 'Live money' : 'Live paper') : 'Backtest'
-      }}</span>
-      <span
-        class="pg-badge"
-        [class.pg-badge-bear]="realOrders && mode() === 'live'"
-        [class.pg-badge-neutral]="!(realOrders && mode() === 'live')"
-      >
-        {{ realOrders && mode() === 'live' ? 'REAL ORDERS' : 'Paper only' }}
-      </span>
-    </div>
-  </header>
+  }
 
   <aside class="trading-basis" aria-label="Stock desk basis">
     <h2 class="trading-basis-title">How this desk trades</h2>
@@ -205,12 +212,35 @@
   <section class="watch-panel">
     <header class="watch-head">
       <div>
-        <h2>Stocks we trade</h2>
-        <p>Toggle names for Testing / Live. Add any NSE equity by symbol — instrument token is resolved for you.</p>
+        <h2>{{ experimentsMode ? 'Universe · Top 50 + custom' : 'Stocks we trade' }}</h2>
+        <p>
+          @if (experimentsMode) {
+            Load Top {{ top50Count }} for DNA hunts, toggle names, then run Testing. Paper only until you tick Live money.
+          } @else {
+            Toggle names for Testing / Live. Add any NSE equity by symbol — instrument token is resolved for you.
+          }
+        </p>
+        @if (top50Hint()) {
+          <p class="top50-hint">{{ top50Hint() }}</p>
+        }
       </div>
-      <button mat-stroked-button type="button" class="reset-btn" [disabled]="busy()" (click)="resetTreasure()">
-        Reset treasure
-      </button>
+      <div class="watch-actions">
+        @if (experimentsMode) {
+          <button
+            mat-flat-button
+            color="primary"
+            type="button"
+            class="top50-btn"
+            [disabled]="busy() || top50Busy()"
+            (click)="loadTop50()"
+          >
+            {{ top50Busy() ? 'Loading…' : 'Load Top ' + top50Count }}
+          </button>
+        }
+        <button mat-stroked-button type="button" class="reset-btn" [disabled]="busy()" (click)="resetTreasure()">
+          Reset treasure
+        </button>
+      </div>
     </header>
 
     <div class="add-row">

@@ -33,14 +33,36 @@ export function resolveCrudeOilFuturesToken(
 export function resolveCrudeOilMiniFuturesToken(
   instruments: Instrument[],
 ): Instrument | undefined {
+  return resolveMcxMiniFuturesToken(instruments, ['CRUDEOILM']);
+}
+
+/**
+ * Nearest MCX Natural Gas Mini futures.
+ * Tries NATGASMINI first, then NATURALGASMINI / NATURALGAS FUT (skips option legs).
+ */
+export function resolveNatGasMiniFuturesToken(
+  instruments: Instrument[],
+): Instrument | undefined {
+  return (
+    resolveMcxMiniFuturesToken(instruments, ['NATGASMINI', 'NATURALGASMINI']) ||
+    resolveMcxMiniFuturesToken(instruments, ['NATURALGAS'])
+  );
+}
+
+/** Nearest MCX mini futures for any symbol prefix list (nearest expiry ≥ today). */
+export function resolveMcxMiniFuturesToken(
+  instruments: Instrument[],
+  prefixes: string[],
+): Instrument | undefined {
   const today = startOfDay(new Date());
+  const prefs = prefixes.map((p) => p.toUpperCase());
 
   return instruments
     .filter(
       (item) =>
         item.exchange === 'MCX' &&
         item.instrumentType === 'FUT' &&
-        item.tradingSymbol.startsWith('CRUDEOILM'),
+        prefs.some((p) => item.tradingSymbol.toUpperCase().startsWith(p)),
     )
     .filter((item) => {
       if (!item.expiry) {

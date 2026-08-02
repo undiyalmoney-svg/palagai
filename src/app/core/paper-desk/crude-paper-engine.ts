@@ -291,6 +291,10 @@ export function replayPaperOnCrude(params: {
   enableEvening?: boolean;
   /** Strategy profile (default daily-profit Trap-style). */
   tradeParams?: CrudeTradeParams;
+  /** ATM option resolve overrides (Nat Gas Mini under Experiments). */
+  optionPrefixes?: string[];
+  strikeStep?: number;
+  syntheticName?: string;
 }): CrudeReplayResult {
   const {
     instrumentId,
@@ -307,6 +311,11 @@ export function replayPaperOnCrude(params: {
   const tradeParams = params.tradeParams ?? resolveCrudeStrategyProfile('all-green');
   const dayLossStopPts = params.dayLossStopPts ?? tradeParams.dayLossStopPts;
   const dayProfitLockPts = tradeParams.dayProfitLockPts;
+  const optionResolve = {
+    prefixes: params.optionPrefixes,
+    strikeStep: params.strikeStep,
+    syntheticName: params.syntheticName,
+  };
   const enableMorning = params.enableMorning !== false;
   const enableEvening = params.enableEvening !== false;
   const trapMode = tradeParams.entryMode === 'trap-confirm';
@@ -466,6 +475,7 @@ export function replayPaperOnCrude(params: {
       direction: signal.action,
       spot: candle.close,
       asOfDateTime: candle.date,
+      ...optionResolve,
     });
     const option = toCrudePaperOption(resolved.instrument, resolved.source);
     chosenOption = option;
@@ -559,6 +569,7 @@ export function replayPaperOnCrude(params: {
         direction: bias,
         spot: candle.close,
         asOfDateTime: candle.date,
+        ...optionResolve,
       });
       chosenOption = toCrudePaperOption(resolved.instrument, resolved.source);
       chosenBias = bias;

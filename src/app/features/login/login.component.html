@@ -3,15 +3,11 @@
     <div class="login-header">
       <div class="brand-mark">P</div>
       <h1>Welcome back</h1>
-      <p>Sign in to Palagai — Devil or customer accounts use their own credentials.</p>
     </div>
 
     @if (existingUser(); as u) {
       <div class="switch-banner" role="status">
-        <p>
-          Currently signed in as <strong>{{ existingLabel() }}</strong>. Customers must sign in
-          with their own username — do not continue on Devil’s session.
-        </p>
+        <p>Signed in as <strong>{{ existingLabel() }}</strong></p>
         <div class="switch-actions">
           <button mat-stroked-button type="button" (click)="continueAsExisting()">
             Continue as {{ u.username }}

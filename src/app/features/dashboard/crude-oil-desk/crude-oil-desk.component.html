@@ -1,31 +1,38 @@
-<section class="desk pg-page">
-  <header class="hero pg-page-hero">
-    <div class="hero-copy">
-      <p class="pg-eyebrow">MCX · Crude Oil Mini</p>
-      <h1>Crude Oil Desk</h1>
-      <p class="pg-lede">
-        Default <strong>All-Green</strong> — Session OR <strong>09:00–09:30</strong>, entries through
-        <strong>23:00</strong> whenever the desk is running · <strong>1 lot</strong> (₹10/pt):
-        <strong>SL ₹150</strong> then hunt next · peak trail <strong>₹500 → lock ₹240</strong>
-        (no day-wide stop). Paper Testing &amp; Live (no real money unless you tick Live money).
-        {{ profileSlTpLabel() }}.
-      </p>
+<section class="desk pg-page" [class.embedded]="embedded">
+  @if (!embedded) {
+    <header class="hero pg-page-hero">
+      <div class="hero-copy">
+        <p class="pg-eyebrow">MCX · {{ asset().label }}</p>
+        <h1>{{ asset().label }} Desk</h1>
+        <p class="pg-lede">
+          Default <strong>All-Green</strong> — Session OR <strong>09:00–09:30</strong>, entries through
+          <strong>23:00</strong> whenever the desk is running · <strong>1 lot</strong> (₹{{ rsPerPoint() }}/pt):
+          <strong>SL ₹150</strong> then hunt next · peak trail <strong>₹500 → lock ₹240</strong>
+          (no day-wide stop). Paper Testing &amp; Live (no real money unless you tick Live money).
+          {{ profileSlTpLabel() }}.
+        </p>
+      </div>
+      <div class="hero-meta">
+        <span class="pg-badge pg-badge-neutral" [class.pg-badge-bull]="mode() === 'live'">{{
+          mode() === 'live' ? (realOrders ? 'Live money' : 'Live paper') : 'Backtest'
+        }}</span>
+        <span
+          class="pg-badge"
+          [class.pg-badge-bear]="realOrders && mode() === 'live'"
+          [class.pg-badge-neutral]="!(realOrders && mode() === 'live')"
+        >
+          {{ realOrders && mode() === 'live' ? 'REAL ORDERS' : 'Paper only' }}
+        </span>
+        <span class="pg-badge pg-badge-neutral">{{ activeProfile().label }}</span>
+        <span class="pg-badge pg-badge-neutral">{{ session.marketOpen }}–{{ session.marketClose }} IST</span>
+      </div>
+    </header>
+  } @else {
+    <div class="embedded-banner" role="note">
+      <strong>{{ asset().label }}</strong>
+      <span>Paper DNA lab · ₹{{ rsPerPoint() }}/pt · {{ activeProfile().label }}</span>
     </div>
-    <div class="hero-meta">
-      <span class="pg-badge pg-badge-neutral" [class.pg-badge-bull]="mode() === 'live'">{{
-        mode() === 'live' ? (realOrders ? 'Live money' : 'Live paper') : 'Backtest'
-      }}</span>
-      <span
-        class="pg-badge"
-        [class.pg-badge-bear]="realOrders && mode() === 'live'"
-        [class.pg-badge-neutral]="!(realOrders && mode() === 'live')"
-      >
-        {{ realOrders && mode() === 'live' ? 'REAL ORDERS' : 'Paper only' }}
-      </span>
-      <span class="pg-badge pg-badge-neutral">{{ activeProfile().label }}</span>
-      <span class="pg-badge pg-badge-neutral">{{ session.marketOpen }}–{{ session.marketClose }} IST</span>
-    </div>
-  </header>
+  }
 
   <div class="mode-switch" role="tablist" aria-label="Desk mode">
     <button
@@ -51,59 +58,87 @@
   </div>
 
   <div class="control-bar">
-    @if (mode() === 'testing') {
-      <label class="field">
-        <span>From</span>
-        <input type="date" [(ngModel)]="fromDate" [disabled]="busy() || snapshot().running" />
-      </label>
-      <label class="field">
-        <span>To</span>
-        <input type="date" [(ngModel)]="toDate" [disabled]="busy() || snapshot().running" />
-      </label>
-    } @else {
-      <div class="live-hint">
-        <strong>Today</strong>
-        <span>{{ realOrders ? 'Real MCX MIS orders on signals' : 'Auto paper on CRUDEOILM (no real money)' }} ·
-          {{
-            activeProfile().entryMode === 'session-or' && enableEvening
-              ? activeProfile().eveningEntryStart + '–' + activeProfile().eveningEntryEnd
-              : enableMorning && enableEvening
-                ? '10:00–12:00 + ' + activeProfile().eveningEntryStart + '–' + activeProfile().eveningEntryEnd
-                : enableMorning
-                  ? '10:00–12:00'
-                  : enableEvening
-                    ? activeProfile().eveningEntryStart + '–' + activeProfile().eveningEntryEnd
-                    : 'no window'
-          }}</span>
-      </div>
-    }
+    <div class="control-primary">
+      @if (mode() === 'testing') {
+        <label class="field">
+          <span>From</span>
+          <input type="date" [(ngModel)]="fromDate" [disabled]="busy() || snapshot().running" />
+        </label>
+        <label class="field">
+          <span>To</span>
+          <input type="date" [(ngModel)]="toDate" [disabled]="busy() || snapshot().running" />
+        </label>
+      } @else {
+        <div class="live-hint">
+          <strong>Today</strong>
+          <span>{{ realOrders ? 'Real MCX MIS orders on signals' : 'Auto paper on ' + asset().futPrefix + ' (no real money)' }} ·
+            {{
+              activeProfile().entryMode === 'session-or' && enableEvening
+                ? activeProfile().eveningEntryStart + '–' + activeProfile().eveningEntryEnd
+                : enableMorning && enableEvening
+                  ? '10:00–12:00 + ' + activeProfile().eveningEntryStart + '–' + activeProfile().eveningEntryEnd
+                  : enableMorning
+                    ? '10:00–12:00'
+                    : enableEvening
+                      ? activeProfile().eveningEntryStart + '–' + activeProfile().eveningEntryEnd
+                      : 'no window'
+            }}</span>
+        </div>
+      }
 
-    <label class="field profile-field">
-      <span>Strategy</span>
-      <select
-        [(ngModel)]="strategyProfile"
-        (ngModelChange)="onStrategyProfileChange()"
-        [disabled]="busy() || snapshot().running"
-        aria-label="Crude strategy profile"
-      >
-        @for (p of strategyProfiles; track p.profileId) {
-          <option [ngValue]="p.profileId">{{ p.label }}</option>
+      <label class="field profile-field">
+        <span>Strategy</span>
+        <select
+          [(ngModel)]="strategyProfile"
+          (ngModelChange)="onStrategyProfileChange()"
+          [disabled]="busy() || snapshot().running"
+          aria-label="Crude strategy profile"
+        >
+          @for (p of strategyProfiles; track p.profileId) {
+            <option [ngValue]="p.profileId">{{ p.label }}</option>
+          }
+        </select>
+        <small>{{ activeProfile().dailyBandLabel }}</small>
+      </label>
+
+      <label class="field lots-field">
+        <span>Lots</span>
+        <input
+          type="number"
+          min="1"
+          step="1"
+          [(ngModel)]="lots"
+          (ngModelChange)="onLotsChange()"
+          [disabled]="busy() || snapshot().running"
+        />
+      </label>
+
+      <div class="actions">
+        @if (busy() || (mode() === 'live' && snapshot().running)) {
+          <button mat-stroked-button type="button" class="stop-btn" (click)="onStop()">
+            {{ busy() ? 'Cancel' : 'Stop' }}
+          </button>
         }
-      </select>
-      <small>{{ activeProfile().dailyBandLabel }}</small>
-    </label>
-
-    <label class="field lots-field">
-      <span>Lots</span>
-      <input
-        type="number"
-        min="1"
-        step="1"
-        [(ngModel)]="lots"
-        (ngModelChange)="onLotsChange()"
-        [disabled]="busy() || snapshot().running"
-      />
-    </label>
+        <button
+          mat-flat-button
+          type="button"
+          class="start-btn"
+          [disabled]="busy() || (mode() === 'live' && snapshot().running)"
+          (click)="onStart()"
+        >
+          @if (busy()) {
+            <span class="start-btn-inner">
+              <mat-spinner diameter="16" />
+              <span>Running…</span>
+            </span>
+          } @else if (mode() === 'live' && snapshot().running) {
+            <span class="start-btn-inner">Live running</span>
+          } @else {
+            <span class="start-btn-inner">Start</span>
+          }
+        </button>
+      </div>
+    </div>
 
     <div class="desk-toggles" role="group" aria-label="Session windows">
       <label
@@ -228,32 +263,6 @@
         </label>
       }
     }
-
-    <div class="actions">
-      @if (busy() || (mode() === 'live' && snapshot().running)) {
-        <button mat-stroked-button type="button" class="stop-btn" (click)="onStop()">
-          {{ busy() ? 'Cancel' : 'Stop' }}
-        </button>
-      }
-      <button
-        mat-flat-button
-        type="button"
-        class="start-btn"
-        [disabled]="busy() || (mode() === 'live' && snapshot().running)"
-        (click)="onStart()"
-      >
-        @if (busy()) {
-          <span class="start-btn-inner">
-            <mat-spinner diameter="16" />
-            <span>Running…</span>
-          </span>
-        } @else if (mode() === 'live' && snapshot().running) {
-          <span class="start-btn-inner">Live running</span>
-        } @else {
-          <span class="start-btn-inner">Start</span>
-        }
-      </button>
-    </div>
   </div>
 
   @if (mode() === 'live' && snapshot().running) {
@@ -444,7 +453,7 @@
               }
             } @else {
               <strong class="chosen-symbol muted">No option resolved yet</strong>
-              <small>Needs CRUDEOILM futures + instruments (Settings → Refresh)</small>
+              <small>Needs {{ asset().futPrefix }} futures + instruments (Settings → Refresh)</small>
             }
           </div>
 
@@ -707,7 +716,7 @@
               }
             } @else {
               <strong class="chosen-symbol muted">No option resolved yet</strong>
-              <small>Press Start · needs CRUDEOILM futures + instruments (Settings → Refresh)</small>
+              <small>Press Start · needs {{ asset().futPrefix }} futures + instruments (Settings → Refresh)</small>
             }
           </div>
 
@@ -739,7 +748,7 @@
     <div class="trades-block orders-block">
       <div class="trades-head">
         <h3>Live order summary</h3>
-        <p>MCX CRUDEOILM · {{ lots }} lot · statuses refresh every tick</p>
+        <p>MCX {{ asset().futPrefix }} · {{ lots }} lot · statuses refresh every tick</p>
       </div>
       @if (snapshot().orderSummary.length) {
         <div class="table-scroll">

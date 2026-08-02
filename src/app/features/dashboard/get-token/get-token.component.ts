@@ -1,4 +1,4 @@
-import { Component, OnInit, PLATFORM_ID, afterNextRender, computed, inject, signal } from '@angular/core';
+import { Component, PLATFORM_ID, afterNextRender, computed, inject, signal } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
 import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -46,7 +46,7 @@ interface CopyOption {
   templateUrl: './get-token.component.html',
   styleUrl: './get-token.component.css',
 })
-export class GetTokenComponent implements OnInit {
+export class GetTokenComponent {
   private readonly formBuilder = inject(FormBuilder);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
@@ -171,19 +171,30 @@ export class GetTokenComponent implements OnInit {
   protected readonly hideManualAccessToken = signal(true);
 
   constructor() {
+    // Browser-only: load DB key → localStorage/UI first, then auto-exchange redirect token.
     afterNextRender(() => {
-      const stored = this.kiteCredentialsService.getCredentials();
-      void this.bootstrapFromKiteRedirect(stored?.apiKey, stored?.apiSecret);
+      void this.bootAndMaybeExchange();
     });
   }
 
-  ngOnInit(): void {
-    void this.bootCredentials();
+  /** Refresh /me, sync Admin API key into localStorage + forms, then exchange Kite redirect if any. */
+  private async bootAndMaybeExchange(): Promise<void> {
+    await this.bootCredentials();
+    const stored = this.kiteCredentialsService.getCredentials();
+    const apiKey = this.assignedApiKey() || stored?.apiKey || '';
+    const apiSecret = stored?.apiSecret || '';
+    await this.bootstrapFromKiteRedirect(apiKey, apiSecret);
   }
 
   private async bootCredentials(): Promise<void> {
     await this.authService.refreshMe();
     const u = this.authService.currentUser();
+    if (u?.id) {
+      // Guarantees scoped localStorage keys before we save / exchange.
+      this.kiteCredentialsService.bindSiteUser(u.id);
+      this.kiteSessionService.bindSiteUser(u.id);
+    }
+
     const fromAdmin =
       u?.role !== 'owner' ? String(u?.kiteApiKey || '').trim() : '';
     this.assignedApiKey.set(fromAdmin);
@@ -194,11 +205,22 @@ export class GetTokenComponent implements OnInit {
       this.selectedCopyId.set('redirect-prod');
     }
 
-    const stored = this.kiteCredentialsService.getCredentials();
+    let stored = this.kiteCredentialsService.getCredentials();
+
+    // Admin-assigned key from DB → localStorage (keep existing secret).
+    if (fromAdmin && stored?.apiSecret) {
+      if (stored.apiKey !== fromAdmin) {
+        this.kiteCredentialsService.saveCredentials({
+          apiKey: fromAdmin,
+          apiSecret: stored.apiSecret,
+        });
+        stored = this.kiteCredentialsService.getCredentials();
+      }
+    }
+
     this.hasStoredCredentials.set(stored !== null);
 
     if (stored) {
-      // Friends: keep Admin-assigned API key visible/preferred over stale local key
       const apiKey = fromAdmin || stored.apiKey;
       const apiSecret = stored.apiSecret;
       this.credentialsForm.patchValue({ apiKey, apiSecret });
@@ -445,8 +467,30 @@ export class GetTokenComponent implements OnInit {
       .subscribe({
         next: (response) => {
           this.tokenExchangeResult.set(JSON.stringify(response, null, 2));
+          const siteUser = this.authService.currentUser();
+          if (siteUser?.id) {
+            this.kiteCredentialsService.bindSiteUser(siteUser.id);
+            this.kiteSessionService.bindSiteUser(siteUser.id);
+          }
           const saved = this.kiteSessionService.saveFromTokenResponse(response);
           if (saved) {
+            const creds = this.kiteCredentialsService.getCredentials();
+            const sessionApiKey =
+              this.kiteSessionService.getSession()?.data.api_key?.trim() || '';
+            if (creds?.apiSecret && sessionApiKey) {
+              this.kiteCredentialsService.saveCredentials({
+                apiKey: sessionApiKey,
+                apiSecret: creds.apiSecret,
+              });
+              this.hasStoredCredentials.set(true);
+              this.prefillStepForms(sessionApiKey, creds.apiSecret);
+              this.credentialsForm.patchValue({
+                apiKey: sessionApiKey,
+                apiSecret: creds.apiSecret,
+              });
+              this.setCredentialsFormEditable(false);
+              this.isEditingCredentials.set(false);
+            }
             this.sessionSavedMessage.set(
               'Access token saved locally. Trade Desk / Historical Tester are ready.',
             );

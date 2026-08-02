@@ -19,8 +19,7 @@ export function crudeStrikeStep(): number {
   return 50;
 }
 
-export function roundCrudeStrike(spot: number): number {
-  const step = crudeStrikeStep();
+export function roundCrudeStrike(spot: number, step = crudeStrikeStep()): number {
   return Math.round(spot / step) * step;
 }
 
@@ -66,6 +65,10 @@ function formatExpiryIso(d: Date): string {
 }
 
 function isCrudeMiniOption(item: Instrument): boolean {
+  return isMcxMiniOption(item, ['CRUDEOILM']);
+}
+
+function isMcxMiniOption(item: Instrument, prefixes: string[]): boolean {
   if (item.exchange !== 'MCX') {
     return false;
   }
@@ -73,7 +76,8 @@ function isCrudeMiniOption(item: Instrument): boolean {
   if (type !== 'CE' && type !== 'PE') {
     return false;
   }
-  return item.tradingSymbol.toUpperCase().startsWith('CRUDEOILM');
+  const sym = item.tradingSymbol.toUpperCase();
+  return prefixes.some((p) => sym.startsWith(p.toUpperCase()));
 }
 
 function isAnyCrudeOption(item: Instrument): boolean {
@@ -88,8 +92,11 @@ function isAnyCrudeOption(item: Instrument): boolean {
   return sym.startsWith('CRUDEOIL');
 }
 
-export function countCrudeMiniOptions(instruments: Instrument[]): number {
-  return instruments.filter(isCrudeMiniOption).length;
+export function countCrudeMiniOptions(
+  instruments: Instrument[],
+  prefixes: string[] = ['CRUDEOILM'],
+): number {
+  return instruments.filter((item) => isMcxMiniOption(item, prefixes)).length;
 }
 
 /**
@@ -98,12 +105,13 @@ export function countCrudeMiniOptions(instruments: Instrument[]): number {
 export function listCrudeLiveExpiries(
   instruments: Instrument[],
   asOfDay: Date,
+  prefixes: string[] = ['CRUDEOILM'],
 ): Date[] {
   const day = crudeIstCalendarDay(asOfDay);
   const seen = new Set<number>();
   const out: Date[] = [];
   for (const item of instruments) {
-    if (!isCrudeMiniOption(item) && !isAnyCrudeOption(item)) {
+    if (!isMcxMiniOption(item, prefixes) && !(prefixes.includes('CRUDEOILM') && isAnyCrudeOption(item))) {
       continue;
     }
     const exp = parseExpiry(item.expiry);
@@ -205,7 +213,7 @@ export function pickCrudeDirectionOption(
 }
 
 /**
- * ATM CRUDEOILM CE/PE for paper + live desk.
+ * ATM MCX mini CE/PE for paper + live desk (Crude Oil Mini by default).
  * Prefers mini chain; falls back to synthetic label when missing.
  * On expiry day, always selects the **next** expiry (never same-day contract).
  */
@@ -214,9 +222,18 @@ export function resolveAtmCrudeMiniOption(params: {
   direction: 'BUY' | 'SELL';
   spot: number;
   asOfDateTime: string;
+  /** Option/fut symbol prefixes — default CRUDEOILM. */
+  prefixes?: string[];
+  strikeStep?: number;
+  syntheticName?: string;
 }): { instrument: Instrument; source: 'chain' | 'synthetic' } {
+  const prefixes = (params.prefixes?.length ? params.prefixes : ['CRUDEOILM']).map((p) =>
+    p.toUpperCase(),
+  );
+  const strikeStep = params.strikeStep && params.strikeStep > 0 ? params.strikeStep : crudeStrikeStep();
+  const syntheticName = params.syntheticName || prefixes[0] || 'CRUDEOILM';
   const optType = params.direction === 'BUY' ? 'CE' : 'PE';
-  const strike = roundCrudeStrike(params.spot);
+  const strike = roundCrudeStrike(params.spot, strikeStep);
   const asOf = new Date(
     params.asOfDateTime.includes('T')
       ? params.asOfDateTime
@@ -227,15 +244,19 @@ export function resolveAtmCrudeMiniOption(params: {
     : crudeIstCalendarDay(asOf);
 
   const pool = params.instruments
-    .filter((item) => isCrudeMiniOption(item) || isAnyCrudeOption(item))
+    .filter(
+      (item) =>
+        isMcxMiniOption(item, prefixes) ||
+        (prefixes.some((p) => p.startsWith('CRUDE')) && isAnyCrudeOption(item)),
+    )
     .filter((item) => item.instrumentType.toUpperCase() === optType)
     .sort((a, b) => {
-      const aMini = a.tradingSymbol.startsWith('CRUDEOILM') ? 0 : 1;
-      const bMini = b.tradingSymbol.startsWith('CRUDEOILM') ? 0 : 1;
+      const aMini = prefixes.some((p) => a.tradingSymbol.toUpperCase().startsWith(p)) ? 0 : 1;
+      const bMini = prefixes.some((p) => b.tradingSymbol.toUpperCase().startsWith(p)) ? 0 : 1;
       return aMini - bMini;
     });
 
-  const liveExpiries = listCrudeLiveExpiries(params.instruments, asOfDay);
+  const liveExpiries = listCrudeLiveExpiries(params.instruments, asOfDay, prefixes);
   const front = resolveCrudeFrontExpiry(asOfDay, liveExpiries);
 
   const withExpiry = pool
@@ -261,7 +282,7 @@ export function resolveAtmCrudeMiniOption(params: {
   }
 
   const near = withExpiry
-    .filter((row) => Math.abs(row.item.strike - strike) <= crudeStrikeStep())
+    .filter((row) => Math.abs(row.item.strike - strike) <= strikeStep)
     .sort(
       (a, b) =>
         Math.abs(a.item.strike - strike) - Math.abs(b.item.strike - strike) ||
@@ -278,6 +299,7 @@ export function resolveAtmCrudeMiniOption(params: {
       params.spot,
       asOfDay,
       front ?? undefined,
+      { strikeStep, name: syntheticName },
     ),
     source: 'synthetic',
   };
@@ -305,9 +327,12 @@ function buildSyntheticCrudeOption(
   spot: number,
   asOfDay: Date,
   frontExpiry?: Date,
+  opts?: { strikeStep?: number; name?: string },
 ): Instrument {
   const optType = direction === 'BUY' ? 'CE' : 'PE';
-  const strike = roundCrudeStrike(spot);
+  const step = opts?.strikeStep && opts.strikeStep > 0 ? opts.strikeStep : crudeStrikeStep();
+  const name = opts?.name || 'CRUDEOILM';
+  const strike = roundCrudeStrike(spot, step);
   // Prefer known next front; else bump one calendar day so we never label same-day expiry.
   const day = crudeIstCalendarDay(asOfDay);
   let exp = frontExpiry ? crudeIstCalendarDay(frontExpiry) : day;
@@ -319,8 +344,8 @@ function buildSyntheticCrudeOption(
   return {
     instrumentToken: 0,
     exchangeToken: 0,
-    tradingSymbol: `CRUDEOILM ATM ${strike} ${optType}`,
-    name: 'CRUDEOILM',
+    tradingSymbol: `${name} ATM ${strike} ${optType}`,
+    name,
     exchange: 'MCX',
     segment: 'MCX-OPT',
     instrumentType: optType,

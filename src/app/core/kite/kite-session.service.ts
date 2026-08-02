@@ -47,7 +47,17 @@ export class KiteSessionService {
       this.session.set(null);
       return;
     }
+    // Already bound with an in-memory session — keep it (e.g. just exchanged).
     if (this.activeSiteUserId === id && this.session()) {
+      return;
+    }
+    // Was unbound but we already hold a session in memory (persist was skipped) —
+    // stamp the user id and write localStorage now so UI + reloads keep the token.
+    const mem = this.session();
+    if (!this.activeSiteUserId && mem?.data?.access_token) {
+      this.activeSiteUserId = id;
+      this.persist({ ...mem, siteUserId: id });
+      this.session.set({ ...mem, siteUserId: id });
       return;
     }
     this.activeSiteUserId = id;

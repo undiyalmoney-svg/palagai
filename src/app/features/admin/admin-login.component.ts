@@ -20,10 +20,6 @@ import { AuthService } from '../../core/auth/auth.service';
       <div class="card">
         <div class="mark">A</div>
         <h1>Admin portal</h1>
-        <p>
-          Create / block site users and set modules. This is
-          <strong>not</strong> the trading desk login.
-        </p>
         @if (error()) {
           <p class="err">{{ error() }}</p>
         }

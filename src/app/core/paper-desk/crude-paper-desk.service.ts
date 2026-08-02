@@ -7,6 +7,7 @@ import { KiteSessionService } from '../kite/kite-session.service';
 import { InstrumentStoreService } from '../services/instrument-store.service';
 import { CRUDE_OIL_MINI_INSTRUMENT } from '../constants/instruments.const';
 import { MCX_CRUDE_SESSION } from '../config/session.config';
+import { McxMiniAssetId, mcxMiniAsset } from '../config/mcx-mini-asset';
 import {
   assertKiteHistoricalSuccess,
   extractKiteApiError,
@@ -18,7 +19,10 @@ import {
   datePart,
   DESK_HISTORICAL_CHUNK_DAYS,
 } from '../kite/kite-historical-limits';
-import { resolveCrudeOilMiniFuturesToken } from '../utils/instrument-resolver.util';
+import {
+  resolveCrudeOilMiniFuturesToken,
+  resolveNatGasMiniFuturesToken,
+} from '../utils/instrument-resolver.util';
 import {
   countCrudeMiniOptions,
   resolveAtmCrudeMiniOption,
@@ -43,6 +47,7 @@ import {
   PaperTrade,
 } from './paper-desk.models';
 import { LiveOrderExecutorService } from '../live-desk/live-order-executor.service';
+import { Instrument } from '../models/instrument.model';
 
 const HISTORICAL_TIMEOUT_MS = 45_000;
 
@@ -85,9 +90,41 @@ export class CrudePaperDeskService {
   private dayLossStopPts = this.tradeParams.dayLossStopPts;
   private runGeneration = 0;
   private readonly maxDaysPerCall = DESK_HISTORICAL_CHUNK_DAYS;
+  /** Experiments: crude (default) or natgas mini paper book. */
+  private miniAssetId: McxMiniAssetId = 'crude';
 
   readonly snapshot = signal<PaperDeskSnapshot>(emptySnapshot('testing'));
   readonly busy = signal(false);
+
+  /** Switch MCX mini book (own provider instance per Experiments tab). */
+  setMiniAsset(id: McxMiniAssetId): void {
+    this.miniAssetId = id === 'natgas' ? 'natgas' : 'crude';
+    const asset = mcxMiniAsset(this.miniAssetId);
+    this.futuresSymbol = asset.futPrefix;
+  }
+
+  private asset() {
+    return mcxMiniAsset(this.miniAssetId);
+  }
+
+  private resolveFuture(allInstruments: Instrument[]): Instrument | undefined {
+    return this.miniAssetId === 'natgas'
+      ? resolveNatGasMiniFuturesToken(allInstruments)
+      : resolveCrudeOilMiniFuturesToken(allInstruments);
+  }
+
+  private optionPrefixes(): string[] {
+    const a = this.asset();
+    return [a.futPrefix, ...a.altFutPrefixes];
+  }
+
+  private rupeesPerPoint(): number {
+    return this.asset().rupeesPerPoint || CRUDE_RUPEES_PER_POINT;
+  }
+
+  private instrumentId(): string {
+    return this.asset().instrumentId || CRUDE_OIL_MINI_INSTRUMENT.id;
+  }
 
   /** Cancel in-flight Testing fetch or stop Live so the UI leaves "Running…". */
   cancelRun(options?: { silent?: boolean }): void {
@@ -142,7 +179,7 @@ export class CrudePaperDeskService {
       message:
         batches.length > 1
           ? `Testing in ${batches.length} × ~3-month batches…`
-          : 'Fetching CRUDEOILM candles…',
+          : `Fetching ${this.asset().futPrefix} candles…`,
       marketOpen: true,
       kiteStats: this.kiteStats(),
     });
@@ -152,9 +189,9 @@ export class CrudePaperDeskService {
       const authorization = this.requireAuth();
       const allInstruments = await this.loadInstruments();
       this.assertActive(runId);
-      const future = resolveCrudeOilMiniFuturesToken(allInstruments);
+      const future = this.resolveFuture(allInstruments);
       if (!future) {
-        throw new Error('No live CRUDEOILM futures contract. Settings → Refresh Instruments.');
+        throw new Error(`No live ${this.asset().futPrefix} futures contract. Settings → Refresh Instruments.`);
       }
       this.futuresToken = future.instrumentToken;
       this.futuresSymbol = future.tradingSymbol;
@@ -190,8 +227,8 @@ export class CrudePaperDeskService {
         const needed = new Set<number>();
         const emptyOpt = new Map<number, Candle[]>();
         const replay = replayPaperOnCrude({
-          instrumentId: CRUDE_OIL_MINI_INSTRUMENT.id,
-          instrumentName: `${CRUDE_OIL_MINI_INSTRUMENT.name} (${future.tradingSymbol})`,
+          instrumentId: this.instrumentId(),
+          instrumentName: `${this.asset().label} (${future.tradingSymbol})`,
           candles,
           fromDate: batch.fromDate,
           toDate: batch.toDate,
@@ -203,6 +240,9 @@ export class CrudePaperDeskService {
           enableMorning: this.enableMorning,
           enableEvening: this.enableEvening,
           tradeParams: this.tradeParams,
+          optionPrefixes: this.optionPrefixes(),
+          strikeStep: this.asset().strikeStep,
+          syntheticName: this.asset().futPrefix,
         });
         dayNetIndexPts += Object.values(replay.dayNetByDate).reduce((a, v) => a + v, 0);
         lastSignal = replay.lastSignal || lastSignal;
@@ -235,8 +275,8 @@ export class CrudePaperDeskService {
 
       const sorted = allEnriched.sort((a, b) => a.entryTime.localeCompare(b.entryTime));
       const status = withLiveFields({
-        instrumentId: CRUDE_OIL_MINI_INSTRUMENT.id,
-        instrumentName: `${CRUDE_OIL_MINI_INSTRUMENT.name} (${future.tradingSymbol})`,
+        instrumentId: this.instrumentId(),
+        instrumentName: `${this.asset().label} (${future.tradingSymbol})`,
         lastBarTime,
         dayNetIndexPts,
         dayNetOptionRs: sorted.reduce((a, t) => a + (t.optionPnlRs ?? 0), 0),
@@ -261,7 +301,7 @@ export class CrudePaperDeskService {
         message: `Testing complete · ${sorted.length} paper trade(s) · ${batches.length} batch(es) · ${this.lotsMultiplier} lot(s) · ${this.tradeParams.label} · ${this.windowsLabel()} · ${this.riskLabel()} · ${this.kiteStatsLabel()}`,
         statuses: [status],
         trades: sorted,
-        totals: summarize(sorted, this.lotsMultiplier, CRUDE_RUPEES_PER_POINT),
+        totals: summarize(sorted, this.lotsMultiplier, this.rupeesPerPoint()),
         dayStats: buildPaperDeskDayStats(sorted, 5),
         kiteStats: this.kiteStats(),
         orderEvents: [],
@@ -298,9 +338,9 @@ export class CrudePaperDeskService {
     this.enableMorning = options?.enableMorning ?? this.tradeParams.defaultEnableMorning;
     this.enableEvening = options?.enableEvening ?? this.tradeParams.defaultEnableEvening;
     // Soft clear — keep Trade Desk Nifty/Bank live broker state intact.
-    this.liveOrders.clearInstruments([CRUDE_OIL_MINI_INSTRUMENT.id]);
+    this.liveOrders.clearInstruments([this.instrumentId()]);
     this.liveOrders.setLotsMultiplier(this.lotsMultiplier);
-    this.liveOrders.setLotsForInstrument(CRUDE_OIL_MINI_INSTRUMENT.id, this.lotsMultiplier);
+    this.liveOrders.setLotsForInstrument(this.instrumentId(), this.lotsMultiplier);
     const today = todayIso();
     const now = istNowHhMm();
 
@@ -359,9 +399,9 @@ export class CrudePaperDeskService {
       const authorization = this.requireAuth();
       const allInstruments = await this.loadInstruments();
       this.assertActive(runId);
-      const future = resolveCrudeOilMiniFuturesToken(allInstruments);
+      const future = this.resolveFuture(allInstruments);
       if (!future) {
-        throw new Error('No live CRUDEOILM futures contract.');
+        throw new Error(`No live ${this.asset().futPrefix} futures contract.`);
       }
       this.futuresToken = future.instrumentToken;
       this.futuresSymbol = future.tradingSymbol;
@@ -453,8 +493,8 @@ export class CrudePaperDeskService {
     const needed = new Set<number>();
     const emptyOpt = new Map<number, Candle[]>();
     const replay = replayPaperOnCrude({
-      instrumentId: CRUDE_OIL_MINI_INSTRUMENT.id,
-      instrumentName: `${CRUDE_OIL_MINI_INSTRUMENT.name} (${this.futuresSymbol})`,
+      instrumentId: this.instrumentId(),
+      instrumentName: `${this.asset().label} (${this.futuresSymbol})`,
       candles: this.liveCandles,
       fromDate: today,
       toDate: today,
@@ -467,6 +507,9 @@ export class CrudePaperDeskService {
       enableMorning: this.enableMorning,
       enableEvening: this.enableEvening,
       tradeParams: this.tradeParams,
+      optionPrefixes: this.optionPrefixes(),
+      strikeStep: this.asset().strikeStep,
+      syntheticName: this.asset().futPrefix,
     });
 
     const optionCandles = await this.fetchOptionHistories(
@@ -483,8 +526,8 @@ export class CrudePaperDeskService {
     this.liveTrades = enriched;
 
     const status = withLiveFields({
-      instrumentId: CRUDE_OIL_MINI_INSTRUMENT.id,
-      instrumentName: `${CRUDE_OIL_MINI_INSTRUMENT.name} (${this.futuresSymbol})`,
+      instrumentId: this.instrumentId(),
+      instrumentName: `${this.asset().label} (${this.futuresSymbol})`,
       lastBarTime: this.liveCandles.at(-1)?.date ?? null,
       dayNetIndexPts: enriched.reduce((a, t) => a + t.indexPoints, 0),
       dayNetOptionRs: enriched.reduce((a, t) => a + (t.optionPnlRs ?? 0), 0),
@@ -555,7 +598,7 @@ export class CrudePaperDeskService {
       message: `${moneyTag} · alive ${now} · ${status.livePhaseLabel} · ${this.kiteStatsLabel()}`,
       statuses: [status],
       trades: enriched.sort((a, b) => a.entryTime.localeCompare(b.entryTime)),
-      totals: summarize(enriched, this.lotsMultiplier, CRUDE_RUPEES_PER_POINT),
+      totals: summarize(enriched, this.lotsMultiplier, this.rupeesPerPoint()),
       dayStats: buildPaperDeskDayStats(enriched, 5),
       kiteStats: this.kiteStats(),
       orderEvents: this.realOrders ? this.liveOrders.getEvents() : [],
@@ -568,10 +611,10 @@ export class CrudePaperDeskService {
     allInstruments: ReturnType<InstrumentStoreService['allInstruments']>,
   ): Promise<PaperInstrumentStatus[]> {
     const authorization = this.kiteSession.getAuthorizationHeader();
-    const future = resolveCrudeOilMiniFuturesToken(allInstruments);
+    const future = this.resolveFuture(allInstruments);
     let spot: number | null = null;
     let asOf = `${today} 15:15:00`;
-    let symbol = CRUDE_OIL_MINI_INSTRUMENT.tradingSymbol;
+    let symbol = this.asset().futPrefix;
 
     if (future && authorization) {
       symbol = future.tradingSymbol;
@@ -592,18 +635,22 @@ export class CrudePaperDeskService {
       }
     }
 
+    const asset = this.asset();
     const resolved = resolveAtmCrudeMiniOption({
       instruments: allInstruments,
       direction: 'BUY',
       spot: spot ?? 7600,
       asOfDateTime: asOf,
+      prefixes: this.optionPrefixes(),
+      strikeStep: asset.strikeStep,
+      syntheticName: asset.futPrefix,
     });
     const chosenOption = toCrudePaperOption(resolved.instrument, resolved.source);
 
     return [
       withLiveFields({
-        instrumentId: CRUDE_OIL_MINI_INSTRUMENT.id,
-        instrumentName: `${CRUDE_OIL_MINI_INSTRUMENT.name} (${symbol})`,
+        instrumentId: this.instrumentId(),
+        instrumentName: `${this.asset().label} (${symbol})`,
         lastBarTime: asOf,
         dayNetIndexPts: 0,
         dayNetOptionRs: 0,
@@ -623,13 +670,13 @@ export class CrudePaperDeskService {
   > {
     await this.instrumentStore.ensureLoaded();
     let all = this.instrumentStore.allInstruments();
-    if (countCrudeMiniOptions(all) < 20) {
+    if (countCrudeMiniOptions(all, this.optionPrefixes()) < 20) {
       this.patchMessage('Refreshing MCX instruments…');
       const ok = await this.instrumentStore.refreshBestEffort(true);
       all = this.instrumentStore.allInstruments();
-      if (!ok && requireMinimum && countCrudeMiniOptions(all) < 5) {
+      if (!ok && requireMinimum && countCrudeMiniOptions(all, this.optionPrefixes()) < 5) {
         throw new Error(
-          'Could not load MCX crude options. Check internet, then Settings → Refresh Instruments.',
+          `Could not load MCX ${this.asset().shortLabel} options. Check internet, then Settings → Refresh Instruments.`,
         );
       }
     }
@@ -801,7 +848,7 @@ export class CrudePaperDeskService {
   }
 
   private riskLabel(): string {
-    const rs = CRUDE_RUPEES_PER_POINT;
+    const rs = this.rupeesPerPoint();
     const dayStop =
       this.dayLossStopPts > 0
         ? `day stop −₹${this.dayLossStopPts * rs}`
