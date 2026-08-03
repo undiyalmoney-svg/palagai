@@ -1,6 +1,7 @@
 # 39 — Natural Gas Mini daily-profit DNA (2026-08-03)
 
 **Status:** Research candidate on **Kite MCX** bars · **not** live-wired as a named profile  
+**See also:** Doc **40** for multi-trade / higher-IS-profit bounce (more fills; lower OOS ₹/day).  
 **Instrument:** `NATGASMINI` · ₹50/pt · strike step 5  
 **Data:** Kite 5m merge · **2026-03-30 → 2026-08-03** (live months only; expired FUT tokens not in instruments dump)  
 **Scripts:** `scripts/natgas-daily-profit-hunt.py` · `scripts/fetch-natgasmini-history.ts`  
