@@ -567,7 +567,9 @@ export class PaperTradeDeskService {
       if (this.deskRunOptions.enableNatGas) {
         const resolvedFuture = resolveNatGasMiniFuturesToken(allInstruments);
         if (!resolvedFuture) {
-          throw new Error('No live NATGASMINI futures contract. Settings → Refresh Instruments.');
+          throw new Error(
+            'No live NATGASMINI futures in cache. Settings → Refresh Instruments (needs v1.3.40+ so Nat Gas is kept in the slim dump).',
+          );
         }
         natGasFuture = {
           instrumentToken: resolvedFuture.instrumentToken,
@@ -1099,7 +1101,9 @@ export class PaperTradeDeskService {
       if (this.deskRunOptions.enableNatGas && mcxOpen) {
         const future = resolveNatGasMiniFuturesToken(allInstruments);
         if (!future) {
-          throw new Error('No live NATGASMINI futures contract.');
+          throw new Error(
+            'No live NATGASMINI futures in cache. Settings → Refresh Instruments (needs v1.3.40+).',
+          );
         }
         if (this.liveLegs.length || this.crudeLive) {
           await delay(1500);
