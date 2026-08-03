@@ -29,9 +29,13 @@ import {
 export type CrudeStrategyProfileId =
   | 'all-green'
   | 'daily-profit'
+  | 'daily-profit-ng'
   | 'champion'
   | 'daily-income'
   | 'trap-confirm';
+
+/** Trap arm style — Nat Gas daily-profit uses trap-only (no soft bounce). */
+export type CrudeTrapEntryStyle = 'trap' | 'bounce' | 'both';
 
 export interface CrudeProtectParams {
   /** Peak MFE ₹ to arm trail (0 = off). */
@@ -86,6 +90,13 @@ export interface CrudeTradeParams extends CrudeProtectParams {
   defaultEnableEvening: boolean;
   /** Short UI blurb (1 lot × ₹10). */
   dailyBandLabel: string;
+  /**
+   * Trap pierce beyond swing (pts). Undefined → crude default pierce (8).
+   * Nat Gas daily-profit DNA uses 0.2.
+   */
+  piercePts?: number;
+  /** Trap arm style. Undefined → both trap + bounce (legacy crude trap). */
+  trapEntryStyle?: CrudeTrapEntryStyle;
 }
 
 const PROTECT_OFF: CrudeProtectParams = {
@@ -264,9 +275,42 @@ export const CRUDE_TRAP_CONFIRM_PARAMS: CrudeTradeParams = {
   ...PROTECT_OFF,
 };
 
+/**
+ * Nat Gas Mini Daily Profit — hunt DNA (doc 39).
+ * Trap-only · pierce 0.2 · fixed SL 1.5 / TP 3 · confirm · first-win · max 1/day.
+ * ₹50/pt → SL ₹75 / TP ₹150 / day loss ₹150.
+ */
+export const NATGAS_DAILY_PROFIT_PARAMS: CrudeTradeParams = {
+  profileId: 'daily-profit-ng',
+  label: 'Daily Profit (NG)',
+  stopPts: 1.5,
+  morningTargetPts: 3,
+  eveningTargetPts: 3,
+  targetRMultiple: 0,
+  dayLossStopPts: 3,
+  strictDayLossPts: 3,
+  dayProfitLockPts: 0,
+  entryMode: 'trap-confirm',
+  requireConfirm: true,
+  firstWinLock: true,
+  eveningEntryStart: '10:00',
+  eveningEntryEnd: '22:00',
+  sessionOrStart: CRUDE_SOR_OR_START,
+  sessionOrEnd: CRUDE_SOR_OR_END,
+  maxOrWidth: CRUDE_SOR_MAX_OR_WIDTH,
+  maxEveningTradesDay: 1,
+  defaultEnableMorning: false,
+  defaultEnableEvening: true,
+  dailyBandLabel: 'NG trap · pierce 0.2 · SL1.5/TP3 · confirm · first-win · max 1/day',
+  piercePts: 0.2,
+  trapEntryStyle: 'trap',
+  ...PROTECT_OFF,
+};
+
 export const CRUDE_STRATEGY_PROFILES: Record<CrudeStrategyProfileId, CrudeTradeParams> = {
   'all-green': CRUDE_ALL_GREEN_PARAMS,
   'daily-profit': CRUDE_DAILY_PROFIT_PARAMS,
+  'daily-profit-ng': NATGAS_DAILY_PROFIT_PARAMS,
   champion: CRUDE_CHAMPION_PARAMS,
   'daily-income': CRUDE_DAILY_INCOME_PARAMS,
   'trap-confirm': CRUDE_TRAP_CONFIRM_PARAMS,

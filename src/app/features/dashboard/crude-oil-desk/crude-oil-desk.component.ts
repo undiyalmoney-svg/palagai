@@ -40,8 +40,12 @@ export class CrudeOilDeskComponent implements OnInit, OnDestroy {
   @Input()
   set miniAsset(v: McxMiniAssetId) {
     const next: McxMiniAssetId = v === 'natgas' ? 'natgas' : 'crude';
+    const changed = this.miniAssetSig() !== next;
     this.miniAssetSig.set(next);
     this.desk.setMiniAsset(next);
+    if (changed) {
+      this.applyAssetDefaults();
+    }
   }
   get miniAsset(): McxMiniAssetId {
     return this.miniAssetSig();
@@ -66,18 +70,10 @@ export class CrudeOilDeskComponent implements OnInit, OnDestroy {
   protected realOrdersAck = false;
   protected lots = 1;
   /**
-   * Default All-Green (09:00–23:00 Session OR; trade whenever desk runs).
-   * Daily Profit / Champion / Trap Confirm / Daily Income selectable.
+   * Crude default: All-Green. Nat Gas Experiments default: Daily Profit (NG) hunt DNA.
    */
   protected strategyProfile: CrudeStrategyProfileId = 'all-green';
-  protected readonly strategyProfiles = [
-    CRUDE_STRATEGY_PROFILES['all-green'],
-    CRUDE_STRATEGY_PROFILES['daily-profit'],
-    CRUDE_STRATEGY_PROFILES.champion,
-    CRUDE_STRATEGY_PROFILES['trap-confirm'],
-    CRUDE_STRATEGY_PROFILES['daily-income'],
-  ];
-  /** Morning ORB 10:00–12:00 (off for All-Green / Daily Profit). */
+  /** Morning ORB 10:00–12:00 (off for All-Green / Daily Profit / NG). */
   protected enableMorning = false;
   /** Session / evening window (All-Green default on · 09:00–23:00). */
   protected enableEvening = true;
@@ -97,6 +93,36 @@ export class CrudeOilDeskComponent implements OnInit, OnDestroy {
 
   protected activeProfile() {
     return resolveCrudeStrategyProfile(this.strategyProfile);
+  }
+
+  /** Nat Gas Experiments: NG Daily Profit first; Crude keeps classic list. */
+  protected strategyProfiles(): ReturnType<typeof resolveCrudeStrategyProfile>[] {
+    if (this.miniAssetSig() === 'natgas') {
+      return [
+        CRUDE_STRATEGY_PROFILES['daily-profit-ng'],
+        CRUDE_STRATEGY_PROFILES['trap-confirm'],
+        CRUDE_STRATEGY_PROFILES['all-green'],
+        CRUDE_STRATEGY_PROFILES['daily-profit'],
+        CRUDE_STRATEGY_PROFILES.champion,
+        CRUDE_STRATEGY_PROFILES['daily-income'],
+      ];
+    }
+    return [
+      CRUDE_STRATEGY_PROFILES['all-green'],
+      CRUDE_STRATEGY_PROFILES['daily-profit'],
+      CRUDE_STRATEGY_PROFILES.champion,
+      CRUDE_STRATEGY_PROFILES['trap-confirm'],
+      CRUDE_STRATEGY_PROFILES['daily-income'],
+    ];
+  }
+
+  private applyAssetDefaults(): void {
+    if (this.miniAssetSig() === 'natgas') {
+      this.strategyProfile = 'daily-profit-ng';
+    } else if (this.strategyProfile === 'daily-profit-ng') {
+      this.strategyProfile = 'all-green';
+    }
+    this.onStrategyProfileChange();
   }
 
   protected readonly resultView = computed(() => {
@@ -121,6 +147,7 @@ export class CrudeOilDeskComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.desk.setMiniAsset(this.miniAssetSig());
+    this.applyAssetDefaults();
     this.lots = this.lotsPreference.get();
   }
 
@@ -133,6 +160,13 @@ export class CrudeOilDeskComponent implements OnInit, OnDestroy {
   protected profileSlTpLabel(): string {
     const p = this.activeProfile();
     const rs = this.rsPerPoint();
+    if (p.profileId === 'daily-profit-ng' || (p.entryMode === 'trap-confirm' && p.targetRMultiple <= 0)) {
+      const pierce = p.piercePts != null ? ` · pierce ${p.piercePts}` : '';
+      const fw = p.firstWinLock ? ' · first-win' : '';
+      const max =
+        p.maxEveningTradesDay > 0 ? ` · max ${p.maxEveningTradesDay}/day` : '';
+      return `NG trap+confirm${pierce} · SL₹${p.stopPts * rs}/TP₹${p.eveningTargetPts * rs}${fw}${max} · day −₹${p.dayLossStopPts * rs}`;
+    }
     if (p.entryMode === 'trap-confirm') {
       return `Trap+confirm ${p.targetRMultiple}R · day −₹${p.dayLossStopPts * rs}`;
     }

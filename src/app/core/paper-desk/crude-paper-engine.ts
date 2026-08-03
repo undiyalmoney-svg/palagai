@@ -379,13 +379,27 @@ export function replayPaperOnCrude(params: {
     let book: CrudeSessionBook = 'morning';
 
     if (trapMode) {
+      const fixedTrap =
+        tradeParams.targetRMultiple <= 0 &&
+        tradeParams.stopPts > 0 &&
+        (tradeParams.eveningTargetPts > 0 || tradeParams.morningTargetPts > 0);
       const trap = runCrudeTrapConfirm({
         candle,
         series: candles,
         state: state as CrudeTrapState,
         dayLossStopPts,
         dayProfitLockPts,
-        targetRMultiple: tradeParams.targetRMultiple || undefined,
+        targetRMultiple: fixedTrap ? 0 : tradeParams.targetRMultiple || undefined,
+        stopPts: fixedTrap ? tradeParams.stopPts : undefined,
+        targetPts: fixedTrap
+          ? tradeParams.eveningTargetPts || tradeParams.morningTargetPts
+          : undefined,
+        pierce: tradeParams.piercePts,
+        trapEntryStyle: tradeParams.trapEntryStyle,
+        entryStart: tradeParams.eveningEntryStart,
+        entryEnd: tradeParams.eveningEntryEnd,
+        maxTradesDay: tradeParams.maxEveningTradesDay,
+        firstWinLock: tradeParams.firstWinLock,
       });
       if (trap.action === 'BUY' || trap.action === 'SELL') {
         signal = trap;
