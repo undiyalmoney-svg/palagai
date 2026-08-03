@@ -25,8 +25,19 @@ export function slimTradingInstruments(list: Instrument[]): Instrument[] {
       }
       return false;
     }
-    if (exchange === 'MCX' && (sym.includes('CRUDE') || name.includes('CRUDE'))) {
-      return true;
+    if (exchange === 'MCX') {
+      // Crude Oil Mini + Natural Gas Mini (Trade Desk / Experiments MCX books).
+      if (sym.includes('CRUDE') || name.includes('CRUDE')) {
+        return true;
+      }
+      if (
+        sym.includes('NATGAS') ||
+        name.includes('NATGAS') ||
+        sym.includes('NATURALGAS') ||
+        name.includes('NATURALGAS')
+      ) {
+        return true;
+      }
     }
     if (exchange === 'NSE') {
       if (itype === 'EQ' || itype === 'BE' || itype === 'IDX') {
