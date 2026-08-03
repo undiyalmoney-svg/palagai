@@ -26,24 +26,33 @@ const DELAY_MS = 1100;
 
 type Candle = { date: string; open: number; high: number; low: number; close: number; volume: number };
 
-function resolveAuth(): string {
-  if (process.env.KITE_AUTH?.trim()) {
-    const a = process.env.KITE_AUTH.trim();
-    return a.startsWith('token ') ? a : `token ${a}`;
-  }
+function normalizeAuth(raw: string): string {
+  const a = raw.trim();
+  return a.startsWith('token ') ? a : `token ${a}`;
+}
+
+/** Candidates in preference order — assertAuth picks the first that works. */
+function authCandidates(): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  const push = (raw: string | undefined | null) => {
+    if (!raw?.trim()) return;
+    const a = normalizeAuth(raw);
+    if (seen.has(a)) return;
+    seen.add(a);
+    out.push(a);
+  };
+  push(process.env.KITE_AUTH);
   const kiteAuthPath = join(root, '.kite-auth');
-  if (existsSync(kiteAuthPath)) {
-    const a = readFileSync(kiteAuthPath, 'utf8').trim();
-    if (a) return a.startsWith('token ') ? a : `token ${a}`;
-  }
+  if (existsSync(kiteAuthPath)) push(readFileSync(kiteAuthPath, 'utf8'));
   const localEnv = join(root, 'src/environments/environment.local.ts');
   if (existsSync(localEnv)) {
     const src = readFileSync(localEnv, 'utf8');
     const apiKey = src.match(/apiKey:\s*'([^']+)'/)?.[1];
     const accessToken = src.match(/accessToken:\s*'([^']+)'/)?.[1];
-    if (apiKey && accessToken) return `token ${apiKey}:${accessToken}`;
+    if (apiKey && accessToken) push(`${apiKey}:${accessToken}`);
   }
-  throw new Error('No Kite auth — set KITE_AUTH or .kite-auth / environment.local.ts');
+  return out;
 }
 
 function pad(n: number): string {
@@ -186,21 +195,32 @@ async function fetchRange(
   return all;
 }
 
-async function assertAuth(authorization: string): Promise<void> {
+async function probeAuth(authorization: string): Promise<string | null> {
   const res = await fetch('https://api.kite.trade/user/profile', {
     headers: { 'X-Kite-Version': '3', Authorization: authorization },
   });
   const body = (await res.json()) as { status?: string; message?: string };
-  if (body.status !== 'success') {
-    throw new Error(
-      `Kite auth failed: ${body.message ?? res.status}. Refresh .kite-auth (apiKey + accessToken), then re-run.`,
-    );
+  return body.status === 'success' ? null : (body.message ?? `HTTP ${res.status}`);
+}
+
+async function resolveWorkingAuth(): Promise<string> {
+  const candidates = authCandidates();
+  if (!candidates.length) {
+    throw new Error('No Kite auth — set KITE_AUTH or .kite-auth / environment.local.ts');
   }
+  const errors: string[] = [];
+  for (const authorization of candidates) {
+    const err = await probeAuth(authorization);
+    if (!err) return authorization;
+    errors.push(err);
+  }
+  throw new Error(
+    `Kite auth failed (${errors[0]}). Refresh .kite-auth (apiKey + accessToken), then re-run.`,
+  );
 }
 
 async function main(): Promise<void> {
-  const authorization = resolveAuth();
-  await assertAuth(authorization);
+  const authorization = await resolveWorkingAuth();
   console.log(`Auth OK. Fetch ${PREFIXES.join('|')} 5m ${FROM.slice(0, 10)} → ${TO.slice(0, 10)}`);
 
   const contracts = await loadContracts(authorization, FROM, TO);

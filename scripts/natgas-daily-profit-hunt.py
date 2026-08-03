@@ -2,8 +2,8 @@
 """
 Natural Gas Mini daily-profit DNA hunt.
 
-Default cache: reports/analyst-cache/natgasmini-60m-proxy.json (Yahoo NG=F × 85, ₹50/pt)
-Override: CACHE=.../natgasmini-5m-merged.json python3 scripts/natgas-daily-profit-hunt.py
+Default cache: reports/analyst-cache/natgasmini-5m-merged.json (Kite MCX or proxy, ₹50/pt)
+Override: CACHE=.../natgasmini-60m-proxy.json python3 scripts/natgas-daily-profit-hunt.py
 
   python3 scripts/natgas-daily-profit-hunt.py
 """
@@ -17,7 +17,7 @@ from pathlib import Path
 import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
-CACHE = Path(os.environ.get("CACHE", ROOT / "reports" / "analyst-cache" / "natgasmini-60m-proxy.json"))
+CACHE = Path(os.environ.get("CACHE", ROOT / "reports" / "analyst-cache" / "natgasmini-5m-merged.json"))
 META = ROOT / "reports" / "analyst-cache" / "natgasmini-5m-merged.meta.json"
 OUT = ROOT / "reports" / "natgas-daily-profit"
 OUT.mkdir(parents=True, exist_ok=True)
