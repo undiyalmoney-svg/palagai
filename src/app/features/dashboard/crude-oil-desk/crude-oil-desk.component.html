@@ -94,7 +94,7 @@
           [disabled]="busy() || snapshot().running"
           aria-label="Crude strategy profile"
         >
-          @for (p of strategyProfiles; track p.profileId) {
+          @for (p of strategyProfiles(); track p.profileId) {
             <option [ngValue]="p.profileId">{{ p.label }}</option>
           }
         </select>

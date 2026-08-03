@@ -186,6 +186,10 @@ export function isBankPdhlInstrument(instrumentId?: string | null): boolean {
 
 export function rupeesPerPointForInstrument(instrumentId?: string | null): number {
   const id = (instrumentId ?? '').toLowerCase();
+  if (id === 'natgas-mini' || id.includes('natgas') || id.includes('naturalgas')) {
+    // MCX Natural Gas Mini — ₹50 per futures point per lot.
+    return 50;
+  }
   if (id === 'crude-oil-mini' || id === 'crude-oil' || id.includes('crude')) {
     // MCX Crude Oil Mini — ₹10 per futures point per lot.
     return 10;

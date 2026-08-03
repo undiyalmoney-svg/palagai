@@ -40,6 +40,15 @@ export const CRUDE_OIL_MINI_INSTRUMENT: TesterInstrument = {
   exchange: 'MCX',
 };
 
+/** MCX Natural Gas Mini — Trade Desk / Experiments (Daily Profit NG DNA). */
+export const NATGAS_MINI_INSTRUMENT: TesterInstrument = {
+  id: 'natgas-mini',
+  instrumentToken: 0,
+  tradingSymbol: 'NATGASMINI',
+  name: 'Natural Gas Mini',
+  exchange: 'MCX',
+};
+
 /** Placeholder — reserved for a future stocks experience. */
 export const STOCKS_TAB_ID = 'stocks';
 
@@ -57,6 +66,9 @@ export function getTesterInstrument(id: string): TesterInstrument | undefined {
   }
   if (id === CRUDE_OIL_MINI_INSTRUMENT.id) {
     return CRUDE_OIL_MINI_INSTRUMENT;
+  }
+  if (id === NATGAS_MINI_INSTRUMENT.id) {
+    return NATGAS_MINI_INSTRUMENT;
   }
   return undefined;
 }

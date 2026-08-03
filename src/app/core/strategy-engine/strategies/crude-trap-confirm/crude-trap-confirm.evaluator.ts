@@ -1,7 +1,10 @@
 /**
  * Crude Oil Mini — S/R Trap + Confirm (Trap DNA port).
  * Same idea as Nifty Trap: wick beyond swing S/R → close back inside → next-bar confirm.
- * Used by profile `trap-confirm` with peak-trail / soft cutoff / day ₹ caps.
+ *
+ * Modes:
+ * - Legacy crude: wick SL + R-multiple TP · pierce 8 · trap+bounce
+ * - Fixed (Nat Gas daily-profit): fill ± stopPts / ± targetPts · configurable pierce · trap-only
  */
 import { Candle } from '../../../models/candle.model';
 import { extractTradeDate } from '../../../utils/trade-date.util';
@@ -14,6 +17,7 @@ import {
   CrudePdhlSignal,
   CrudePdhlState,
 } from '../crude-pdhl-evening/crude-pdhl-evening.evaluator';
+import type { CrudeTrapEntryStyle } from '../crude-pdhl-evening/crude-strategy-profile';
 
 export const CRUDE_TRAP_ENTRY_START = '10:00';
 export const CRUDE_TRAP_ENTRY_END = '22:00';
@@ -29,6 +33,7 @@ export const CRUDE_TRAP_RR = 3.5;
 export interface CrudeTrapState extends CrudePdhlState {
   pending: {
     dir: 1 | -1;
+    /** Wick stop (legacy). Ignored in fixedStop mode at fill. */
     stop: number;
     signalClose: number;
   } | null;
@@ -90,10 +95,18 @@ export function runCrudeTrapConfirm(params: {
   state: CrudeTrapState;
   dayLossStopPts?: number;
   dayProfitLockPts?: number;
+  /** R-multiple target. 0 / omitted with stopPts+targetPts → fixed SL/TP mode. */
   targetRMultiple?: number;
+  /** Fixed stop distance from fill (pts). */
+  stopPts?: number;
+  /** Fixed target distance from fill (pts). */
+  targetPts?: number;
+  pierce?: number;
+  trapEntryStyle?: CrudeTrapEntryStyle;
   entryStart?: string;
   entryEnd?: string;
   maxTradesDay?: number;
+  firstWinLock?: boolean;
 }): CrudePdhlSignal {
   const { candle, series, state } = params;
   const dayLossStopPts = params.dayLossStopPts ?? CRUDE_DAY_LOSS_STOP_PTS;
@@ -102,6 +115,15 @@ export function runCrudeTrapConfirm(params: {
   const entryStart = params.entryStart ?? CRUDE_TRAP_ENTRY_START;
   const entryEnd = params.entryEnd ?? CRUDE_TRAP_ENTRY_END;
   const maxDay = params.maxTradesDay ?? CRUDE_TRAP_MAX_TRADES_DAY;
+  const pierce = params.pierce ?? CRUDE_TRAP_PIERCE;
+  const style: CrudeTrapEntryStyle = params.trapEntryStyle ?? 'both';
+  const firstWinLock = params.firstWinLock === true;
+  const fixedStop =
+    (params.stopPts ?? 0) > 0 &&
+    (params.targetPts ?? 0) > 0 &&
+    !(params.targetRMultiple != null && params.targetRMultiple > 0);
+  const stopPts = params.stopPts ?? 0;
+  const targetPts = params.targetPts ?? 0;
 
   const tradingDate = extractTradeDate(candle.date);
   const month = tradingDate.slice(0, 7);
@@ -134,6 +156,9 @@ export function runCrudeTrapConfirm(params: {
     state.dayStoppedReason = `Day max loss ${state.dayNetPts.toFixed(1)} pts`;
     return wait(candle, state.dayStoppedReason);
   }
+  if (firstWinLock && state.wonToday) {
+    return wait(candle, 'First-win lock — done for day');
+  }
   if (crudeTradeCapActive(maxDay) && state.tradesToday >= maxDay) {
     return wait(candle, `Max ${maxDay} trap trades/day`);
   }
@@ -163,6 +188,28 @@ export function runCrudeTrapConfirm(params: {
       return wait(candle, 'Crude trap confirm failed');
     }
     const fill = candle.open;
+
+    if (fixedStop) {
+      const stop = p.dir === 1 ? fill - stopPts : fill + stopPts;
+      const target = p.dir === 1 ? fill + targetPts : fill - targetPts;
+      if (crudeDayLossActive(dayLossStopPts) && state.dayNetPts - stopPts < -dayLossStopPts) {
+        return {
+          action: 'NO_TRADE',
+          entryPrice: fill,
+          stopLoss: fill,
+          target: fill,
+          reason: 'Next SL would breach day max loss',
+        };
+      }
+      return {
+        action: p.dir === 1 ? 'BUY' : 'SELL',
+        entryPrice: fill,
+        stopLoss: stop,
+        target,
+        reason: `NG trap confirm ${p.dir === 1 ? 'BUY' : 'SELL'} · SL${stopPts}/TP${targetPts} · day ${state.dayNetPts.toFixed(1)}`,
+      };
+    }
+
     const stop = p.dir === 1 ? Math.min(p.stop, fill - 1) : Math.max(p.stop, fill + 1);
     const risk = Math.abs(fill - stop);
     if (risk < CRUDE_TRAP_MIN_RISK || risk > CRUDE_TRAP_MAX_RISK) {
@@ -205,19 +252,23 @@ export function runCrudeTrapConfirm(params: {
   const oo = candle.open;
   const hh = candle.high;
   const ll = candle.low;
-  const pierce = CRUDE_TRAP_PIERCE;
   const pad = CRUDE_TRAP_SL_PAD;
   const rng = Math.max(hh - ll, 1e-9);
 
-  const trapBuy = ll < sl - pierce && cc > sl && cc > oo;
-  const trapSell = hh > sh + pierce && cc < sh && cc < oo;
+  const allowTrap = style === 'trap' || style === 'both';
+  const allowBounce = style === 'bounce' || style === 'both';
+
+  const trapBuy = allowTrap && ll < sl - pierce && cc > sl && cc > oo;
+  const trapSell = allowTrap && hh > sh + pierce && cc < sh && cc < oo;
   const bounceBuy =
+    allowBounce &&
     ll <= sl + pierce &&
     ll >= sl - pierce * 2 &&
     cc > oo &&
     cc >= sl &&
     (hh - cc) / rng < 0.35;
   const bounceSell =
+    allowBounce &&
     hh >= sh - pierce &&
     hh <= sh + pierce * 2 &&
     cc < oo &&
@@ -228,23 +279,25 @@ export function runCrudeTrapConfirm(params: {
   let stop = 0;
   if ((trapBuy || bounceBuy) && cc > ema) {
     dir = 1;
-    stop = ll - pad;
+    stop = fixedStop ? cc - stopPts : ll - pad;
   } else if ((trapSell || bounceSell) && cc < ema) {
     dir = -1;
-    stop = hh + pad;
+    stop = fixedStop ? cc + stopPts : hh + pad;
   }
   if (!dir) {
-    return wait(candle, 'No crude S/R trap / bounce');
+    return wait(candle, style === 'trap' ? 'No S/R trap' : 'No crude S/R trap / bounce');
   }
 
-  const risk = Math.abs(cc - stop);
-  if (risk < CRUDE_TRAP_MIN_RISK || risk > CRUDE_TRAP_MAX_RISK) {
-    return wait(candle, `Arm risk ${risk.toFixed(1)} outside band`);
+  if (!fixedStop) {
+    const risk = Math.abs(cc - stop);
+    if (risk < CRUDE_TRAP_MIN_RISK || risk > CRUDE_TRAP_MAX_RISK) {
+      return wait(candle, `Arm risk ${risk.toFixed(1)} outside band`);
+    }
   }
 
   state.pending = { dir, stop, signalClose: cc };
   return wait(
     candle,
-    dir === 1 ? 'Crude trap BUY armed — wait confirm' : 'Crude trap SELL armed — wait confirm',
+    dir === 1 ? 'Trap BUY armed — wait confirm' : 'Trap SELL armed — wait confirm',
   );
 }

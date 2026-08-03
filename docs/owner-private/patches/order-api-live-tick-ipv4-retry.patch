@@ -1,0 +1,283 @@
+From e8f9c3481442fb5afb68ba113d3b25cef27fc5ae Mon Sep 17 00:00:00 2001
+From: Cursor Agent <cursoragent@cursor.com>
+Date: Mon, 3 Aug 2026 09:33:51 +0000
+Subject: [PATCH] Fix Auto Live Tick AggregateError by forcing IPv4 to Kite.
+
+Droplet DNS returns AAAA but IPv6 cannot reach api.kite.trade, so Node
+Happy Eyeballs times out as AggregateError during historical candle ticks.
+---
+ live/kite-market.js      | 91 ++++++++++++++++++++++++----------------
+ live/live.worker.js      | 20 ++++++---
+ services/kite.service.js |  3 ++
+ utils/kite-http.js       | 69 ++++++++++++++++++++++++++++++
+ 4 files changed, 141 insertions(+), 42 deletions(-)
+ create mode 100644 utils/kite-http.js
+
+diff --git a/live/kite-market.js b/live/kite-market.js
+index 8704574..b72a553 100644
+--- a/live/kite-market.js
++++ b/live/kite-market.js
+@@ -4,11 +4,13 @@
+  */
+ const axios = require('axios');
+ const { config } = require('../config/env');
++const { kiteAxiosNetwork, withRetry } = require('../utils/kite-http');
+ 
+ const client = axios.create({
+   baseURL: config.kiteApiBaseUrl || 'https://api.kite.trade',
+   timeout: 45_000,
+   validateStatus: () => true,
++  ...kiteAxiosNetwork,
+ });
+ 
+ function headers(authorization) {
+@@ -90,50 +92,65 @@ function parseInstrumentsCsv(csv) {
+ }
+ 
+ async function fetchInstruments(authorization) {
+-  const res = await client.get('/instruments', {
+-    headers: headers(authorization),
+-    responseType: 'text',
+-    transformResponse: [(d) => d],
+-  });
+-  if (res.status >= 400) {
+-    throw new Error(`instruments HTTP ${res.status}`);
+-  }
+-  return parseInstrumentsCsv(res.data);
++  return withRetry(
++    async () => {
++      const res = await client.get('/instruments', {
++        headers: headers(authorization),
++        responseType: 'text',
++        transformResponse: [(d) => d],
++      });
++      if (res.status >= 400) {
++        throw new Error(`instruments HTTP ${res.status}`);
++      }
++      return parseInstrumentsCsv(res.data);
++    },
++    { label: 'instruments' },
++  );
+ }
+ 
+ async function fetchHistorical5m(authorization, instrumentToken, fromDate, toDate) {
+-  const res = await client.get(`/instruments/historical/${instrumentToken}/5minute`, {
+-    headers: headers(authorization),
+-    params: { from: fromDate, to: toDate },
+-  });
+-  if (res.status >= 400 || res.data?.status === 'error') {
+-    throw new Error(
+-      res.data?.message || `historical HTTP ${res.status} token=${instrumentToken}`,
+-    );
+-  }
+-  const rows = res.data?.data?.candles || [];
+-  return rows.map((r) => ({
+-    date: String(r[0]),
+-    open: Number(r[1]),
+-    high: Number(r[2]),
+-    low: Number(r[3]),
+-    close: Number(r[4]),
+-    volume: Number(r[5]) || 0,
+-  }));
++  return withRetry(
++    async () => {
++      const res = await client.get(`/instruments/historical/${instrumentToken}/5minute`, {
++        headers: headers(authorization),
++        params: { from: fromDate, to: toDate },
++      });
++      if (res.status >= 400 || res.data?.status === 'error') {
++        throw new Error(
++          res.data?.message || `historical HTTP ${res.status} token=${instrumentToken}`,
++        );
++      }
++      const rows = res.data?.data?.candles || [];
++      return rows.map((r) => ({
++        date: String(r[0]),
++        open: Number(r[1]),
++        high: Number(r[2]),
++        low: Number(r[3]),
++        close: Number(r[4]),
++        volume: Number(r[5]) || 0,
++      }));
++    },
++    { label: `hist-${instrumentToken}` },
++  );
+ }
+ 
+ async function fetchQuotes(authorization, keys) {
+   if (!keys.length) return {};
+-  const res = await client.get('/quote', {
+-    headers: headers(authorization),
+-    params: { i: keys },
+-    paramsSerializer: (params) =>
+-      (params.i || []).map((k) => `i=${encodeURIComponent(k)}`).join('&'),
+-  });
+-  if (res.status >= 400 || res.data?.status === 'error') {
+-    throw new Error(res.data?.message || `quote HTTP ${res.status}`);
+-  }
+-  return res.data?.data || {};
++  return withRetry(
++    async () => {
++      const res = await client.get('/quote', {
++        headers: headers(authorization),
++        params: { i: keys },
++        paramsSerializer: (params) =>
++          (params.i || []).map((k) => `i=${encodeURIComponent(k)}`).join('&'),
++      });
++      if (res.status >= 400 || res.data?.status === 'error') {
++        throw new Error(res.data?.message || `quote HTTP ${res.status}`);
++      }
++      return res.data?.data || {};
++    },
++    { label: 'quote' },
++  );
+ }
+ 
+ module.exports = {
+diff --git a/live/live.worker.js b/live/live.worker.js
+index e3c2541..6648a2d 100644
+--- a/live/live.worker.js
++++ b/live/live.worker.js
+@@ -17,6 +17,7 @@ const {
+ } = require('./strategy-core.cjs');
+ const { fetchInstruments, fetchHistorical5m } = require('./kite-market');
+ const { LiveBroker } = require('./live-broker');
++const { formatAxiosNetworkError } = require('../utils/kite-http');
+ 
+ const CRUDE_EXIT_BY = '23:10';
+ const LOOKBACK_DAYS = 12;
+@@ -149,10 +150,19 @@ class LiveWorker {
+ 
+   async refreshToday(authorization) {
+     const { date: today } = istParts();
+-    const [n, b] = await Promise.all([
+-      fetchHistorical5m(authorization, NIFTY_50_INSTRUMENT.instrumentToken, today, today),
+-      fetchHistorical5m(authorization, BANK_NIFTY_INSTRUMENT.instrumentToken, today, today),
+-    ]);
++    // Sequential (not Promise.all): fewer parallel sockets to Kite; clearer errors.
++    const n = await fetchHistorical5m(
++      authorization,
++      NIFTY_50_INSTRUMENT.instrumentToken,
++      today,
++      today,
++    );
++    const b = await fetchHistorical5m(
++      authorization,
++      BANK_NIFTY_INSTRUMENT.instrumentToken,
++      today,
++      today,
++    );
+     this.candles.nifty = mergeCandles(this.candles.nifty, n);
+     this.candles.bank = mergeCandles(this.candles.bank, b);
+     if (this.crudeFuture?.instrumentToken) {
+@@ -308,7 +318,7 @@ class LiveWorker {
+         `Live tick · ${now} IST · real=${!!config.realOrders} · N${config.enableNifty ? 1 : 0}/B${config.enableBank ? 1 : 0}/C${config.enableCrude ? 1 : 0}`,
+       );
+     } catch (err) {
+-      const msg = err?.message || String(err);
++      const msg = formatAxiosNetworkError(err);
+       this.pushEvent('ERROR', `Tick failed: ${msg}`);
+       this.heartbeat(`Tick error: ${msg}`);
+       console.error('[live-worker]', err);
+diff --git a/services/kite.service.js b/services/kite.service.js
+index f82b657..82e4717 100644
+--- a/services/kite.service.js
++++ b/services/kite.service.js
+@@ -1,9 +1,11 @@
+ const axios = require('axios');
+ const { config } = require('../config/env');
++const { kiteAxiosNetwork } = require('../utils/kite-http');
+ 
+ /**
+  * Thin Kite Connect client for order-related endpoints only.
+  * Always uses this machine's egress IP (DigitalOcean static IP).
++ * IPv4-only — droplet has no working IPv6 path to api.kite.trade.
+  */
+ class KiteService {
+   constructor() {
+@@ -11,6 +13,7 @@ class KiteService {
+       baseURL: config.kiteApiBaseUrl,
+       timeout: 30_000,
+       validateStatus: () => true,
++      ...kiteAxiosNetwork,
+     });
+   }
+ 
+diff --git a/utils/kite-http.js b/utils/kite-http.js
+new file mode 100644
+index 0000000..16f457c
+--- /dev/null
++++ b/utils/kite-http.js
+@@ -0,0 +1,69 @@
++/**
++ * Axios / Node HTTP helpers for Kite egress.
++ *
++ * DO droplet DNS returns A + AAAA for api.kite.trade, but IPv6 is unreachable
++ * → Node Happy Eyeballs throws AggregateError [ETIMEDOUT] on historical ticks.
++ * Force IPv4 so Server Live candle fetches stay reliable.
++ */
++const http = require('http');
++const https = require('https');
++
++const httpAgent = new http.Agent({ family: 4, keepAlive: true });
++const httpsAgent = new https.Agent({ family: 4, keepAlive: true });
++
++/** Axios config fragment — attach to every Kite client. */
++const kiteAxiosNetwork = {
++  httpAgent,
++  httpsAgent,
++  // axios also honors `family` on newer versions; agents cover older ones
++  family: 4,
++};
++
++function formatAxiosNetworkError(err) {
++  if (!err) return 'unknown error';
++  const cause = err.cause || err;
++  const code = err.code || cause.code || '';
++  const parts = [];
++  if (code) parts.push(code);
++  const msg = err.message || String(err);
++  if (msg && msg !== 'AggregateError') parts.push(msg);
++  else if (cause?.message && cause.message !== 'AggregateError') parts.push(cause.message);
++  else parts.push('AggregateError');
++  if (Array.isArray(cause?.errors) && cause.errors.length) {
++    const nested = cause.errors
++      .map((e) => e?.code || e?.message)
++      .filter(Boolean)
++      .slice(0, 4)
++      .join(', ');
++    if (nested) parts.push(`[${nested}]`);
++  }
++  const url = err.config?.url || err._currentUrl;
++  if (url) parts.push(String(url).split('?')[0]);
++  return parts.join(' · ');
++}
++
++async function withRetry(fn, { retries = 2, delayMs = 800, label = 'kite' } = {}) {
++  let last;
++  for (let i = 0; i <= retries; i += 1) {
++    try {
++      return await fn();
++    } catch (err) {
++      last = err;
++      const code = err?.code || err?.cause?.code || '';
++      const retryable = /ETIMEDOUT|ECONNRESET|ECONNREFUSED|EAI_AGAIN|ENOTFOUND|socket hang up/i.test(
++        `${code} ${err?.message || ''}`,
++      );
++      if (!retryable || i === retries) throw err;
++      await new Promise((r) => setTimeout(r, delayMs * (i + 1)));
++      // eslint-disable-next-line no-console
++      console.warn(`[${label}] retry ${i + 1}/${retries} after ${code || err.message}`);
++    }
++  }
++  throw last;
++}
++
++module.exports = {
++  kiteAxiosNetwork,
++  formatAxiosNetworkError,
++  withRetry,
++};
+-- 
+2.43.0
+
