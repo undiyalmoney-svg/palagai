@@ -10,6 +10,8 @@ import { countIndexOptions } from '../utils/option-chain.util';
 
 const STORAGE_KEY = 'palagai_instruments';
 const META_KEY = 'palagai_instruments_meta';
+/** Must match when slimTradingInstruments keep-list changes (Nat Gas = 2). */
+export const INSTRUMENT_SLIM_SCHEMA = 2;
 
 @Injectable({ providedIn: 'root' })
 export class InstrumentStoreService {
@@ -71,7 +73,21 @@ export class InstrumentStoreService {
   }
 
   async ensureLoaded(): Promise<void> {
-    if (this.instruments().length > 0 && this.isRefreshedToday()) {
+    if (
+      this.instruments().length > 0 &&
+      this.isRefreshedToday() &&
+      this.isSlimSchemaCurrent()
+    ) {
+      return;
+    }
+
+    // Slim keep-list changed (e.g. Nat Gas) — force re-download even if refreshed today.
+    if (this.instruments().length > 0 && !this.isSlimSchemaCurrent()) {
+      try {
+        await this.refresh(true);
+      } catch {
+        // keep stale rows
+      }
       return;
     }
 
@@ -100,7 +116,13 @@ export class InstrumentStoreService {
   }
 
   async refresh(force: boolean): Promise<void> {
-    if (!force && this.instruments().length > 0 && this.isRefreshedToday()) {
+    const schemaOk = this.isSlimSchemaCurrent();
+    if (
+      !force &&
+      this.instruments().length > 0 &&
+      this.isRefreshedToday() &&
+      schemaOk
+    ) {
       return;
     }
 
@@ -137,7 +159,12 @@ export class InstrumentStoreService {
       totalInstruments: 0,
       fileSizeBytes: 0,
       status: 'missing',
+      slimSchema: INSTRUMENT_SLIM_SCHEMA,
     });
+  }
+
+  private isSlimSchemaCurrent(): boolean {
+    return (this.metadata().slimSchema ?? 0) >= INSTRUMENT_SLIM_SCHEMA;
   }
 
   private isRefreshedToday(): boolean {
@@ -173,6 +200,7 @@ export class InstrumentStoreService {
       totalInstruments: 0,
       fileSizeBytes: 0,
       status: 'missing',
+      slimSchema: 0,
     };
   }
 
@@ -186,6 +214,7 @@ export class InstrumentStoreService {
       totalInstruments: stored.length,
       fileSizeBytes: new Blob([json]).size,
       status: 'ready',
+      slimSchema: INSTRUMENT_SLIM_SCHEMA,
     };
 
     try {

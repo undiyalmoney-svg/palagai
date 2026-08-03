@@ -18,4 +18,9 @@ export interface InstrumentMetadata {
   totalInstruments: number;
   fileSizeBytes: number;
   status: 'ready' | 'missing' | 'stale' | 'error';
+  /**
+   * Bump when slimTradingInstruments keep-list changes so same-day caches
+   * re-download (e.g. Nat Gas Mini was added after Crude-only slim).
+   */
+  slimSchema?: number;
 }
