@@ -65,7 +65,8 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
   protected enableNifty = true;
   protected enableBank = true;
   protected enableCrude = true;
-  protected enableNatGas = true;
+  /** Off until Nat Gas DNA is fully vetted — opt in for Testing / Live. */
+  protected enableNatGas = false;
   /** Combined strict day loss ≈ −₹2,950 — off by default; user must opt in. */
   protected strictDayStop = false;
   /** Combined day profit lock ≈ +₹5,000. */
