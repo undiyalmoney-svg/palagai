@@ -38,12 +38,27 @@ describe('slimTradingInstruments', () => {
       }),
       row({ tradingSymbol: 'RELIANCE', exchange: 'NSE', instrumentType: 'EQ' }),
       row({ tradingSymbol: 'CRUDEOILM26AUGFUT', exchange: 'MCX', instrumentType: 'FUT', name: 'CRUDEOILM' }),
+      row({
+        tradingSymbol: 'NATGASMINI26AUGFUT',
+        exchange: 'MCX',
+        instrumentType: 'FUT',
+        name: 'NATGASMINI',
+      }),
+      row({
+        tradingSymbol: 'NATGASMINI26AUG250CE',
+        exchange: 'MCX',
+        instrumentType: 'CE',
+        name: 'NATGASMINI',
+        strike: 250,
+      }),
       row({ tradingSymbol: 'USDINR26AUGFUT', exchange: 'CDS', instrumentType: 'FUT' }),
     ]);
     expect(slim.map((i) => i.tradingSymbol)).toEqual([
       'NIFTY2580424800CE',
       'RELIANCE',
       'CRUDEOILM26AUGFUT',
+      'NATGASMINI26AUGFUT',
+      'NATGASMINI26AUG250CE',
     ]);
   });
 });
