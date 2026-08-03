@@ -94,7 +94,7 @@ export interface TradeDeskRunOptions {
   enableBank?: boolean;
   /** Crude Oil Mini All-Green parallel book on Trade Desk. Default on from UI. */
   enableCrude?: boolean;
-  /** Natural Gas Mini Daily Profit NG parallel book. Default on from UI. */
+  /** Natural Gas Mini Daily Profit NG parallel book. Default off — opt in from UI. */
   enableNatGas?: boolean;
   /** Combined strict day loss ≈ −₹2,950 (split if both index books on). */
   strictDayStop?: boolean;
@@ -167,7 +167,7 @@ export class PaperTradeDeskService {
     enableNifty: true,
     enableBank: true,
     enableCrude: true,
-    enableNatGas: true,
+    enableNatGas: false,
     strictDayStop: false,
     dayProfitLock: false,
     enableKutty: true,
@@ -242,7 +242,8 @@ export class PaperTradeDeskService {
     const enableNifty = options?.enableNifty !== false;
     const enableBank = options?.enableBank !== false;
     const enableCrude = options?.enableCrude !== false;
-    const enableNatGas = options?.enableNatGas !== false;
+    // Nat Gas is opt-in (unlike Crude) until the book is fully analyzed.
+    const enableNatGas = !!options?.enableNatGas;
     if (!enableNifty && !enableBank && !enableCrude && !enableNatGas) {
       throw new Error(
         'Select at least one book: Nifty 50, Bank Nifty, Crude Oil Mini, or Natural Gas Mini.',
