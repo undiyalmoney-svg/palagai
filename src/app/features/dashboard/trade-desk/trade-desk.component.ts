@@ -55,11 +55,13 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
   protected niftyLots = 1;
   protected bankLots = 1;
   protected crudeLots = 1;
+  protected natGasLots = 1;
 
   /** Trade Desk book + risk checkboxes (Testing + Live). All books ON by default. */
   protected enableNifty = true;
   protected enableBank = true;
   protected enableCrude = true;
+  protected enableNatGas = true;
   /** Combined strict day loss ≈ −₹2,950 — off by default; user must opt in. */
   protected strictDayStop = false;
   /** Combined day profit lock ≈ +₹5,000. */
@@ -73,8 +75,9 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
   protected readonly showKutty = computed(
     () => this.auth.currentUser()?.role === 'owner',
   );
-  /** Crude controls only if user has crude module (owner always has it). */
+  /** Crude / Nat Gas controls if user has crude module (owner always has it). */
   protected readonly showCrude = computed(() => this.auth.hasModule('crude'));
+  protected readonly showNatGas = computed(() => this.auth.hasModule('crude'));
 
   /** Testing result filter: Mon–Fri (fetch all, show selected weekdays). */
   protected readonly weekdayOptions = PAPER_WEEKDAY_OPTIONS;
@@ -110,6 +113,11 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
         name: 'All-Green',
         maxTradesLabel: '∞ t/day',
       },
+      natgas: {
+        id: 'natgas-daily-profit-ng',
+        name: 'Daily Profit (NG)',
+        maxTradesLabel: '1t/day',
+      },
       same: map.nifty[assignMode] === map.bank[assignMode],
     };
   });
@@ -140,13 +148,17 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
     this.niftyLots = preferred;
     this.bankLots = preferred;
     this.crudeLots = preferred;
-    // Friends: no Kutty. Crude only if module granted.
+    this.natGasLots = preferred;
+    // Friends: no Kutty. Crude/Nat Gas only if module granted.
     if (!this.showKutty()) {
       this.enableKutty = false;
       this.kuttyAlone = false;
     }
     if (!this.showCrude()) {
       this.enableCrude = false;
+    }
+    if (!this.showNatGas()) {
+      this.enableNatGas = false;
     }
     // Live continues in the root desk service across tab switches — restore UI mode.
     if (this.snapshot().running) {
@@ -156,15 +168,17 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
-    // Do not stopLive — Trade Desk + Crude must keep polling when you switch tabs.
+    // Do not stopLive — Trade Desk + MCX books must keep polling when you switch tabs.
   }
 
-  protected onLotsChange(book: 'nifty' | 'bank' | 'crude'): void {
+  protected onLotsChange(book: 'nifty' | 'bank' | 'crude' | 'natgas'): void {
     if (book === 'nifty') {
       this.niftyLots = Math.max(1, Math.floor(Number(this.niftyLots)) || 1);
       this.lotsPreference.set(this.niftyLots);
     } else if (book === 'bank') {
       this.bankLots = Math.max(1, Math.floor(Number(this.bankLots)) || 1);
+    } else if (book === 'natgas') {
+      this.natGasLots = Math.max(1, Math.floor(Number(this.natGasLots)) || 1);
     } else {
       this.crudeLots = Math.max(1, Math.floor(Number(this.crudeLots)) || 1);
     }
@@ -172,6 +186,9 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
 
   private lotsForInstrumentId(instrumentId: string): number {
     const id = instrumentId.toLowerCase();
+    if (id.includes('natgas') || id.includes('naturalgas')) {
+      return this.natGasLots;
+    }
     if (id.includes('crude')) {
       return this.crudeLots;
     }
@@ -207,14 +224,17 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
     const kuttyAlone = this.showKutty() && this.kuttyAlone;
     const enableKutty = this.showKutty() && (kuttyAlone || this.enableKutty);
     const enableCrude = this.showCrude() && this.enableCrude;
+    const enableNatGas = this.showNatGas() && this.enableNatGas;
     return {
       lots: this.niftyLots,
       niftyLots: this.niftyLots,
       bankLots: this.bankLots,
       crudeLots: this.crudeLots,
+      natGasLots: this.natGasLots,
       enableNifty: this.enableNifty,
       enableBank: this.enableBank,
       enableCrude,
+      enableNatGas,
       strictDayStop: this.strictDayStop,
       dayProfitLock: this.dayProfitLock,
       enableKutty,
@@ -241,8 +261,17 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
       this.enableCrude && this.showCrude()
         ? `Crude Oil Mini ×${this.crudeLots} (All-Green)`
         : null,
+      this.enableNatGas && this.showNatGas()
+        ? `Natural Gas Mini ×${this.natGasLots} (Daily Profit NG)`
+        : null,
     ].filter(Boolean);
     return parts.join(' + ') || 'none';
+  }
+
+  private anyMcxSelected(): boolean {
+    return (
+      (!!this.enableCrude && this.showCrude()) || (!!this.enableNatGas && this.showNatGas())
+    );
   }
 
   protected async onStart(): Promise<void> {
@@ -251,10 +280,10 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
       this.error.set('No Kite session. Open Get Token and paste your access token, then try again.');
       return;
     }
-    if (!this.enableNifty && !this.enableBank && !(this.enableCrude && this.showCrude())) {
+    if (!this.enableNifty && !this.enableBank && !this.anyMcxSelected()) {
       this.error.set(
-        this.showCrude()
-          ? 'Select at least one: Nifty 50, Bank Nifty, or Crude Oil Mini.'
+        this.showCrude() || this.showNatGas()
+          ? 'Select at least one: Nifty 50, Bank Nifty, Crude Oil Mini, or Natural Gas Mini.'
           : 'Select at least one: Nifty 50 or Bank Nifty.',
       );
       return;
@@ -263,6 +292,7 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
     this.niftyLots = Math.max(1, Math.floor(Number(this.niftyLots)) || 1);
     this.bankLots = Math.max(1, Math.floor(Number(this.bankLots)) || 1);
     this.crudeLots = Math.max(1, Math.floor(Number(this.crudeLots)) || 1);
+    this.natGasLots = Math.max(1, Math.floor(Number(this.natGasLots)) || 1);
     this.lotsPreference.set(this.niftyLots);
     const runOpts = this.buildRunOptions();
 
@@ -282,9 +312,7 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
           const riskBits = [
             this.strictDayStop ? 'strict day stop −₹2,950' : null,
             this.dayProfitLock ? 'day profit lock +₹5,000' : null,
-            this.enableCrude && this.showCrude()
-              ? 'Crude All-Green continues past 15:15'
-              : null,
+            this.anyMcxSelected() ? 'MCX books continue past 15:15' : null,
           ]
             .filter(Boolean)
             .join(', ');
@@ -355,6 +383,7 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
         nifty: this.niftyLots,
         bank: this.bankLots,
         crude: this.crudeLots,
+        natgas: this.natGasLots,
       },
     });
   });
@@ -445,9 +474,10 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
       },
       {
         title: 'Trade Desk Results',
-        subtitle: this.showCrude()
-          ? `Nifty / Bank / Crude paper · days ${view.weekdayLabel}`
-          : `Nifty / Bank paper · days ${view.weekdayLabel}`,
+        subtitle:
+          this.showCrude() || this.showNatGas()
+            ? `Nifty / Bank / Crude / Nat Gas paper · days ${view.weekdayLabel}`
+            : `Nifty / Bank paper · days ${view.weekdayLabel}`,
       },
     );
   }

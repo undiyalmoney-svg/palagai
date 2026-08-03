@@ -20,7 +20,7 @@ export interface LiveAssistantView {
   headline: string;
   detail: string;
   lines: LiveAssistantLine[];
-  /** Clock rules for mixed index + crude desks. */
+  /** Clock rules for mixed index + MCX desks. */
   clockNote?: string;
   /** Plain-language next action. */
   nextAction?: string;
@@ -76,19 +76,42 @@ function isCrudeStatus(s: PaperInstrumentStatus): boolean {
   return id.includes('crude') || name.includes('crude');
 }
 
+function isNatGasStatus(s: PaperInstrumentStatus): boolean {
+  const id = (s.instrumentId || '').toLowerCase();
+  const name = (s.instrumentName || '').toLowerCase();
+  return (
+    id.includes('natgas') ||
+    name.includes('nat gas') ||
+    name.includes('natural gas') ||
+    name.includes('natgas')
+  );
+}
+
+function isMcxStatus(s: PaperInstrumentStatus): boolean {
+  return isCrudeStatus(s) || isNatGasStatus(s);
+}
+
 function buildClockNote(params: {
   nowHhMm?: string;
   hasIndex: boolean;
   hasCrude: boolean;
+  hasNatGas: boolean;
 }): string | undefined {
-  if (!params.hasIndex && !params.hasCrude) {
+  const hasMcx = params.hasCrude || params.hasNatGas;
+  if (!params.hasIndex && !hasMcx) {
     return undefined;
   }
-  if (params.hasIndex && params.hasCrude) {
-    return 'Clock · Index books until 15:15 · Crude All-Green continues on MCX to ~23:10';
+  const mcxBits = [
+    params.hasCrude ? 'Crude All-Green' : null,
+    params.hasNatGas ? 'Nat Gas Daily Profit' : null,
+  ]
+    .filter(Boolean)
+    .join(' + ');
+  if (params.hasIndex && hasMcx) {
+    return `Clock · Index books until 15:15 · ${mcxBits} continues on MCX to ~23:10`;
   }
-  if (params.hasCrude) {
-    return 'Clock · Crude All-Green · entries ~09:00–23:00 · force exit ~23:10';
+  if (hasMcx) {
+    return `Clock · ${mcxBits} · entries ~09:00–23:00 · force exit ~23:10`;
   }
   return 'Clock · Index books 09:15–15:15 · no new entries after session exit';
 }
@@ -98,9 +121,11 @@ function buildNextAction(params: {
   realOrders: boolean;
   statuses: PaperInstrumentStatus[];
   hasCrude: boolean;
+  hasNatGas: boolean;
   nowHhMm?: string;
 }): string {
   const now = params.nowHhMm ?? '';
+  const hasMcx = params.hasCrude || params.hasNatGas;
   if (params.tone === 'blocked') {
     return 'Fix the Kite block (Instruments / Event log), then wait for the next tick.';
   }
@@ -109,12 +134,18 @@ function buildNextAction(params: {
       ? 'Managing open Kite leg(s) — protective SL is live; desk exits cancel SL then SELL the long.'
       : 'Managing paper leg(s) — watching target, SL, protect rules, and session exit.';
   }
-  if (params.hasCrude && now >= '15:15' && now <= '23:15') {
-    const crude = params.statuses.find(isCrudeStatus);
-    if (crude?.openTrade) {
-      return 'Index session stopped · Crude still in trade through MCX evening.';
+  if (hasMcx && now >= '15:15' && now <= '23:15') {
+    const mcxOpen = params.statuses.find((s) => isMcxStatus(s) && !!s.openTrade);
+    if (mcxOpen) {
+      return 'Index session stopped · MCX book still in trade through evening.';
     }
-    return 'Index session stopped · Crude All-Green still scanning MCX evening.';
+    const labels = [
+      params.hasCrude ? 'Crude All-Green' : null,
+      params.hasNatGas ? 'Nat Gas Daily Profit' : null,
+    ]
+      .filter(Boolean)
+      .join(' / ');
+    return `Index session stopped · ${labels} still scanning MCX evening.`;
   }
   if (params.tone === 'closed') {
     return 'Start again when a selected book is inside its market hours.';
@@ -134,7 +165,7 @@ export function buildLiveAssistant(params: {
   /** Optional IST HH:mm for clock copy. */
   nowHhMm?: string;
   /** Optional lots labels keyed by instrument id or name fragment. */
-  lotsByBook?: { nifty?: number; bank?: number; crude?: number };
+  lotsByBook?: { nifty?: number; bank?: number; crude?: number; natgas?: number };
 }): LiveAssistantView | null {
   if (!params.running) {
     return null;
@@ -143,17 +174,23 @@ export function buildLiveAssistant(params: {
   const money = params.realOrders ? 'Live money' : 'Live paper';
   const statuses = params.statuses;
   const hasCrude = statuses.some(isCrudeStatus);
-  const hasIndex = statuses.some((s) => !isCrudeStatus(s));
+  const hasNatGas = statuses.some(isNatGasStatus);
+  const hasMcx = hasCrude || hasNatGas;
+  const hasIndex = statuses.some((s) => !isMcxStatus(s));
   const clockNote = buildClockNote({
     nowHhMm: params.nowHhMm,
     hasIndex,
     hasCrude,
+    hasNatGas,
   });
 
   const lotsMeta = (s: PaperInstrumentStatus): string | undefined => {
     const lots = params.lotsByBook;
     if (!lots) {
       return undefined;
+    }
+    if (isNatGasStatus(s) && lots.natgas != null) {
+      return `${lots.natgas} lot${lots.natgas > 1 ? 's' : ''}`;
     }
     if (isCrudeStatus(s) && lots.crude != null) {
       return `${lots.crude} lot${lots.crude > 1 ? 's' : ''}`;
@@ -180,8 +217,8 @@ export function buildLiveAssistant(params: {
       headline: 'Outside market hours',
       detail:
         params.message ||
-        (hasCrude
-          ? 'No selected book is inside hours right now (Index 09:15–15:30 · Crude ~09:00–23:15).'
+        (hasMcx
+          ? 'No selected book is inside hours right now (Index 09:15–15:30 · MCX ~09:00–23:15).'
           : 'Live desk only runs 09:15–15:30 IST. Start again when the cash market is open.'),
       lines,
       clockNote,
@@ -191,6 +228,7 @@ export function buildLiveAssistant(params: {
       realOrders: params.realOrders,
       statuses,
       hasCrude,
+      hasNatGas,
       nowHhMm: params.nowHhMm,
     });
     return view;
@@ -212,6 +250,7 @@ export function buildLiveAssistant(params: {
       realOrders: params.realOrders,
       statuses,
       hasCrude,
+      hasNatGas,
       nowHhMm: params.nowHhMm,
     });
     return view;
@@ -233,6 +272,7 @@ export function buildLiveAssistant(params: {
       realOrders: params.realOrders,
       statuses,
       hasCrude,
+      hasNatGas,
       nowHhMm: params.nowHhMm,
     });
     return view;
@@ -252,6 +292,7 @@ export function buildLiveAssistant(params: {
       realOrders: params.realOrders,
       statuses,
       hasCrude,
+      hasNatGas,
       nowHhMm: params.nowHhMm,
     });
     return view;
@@ -278,6 +319,7 @@ export function buildLiveAssistant(params: {
       realOrders: params.realOrders,
       statuses,
       hasCrude,
+      hasNatGas,
       nowHhMm: params.nowHhMm,
     });
     return view;
@@ -296,6 +338,7 @@ export function buildLiveAssistant(params: {
       realOrders: params.realOrders,
       statuses,
       hasCrude,
+      hasNatGas,
       nowHhMm: params.nowHhMm,
     });
     return view;
@@ -313,6 +356,7 @@ export function buildLiveAssistant(params: {
     realOrders: params.realOrders,
     statuses,
     hasCrude,
+    hasNatGas,
     nowHhMm: params.nowHhMm,
   });
   return view;

@@ -10,6 +10,6 @@ export const environment = {
   defaultLots: 1,
   allowLiveMoney: true,
   orderEgressIp: '168.144.28.89',
-  appVersion: '1.3.38',
-  appBuild: '2026.08.03-natgas-daily-profit',
+  appVersion: '1.3.39',
+  appBuild: '2026.08.03-trade-desk-natgas',
 };

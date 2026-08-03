@@ -1,6 +1,6 @@
 # 39 — Natural Gas Mini daily-profit DNA (2026-08-03)
 
-**Status:** Wired in **Experiments → Nat Gas Mini** as profile **Daily Profit (NG)** (`daily-profit-ng`)  
+**Status:** Wired in **Trade Desk** (parallel MCX book) + **Experiments → Nat Gas Mini** as profile **Daily Profit (NG)** (`daily-profit-ng`)  
 **See also:** Doc **40** for multi-trade / higher-IS-profit bounce (more fills; lower OOS ₹/day).  
 **Instrument:** `NATGASMINI` · ₹50/pt · strike step 5  
 **Data:** Kite 5m merge · **2026-03-30 → 2026-08-03** (live months only; expired FUT tokens not in instruments dump)  
@@ -38,10 +38,11 @@ Proxy (Yahoo NG=F×85) earlier pointed at the same SL/TP family with pierce **0.
 
 ## Desk map
 
-1. Experiments → **Nat Gas Mini**
-2. Trap-style + confirm · SL/TP/pierce as above  
+1. **Trade Desk** → enable **Natural Gas Mini** (hardwired Daily Profit NG; same `crude` module gate as Crude)
+2. **Experiments → Nat Gas Mini** (same DNA for lab / profile switching)
+3. Trap-style + confirm · SL/TP/pierce as above  
    (do **not** copy Crude Daily Profit’s 20/40 pts — crude is ₹10/pt)
-3. Paper 1 lot first
+4. Paper 1 lot first
 
 ## Refresh bars
 

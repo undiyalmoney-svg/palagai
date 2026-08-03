@@ -4,9 +4,10 @@
       <p class="pg-eyebrow">Strategy Manager → Trade Desk</p>
       <h1>Trade Desk</h1>
       <p class="pg-lede">
-        @if (showCrude()) {
-          Nifty, Bank Nifty &amp; Crude Oil Mini — Strat for indices; Crude fixed
-          <strong>All-Green</strong>. Index until 15:15 · Crude continues on MCX evening.
+        @if (showCrude() || showNatGas()) {
+          Nifty, Bank, Crude &amp; Nat Gas Mini — Strat for indices; Crude
+          <strong>All-Green</strong>; Nat Gas <strong>Daily Profit (NG)</strong>. Index until
+          15:15 · MCX continues evening.
         } @else {
           Nifty &amp; Bank Nifty — Strat for indices. Session until 15:15.
         }
@@ -31,28 +32,33 @@
       <div class="active-strategy-label">
         <span class="as-kicker">Active now · {{ activeStrategies().modeLabel }}</span>
         @if (kuttyAlone) {
-          <strong class="as-name">Kutty alone{{ enableCrude && showCrude() ? ' + Crude All-Green' : '' }}</strong>
+          <strong class="as-name"
+            >Kutty alone{{ enableCrude && showCrude() ? ' + Crude All-Green' : ''
+            }}{{ enableNatGas && showNatGas() ? ' + Nat Gas Daily Profit' : '' }}</strong
+          >
           <span class="as-meta">No Trap/Strat · ₹600 TP / ₹200 SL · ∞ trades</span>
         } @else if (activeStrategies().same) {
           <strong class="as-name"
             >{{ activeStrategies().nifty.name
-            }}{{ enableCrude && showCrude() ? ' · Crude All-Green' : '' }}</strong
+            }}{{ enableCrude && showCrude() ? ' · Crude All-Green' : ''
+            }}{{ enableNatGas && showNatGas() ? ' · Nat Gas Daily Profit' : '' }}</strong
           >
           <span class="as-meta"
             >Nifty + Bank · {{ activeStrategies().nifty.maxTradesLabel
             }}{{ enableKutty ? ' · +Kutty' : ''
-            }}{{ enableCrude && showCrude() ? ' · Crude →23:10' : '' }}</span
+            }}{{ (enableCrude && showCrude()) || (enableNatGas && showNatGas()) ? ' · MCX →23:10' : '' }}</span
           >
         } @else {
           <strong class="as-name"
             >Nifty {{ activeStrategies().nifty.name }} · Bank {{ activeStrategies().bank.name
-            }}{{ enableCrude && showCrude() ? ' · Crude All-Green' : '' }}</strong
+            }}{{ enableCrude && showCrude() ? ' · Crude All-Green' : ''
+            }}{{ enableNatGas && showNatGas() ? ' · Nat Gas Daily Profit' : '' }}</strong
           >
           <span class="as-meta"
             >{{ activeStrategies().nifty.maxTradesLabel }} /
             {{ activeStrategies().bank.maxTradesLabel
             }}{{ enableKutty ? ' · +Kutty' : ''
-            }}{{ enableCrude && showCrude() ? ' · Crude →23:10' : '' }}</span
+            }}{{ (enableCrude && showCrude()) || (enableNatGas && showNatGas()) ? ' · MCX →23:10' : '' }}</span
           >
         }
       </div>
@@ -82,7 +88,7 @@
     >
       <span class="mode-title">Live</span>
       <span class="mode-sub"
-        >Today · Index→15:15{{ showCrude() ? ' · Crude→23:10' : '' }}</span
+        >Today · Index→15:15{{ showCrude() || showNatGas() ? ' · MCX→23:10' : '' }}</span
       >
     </button>
   </div>
@@ -166,6 +172,19 @@
           />
         </label>
       }
+      @if (showNatGas()) {
+        <label class="field lots-field">
+          <span>Nat Gas lots</span>
+          <input
+            type="number"
+            min="1"
+            step="1"
+            [(ngModel)]="natGasLots"
+            (ngModelChange)="onLotsChange('natgas')"
+            [disabled]="busy() || snapshot().running || !enableNatGas"
+          />
+        </label>
+      }
     </div>
 
     <div class="desk-toggles" role="group" aria-label="Books and day risk">
@@ -181,6 +200,19 @@
         <label class="desk-check" title="All-Green Session OR · continues past 15:15 on MCX">
           <input type="checkbox" [(ngModel)]="enableCrude" [disabled]="busy() || snapshot().running" />
           <span>Crude Oil Mini</span>
+        </label>
+      }
+      @if (showNatGas()) {
+        <label
+          class="desk-check"
+          title="Daily Profit NG · trap SL1.5/TP3 · max 1/day · continues past 15:15 on MCX"
+        >
+          <input
+            type="checkbox"
+            [(ngModel)]="enableNatGas"
+            [disabled]="busy() || snapshot().running"
+          />
+          <span>Natural Gas Mini</span>
         </label>
       }
       <label class="desk-check" title="Stops new entries after about −₹2,950 day loss (split if both books on)">
@@ -253,7 +285,8 @@
         />
         <span
           >Live money — real Kite MIS (N×{{ niftyLots }} · B×{{ bankLots
-          }}{{ showCrude() ? ' · C×' + crudeLots : '' }})</span
+          }}{{ showCrude() ? ' · C×' + crudeLots : ''
+          }}{{ showNatGas() ? ' · NG×' + natGasLots : '' }})</span
         >
       </label>
       @if (realOrders) {
@@ -308,7 +341,7 @@
   @if (liveAssistant(); as assist) {
     <aside class="live-assistant" role="status" aria-live="polite" [attr.data-tone]="assist.tone">
       <div class="la-head">
-        <span class="la-kicker">Live assistant · three books</span>
+        <span class="la-kicker">Live assistant · desk books</span>
         <span class="phase-pill" [attr.data-phase]="assist.tone">{{ assist.headline }}</span>
       </div>
       <p class="la-detail">{{ assist.detail }}</p>
@@ -335,7 +368,7 @@
       }
       <p class="la-foot">
         Updates every live tick (~60s) · keep this tab open{{
-          showCrude() ? ' · /crude-oil page still separate' : ''
+          showCrude() || showNatGas() ? ' · Experiments MCX desks still separate' : ''
         }}
       </p>
     </aside>
@@ -797,7 +830,8 @@
         <h3>Live order summary</h3>
         <p>
           Full Kite session book — Nifty ×{{ niftyLots }} · Bank ×{{ bankLots
-          }}{{ showCrude() ? ' · Crude ×' + crudeLots : '' }} · statuses refresh every tick
+          }}{{ showCrude() ? ' · Crude ×' + crudeLots : ''
+          }}{{ showNatGas() ? ' · Nat Gas ×' + natGasLots : '' }} · statuses refresh every tick
         </p>
       </div>
       @if (snapshot().orderSummary.length) {
