@@ -568,7 +568,7 @@ export class PaperTradeDeskService {
         const resolvedFuture = resolveNatGasMiniFuturesToken(allInstruments);
         if (!resolvedFuture) {
           throw new Error(
-            'No live NATGASMINI futures in cache. Settings → Refresh Instruments (needs v1.3.40+ so Nat Gas is kept in the slim dump).',
+            'No live NATGASMINI futures after refresh. Open Get Token if expired, then Settings → Refresh Instruments, and confirm badge shows v1.3.41+.',
           );
         }
         natGasFuture = {
@@ -1102,7 +1102,7 @@ export class PaperTradeDeskService {
         const future = resolveNatGasMiniFuturesToken(allInstruments);
         if (!future) {
           throw new Error(
-            'No live NATGASMINI futures in cache. Settings → Refresh Instruments (needs v1.3.40+).',
+            'No live NATGASMINI futures after refresh. Confirm badge shows v1.3.41+, then Settings → Refresh Instruments.',
           );
         }
         if (this.liveLegs.length || this.crudeLive) {
@@ -2054,19 +2054,28 @@ export class PaperTradeDeskService {
       }
     }
 
-    if (requireNatGas && countCrudeMiniOptions(allInstruments, natGasPrefixes) < 20) {
+    const natGasFutMissing = requireNatGas && !resolveNatGasMiniFuturesToken(allInstruments);
+    if (
+      requireNatGas &&
+      (natGasFutMissing || countCrudeMiniOptions(allInstruments, natGasPrefixes) < 20)
+    ) {
       if (patchStatus) {
-        this.patchMessage('Refreshing MCX Nat Gas instruments…');
+        this.patchMessage(
+          natGasFutMissing
+            ? 'Nat Gas futures missing from cache — refreshing instruments…'
+            : 'Refreshing MCX Nat Gas instruments…',
+        );
       }
       const refreshed = await this.instrumentStore.refreshBestEffort(true);
       allInstruments = this.instrumentStore.allInstruments();
       if (
         !refreshed &&
         requireMinimum &&
-        countCrudeMiniOptions(allInstruments, natGasPrefixes) < 5
+        (countCrudeMiniOptions(allInstruments, natGasPrefixes) < 5 ||
+          !resolveNatGasMiniFuturesToken(allInstruments))
       ) {
         throw new Error(
-          'Could not load MCX Nat Gas options. Check internet, then Settings → Refresh Instruments.',
+          'Could not load MCX Nat Gas instruments. Check internet / Get Token, then Settings → Refresh Instruments.',
         );
       }
     }

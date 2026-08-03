@@ -26,6 +26,7 @@ import { StrategyRegistryService } from '../../../core/strategy-manager/registry
 import { dnaCapsForStrategy } from '../../../core/strategy-manager/config/strategy-dna-caps';
 import { DeskChannel } from '../../../core/strategy-manager/models/desk-channel.model';
 import { UiDialogService } from '../../../shared/ui/dialog/ui-dialog.service';
+import { APP_BUILD_LABEL } from '../../../core/config/app-build';
 
 @Component({
   selector: 'app-trade-desk',
@@ -43,6 +44,9 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
   private readonly uiDialog = inject(UiDialogService);
   private readonly assignments = inject(StrategyAssignmentService);
   private readonly registry = inject(StrategyRegistryService);
+
+  /** Visible build stamp so you can confirm deploy (e.g. v1.3.41 · …). */
+  protected readonly appBuildLabel = APP_BUILD_LABEL;
 
   protected readonly mode = signal<PaperDeskMode>('testing');
   /** Default both dates to yesterday so Testing opens on the last completed session. */
