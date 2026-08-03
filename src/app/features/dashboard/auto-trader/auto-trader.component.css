@@ -66,6 +66,66 @@
   font-size: 0.92rem;
 }
 
+.at-note {
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  border: 1px solid #d8e0da;
+  background: #f7f8f6;
+}
+
+.at-note.ok {
+  border-color: #86efac;
+  background: #e7f6ec;
+  color: #1f6b3a;
+  font-weight: 600;
+}
+
+.at-note.err {
+  border-color: #fecdd3;
+  background: #fdecec;
+  color: #a12a2a;
+  font-weight: 600;
+}
+
+.at-auth-status {
+  margin: 0.65rem 0 0;
+  padding: 0.65rem 0.85rem;
+  border-radius: 10px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.at-auth-status.ok {
+  background: #e7f6ec;
+  color: #1f6b3a;
+  border: 1px solid #86efac;
+}
+
+.at-auth-status.err {
+  background: #fdecec;
+  color: #a12a2a;
+  border: 1px solid #fecdd3;
+}
+
+/* Start: green only when idle/ready — not while already running. */
+.at-start-btn.ready {
+  --mdc-filled-button-container-color: #0f9d58;
+  --mdc-filled-button-label-text-color: #fff;
+  background: #0f9d58 !important;
+  color: #fff !important;
+}
+
+.at-start-btn.running,
+.at-start-btn:disabled {
+  --mdc-filled-button-container-color: #d8e0da;
+  --mdc-filled-button-label-text-color: #5a6f66;
+  --mdc-filled-button-disabled-container-color: #d8e0da;
+  --mdc-filled-button-disabled-label-text-color: #5a6f66;
+  background: #d8e0da !important;
+  color: #5a6f66 !important;
+}
+
 .order-check .order-log {
   list-style: none;
   margin: 0;

@@ -19,7 +19,9 @@
     </div>
   </header>
 
-  <p class="at-note">{{ note() }}</p>
+  <p class="at-note" [class.ok]="noteTone() === 'ok'" [class.err]="noteTone() === 'err'" role="status">
+    {{ note() }}
+  </p>
 
   <div class="at-grid">
     <article class="at-card">
@@ -68,12 +70,14 @@
       <div class="at-actions">
         <button
           mat-flat-button
-          color="primary"
           type="button"
+          class="at-start-btn"
+          [class.ready]="status().status !== 'running' && !busy()"
+          [class.running]="status().status === 'running'"
           (click)="start()"
           [disabled]="busy() || status().status === 'running'"
         >
-          Start Server Live
+          {{ status().status === 'running' ? 'Running…' : 'Start Server Live' }}
         </button>
         <button mat-stroked-button type="button" (click)="stop()" [disabled]="busy()">Stop</button>
         <button mat-stroked-button type="button" (click)="refreshStatus()" [disabled]="busy()">Refresh</button>
@@ -83,6 +87,11 @@
           Push Kite token to server
         </button>
       </div>
+      @if (authPushStatus(); as auth) {
+        <p class="at-auth-status" [class.ok]="auth.ok" [class.err]="!auth.ok" role="status">
+          {{ auth.ok ? '✓' : '✕' }} {{ auth.message }}
+        </p>
+      }
       <p class="at-hint">
         Fixed DNA: Nifty = Trap · Crude = All-Green. Only Bank is selectable (Trap / Genie).
       </p>
