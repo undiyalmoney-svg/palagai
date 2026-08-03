@@ -28,6 +28,7 @@ Those two files are the product “secret sauce.” Docs 01–03 expand them **l
 13. Use **31** for **S/R Trap + Confirm** max-earn hunt (wired selectable).  
 14. Use **33** for **Trap RCA + Kutty design + Trade Desk UI defaults** (Kite 5y evidence; no trading-logic change yet).  
 15. Use **34** for **Kutty daily-profit champion** (TP ₹600 / SL ₹200 · ~₹838/day OOS).  
+16. Use **39** for **Nat Gas Mini daily-profit** trap DNA (proxy NG=F×85 · SL 1.5 / TP 3 · ~₹72/day).  
 16. Use **36** for **Crude Trap peers + loss cutoffs** (Champion stays strong ₹; Trap Confirm selectable).  
 17. Use **37** for **Crude Daily Profit (Trap-style)** — evening PDHL + confirm.  
 18. Use **38** for **Crude All-Green Afternoon** — Session OR 15:15–23:00 · ~90% green · desk default.
