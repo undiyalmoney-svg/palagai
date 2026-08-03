@@ -6,8 +6,8 @@ export const environment = {
   defaultLots: 1,
   allowLiveMoney: true,
   orderEgressIp: '168.144.28.89',
-  appVersion: '1.3.41',
-  appBuild: '2026.08.03-natgas-cache-bump',
+  appVersion: '1.3.42',
+  appBuild: '2026.08.03-server-natgas-slim',
   /**
    * Optional local-only session bootstrap. Fill via Get Token — do not commit real tokens.
    */
