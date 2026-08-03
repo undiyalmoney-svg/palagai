@@ -568,7 +568,7 @@ export class PaperTradeDeskService {
         const resolvedFuture = resolveNatGasMiniFuturesToken(allInstruments);
         if (!resolvedFuture) {
           throw new Error(
-            'No live NATGASMINI futures after refresh. Open Get Token if expired, then Settings → Refresh Instruments, and confirm badge shows v1.3.41+.',
+            'No live NATGASMINI futures after refresh. Open Get Token if expired, then Settings → Refresh Instruments, and confirm badge shows v1.3.42+.',
           );
         }
         natGasFuture = {
@@ -1102,7 +1102,7 @@ export class PaperTradeDeskService {
         const future = resolveNatGasMiniFuturesToken(allInstruments);
         if (!future) {
           throw new Error(
-            'No live NATGASMINI futures after refresh. Confirm badge shows v1.3.41+, then Settings → Refresh Instruments.',
+            'No live NATGASMINI futures after refresh. Confirm badge shows v1.3.42+, then Settings → Refresh Instruments.',
           );
         }
         if (this.liveLegs.length || this.crudeLive) {

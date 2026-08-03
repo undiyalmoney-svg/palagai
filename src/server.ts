@@ -50,8 +50,9 @@ function splitCsvLine(line: string): string[] {
 
 /**
  * Full Kite instruments CSV is ~9MB — over Vercel’s serverless response limit.
- * Keep desk-relevant rows only (NFO index opts/futs, MCX crude, NSE EQ/indices).
+ * Keep desk-relevant rows only (NFO index opts/futs, MCX Crude + Nat Gas, NSE EQ/indices).
  * Client still decompresses gzip via decompressIfGzip (no Content-Encoding header).
+ * Keep in sync with slimTradingInstruments() on the client.
  */
 function slimTradingInstrumentsCsv(csv: string): string {
   const lines = csv.split(/\r?\n/);
@@ -88,9 +89,21 @@ function slimTradingInstrumentsCsv(csv: string): string {
         continue;
       }
     }
-    if (exchange === 'MCX' && (sym.includes('CRUDE') || name.includes('CRUDE'))) {
-      out.push(line);
-      continue;
+    if (exchange === 'MCX') {
+      if (sym.includes('CRUDE') || name.includes('CRUDE')) {
+        out.push(line);
+        continue;
+      }
+      // Natural Gas Mini (Trade Desk + Experiments) — was missing; proxy dropped all NG rows.
+      if (
+        sym.includes('NATGAS') ||
+        name.includes('NATGAS') ||
+        sym.includes('NATURALGAS') ||
+        name.includes('NATURALGAS')
+      ) {
+        out.push(line);
+        continue;
+      }
     }
     if (exchange === 'NSE') {
       if (itype === 'EQ' || itype === 'BE' || itype === 'IDX') {
