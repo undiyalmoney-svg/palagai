@@ -1,7 +1,8 @@
 /**
  * Crude Oil Mini strategy profiles for the Crude Desk.
  *
- * - all-green: Session OR 09:00–09:30 · entries →23:00 · per-trade SL/trail (default)
+ * - all-green: Session OR 09:00–09:30 · entries →23:00 · per-trade SL/trail (Trade Desk default)
+ * - selective: charge-aware · max 1/day · OR-width skip · evening window (doc 41)
  * - daily-profit: Trap-style evening PDHL + confirm · tight SL/TP
  * - champion: hunt pair (larger SL/TP)
  * - daily-income: sized for ~₹300–₹1,000 / day on 1 lot (₹10/pt)
@@ -28,6 +29,7 @@ import {
 
 export type CrudeStrategyProfileId =
   | 'all-green'
+  | 'selective'
   | 'daily-profit'
   | 'daily-profit-ng'
   | 'champion'
@@ -160,6 +162,36 @@ export const CRUDE_ALL_GREEN_PARAMS: CrudeTradeParams = {
   defaultEnableEvening: true,
   dailyBandLabel: 'OR 09:00–09:30 · SL₹150 · trail ₹500→₹240 · no OR skip',
   ...PROTECT_TRADE_CUTOFF,
+};
+
+/**
+ * Selective — charge-aware Crude (doc 41).
+ * One quality Session-OR trade after a sane OR · evening window · first-win.
+ * Skips wild OR days (e.g. 189 pts on 2026-08-03) that All-Green overtrades.
+ */
+export const CRUDE_SELECTIVE_PARAMS: CrudeTradeParams = {
+  profileId: 'selective',
+  label: 'Selective (1/day · OR≤60)',
+  stopPts: 40,
+  morningTargetPts: 80,
+  eveningTargetPts: 80,
+  targetRMultiple: 0,
+  dayLossStopPts: 40,
+  strictDayLossPts: 40,
+  dayProfitLockPts: 0,
+  entryMode: 'session-or',
+  requireConfirm: true,
+  firstWinLock: true,
+  eveningEntryStart: '18:30',
+  eveningEntryEnd: '22:00',
+  sessionOrStart: CRUDE_SOR_OR_START,
+  sessionOrEnd: CRUDE_SOR_OR_END,
+  maxOrWidth: 60,
+  maxEveningTradesDay: 1,
+  defaultEnableMorning: false,
+  defaultEnableEvening: true,
+  dailyBandLabel: 'OR≤60 · eve 18:30–22:00 · SL40/TP80 · confirm · first-win · max 1/day',
+  ...PROTECT_OFF,
 };
 
 /**
@@ -309,6 +341,7 @@ export const NATGAS_DAILY_PROFIT_PARAMS: CrudeTradeParams = {
 
 export const CRUDE_STRATEGY_PROFILES: Record<CrudeStrategyProfileId, CrudeTradeParams> = {
   'all-green': CRUDE_ALL_GREEN_PARAMS,
+  selective: CRUDE_SELECTIVE_PARAMS,
   'daily-profit': CRUDE_DAILY_PROFIT_PARAMS,
   'daily-profit-ng': NATGAS_DAILY_PROFIT_PARAMS,
   champion: CRUDE_CHAMPION_PARAMS,

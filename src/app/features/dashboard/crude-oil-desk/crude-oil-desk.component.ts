@@ -70,12 +70,14 @@ export class CrudeOilDeskComponent implements OnInit, OnDestroy {
   protected realOrdersAck = false;
   protected lots = 1;
   /**
-   * Crude default: All-Green. Nat Gas Experiments default: Daily Profit (NG) hunt DNA.
+   * Crude Experiments default: Selective (charge-aware · max 1/day).
+   * Trade Desk Live Crude stays All-Green until you switch.
+   * Nat Gas Experiments default: Daily Profit (NG).
    */
-  protected strategyProfile: CrudeStrategyProfileId = 'all-green';
-  /** Morning ORB 10:00–12:00 (off for All-Green / Daily Profit / NG). */
+  protected strategyProfile: CrudeStrategyProfileId = 'selective';
+  /** Morning ORB 10:00–12:00 (off for Selective / All-Green / Daily Profit / NG). */
   protected enableMorning = false;
-  /** Session / evening window (All-Green default on · 09:00–23:00). */
+  /** Session / evening window (Selective evening · All-Green full session). */
   protected enableEvening = true;
   /** Stricter day loss (pts depend on profile). */
   protected strictDayStop = false;
@@ -108,6 +110,7 @@ export class CrudeOilDeskComponent implements OnInit, OnDestroy {
       ];
     }
     return [
+      CRUDE_STRATEGY_PROFILES.selective,
       CRUDE_STRATEGY_PROFILES['all-green'],
       CRUDE_STRATEGY_PROFILES['daily-profit'],
       CRUDE_STRATEGY_PROFILES.champion,
@@ -120,7 +123,7 @@ export class CrudeOilDeskComponent implements OnInit, OnDestroy {
     if (this.miniAssetSig() === 'natgas') {
       this.strategyProfile = 'daily-profit-ng';
     } else if (this.strategyProfile === 'daily-profit-ng') {
-      this.strategyProfile = 'all-green';
+      this.strategyProfile = 'selective';
     }
     this.onStrategyProfileChange();
   }

@@ -32,7 +32,8 @@ Those two files are the product “secret sauce.” Docs 01–03 expand them **l
 17. Use **40** for **Nat Gas Mini multi-trade** bounce DNA (SL 5 / TP 10 trail · ~2 tpd · higher IS ₹/day).  
 16. Use **36** for **Crude Trap peers + loss cutoffs** (Champion stays strong ₹; Trap Confirm selectable).  
 17. Use **37** for **Crude Daily Profit (Trap-style)** — evening PDHL + confirm.  
-18. Use **38** for **Crude All-Green Afternoon** — Session OR 15:15–23:00 · ~90% green · desk default.
+18. Use **38** for **Crude All-Green Afternoon** — Session OR 15:15–23:00 · ~90% green · desk default.  
+19. Use **41** for **Crude Selective (charge-aware)** — max 1/day · OR≤60 · evening window; fights ₹1k fee days. Experiments profile; Trade Desk stays All-Green until you switch.
 
 ## Not in the deploy
 Angular assets come from `src/` + `public/` only (`angular.json`).  
