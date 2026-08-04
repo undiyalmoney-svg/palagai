@@ -1,5 +1,5 @@
 /**
- * Server Live strategy worker — Trap / Genie / All-Green on 60s ticks.
+ * Server Live strategy worker — Trap / Genie / Crude Selective on 60s ticks.
  * Places orders via live-broker → kite.service (does NOT touch kiteOrders.controller).
  */
 const {
