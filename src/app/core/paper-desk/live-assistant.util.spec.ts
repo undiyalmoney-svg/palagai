@@ -106,4 +106,50 @@ describe('live-assistant.util', () => {
     expect(view?.tone).toBe('in_trade');
     expect(view?.headline).toContain('paper');
   });
+
+  it('calls out Genie weekday sit-out so desk does not look dead', () => {
+    const view = buildLiveAssistant({
+      running: true,
+      marketOpen: true,
+      realOrders: true,
+      message: '',
+      statuses: [
+        status({
+          instrumentName: 'Nifty 50',
+          strategyName: 'Align Combo · GENIE',
+          livePhase: 'waiting',
+          lastSignal: 'GENIE SKIP: sit out this leg',
+        }),
+        status({
+          instrumentName: 'Bank Nifty',
+          strategyName: 'Align Combo · GENIE',
+          livePhase: 'waiting',
+          lastSignal: 'GENIE SKIP: sit out this leg',
+        }),
+      ],
+    });
+    expect(view?.headline).toContain('Genie sitting out');
+    expect(view?.detail).toMatch(/Trap/i);
+  });
+
+  it('explains Trap confirm DNA while waiting', () => {
+    const view = buildLiveAssistant({
+      running: true,
+      marketOpen: true,
+      realOrders: false,
+      message: '',
+      statuses: [
+        status({
+          instrumentName: 'Nifty 50',
+          livePhase: 'waiting',
+          lastSignal: 'Trap confirm failed',
+        }),
+      ],
+    });
+    expect(view?.headline).toContain('Trap scanning');
+    expect(describeStatusForAssistant(
+      status({ instrumentName: 'Nifty 50', lastSignal: 'Trap confirm failed' }),
+      false,
+    )).toMatch(/next bar did not confirm/i);
+  });
 });
