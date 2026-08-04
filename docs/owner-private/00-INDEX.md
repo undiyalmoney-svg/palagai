@@ -33,7 +33,8 @@ Those two files are the product “secret sauce.” Docs 01–03 expand them **l
 16. Use **36** for **Crude Trap peers + loss cutoffs** (Champion stays strong ₹; Trap Confirm selectable).  
 17. Use **37** for **Crude Daily Profit (Trap-style)** — evening PDHL + confirm.  
 18. Use **38** for **Crude All-Green Afternoon** — Session OR 15:15–23:00 · ~90% green · desk default.  
-19. Use **41** for **Crude Selective (charge-aware)** — max 1/day · OR≤60 · evening window; fights ₹1k fee days. Experiments profile; Trade Desk stays All-Green until you switch.
+19. Use **41** for **Crude Selective (charge-aware)** — Trade Desk default; retuned in **42**.  
+20. Use **42** for **Daily profit upgrade re-hunt** — Trap peak-trail arm₹400 + Crude Selective SL20/TP40 max 2/day.
 
 ## Not in the deploy
 Angular assets come from `src/` + `public/` only (`angular.json`).  

@@ -15,11 +15,11 @@ describe('AlignComboGenieManagedStrategy', () => {
     expect(s.supports).toEqual(['nifty', 'bank', 'stocks']);
     expect(s.getSettings().extras?.['genieRouterEnabled']).toBe(true);
     expect(s.getSettings().extras?.['slConfirmCutoffEnabled']).toBe(true);
-    expect(s.getSettings().extras?.['slConfirmCutoffFracR']).toBe(0.55);
-    expect(s.getSettings().extras?.['slConfirmCutoffMaxMfeR']).toBe(0.75);
-    expect(s.getSettings().extras?.['slConfirmSoftRs']).toBe(700);
-    expect(s.getSettings().extras?.['profitLockArmRs']).toBe(600);
-    expect(s.getSettings().extras?.['profitLockGivebackRs']).toBe(300);
+    expect(s.getSettings().extras?.['slConfirmCutoffFracR']).toBe(0.45);
+    expect(s.getSettings().extras?.['slConfirmCutoffMaxMfeR']).toBe(0.6);
+    expect(s.getSettings().extras?.['slConfirmSoftRs']).toBe(500);
+    expect(s.getSettings().extras?.['profitLockArmRs']).toBe(400);
+    expect(s.getSettings().extras?.['profitLockGivebackRs']).toBe(200);
   });
 
   it('maps screenshot-style aligned dump day to BOTH (short combo)', () => {

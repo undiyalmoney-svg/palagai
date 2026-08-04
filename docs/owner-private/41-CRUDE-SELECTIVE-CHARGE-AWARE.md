@@ -1,7 +1,7 @@
 # 41 — Crude Selective (charge-aware, max 1/day)
 
 **Date:** 2026-08-04  
-**Status:** Wired as Trade Desk + Autobot default **`selective`** (Experiments keeps All-Green in picker)  
+**Status:** Wired as Trade Desk default **`selective`** — **retuned 2026-08-04** (doc **42**: SL20/TP40 · max 2/day · no OR skip). Experiments keeps All-Green in picker.  
 **Script:** `scripts/crude-selective-hunt.py`  
 **Artifact:** `reports/crude-selective/summary.json` (gitignored)  
 **Data:** MCX `crudeoilm-5m-merged.json` · 2026-03-23 → 2026-08-03 · ₹10/pt · charge model **₹50/roundtrip**
