@@ -41,11 +41,24 @@ export function createPdhlOrState(): PdhlOrState {
 export const PDHL_RUPEES_PER_POINT = 65;
 /** Bank Nifty plan: 1 point = ₹30 */
 export const PDHL_BANK_RUPEES_PER_POINT = 30;
-/** Desk checkbox: combined strict day loss (₹) — split across selected books. */
+/** Desk checkbox: combined strict day loss (₹) at **1 lot** — split across selected books. */
 export const DESK_STRICT_DAY_LOSS_RS = 2950;
-/** Desk checkbox: combined day profit lock (₹) — split across selected books. */
-/** 1-lot Daily band (doc 43): lock at ₹3k so winners stay in ₹1k–₹3k target. */
+/**
+ * Desk checkbox: combined day profit lock (₹) at **1 lot** — split across selected books.
+ * Lock is stored in index **points** (= ₹ / ₹-per-point). Money at N lots ≈ this × N
+ * (e.g. 1 lot → ~₹3k, 3 lots → ~₹9k). Do **not** multiply the point threshold by lots.
+ */
 export const DESK_DAY_PROFIT_LOCK_RS = 3000;
+
+/** Index-money ₹ when the 1-lot profit-lock band is hit at `lots` size. */
+export function deskDayProfitLockMoneyRs(lots: number): number {
+  return DESK_DAY_PROFIT_LOCK_RS * Math.max(1, Math.floor(Number(lots)) || 1);
+}
+
+/** Index-money ₹ when the 1-lot strict day-stop band is hit at `lots` size. */
+export function deskStrictDayLossMoneyRs(lots: number): number {
+  return DESK_STRICT_DAY_LOSS_RS * Math.max(1, Math.floor(Number(lots)) || 1);
+}
 
 /**
  * Per-index risk profile (champion pair, 2020–2026 hunt):
@@ -212,7 +225,8 @@ export function mergePdhlOrParams(
 
 /**
  * Build per-book day loss / profit overrides from Trade Desk checkboxes.
- * Strict −₹2950 and profit lock +₹5000 are split evenly when both books are on.
+ * Strict −₹2950/lot and profit lock +₹3000/lot (1-lot ₹ band) are split evenly when
+ * both books are on. Thresholds are in index points — lot size scales **money**, not pts.
  */
 export function buildDeskRiskOverrides(options: {
   instrumentId: string;
@@ -229,6 +243,7 @@ export function buildDeskRiskOverrides(options: {
   const rs = rupeesPerPointForInstrument(options.instrumentId);
   const overrides: Partial<PdhlOrParams> = {};
   if (options.strictDayStop) {
+    // 1-lot ₹ band → pts; actual ₹ loss at stop ≈ pts × ₹/pt × lots.
     overrides.dailyMaxLossPts = Math.max(1, Math.round((DESK_STRICT_DAY_LOSS_RS * share) / rs));
   }
   if (options.dayProfitLock) {

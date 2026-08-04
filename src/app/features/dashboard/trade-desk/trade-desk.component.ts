@@ -15,7 +15,11 @@ import {
   buildWeekdayFilteredView,
   defaultPaperWeekdaySelection,
 } from '../../../core/paper-desk/paper-desk-weekday-filter';
-import { PDHL_RUPEES_PER_POINT } from '../../../core/strategy-engine/strategies/pdhl-opening-range/pdhl-opening-range.evaluator';
+import {
+  PDHL_RUPEES_PER_POINT,
+  deskDayProfitLockMoneyRs,
+  deskStrictDayLossMoneyRs,
+} from '../../../core/strategy-engine/strategies/pdhl-opening-range/pdhl-opening-range.evaluator';
 import { KiteSessionService } from '../../../core/kite/kite-session.service';
 import { LotsPreferenceService } from '../../../core/services/lots-preference.service';
 import { formatUnknownError } from '../../../core/utils/kite-error.util';
@@ -274,6 +278,26 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
     };
   }
 
+  /**
+   * Lots used for ₹ lock/stop labels. Daily keeps Nifty/Bank equal — money ≈ ₹3k × lots.
+   */
+  protected deskRiskLots(): number {
+    if (this.enableBank && !this.enableNifty) {
+      return Math.max(1, Math.floor(Number(this.bankLots)) || 1);
+    }
+    return Math.max(1, Math.floor(Number(this.niftyLots)) || 1);
+  }
+
+  /** Day profit lock money band at current lots (1→₹3k, 3→₹9k). */
+  protected profitLockMoneyRs(): number {
+    return deskDayProfitLockMoneyRs(this.deskRiskLots());
+  }
+
+  /** Strict day-stop money band at current lots (1→₹2,950, 3→₹8,850). */
+  protected strictStopMoneyRs(): number {
+    return deskStrictDayLossMoneyRs(this.deskRiskLots());
+  }
+
   protected onKuttyAloneChange(): void {
     if (this.kuttyAlone) {
       this.enableKutty = true;
@@ -342,8 +366,12 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
         }
         if (this.realOrders) {
           const riskBits = [
-            this.strictDayStop ? 'strict day stop −₹2,950' : null,
-            this.dayProfitLock ? 'day profit lock +₹3,000' : null,
+            this.strictDayStop
+              ? `strict day stop −₹${this.strictStopMoneyRs().toLocaleString('en-IN')}`
+              : null,
+            this.dayProfitLock
+              ? `day profit lock +₹${this.profitLockMoneyRs().toLocaleString('en-IN')}`
+              : null,
             this.anyMcxSelected() ? 'MCX books continue past 15:15' : null,
           ]
             .filter(Boolean)

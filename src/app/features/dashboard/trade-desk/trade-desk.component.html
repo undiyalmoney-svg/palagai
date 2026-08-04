@@ -219,21 +219,27 @@
           <span>Natural Gas Mini</span>
         </label>
       }
-      <label class="desk-check" title="Stops new entries after about −₹2,950 day loss (split if both books on)">
+      <label
+        class="desk-check"
+        title="Stops new entries after about −₹2,950 × lots day loss (split if both books on). 3 lots ≈ −₹8,850."
+      >
         <input
           type="checkbox"
           [(ngModel)]="strictDayStop"
           [disabled]="busy() || snapshot().running"
         />
-        <span>Strict day stop (−₹2,950)</span>
+        <span>Strict day stop (−₹{{ strictStopMoneyRs() | number: '1.0-0' }})</span>
       </label>
-      <label class="desk-check" title="Stops new entries after about +₹3,000 day profit (split if both books on)">
+      <label
+        class="desk-check"
+        title="Stops new entries after about +₹3,000 × lots day profit (split if both books on). 1 lot → ₹3k · 3 lots → ₹9k."
+      >
         <input
           type="checkbox"
           [(ngModel)]="dayProfitLock"
           [disabled]="busy() || snapshot().running"
         />
-        <span>Day profit lock (+₹3,000)</span>
+        <span>Day profit lock (+₹{{ profitLockMoneyRs() | number: '1.0-0' }})</span>
       </label>
       @if (showKutty()) {
         <label

@@ -47,7 +47,14 @@ import { applyKiteFillPnl } from './apply-kite-fill-pnl';
 import { enrichTradesWithCharges } from './trade-charges.util';
 import { buildPaperDeskDayStats, emptyPaperDeskDayStats } from './paper-desk-day-stats';
 import { MAX_OPTION_HISTORY_TOKENS, rankTokensByFrequency } from './option-history-tokens.util';
-import { PDHL_RUPEES_PER_POINT, buildDeskRiskOverrides, buildIndexDeskRiskSettings, rupeesPerPointForInstrument } from '../strategy-engine/strategies/pdhl-opening-range/pdhl-opening-range.evaluator';
+import {
+  PDHL_RUPEES_PER_POINT,
+  buildDeskRiskOverrides,
+  buildIndexDeskRiskSettings,
+  deskDayProfitLockMoneyRs,
+  deskStrictDayLossMoneyRs,
+  rupeesPerPointForInstrument,
+} from '../strategy-engine/strategies/pdhl-opening-range/pdhl-opening-range.evaluator';
 import { CRUDE_EXIT_BY } from '../strategy-engine/strategies/crude-pdhl-evening/crude-pdhl-evening.evaluator';
 import {
   resolveCrudeProfileDayLossPts,
@@ -501,9 +508,18 @@ export class PaperTradeDeskService {
     ]
       .filter(Boolean)
       .join('+');
+    const lockLots = this.deskRunOptions.enableNifty
+      ? this.niftyLots
+      : this.deskRunOptions.enableBank
+        ? this.bankLots
+        : this.niftyLots;
     const risk = [
-      this.deskRunOptions.strictDayStop ? 'strict −₹2950' : null,
-      this.deskRunOptions.dayProfitLock ? 'profit lock +₹3000' : null,
+      this.deskRunOptions.strictDayStop
+        ? `strict −₹${deskStrictDayLossMoneyRs(lockLots)}`
+        : null,
+      this.deskRunOptions.dayProfitLock
+        ? `profit lock +₹${deskDayProfitLockMoneyRs(lockLots)}`
+        : null,
       this.deskRunOptions.kuttyAlone
         ? 'Kutty alone'
         : this.deskRunOptions.enableKutty
