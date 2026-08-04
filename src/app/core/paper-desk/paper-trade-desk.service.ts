@@ -92,7 +92,7 @@ export interface TradeDeskRunOptions {
   realOrders?: boolean;
   enableNifty?: boolean;
   enableBank?: boolean;
-  /** Crude Oil Mini All-Green parallel book on Trade Desk. Default on from UI. */
+  /** Crude Oil Mini Selective parallel book on Trade Desk. Default on from UI. */
   enableCrude?: boolean;
   /** Natural Gas Mini Daily Profit NG parallel book. Default off — opt in from UI. */
   enableNatGas?: boolean;
@@ -509,7 +509,7 @@ export class PaperTradeDeskService {
         : this.deskRunOptions.enableKutty
           ? 'Kutty on'
           : null,
-      this.deskRunOptions.enableCrude ? 'Crude All-Green' : null,
+      this.deskRunOptions.enableCrude ? 'Crude Selective' : null,
       this.deskRunOptions.enableNatGas ? 'Nat Gas Daily Profit' : null,
     ]
       .filter(Boolean)
@@ -577,7 +577,7 @@ export class PaperTradeDeskService {
           tradingSymbol: resolvedFuture.tradingSymbol,
         };
       }
-      const crudeTradeParams = resolveCrudeStrategyProfile('all-green');
+      const crudeTradeParams = resolveCrudeStrategyProfile('selective');
       const crudeDayLossPts = resolveCrudeProfileDayLossPts(crudeTradeParams, false);
       const natGasTradeParams = resolveCrudeStrategyProfile('daily-profit-ng');
       const natGasDayLossPts = resolveCrudeProfileDayLossPts(natGasTradeParams, false);
@@ -768,7 +768,7 @@ export class PaperTradeDeskService {
             indexSpot: crudeReplay.indexSpot ?? prev?.indexSpot ?? null,
             chosenAsOf: crudeReplay.chosenAsOf ?? prev?.chosenAsOf ?? null,
             lastSignal: crudeReplay.lastSignal || prev?.lastSignal || 'Waiting',
-            strategyId: 'crude-all-green',
+            strategyId: 'crude-selective',
             strategyName: crudeTradeParams.label,
             maxTradesPerDay: crudeTradeParams.maxEveningTradesDay,
           });
@@ -1405,7 +1405,7 @@ export class PaperTradeDeskService {
     }
 
     if (crudeSessionActive && this.crudeLive) {
-      const crudeTradeParams = resolveCrudeStrategyProfile('all-green');
+      const crudeTradeParams = resolveCrudeStrategyProfile('selective');
       const crudeDayLossPts = resolveCrudeProfileDayLossPts(crudeTradeParams, false);
       const replay = replayPaperOnCrude({
         instrumentId: CRUDE_OIL_MINI_INSTRUMENT.id,
@@ -1448,7 +1448,7 @@ export class PaperTradeDeskService {
           chosenAsOf: replay.chosenAsOf,
           lastSignal: replay.lastSignal,
           tradesToday: replay.trades.length,
-          strategyId: 'crude-all-green',
+          strategyId: 'crude-selective',
           strategyName: crudeTradeParams.label,
           maxTradesPerDay: crudeTradeParams.maxEveningTradesDay,
         }),
@@ -1828,11 +1828,11 @@ export class PaperTradeDeskService {
           chosenAsOf: asOf,
           lastSignal:
             spot != null
-              ? `Preview ATM @ ${spot.toFixed(1)} · All-Green`
-              : 'Preview ATM (spot fallback) · All-Green',
+              ? `Preview ATM @ ${spot.toFixed(1)} · Selective`
+              : 'Preview ATM (spot fallback) · Selective',
           tradesToday: 0,
-          strategyId: 'crude-all-green',
-          strategyName: 'All-Green (09:00–23:00)',
+          strategyId: 'crude-selective',
+          strategyName: 'Selective (1/day · OR≤60)',
         }),
       );
     }

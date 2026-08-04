@@ -1,7 +1,7 @@
 # 41 — Crude Selective (charge-aware, max 1/day)
 
 **Date:** 2026-08-04  
-**Status:** Wired as Experiments profile **`selective`** (Trade Desk still All-Green until you switch)  
+**Status:** Wired as Trade Desk + Autobot default **`selective`** (Experiments keeps All-Green in picker)  
 **Script:** `scripts/crude-selective-hunt.py`  
 **Artifact:** `reports/crude-selective/summary.json` (gitignored)  
 **Data:** MCX `crudeoilm-5m-merged.json` · 2026-03-23 → 2026-08-03 · ₹10/pt · charge model **₹50/roundtrip**
@@ -43,8 +43,8 @@ Honest: **not 100% green** on IS. Selective = skip bad days + one shot when OR i
 
 Experiments → Crude → **`Selective (1/day · OR≤60)`** (`selective`)
 
-**Auto Trader (Autobot / Server Live)** Crude DNA = **Selective** (fixed).  
-Trade Desk Local Live Crude remains **All-Green** until you switch that desk.
+**Auto Trader (Autobot / Server Live)** Crude DNA = **Selective** (fixed); Crude checkbox **OFF** by default.  
+**Trade Desk Local Live** Crude DNA = **Selective** (same). All-Green remains only on Experiments profile picker.
 
 ## Autobot deploy (Order-API droplet)
 

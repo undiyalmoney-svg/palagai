@@ -1,8 +1,8 @@
 /**
  * Crude Oil Mini strategy profiles for the Crude Desk.
  *
- * - all-green: Session OR 09:00–09:30 · entries →23:00 · per-trade SL/trail (Trade Desk default)
- * - selective: charge-aware · max 1/day · OR-width skip · evening window (doc 41)
+ * - selective: charge-aware · max 1/day · OR-width skip · evening window (Trade Desk + Autobot default · doc 41)
+ * - all-green: Session OR 09:00–09:30 · entries →23:00 · per-trade SL/trail (Experiments picker only)
  * - daily-profit: Trap-style evening PDHL + confirm · tight SL/TP
  * - champion: hunt pair (larger SL/TP)
  * - daily-income: sized for ~₹300–₹1,000 / day on 1 lot (₹10/pt)
