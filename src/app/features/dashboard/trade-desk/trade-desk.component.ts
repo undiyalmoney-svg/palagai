@@ -27,6 +27,8 @@ import { dnaCapsForStrategy } from '../../../core/strategy-manager/config/strate
 import { DeskChannel } from '../../../core/strategy-manager/models/desk-channel.model';
 import { UiDialogService } from '../../../shared/ui/dialog/ui-dialog.service';
 import { APP_BUILD_LABEL } from '../../../core/config/app-build';
+import { DAILY_3K_DESK_PRESET } from '../../../core/paper-desk/daily-3k-desk-preset';
+import { MANAGED_STRATEGY_IDS } from '../../../core/strategy-manager/config/managed-strategy-ids';
 
 @Component({
   selector: 'app-trade-desk',
@@ -47,6 +49,7 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
 
   /** Visible build stamp so you can confirm deploy (e.g. v1.3.41 · …). */
   protected readonly appBuildLabel = APP_BUILD_LABEL;
+  protected readonly daily3kPreset = DAILY_3K_DESK_PRESET;
 
   protected readonly mode = signal<PaperDeskMode>('testing');
   /** Default both dates to yesterday so Testing opens on the last completed session. */
@@ -188,6 +191,57 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
       this.crudeLots = Math.max(1, Math.floor(Number(this.crudeLots)) || 1);
     }
   }
+
+  /**
+   * One-click Daily ₹3k desk: Trap N×2 · Bank×2 · Crude Selective×1 · risk locks on.
+   * Does not start a run — user still clicks Start.
+   */
+  protected applyDaily3kPreset(): void {
+    if (this.busy() || this.snapshot().running) {
+      return;
+    }
+    const p = DAILY_3K_DESK_PRESET;
+    this.assignments.forceTrapDefaultsForDaily3k();
+    this.niftyLots = p.niftyLots;
+    this.bankLots = p.bankLots;
+    this.crudeLots = p.crudeLots;
+    this.natGasLots = p.natGasLots;
+    this.lotsPreference.set(p.niftyLots);
+    this.enableNifty = p.enableNifty;
+    this.enableBank = p.enableBank;
+    this.enableCrude = this.showCrude() && p.enableCrude;
+    this.enableNatGas = false;
+    this.strictDayStop = p.strictDayStop;
+    this.dayProfitLock = p.dayProfitLock;
+    if (this.showKutty()) {
+      this.enableKutty = p.enableKutty;
+      this.kuttyAlone = p.kuttyAlone;
+    }
+    this.error.set('');
+  }
+
+  protected readonly daily3kReady = computed(() => {
+    const trap = MANAGED_STRATEGY_IDS.SR_TRAP_CONFIRM;
+    const a = this.activeStrategies();
+    const booksOk =
+      this.enableNifty &&
+      this.enableBank &&
+      (!this.showCrude() || this.enableCrude) &&
+      !this.enableNatGas &&
+      !(this.showKutty() && (this.enableKutty || this.kuttyAlone));
+    const lotsOk =
+      this.niftyLots === DAILY_3K_DESK_PRESET.niftyLots &&
+      this.bankLots === DAILY_3K_DESK_PRESET.bankLots &&
+      (!this.showCrude() || this.crudeLots === DAILY_3K_DESK_PRESET.crudeLots);
+    return (
+      booksOk &&
+      lotsOk &&
+      this.strictDayStop &&
+      this.dayProfitLock &&
+      a.nifty.id === trap &&
+      a.bank.id === trap
+    );
+  });
 
   private lotsForInstrumentId(instrumentId: string): number {
     const id = instrumentId.toLowerCase();

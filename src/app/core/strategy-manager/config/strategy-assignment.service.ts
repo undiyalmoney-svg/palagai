@@ -247,6 +247,21 @@ export class StrategyAssignmentService {
     this.persist();
   }
 
+  /**
+   * Daily ₹3k desk: force Trap Paper+Live on Nifty/Bank and re-apply protect DNA.
+   * Leaves stocks assignment untouched.
+   */
+  forceTrapDefaultsForDaily3k(): void {
+    const trap = MANAGED_STRATEGY_IDS.SR_TRAP_CONFIRM;
+    const next = { ...this.assignmentsSignal() };
+    next.nifty = { paper: trap, live: trap, shadow: next.nifty.shadow };
+    next.bank = { paper: trap, live: trap, shadow: next.bank.shadow };
+    this.assignmentsSignal.set(next);
+    this.applyDnaCaps(trap, 'nifty');
+    this.applyDnaCaps(trap, 'bank');
+    this.persist();
+  }
+
   private load(): void {
     if (!isPlatformBrowser(this.platformId)) {
       return;
