@@ -7,5 +7,5 @@ export const environment = {
   allowLiveMoney: true,
   orderEgressIp: '168.144.28.89',
   appVersion: '1.3.49',
-  appBuild: '2026.08.04-1lot-daily-1k3k',
+  appBuild: '2026.08.04-desk-one-profit',
 };

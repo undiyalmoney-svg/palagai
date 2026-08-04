@@ -547,15 +547,28 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
     this.toDate = todayIso();
   }
 
-  /** True when almost every row is estimated → Index ₹ proxy is the money truth. */
-  protected readonly moneyIsIndexProxy = computed(() => {
+  /**
+   * One money number for Testing + Live paper/results.
+   * Prefer net after charges (closest to live); else option/fill ₹.
+   */
+  protected primaryProfitRs(): number {
     const t = this.resultView().totals;
-    if (!t.trades) {
-      return false;
+    if (t.optionNetAfterChargesRs != null) {
+      return t.optionNetAfterChargesRs;
     }
-    const est = t.premiumEstimatedCount ?? 0;
-    return est >= t.trades;
-  });
+    return t.optionNetRs ?? 0;
+  }
+
+  /** Per-trade profit — same basis as primary (net if present). */
+  protected tradeProfitRs(t: {
+    netOptionPnlRs?: number | null;
+    optionPnlRs?: number | null;
+  }): number {
+    if (t.netOptionPnlRs != null) {
+      return t.netOptionPnlRs;
+    }
+    return t.optionPnlRs ?? 0;
+  }
 }
 
 function todayIso(): string {

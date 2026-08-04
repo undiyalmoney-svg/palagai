@@ -1119,6 +1119,15 @@
   margin-bottom: 1rem;
 }
 
+.totals-simple {
+  grid-template-columns: 2fr 1fr 1fr;
+}
+
+.stat.profit-hero strong {
+  font-size: 1.85rem;
+  letter-spacing: -0.03em;
+}
+
 .stat {
   padding: 0.85rem 0.95rem;
   border-radius: 14px;
@@ -1558,6 +1567,14 @@ td small {
 
   .totals {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .totals-simple {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .totals-simple .profit-hero {
+    grid-column: 1 / -1;
   }
 
   .status-grid {

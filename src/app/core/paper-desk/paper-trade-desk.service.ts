@@ -98,7 +98,7 @@ export interface TradeDeskRunOptions {
   enableNatGas?: boolean;
   /** Combined strict day loss ≈ −₹2,950 (split if both index books on). */
   strictDayStop?: boolean;
-  /** Combined day profit lock ≈ +₹5,000 (split if both index books on). */
+  /** Combined day profit lock ≈ +₹3,000 (split if both index books on). */
   dayProfitLock?: boolean;
   /** Background Kutty scalp (not in Strat dropdown). Default on. */
   enableKutty?: boolean;

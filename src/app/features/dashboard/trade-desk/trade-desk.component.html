@@ -431,7 +431,17 @@
   }
 
   @if (resultView().totals.trades || snapshot().statuses.length) {
-    <div class="totals">
+    <div class="totals totals-simple">
+      <div
+        class="stat primary profit-hero"
+        [class.up]="primaryProfitRs() > 0"
+        [class.down]="primaryProfitRs() < 0"
+      >
+        <span>Profit ₹</span>
+        <strong
+          >{{ primaryProfitRs() > 0 ? '+' : '' }}{{ primaryProfitRs() | number: '1.0-0' }}</strong
+        >
+      </div>
       <div class="stat">
         <span>Trades</span>
         <strong>{{ resultView().totals.trades }}</strong>
@@ -439,65 +449,6 @@
       <div class="stat">
         <span>W / L</span>
         <strong>{{ resultView().totals.wins }} / {{ resultView().totals.losses }}</strong>
-      </div>
-      <div class="stat" [class.up]="resultView().totals.indexNetPts > 0" [class.down]="resultView().totals.indexNetPts < 0">
-        <span>Index pts</span>
-        <strong>{{ resultView().totals.indexNetPts > 0 ? '+' : '' }}{{ resultView().totals.indexNetPts | number: '1.1-1' }}</strong>
-      </div>
-      <div
-        class="stat"
-        [class.primary]="moneyIsIndexProxy()"
-        [class.up]="resultView().totals.pointsMoneyRs > 0"
-        [class.down]="resultView().totals.pointsMoneyRs < 0"
-      >
-        <span title="Honest pts × lot money (Nifty×65 · Bank×30). When all rows are est. premium, this IS the money number."
-          >Index ₹ proxy</span
-        >
-        <strong
-          >{{ resultView().totals.pointsMoneyRs > 0 ? '+' : ''
-          }}{{ resultView().totals.pointsMoneyRs | number: '1.0-0' }}</strong
-        >
-      </div>
-      <div
-        class="stat"
-        [class.primary]="!moneyIsIndexProxy()"
-        [class.up]="resultView().totals.optionNetRs > 0"
-        [class.down]="resultView().totals.optionNetRs < 0"
-      >
-        <span
-          title="Front-week OHLC when available. All-est rows: equals Index ₹ proxy (pts × 65/30) — never invents far-week premium."
-        >P&amp;L ₹ gross ({{ resultView().totals.lotsUsed }} lot{{ resultView().totals.lotsUsed > 1 ? 's' : '' }} · options)</span>
-        <strong>{{ resultView().totals.optionNetRs > 0 ? '+' : '' }}{{ resultView().totals.optionNetRs | number: '1.2-2' }}</strong>
-      </div>
-      @if ((resultView().totals.premiumEstimatedCount ?? 0) > 0) {
-        <div class="stat">
-          <span title="No front-week option OHLC (or stop/target) — Option ₹ = Index ₹ proxy.">Est. premium rows</span>
-          <strong
-            >{{ resultView().totals.premiumEstimatedCount }} /
-            {{ resultView().totals.trades }}</strong
-          >
-        </div>
-      }
-      @if (resultView().totals.optionNetAfterChargesRs != null) {
-        <div
-          class="stat"
-          [class.up]="(resultView().totals.optionNetAfterChargesRs ?? 0) > 0"
-          [class.down]="(resultView().totals.optionNetAfterChargesRs ?? 0) < 0"
-        >
-          <span title="Gross option ₹ minus estimated Zerodha round-trip charges (approx).">Net ₹ est.</span>
-          <strong
-            >{{ (resultView().totals.optionNetAfterChargesRs ?? 0) > 0 ? '+' : ''
-            }}{{ resultView().totals.optionNetAfterChargesRs | number: '1.2-2' }}</strong
-          >
-        </div>
-      }
-      <div class="stat">
-        <span>Kite 5m calls</span>
-        <strong>{{ snapshot().kiteStats.historicalCalls }}</strong>
-      </div>
-      <div class="stat">
-        <span>Last span / max</span>
-        <strong>{{ snapshot().kiteStats.lastRangeDays }}d / {{ snapshot().kiteStats.maxDaysPerCall }}d</strong>
       </div>
     </div>
 
@@ -507,7 +458,7 @@
           <div>
             <h3>Day breakdown</h3>
             <p>
-              {{ resultView().dayStats.tradingDays }} trading day(s) · ranked by Option ₹
+              {{ resultView().dayStats.tradingDays }} trading day(s) · ranked by Profit ₹
               @if (resultView().filtered) {
                 · {{ resultView().weekdayLabel }}
               }
@@ -551,8 +502,7 @@
                     <th>Date</th>
                     <th>Day</th>
                     <th>Trades</th>
-                    <th>Option ₹</th>
-                    <th>Pts</th>
+                    <th>Profit ₹</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -562,10 +512,9 @@
                       <td>{{ d.weekday }}</td>
                       <td>{{ d.trades }}</td>
                       <td class="num up">{{ d.optionNetRs > 0 ? '+' : '' }}{{ d.optionNetRs | number: '1.0-0' }}</td>
-                      <td class="num">{{ d.indexNetPts > 0 ? '+' : '' }}{{ d.indexNetPts | number: '1.1-1' }}</td>
                     </tr>
                   } @empty {
-                    <tr><td colspan="5" class="muted">No profit days</td></tr>
+                    <tr><td colspan="4" class="muted">No profit days</td></tr>
                   }
                 </tbody>
               </table>
@@ -580,8 +529,7 @@
                     <th>Date</th>
                     <th>Day</th>
                     <th>Trades</th>
-                    <th>Option ₹</th>
-                    <th>Pts</th>
+                    <th>Profit ₹</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -591,10 +539,9 @@
                       <td>{{ d.weekday }}</td>
                       <td>{{ d.trades }}</td>
                       <td class="num down">{{ d.optionNetRs | number: '1.0-0' }}</td>
-                      <td class="num">{{ d.indexNetPts > 0 ? '+' : '' }}{{ d.indexNetPts | number: '1.1-1' }}</td>
                     </tr>
                   } @empty {
-                    <tr><td colspan="5" class="muted">No loss days</td></tr>
+                    <tr><td colspan="4" class="muted">No loss days</td></tr>
                   }
                 </tbody>
               </table>
@@ -612,8 +559,7 @@
                     <th>Day</th>
                     <th>Trades</th>
                     <th>W / L</th>
-                    <th>Option ₹</th>
-                    <th>Pts</th>
+                    <th>Profit ₹</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -624,9 +570,6 @@
                       <td>{{ w.wins }} / {{ w.losses }}</td>
                       <td class="num" [class.up]="w.optionNetRs > 0" [class.down]="w.optionNetRs < 0">
                         {{ w.optionNetRs > 0 ? '+' : '' }}{{ w.optionNetRs | number: '1.0-0' }}
-                      </td>
-                      <td class="num" [class.up]="w.indexNetPts > 0" [class.down]="w.indexNetPts < 0">
-                        {{ w.indexNetPts > 0 ? '+' : '' }}{{ w.indexNetPts | number: '1.1-1' }}
                       </td>
                     </tr>
                   }
@@ -815,13 +758,7 @@
 
           <div class="status-metrics">
             <div>
-              <span>Day index</span>
-              <strong [class.up]="s.dayNetIndexPts > 0" [class.down]="s.dayNetIndexPts < 0">
-                {{ s.dayNetIndexPts > 0 ? '+' : '' }}{{ s.dayNetIndexPts | number: '1.1-1' }}
-              </strong>
-            </div>
-            <div>
-              <span>Day option ₹</span>
+              <span>Profit ₹</span>
               <strong [class.up]="s.dayNetOptionRs > 0" [class.down]="s.dayNetOptionRs < 0">
                 {{ s.dayNetOptionRs > 0 ? '+' : '' }}{{ s.dayNetOptionRs | number: '1.0-0' }}
               </strong>
@@ -948,12 +885,9 @@
               <th>When</th>
               <th>Index</th>
               <th>Dir</th>
-              <th>Chosen instrument</th>
-              <th>Idx entry / tgt</th>
+              <th>Instrument</th>
               <th>Prem in/out</th>
-              <th>Option ₹</th>
-              <th>MFE/MAE</th>
-              <th>Idx pts</th>
+              <th>Profit ₹</th>
               <th>Exit</th>
             </tr>
           </thead>
@@ -980,31 +914,11 @@
                   @if (t.option; as opt) {
                     <div class="stack">
                       <strong>{{ opt.tradingSymbol }}</strong>
-                      <small>
-                        {{ opt.optionType }} · Strike {{ opt.strike | number: '1.0-0' }} · Exp {{ opt.expiry || '—' }}
-                      </small>
-                      <small>
-                        @if (opt.instrumentToken > 0) {
-                          Token {{ opt.instrumentToken }} ·
-                        }
-                        Lot {{ opt.lotSize }}
-                        @if (opt.source === 'synthetic') {
-                          · <span class="est">synthetic</span>
-                        }
-                      </small>
-                      @if (t.premiumEstimated) {
-                        <small class="est">est. premium</small>
-                      }
+                      <small>{{ opt.optionType }} · {{ opt.strike | number: '1.0-0' }}</small>
                     </div>
                   } @else {
                     <span class="muted">—</span>
                   }
-                </td>
-                <td class="num">
-                  <div class="stack">
-                    <strong>{{ t.indexEntry | number: '1.1-1' }}</strong>
-                    <small>Tgt {{ t.indexTarget | number: '1.1-1' }}</small>
-                  </div>
                 </td>
                 <td>
                   @if (t.optionEntryPremium != null && t.optionExitPremium != null) {
@@ -1013,22 +927,8 @@
                     —
                   }
                 </td>
-                <td class="num" [class.up]="(t.optionPnlRs ?? 0) > 0" [class.down]="(t.optionPnlRs ?? 0) < 0">
-                  {{ t.optionPnlRs != null ? ((t.optionPnlRs > 0 ? '+' : '') + (t.optionPnlRs | number: '1.2-2')) : '—' }}
-                  @if (t.netOptionPnlRs != null) {
-                    <div class="stack">
-                      <small title="After estimated charges">net {{ t.netOptionPnlRs | number: '1.0-0' }}</small>
-                    </div>
-                  }
-                </td>
-                <td class="num">
-                  <div class="stack">
-                    <small title="Max favorable excursion (index pts)">+{{ t.mfeIndexPts ?? 0 | number: '1.0-0' }}</small>
-                    <small title="Max adverse excursion (index pts)">−{{ t.maeIndexPts ?? 0 | number: '1.0-0' }}</small>
-                  </div>
-                </td>
-                <td class="num" [class.up]="t.indexPoints > 0" [class.down]="t.indexPoints < 0">
-                  {{ t.indexPoints > 0 ? '+' : '' }}{{ t.indexPoints | number: '1.1-1' }}
+                <td class="num" [class.up]="tradeProfitRs(t) > 0" [class.down]="tradeProfitRs(t) < 0">
+                  {{ tradeProfitRs(t) > 0 ? '+' : '' }}{{ tradeProfitRs(t) | number: '1.0-0' }}
                 </td>
                 <td><small>{{ t.exitReason }}</small></td>
               </tr>
