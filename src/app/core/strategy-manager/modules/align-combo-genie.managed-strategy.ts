@@ -67,14 +67,14 @@ export class AlignComboGenieManagedStrategy implements IManagedStrategy {
     extras: {
       ...DEFAULT_SMART_PB_EXTRAS,
       genieRouterEnabled: true,
-      /** Same researched peak-trail + soft cutoff as Trap (Paper+Live). */
-      profitLockArmRs: 600,
-      profitLockLockRs: 300,
-      profitLockGivebackRs: 300,
+      /** Same researched peak-trail + soft cutoff as Trap (doc 42). */
+      profitLockArmRs: 400,
+      profitLockLockRs: 200,
+      profitLockGivebackRs: 200,
       slConfirmCutoffEnabled: true,
-      slConfirmCutoffFracR: 0.55,
-      slConfirmCutoffMaxMfeR: 0.75,
-      slConfirmSoftRs: 700,
+      slConfirmCutoffFracR: 0.45,
+      slConfirmCutoffMaxMfeR: 0.6,
+      slConfirmSoftRs: 500,
     },
   });
 

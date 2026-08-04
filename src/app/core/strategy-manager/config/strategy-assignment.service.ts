@@ -14,10 +14,10 @@ import { StrategySettings } from '../models/strategy-settings.model';
 import { StrategyRegistryService } from '../registry/strategy-registry.service';
 
 /**
- * v20 — force Trap defaults again. v19 kept intentional Genie/Donch picks, which
- * look “dead” on Mon (drive skip) / Tue (hard sit-out) while users expect Trap.
+ * v21 — re-apply Trap peak-trail arm₹400 + soft 0.45R (doc 42 daily-profit re-hunt).
+ * Drops v20 so stale protect extras cannot stick at arm₹600.
  */
-const STORAGE_KEY = 'palagai_strategy_assignments_v20';
+const STORAGE_KEY = 'palagai_strategy_assignments_v21';
 const LEGACY_STORAGE_KEYS = [
   'palagai_strategy_assignments_v1',
   'palagai_strategy_assignments_v2',
@@ -38,6 +38,7 @@ const LEGACY_STORAGE_KEYS = [
   'palagai_strategy_assignments_v17',
   'palagai_strategy_assignments_v18',
   'palagai_strategy_assignments_v19',
+  'palagai_strategy_assignments_v20',
 ] as const;
 
 export interface ChannelAssignment {

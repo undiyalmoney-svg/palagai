@@ -165,32 +165,32 @@ export const CRUDE_ALL_GREEN_PARAMS: CrudeTradeParams = {
 };
 
 /**
- * Selective — charge-aware Crude (doc 41).
- * One quality Session-OR trade after a sane OR · evening window · first-win.
- * Skips wild OR days (e.g. 189 pts on 2026-08-03) that All-Green overtrades.
+ * Selective — charge-aware Crude (doc 41 + re-hunt doc 42).
+ * 2026-08-04 Kite re-hunt: SL20/TP40 · eve · max 2/day · no OR-width skip
+ * beats OR≤60 SL40 (Jul green ~31% → ~77%) while staying far below All-Green churn.
  */
 export const CRUDE_SELECTIVE_PARAMS: CrudeTradeParams = {
   profileId: 'selective',
-  label: 'Selective (1/day · OR≤60)',
-  stopPts: 40,
-  morningTargetPts: 80,
-  eveningTargetPts: 80,
+  label: 'Selective (≤2/day · SL20/TP40)',
+  stopPts: 20,
+  morningTargetPts: 40,
+  eveningTargetPts: 40,
   targetRMultiple: 0,
   dayLossStopPts: 40,
   strictDayLossPts: 40,
   dayProfitLockPts: 0,
   entryMode: 'session-or',
   requireConfirm: true,
-  firstWinLock: true,
+  firstWinLock: false,
   eveningEntryStart: '18:30',
-  eveningEntryEnd: '22:00',
+  eveningEntryEnd: '21:00',
   sessionOrStart: CRUDE_SOR_OR_START,
   sessionOrEnd: CRUDE_SOR_OR_END,
-  maxOrWidth: 60,
-  maxEveningTradesDay: 1,
+  maxOrWidth: 0,
+  maxEveningTradesDay: 2,
   defaultEnableMorning: false,
   defaultEnableEvening: true,
-  dailyBandLabel: 'OR≤60 · eve 18:30–22:00 · SL40/TP80 · confirm · first-win · max 1/day',
+  dailyBandLabel: 'Eve 18:30–21:00 · SL20/TP40 · confirm · max 2/day · no OR skip',
   ...PROTECT_OFF,
 };
 

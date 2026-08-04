@@ -32,7 +32,7 @@ export class SrTrapConfirmManagedStrategy implements IManagedStrategy {
   readonly name = 'Trap';
   readonly version = '1.0.0';
   readonly description =
-    'Default · liquidity trap + next-bar confirm · 3.5R · peak-trail arm₹600/gb₹300 · ≤3 trades/day.';
+    'Default · liquidity trap + next-bar confirm · 3.5R · peak-trail arm₹400/gb₹200 · soft0.45R.';
   readonly supports: readonly DeskChannel[] = ['nifty', 'bank'];
 
   readonly defaultSettings = defaultStrategySettings({
@@ -62,17 +62,17 @@ export class SrTrapConfirmManagedStrategy implements IManagedStrategy {
       slPadPts: 2,
       minConfirmBody: 0,
       /**
-       * Research (paper-loss-giveback-cutoff): arm earlier so ~₹800–1k peaks
-       * cannot reverse to full hard SL. Peak ₹900 → lock ~₹600 (not wait until ₹0).
+       * Re-hunt 2026-08-04 (Kite 2025–2026): arm₹400/lock₹200/gb₹200 + soft 0.45R
+       * beats prior arm₹600 on avg ₹/day + green% (doc 42).
        */
-      profitLockArmRs: 600,
-      profitLockLockRs: 300,
-      profitLockGivebackRs: 300,
-      /** Research: briefly-green SL confirm (MFE < 0.75R + 0.55R / ₹700 soft). */
+      profitLockArmRs: 400,
+      profitLockLockRs: 200,
+      profitLockGivebackRs: 200,
+      /** Briefly-green soft cut — tighter than v1.3.11 loser-only band. */
       slConfirmCutoffEnabled: true,
-      slConfirmCutoffFracR: 0.55,
-      slConfirmCutoffMaxMfeR: 0.75,
-      slConfirmSoftRs: 700,
+      slConfirmCutoffFracR: 0.45,
+      slConfirmCutoffMaxMfeR: 0.6,
+      slConfirmSoftRs: 500,
     },
   });
 
