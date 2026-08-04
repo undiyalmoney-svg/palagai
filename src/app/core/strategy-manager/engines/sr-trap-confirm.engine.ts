@@ -73,7 +73,7 @@ function readTrapExtras(settings: StrategySettings): {
   const mode = x['trapMode'] === 'trap' ? 'trap' : 'both';
   return {
     swingLb: Math.max(3, Math.floor(num(x['swingLb'], 5))),
-    piercePts: num(x['piercePts'], 3),
+    piercePts: num(x['piercePts'], 5),
     mode,
     minRisk: num(x['minRiskPts'], 4),
     maxRisk: num(x['maxRiskPts'], 28),

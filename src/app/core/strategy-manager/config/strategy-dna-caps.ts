@@ -28,6 +28,18 @@ export const PROTECTION_DNA_EXTRAS: Record<string, number | boolean> = {
   slConfirmSoftRs: 500,
 };
 
+/**
+ * Desk ₹3k hunt (doc 43): pierce 5 beats pierce 3 on ≥₹3k hit-rate + fewer zero-fill days.
+ * Forced only on Trap — Genie/SmartPullback ignore this key.
+ */
+export const TRAP_ENTRY_DNA_EXTRAS: Record<string, number | boolean | string> = {
+  piercePts: 5,
+};
+
+export function usesTrapEntryDna(strategyId: string): boolean {
+  return strategyId === MANAGED_STRATEGY_IDS.SR_TRAP_CONFIRM;
+}
+
 /** Strategies that share the researched Trap/Genie loss-cut DNA. */
 export function usesProtectionDna(strategyId: string): boolean {
   return (

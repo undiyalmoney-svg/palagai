@@ -193,7 +193,7 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * One-click Daily ₹3k desk: Trap N×2 · Bank×2 · Crude Selective×1 · risk locks on.
+   * One-click Daily ₹3k desk: Trap N×5 · Bank×3 · Crude Selective×1 · risk locks on.
    * Does not start a run — user still clicks Start.
    */
   protected applyDaily3kPreset(): void {
@@ -318,7 +318,7 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
       this.enableNifty ? `Nifty 50 ×${this.niftyLots}` : null,
       this.enableBank ? `Bank Nifty ×${this.bankLots}` : null,
       this.enableCrude && this.showCrude()
-        ? `Crude Oil Mini ×${this.crudeLots} (Selective · max 2/day)`
+        ? `Crude Oil Mini ×${this.crudeLots} (Selective · 10:00–22:00 · max 2/day)`
         : null,
       this.enableNatGas && this.showNatGas()
         ? `Natural Gas Mini ×${this.natGasLots} (Daily Profit NG)`

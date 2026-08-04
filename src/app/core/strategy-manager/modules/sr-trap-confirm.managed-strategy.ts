@@ -32,7 +32,7 @@ export class SrTrapConfirmManagedStrategy implements IManagedStrategy {
   readonly name = 'Trap';
   readonly version = '1.0.0';
   readonly description =
-    'Default · liquidity trap + next-bar confirm · 3.5R · peak-trail arm₹400/gb₹200 · soft0.45R.';
+    'Default · liquidity trap + next-bar confirm · pierce5 · 3.5R · peak-trail arm₹400/gb₹200 · soft0.45R.';
   readonly supports: readonly DeskChannel[] = ['nifty', 'bank'];
 
   readonly defaultSettings = defaultStrategySettings({
@@ -56,7 +56,7 @@ export class SrTrapConfirmManagedStrategy implements IManagedStrategy {
     extras: {
       trapMode: 'both',
       swingLb: 5,
-      piercePts: 3,
+      piercePts: 5,
       minRiskPts: 4,
       maxRiskPts: 28,
       slPadPts: 2,

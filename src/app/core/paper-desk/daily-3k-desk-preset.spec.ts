@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { DAILY_3K_DESK_PRESET } from './daily-3k-desk-preset';
 
 describe('DAILY_3K_DESK_PRESET', () => {
-  it('targets Trap + Selective with 2/2/1 lots and risk locks', () => {
-    expect(DAILY_3K_DESK_PRESET.niftyLots).toBe(2);
-    expect(DAILY_3K_DESK_PRESET.bankLots).toBe(2);
+  it('wires hunt answer lots 5/3/1 with risk locks', () => {
+    expect(DAILY_3K_DESK_PRESET.niftyLots).toBe(5);
+    expect(DAILY_3K_DESK_PRESET.bankLots).toBe(3);
     expect(DAILY_3K_DESK_PRESET.crudeLots).toBe(1);
     expect(DAILY_3K_DESK_PRESET.enableNifty).toBe(true);
     expect(DAILY_3K_DESK_PRESET.enableBank).toBe(true);

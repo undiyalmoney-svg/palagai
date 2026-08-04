@@ -42,7 +42,7 @@ OR≤60 · SL40/TP40 · max 1 was **cold in July** (~31% green, avg −₹71/day
 
 \*All-Green sim ignores live SL-M blocks + ~₹50–100×many fills (Aug 3 live ≈ −₹63 after ~₹1k charges). Keep **max 2/day**.
 
-**Wired Selective:** SL**20**/TP**40** · eve **18:30–21:00** · confirm · **max 2/day** · `maxOrWidth: 0` (no OR skip) · first-win off.
+**Wired Selective (later retuned in doc 43):** SL**20**/TP**40** · **10:00–22:00** · confirm · **max 2/day** · `maxOrWidth: 0` (no OR skip) · first-win off.
 
 ## Today / tomorrow
 

@@ -1,7 +1,7 @@
 /**
  * Crude Oil Mini strategy profiles for the Crude Desk.
  *
- * - selective: charge-aware · max 1/day · OR-width skip · evening window (Trade Desk + Autobot default · doc 41)
+ * - selective: charge-aware · max 2/day · SL20/TP40 · 10:00–22:00 (Trade Desk default · doc 41/43)
  * - all-green: Session OR 09:00–09:30 · entries →23:00 · per-trade SL/trail (Experiments picker only)
  * - daily-profit: Trap-style evening PDHL + confirm · tight SL/TP
  * - champion: hunt pair (larger SL/TP)
@@ -165,9 +165,9 @@ export const CRUDE_ALL_GREEN_PARAMS: CrudeTradeParams = {
 };
 
 /**
- * Selective — charge-aware Crude (doc 41 + re-hunt doc 42).
- * 2026-08-04 Kite re-hunt: SL20/TP40 · eve · max 2/day · no OR-width skip
- * beats OR≤60 SL40 (Jul green ~31% → ~77%) while staying far below All-Green churn.
+ * Selective — charge-aware Crude (doc 41 + re-hunt doc 42 + desk ₹3k doc 43).
+ * Desk ₹3k hunt: SL20/TP40 · session 10:00–22:00 · max 2/day · no OR skip
+ * lifts ≥₹3k hit-rate vs eve-only while staying far below All-Green churn.
  */
 export const CRUDE_SELECTIVE_PARAMS: CrudeTradeParams = {
   profileId: 'selective',
@@ -182,15 +182,15 @@ export const CRUDE_SELECTIVE_PARAMS: CrudeTradeParams = {
   entryMode: 'session-or',
   requireConfirm: true,
   firstWinLock: false,
-  eveningEntryStart: '18:30',
-  eveningEntryEnd: '21:00',
+  eveningEntryStart: '10:00',
+  eveningEntryEnd: '22:00',
   sessionOrStart: CRUDE_SOR_OR_START,
   sessionOrEnd: CRUDE_SOR_OR_END,
   maxOrWidth: 0,
   maxEveningTradesDay: 2,
   defaultEnableMorning: false,
   defaultEnableEvening: true,
-  dailyBandLabel: 'Eve 18:30–21:00 · SL20/TP40 · confirm · max 2/day · no OR skip',
+  dailyBandLabel: '10:00–22:00 · SL20/TP40 · confirm · max 2/day · no OR skip',
   ...PROTECT_OFF,
 };
 

@@ -9,15 +9,21 @@ import {
   DEFAULT_CHANNEL_ASSIGNMENTS,
   MANAGED_STRATEGY_IDS,
 } from '../config/managed-strategy-ids';
-import { dnaCapsForStrategy, PROTECTION_DNA_EXTRAS, usesProtectionDna } from '../config/strategy-dna-caps';
+import {
+  dnaCapsForStrategy,
+  PROTECTION_DNA_EXTRAS,
+  TRAP_ENTRY_DNA_EXTRAS,
+  usesProtectionDna,
+  usesTrapEntryDna,
+} from '../config/strategy-dna-caps';
 import { StrategySettings } from '../models/strategy-settings.model';
 import { StrategyRegistryService } from '../registry/strategy-registry.service';
 
 /**
- * v21 — re-apply Trap peak-trail arm₹400 + soft 0.45R (doc 42 daily-profit re-hunt).
- * Drops v20 so stale protect extras cannot stick at arm₹600.
+ * v22 — Desk ₹3k hunt: Trap piercePts 5 + protect arm₹400 (doc 43).
+ * Drops v21 so stale pierce 3 cannot stick.
  */
-const STORAGE_KEY = 'palagai_strategy_assignments_v21';
+const STORAGE_KEY = 'palagai_strategy_assignments_v22';
 const LEGACY_STORAGE_KEYS = [
   'palagai_strategy_assignments_v1',
   'palagai_strategy_assignments_v2',
@@ -39,6 +45,7 @@ const LEGACY_STORAGE_KEYS = [
   'palagai_strategy_assignments_v18',
   'palagai_strategy_assignments_v19',
   'palagai_strategy_assignments_v20',
+  'palagai_strategy_assignments_v21',
 ] as const;
 
 export interface ChannelAssignment {
@@ -144,16 +151,20 @@ export class StrategyAssignmentService {
     if (caps.targetRMultiple != null) {
       patch.targetRMultiple = caps.targetRMultiple;
     }
-    if (usesProtectionDna(strategyId)) {
-      patch.extras = { ...PROTECTION_DNA_EXTRAS };
+    if (usesProtectionDna(strategyId) || usesTrapEntryDna(strategyId)) {
+      patch.extras = {
+        ...(usesProtectionDna(strategyId) ? PROTECTION_DNA_EXTRAS : {}),
+        ...(usesTrapEntryDna(strategyId) ? TRAP_ENTRY_DNA_EXTRAS : {}),
+      };
     }
     // Persist under channel-scoped key so Nifty/Bank DNA do not overwrite each other.
     const key = settingsKey(strategyId, channel);
     const merged = { ...(this.settingsMap[strategyId] ?? {}), ...(this.settingsMap[key] ?? {}), ...patch };
-    if (usesProtectionDna(strategyId)) {
+    if (usesProtectionDna(strategyId) || usesTrapEntryDna(strategyId)) {
       merged.extras = {
         ...(merged.extras ?? {}),
-        ...PROTECTION_DNA_EXTRAS,
+        ...(usesProtectionDna(strategyId) ? PROTECTION_DNA_EXTRAS : {}),
+        ...(usesTrapEntryDna(strategyId) ? TRAP_ENTRY_DNA_EXTRAS : {}),
       };
     }
     this.settingsMap[key] = merged;
@@ -213,11 +224,12 @@ export class StrategyAssignmentService {
     if (caps.targetRMultiple != null) {
       merged.targetRMultiple = caps.targetRMultiple;
     }
-    // Force researched peak-trail / soft cutoff (stale arm₹1000 must not stick).
-    if (usesProtectionDna(strategyId)) {
+    // Force researched peak-trail / soft cutoff / Trap pierce (stale DNA must not stick).
+    if (usesProtectionDna(strategyId) || usesTrapEntryDna(strategyId)) {
       merged.extras = {
         ...(merged.extras ?? {}),
-        ...PROTECTION_DNA_EXTRAS,
+        ...(usesProtectionDna(strategyId) ? PROTECTION_DNA_EXTRAS : {}),
+        ...(usesTrapEntryDna(strategyId) ? TRAP_ENTRY_DNA_EXTRAS : {}),
       };
     }
     mod.initialize(merged);
