@@ -66,11 +66,12 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
 
   protected enableNifty = true;
   protected enableBank = true;
-  protected enableCrude = true;
+  /** Off by default — Aug 3 All-Green Autobot fee churn (~₹1k). Opt in only. */
+  protected enableCrude = false;
   protected niftyLots = 1;
   protected bankLots = 1;
   protected crudeLots = 1;
-  /** Only Bank is selectable — Nifty=Trap, Crude=Selective (charge-aware) fixed. */
+  /** Only Bank is selectable — Nifty=Trap, Crude=Selective (charge-aware) when enabled. */
   protected bankStrategy: BankStrategy = 'trap';
   protected realOrders = false;
   protected testQty = 1;
@@ -84,7 +85,7 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
     message: 'Not connected yet',
   });
   protected readonly note = signal(
-    'Server Live runs Trap / Genie / Crude Selective on DigitalOcean every 60s. Push Kite token, then Start. Uncheck real money first to watch SIGNAL events.',
+    'Server Live on DigitalOcean every 60s. Crude is OFF by default (fee protection). If you enable it, DNA is Selective · max 1/day. Push Kite token, then Start — paper first.',
   );
 
   ngOnInit(): void {
@@ -105,7 +106,8 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
         this.http.get<LiveStatus>(`${this.liveApiBase}/status`),
       );
       this.status.set(res);
-      if (res.config) {
+      // Only mirror books while running — do not re-check Crude from an old All-Green session.
+      if (res.config && res.status === 'running') {
         this.enableNifty = !!res.config.enableNifty;
         this.enableBank = !!res.config.enableBank;
         this.enableCrude = !!res.config.enableCrude;
@@ -133,7 +135,9 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
         message:
           'Orders go via DigitalOcean static IP Order-API.\nChrome can close — worker keeps scanning.\n\nNifty = Trap · Bank = ' +
           (this.bankStrategy === 'genie' ? 'Genie' : 'Trap') +
-          ' · Crude = Selective (max 1/day)',
+          (this.enableCrude
+            ? ' · Crude = Selective (max 1/day)'
+            : ' · Crude = OFF'),
         confirmLabel: 'Start live',
         cancelLabel: 'Cancel',
         tone: 'danger',

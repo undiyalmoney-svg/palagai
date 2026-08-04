@@ -51,7 +51,7 @@
 
       <label class="at-check">
         <input type="checkbox" [(ngModel)]="enableCrude" [disabled]="busy() || status().status === 'running'" />
-        <span>Crude Oil Mini · <em>Selective · max 1/day (fixed)</em></span>
+        <span>Crude Oil Mini · <em>OFF by default · Selective if enabled</em></span>
       </label>
       <label class="at-lots">
         Lots
@@ -84,7 +84,7 @@
         </button>
       </div>
       <p class="at-hint">
-        Fixed DNA: Nifty = Trap · Crude = Selective (OR≤60 · eve · max 1/day). Only Bank is selectable (Trap / Genie).
+        Nifty = Trap · Crude OFF by default (Aug 3 fee lesson). If enabled → Selective max 1/day. Bank = Trap/Genie.
       </p>
       @if (status().message) {
         <p class="at-msg">{{ status().message }}</p>
