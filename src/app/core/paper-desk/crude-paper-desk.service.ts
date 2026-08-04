@@ -61,8 +61,8 @@ export interface CrudeDeskRunOptions {
   /** Evening PDHL entries 18:30–20:30. */
   enableEvening?: boolean;
   /**
-   * Strategy profile. Service fallback `all-green` (Trade Desk Live Crude).
-   * Experiments Crude defaults to `selective` (charge-aware · max 1/day · doc 41).
+   * Strategy profile. Service fallback `selective` (charge-aware · max 1/day · doc 41).
+   * Experiments keeps an explicit profile picker (All-Green still available there).
    */
   strategyProfile?: CrudeStrategyProfileId;
 }
@@ -86,7 +86,7 @@ export class CrudePaperDeskService {
   private strictDayStop = false;
   private enableMorning = true;
   private enableEvening = true;
-  private tradeParams: CrudeTradeParams = resolveCrudeStrategyProfile('all-green');
+  private tradeParams: CrudeTradeParams = resolveCrudeStrategyProfile('selective');
   private dayLossStopPts = this.tradeParams.dayLossStopPts;
   private runGeneration = 0;
   private readonly maxDaysPerCall = DESK_HISTORICAL_CHUNK_DAYS;

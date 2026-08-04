@@ -114,7 +114,7 @@ function buildClockNote(params: {
     return undefined;
   }
   const mcxBits = [
-    params.hasCrude ? 'Crude All-Green' : null,
+    params.hasCrude ? 'Crude Selective' : null,
     params.hasNatGas ? 'Nat Gas Daily Profit' : null,
   ]
     .filter(Boolean)
@@ -152,7 +152,7 @@ function buildNextAction(params: {
       return 'Index session stopped · MCX book still in trade through evening.';
     }
     const labels = [
-      params.hasCrude ? 'Crude All-Green' : null,
+      params.hasCrude ? 'Crude Selective' : null,
       params.hasNatGas ? 'Nat Gas Daily Profit' : null,
     ]
       .filter(Boolean)

@@ -81,9 +81,14 @@ async function main() {
     ],
   });
 
-  fs.copyFileSync(outLocal, outApi);
   console.log('Wrote', outLocal);
-  console.log('Wrote', outApi);
+  try {
+    fs.mkdirSync(path.dirname(outApi), { recursive: true });
+    fs.copyFileSync(outLocal, outApi);
+    console.log('Wrote', outApi);
+  } catch (err) {
+    console.warn('Skip Order-API copy (sibling missing):', err.message || err);
+  }
 }
 
 main().catch((err) => {

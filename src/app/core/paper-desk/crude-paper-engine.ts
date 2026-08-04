@@ -308,7 +308,7 @@ export function replayPaperOnCrude(params: {
   } = params;
   const forceCloseOpen = params.forceCloseOpen !== false;
   const lotsMultiplier = Math.max(1, Math.floor(params.lotsMultiplier ?? 1) || 1);
-  const tradeParams = params.tradeParams ?? resolveCrudeStrategyProfile('all-green');
+  const tradeParams = params.tradeParams ?? resolveCrudeStrategyProfile('selective');
   const dayLossStopPts = params.dayLossStopPts ?? tradeParams.dayLossStopPts;
   const dayProfitLockPts = tradeParams.dayProfitLockPts;
   const optionResolve = {

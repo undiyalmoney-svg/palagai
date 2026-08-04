@@ -71,7 +71,7 @@ export class CrudeOilDeskComponent implements OnInit, OnDestroy {
   protected lots = 1;
   /**
    * Crude Experiments default: Selective (charge-aware · max 1/day).
-   * Trade Desk Live Crude stays All-Green until you switch.
+   * Trade Desk Live Crude defaults to Selective (same as Autobot).
    * Nat Gas Experiments default: Daily Profit (NG).
    */
   protected strategyProfile: CrudeStrategyProfileId = 'selective';
