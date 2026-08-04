@@ -72,9 +72,9 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
   protected enableCrude = true;
   /** Off until Nat Gas DNA is fully vetted — opt in for Testing / Live. */
   protected enableNatGas = false;
-  /** Combined strict day loss ≈ −₹2,950 — off by default; user must opt in. */
+  /** Combined strict day loss ≈ −₹2,950 × lots — off by default; user must opt in. */
   protected strictDayStop = false;
-  /** Combined day profit lock ≈ +₹3,000 (1-lot Daily band) — on by default. */
+  /** Combined day profit lock ≈ +₹3,000 × lots (1→₹3k, 3→₹9k) — on by default. */
   protected dayProfitLock = true;
   /** Background Kutty scalp — owner only in UI; off by default (Daily desk). */
   protected enableKutty = false;
