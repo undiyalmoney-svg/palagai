@@ -20,10 +20,10 @@ import { StrategySettings } from '../models/strategy-settings.model';
 import { StrategyRegistryService } from '../registry/strategy-registry.service';
 
 /**
- * v22 — Desk ₹3k hunt: Trap piercePts 5 + protect arm₹400 (doc 43).
- * Drops v21 so stale pierce 3 cannot stick.
+ * v23 — 1-lot Daily DNA: Trap pierce10 · peak₹150 · soft OFF · RR2 (doc 43).
+ * Drops v22 so stale pierce5/arm400/soft cannot stick on Trap.
  */
-const STORAGE_KEY = 'palagai_strategy_assignments_v22';
+const STORAGE_KEY = 'palagai_strategy_assignments_v23';
 const LEGACY_STORAGE_KEYS = [
   'palagai_strategy_assignments_v1',
   'palagai_strategy_assignments_v2',
@@ -46,6 +46,7 @@ const LEGACY_STORAGE_KEYS = [
   'palagai_strategy_assignments_v19',
   'palagai_strategy_assignments_v20',
   'palagai_strategy_assignments_v21',
+  'palagai_strategy_assignments_v22',
 ] as const;
 
 export interface ChannelAssignment {

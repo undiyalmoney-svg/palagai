@@ -44,7 +44,8 @@ export const PDHL_BANK_RUPEES_PER_POINT = 30;
 /** Desk checkbox: combined strict day loss (₹) — split across selected books. */
 export const DESK_STRICT_DAY_LOSS_RS = 2950;
 /** Desk checkbox: combined day profit lock (₹) — split across selected books. */
-export const DESK_DAY_PROFIT_LOCK_RS = 5000;
+/** 1-lot Daily band (doc 43): lock at ₹3k so winners stay in ₹1k–₹3k target. */
+export const DESK_DAY_PROFIT_LOCK_RS = 3000;
 
 /**
  * Per-index risk profile (champion pair, 2020–2026 hunt):

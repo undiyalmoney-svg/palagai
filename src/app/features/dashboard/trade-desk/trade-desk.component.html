@@ -6,7 +6,7 @@
       <p class="pg-lede">
         @if (showCrude() || showNatGas()) {
           Nifty, Bank, Crude &amp; Nat Gas Mini — Strat for indices; Crude
-          <strong>Selective</strong> (max 2/day · SL20/TP40 · 10:00–22:00); Nat Gas
+          <strong>Selective</strong> (max 2/day · SL30/TP60 · 10:00–22:00); Nat Gas
           <strong>Daily Profit (NG)</strong>. Index until 15:15 · MCX continues evening.
         } @else {
           Nifty &amp; Bank Nifty — Strat for indices. Session until 15:15.
@@ -227,7 +227,7 @@
       @if (showCrude()) {
         <label
           class="desk-check"
-          title="Selective · 10:00–22:00 · SL20/TP40 · max 2/day · continues past 15:15 on MCX"
+          title="Selective · 10:00–22:00 · SL30/TP60 · max 2/day · continues past 15:15 on MCX"
         >
           <input type="checkbox" [(ngModel)]="enableCrude" [disabled]="busy() || snapshot().running" />
           <span>Crude Oil Mini</span>
@@ -254,13 +254,13 @@
         />
         <span>Strict day stop (−₹2,950)</span>
       </label>
-      <label class="desk-check" title="Stops new entries after about +₹5,000 day profit (split if both books on)">
+      <label class="desk-check" title="Stops new entries after about +₹3,000 day profit (split if both books on)">
         <input
           type="checkbox"
           [(ngModel)]="dayProfitLock"
           [disabled]="busy() || snapshot().running"
         />
-        <span>Day profit lock (+₹5,000)</span>
+        <span>Day profit lock (+₹3,000)</span>
       </label>
       @if (showKutty()) {
         <label

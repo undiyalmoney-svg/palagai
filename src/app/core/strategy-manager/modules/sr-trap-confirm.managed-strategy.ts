@@ -23,16 +23,16 @@ import {
 } from '../engines/sr-trap-confirm.engine';
 
 /**
- * S/R Trap + Confirm — research max-earn book (doc 31/33). Default Nifty/Bank Paper+Live.
- * Profit protect 1R→BE (doc 33 giveback fix). OOS ~₹1,049–1,464/day index proxy.
+ * S/R Trap + Confirm — default Nifty/Bank Paper+Live.
+ * 1-lot Daily DNA (doc 43): pierce10 · peak arm₹150 · soft OFF · 2R.
  */
 @Injectable({ providedIn: 'root' })
 export class SrTrapConfirmManagedStrategy implements IManagedStrategy {
   readonly id = MANAGED_STRATEGY_IDS.SR_TRAP_CONFIRM;
   readonly name = 'Trap';
-  readonly version = '1.0.0';
+  readonly version = '1.1.0';
   readonly description =
-    'Default · liquidity trap + next-bar confirm · pierce5 · 3.5R · peak-trail arm₹400/gb₹200 · soft0.45R.';
+    'Default · liquidity trap + next-bar confirm · pierce10 · 2R · peak-trail arm₹150 · soft OFF · 1-lot Daily.';
   readonly supports: readonly DeskChannel[] = ['nifty', 'bank'];
 
   readonly defaultSettings = defaultStrategySettings({
@@ -47,7 +47,7 @@ export class SrTrapConfirmManagedStrategy implements IManagedStrategy {
     instrumentType: 'futures',
     dayStopPts: 80,
     dayProfitLockPts: 0,
-    targetRMultiple: 3.5,
+    targetRMultiple: 2,
     profitProtectEnabled: true,
     profitProtectArmR: 1,
     profitProtectLockR: 0,
@@ -56,23 +56,22 @@ export class SrTrapConfirmManagedStrategy implements IManagedStrategy {
     extras: {
       trapMode: 'both',
       swingLb: 5,
-      piercePts: 5,
+      piercePts: 10,
       minRiskPts: 4,
       maxRiskPts: 28,
       slPadPts: 2,
       minConfirmBody: 0,
       /**
-       * Re-hunt 2026-08-04 (Kite 2025–2026): arm₹400/lock₹200/gb₹200 + soft 0.45R
-       * beats prior arm₹600 on avg ₹/day + green% (doc 42).
+       * 1-lot Daily hunt (doc 43): pierce10 · peak₹150 · soft OFF
+       * → OOS ~89% days ≥₹1k · p10~₹823 · worst~−₹77 (1 lot N+B).
        */
-      profitLockArmRs: 400,
-      profitLockLockRs: 200,
-      profitLockGivebackRs: 200,
-      /** Briefly-green soft cut — tighter than v1.3.11 loser-only band. */
-      slConfirmCutoffEnabled: true,
-      slConfirmCutoffFracR: 0.45,
-      slConfirmCutoffMaxMfeR: 0.6,
-      slConfirmSoftRs: 500,
+      profitLockArmRs: 150,
+      profitLockLockRs: 75,
+      profitLockGivebackRs: 75,
+      slConfirmCutoffEnabled: false,
+      slConfirmCutoffFracR: 0,
+      slConfirmCutoffMaxMfeR: 0,
+      slConfirmSoftRs: 0,
     },
   });
 

@@ -1,7 +1,7 @@
 /**
  * Crude Oil Mini strategy profiles for the Crude Desk.
  *
- * - selective: charge-aware · max 2/day · SL20/TP40 · 10:00–22:00 (Trade Desk default · doc 41/43)
+ * - selective: charge-aware · max 2/day · SL30/TP60 · 10:00–22:00 (Trade Desk default · doc 41/43)
  * - all-green: Session OR 09:00–09:30 · entries →23:00 · per-trade SL/trail (Experiments picker only)
  * - daily-profit: Trap-style evening PDHL + confirm · tight SL/TP
  * - champion: hunt pair (larger SL/TP)
@@ -165,16 +165,16 @@ export const CRUDE_ALL_GREEN_PARAMS: CrudeTradeParams = {
 };
 
 /**
- * Selective — charge-aware Crude (doc 41 + re-hunt doc 42 + desk ₹3k doc 43).
- * Desk ₹3k hunt: SL20/TP40 · session 10:00–22:00 · max 2/day · no OR skip
- * lifts ≥₹3k hit-rate vs eve-only while staying far below All-Green churn.
+ * Selective — charge-aware Crude (doc 41/43 1-lot Daily).
+ * 1-lot hunt: SL30/TP60 · session 10:00–22:00 · max 2/day · no OR skip
+ * pairs with Trap pierce10 for ~87–89% desk days ≥₹1k at 1/1/1.
  */
 export const CRUDE_SELECTIVE_PARAMS: CrudeTradeParams = {
   profileId: 'selective',
-  label: 'Selective (≤2/day · SL20/TP40)',
-  stopPts: 20,
-  morningTargetPts: 40,
-  eveningTargetPts: 40,
+  label: 'Selective (≤2/day · SL30/TP60)',
+  stopPts: 30,
+  morningTargetPts: 60,
+  eveningTargetPts: 60,
   targetRMultiple: 0,
   dayLossStopPts: 40,
   strictDayLossPts: 40,
@@ -190,7 +190,7 @@ export const CRUDE_SELECTIVE_PARAMS: CrudeTradeParams = {
   maxEveningTradesDay: 2,
   defaultEnableMorning: false,
   defaultEnableEvening: true,
-  dailyBandLabel: '10:00–22:00 · SL20/TP40 · confirm · max 2/day · no OR skip',
+  dailyBandLabel: '10:00–22:00 · SL30/TP60 · confirm · max 2/day · no OR skip',
   ...PROTECT_OFF,
 };
 

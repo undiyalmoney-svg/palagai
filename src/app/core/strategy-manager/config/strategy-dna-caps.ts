@@ -17,7 +17,10 @@ export interface StrategyDnaCaps {
  * Researched peak-trail + SL soft cutoff (reports/paper-loss-giveback-cutoff).
  * Always re-applied on desk hydrate so stale localStorage cannot keep arm₹1000.
  */
-/** Re-hunt 2026-08-04 (daily-profit-upgrade-hunt): arm earlier beats 600/300. */
+/**
+ * Genie / SmartPullback protect DNA (unchanged).
+ * Trap uses TRAP_1LOT_DAILY_DNA_EXTRAS instead (doc 43 1-lot hunt).
+ */
 export const PROTECTION_DNA_EXTRAS: Record<string, number | boolean> = {
   profitLockArmRs: 400,
   profitLockLockRs: 200,
@@ -29,21 +32,32 @@ export const PROTECTION_DNA_EXTRAS: Record<string, number | boolean> = {
 };
 
 /**
- * Desk ₹3k hunt (doc 43): pierce 5 beats pierce 3 on ≥₹3k hit-rate + fewer zero-fill days.
- * Forced only on Trap — Genie/SmartPullback ignore this key.
+ * 1-lot Daily ₹1k–₹3k Trap DNA (doc 43).
+ * pierce10 · peak arm₹150 · soft OFF · IS/OOS ~89–90% days ≥₹1k · OOS p10~₹823.
+ * Forced only on Trap.
  */
-export const TRAP_ENTRY_DNA_EXTRAS: Record<string, number | boolean | string> = {
-  piercePts: 5,
+export const TRAP_1LOT_DAILY_DNA_EXTRAS: Record<string, number | boolean | string> = {
+  piercePts: 10,
+  profitLockArmRs: 150,
+  profitLockLockRs: 75,
+  profitLockGivebackRs: 75,
+  slConfirmCutoffEnabled: false,
+  slConfirmCutoffFracR: 0,
+  slConfirmCutoffMaxMfeR: 0,
+  slConfirmSoftRs: 0,
+  trapMode: 'both',
 };
+
+/** @deprecated alias — prefer TRAP_1LOT_DAILY_DNA_EXTRAS */
+export const TRAP_ENTRY_DNA_EXTRAS = TRAP_1LOT_DAILY_DNA_EXTRAS;
 
 export function usesTrapEntryDna(strategyId: string): boolean {
   return strategyId === MANAGED_STRATEGY_IDS.SR_TRAP_CONFIRM;
 }
 
-/** Strategies that share the researched Trap/Genie loss-cut DNA. */
+/** Genie / SmartPullback protect DNA (Trap uses TRAP_1LOT_DAILY_DNA_EXTRAS). */
 export function usesProtectionDna(strategyId: string): boolean {
   return (
-    strategyId === MANAGED_STRATEGY_IDS.SR_TRAP_CONFIRM ||
     strategyId === MANAGED_STRATEGY_IDS.ALIGN_COMBO_GENIE ||
     strategyId === MANAGED_STRATEGY_IDS.SMART_PULLBACK_PRO
   );
@@ -59,7 +73,8 @@ export function dnaCapsForStrategy(
 ): StrategyDnaCaps {
   switch (strategyId) {
     case MANAGED_STRATEGY_IDS.SR_TRAP_CONFIRM:
-      return { maxTradesPerDay: 0, targetRMultiple: 3.5 };
+      /** 1-lot hunt: RR2 matches peak-trail exits; day lock ₹3k keeps band. */
+      return { maxTradesPerDay: 0, targetRMultiple: 2 };
     case MANAGED_STRATEGY_IDS.ALIGN_COMBO_GENIE:
       return channel === 'bank'
         ? { maxTradesPerDay: 0, targetRMultiple: 1.5 }

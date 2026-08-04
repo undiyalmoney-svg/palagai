@@ -3,23 +3,21 @@ import { SrTrapConfirmManagedStrategy } from './sr-trap-confirm.managed-strategy
 import { DEFAULT_CHANNEL_ASSIGNMENTS, MANAGED_STRATEGY_IDS } from '../config/managed-strategy-ids';
 
 describe('SrTrapConfirmManagedStrategy', () => {
-  it('is indices default with mt3 / 3.5R / 1R→BE protect', () => {
+  it('is indices default with 1-lot Daily DNA (pierce10 · peak₹150 · soft OFF · 2R)', () => {
     const s = new SrTrapConfirmManagedStrategy();
     s.initialize();
     expect(s.id).toBe(MANAGED_STRATEGY_IDS.SR_TRAP_CONFIRM);
     expect(s.name).toContain('Trap');
     expect(s.getSettings().maxTradesPerDay).toBe(0);
-    expect(s.getSettings().targetRMultiple).toBe(3.5);
+    expect(s.getSettings().targetRMultiple).toBe(2);
     expect(s.getSettings().profitProtectEnabled).toBe(true);
     expect(s.getSettings().profitProtectArmR).toBe(1);
     expect(s.getSettings().profitProtectLockR).toBe(0);
-    expect(s.getSettings().extras['profitLockArmRs']).toBe(400);
-    expect(s.getSettings().extras['profitLockLockRs']).toBe(200);
-    expect(s.getSettings().extras['profitLockGivebackRs']).toBe(200);
-    expect(s.getSettings().extras['slConfirmCutoffEnabled']).toBe(true);
-    expect(s.getSettings().extras['slConfirmCutoffFracR']).toBe(0.45);
-    expect(s.getSettings().extras['slConfirmCutoffMaxMfeR']).toBe(0.6);
-    expect(s.getSettings().extras['slConfirmSoftRs']).toBe(500);
+    expect(s.getSettings().extras['piercePts']).toBe(10);
+    expect(s.getSettings().extras['profitLockArmRs']).toBe(150);
+    expect(s.getSettings().extras['profitLockLockRs']).toBe(75);
+    expect(s.getSettings().extras['profitLockGivebackRs']).toBe(75);
+    expect(s.getSettings().extras['slConfirmCutoffEnabled']).toBe(false);
     expect(s.supports).toContain('nifty');
     expect(s.supports).toContain('bank');
     expect(DEFAULT_CHANNEL_ASSIGNMENTS.nifty.paper).toBe(MANAGED_STRATEGY_IDS.SR_TRAP_CONFIRM);

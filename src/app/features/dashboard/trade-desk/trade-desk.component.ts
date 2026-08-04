@@ -72,7 +72,7 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
   protected enableNatGas = false;
   /** Combined strict day loss ≈ −₹2,950 — off by default; user must opt in. */
   protected strictDayStop = false;
-  /** Combined day profit lock ≈ +₹5,000. */
+  /** Combined day profit lock ≈ +₹3,000 (1-lot Daily band). */
   protected dayProfitLock = false;
   /** Background Kutty scalp — owner only in UI; friends always off. */
   protected enableKutty = true;
@@ -119,7 +119,7 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
         channel: 'crude' as const,
         id: 'crude-selective',
         name: 'Selective',
-        maxTradesLabel: '2t/day',
+        maxTradesLabel: '2t/day · SL30/TP60',
       },
       natgas: {
         id: 'natgas-daily-profit-ng',
@@ -193,7 +193,7 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * One-click Daily ₹3k desk: Trap N×5 · Bank×3 · Crude Selective×1 · risk locks on.
+   * One-click Daily ₹1k–₹3k desk: Trap N×1 · Bank×1 · Crude Selective×1 · risk locks on.
    * Does not start a run — user still clicks Start.
    */
   protected applyDaily3kPreset(): void {
@@ -318,7 +318,7 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
       this.enableNifty ? `Nifty 50 ×${this.niftyLots}` : null,
       this.enableBank ? `Bank Nifty ×${this.bankLots}` : null,
       this.enableCrude && this.showCrude()
-        ? `Crude Oil Mini ×${this.crudeLots} (Selective · 10:00–22:00 · max 2/day)`
+        ? `Crude Oil Mini ×${this.crudeLots} (Selective · SL30/TP60 · max 2/day)`
         : null,
       this.enableNatGas && this.showNatGas()
         ? `Natural Gas Mini ×${this.natGasLots} (Daily Profit NG)`
@@ -370,7 +370,7 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
         if (this.realOrders) {
           const riskBits = [
             this.strictDayStop ? 'strict day stop −₹2,950' : null,
-            this.dayProfitLock ? 'day profit lock +₹5,000' : null,
+            this.dayProfitLock ? 'day profit lock +₹3,000' : null,
             this.anyMcxSelected() ? 'MCX books continue past 15:15' : null,
           ]
             .filter(Boolean)

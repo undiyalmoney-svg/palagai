@@ -1,64 +1,66 @@
-# 43 — Daily ₹3k Trade Desk preset (hunt answer)
+# 43 — Daily ₹1k–₹3k with **1 lot** (hunt answer)
 
 **Date:** 2026-08-04  
-**Build:** v1.3.51 · `daily-3k-hunt-answer`  
-**UI:** Trade Desk → **Apply Daily ₹3k**  
-**Scripts:** `scripts/desk-3k-floor-hunt.py` · `scripts/daily-profit-upgrade-hunt.py`  
-**Artifacts:** `reports/daily-profit-research/desk-3k-floor-hunt.json`, `desk-3k-answer.json` (gitignored)
+**Build:** v1.3.52 · `1lot-daily-1k3k`  
+**UI:** Trade Desk → **Apply Daily ₹1k–₹3k**  
+**Scripts:** `scripts/desk-1lot-1k-3k-hunt.py` · `scripts/desk-3k-floor-hunt.py`  
+**Artifacts:** `reports/daily-profit-research/desk-1lot-1k-3k-hunt.json` (gitignored)
 
 ## Ask
 
-> Tomorrow I need ₹3000 min — strategy with Nifty 50, Bank Nifty, Crude Oil Mini.  
-> Hunt until you get the answer.
+> Need ₹1,000–₹3,000 with **one lot**. Hunt until you find that DNA.
 
-## Answer
+## Answer (wired)
 
-**A guaranteed ₹3,000 every calendar day does not exist** in this DNA family.
-
-| Why | Evidence |
-|---|---|
-| Zero-fill days | ~9–15% of OOS index days have **no** Trap confirm → ₹0 |
-| Red traded days | 16/334 OOS traded days are red; scaling lots makes them worse |
-| Crude alone | Selective avg ~₹98/day on MCX sample — cannot carry a ₹3k floor |
-| Hard floor search | **0 / 14,850** configs had P10 ≥ ₹3,000 |
-
-## Best bounded answer (wired)
-
-Maximize % days ≥ ₹3k subject to worst ≥ −₹1,500 (cash-day overlap proxy, after fill costs):
+**1-lot DNA found.** Not a hard every-day floor (~5% zero-fill), but the best robust ≥₹1k hit-rate at lots **1/1/1**.
 
 | Book | DNA | Lots |
 |---|---|---:|
-| Nifty 50 | Trap + confirm · **pierce 5** · peak-trail arm₹400 · soft 0.45R | **5** |
-| Bank Nifty | same | **3** |
-| Crude Oil Mini | Selective SL20/TP40 · **10:00–22:00** · max 2/day · confirm | **1** |
+| Nifty 50 | Trap + confirm · **pierce 10** · peak-trail **arm₹150** · **soft OFF** · **2R** | **1** |
+| Bank Nifty | same | **1** |
+| Crude Oil Mini | Selective **SL30/TP60** · **10:00–22:00** · max 2/day · confirm | **1** |
 
-| Metric (overlap proxy) | Value |
-|---|---:|
-| Days ≥ ₹3k | **~79%** |
-| Avg ₹/day | **~₹11.4k** |
-| Worst day | **~−₹1,115** |
-| Green% | **~96%** |
+Desk risk on Apply: **day profit lock +₹3,000** · strict day stop −₹2,950 · Nat Gas/Kutty off.
 
-Safer alt (not default): lots **4/2/1** → ~76% ≥₹3k · worst ~−₹510.
+## Research evidence
 
-Risk toggles on Apply: strict day stop −₹2,950 · day profit lock +₹5,000 · Nat Gas/Kutty off.
+### Index OOS (2025-01-01→2026-08-04, 1 lot N+B)
 
-## Wired DNA changes (v1.3.51)
+| DNA | ≥₹1k% | P10 | Avg | Worst | tpd |
+|---|---:|---:|---:|---:|---:|
+| prior pierce5 arm₹400 softON | 74.9% | 0 | 2634 | −1012 | 2.7 |
+| pierce6 arm₹200 softOFF | 82.7% | 211 | 3300 | −825 | 2.9 |
+| pierce8 arm₹200 softOFF | 86.3% | 466 | 3696 | −398 | 3.3 |
+| **pierce10 arm₹150 softOFF** | **88.6%** | **823** | **4256** | **−77** | **3.7** |
+| pierce12 arm₹150 softOFF | 89.6% | 908 | 4625 | −77 | 4.1 |
 
-1. Trap `piercePts` **3 → 5** (strat storage **v22**).  
-2. Crude Selective entry window **18:30–21:00 → 10:00–22:00** (still max 2/day).  
-3. Daily ₹3k preset lots **2/2/1 → 5/3/1**.
+IS 2023–24 for pierce10: ≥₹1k **90.5%** · P10 **₹1,027** (holds OOS).
+
+Jul–Aug 2026 (1 lot): **100%** days ≥₹1k · P10 ~₹2,973.
+
+### Desk overlap + Crude SL30/TP60 (1/1/1)
+
+| | ≥₹1k% | P10 | Avg | Worst |
+|---|---:|---:|---:|---:|
+| raw | ~87–89% | ~700 | ~4.2–4.6k | ≥ −700 |
+| + day lock ₹3k | ~87–89% | ~700 | ~₹2.4k | same |
+
+Day lock ₹3k puts hit days into the **₹1k–₹3k band**.
+
+## Why not 100% every day
+
+~5–6% calendar days still have **zero Trap confirms** → ₹0. No DNA in 20k+ 1-lot configs made P10 ≥ ₹1,000 on the full overlap window. Closest floor-ish: OOS index P10 **₹823** (pierce10).
 
 ## Tomorrow checklist
 
-1. Deploy build **v1.3.51**.  
-2. Trade Desk → **Apply Daily ₹3k**.  
-3. Confirm Active Strat = **Trap** · lots N×5 B×3 C×1.  
-4. Start Live.  
-5. Expect some flat/red days — hunt answer is hit-rate, not a floor.
+1. Deploy **v1.3.52**.  
+2. Trade Desk → **Apply Daily ₹1k–₹3k**.  
+3. Confirm Trap · lots **1/1/1** · day lock **+₹3,000**.  
+4. Start Live.
 
-## Do not
+## Wired changes (v1.3.52)
 
-- Loosen Trap next-bar confirm for “more fills.”  
-- Switch Crude to unlimited All-Green.  
-- Treat ~79% as a live guarantee.
+1. Trap DNA → pierce**10** · peak**150/75/75** · soft **OFF** · RR**2** (strat storage **v23**).  
+2. Crude Selective → SL**30**/TP**60** · 10:00–22:00 · max 2.  
+3. Desk day profit lock **₹5,000 → ₹3,000**.  
+4. Preset lots **1/1/1**.

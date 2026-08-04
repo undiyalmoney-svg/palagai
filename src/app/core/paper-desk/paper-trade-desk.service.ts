@@ -503,7 +503,7 @@ export class PaperTradeDeskService {
       .join('+');
     const risk = [
       this.deskRunOptions.strictDayStop ? 'strict −₹2950' : null,
-      this.deskRunOptions.dayProfitLock ? 'profit lock +₹5000' : null,
+      this.deskRunOptions.dayProfitLock ? 'profit lock +₹3000' : null,
       this.deskRunOptions.kuttyAlone
         ? 'Kutty alone'
         : this.deskRunOptions.enableKutty

@@ -18,7 +18,7 @@ describe('dnaCapsForStrategy', () => {
     });
     expect(dnaCapsForStrategy(MANAGED_STRATEGY_IDS.SR_TRAP_CONFIRM, 'nifty')).toEqual({
       maxTradesPerDay: 0,
-      targetRMultiple: 3.5,
+      targetRMultiple: 2,
     });
     expect(dnaCapsForStrategy(MANAGED_STRATEGY_IDS.ALIGN_COMBO_GENIE, 'nifty').targetRMultiple).toBe(
       3,

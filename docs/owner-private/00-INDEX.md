@@ -35,7 +35,7 @@ Those two files are the product “secret sauce.” Docs 01–03 expand them **l
 18. Use **38** for **Crude All-Green Afternoon** — Session OR 15:15–23:00 · ~90% green · desk default.  
 19. Use **41** for **Crude Selective (charge-aware)** — Trade Desk default; retuned in **42**.  
 20. Use **42** for **Daily profit upgrade re-hunt** — Trap peak-trail arm₹400 + Crude Selective SL20/TP40 max 2/day.  
-21. Use **43** for **Daily ₹3k hunt answer** — Trap pierce5 N×5 / Bank×3 / Crude Selective×1 (~79% ≥₹3k; not a floor).
+21. Use **43** for **1-lot Daily ₹1k–₹3k** — Trap pierce10 · peak₹150 · soft OFF · Crude SL30/TP60 · lots 1/1/1 (~89% ≥₹1k).
 
 ## Not in the deploy
 Angular assets come from `src/` + `public/` only (`angular.json`).  
