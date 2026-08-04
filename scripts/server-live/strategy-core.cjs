@@ -251,6 +251,9 @@ function isBankPdhlInstrument(instrumentId) {
 }
 function rupeesPerPointForInstrument(instrumentId) {
   const id = (instrumentId ?? "").toLowerCase();
+  if (id === "natgas-mini" || id.includes("natgas") || id.includes("naturalgas")) {
+    return 50;
+  }
   if (id === "crude-oil-mini" || id === "crude-oil" || id.includes("crude")) {
     return 10;
   }
@@ -2517,6 +2520,12 @@ function runCrudeTrapConfirm(params) {
   const entryStart = params.entryStart ?? CRUDE_TRAP_ENTRY_START;
   const entryEnd = params.entryEnd ?? CRUDE_TRAP_ENTRY_END;
   const maxDay = params.maxTradesDay ?? CRUDE_TRAP_MAX_TRADES_DAY;
+  const pierce = params.pierce ?? CRUDE_TRAP_PIERCE;
+  const style = params.trapEntryStyle ?? "both";
+  const firstWinLock = params.firstWinLock === true;
+  const fixedStop = (params.stopPts ?? 0) > 0 && (params.targetPts ?? 0) > 0 && !(params.targetRMultiple != null && params.targetRMultiple > 0);
+  const stopPts = params.stopPts ?? 0;
+  const targetPts = params.targetPts ?? 0;
   const tradingDate = extractTradeDate(candle.date);
   const month = tradingDate.slice(0, 7);
   const time = extractHhMm(candle.date);
@@ -2546,6 +2555,9 @@ function runCrudeTrapConfirm(params) {
     state.dayStoppedReason = `Day max loss ${state.dayNetPts.toFixed(1)} pts`;
     return wait4(candle, state.dayStoppedReason);
   }
+  if (firstWinLock && state.wonToday) {
+    return wait4(candle, "First-win lock \u2014 done for day");
+  }
   if (crudeTradeCapActive(maxDay) && state.tradesToday >= maxDay) {
     return wait4(candle, `Max ${maxDay} trap trades/day`);
   }
@@ -2569,12 +2581,32 @@ function runCrudeTrapConfirm(params) {
       return wait4(candle, "Crude trap confirm failed");
     }
     const fill = candle.open;
-    const stop2 = p.dir === 1 ? Math.min(p.stop, fill - 1) : Math.max(p.stop, fill + 1);
-    const risk2 = Math.abs(fill - stop2);
-    if (risk2 < CRUDE_TRAP_MIN_RISK || risk2 > CRUDE_TRAP_MAX_RISK) {
-      return wait4(candle, `Risk ${risk2.toFixed(1)} outside ${CRUDE_TRAP_MIN_RISK}\u2013${CRUDE_TRAP_MAX_RISK}`);
+    if (fixedStop) {
+      const stop3 = p.dir === 1 ? fill - stopPts : fill + stopPts;
+      const target2 = p.dir === 1 ? fill + targetPts : fill - targetPts;
+      if (crudeDayLossActive(dayLossStopPts) && state.dayNetPts - stopPts < -dayLossStopPts) {
+        return {
+          action: "NO_TRADE",
+          entryPrice: fill,
+          stopLoss: fill,
+          target: fill,
+          reason: "Next SL would breach day max loss"
+        };
+      }
+      return {
+        action: p.dir === 1 ? "BUY" : "SELL",
+        entryPrice: fill,
+        stopLoss: stop3,
+        target: target2,
+        reason: `NG trap confirm ${p.dir === 1 ? "BUY" : "SELL"} \xB7 SL${stopPts}/TP${targetPts} \xB7 day ${state.dayNetPts.toFixed(1)}`
+      };
     }
-    if (crudeDayLossActive(dayLossStopPts) && state.dayNetPts - risk2 < -dayLossStopPts) {
+    const stop2 = p.dir === 1 ? Math.min(p.stop, fill - 1) : Math.max(p.stop, fill + 1);
+    const risk = Math.abs(fill - stop2);
+    if (risk < CRUDE_TRAP_MIN_RISK || risk > CRUDE_TRAP_MAX_RISK) {
+      return wait4(candle, `Risk ${risk.toFixed(1)} outside ${CRUDE_TRAP_MIN_RISK}\u2013${CRUDE_TRAP_MAX_RISK}`);
+    }
+    if (crudeDayLossActive(dayLossStopPts) && state.dayNetPts - risk < -dayLossStopPts) {
       return {
         action: "NO_TRADE",
         entryPrice: fill,
@@ -2583,7 +2615,7 @@ function runCrudeTrapConfirm(params) {
         reason: "Next SL would breach day max loss"
       };
     }
-    const target = p.dir === 1 ? fill + risk2 * rr : fill - risk2 * rr;
+    const target = p.dir === 1 ? fill + risk * rr : fill - risk * rr;
     return {
       action: p.dir === 1 ? "BUY" : "SELL",
       entryPrice: fill,
@@ -2608,33 +2640,36 @@ function runCrudeTrapConfirm(params) {
   const oo = candle.open;
   const hh = candle.high;
   const ll = candle.low;
-  const pierce = CRUDE_TRAP_PIERCE;
   const pad = CRUDE_TRAP_SL_PAD;
   const rng = Math.max(hh - ll, 1e-9);
-  const trapBuy = ll < sl - pierce && cc > sl && cc > oo;
-  const trapSell = hh > sh + pierce && cc < sh && cc < oo;
-  const bounceBuy = ll <= sl + pierce && ll >= sl - pierce * 2 && cc > oo && cc >= sl && (hh - cc) / rng < 0.35;
-  const bounceSell = hh >= sh - pierce && hh <= sh + pierce * 2 && cc < oo && cc <= sh && (cc - ll) / rng < 0.35;
+  const allowTrap = style === "trap" || style === "both";
+  const allowBounce = style === "bounce" || style === "both";
+  const trapBuy = allowTrap && ll < sl - pierce && cc > sl && cc > oo;
+  const trapSell = allowTrap && hh > sh + pierce && cc < sh && cc < oo;
+  const bounceBuy = allowBounce && ll <= sl + pierce && ll >= sl - pierce * 2 && cc > oo && cc >= sl && (hh - cc) / rng < 0.35;
+  const bounceSell = allowBounce && hh >= sh - pierce && hh <= sh + pierce * 2 && cc < oo && cc <= sh && (cc - ll) / rng < 0.35;
   let dir = 0;
   let stop = 0;
   if ((trapBuy || bounceBuy) && cc > ema) {
     dir = 1;
-    stop = ll - pad;
+    stop = fixedStop ? cc - stopPts : ll - pad;
   } else if ((trapSell || bounceSell) && cc < ema) {
     dir = -1;
-    stop = hh + pad;
+    stop = fixedStop ? cc + stopPts : hh + pad;
   }
   if (!dir) {
-    return wait4(candle, "No crude S/R trap / bounce");
+    return wait4(candle, style === "trap" ? "No S/R trap" : "No crude S/R trap / bounce");
   }
-  const risk = Math.abs(cc - stop);
-  if (risk < CRUDE_TRAP_MIN_RISK || risk > CRUDE_TRAP_MAX_RISK) {
-    return wait4(candle, `Arm risk ${risk.toFixed(1)} outside band`);
+  if (!fixedStop) {
+    const risk = Math.abs(cc - stop);
+    if (risk < CRUDE_TRAP_MIN_RISK || risk > CRUDE_TRAP_MAX_RISK) {
+      return wait4(candle, `Arm risk ${risk.toFixed(1)} outside band`);
+    }
   }
   state.pending = { dir, stop, signalClose: cc };
   return wait4(
     candle,
-    dir === 1 ? "Crude trap BUY armed \u2014 wait confirm" : "Crude trap SELL armed \u2014 wait confirm"
+    dir === 1 ? "Trap BUY armed \u2014 wait confirm" : "Trap SELL armed \u2014 wait confirm"
   );
 }
 
@@ -2844,6 +2879,30 @@ var CRUDE_ALL_GREEN_PARAMS = {
   dailyBandLabel: "OR 09:00\u201309:30 \xB7 SL\u20B9150 \xB7 trail \u20B9500\u2192\u20B9240 \xB7 no OR skip",
   ...PROTECT_TRADE_CUTOFF
 };
+var CRUDE_SELECTIVE_PARAMS = {
+  profileId: "selective",
+  label: "Selective (1/day \xB7 OR\u226460)",
+  stopPts: 40,
+  morningTargetPts: 80,
+  eveningTargetPts: 80,
+  targetRMultiple: 0,
+  dayLossStopPts: 40,
+  strictDayLossPts: 40,
+  dayProfitLockPts: 0,
+  entryMode: "session-or",
+  requireConfirm: true,
+  firstWinLock: true,
+  eveningEntryStart: "18:30",
+  eveningEntryEnd: "22:00",
+  sessionOrStart: CRUDE_SOR_OR_START,
+  sessionOrEnd: CRUDE_SOR_OR_END,
+  maxOrWidth: 60,
+  maxEveningTradesDay: 1,
+  defaultEnableMorning: false,
+  defaultEnableEvening: true,
+  dailyBandLabel: "OR\u226460 \xB7 eve 18:30\u201322:00 \xB7 SL40/TP80 \xB7 confirm \xB7 first-win \xB7 max 1/day",
+  ...PROTECT_OFF
+};
 var CRUDE_DAILY_PROFIT_PARAMS = {
   profileId: "daily-profit",
   label: "Daily Profit (Trap-style)",
@@ -2940,9 +2999,37 @@ var CRUDE_TRAP_CONFIRM_PARAMS = {
   dailyBandLabel: "S/R trap + confirm \xB7 3.5R \xB7 unlimited \xB7 no day stop",
   ...PROTECT_OFF
 };
+var NATGAS_DAILY_PROFIT_PARAMS = {
+  profileId: "daily-profit-ng",
+  label: "Daily Profit (NG)",
+  stopPts: 1.5,
+  morningTargetPts: 3,
+  eveningTargetPts: 3,
+  targetRMultiple: 0,
+  dayLossStopPts: 3,
+  strictDayLossPts: 3,
+  dayProfitLockPts: 0,
+  entryMode: "trap-confirm",
+  requireConfirm: true,
+  firstWinLock: true,
+  eveningEntryStart: "10:00",
+  eveningEntryEnd: "22:00",
+  sessionOrStart: CRUDE_SOR_OR_START,
+  sessionOrEnd: CRUDE_SOR_OR_END,
+  maxOrWidth: CRUDE_SOR_MAX_OR_WIDTH,
+  maxEveningTradesDay: 1,
+  defaultEnableMorning: false,
+  defaultEnableEvening: true,
+  dailyBandLabel: "NG trap \xB7 pierce 0.2 \xB7 SL1.5/TP3 \xB7 confirm \xB7 first-win \xB7 max 1/day",
+  piercePts: 0.2,
+  trapEntryStyle: "trap",
+  ...PROTECT_OFF
+};
 var CRUDE_STRATEGY_PROFILES = {
   "all-green": CRUDE_ALL_GREEN_PARAMS,
+  selective: CRUDE_SELECTIVE_PARAMS,
   "daily-profit": CRUDE_DAILY_PROFIT_PARAMS,
+  "daily-profit-ng": NATGAS_DAILY_PROFIT_PARAMS,
   champion: CRUDE_CHAMPION_PARAMS,
   "daily-income": CRUDE_DAILY_INCOME_PARAMS,
   "trap-confirm": CRUDE_TRAP_CONFIRM_PARAMS
@@ -2961,8 +3048,7 @@ function resolveCrudeProfileDayLossPts(params, strictDayStop) {
 function crudeStrikeStep() {
   return 50;
 }
-function roundCrudeStrike(spot) {
-  const step = crudeStrikeStep();
+function roundCrudeStrike(spot, step = crudeStrikeStep()) {
   return Math.round(spot / step) * step;
 }
 function startOfDay2(date) {
@@ -2997,7 +3083,7 @@ function formatExpiryIso2(d) {
   const pad = (n) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
-function isCrudeMiniOption(item) {
+function isMcxMiniOption(item, prefixes) {
   if (item.exchange !== "MCX") {
     return false;
   }
@@ -3005,7 +3091,8 @@ function isCrudeMiniOption(item) {
   if (type !== "CE" && type !== "PE") {
     return false;
   }
-  return item.tradingSymbol.toUpperCase().startsWith("CRUDEOILM");
+  const sym = item.tradingSymbol.toUpperCase();
+  return prefixes.some((p) => sym.startsWith(p.toUpperCase()));
 }
 function isAnyCrudeOption(item) {
   if (item.exchange !== "MCX") {
@@ -3018,12 +3105,12 @@ function isAnyCrudeOption(item) {
   const sym = item.tradingSymbol.toUpperCase();
   return sym.startsWith("CRUDEOIL");
 }
-function listCrudeLiveExpiries(instruments, asOfDay) {
+function listCrudeLiveExpiries(instruments, asOfDay, prefixes = ["CRUDEOILM"]) {
   const day = crudeIstCalendarDay(asOfDay);
   const seen = /* @__PURE__ */ new Set();
   const out = [];
   for (const item of instruments) {
-    if (!isCrudeMiniOption(item) && !isAnyCrudeOption(item)) {
+    if (!isMcxMiniOption(item, prefixes) && !(prefixes.includes("CRUDEOILM") && isAnyCrudeOption(item))) {
       continue;
     }
     const exp = parseExpiry2(item.expiry);
@@ -3047,18 +3134,25 @@ function resolveCrudeFrontExpiry(asOfDay, liveExpiries) {
   return liveExpiries[0];
 }
 function resolveAtmCrudeMiniOption(params) {
+  const prefixes = (params.prefixes?.length ? params.prefixes : ["CRUDEOILM"]).map(
+    (p) => p.toUpperCase()
+  );
+  const strikeStep2 = params.strikeStep && params.strikeStep > 0 ? params.strikeStep : crudeStrikeStep();
+  const syntheticName = params.syntheticName || prefixes[0] || "CRUDEOILM";
   const optType = params.direction === "BUY" ? "CE" : "PE";
-  const strike = roundCrudeStrike(params.spot);
+  const strike = roundCrudeStrike(params.spot, strikeStep2);
   const asOf = new Date(
     params.asOfDateTime.includes("T") ? params.asOfDateTime : params.asOfDateTime.replace(" ", "T")
   );
   const asOfDay = Number.isNaN(asOf.getTime()) ? crudeIstCalendarDay(/* @__PURE__ */ new Date()) : crudeIstCalendarDay(asOf);
-  const pool = params.instruments.filter((item) => isCrudeMiniOption(item) || isAnyCrudeOption(item)).filter((item) => item.instrumentType.toUpperCase() === optType).sort((a, b) => {
-    const aMini = a.tradingSymbol.startsWith("CRUDEOILM") ? 0 : 1;
-    const bMini = b.tradingSymbol.startsWith("CRUDEOILM") ? 0 : 1;
+  const pool = params.instruments.filter(
+    (item) => isMcxMiniOption(item, prefixes) || prefixes.some((p) => p.startsWith("CRUDE")) && isAnyCrudeOption(item)
+  ).filter((item) => item.instrumentType.toUpperCase() === optType).sort((a, b) => {
+    const aMini = prefixes.some((p) => a.tradingSymbol.toUpperCase().startsWith(p)) ? 0 : 1;
+    const bMini = prefixes.some((p) => b.tradingSymbol.toUpperCase().startsWith(p)) ? 0 : 1;
     return aMini - bMini;
   });
-  const liveExpiries = listCrudeLiveExpiries(params.instruments, asOfDay);
+  const liveExpiries = listCrudeLiveExpiries(params.instruments, asOfDay, prefixes);
   const front = resolveCrudeFrontExpiry(asOfDay, liveExpiries);
   const withExpiry = pool.map((item) => ({ item, exp: parseExpiry2(item.expiry) })).filter((row) => row.exp != null).filter((row) => {
     if (row.exp.getTime() <= asOfDay.getTime()) {
@@ -3073,7 +3167,7 @@ function resolveAtmCrudeMiniOption(params) {
   if (exact[0]) {
     return { instrument: exact[0].item, source: "chain" };
   }
-  const near = withExpiry.filter((row) => Math.abs(row.item.strike - strike) <= crudeStrikeStep()).sort(
+  const near = withExpiry.filter((row) => Math.abs(row.item.strike - strike) <= strikeStep2).sort(
     (a, b) => Math.abs(a.item.strike - strike) - Math.abs(b.item.strike - strike) || a.exp.getTime() - b.exp.getTime()
   );
   if (near[0]) {
@@ -3084,7 +3178,8 @@ function resolveAtmCrudeMiniOption(params) {
       params.direction,
       params.spot,
       asOfDay,
-      front ?? void 0
+      front ?? void 0,
+      { strikeStep: strikeStep2, name: syntheticName }
     ),
     source: "synthetic"
   };
@@ -3102,9 +3197,11 @@ function toCrudePaperOption(instrument, source) {
     product: "MIS"
   };
 }
-function buildSyntheticCrudeOption(direction, spot, asOfDay, frontExpiry) {
+function buildSyntheticCrudeOption(direction, spot, asOfDay, frontExpiry, opts) {
   const optType = direction === "BUY" ? "CE" : "PE";
-  const strike = roundCrudeStrike(spot);
+  const step = opts?.strikeStep && opts.strikeStep > 0 ? opts.strikeStep : crudeStrikeStep();
+  const name = opts?.name || "CRUDEOILM";
+  const strike = roundCrudeStrike(spot, step);
   const day = crudeIstCalendarDay(asOfDay);
   let exp = frontExpiry ? crudeIstCalendarDay(frontExpiry) : day;
   if (exp.getTime() <= day.getTime()) {
@@ -3115,8 +3212,8 @@ function buildSyntheticCrudeOption(direction, spot, asOfDay, frontExpiry) {
   return {
     instrumentToken: 0,
     exchangeToken: 0,
-    tradingSymbol: `CRUDEOILM ATM ${strike} ${optType}`,
-    name: "CRUDEOILM",
+    tradingSymbol: `${name} ATM ${strike} ${optType}`,
+    name,
     exchange: "MCX",
     segment: "MCX-OPT",
     instrumentType: optType,
@@ -3309,6 +3406,11 @@ function replayPaperOnCrude(params) {
   const tradeParams = params.tradeParams ?? resolveCrudeStrategyProfile("all-green");
   const dayLossStopPts = params.dayLossStopPts ?? tradeParams.dayLossStopPts;
   const dayProfitLockPts = tradeParams.dayProfitLockPts;
+  const optionResolve = {
+    prefixes: params.optionPrefixes,
+    strikeStep: params.strikeStep,
+    syntheticName: params.syntheticName
+  };
   const enableMorning = params.enableMorning !== false;
   const enableEvening = params.enableEvening !== false;
   const trapMode = tradeParams.entryMode === "trap-confirm";
@@ -3360,13 +3462,22 @@ function replayPaperOnCrude(params) {
     let signal = null;
     let book = "morning";
     if (trapMode) {
+      const fixedTrap = tradeParams.targetRMultiple <= 0 && tradeParams.stopPts > 0 && (tradeParams.eveningTargetPts > 0 || tradeParams.morningTargetPts > 0);
       const trap = runCrudeTrapConfirm({
         candle,
         series: candles,
         state,
         dayLossStopPts,
         dayProfitLockPts,
-        targetRMultiple: tradeParams.targetRMultiple || void 0
+        targetRMultiple: fixedTrap ? 0 : tradeParams.targetRMultiple || void 0,
+        stopPts: fixedTrap ? tradeParams.stopPts : void 0,
+        targetPts: fixedTrap ? tradeParams.eveningTargetPts || tradeParams.morningTargetPts : void 0,
+        pierce: tradeParams.piercePts,
+        trapEntryStyle: tradeParams.trapEntryStyle,
+        entryStart: tradeParams.eveningEntryStart,
+        entryEnd: tradeParams.eveningEntryEnd,
+        maxTradesDay: tradeParams.maxEveningTradesDay,
+        firstWinLock: tradeParams.firstWinLock
       });
       if (trap.action === "BUY" || trap.action === "SELL") {
         signal = trap;
@@ -3451,7 +3562,8 @@ function replayPaperOnCrude(params) {
       instruments,
       direction: signal.action,
       spot: candle.close,
-      asOfDateTime: candle.date
+      asOfDateTime: candle.date,
+      ...optionResolve
     });
     const option = toCrudePaperOption(resolved.instrument, resolved.source);
     chosenOption = option;
@@ -3530,7 +3642,8 @@ function replayPaperOnCrude(params) {
         instruments,
         direction: bias,
         spot: candle.close,
-        asOfDateTime: candle.date
+        asOfDateTime: candle.date,
+        ...optionResolve
       });
       chosenOption = toCrudePaperOption(resolved.instrument, resolved.source);
       chosenBias = bias;
@@ -4369,16 +4482,29 @@ function computeProtectiveSlTrigger(params) {
 
 // src/app/core/utils/instrument-resolver.util.ts
 function resolveCrudeOilMiniFuturesToken(instruments) {
+  return resolveMcxMiniFuturesToken(instruments, ["CRUDEOILM"]);
+}
+function resolveMcxMiniFuturesToken(instruments, prefixes) {
   const today = startOfDay3(/* @__PURE__ */ new Date());
-  return instruments.filter(
-    (item) => item.exchange === "MCX" && item.instrumentType === "FUT" && item.tradingSymbol.startsWith("CRUDEOILM")
-  ).filter((item) => {
+  const prefs = prefixes.map((p) => p.toUpperCase());
+  const pool = instruments.filter(
+    (item) => item.exchange === "MCX" && item.instrumentType === "FUT" && prefs.some((p) => item.tradingSymbol.toUpperCase().startsWith(p))
+  ).sort((left, right) => expiryTime(left) - expiryTime(right));
+  const next = pool.find((item) => {
     if (!item.expiry) {
       return true;
     }
-    const expiry = startOfDay3(new Date(item.expiry));
-    return expiry >= today;
-  }).sort((left, right) => expiryTime(left) - expiryTime(right))[0];
+    return startOfDay3(new Date(item.expiry)) > today;
+  });
+  if (next) {
+    return next;
+  }
+  return pool.find((item) => {
+    if (!item.expiry) {
+      return true;
+    }
+    return startOfDay3(new Date(item.expiry)) >= today;
+  });
 }
 function expiryTime(instrument) {
   if (!instrument.expiry) {

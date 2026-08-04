@@ -43,7 +43,31 @@ Honest: **not 100% green** on IS. Selective = skip bad days + one shot when OR i
 
 Experiments → Crude → **`Selective (1/day · OR≤60)`** (`selective`)
 
-Trade Desk remains **All-Green** until you decide to switch Live.
+**Auto Trader (Autobot / Server Live)** Crude DNA = **Selective** (fixed).  
+Trade Desk Local Live Crude remains **All-Green** until you switch that desk.
+
+## Autobot deploy (Order-API droplet)
+
+```bash
+# 1) Palagai — merge/push Selective + rebuild strategy core
+cd palagai
+node scripts/server-live/build-strategy-core.cjs   # needs sibling ../Palagai-Order-API
+
+# 2) Order-API — commit strategy-core + live.worker (crudeStrategy selective)
+cd ../Palagai-Order-API
+git add live/strategy-core.cjs live/live.worker.js live/live.store.js
+git commit -m "Auto Live Crude = Selective (max 1/day)"
+git push origin main
+
+# 3) Droplet 168.144.28.89
+ssh root@168.144.28.89
+cd /var/www/Palagai-Order-API
+git pull
+pm2 restart trading-backend
+
+# 4) App (Vercel) — merge palagai PR so Auto Trader UI shows Selective
+# 5) Auto Trader → Push Kite token → Start (paper first)
+```
 
 ## Refresh / re-hunt
 

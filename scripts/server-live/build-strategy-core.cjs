@@ -9,10 +9,9 @@ const fs = require('fs');
 const root = path.resolve(__dirname, '../..');
 const entry = path.join(__dirname, 'bundle-entry.ts');
 const outLocal = path.join(__dirname, 'strategy-core.cjs');
-const outApi = path.resolve(
-  root,
-  '../Palagai-Order-API/live/strategy-core.cjs',
-);
+const outApi =
+  process.env.ORDER_API_STRATEGY_OUT ||
+  path.resolve(root, '../Palagai-Order-API/live/strategy-core.cjs');
 
 const angularStub = `
 export function Injectable(_opts) {

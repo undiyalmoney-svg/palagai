@@ -11,7 +11,7 @@ export function resolveCrudeOilFuturesToken(
 ): Instrument | undefined {
   const today = startOfDay(new Date());
 
-  return instruments
+  const pool = instruments
     .filter(
       (item) =>
         item.exchange === 'MCX' &&
@@ -19,14 +19,23 @@ export function resolveCrudeOilFuturesToken(
         item.tradingSymbol.startsWith('CRUDEOIL') &&
         !item.tradingSymbol.startsWith('CRUDEOILM'),
     )
-    .filter((item) => {
-      if (!item.expiry) {
-        return true;
-      }
-      const expiry = startOfDay(new Date(item.expiry));
-      return expiry >= today;
-    })
-    .sort((left, right) => expiryTime(left) - expiryTime(right))[0];
+    .sort((left, right) => expiryTime(left) - expiryTime(right));
+
+  const next = pool.find((item) => {
+    if (!item.expiry) {
+      return true;
+    }
+    return startOfDay(new Date(item.expiry)) > today;
+  });
+  if (next) {
+    return next;
+  }
+  return pool.find((item) => {
+    if (!item.expiry) {
+      return true;
+    }
+    return startOfDay(new Date(item.expiry)) >= today;
+  });
 }
 
 /** Nearest MCX CRUDEOILM (mini) futures contract. */
@@ -49,7 +58,11 @@ export function resolveNatGasMiniFuturesToken(
   );
 }
 
-/** Nearest MCX mini futures for any symbol prefix list (nearest expiry ≥ today). */
+/**
+ * Nearest MCX mini futures for any symbol prefix list.
+ * Prefers next contract (expiry > today) so expiry day rolls like options;
+ * falls back to same-day only if no later FUT exists.
+ */
 export function resolveMcxMiniFuturesToken(
   instruments: Instrument[],
   prefixes: string[],
@@ -57,21 +70,30 @@ export function resolveMcxMiniFuturesToken(
   const today = startOfDay(new Date());
   const prefs = prefixes.map((p) => p.toUpperCase());
 
-  return instruments
+  const pool = instruments
     .filter(
       (item) =>
         item.exchange === 'MCX' &&
         item.instrumentType === 'FUT' &&
         prefs.some((p) => item.tradingSymbol.toUpperCase().startsWith(p)),
     )
-    .filter((item) => {
-      if (!item.expiry) {
-        return true;
-      }
-      const expiry = startOfDay(new Date(item.expiry));
-      return expiry >= today;
-    })
-    .sort((left, right) => expiryTime(left) - expiryTime(right))[0];
+    .sort((left, right) => expiryTime(left) - expiryTime(right));
+
+  const next = pool.find((item) => {
+    if (!item.expiry) {
+      return true;
+    }
+    return startOfDay(new Date(item.expiry)) > today;
+  });
+  if (next) {
+    return next;
+  }
+  return pool.find((item) => {
+    if (!item.expiry) {
+      return true;
+    }
+    return startOfDay(new Date(item.expiry)) >= today;
+  });
 }
 
 /** Nearest NSE monthly futures for Nifty / Bank Nifty (index tokens as fallback). */
@@ -82,7 +104,7 @@ export function resolveNseIndexFuturesToken(
   const today = startOfDay(new Date());
   const prefix = kind === 'banknifty' ? 'BANKNIFTY' : 'NIFTY';
 
-  return instruments
+  const pool = instruments
     .filter(
       (item) =>
         item.exchange === 'NFO' &&
@@ -93,14 +115,23 @@ export function resolveNseIndexFuturesToken(
         !(kind === 'nifty' && item.tradingSymbol.startsWith('FINNIFTY')) &&
         !(kind === 'nifty' && item.tradingSymbol.startsWith('MIDCPNIFTY')),
     )
-    .filter((item) => {
-      if (!item.expiry) {
-        return true;
-      }
-      const expiry = startOfDay(new Date(item.expiry));
-      return expiry >= today;
-    })
-    .sort((left, right) => expiryTime(left) - expiryTime(right))[0];
+    .sort((left, right) => expiryTime(left) - expiryTime(right));
+
+  const next = pool.find((item) => {
+    if (!item.expiry) {
+      return true;
+    }
+    return startOfDay(new Date(item.expiry)) > today;
+  });
+  if (next) {
+    return next;
+  }
+  return pool.find((item) => {
+    if (!item.expiry) {
+      return true;
+    }
+    return startOfDay(new Date(item.expiry)) >= today;
+  });
 }
 
 export function isCrudeOilInstrumentId(id: string): boolean {

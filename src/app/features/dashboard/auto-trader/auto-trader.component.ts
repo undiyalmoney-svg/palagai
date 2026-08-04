@@ -27,7 +27,7 @@ interface LiveStatus {
     crudeLots: number;
     bankStrategy: BankStrategy;
     niftyStrategy: 'trap';
-    crudeStrategy: 'all-green';
+    crudeStrategy: 'selective' | 'all-green';
     realOrders: boolean;
   } | null;
   events?: Array<{ at: string; action: string; detail: string }>;
@@ -70,7 +70,7 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
   protected niftyLots = 1;
   protected bankLots = 1;
   protected crudeLots = 1;
-  /** Only Bank is selectable — Nifty=Trap, Crude=All-Green fixed. */
+  /** Only Bank is selectable — Nifty=Trap, Crude=Selective (charge-aware) fixed. */
   protected bankStrategy: BankStrategy = 'trap';
   protected realOrders = false;
   protected testQty = 1;
@@ -84,7 +84,7 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
     message: 'Not connected yet',
   });
   protected readonly note = signal(
-    'Server Live runs Trap / Genie / All-Green on DigitalOcean every 60s. Push Kite token, then Start. Uncheck real money first to watch SIGNAL events.',
+    'Server Live runs Trap / Genie / Crude Selective on DigitalOcean every 60s. Push Kite token, then Start. Uncheck real money first to watch SIGNAL events.',
   );
 
   ngOnInit(): void {
@@ -133,7 +133,7 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
         message:
           'Orders go via DigitalOcean static IP Order-API.\nChrome can close — worker keeps scanning.\n\nNifty = Trap · Bank = ' +
           (this.bankStrategy === 'genie' ? 'Genie' : 'Trap') +
-          ' · Crude = All-Green',
+          ' · Crude = Selective (max 1/day)',
         confirmLabel: 'Start live',
         cancelLabel: 'Cancel',
         tone: 'danger',
@@ -154,7 +154,7 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
           crudeLots: Math.max(1, Math.floor(this.crudeLots) || 1),
           bankStrategy: this.bankStrategy,
           niftyStrategy: 'trap',
-          crudeStrategy: 'all-green',
+          crudeStrategy: 'selective',
           realOrders: this.realOrders,
         }),
       );
