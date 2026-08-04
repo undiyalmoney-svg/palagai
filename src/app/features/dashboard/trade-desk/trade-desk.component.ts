@@ -28,7 +28,6 @@ import { DeskChannel } from '../../../core/strategy-manager/models/desk-channel.
 import { UiDialogService } from '../../../shared/ui/dialog/ui-dialog.service';
 import { APP_BUILD_LABEL } from '../../../core/config/app-build';
 import { DAILY_3K_DESK_PRESET } from '../../../core/paper-desk/daily-3k-desk-preset';
-import { MANAGED_STRATEGY_IDS } from '../../../core/strategy-manager/config/managed-strategy-ids';
 
 @Component({
   selector: 'app-trade-desk',
@@ -49,7 +48,6 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
 
   /** Visible build stamp so you can confirm deploy (e.g. v1.3.41 · …). */
   protected readonly appBuildLabel = APP_BUILD_LABEL;
-  protected readonly daily3kPreset = DAILY_3K_DESK_PRESET;
 
   protected readonly mode = signal<PaperDeskMode>('testing');
   /** Default both dates to yesterday so Testing opens on the last completed session. */
@@ -72,10 +70,10 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
   protected enableNatGas = false;
   /** Combined strict day loss ≈ −₹2,950 — off by default; user must opt in. */
   protected strictDayStop = false;
-  /** Combined day profit lock ≈ +₹3,000 (1-lot Daily band). */
-  protected dayProfitLock = false;
-  /** Background Kutty scalp — owner only in UI; friends always off. */
-  protected enableKutty = true;
+  /** Combined day profit lock ≈ +₹3,000 (1-lot Daily band) — on by default. */
+  protected dayProfitLock = true;
+  /** Background Kutty scalp — owner only in UI; off by default (Daily desk). */
+  protected enableKutty = false;
   /** Kutty only — no Trap/Strat entries. Off by default. */
   protected kuttyAlone = false;
 
@@ -152,11 +150,14 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
   });
 
   ngOnInit(): void {
-    const preferred = this.lotsPreference.get();
-    this.niftyLots = preferred;
-    this.bankLots = preferred;
-    this.crudeLots = preferred;
-    this.natGasLots = preferred;
+    // Live continues in the root desk service across tab switches — restore UI mode.
+    if (this.snapshot().running) {
+      this.mode.set('live');
+      this.realOrders = this.snapshot().realOrders;
+    } else {
+      // Default desk = Daily ₹1k–₹3k (Trap 1/1/1 · profit lock on · strict stop off).
+      this.applyDaily3kPreset();
+    }
     // Friends: no Kutty. Crude/Nat Gas only if module granted.
     if (!this.showKutty()) {
       this.enableKutty = false;
@@ -167,11 +168,6 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
     }
     if (!this.showNatGas()) {
       this.enableNatGas = false;
-    }
-    // Live continues in the root desk service across tab switches — restore UI mode.
-    if (this.snapshot().running) {
-      this.mode.set('live');
-      this.realOrders = this.snapshot().realOrders;
     }
   }
 
@@ -193,10 +189,10 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * One-click Daily ₹1k–₹3k desk: Trap N×1 · Bank×1 · Crude Selective×1 · risk locks on.
-   * Does not start a run — user still clicks Start.
+   * Default Daily ₹1k–₹3k desk: Trap N×1 · Bank×1 · Crude Selective×1 · profit lock on.
+   * Strict day stop stays off unless the user checks it. Does not start a run.
    */
-  protected applyDaily3kPreset(): void {
+  private applyDaily3kPreset(): void {
     if (this.busy() || this.snapshot().running) {
       return;
     }
@@ -219,29 +215,6 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
     }
     this.error.set('');
   }
-
-  protected readonly daily3kReady = computed(() => {
-    const trap = MANAGED_STRATEGY_IDS.SR_TRAP_CONFIRM;
-    const a = this.activeStrategies();
-    const booksOk =
-      this.enableNifty &&
-      this.enableBank &&
-      (!this.showCrude() || this.enableCrude) &&
-      !this.enableNatGas &&
-      !(this.showKutty() && (this.enableKutty || this.kuttyAlone));
-    const lotsOk =
-      this.niftyLots === DAILY_3K_DESK_PRESET.niftyLots &&
-      this.bankLots === DAILY_3K_DESK_PRESET.bankLots &&
-      (!this.showCrude() || this.crudeLots === DAILY_3K_DESK_PRESET.crudeLots);
-    return (
-      booksOk &&
-      lotsOk &&
-      this.strictDayStop &&
-      this.dayProfitLock &&
-      a.nifty.id === trap &&
-      a.bank.id === trap
-    );
-  });
 
   private lotsForInstrumentId(instrumentId: string): number {
     const id = instrumentId.toLowerCase();

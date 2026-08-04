@@ -69,33 +69,6 @@
     }
   </div>
 
-  <div
-    class="daily-3k-bar"
-    [class.armed]="daily3kReady()"
-    role="region"
-    aria-label="Daily 3000 rupee desk preset"
-  >
-    <div class="daily-3k-copy">
-      <span class="as-kicker">{{ daily3kPreset.label }} desk</span>
-      <strong class="as-name"
-        >Nifty Trap ×{{ daily3kPreset.niftyLots }} · Bank Trap ×{{ daily3kPreset.bankLots
-        }}{{ showCrude() ? ' · Crude Selective ×' + daily3kPreset.crudeLots : '' }}</strong
-      >
-      <span class="as-meta">{{ daily3kPreset.researchNote }}</span>
-      @if (daily3kReady()) {
-        <span class="daily-3k-armed">Armed — Start Live when ready</span>
-      }
-    </div>
-    <button
-      type="button"
-      class="daily-3k-btn"
-      [disabled]="busy() || snapshot().running"
-      (click)="applyDaily3kPreset()"
-    >
-      {{ daily3kReady() ? 'Re-apply Daily ₹3k' : 'Apply Daily ₹3k' }}
-    </button>
-  </div>
-
   <div class="mode-switch" role="tablist" aria-label="Desk mode">
     <button
       type="button"

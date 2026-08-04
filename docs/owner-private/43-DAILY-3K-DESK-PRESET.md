@@ -1,8 +1,8 @@
 # 43 — Daily ₹1k–₹3k with **1 lot** (hunt answer)
 
 **Date:** 2026-08-04  
-**Build:** v1.3.52 · `1lot-daily-1k3k`  
-**UI:** Trade Desk → **Apply Daily ₹1k–₹3k**  
+**Build:** v1.3.54 · `desk-defaults`  
+**UI:** Trade Desk loads Daily ₹1k–₹3k by default (no Apply button)  
 **Scripts:** `scripts/desk-1lot-1k-3k-hunt.py` · `scripts/desk-3k-floor-hunt.py`  
 **Artifacts:** `reports/daily-profit-research/desk-1lot-1k-3k-hunt.json` (gitignored)
 
@@ -20,7 +20,7 @@
 | Bank Nifty | same | **1** |
 | Crude Oil Mini | Selective **SL30/TP60** · **10:00–22:00** · max 2/day · confirm | **1** |
 
-Desk risk on Apply: **day profit lock +₹3,000** · strict day stop −₹2,950 · Nat Gas/Kutty off.
+Desk defaults: **day profit lock +₹3,000** on · **strict day stop** off (opt in) · Nat Gas/Kutty off.
 
 ## Research evidence
 
@@ -53,10 +53,9 @@ Day lock ₹3k puts hit days into the **₹1k–₹3k band**.
 
 ## Tomorrow checklist
 
-1. Deploy **v1.3.52**.  
-2. Trade Desk → **Apply Daily ₹1k–₹3k**.  
-3. Confirm Trap · lots **1/1/1** · day lock **+₹3,000**.  
-4. Start Live.
+1. Deploy **v1.3.54**.  
+2. Open Trade Desk — defaults already armed (Trap · 1/1/1 · day lock +₹3,000 · strict stop off).  
+3. Start Live.
 
 ## Wired changes (v1.3.52)
 
