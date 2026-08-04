@@ -1832,7 +1832,7 @@ export class PaperTradeDeskService {
               : 'Preview ATM (spot fallback) · Selective',
           tradesToday: 0,
           strategyId: 'crude-selective',
-          strategyName: 'Selective (≤2/day · SL20/TP40)',
+          strategyName: 'Selective (≤2/day · SL30/TP60)',
         }),
       );
     }
