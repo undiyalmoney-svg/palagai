@@ -58,6 +58,18 @@ export function describeStatusForAssistant(
   if (/index session closed|session closed/i.test(signal)) {
     return signal;
   }
+  if (/genie.*sit out|sit out this leg/i.test(signal)) {
+    return `${strat} sitting out this weekday (Genie Tue = skip) — Strat → Trap to trade today`;
+  }
+  if (/trap confirm failed/i.test(signal)) {
+    return `${strat}: armed but next bar did not confirm — no entry (by design)`;
+  }
+  if (/armed — wait confirm/i.test(signal)) {
+    return `${strat}: setup armed — waiting for next-bar confirm`;
+  }
+  if (/no s\/r trap/i.test(signal)) {
+    return `${strat}: no trap/bounce yet this bar`;
+  }
   if (isQuietSignal(signal)) {
     return `Scanning ${strat} — no trigger yet (quiet / flat vs rules)`;
   }
@@ -305,12 +317,26 @@ export function buildLiveAssistant(params: {
 
   if (waiting.length && done.length === statuses.length - waiting.length) {
     const quiet = waiting.every((s) => isQuietSignal(s.lastSignal));
+    const genieSitOut = waiting.some((s) => /genie.*sit out|sit out this leg/i.test(s.lastSignal || ''));
+    const trapConfirmWait = waiting.some((s) =>
+      /trap confirm failed|armed — wait confirm|no s\/r trap/i.test(s.lastSignal || ''),
+    );
     const view: LiveAssistantView = {
       tone: quiet ? 'scanning' : 'waiting',
-      headline: quiet ? 'Scanning — no setup yet' : 'Looking for entry',
-      detail: quiet
-        ? `${money}: desk is alive and scanning each tick. Market has not given a strategy trigger yet (looks quiet / flat vs rules).`
-        : `${money}: scanning each tick for ${waiting.map((s) => s.strategyName || 'strategy').join(' / ')}. Setup filters are active — waiting for a clean entry.`,
+      headline: genieSitOut
+        ? 'Genie sitting out today'
+        : trapConfirmWait
+          ? 'Trap scanning — waiting for confirm'
+          : quiet
+            ? 'Scanning — no setup yet'
+            : 'Looking for entry',
+      detail: genieSitOut
+        ? `${money}: Align Combo Genie skips Tuesdays (and weak Mondays). Strat → set Nifty/Bank to Trap if you want entries today.`
+        : trapConfirmWait
+          ? `${money}: Trap arms on a sweep then needs the next bar to continue. Failed confirms = no order (normal DNA, not a desk bug).`
+          : quiet
+            ? `${money}: desk is alive and scanning each tick. Market has not given a strategy trigger yet (looks quiet / flat vs rules).`
+            : `${money}: scanning each tick for ${waiting.map((s) => s.strategyName || 'strategy').join(' / ')}. Setup filters are active — waiting for a clean entry.`,
       lines,
       clockNote,
     };

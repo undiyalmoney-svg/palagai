@@ -13,7 +13,11 @@ import { dnaCapsForStrategy, PROTECTION_DNA_EXTRAS, usesProtectionDna } from '..
 import { StrategySettings } from '../models/strategy-settings.model';
 import { StrategyRegistryService } from '../registry/strategy-registry.service';
 
-const STORAGE_KEY = 'palagai_strategy_assignments_v19';
+/**
+ * v20 — force Trap defaults again. v19 kept intentional Genie/Donch picks, which
+ * look “dead” on Mon (drive skip) / Tue (hard sit-out) while users expect Trap.
+ */
+const STORAGE_KEY = 'palagai_strategy_assignments_v20';
 const LEGACY_STORAGE_KEYS = [
   'palagai_strategy_assignments_v1',
   'palagai_strategy_assignments_v2',
@@ -33,6 +37,7 @@ const LEGACY_STORAGE_KEYS = [
   'palagai_strategy_assignments_v16',
   'palagai_strategy_assignments_v17',
   'palagai_strategy_assignments_v18',
+  'palagai_strategy_assignments_v19',
 ] as const;
 
 export interface ChannelAssignment {
@@ -309,4 +314,4 @@ export function settingsKey(strategyId: string, channel: DeskChannel): string {
 }
 
 /** Default live strategy for Trade Desk resolution fallback. */
-export const DEFAULT_LIVE_STRATEGY_ID = MANAGED_STRATEGY_IDS.VOL_EXPAND_DONCH15;
+export const DEFAULT_LIVE_STRATEGY_ID = MANAGED_STRATEGY_IDS.SR_TRAP_CONFIRM;

@@ -150,11 +150,12 @@ export function nextWeeklyExpiryDate(
  */
 export function isCurrentWeeklyExpiryDay(
   asOfDay: Date,
-  instruments: Instrument[],
+  instruments: Instrument[] | null | undefined,
   kind: IndexOptionKind,
 ): boolean {
   const day = asOfCalendarDay(asOfDay);
-  const expiresToday = instruments.some((item) => {
+  const chain = instruments ?? [];
+  const expiresToday = chain.some((item) => {
     if (!isIndexOption(item, kind)) {
       return false;
     }

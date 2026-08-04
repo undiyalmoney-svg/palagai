@@ -1020,6 +1020,7 @@ export class PaperTradeDeskService {
         requireNatGas: this.deskRunOptions.enableNatGas,
       });
       // Live money needs a fresh NFO dump — stale/empty cache → synthetic options → no Kite orders.
+      // Tuesday Nifty expiry rolls to next weekly — force refresh so Aug+1 week is in cache.
       if (this.realOrders && anyIndex) {
         this.patchMessage('Live money · refreshing NFO option chain for real orders…');
         try {
@@ -1030,6 +1031,7 @@ export class PaperTradeDeskService {
               'Open Get Token if expired, then Settings → Refresh Instruments.',
           );
         }
+        const fresh = this.instrumentStore.allInstruments();
         const nfoCount = this.instrumentStore.indexOptionCount();
         if (nfoCount < 50) {
           throw new Error(
@@ -1037,7 +1039,29 @@ export class PaperTradeDeskService {
               'Settings → Refresh Instruments, then restart Live money.',
           );
         }
-        this.patchMessage(`Live money · NFO chain ready (${nfoCount} index options)`);
+        // Expiry Tuesday rolls to next weekly — fail fast if that contract isn't in the dump.
+        const asOfDateTime = `${today}T${now.length === 5 ? now : '10:00'}:00+0530`;
+        const niftyProbe = resolveAtmWeeklyOption({
+          instruments: fresh,
+          kind: 'nifty',
+          direction: 'BUY',
+          spot: 25000,
+          asOfDateTime,
+        });
+        if (niftyProbe.source === 'synthetic') {
+          throw new Error(
+            `Live money blocked — Nifty next-week ATM missing after refresh (${describeOptionChainGap({
+              instruments: fresh,
+              kind: 'nifty',
+              direction: 'BUY',
+              spot: 25000,
+              asOfDateTime,
+            })}). On expiry Tuesday the desk trades next weekly only — Settings → Refresh Instruments, then restart.`,
+          );
+        }
+        this.patchMessage(
+          `Live money · NFO chain ready (${nfoCount} index options · Nifty ${niftyProbe.instrument.expiry.slice(0, 10)})`,
+        );
       }
       if (this.realOrders) {
         this.patchMessage('Live money · reconciling open Kite positions…');
