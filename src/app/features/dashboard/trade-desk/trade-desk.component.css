@@ -1650,6 +1650,14 @@ td small {
     grid-template-columns: 1fr 1fr;
   }
 
+  .totals-simple {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .totals-simple .profit-hero {
+    grid-column: 1 / -1;
+  }
+
   .status-metrics {
     grid-template-columns: 1fr;
   }
