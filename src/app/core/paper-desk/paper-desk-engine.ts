@@ -436,6 +436,15 @@ function closePaperTrade(params: {
  * Replay selected managed strategy on index candles; attach ATM weekly options.
  * Strategy modules own entry + exit logic — engine stays strategy-agnostic.
  */
+export type PaperLiveOpenHook = {
+  direction: 'BUY' | 'SELL';
+  entryTime: string;
+  indexEntry: number;
+  indexStop: number;
+  option: PaperOptionContract | null;
+  optionEntryPremium: number | null;
+};
+
 export function replayPaperOnIndex(params: {
   instrumentId: string;
   instrumentName: string;
@@ -467,6 +476,15 @@ export function replayPaperOnIndex(params: {
   kuttyAlone?: boolean;
   /** Shared margin ledger across Nifty+Bank legs (mutated in place). */
   kuttyMargin?: { usedRs: number; trapOpenLegs: number };
+  /**
+   * Live money: fire open/close on bars after `afterBarTime` so placeEntry runs
+   * even when a Trap leg opens and closes inside one poll (Crude holds longer).
+   */
+  liveHook?: {
+    afterBarTime?: string | null;
+    onOpen?: (open: PaperLiveOpenHook) => void;
+    onClose?: (entryTime: string) => void;
+  };
 }): ReplayInstrumentResult {
   const {
     instrumentId,
@@ -485,6 +503,10 @@ export function replayPaperOnIndex(params: {
   const enableKutty = kuttyAlone || params.enableKutty !== false;
   const kuttyMargin = params.kuttyMargin ?? { usedRs: 0, trapOpenLegs: 0 };
   const kuttyState = createKuttyDayState();
+  const liveHook = params.liveHook;
+  const afterBar = liveHook?.afterBarTime ?? null;
+  const hookActive = (barTime: string): boolean =>
+    !!liveHook && (!afterBar || barTime > afterBar);
 
   const strategy =
     params.strategy ??
@@ -592,6 +614,9 @@ export function replayPaperOnIndex(params: {
           strategyName: isKutty ? KUTTY_NAME : strategy.name,
         });
         trades.push(closed);
+        if (hookActive(candle.date)) {
+          liveHook?.onClose?.(closed.entryTime);
+        }
         if (isKutty) {
           recordKuttyClosed(kuttyState);
           kuttyMargin.usedRs = Math.max(0, kuttyMargin.usedRs - KUTTY_MARGIN_PER_TRADE_RS);
@@ -723,6 +748,16 @@ export function replayPaperOnIndex(params: {
         },
       ],
     };
+    if (hookActive(candle.date)) {
+      liveHook?.onOpen?.({
+        direction: entryAction,
+        entryTime: candle.date,
+        indexEntry: entryPrice,
+        indexStop: entryStop,
+        option,
+        optionEntryPremium,
+      });
+    }
     if (entrySource === 'kutty') {
       kuttyMargin.usedRs += KUTTY_MARGIN_PER_TRADE_RS;
     } else {

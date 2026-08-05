@@ -119,7 +119,25 @@ interface LiveLeg {
   candles: Candle[];
   processedThrough: number;
   resultTrades: PaperTrade[];
+  /** Live money: only hook placeEntry/Exit for bars after this candle time. */
+  lastLiveEventAt: string | null;
 }
+
+type IndexLiveBrokerEvent =
+  | {
+      kind: 'open';
+      instrumentId: string;
+      instrumentName: string;
+      open: {
+        direction: 'BUY' | 'SELL';
+        entryTime: string;
+        indexEntry: number;
+        indexStop: number;
+        option: PaperTrade['option'];
+        optionEntryPremium: number | null;
+      };
+    }
+  | { kind: 'close'; instrumentId: string; instrumentName: string; entryTime: string };
 
 interface CrudeLiveState {
   futuresToken: number;
@@ -1127,6 +1145,7 @@ export class PaperTradeDeskService {
             candles,
             processedThrough: -1,
             resultTrades: [],
+            lastLiveEventAt: null,
           });
         }
       }
@@ -1180,9 +1199,15 @@ export class PaperTradeDeskService {
       await this.tickLive(true);
       this.assertActive(runId);
 
+      // Live money + index: poll faster so Trap open→SL inside one 5m bar still hits Kite.
+      // Crude-only can stay at 60s (holds longer).
+      const tickMs =
+        this.realOrders && (this.deskRunOptions.enableNifty || this.deskRunOptions.enableBank)
+          ? 15_000
+          : 60_000;
       this.liveTimer = setInterval(() => {
         void this.tickLive(false);
-      }, 60_000);
+      }, tickMs);
     } catch (err) {
       if (isCancelledError(err)) {
         return;
@@ -1418,10 +1443,41 @@ export class PaperTradeDeskService {
     const statuses: PaperInstrumentStatus[] = [];
     const kuttyMargin = { usedRs: 0, trapOpenLegs: 0 };
 
+    const indexBrokerEvents: IndexLiveBrokerEvent[] = [];
+
     if (indexSessionActive) {
       for (const leg of this.liveLegs) {
         const resolved = this.resolveDeskStrategy(leg.kind, 'live');
         const primaryActions = new Map<string, string>();
+        const liveHook =
+          this.realOrders && !initial
+            ? {
+                afterBarTime: leg.lastLiveEventAt,
+                onOpen: (o: {
+                  direction: 'BUY' | 'SELL';
+                  entryTime: string;
+                  indexEntry: number;
+                  indexStop: number;
+                  option: PaperTrade['option'];
+                  optionEntryPremium: number | null;
+                }) => {
+                  indexBrokerEvents.push({
+                    kind: 'open',
+                    instrumentId: leg.instrument.id,
+                    instrumentName: leg.instrument.name,
+                    open: o,
+                  });
+                },
+                onClose: (entryTime: string) => {
+                  indexBrokerEvents.push({
+                    kind: 'close',
+                    instrumentId: leg.instrument.id,
+                    instrumentName: leg.instrument.name,
+                    entryTime,
+                  });
+                },
+              }
+            : undefined;
         const replay = replayPaperOnIndex({
           instrumentId: leg.instrument.id,
           instrumentName: leg.instrument.name,
@@ -1438,7 +1494,10 @@ export class PaperTradeDeskService {
           enableKutty: this.deskRunOptions.enableKutty,
           kuttyAlone: this.deskRunOptions.kuttyAlone,
           kuttyMargin,
+          liveHook,
         });
+        // Advance watermark after warm tick and after each live poll.
+        leg.lastLiveEventAt = leg.candles.at(-1)?.date ?? leg.lastLiveEventAt;
         for (const t of replay.trades) {
           primaryActions.set(t.entryTime, t.direction);
         }
@@ -1489,6 +1548,12 @@ export class PaperTradeDeskService {
         );
       }
       this.lastIndexStatuses = statuses.map((s) => ({ ...s }));
+      // Place/exit Nifty+Bank on Kite as soon as new bars open/close — before Crude
+      // fetch delay. Fixes "only Crude gets placed" when Trap opens&closes in one poll.
+      if (this.realOrders && indexBrokerEvents.length) {
+        await this.flushIndexLiveBrokerEvents(authorization, indexBrokerEvents, allInstruments);
+        allInstruments = this.instrumentStore.allInstruments();
+      }
     } else if (anyIndexLegs && this.lastIndexStatuses.length) {
       for (const s of this.lastIndexStatuses) {
         statuses.push({
@@ -1821,6 +1886,73 @@ export class PaperTradeDeskService {
       orderEvents: this.liveOrders.getEvents(),
       orderSummary: this.liveOrders.getOrderSummary(),
     });
+  }
+
+  /**
+   * Live money: apply Trap open/close from newly seen bars immediately.
+   * End-of-tick sync alone misses legs that open and SL inside one 5m/15s poll.
+   */
+  private async flushIndexLiveBrokerEvents(
+    authorization: string,
+    events: IndexLiveBrokerEvent[],
+    instruments: Instrument[],
+  ): Promise<void> {
+    let allInstruments = instruments;
+    for (const ev of events) {
+      if (ev.kind === 'open') {
+        let option = ev.open.option;
+        if (!option || option.source === 'synthetic' || option.instrumentToken <= 0) {
+          const kind: IndexOptionKind =
+            ev.instrumentId === NIFTY_50_INSTRUMENT.id ? 'nifty' : 'banknifty';
+          let resolved = resolveAtmWeeklyOption({
+            instruments: allInstruments,
+            kind,
+            direction: ev.open.direction,
+            spot: ev.open.indexEntry,
+            asOfDateTime: ev.open.entryTime,
+          });
+          if (resolved.source === 'synthetic') {
+            try {
+              await this.instrumentStore.refresh(true);
+              allInstruments = this.instrumentStore.allInstruments();
+            } catch {
+              // SKIP path inside placeEntry
+            }
+            resolved = resolveAtmWeeklyOption({
+              instruments: allInstruments,
+              kind,
+              direction: ev.open.direction,
+              spot: ev.open.indexEntry,
+              asOfDateTime: ev.open.entryTime,
+            });
+          }
+          option = toOptionContract(resolved.instrument, resolved.source);
+        }
+        await this.liveOrders.syncInstrument({
+          authorization,
+          instrumentId: ev.instrumentId,
+          instrumentName: ev.instrumentName,
+          lots: this.lotsForInstrument(ev.instrumentId),
+          open: {
+            direction: ev.open.direction,
+            entryTime: ev.open.entryTime,
+            indexEntry: ev.open.indexEntry,
+            indexStop: ev.open.indexStop,
+            option,
+            optionEntryPremium: ev.open.optionEntryPremium,
+          },
+        });
+      } else {
+        await this.liveOrders.syncInstrument({
+          authorization,
+          instrumentId: ev.instrumentId,
+          instrumentName: ev.instrumentName,
+          lots: this.lotsForInstrument(ev.instrumentId),
+          open: null,
+        });
+      }
+      await delay(300);
+    }
   }
 
   /** Event-log desk closed legs that never matched a Kite ENTRY+EXIT/SL pair. */
