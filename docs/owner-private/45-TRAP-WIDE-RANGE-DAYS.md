@@ -94,6 +94,6 @@ Early-start Live bug: index legs only load if index already open at Start. Silen
 
 ## Suggested ship order
 
-1. **Shipped in v1.3.56:** Rec A (`bounceOrPierceMult=0.20`, `cap=35`) + Live deferred Start (selected books auto-join at their open).  
-2. Keep confirm ON · peak150 softOFF · RR2 · lots 1/1/1.  
-3. Rec B (pierce15 / bank30) left as optional DNA bump if Rec A under-delivers live.
+1. **Shipped in v1.3.56:** Rec A bounce OR + Live deferred Start.  
+2. **Shipped in v1.3.59:** Rec A+B combined for daily fills — `piercePts=15` · `bankPiercePts=30` · `bounceOrPierceMult=0.25` · `cap=40` · strat storage **v25**.  
+3. Keep confirm ON · peak150 softOFF · RR2 · lots 1/1/1.

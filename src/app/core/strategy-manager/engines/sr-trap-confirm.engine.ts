@@ -63,6 +63,8 @@ function num(v: unknown, fallback: number): number {
 function readTrapExtras(settings: StrategySettings): {
   swingLb: number;
   piercePts: number;
+  /** Bank Nifty trap pierce override (0 = use piercePts). */
+  bankPiercePts: number;
   mode: SrTrapMode;
   minRisk: number;
   maxRisk: number;
@@ -76,7 +78,8 @@ function readTrapExtras(settings: StrategySettings): {
   const mode = x['trapMode'] === 'trap' ? 'trap' : 'both';
   return {
     swingLb: Math.max(3, Math.floor(num(x['swingLb'], 5))),
-    piercePts: num(x['piercePts'], 10),
+    piercePts: num(x['piercePts'], 15),
+    bankPiercePts: Math.max(0, num(x['bankPiercePts'], 0)),
     mode,
     minRisk: num(x['minRiskPts'], 4),
     maxRisk: num(x['maxRiskPts'], 28),
@@ -236,8 +239,11 @@ export function runSrTrapConfirm(
   }
 
   const { sh, sl } = swingHL(dayBars, i, extras.swingLb);
-  const trapPierce = extras.piercePts;
-  // Doc 45: keep trap pierce at DNA floor; widen bounce only on wide morning OR.
+  const isBank = /bank/i.test(ctx.instrumentId ?? '');
+  // Doc 45 Rec B: Nifty pierce15 · Bank pierce30 so wide-OR Bank days don't sit silent.
+  const trapPierce =
+    isBank && extras.bankPiercePts > 0 ? extras.bankPiercePts : extras.piercePts;
+  // Doc 45 Rec A: widen bounce on wide morning OR (daily participation).
   let bouncePierce = trapPierce;
   if (extras.bounceOrPierceMult > 0) {
     const orW = morningOrWidth(dayBars, settings.orEnd || '09:45');

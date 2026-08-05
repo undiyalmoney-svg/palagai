@@ -32,12 +32,13 @@ export const PROTECTION_DNA_EXTRAS: Record<string, number | boolean> = {
 };
 
 /**
- * 1-lot Daily ₹1k–₹3k Trap DNA (doc 43).
- * pierce10 · peak arm₹150 · soft OFF · bounce OR×0.20/cap35 (doc 45 wide days).
+ * Daily-fill Trap DNA (doc 43 + 45): more Nifty/Bank entries every session.
+ * pierce15 · Bank pierce30 · bounce OR×0.25/cap40 · peak₹150 · soft OFF · confirm ON.
  * Forced only on Trap.
  */
 export const TRAP_1LOT_DAILY_DNA_EXTRAS: Record<string, number | boolean | string> = {
-  piercePts: 10,
+  piercePts: 15,
+  bankPiercePts: 30,
   profitLockArmRs: 150,
   profitLockLockRs: 75,
   profitLockGivebackRs: 75,
@@ -46,9 +47,9 @@ export const TRAP_1LOT_DAILY_DNA_EXTRAS: Record<string, number | boolean | strin
   slConfirmCutoffMaxMfeR: 0,
   slConfirmSoftRs: 0,
   trapMode: 'both',
-  /** Doc 45: widen bounce pierce on wide morning OR (Bank dump days). */
-  bounceOrPierceMult: 0.2,
-  bounceOrPierceCap: 35,
+  /** Wide-day bounce so Bank/Nifty don't sit dump on large OR. */
+  bounceOrPierceMult: 0.25,
+  bounceOrPierceCap: 40,
 };
 
 /** @deprecated alias — prefer TRAP_1LOT_DAILY_DNA_EXTRAS */

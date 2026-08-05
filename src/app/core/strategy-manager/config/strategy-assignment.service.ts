@@ -20,10 +20,10 @@ import { StrategySettings } from '../models/strategy-settings.model';
 import { StrategyRegistryService } from '../registry/strategy-registry.service';
 
 /**
- * v24 — Trap wide-day bounce: OR-scaled bounce pierce 0.20/cap35 (doc 45).
- * Drops v23 so stale Trap extras without bounce OR scale cannot stick.
+ * v25 — Daily-fill Trap: pierce15 · Bank pierce30 · bounce OR 0.25/cap40 (doc 45).
+ * Drops v24 so quieter pierce10 DNA cannot stick.
  */
-const STORAGE_KEY = 'palagai_strategy_assignments_v24';
+const STORAGE_KEY = 'palagai_strategy_assignments_v25';
 const LEGACY_STORAGE_KEYS = [
   'palagai_strategy_assignments_v1',
   'palagai_strategy_assignments_v2',
@@ -48,6 +48,7 @@ const LEGACY_STORAGE_KEYS = [
   'palagai_strategy_assignments_v21',
   'palagai_strategy_assignments_v22',
   'palagai_strategy_assignments_v23',
+  'palagai_strategy_assignments_v24',
 ] as const;
 
 export interface ChannelAssignment {
