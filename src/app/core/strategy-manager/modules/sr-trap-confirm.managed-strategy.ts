@@ -24,7 +24,7 @@ import {
 
 /**
  * S/R Trap + Confirm — default Nifty/Bank Paper+Live.
- * 1-lot Daily DNA (doc 43): pierce10 · peak arm₹150 · soft OFF · 2R.
+ * Daily-fill DNA (doc 45): pierce15 · Bank30 · bounce OR · peak₹150 · soft OFF · 2R.
  */
 @Injectable({ providedIn: 'root' })
 export class SrTrapConfirmManagedStrategy implements IManagedStrategy {
