@@ -20,10 +20,10 @@ import { StrategySettings } from '../models/strategy-settings.model';
 import { StrategyRegistryService } from '../registry/strategy-registry.service';
 
 /**
- * v23 — 1-lot Daily DNA: Trap pierce10 · peak₹150 · soft OFF · RR2 (doc 43).
- * Drops v22 so stale pierce5/arm400/soft cannot stick on Trap.
+ * v24 — Trap wide-day bounce: OR-scaled bounce pierce 0.20/cap35 (doc 45).
+ * Drops v23 so stale Trap extras without bounce OR scale cannot stick.
  */
-const STORAGE_KEY = 'palagai_strategy_assignments_v23';
+const STORAGE_KEY = 'palagai_strategy_assignments_v24';
 const LEGACY_STORAGE_KEYS = [
   'palagai_strategy_assignments_v1',
   'palagai_strategy_assignments_v2',
@@ -47,6 +47,7 @@ const LEGACY_STORAGE_KEYS = [
   'palagai_strategy_assignments_v20',
   'palagai_strategy_assignments_v21',
   'palagai_strategy_assignments_v22',
+  'palagai_strategy_assignments_v23',
 ] as const;
 
 export interface ChannelAssignment {

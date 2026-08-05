@@ -32,7 +32,7 @@ export class SrTrapConfirmManagedStrategy implements IManagedStrategy {
   readonly name = 'Trap';
   readonly version = '1.1.0';
   readonly description =
-    'Default · liquidity trap + next-bar confirm · pierce10 · 2R · peak-trail arm₹150 · soft OFF · 1-lot Daily.';
+    'Default · liquidity trap + next-bar confirm · pierce10 · OR-scaled bounce · 2R · peak₹150 · soft OFF · 1-lot Daily.';
   readonly supports: readonly DeskChannel[] = ['nifty', 'bank'];
 
   readonly defaultSettings = defaultStrategySettings({
@@ -62,8 +62,8 @@ export class SrTrapConfirmManagedStrategy implements IManagedStrategy {
       slPadPts: 2,
       minConfirmBody: 0,
       /**
-       * 1-lot Daily hunt (doc 43): pierce10 · peak₹150 · soft OFF
-       * → OOS ~89% days ≥₹1k · p10~₹823 · worst~−₹77 (1 lot N+B).
+       * 1-lot Daily (doc 43) + wide-day bounce (doc 45):
+       * pierce10 · peak₹150 · soft OFF · bounce OR×0.20 cap35.
        */
       profitLockArmRs: 150,
       profitLockLockRs: 75,
@@ -72,6 +72,8 @@ export class SrTrapConfirmManagedStrategy implements IManagedStrategy {
       slConfirmCutoffFracR: 0,
       slConfirmCutoffMaxMfeR: 0,
       slConfirmSoftRs: 0,
+      bounceOrPierceMult: 0.2,
+      bounceOrPierceCap: 35,
     },
   });
 

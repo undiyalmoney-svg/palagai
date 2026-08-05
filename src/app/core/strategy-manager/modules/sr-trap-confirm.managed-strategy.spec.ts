@@ -3,7 +3,7 @@ import { SrTrapConfirmManagedStrategy } from './sr-trap-confirm.managed-strategy
 import { DEFAULT_CHANNEL_ASSIGNMENTS, MANAGED_STRATEGY_IDS } from '../config/managed-strategy-ids';
 
 describe('SrTrapConfirmManagedStrategy', () => {
-  it('is indices default with 1-lot Daily DNA (pierce10 · peak₹150 · soft OFF · 2R)', () => {
+  it('is indices default with 1-lot Daily DNA (pierce10 · OR bounce · peak₹150 · soft OFF · 2R)', () => {
     const s = new SrTrapConfirmManagedStrategy();
     s.initialize();
     expect(s.id).toBe(MANAGED_STRATEGY_IDS.SR_TRAP_CONFIRM);
@@ -14,6 +14,8 @@ describe('SrTrapConfirmManagedStrategy', () => {
     expect(s.getSettings().profitProtectArmR).toBe(1);
     expect(s.getSettings().profitProtectLockR).toBe(0);
     expect(s.getSettings().extras['piercePts']).toBe(10);
+    expect(s.getSettings().extras['bounceOrPierceMult']).toBe(0.2);
+    expect(s.getSettings().extras['bounceOrPierceCap']).toBe(35);
     expect(s.getSettings().extras['profitLockArmRs']).toBe(150);
     expect(s.getSettings().extras['profitLockLockRs']).toBe(75);
     expect(s.getSettings().extras['profitLockGivebackRs']).toBe(75);

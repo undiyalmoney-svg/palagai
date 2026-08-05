@@ -68,6 +68,9 @@ function readTrapExtras(settings: StrategySettings): {
   maxRisk: number;
   slPad: number;
   minConfirmBody: number;
+  /** Widen bounce pierce with morning OR (doc 45). 0 = off. */
+  bounceOrPierceMult: number;
+  bounceOrPierceCap: number;
 } {
   const x = settings.extras ?? {};
   const mode = x['trapMode'] === 'trap' ? 'trap' : 'both';
@@ -79,7 +82,27 @@ function readTrapExtras(settings: StrategySettings): {
     maxRisk: num(x['maxRiskPts'], 28),
     slPad: num(x['slPadPts'], 2),
     minConfirmBody: num(x['minConfirmBody'], 0),
+    bounceOrPierceMult: Math.max(0, num(x['bounceOrPierceMult'], 0)),
+    bounceOrPierceCap: Math.max(0, num(x['bounceOrPierceCap'], 0)),
   };
+}
+
+/** Morning OR width 09:15–orEnd (default 09:45) for bounce pierce scaling. */
+function morningOrWidth(dayBars: Candle[], orEnd: string): number {
+  let hi = -Infinity;
+  let lo = Infinity;
+  for (const b of dayBars) {
+    const t = extractHhMm(b.date);
+    if (t < '09:15' || t > orEnd) {
+      continue;
+    }
+    hi = Math.max(hi, b.high);
+    lo = Math.min(lo, b.low);
+  }
+  if (!Number.isFinite(hi) || !Number.isFinite(lo) || hi < lo) {
+    return 0;
+  }
+  return hi - lo;
 }
 
 function swingHL(
@@ -213,24 +236,35 @@ export function runSrTrapConfirm(
   }
 
   const { sh, sl } = swingHL(dayBars, i, extras.swingLb);
-  const pierce = extras.piercePts;
+  const trapPierce = extras.piercePts;
+  // Doc 45: keep trap pierce at DNA floor; widen bounce only on wide morning OR.
+  let bouncePierce = trapPierce;
+  if (extras.bounceOrPierceMult > 0) {
+    const orW = morningOrWidth(dayBars, settings.orEnd || '09:45');
+    if (orW > 0) {
+      bouncePierce = Math.max(trapPierce, orW * extras.bounceOrPierceMult);
+      if (extras.bounceOrPierceCap > 0) {
+        bouncePierce = Math.min(bouncePierce, extras.bounceOrPierceCap);
+      }
+    }
+  }
   const cc = candle.close;
   const oo = candle.open;
   const hh = candle.high;
   const ll = candle.low;
 
-  const trapBuy = ll < sl - pierce && cc > sl && cc > oo;
-  const trapSell = hh > sh + pierce && cc < sh && cc < oo;
+  const trapBuy = ll < sl - trapPierce && cc > sl && cc > oo;
+  const trapSell = hh > sh + trapPierce && cc < sh && cc < oo;
   const rng = Math.max(hh - ll, 1e-9);
   const bounceBuy =
-    ll <= sl + pierce &&
-    ll >= sl - pierce * 2 &&
+    ll <= sl + bouncePierce &&
+    ll >= sl - bouncePierce * 2 &&
     cc > oo &&
     cc >= sl &&
     (hh - cc) / rng < 0.35;
   const bounceSell =
-    hh >= sh - pierce &&
-    hh <= sh + pierce * 2 &&
+    hh >= sh - bouncePierce &&
+    hh <= sh + bouncePierce * 2 &&
     cc < oo &&
     cc <= sh &&
     (cc - ll) / rng < 0.35;

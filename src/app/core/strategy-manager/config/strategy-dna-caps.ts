@@ -33,7 +33,7 @@ export const PROTECTION_DNA_EXTRAS: Record<string, number | boolean> = {
 
 /**
  * 1-lot Daily ₹1k–₹3k Trap DNA (doc 43).
- * pierce10 · peak arm₹150 · soft OFF · IS/OOS ~89–90% days ≥₹1k · OOS p10~₹823.
+ * pierce10 · peak arm₹150 · soft OFF · bounce OR×0.20/cap35 (doc 45 wide days).
  * Forced only on Trap.
  */
 export const TRAP_1LOT_DAILY_DNA_EXTRAS: Record<string, number | boolean | string> = {
@@ -46,6 +46,9 @@ export const TRAP_1LOT_DAILY_DNA_EXTRAS: Record<string, number | boolean | strin
   slConfirmCutoffMaxMfeR: 0,
   slConfirmSoftRs: 0,
   trapMode: 'both',
+  /** Doc 45: widen bounce pierce on wide morning OR (Bank dump days). */
+  bounceOrPierceMult: 0.2,
+  bounceOrPierceCap: 35,
 };
 
 /** @deprecated alias — prefer TRAP_1LOT_DAILY_DNA_EXTRAS */

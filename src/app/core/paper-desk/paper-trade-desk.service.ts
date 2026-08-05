@@ -977,9 +977,11 @@ export class PaperTradeDeskService {
     const indexOpen = now >= '09:15' && now <= '15:30';
     const mcxOpen =
       now >= MCX_CRUDE_SESSION.marketOpen && now <= MCX_CRUDE_SESSION.marketClose;
-    const canRun = (anyIndex && indexOpen) || (this.anyMcxBookEnabled() && mcxOpen);
+    const sessionOpenNow = (anyIndex && indexOpen) || (this.anyMcxBookEnabled() && mcxOpen);
+    // Allow Start any morning time — selected books arm automatically at their open.
+    const canDeferStart = anyIndex || this.anyMcxBookEnabled();
 
-    if (!canRun) {
+    if (!sessionOpenNow && !canDeferStart) {
       try {
         const allInstruments = await this.loadOptionInstruments({
           patchStatus: false,
@@ -1019,11 +1021,13 @@ export class PaperTradeDeskService {
       running: true,
       fromDate: today,
       toDate: today,
-      marketOpen: true,
+      marketOpen: sessionOpenNow,
       realOrders: this.realOrders,
-      message: this.realOrders
-        ? `Starting LIVE MONEY desk (${this.deskOptionsLabel()})…`
-        : `Starting live paper (${this.deskOptionsLabel()})…`,
+      message: !sessionOpenNow
+        ? `Live armed — waiting for open (now ${now}). Index 09:15 · MCX ${MCX_CRUDE_SESSION.marketOpen}. Selected books auto-join.`
+        : this.realOrders
+          ? `Starting LIVE MONEY desk (${this.deskOptionsLabel()})…`
+          : `Starting live paper (${this.deskOptionsLabel()})…`,
       kiteStats: this.kiteStats(),
     });
 
@@ -1093,20 +1097,27 @@ export class PaperTradeDeskService {
       this.lastIndexStatuses = [];
       this.liveTrades = [];
 
-      if (anyIndex && indexOpen) {
+      // Always register selected index books — fetch lookback even before 09:15 so they
+      // auto-join the tick loop when the cash session opens (any morning Start time).
+      if (anyIndex) {
         for (let i = 0; i < active.length; i += 1) {
           this.assertActive(runId);
           const row = active[i]!;
           if (i > 0) {
             await delay(1500);
           }
-          const candles = await this.fetch5m({
-            instrumentToken: row.instrument.instrumentToken,
-            from: `${lookbackFrom} 09:00:00`,
-            to: `${today} 15:30:00`,
-            authorization,
-            runId,
-          });
+          let candles: Candle[] = [];
+          try {
+            candles = await this.fetch5m({
+              instrumentToken: row.instrument.instrumentToken,
+              from: `${lookbackFrom} 09:00:00`,
+              to: `${today} 15:30:00`,
+              authorization,
+              runId,
+            });
+          } catch {
+            candles = [];
+          }
           this.liveLegs.push({
             instrument: row.instrument,
             kind: row.kind,
@@ -1210,15 +1221,83 @@ export class PaperTradeDeskService {
     }
   }
 
+  /**
+   * When Live was started before MCX open, arm Crude/Nat Gas on the first in-hours tick.
+   */
+  private async ensureMcxLiveBooksArmed(today: string): Promise<void> {
+    const authorization = this.requireAuth();
+    const lookbackFrom = shiftDate(today, -12);
+    let allInstruments = this.instrumentStore.allInstruments();
+    if (!allInstruments.length) {
+      allInstruments = await this.loadOptionInstruments({
+        patchStatus: false,
+        requireCrude: this.deskRunOptions.enableCrude,
+        requireNatGas: this.deskRunOptions.enableNatGas,
+      });
+    }
+
+    if (this.deskRunOptions.enableCrude && !this.crudeLive) {
+      const future = resolveCrudeOilMiniFuturesToken(allInstruments);
+      if (!future) {
+        throw new Error('No live CRUDEOILM futures contract.');
+      }
+      const candles = await this.fetch5m({
+        instrumentToken: future.instrumentToken,
+        from: `${lookbackFrom} 09:00:00`,
+        to: `${today} 23:30:00`,
+        authorization,
+      });
+      this.crudeLive = {
+        futuresToken: future.instrumentToken,
+        futuresSymbol: future.tradingSymbol,
+        candles,
+      };
+    }
+
+    if (this.deskRunOptions.enableNatGas && !this.natGasLive) {
+      const future = resolveNatGasMiniFuturesToken(allInstruments);
+      if (!future) {
+        throw new Error('No live NATGASMINI futures contract.');
+      }
+      if (this.crudeLive) {
+        await delay(1200);
+      }
+      const candles = await this.fetch5m({
+        instrumentToken: future.instrumentToken,
+        from: `${lookbackFrom} 09:00:00`,
+        to: `${today} 23:30:00`,
+        authorization,
+      });
+      this.natGasLive = {
+        futuresToken: future.instrumentToken,
+        futuresSymbol: future.tradingSymbol,
+        candles,
+      };
+    }
+  }
+
   private async tickLive(initial: boolean): Promise<void> {
     const today = todayIso();
     const now = istNowHhMm();
+    const anyIndexLegs = this.liveLegs.length > 0;
+    const mcxHours =
+      now >= MCX_CRUDE_SESSION.marketOpen && now <= MCX_CRUDE_SESSION.marketClose;
+    const wantsMcx = this.deskRunOptions.enableCrude || this.deskRunOptions.enableNatGas;
+
+    // Deferred morning Start: arm MCX books on the first tick inside MCX hours.
+    if (mcxHours && wantsMcx && (!this.crudeLive || !this.natGasLive)) {
+      try {
+        await this.ensureMcxLiveBooksArmed(today);
+      } catch {
+        // keep waiting — next tick retries
+      }
+    }
+
     const crudeEnabled = this.deskRunOptions.enableCrude && !!this.crudeLive;
     const natGasEnabled = this.deskRunOptions.enableNatGas && !!this.natGasLive;
     const mcxEnabled = crudeEnabled || natGasEnabled;
-    const anyIndexLegs = this.liveLegs.length > 0;
 
-    if (mcxEnabled) {
+    if (mcxEnabled || (wantsMcx && anyIndexLegs)) {
       if (now > MCX_CRUDE_SESSION.marketClose) {
         this.snapshot.update((s) => ({
           ...s,
@@ -1252,7 +1331,7 @@ export class PaperTradeDeskService {
       this.snapshot.update((s) => ({
         ...s,
         marketOpen: false,
-        message: `Waiting for open. Now ${now}`,
+        message: `Waiting for open. Now ${now} · Index 09:15 · MCX ${MCX_CRUDE_SESSION.marketOpen}`,
       }));
       return;
     }
