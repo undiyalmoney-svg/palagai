@@ -149,6 +149,8 @@ export class PaperTradeDeskService {
   /** Last index statuses kept after 15:30 while MCX books continue. */
   private lastIndexStatuses: PaperInstrumentStatus[] = [];
   private liveTrades: PaperTrade[] = [];
+  /** Dedup Event log for desk-only legs (never on Kite). */
+  private loggedDeskOnlyTradeIds = new Set<string>();
   private historicalCalls = 0;
   private lastRangeDays = 0;
   private realOrders = false;
@@ -1096,6 +1098,7 @@ export class PaperTradeDeskService {
       this.natGasLive = null;
       this.lastIndexStatuses = [];
       this.liveTrades = [];
+      this.loggedDeskOnlyTradeIds.clear();
 
       // Always register selected index books — fetch lookback even before 09:15 so they
       // auto-join the tick loop when the cash session opens (any morning Start time).
@@ -1744,8 +1747,10 @@ export class PaperTradeDeskService {
 
       enriched = applyKiteFillPnl(enriched, this.liveOrders.getOrderSummary());
       enriched = this.enrichMixedLots(enriched);
+      this.logDeskOnlyLegsNotOnKite(enriched);
       for (const s of statuses) {
-        const mine = enriched.filter((t) => t.instrumentId === s.instrumentId);
+        // Live money card ₹ = Kite-matched closed legs only (not desk-only replay).
+        const mine = enriched.filter((t) => t.instrumentId === s.instrumentId && t.onKite);
         s.dayNetOptionRs = mine.reduce((a, t) => a + (t.optionPnlRs ?? 0), 0);
       }
     } else {
@@ -1755,6 +1760,16 @@ export class PaperTradeDeskService {
           : null;
       }
     }
+
+    // Live money: Profit ₹ + trade list = Kite fills only. Desk replay can invent
+    // legs that never got placeEntry (blocked / opened&closed between ticks).
+    const deskSignalCount = enriched.length;
+    const displayTrades = this.realOrders
+      ? enriched.filter((t) => t.onKite)
+      : enriched;
+    const deskOnlyCount = this.realOrders
+      ? Math.max(0, deskSignalCount - displayTrades.length)
+      : 0;
 
     this.liveTrades = enriched;
     const moneyTag = this.realOrders ? 'LIVE MONEY' : 'Live paper';
@@ -1779,6 +1794,10 @@ export class PaperTradeDeskService {
     const blockedMsg = blockedBits.length
       ? ` · NOT ON KITE (${blocked}): ${blockedBits.join(' · ')}`
       : '';
+    const deskOnlyMsg =
+      deskOnlyCount > 0
+        ? ` · ${deskOnlyCount} desk signal(s) NOT on Kite (hidden from Profit ₹)`
+        : '';
     const clockMsg =
       mcxEnabled && now >= '15:15'
         ? ' · Index closed · MCX continues'
@@ -1793,15 +1812,41 @@ export class PaperTradeDeskService {
       marketOpen: true,
       realOrders: this.realOrders,
       lastTickAt: new Date().toISOString(),
-      message: `${moneyTag} · alive ${now}${clockMsg} · waiting ${waiting} · in trade ${inTrade}${targets ? ` · target hit ${targets}` : ''}${openMsg}${blockedMsg} · ${this.kiteStatsLabel()}`,
+      message: `${moneyTag} · alive ${now}${clockMsg} · waiting ${waiting} · in trade ${inTrade}${targets ? ` · target hit ${targets}` : ''}${openMsg}${blockedMsg}${deskOnlyMsg} · ${this.kiteStatsLabel()}`,
       statuses,
-      trades: enriched.sort((a, b) => b.entryTime.localeCompare(a.entryTime)),
-      totals: summarize(enriched, (id) => this.lotsForInstrument(id), this.lotsMultiplier),
-      dayStats: buildPaperDeskDayStats(enriched),
+      trades: displayTrades.sort((a, b) => b.entryTime.localeCompare(a.entryTime)),
+      totals: summarize(displayTrades, (id) => this.lotsForInstrument(id), this.lotsMultiplier),
+      dayStats: buildPaperDeskDayStats(displayTrades),
       kiteStats: this.kiteStats(),
       orderEvents: this.liveOrders.getEvents(),
       orderSummary: this.liveOrders.getOrderSummary(),
     });
+  }
+
+  /** Event-log desk closed legs that never matched a Kite ENTRY+EXIT/SL pair. */
+  private logDeskOnlyLegsNotOnKite(trades: PaperTrade[]): void {
+    if (!this.realOrders) {
+      return;
+    }
+    for (const t of trades) {
+      if (t.onKite) {
+        continue;
+      }
+      const key = `desk-only:${t.id}`;
+      if (this.loggedDeskOnlyTradeIds.has(key)) {
+        continue;
+      }
+      this.loggedDeskOnlyTradeIds.add(key);
+      this.liveOrders.pushDeskSkipEvent({
+        instrumentId: t.instrumentId,
+        instrumentName: t.instrumentName,
+        detail:
+          `Desk signal ${t.direction} ${t.option?.tradingSymbol ?? 'ATM'} ` +
+          `${t.entryTime.slice(11, 16)}→${t.exitTime.slice(11, 16)} never reached Kite ` +
+          `(blocked, or opened&closed between ticks). Not counted in Profit ₹.`,
+        tradingSymbol: t.option?.tradingSymbol,
+      });
+    }
   }
 
   private async previewChosenInstruments(

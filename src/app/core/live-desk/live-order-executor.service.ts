@@ -200,6 +200,26 @@ export class LiveOrderExecutorService {
     return [...this.summary.values()].sort((a, b) => b.at.localeCompare(a.at));
   }
 
+  /**
+   * Desk replay closed a leg that never got a Kite ENTRY (blocked / missed tick).
+   * Event log only — does not place orders.
+   */
+  pushDeskSkipEvent(params: {
+    instrumentId: string;
+    instrumentName?: string;
+    detail: string;
+    tradingSymbol?: string;
+  }): void {
+    this.pushEvent({
+      at: new Date().toISOString(),
+      instrumentId: params.instrumentId,
+      instrumentName: params.instrumentName,
+      action: 'SKIP',
+      detail: params.detail,
+      tradingSymbol: params.tradingSymbol,
+    });
+  }
+
   /** Latest SKIP/ERROR detail for an instrument (for Trade Desk banners). */
   getLastBlockReason(instrumentId: string): string | null {
     for (let i = this.events.length - 1; i >= 0; i -= 1) {

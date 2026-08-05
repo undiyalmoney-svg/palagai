@@ -63,6 +63,7 @@ export function applyKiteFillPnl(
       optionExitPremium: pair.exitAvg,
       optionPnlRs,
       premiumEstimated: false,
+      onKite: true,
       option: trade.option
         ? {
             ...trade.option,

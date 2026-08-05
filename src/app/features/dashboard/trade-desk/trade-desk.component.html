@@ -841,10 +841,14 @@
   @if (resultView().trades.length) {
     <div class="trades-block">
       <div class="trades-head">
-        <h3>Paper trades</h3>
+        <h3>{{ snapshot().realOrders ? 'Kite fills' : 'Paper trades' }}</h3>
         <p>
-          Desk replay of today’s closed legs (not Kite fills). Live money only sends when a card shows
-          <em>Live on Kite</em> / <em>Desk signal</em> — check Event log if paper has more rows than Kite.
+          @if (snapshot().realOrders) {
+            Only legs with confirmed Kite ENTRY + EXIT/SL. Desk signals that never reached Kite are
+            hidden from Profit ₹ — see Event log (SKIP).
+          } @else {
+            Desk replay of today’s closed legs (not Kite fills). Tick Real Orders to send MIS to Kite.
+          }
         </p>
         <button
           mat-stroked-button

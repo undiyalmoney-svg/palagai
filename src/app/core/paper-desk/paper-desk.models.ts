@@ -68,6 +68,11 @@ export interface PaperTrade {
   timeline?: PaperTradeTimelineEvent[];
   /** Entry signal reason captured at open (when available). */
   entryReason?: string;
+  /**
+   * Live money: true when this closed leg was matched to Kite ENTRY+EXIT/SL fills.
+   * Desk replay rows without this must not be shown as real orders.
+   */
+  onKite?: boolean;
 }
 
 export interface PaperInstrumentStatus {

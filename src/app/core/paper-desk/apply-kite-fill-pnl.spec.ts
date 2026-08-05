@@ -76,6 +76,7 @@ describe('applyKiteFillPnl', () => {
     // (175.2 − 163.05) × 65 = 789.75
     expect(out[0]!.optionPnlRs).toBe(789.75);
     expect(out[0]!.premiumEstimated).toBe(false);
+    expect(out[0]!.onKite).toBe(true);
   });
 
   it('leaves candle-based P&L when fills are incomplete', () => {
@@ -92,6 +93,7 @@ describe('applyKiteFillPnl', () => {
       },
     ]);
     expect(out[0]!.optionPnlRs).toBe(400);
+    expect(out[0]!.onKite).toBeUndefined();
   });
 
   it('pairs Bank SL-M fill the same way', () => {
