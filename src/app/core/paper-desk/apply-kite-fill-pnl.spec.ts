@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { applyKiteFillPnl, deskLegHasKiteEntry } from './apply-kite-fill-pnl';
+import {
+  applyKiteFillPnl,
+  deskLegHasKiteEntry,
+  fillUnitsForPnl,
+} from './apply-kite-fill-pnl';
 import { PaperTrade } from './paper-desk.models';
 
 function trade(partial: Partial<PaperTrade> & Pick<PaperTrade, 'id' | 'instrumentId'>): PaperTrade {
@@ -241,6 +245,74 @@ describe('applyKiteFillPnl', () => {
     expect(out[0]!.optionEntryPremium).toBe(726);
     expect(out[0]!.optionExitPremium).toBe(738.5);
     expect(out[0]!.optionPnlRs).toBe(375);
+  });
+
+  it('fillUnitsForPnl: Crude qty=1 lot means ×10 (Kite Positions ₹)', () => {
+    expect(
+      fillUnitsForPnl({
+        tradingSymbol: 'CRUDEOILM26AUG7250CE',
+        quantity: 1,
+        lotSize: 1,
+      }),
+    ).toBe(10);
+    expect(
+      fillUnitsForPnl({
+        tradingSymbol: 'CRUDEOILM26AUG7250CE',
+        quantity: 10,
+        lotSize: 10,
+      }),
+    ).toBe(10);
+    expect(
+      fillUnitsForPnl({
+        tradingSymbol: 'NIFTY2681124650CE',
+        quantity: 65,
+        lotSize: 65,
+      }),
+    ).toBe(65);
+  });
+
+  it('Crude Kite fill qty=1 uses ×10 like Positions (+620 day case)', () => {
+    const trades = [
+      trade({
+        id: 'c1',
+        instrumentId: 'crude-oil-mini',
+        instrumentName: 'Crude Oil Mini',
+        entryTime: '2026-08-06 17:46:00',
+        option: {
+          tradingSymbol: 'CRUDEOILM26AUG7250CE',
+          instrumentToken: 9,
+          strike: 7250,
+          expiry: '2026-08-19',
+          optionType: 'CE',
+          lotSize: 1,
+          source: 'chain',
+          exchange: 'MCX',
+        },
+      }),
+    ];
+    const out = applyKiteFillPnl(trades, [
+      {
+        instrumentId: 'crude-oil-mini',
+        tradingSymbol: 'CRUDEOILM26AUG7250CE',
+        quantity: 1,
+        leg: 'ENTRY',
+        status: 'COMPLETE',
+        averagePrice: 292.65,
+        at: '2026-08-06T17:46:32.000Z',
+      },
+      {
+        instrumentId: 'crude-oil-mini',
+        tradingSymbol: 'CRUDEOILM26AUG7250CE',
+        quantity: 1,
+        leg: 'EXIT',
+        status: 'COMPLETE',
+        averagePrice: 330.9,
+        at: '2026-08-06T18:45:21.000Z',
+      },
+    ]);
+    // (330.9 − 292.65) × 10 = 382.5 — not ×1 (=38.25)
+    expect(out[0]!.optionPnlRs).toBe(382.5);
+    expect(out[0]!.option?.lotSize).toBe(10);
   });
 
   it('deskLegHasKiteEntry is true for ENTRY-only fills (not a miss)', () => {

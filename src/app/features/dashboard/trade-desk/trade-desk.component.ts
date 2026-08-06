@@ -620,6 +620,19 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
     return this.resultView().totals.pointsMoneyRs ?? 0;
   }
 
+  /** Live money: lead with Kite ₹. Paper/Testing: lead with Index ₹ (DNA). */
+  protected leadWithKiteRs(): boolean {
+    return !!this.snapshot().realOrders;
+  }
+
+  protected heroProfitRs(): number {
+    return this.leadWithKiteRs() ? this.primaryProfitRs() : this.indexProxyProfitRs();
+  }
+
+  protected secondaryProfitRs(): number {
+    return this.leadWithKiteRs() ? this.indexProxyProfitRs() : this.primaryProfitRs();
+  }
+
   /** Per-trade profit — same basis as primary (net if present). */
   protected tradeProfitRs(t: {
     netOptionPnlRs?: number | null;

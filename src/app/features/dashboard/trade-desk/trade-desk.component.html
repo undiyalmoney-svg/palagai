@@ -422,27 +422,34 @@
     <div class="totals totals-simple">
       <div
         class="stat primary profit-hero"
-        [class.up]="indexProxyProfitRs() > 0"
-        [class.down]="indexProxyProfitRs() < 0"
-        title="Same Index ₹ as DNA reports: Nifty×65 · Bank×30 · Crude×10 × pts × lots"
+        [class.up]="heroProfitRs() > 0"
+        [class.down]="heroProfitRs() < 0"
       >
-        <span>Index ₹</span>
+        <span>{{ leadWithKiteRs() ? 'Kite ₹' : 'Index ₹' }}</span>
         <strong
-          >{{ indexProxyProfitRs() > 0 ? '+' : ''
-          }}{{ indexProxyProfitRs() | number: '1.0-0' }}</strong
+          >{{ heroProfitRs() > 0 ? '+' : '' }}{{ heroProfitRs() | number: '1.0-0' }}</strong
         >
-        <small class="profit-sub">DNA report · fut pts × ₹65/30/10</small>
+        <small class="profit-sub">{{
+          leadWithKiteRs()
+            ? 'Positions truth · real fills'
+            : 'DNA report · fut pts × ₹65/30/10'
+        }}</small>
       </div>
       <div
         class="stat profit-hero"
-        [class.up]="primaryProfitRs() > 0"
-        [class.down]="primaryProfitRs() < 0"
+        [class.up]="secondaryProfitRs() > 0"
+        [class.down]="secondaryProfitRs() < 0"
       >
-        <span>{{ snapshot().realOrders ? 'Kite ₹' : 'Option ₹' }}</span>
+        <span>{{ leadWithKiteRs() ? 'Index ₹' : snapshot().realOrders ? 'Kite ₹' : 'Option ₹' }}</span>
         <strong
-          >{{ primaryProfitRs() > 0 ? '+' : '' }}{{ primaryProfitRs() | number: '1.0-0' }}</strong
+          >{{ secondaryProfitRs() > 0 ? '+' : ''
+          }}{{ secondaryProfitRs() | number: '1.0-0' }}</strong
         >
-        <small class="profit-sub">premium × lot — can differ from Index ₹</small>
+        <small class="profit-sub">{{
+          leadWithKiteRs()
+            ? 'fut proxy — can disagree with Kite'
+            : 'premium × lot — can differ from Index ₹'
+        }}</small>
       </div>
       <div class="stat">
         <span>Trades</span>
@@ -873,10 +880,10 @@
         <h3>{{ snapshot().realOrders ? 'Kite fills' : 'Paper trades' }}</h3>
         <p>
           @if (snapshot().realOrders) {
-            Big number = Index ₹ (DNA). Kite ₹ is premium fills — can disagree when trail cuts on
-            futures. HOLD skips market-dump when option is still red.
+            Big number = Kite ₹ (Positions truth). Index ₹ is fut proxy — today’s desk −₹500 Crude
+            cards were Index SL, not your Kite CE +₹750 day.
           } @else {
-            Big number = Index ₹ (same as DNA reports). Option ₹ is premium estimate/fill — secondary.
+            Big number = Index ₹ (DNA reports). Option ₹ is premium estimate — secondary.
           }
         </p>
         <button
@@ -894,8 +901,8 @@
         @for (t of resultView().trades; track t.id) {
           <article
             class="trade-card"
-            [class.win]="indexProxyRs(t) > 0"
-            [class.loss]="indexProxyRs(t) < 0"
+            [class.win]="(leadWithKiteRs() ? tradeProfitRs(t) : indexProxyRs(t)) > 0"
+            [class.loss]="(leadWithKiteRs() ? tradeProfitRs(t) : indexProxyRs(t)) < 0"
           >
             <div class="trade-card-top">
               <div class="stack">
@@ -908,22 +915,39 @@
                 >
               </div>
               <div class="trade-card-pnl-stack">
-                <div
-                  class="trade-card-pnl num"
-                  [class.up]="indexProxyRs(t) > 0"
-                  [class.down]="indexProxyRs(t) < 0"
-                >
-                  {{ indexProxyRs(t) > 0 ? '+' : '' }}{{ indexProxyRs(t) | number: '1.0-0' }}
-                </div>
-                <small class="trade-card-pnl-label">Index ₹</small>
-                <small
-                  class="trade-card-opt num"
-                  [class.up]="tradeProfitRs(t) > 0"
-                  [class.down]="tradeProfitRs(t) < 0"
-                  >{{ snapshot().realOrders ? 'Kite' : 'Opt' }}
-                  {{ tradeProfitRs(t) > 0 ? '+' : ''
-                  }}{{ tradeProfitRs(t) | number: '1.0-0' }}</small
-                >
+                @if (leadWithKiteRs()) {
+                  <div
+                    class="trade-card-pnl num"
+                    [class.up]="tradeProfitRs(t) > 0"
+                    [class.down]="tradeProfitRs(t) < 0"
+                  >
+                    {{ tradeProfitRs(t) > 0 ? '+' : '' }}{{ tradeProfitRs(t) | number: '1.0-0' }}
+                  </div>
+                  <small class="trade-card-pnl-label">Kite ₹</small>
+                  <small
+                    class="trade-card-opt num"
+                    [class.up]="indexProxyRs(t) > 0"
+                    [class.down]="indexProxyRs(t) < 0"
+                    >Index {{ indexProxyRs(t) > 0 ? '+' : ''
+                    }}{{ indexProxyRs(t) | number: '1.0-0' }}</small
+                  >
+                } @else {
+                  <div
+                    class="trade-card-pnl num"
+                    [class.up]="indexProxyRs(t) > 0"
+                    [class.down]="indexProxyRs(t) < 0"
+                  >
+                    {{ indexProxyRs(t) > 0 ? '+' : '' }}{{ indexProxyRs(t) | number: '1.0-0' }}
+                  </div>
+                  <small class="trade-card-pnl-label">Index ₹</small>
+                  <small
+                    class="trade-card-opt num"
+                    [class.up]="tradeProfitRs(t) > 0"
+                    [class.down]="tradeProfitRs(t) < 0"
+                    >Opt {{ tradeProfitRs(t) > 0 ? '+' : ''
+                    }}{{ tradeProfitRs(t) | number: '1.0-0' }}</small
+                  >
+                }
               </div>
             </div>
             <div class="trade-card-meta">

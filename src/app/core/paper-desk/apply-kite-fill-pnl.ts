@@ -1,3 +1,5 @@
+import { isMcxOptionContext } from '../live-desk/option-sl-premium.util';
+import { crudeMiniLotSize } from '../utils/crude-option.util';
 import { PaperTrade } from './paper-desk.models';
 
 /** Minimal order-book row needed to rebuild Kite Positions P&L. */
@@ -12,8 +14,31 @@ export interface KiteFillOrderRow {
 }
 
 /**
+ * Units for Positions-style ₹.
+ * NFO: order qty is already units (65/30).
+ * MCX Crude/NG: orders often show qty=1 (= 1 lot) while Positions ₹ uses × lotSize (10).
+ * Today 2026-08-06: Crude CE fills qty=1 but Kite day PnL = premiumΔ × 10.
+ */
+export function fillUnitsForPnl(params: {
+  tradingSymbol?: string | null;
+  quantity: number;
+  lotSize?: number | null;
+  exchange?: string | null;
+}): number {
+  const q = Math.max(1, Math.floor(params.quantity) || 1);
+  if (!isMcxOptionContext(params.exchange, params.tradingSymbol)) {
+    return q;
+  }
+  const sym = (params.tradingSymbol ?? '').toUpperCase();
+  const lot = sym.startsWith('CRUDEOIL')
+    ? crudeMiniLotSize(params.lotSize)
+    : Math.max(1, Math.floor(Number(params.lotSize) || 0) || q);
+  return q < lot ? q * lot : q;
+}
+
+/**
  * Kite closed-position money (long option MIS):
- *   (exitAvg − entryAvg) × quantity
+ *   (exitAvg − entryAvg) × units
  *
  * Overlays that onto paper trades using Live money order-book fills.
  * Does not change entry/exit timing or order placement — calculation only.
@@ -76,8 +101,21 @@ export function applyKiteFillPnl(
 
     used.add(pairKey(trade.instrumentId, bestIdx));
     const pair = pairs[bestIdx]!;
-    const qty = Math.max(1, pair.quantity);
-    const optionPnlRs = roundPaise((pair.exitAvg - pair.entryAvg) * qty);
+    const mcx = isMcxOptionContext(trade.option?.exchange, pair.tradingSymbol);
+    const units = fillUnitsForPnl({
+      tradingSymbol: pair.tradingSymbol,
+      quantity: pair.quantity,
+      lotSize: trade.option?.lotSize,
+      exchange: trade.option?.exchange,
+    });
+    const optionPnlRs = roundPaise((pair.exitAvg - pair.entryAvg) * units);
+    const nextLotSize = mcx
+      ? (pair.tradingSymbol || '').toUpperCase().startsWith('CRUDEOIL')
+        ? crudeMiniLotSize(trade.option?.lotSize)
+        : Math.max(1, trade.option?.lotSize || units)
+      : trade.option && trade.option.lotSize > 1
+        ? trade.option.lotSize
+        : Math.max(1, pair.quantity);
 
     return {
       ...trade,
@@ -89,11 +127,7 @@ export function applyKiteFillPnl(
       option: trade.option
         ? {
             ...trade.option,
-            // Prefer fill qty as lotSize when chain lot was missing/wrong (e.g. CSV lot=1).
-            lotSize:
-              trade.option.lotSize > 1
-                ? trade.option.lotSize
-                : qty,
+            lotSize: nextLotSize,
           }
         : trade.option,
     };

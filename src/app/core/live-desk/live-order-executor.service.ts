@@ -597,16 +597,20 @@ export class LiveOrderExecutorService {
       return;
     }
 
-    // qty = exchange lot size × configured lots (Live money only).
-    const lotSize = Math.max(1, option.lotSize || 1);
-    const lotsMult = this.lotsFor(instrumentId);
-    const quantity = lotSize * lotsMult;
     const symUpper = option.tradingSymbol.toUpperCase();
     const exchange: 'NFO' | 'MCX' =
       option.exchange ??
       (symUpper.startsWith('CRUDEOIL') || symUpper.startsWith('NATURALGAS') || symUpper.startsWith('NATGAS')
         ? 'MCX'
         : 'NFO');
+    // qty = exchange lot size × configured lots (Live money only).
+    // Crude options: never place qty=1 when lot is 10 (today's book showed qty=1 vs Positions ×10 ₹).
+    const lotSize =
+      exchange === 'MCX' && symUpper.startsWith('CRUDEOIL')
+        ? Math.max(10, Math.floor(option.lotSize || 10) || 10)
+        : Math.max(1, option.lotSize || 1);
+    const lotsMult = this.lotsFor(instrumentId);
+    const quantity = lotSize * lotsMult;
     // Crude/energy options: prefer MIS (Zerodha allows MIS on energy MCX options).
     const product =
       option.product ??
