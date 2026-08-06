@@ -675,11 +675,6 @@ function todayIso(): string {
   return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
 }
 
-/** Yesterday in Asia/Kolkata calendar (used as Trade Desk Testing default). */
-function yesterdayIso(): string {
-  return shiftDays(-1);
-}
-
 function shiftDays(days: number): string {
   const d = new Date();
   d.setDate(d.getDate() + days);
