@@ -422,17 +422,6 @@
     <div class="totals totals-simple">
       <div
         class="stat primary profit-hero"
-        [class.up]="primaryProfitRs() > 0"
-        [class.down]="primaryProfitRs() < 0"
-      >
-        <span>Option / fill ₹</span>
-        <strong
-          >{{ primaryProfitRs() > 0 ? '+' : '' }}{{ primaryProfitRs() | number: '1.0-0' }}</strong
-        >
-        <small class="profit-sub">premium × lot{{ snapshot().realOrders ? ' · Kite' : '' }}</small>
-      </div>
-      <div
-        class="stat profit-hero"
         [class.up]="indexProxyProfitRs() > 0"
         [class.down]="indexProxyProfitRs() < 0"
         title="Same Index ₹ as DNA reports: Nifty×65 · Bank×30 · Crude×10 × pts × lots"
@@ -442,7 +431,18 @@
           >{{ indexProxyProfitRs() > 0 ? '+' : ''
           }}{{ indexProxyProfitRs() | number: '1.0-0' }}</strong
         >
-        <small class="profit-sub">fut/index proxy · DNA report</small>
+        <small class="profit-sub">DNA report · fut pts × ₹65/30/10</small>
+      </div>
+      <div
+        class="stat profit-hero"
+        [class.up]="primaryProfitRs() > 0"
+        [class.down]="primaryProfitRs() < 0"
+      >
+        <span>{{ snapshot().realOrders ? 'Kite ₹' : 'Option ₹' }}</span>
+        <strong
+          >{{ primaryProfitRs() > 0 ? '+' : '' }}{{ primaryProfitRs() | number: '1.0-0' }}</strong
+        >
+        <small class="profit-sub">premium × lot — can differ from Index ₹</small>
       </div>
       <div class="stat">
         <span>Trades</span>
@@ -873,10 +873,10 @@
         <h3>{{ snapshot().realOrders ? 'Kite fills' : 'Paper trades' }}</h3>
         <p>
           @if (snapshot().realOrders) {
-            Only legs with confirmed Kite ENTRY + EXIT/SL. Older fills stay as booked — HOLD (no
-            market-dump on red option) applies to new Profit-drained exits. SKIP = never reached Kite.
+            Big number = Index ₹ (DNA). Kite ₹ is premium fills — can disagree when trail cuts on
+            futures. HOLD skips market-dump when option is still red.
           } @else {
-            Desk replay of today’s closed legs (not Kite fills). Tick Real Orders to send MIS to Kite.
+            Big number = Index ₹ (same as DNA reports). Option ₹ is premium estimate/fill — secondary.
           }
         </p>
         <button
@@ -894,8 +894,8 @@
         @for (t of resultView().trades; track t.id) {
           <article
             class="trade-card"
-            [class.win]="t.outcome === 'WIN'"
-            [class.loss]="t.outcome === 'LOSS'"
+            [class.win]="indexProxyRs(t) > 0"
+            [class.loss]="indexProxyRs(t) < 0"
           >
             <div class="trade-card-top">
               <div class="stack">
@@ -907,12 +907,23 @@
                   <span class="dir" [attr.data-dir]="t.direction">{{ optionLegLabel(t) }}</span></small
                 >
               </div>
-              <div
-                class="trade-card-pnl num"
-                [class.up]="tradeProfitRs(t) > 0"
-                [class.down]="tradeProfitRs(t) < 0"
-              >
-                {{ tradeProfitRs(t) > 0 ? '+' : '' }}{{ tradeProfitRs(t) | number: '1.0-0' }}
+              <div class="trade-card-pnl-stack">
+                <div
+                  class="trade-card-pnl num"
+                  [class.up]="indexProxyRs(t) > 0"
+                  [class.down]="indexProxyRs(t) < 0"
+                >
+                  {{ indexProxyRs(t) > 0 ? '+' : '' }}{{ indexProxyRs(t) | number: '1.0-0' }}
+                </div>
+                <small class="trade-card-pnl-label">Index ₹</small>
+                <small
+                  class="trade-card-opt num"
+                  [class.up]="tradeProfitRs(t) > 0"
+                  [class.down]="tradeProfitRs(t) < 0"
+                  >{{ snapshot().realOrders ? 'Kite' : 'Opt' }}
+                  {{ tradeProfitRs(t) > 0 ? '+' : ''
+                  }}{{ tradeProfitRs(t) | number: '1.0-0' }}</small
+                >
               </div>
             </div>
             <div class="trade-card-meta">
@@ -923,14 +934,15 @@
                 >
               }
               <span
-                >fut {{ t.indexPoints > 0 ? '+' : '' }}{{ t.indexPoints | number: '1.1-1' }} · idx ₹{{
-                  indexProxyRs(t) > 0 ? '+' : ''
-                }}{{ indexProxyRs(t) | number: '1.0-0' }}</span
+                >fut {{ t.indexPoints > 0 ? '+' : '' }}{{ t.indexPoints | number: '1.1-1' }} · =
+                Index ₹ above</span
               >
             </div>
             <p class="trade-card-exit">{{ t.exitReason }}</p>
             @if (futOptionDisagree(t)) {
-              <small class="trade-card-warn">Kite ₹ ≠ index (trail on fut — HOLD on new drains)</small>
+              <small class="trade-card-warn"
+                >{{ snapshot().realOrders ? 'Kite' : 'Option' }} ₹ ≠ Index ₹ (trail on fut)</small
+              >
             }
           </article>
         }
@@ -946,13 +958,13 @@
               <th>Dir</th>
               <th>Instrument</th>
               <th>Prem in/out</th>
-              <th>Profit ₹</th>
+              <th>Index ₹</th>
               <th>Exit</th>
             </tr>
           </thead>
           <tbody>
             @for (t of resultView().trades; track t.id) {
-              <tr [class.win]="t.outcome === 'WIN'" [class.loss]="t.outcome === 'LOSS'">
+              <tr [class.win]="indexProxyRs(t) > 0" [class.loss]="indexProxyRs(t) < 0">
                 <td>
                   <div class="stack">
                     <strong>{{ fmtWeekday(t.entryTime) }}</strong>
@@ -986,20 +998,21 @@
                     —
                   }
                 </td>
-                <td class="num" [class.up]="tradeProfitRs(t) > 0" [class.down]="tradeProfitRs(t) < 0">
+                <td class="num" [class.up]="indexProxyRs(t) > 0" [class.down]="indexProxyRs(t) < 0">
                   <div class="stack">
                     <strong
-                      >{{ tradeProfitRs(t) > 0 ? '+' : ''
-                      }}{{ tradeProfitRs(t) | number: '1.0-0' }}</strong
+                      >{{ indexProxyRs(t) > 0 ? '+' : ''
+                      }}{{ indexProxyRs(t) | number: '1.0-0' }}</strong
                     >
                     <small class="muted"
                       >fut {{ t.indexPoints > 0 ? '+' : ''
                       }}{{ t.indexPoints | number: '1.1-1' }}
-                      · idx ₹{{ indexProxyRs(t) > 0 ? '+' : ''
-                      }}{{ indexProxyRs(t) | number: '1.0-0' }}</small
+                      · {{ snapshot().realOrders ? 'Kite' : 'Opt' }}
+                      {{ tradeProfitRs(t) > 0 ? '+' : ''
+                      }}{{ tradeProfitRs(t) | number: '1.0-0' }}</small
                     >
                     @if (futOptionDisagree(t)) {
-                      <small class="muted">Kite ₹ ≠ index (trail on fut)</small>
+                      <small class="muted">Option/Kite ₹ ≠ Index ₹</small>
                     }
                   </div>
                 </td>
