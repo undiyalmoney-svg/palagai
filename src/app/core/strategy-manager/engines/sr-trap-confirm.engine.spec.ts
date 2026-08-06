@@ -44,7 +44,7 @@ function ctx(instrumentId = 'NIFTY 50') {
     instrumentId,
     candle5m: bar({ open: 100, high: 100, low: 100, close: 100 }),
     previous5m: [],
-  } as Parameters<typeof srTrapExitLogic>[4];
+  } as unknown as Parameters<typeof srTrapExitLogic>[4];
 }
 
 describe('Trap peak-trail drain (arm ₹600 / giveback ₹300)', () => {
