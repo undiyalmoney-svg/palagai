@@ -1,7 +1,7 @@
 # 41 — Crude Selective (charge-aware, max 1/day)
 
 **Date:** 2026-08-04  
-**Status:** Wired as Trade Desk default **`selective`** — **v1.3.62:** SL30/TP60 · confirm · unlimited (max-2 + day-stop removed; still not All-Green). Experiments keeps All-Green in picker.  
+**Status:** Wired as Trade Desk default **`selective`** — **v1.3.63:** Trap SL50/TP200 · ≤4/day · day lock ₹1k (doc **46**). Experiments keeps All-Green in picker.  
 **Script:** `scripts/crude-selective-hunt.py`  
 **Artifact:** `reports/crude-selective/summary.json` (gitignored)  
 **Data:** MCX `crudeoilm-5m-merged.json` · 2026-03-23 → 2026-08-03 · ₹10/pt · charge model **₹50/roundtrip**

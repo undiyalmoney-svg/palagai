@@ -2117,7 +2117,7 @@ export class PaperTradeDeskService {
               : 'Preview ATM (spot fallback) · Selective',
           tradesToday: 0,
           strategyId: 'crude-selective',
-          strategyName: 'Selective (SL30/TP60 · unlimited)',
+          strategyName: 'Selective (Trap SL50/TP200 · ≤4 · lock ₹1k)',
         }),
       );
     }

@@ -37,7 +37,8 @@ Those two files are the product “secret sauce.” Docs 01–03 expand them **l
 20. Use **42** for **Daily profit upgrade re-hunt** — Trap peak-trail arm₹400 + Crude Selective (now unlimited in v1.3.62).  
 21. Use **43** for **1-lot Daily ₹1k–₹3k** — Trap pierce10 · peak₹150 · soft OFF · Crude SL30/TP60 · lots 1/1/1 (~89% ≥₹1k).  
 22. Use **44** for **missed CE/PE audit** (Aug 3–4) — confirm fails vs exact 1-lot ₹ vs friend 3k/4k.  
-23. Use **45** for **Trap wide-range days** (Jul 28–31 vs Aug 3–4) — OR-scaled bounce pierce / Bank pierce; do not kill confirm. Peak trail hold-longer (arm₹400) in v1.3.61.
+23. Use **45** for **Trap wide-range days** (Jul 28–31 vs Aug 3–4) — OR-scaled bounce pierce / Bank pierce; do not kill confirm. Peak trail hold-longer (arm₹400) in v1.3.61.  
+24. Use **46** for **Crude min-trade max-profit** — Trap SL50/TP200 · ≤4/day · day lock ₹1k (v1.3.63).
 
 ## Not in the deploy
 Angular assets come from `src/` + `public/` only (`angular.json`).  

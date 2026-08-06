@@ -121,7 +121,7 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
         channel: 'crude' as const,
         id: 'crude-selective',
         name: 'Selective',
-        maxTradesLabel: 'unlimited · SL30/TP60',
+        maxTradesLabel: '≤4 · SL50/TP200 · lock ₹1k',
       },
       natgas: {
         id: 'natgas-daily-profit-ng',
@@ -315,7 +315,7 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
       this.enableNifty ? `Nifty 50 ×${this.niftyLots}` : null,
       this.enableBank ? `Bank Nifty ×${this.bankLots}` : null,
       this.enableCrude && this.showCrude()
-        ? `Crude Oil Mini ×${this.crudeLots} (Selective · SL30/TP60 · unlimited)`
+        ? `Crude Oil Mini ×${this.crudeLots} (Selective · Trap SL50/TP200 · ≤4 · lock ₹1k)`
         : null,
       this.enableNatGas && this.showNatGas()
         ? `Natural Gas Mini ×${this.natGasLots} (Daily Profit NG)`
