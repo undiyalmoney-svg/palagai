@@ -1489,6 +1489,11 @@
   color: var(--muted);
 }
 
+.est-tag {
+  font-weight: 700;
+  color: #b45309;
+}
+
 .trade-card-exit {
   margin: 0.45rem 0 0;
   font-size: 0.8rem;

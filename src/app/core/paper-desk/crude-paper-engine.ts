@@ -19,6 +19,7 @@ import {
   runCrudeTrapConfirm,
 } from '../strategy-engine/strategies/crude-trap-confirm/crude-trap-confirm.evaluator';
 import { runCrudeSessionOr } from '../strategy-engine/strategies/crude-session-or/crude-session-or.evaluator';
+import { estimatedPremiumMove } from './option-delta.util';
 import {
   CrudeTradeParams,
   resolveCrudeStrategyProfile,
@@ -204,9 +205,13 @@ function lookupPremium(
   return edge === 'entry' ? best.open : best.close;
 }
 
-/** MCX Crude options ≈ 1.0Δ (not NFO 0.5) when option candles are missing. */
+/**
+ * Premium move when option candles are missing.
+ * Measured ATM Crude mini delta ≈ 0.55 (Kite 5m, 2026-08-06) — the old 1.0
+ * made a 50-pt SL read as −₹500 instead of about −₹275.
+ */
 function estimatePremiumMove(points: number): number {
-  return points * 1;
+  return estimatedPremiumMove(points, 'crude-oil-mini');
 }
 
 let tradeSeq = 0;
@@ -236,17 +241,15 @@ function closePaperTrade(params: {
       params.exitTime,
       'exit',
     );
-    if (open.optionEntryPremium != null && optionExitPremium != null) {
+    if (open.optionEntryPremium != null && optionExitPremium != null && !premiumEstimated) {
       optionPnlRs =
         (optionExitPremium - open.optionEntryPremium) * open.option.lotSize * lots;
       premiumEstimated = false;
     } else {
-      // Do NOT invent option ₹ from fut pts (SL50 → fake −₹500). That number is
-      // Index proxy, not money — it made Crude look red while Kite CE was green.
       const estMove = estimatePremiumMove(indexPoints);
       const entryPx = open.optionEntryPremium ?? Math.max(10, Math.abs(estMove) + 20);
       optionExitPremium = entryPx + estMove;
-      optionPnlRs = null;
+      optionPnlRs = estMove * open.option.lotSize * lots;
       premiumEstimated = true;
     }
   }
@@ -684,34 +687,41 @@ export function enrichCrudeTradesWithOptionPremiums(
     if (!t.option) {
       return t;
     }
-    const entry =
-      lookupPremium(optionCandlesByToken.get(t.option.instrumentToken), t.entryTime, 'entry') ??
-      t.optionEntryPremium;
-    const exit =
-      lookupPremium(optionCandlesByToken.get(t.option.instrumentToken), t.exitTime, 'exit') ??
-      t.optionExitPremium;
-    if (entry != null && exit != null) {
-      const optionPnlRs = (exit - entry) * t.option.lotSize * lots;
+    const entryHit = lookupPremium(
+      optionCandlesByToken.get(t.option.instrumentToken),
+      t.entryTime,
+      'entry',
+    );
+    const exitHit = lookupPremium(
+      optionCandlesByToken.get(t.option.instrumentToken),
+      t.exitTime,
+      'exit',
+    );
+    // Both sides must come from real candles — never mix estimate + OHLC.
+    // Falling back to the trade's own fabricated premiums used to relabel an
+    // estimate as real money (premiumEstimated: false) and hid the guess.
+    if (entryHit != null && exitHit != null) {
+      const optionPnlRs = (exitHit - entryHit) * t.option.lotSize * lots;
       return {
         ...t,
-        optionEntryPremium: entry,
-        optionExitPremium: exit,
+        optionEntryPremium: entryHit,
+        optionExitPremium: exitHit,
         optionPnlRs,
         premiumEstimated: false,
         outcome: optionPnlRs > 0 ? 'WIN' : optionPnlRs < 0 ? 'LOSS' : 'FLAT',
       };
     }
     const estMove = estimatePremiumMove(t.indexPoints);
-    const entryPx = entry ?? Math.max(10, Math.abs(estMove) + 20);
-    const exitPx = exit ?? entryPx + estMove;
-    // Missing option bars → keep fut narrative, but leave Profit ₹ empty.
-    // Fake (exit−entry)×lot from Index pts was the “Crude −₹500 loss” lie.
+    const entryPx = entryHit ?? t.optionEntryPremium ?? Math.max(10, Math.abs(estMove) + 20);
+    const exitPx = entryPx + estMove;
+    const estPnl = estMove * t.option.lotSize * lots;
     return {
       ...t,
       optionEntryPremium: entryPx,
       optionExitPremium: exitPx,
-      optionPnlRs: null,
+      optionPnlRs: estPnl,
       premiumEstimated: true,
+      outcome: estPnl > 0 ? 'WIN' : estPnl < 0 ? 'LOSS' : 'FLAT',
     };
   });
 }

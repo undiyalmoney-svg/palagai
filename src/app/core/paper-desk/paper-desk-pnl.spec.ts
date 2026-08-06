@@ -7,6 +7,7 @@ import {
 } from './paper-desk-engine';
 import { PaperTrade } from './paper-desk.models';
 import { Candle } from '../models/candle.model';
+import { ATM_OPTION_DELTA } from './option-delta.util';
 
 function optCandle(date: string, o: number, h: number, l: number, c: number): Candle {
   return { date, open: o, high: h, low: l, close: c, volume: 1 };
@@ -143,8 +144,8 @@ describe('enrichTradesWithOptionPremiums', () => {
       1,
     );
     expect(out!.premiumEstimated).toBe(true);
-    // Money = pts × ₹65 (index proxy), not recovered bar close
-    expect(out!.optionPnlRs).toBe(-30 * 65);
+    // Money = pts × ATM delta × lot, not the recovered bar close
+    expect(out!.optionPnlRs).toBeCloseTo(-30 * ATM_OPTION_DELTA.nifty * 65, 6);
   });
 
   it('forces estimate for synthetic contracts (historical missing week)', () => {
@@ -168,7 +169,7 @@ describe('enrichTradesWithOptionPremiums', () => {
       1,
     );
     expect(out!.premiumEstimated).toBe(true);
-    expect(out!.optionPnlRs).toBe(40 * 65);
+    expect(out!.optionPnlRs).toBeCloseTo(40 * ATM_OPTION_DELTA.nifty * 65, 6);
   });
 
   it('does NOT borrow a stale prior-day bar', () => {
@@ -189,7 +190,7 @@ describe('enrichTradesWithOptionPremiums', () => {
       1,
     );
     expect(out!.premiumEstimated).toBe(true);
-    expect(out!.optionPnlRs).toBeCloseTo(24.4 * 65, 6);
+    expect(out!.optionPnlRs).toBeCloseTo(24.4 * ATM_OPTION_DELTA.nifty * 65, 6);
   });
 
   it('REGRESSION: far-week OHLC must not mint ~₹28k on +24 index pts', () => {
@@ -225,8 +226,7 @@ describe('enrichTradesWithOptionPremiums', () => {
     );
     const out = enrichTradesWithOptionPremiums(trades, candles, 1);
     const optionNet = out.reduce((a, t) => a + (t.optionPnlRs ?? 0), 0);
-    // 20 * 1.22 * 65 ≈ 1586
-    expect(optionNet).toBeCloseTo(20 * 1.22 * 65, 6);
+    expect(optionNet).toBeCloseTo(20 * 1.22 * ATM_OPTION_DELTA.nifty * 65, 6);
     expect(optionNet).toBeLessThan(5000);
     expect(out.every((t) => t.premiumEstimated)).toBe(true);
   });
@@ -250,7 +250,7 @@ describe('enrichTradesWithOptionPremiums', () => {
     expect(out!.optionPnlRs).toBe(computeOptionPnl({ entryPremium: 74, exitPremium: 82, lotSize: 65, lots: 1 }));
   });
 
-  it('REGRESSION: all-estimated Nifty+Bank matches Index ₹ proxy (no green option on red money)', () => {
+  it('REGRESSION: all-estimated Nifty+Bank stays red, sized by ATM delta not index proxy', () => {
     const trades = [
       trade({
         id: 'a',
@@ -285,8 +285,29 @@ describe('enrichTradesWithOptionPremiums', () => {
     ];
     const out = enrichTradesWithOptionPremiums(trades, new Map(), 1);
     const optionNet = out.reduce((a, t) => a + (t.optionPnlRs ?? 0), 0);
+    // Long CE/PE never loses the full index-proxy amount — ATM delta is ~0.3–0.41.
     const proxy = -80 * 65 + -23.9 * 30;
-    expect(optionNet).toBeCloseTo(proxy, 6);
+    const expected =
+      -80 * ATM_OPTION_DELTA.nifty * 65 + -23.9 * ATM_OPTION_DELTA.bank * 15;
+    expect(optionNet).toBeCloseTo(expected, 6);
     expect(optionNet).toBeLessThan(0);
+    expect(optionNet).toBeGreaterThan(proxy);
+    expect(out.every((t) => t.premiumEstimated)).toBe(true);
+  });
+
+  it('estimated legs never claim to be real premiums (no laundering)', () => {
+    const [out] = enrichTradesWithOptionPremiums(
+      [
+        trade({
+          instrumentId: 'nifty-50',
+          optionEntryPremium: 120,
+          optionExitPremium: 60,
+          premiumEstimated: true,
+        }),
+      ],
+      new Map(),
+      1,
+    );
+    expect(out!.premiumEstimated).toBe(true);
   });
 });

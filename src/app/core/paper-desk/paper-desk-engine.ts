@@ -18,6 +18,11 @@ import {
 } from './paper-desk.models';
 import { applyChargesToOptionTrade } from './trade-charges.util';
 import {
+  BOOK_LOT_SIZE,
+  bookForInstrumentId,
+  estimatedPremiumMove,
+} from './option-delta.util';
+import {
   IManagedStrategy,
   ManagedOpenPosition,
   ManagedStrategySignal,
@@ -261,20 +266,14 @@ export function applyEstimatedOptionPnl(params: {
   instrumentId?: string | null;
 }): { entry: number; exit: number; pnl: number } {
   const lots = Math.max(1, Math.floor(params.lots) || 1);
-  const rpp = rupeesPerPointForInstrument(params.instrumentId);
-  // Keep lotSize as fallback when instrument id unknown (crude etc.).
-  const moneyPerPt =
-    params.instrumentId != null && String(params.instrumentId).length > 0
-      ? rpp
-      : params.lotSize > 0
-        ? params.lotSize
-        : rpp;
-  const pnl = params.indexPoints * moneyPerPt * lots;
-  const estMove = moneyPerPt !== 0 ? pnl / (moneyPerPt * lots) : 0; // = indexPoints
-  // Synthetic premiums for UI only — money comes from pnl above.
-  const premiumMove = estMove * 0.5;
+  // Option money = premium move × contract size, NOT index ₹ proxy.
+  // Delta 1.0 (old behaviour) made estimated legs ~2.5× too big in both directions.
+  const premiumMove = estimatedPremiumMove(params.indexPoints, params.instrumentId);
+  const lotSize =
+    params.lotSize > 0 ? params.lotSize : BOOK_LOT_SIZE[bookForInstrumentId(params.instrumentId)];
   const entry = params.entryPremium ?? Math.max(10, Math.abs(premiumMove) + 20);
   const exit = entry + premiumMove;
+  const pnl = premiumMove * lotSize * lots;
   return { entry, exit, pnl };
 }
 

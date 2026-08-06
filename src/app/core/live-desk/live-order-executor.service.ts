@@ -7,6 +7,10 @@ import { PaperOptionContract } from '../paper-desk/paper-desk.models';
 import { liveOpenMatchesBroker } from './live-open-match.util';
 import { resolveExitSellQty } from './live-exit-guard.util';
 import { computeProtectiveSlTrigger } from './option-sl-premium.util';
+import {
+  mergeSummaryRows,
+  summaryRowsFromKiteOrderBook,
+} from './kite-order-book-fills.util';
 
 export interface LiveBrokerPosition {
   instrumentId: string;
@@ -207,6 +211,31 @@ export class LiveOrderExecutorService {
 
   getOrderSummary(): LiveOrderSummaryRow[] {
     return [...this.summary.values()].sort((a, b) => b.at.localeCompare(a.at));
+  }
+
+  /**
+   * Pull today's PALAGAI fills back from Kite so a refresh/restart cannot drop
+   * earlier legs out of Profit ₹. Kite order book is the record of truth.
+   */
+  async importFillsFromBroker(authorization: string): Promise<number> {
+    const orders = await this.fetchOrders(authorization);
+    if (!orders.length) {
+      return 0;
+    }
+    const brokerRows = summaryRowsFromKiteOrderBook(orders, this.instrumentNames);
+    if (!brokerRows.length) {
+      return 0;
+    }
+    const merged = mergeSummaryRows([...this.summary.values()], brokerRows);
+    let added = 0;
+    for (const row of merged) {
+      const key = row.orderId || row.id;
+      if (!this.summary.has(key)) {
+        added += 1;
+      }
+      this.summary.set(key, row);
+    }
+    return added;
   }
 
   /**

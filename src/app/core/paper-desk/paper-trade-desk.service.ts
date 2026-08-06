@@ -1880,6 +1880,12 @@ export class PaperTradeDeskService {
       }
 
       const nameById = new Map(statuses.map((s) => [s.instrumentId, s.instrumentName] as const));
+      // Read today's fills back from Kite — session memory alone loses legs on refresh.
+      try {
+        await this.liveOrders.importFillsFromBroker(authorization);
+      } catch {
+        // Keep session rows; Profit ₹ still shows what we know.
+      }
       // Kite fill pairs are Profit ₹ truth — including CE wins desk replay never built.
       enriched = syncTradesToKiteFills(
         enriched,

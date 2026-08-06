@@ -855,7 +855,14 @@
           @if (snapshot().realOrders) {
             Profit ₹ = Kite fill money (same as Positions). Desk PE ghosts stay hidden.
           } @else {
-            Profit ₹ = real option premium only — not fut SL proxy (−₹500).
+            Profit ₹ = option premium × lot.
+            @if (resultView().totals.premiumEstimatedCount) {
+              {{ resultView().totals.premiumEstimatedCount }} of
+              {{ resultView().totals.trades }} leg(s) estimated at ATM delta (no option bars) —
+              marked <em>est.</em>
+            } @else {
+              All legs priced from real option bars.
+            }
           }
         </p>
         <button
@@ -904,6 +911,9 @@
                   >{{ t.optionEntryPremium | number: '1.2-2' }} →
                   {{ t.optionExitPremium | number: '1.2-2' }}</span
                 >
+              }
+              @if (t.premiumEstimated) {
+                <span class="est-tag">est. — no option bars</span>
               }
             </div>
             <p class="trade-card-exit">{{ t.exitReason }}</p>
