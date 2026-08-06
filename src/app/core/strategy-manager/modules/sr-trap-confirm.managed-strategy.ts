@@ -24,7 +24,7 @@ import {
 
 /**
  * S/R Trap + Confirm — default Nifty/Bank Paper+Live.
- * Daily-fill DNA: pierce15 · Bank30 · bounce OR · peak₹400 · soft OFF · 2R.
+ * Monster 5-day-green DNA: pierce15 · Bank30 · bounce OR · peak₹150 · ≤2/day · 2R.
  */
 @Injectable({ providedIn: 'root' })
 export class SrTrapConfirmManagedStrategy implements IManagedStrategy {
@@ -32,7 +32,7 @@ export class SrTrapConfirmManagedStrategy implements IManagedStrategy {
   readonly name = 'Trap';
   readonly version = '1.1.0';
   readonly description =
-    'Default · Trap confirm · pierce15 · Bank pierce30 · OR bounce · 2R · peak₹400 · soft OFF · daily fills.';
+    'Default · Trap confirm · pierce15 · Bank pierce30 · OR bounce · 2R · peak₹150 · ≤2/day · soft OFF.';
   readonly supports: readonly DeskChannel[] = ['nifty', 'bank'];
 
   readonly defaultSettings = defaultStrategySettings({
@@ -43,9 +43,9 @@ export class SrTrapConfirmManagedStrategy implements IManagedStrategy {
     stopLossPts: 30,
     bankStopLossPts: 50,
     emaLength: 50,
-    maxTradesPerDay: 0,
+    maxTradesPerDay: 2,
     instrumentType: 'futures',
-    dayStopPts: 80,
+    dayStopPts: 40,
     dayProfitLockPts: 0,
     targetRMultiple: 2,
     profitProtectEnabled: true,
@@ -63,12 +63,12 @@ export class SrTrapConfirmManagedStrategy implements IManagedStrategy {
       slPadPts: 2,
       minConfirmBody: 0,
       /**
-       * Daily-fill DNA: pierce15 · Bank30 · bounce OR×0.25/cap40
-       * · peak₹400 · soft OFF · confirm ON — entries daily, winners hold longer.
+       * Monster 5-day-green (doc 47): pierce15 · Bank30 · bounce OR
+       * · peak₹150 · ≤2/day · soft OFF — max rolling-5 all-green rate.
        */
-      profitLockArmRs: 400,
-      profitLockLockRs: 200,
-      profitLockGivebackRs: 200,
+      profitLockArmRs: 150,
+      profitLockLockRs: 75,
+      profitLockGivebackRs: 75,
       slConfirmCutoffEnabled: false,
       slConfirmCutoffFracR: 0,
       slConfirmCutoffMaxMfeR: 0,

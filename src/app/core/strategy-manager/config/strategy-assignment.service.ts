@@ -20,10 +20,10 @@ import { StrategySettings } from '../models/strategy-settings.model';
 import { StrategyRegistryService } from '../registry/strategy-registry.service';
 
 /**
- * v26 — Trap hold-longer: peak arm₹400/200/200 (was 150/75/75 rocket cut&rehunt).
- * Keeps pierce15 · Bank30 · bounce OR. Drops v25 so tight peak DNA cannot stick.
+ * v27 — Monster 5-day-green: peak₹150 · ≤2/day · dayStop40 (doc 47).
+ * Drops v26 so peak400 hold-longer cannot stick when green-week DNA wins.
  */
-const STORAGE_KEY = 'palagai_strategy_assignments_v26';
+const STORAGE_KEY = 'palagai_strategy_assignments_v27';
 const LEGACY_STORAGE_KEYS = [
   'palagai_strategy_assignments_v1',
   'palagai_strategy_assignments_v2',
@@ -50,6 +50,7 @@ const LEGACY_STORAGE_KEYS = [
   'palagai_strategy_assignments_v23',
   'palagai_strategy_assignments_v24',
   'palagai_strategy_assignments_v25',
+  'palagai_strategy_assignments_v26',
 ] as const;
 
 export interface ChannelAssignment {

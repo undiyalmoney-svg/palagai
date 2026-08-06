@@ -3,12 +3,13 @@ import { SrTrapConfirmManagedStrategy } from './sr-trap-confirm.managed-strategy
 import { DEFAULT_CHANNEL_ASSIGNMENTS, MANAGED_STRATEGY_IDS } from '../config/managed-strategy-ids';
 
 describe('SrTrapConfirmManagedStrategy', () => {
-  it('is indices default with daily-fill DNA (pierce15 · Bank30 · OR bounce · peak₹400 · 2R)', () => {
+  it('is indices default with monster 5-day-green DNA (pierce15 · Bank30 · peak₹150 · ≤2 · 2R)', () => {
     const s = new SrTrapConfirmManagedStrategy();
     s.initialize();
     expect(s.id).toBe(MANAGED_STRATEGY_IDS.SR_TRAP_CONFIRM);
     expect(s.name).toContain('Trap');
-    expect(s.getSettings().maxTradesPerDay).toBe(0);
+    expect(s.getSettings().maxTradesPerDay).toBe(2);
+    expect(s.getSettings().dayStopPts).toBe(40);
     expect(s.getSettings().targetRMultiple).toBe(2);
     expect(s.getSettings().profitProtectEnabled).toBe(true);
     expect(s.getSettings().profitProtectArmR).toBe(1);
@@ -17,9 +18,9 @@ describe('SrTrapConfirmManagedStrategy', () => {
     expect(s.getSettings().extras['bankPiercePts']).toBe(30);
     expect(s.getSettings().extras['bounceOrPierceMult']).toBe(0.25);
     expect(s.getSettings().extras['bounceOrPierceCap']).toBe(40);
-    expect(s.getSettings().extras['profitLockArmRs']).toBe(400);
-    expect(s.getSettings().extras['profitLockLockRs']).toBe(200);
-    expect(s.getSettings().extras['profitLockGivebackRs']).toBe(200);
+    expect(s.getSettings().extras['profitLockArmRs']).toBe(150);
+    expect(s.getSettings().extras['profitLockLockRs']).toBe(75);
+    expect(s.getSettings().extras['profitLockGivebackRs']).toBe(75);
     expect(s.getSettings().extras['slConfirmCutoffEnabled']).toBe(false);
     expect(s.supports).toContain('nifty');
     expect(s.supports).toContain('bank');
