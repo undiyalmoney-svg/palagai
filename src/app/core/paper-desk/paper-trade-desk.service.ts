@@ -43,7 +43,7 @@ import {
   enrichCrudeTradesWithOptionPremiums,
   replayPaperOnCrude,
 } from './crude-paper-engine';
-import { applyKiteFillPnl } from './apply-kite-fill-pnl';
+import { applyKiteFillPnl, deskLegHasKiteEntry } from './apply-kite-fill-pnl';
 import { enrichTradesWithCharges } from './trade-charges.util';
 import { buildPaperDeskDayStats, emptyPaperDeskDayStats } from './paper-desk-day-stats';
 import { MAX_OPTION_HISTORY_TOKENS, rankTokensByFrequency } from './option-history-tokens.util';
@@ -1955,17 +1955,30 @@ export class PaperTradeDeskService {
     }
   }
 
-  /** Event-log desk closed legs that never matched a Kite ENTRY+EXIT/SL pair. */
+  /**
+   * Event-log desk closed legs that never got a Kite ENTRY fill.
+   * Dedup by instrument+entryTime+symbol (not trade.id — replay mints a new id each tick).
+   * Do not SKIP when order book already has COMPLETE ENTRY for that symbol
+   * (onKite needs ENTRY+EXIT pair for Profit ₹; entry-only is not a miss).
+   */
   private logDeskOnlyLegsNotOnKite(trades: PaperTrade[]): void {
     if (!this.realOrders) {
       return;
     }
+    const orderSummary = this.liveOrders.getOrderSummary();
     for (const t of trades) {
       if (t.onKite) {
         continue;
       }
-      const key = `desk-only:${t.id}`;
+      const symbol = t.option?.tradingSymbol ?? '';
+      // Stable across full-day replays; trade.id is pt-${seq}-${exit} and changes every poll.
+      const key = `desk-only:${t.instrumentId}|${t.entryTime}|${t.direction}|${symbol}`;
       if (this.loggedDeskOnlyTradeIds.has(key)) {
+        continue;
+      }
+      if (deskLegHasKiteEntry(t, orderSummary)) {
+        // Entry reached Kite; exit fill not paired yet (or still open). Not a miss.
+        this.loggedDeskOnlyTradeIds.add(key);
         continue;
       }
       this.loggedDeskOnlyTradeIds.add(key);
@@ -1973,9 +1986,9 @@ export class PaperTradeDeskService {
         instrumentId: t.instrumentId,
         instrumentName: t.instrumentName,
         detail:
-          `Desk signal ${t.direction} ${t.option?.tradingSymbol ?? 'ATM'} ` +
+          `Desk signal ${t.direction} ${symbol || 'ATM'} ` +
           `${t.entryTime.slice(11, 16)}→${t.exitTime.slice(11, 16)} never reached Kite ` +
-          `(blocked, or opened&closed between ticks). Not counted in Profit ₹.`,
+          `(blocked, late Start after bar, or miss). Not counted in Profit ₹.`,
         tradingSymbol: t.option?.tradingSymbol,
       });
     }

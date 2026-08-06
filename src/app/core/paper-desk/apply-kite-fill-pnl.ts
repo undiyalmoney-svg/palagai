@@ -148,3 +148,23 @@ function pairKey(instrumentId: string, index: number): string {
 function roundPaise(value: number): number {
   return Math.round(value * 100) / 100;
 }
+
+/**
+ * True when the Live money order book already has a COMPLETE ENTRY fill for this
+ * desk leg's instrument (and symbol when known). Used so Event log SKIP does not
+ * claim "never reached Kite" while ENTRY is on the book but EXIT not paired yet.
+ */
+export function deskLegHasKiteEntry(
+  trade: Pick<PaperTrade, 'instrumentId' | 'option'>,
+  orderSummary: KiteFillOrderRow[],
+): boolean {
+  const symbol = trade.option?.tradingSymbol ?? '';
+  return orderSummary.some(
+    (r) =>
+      r.instrumentId === trade.instrumentId &&
+      isComplete(r.status) &&
+      r.leg === 'ENTRY' &&
+      hasAvg(r) &&
+      (!symbol || !r.tradingSymbol || r.tradingSymbol === symbol),
+  );
+}

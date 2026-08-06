@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyKiteFillPnl } from './apply-kite-fill-pnl';
+import { applyKiteFillPnl, deskLegHasKiteEntry } from './apply-kite-fill-pnl';
 import { PaperTrade } from './paper-desk.models';
 
 function trade(partial: Partial<PaperTrade> & Pick<PaperTrade, 'id' | 'instrumentId'>): PaperTrade {
@@ -135,5 +135,27 @@ describe('applyKiteFillPnl', () => {
     ]);
     // (461.7 − 440) × 15 = 325.5
     expect(out[0]!.optionPnlRs).toBe(325.5);
+  });
+
+  it('deskLegHasKiteEntry is true for ENTRY-only fills (not a miss)', () => {
+    const t = trade({ id: 't1', instrumentId: 'nifty' });
+    expect(
+      deskLegHasKiteEntry(t, [
+        {
+          instrumentId: 'nifty',
+          tradingSymbol: 'NIFTY2572323900PE',
+          quantity: 65,
+          leg: 'ENTRY',
+          status: 'COMPLETE',
+          averagePrice: 160,
+          at: '2026-07-23T10:00:00.000Z',
+        },
+      ]),
+    ).toBe(true);
+  });
+
+  it('deskLegHasKiteEntry is false when no ENTRY fill exists', () => {
+    const t = trade({ id: 't1', instrumentId: 'nifty' });
+    expect(deskLegHasKiteEntry(t, [])).toBe(false);
   });
 });
