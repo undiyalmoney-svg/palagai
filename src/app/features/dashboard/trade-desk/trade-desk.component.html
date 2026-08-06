@@ -6,7 +6,8 @@
       <p class="pg-lede">
         @if (showCrude() || showNatGas()) {
           Nifty, Bank, Crude &amp; Nat Gas Mini — Strat for indices; Crude
-          <strong>Selective</strong> (Trap SL50/TP200 · unlimited · 10:00–23:00); Nat Gas
+          <strong>Selective</strong> (Trap SL50/TP200 · unlimited · 10:00–23:00). Always
+          <strong>buy</strong> CE/PE (fut BUY→long CE, fut SELL→long PE) — never short options. Nat Gas
           <strong>Daily Profit (NG)</strong>. Index until 15:15 · MCX continues evening.
         } @else {
           Nifty &amp; Bank Nifty — Strat for indices. Session until 15:15.
@@ -875,7 +876,7 @@
                   >{{ fmtWeekday(t.entryTime) }} · {{ fmtClock(t.entryTime) }} →
                   {{ fmtClock(t.exitTime) }}
                   ·
-                  <span class="dir" [attr.data-dir]="t.direction">{{ t.direction }}</span></small
+                  <span class="dir" [attr.data-dir]="t.direction">{{ optionLegLabel(t) }}</span></small
                 >
               </div>
               <div
@@ -938,13 +939,13 @@
                 </td>
                 <td>{{ t.instrumentName }}</td>
                 <td>
-                  <span class="dir" [attr.data-dir]="t.direction">{{ t.direction }}</span>
+                  <span class="dir" [attr.data-dir]="t.direction">{{ optionLegLabel(t) }}</span>
                 </td>
                 <td>
                   @if (t.option; as opt) {
                     <div class="stack">
                       <strong>{{ opt.tradingSymbol }}</strong>
-                      <small>{{ opt.optionType }} · {{ opt.strike | number: '1.0-0' }}</small>
+                      <small>bought {{ opt.optionType }} · {{ opt.strike | number: '1.0-0' }}</small>
                     </div>
                   } @else {
                     <span class="muted">—</span>

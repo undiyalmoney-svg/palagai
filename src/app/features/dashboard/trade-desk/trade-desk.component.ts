@@ -637,6 +637,21 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
     const opt = this.tradeProfitRs(t);
     return t.indexPoints * opt < 0;
   }
+
+  /**
+   * Closed-leg side label — desk always buys the option (long CE/PE).
+   * Bare "SELL" next to a PE looked like a short; premium drop then looked "should be green".
+   */
+  protected optionLegLabel(t: {
+    direction: 'BUY' | 'SELL';
+    option?: { optionType?: 'CE' | 'PE' | string } | null;
+  }): string {
+    const ot = (t.option?.optionType ?? '').toUpperCase();
+    if (ot === 'CE' || ot === 'PE') {
+      return `Long ${ot} · fut ${t.direction}`;
+    }
+    return t.direction === 'BUY' ? 'Long CE · fut BUY' : 'Long PE · fut SELL';
+  }
 }
 
 function todayIso(): string {
