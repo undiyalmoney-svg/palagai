@@ -32,16 +32,18 @@ export const PROTECTION_DNA_EXTRAS: Record<string, number | boolean> = {
 };
 
 /**
- * Daily-fill Trap DNA (doc 43 + 45): more Nifty/Bank entries every session.
- * pierce15 · Bank pierce30 · bounce OR×0.25/cap40 · peak₹150 · soft OFF · confirm ON.
+ * Daily-fill Trap DNA (doc 43 + 45 + hold-longer): more Nifty/Bank entries,
+ * without rocket-speed cut&rehunt on ₹75 givebacks.
+ * pierce15 · Bank pierce30 · bounce OR×0.25/cap40 · peak₹400 · soft OFF · confirm ON.
  * Forced only on Trap.
  */
 export const TRAP_1LOT_DAILY_DNA_EXTRAS: Record<string, number | boolean | string> = {
   piercePts: 15,
   bankPiercePts: 30,
-  profitLockArmRs: 150,
-  profitLockLockRs: 75,
-  profitLockGivebackRs: 75,
+  /** Doc 42 protect DNA — arm later so winners breathe (was 150/75/75 rapid fire). */
+  profitLockArmRs: 400,
+  profitLockLockRs: 200,
+  profitLockGivebackRs: 200,
   slConfirmCutoffEnabled: false,
   slConfirmCutoffFracR: 0,
   slConfirmCutoffMaxMfeR: 0,

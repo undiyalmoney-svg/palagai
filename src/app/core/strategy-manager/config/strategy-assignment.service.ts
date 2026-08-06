@@ -20,10 +20,10 @@ import { StrategySettings } from '../models/strategy-settings.model';
 import { StrategyRegistryService } from '../registry/strategy-registry.service';
 
 /**
- * v25 — Daily-fill Trap: pierce15 · Bank pierce30 · bounce OR 0.25/cap40 (doc 45).
- * Drops v24 so quieter pierce10 DNA cannot stick.
+ * v26 — Trap hold-longer: peak arm₹400/200/200 (was 150/75/75 rocket cut&rehunt).
+ * Keeps pierce15 · Bank30 · bounce OR. Drops v25 so tight peak DNA cannot stick.
  */
-const STORAGE_KEY = 'palagai_strategy_assignments_v25';
+const STORAGE_KEY = 'palagai_strategy_assignments_v26';
 const LEGACY_STORAGE_KEYS = [
   'palagai_strategy_assignments_v1',
   'palagai_strategy_assignments_v2',
@@ -49,6 +49,7 @@ const LEGACY_STORAGE_KEYS = [
   'palagai_strategy_assignments_v22',
   'palagai_strategy_assignments_v23',
   'palagai_strategy_assignments_v24',
+  'palagai_strategy_assignments_v25',
 ] as const;
 
 export interface ChannelAssignment {

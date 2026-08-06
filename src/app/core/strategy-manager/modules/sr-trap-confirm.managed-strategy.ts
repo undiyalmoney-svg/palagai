@@ -24,7 +24,7 @@ import {
 
 /**
  * S/R Trap + Confirm — default Nifty/Bank Paper+Live.
- * Daily-fill DNA (doc 45): pierce15 · Bank30 · bounce OR · peak₹150 · soft OFF · 2R.
+ * Daily-fill DNA: pierce15 · Bank30 · bounce OR · peak₹400 · soft OFF · 2R.
  */
 @Injectable({ providedIn: 'root' })
 export class SrTrapConfirmManagedStrategy implements IManagedStrategy {
@@ -32,7 +32,7 @@ export class SrTrapConfirmManagedStrategy implements IManagedStrategy {
   readonly name = 'Trap';
   readonly version = '1.1.0';
   readonly description =
-    'Default · Trap confirm · pierce15 · Bank pierce30 · OR bounce · 2R · peak₹150 · soft OFF · daily fills.';
+    'Default · Trap confirm · pierce15 · Bank pierce30 · OR bounce · 2R · peak₹400 · soft OFF · daily fills.';
   readonly supports: readonly DeskChannel[] = ['nifty', 'bank'];
 
   readonly defaultSettings = defaultStrategySettings({
@@ -63,12 +63,12 @@ export class SrTrapConfirmManagedStrategy implements IManagedStrategy {
       slPadPts: 2,
       minConfirmBody: 0,
       /**
-       * Daily-fill DNA (doc 45): pierce15 · Bank30 · bounce OR×0.25/cap40
-       * · peak₹150 · soft OFF · confirm ON — fewer silent Nifty/Bank days.
+       * Daily-fill DNA: pierce15 · Bank30 · bounce OR×0.25/cap40
+       * · peak₹400 · soft OFF · confirm ON — entries daily, winners hold longer.
        */
-      profitLockArmRs: 150,
-      profitLockLockRs: 75,
-      profitLockGivebackRs: 75,
+      profitLockArmRs: 400,
+      profitLockLockRs: 200,
+      profitLockGivebackRs: 200,
       slConfirmCutoffEnabled: false,
       slConfirmCutoffFracR: 0,
       slConfirmCutoffMaxMfeR: 0,

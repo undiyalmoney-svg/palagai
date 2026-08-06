@@ -323,7 +323,7 @@ export function srTrapExitLogic(
   settings: StrategySettings,
   ctx: StrategyContext,
 ): ManagedExitDecision | null {
-  // Research: after ~₹600+ peak, trail (≤₹300 giveback) → cut & rehunt.
+  // Peak-trail DNA (extras): arm → lock floor → cut & rehunt on giveback.
   const armed = armPeakTrailFloor(candle, open, settings, ctx.instrumentId ?? '');
   // Research: briefly-green SL confirm (MFE < 0.75R + 0.55R / ₹700 soft).
   const cutoff = applySlConfirmCutoff(candle, open, settings, ctx.instrumentId ?? '');

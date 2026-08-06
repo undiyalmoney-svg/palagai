@@ -96,4 +96,4 @@ Early-start Live bug: index legs only load if index already open at Start. Silen
 
 1. **Shipped in v1.3.56:** Rec A bounce OR + Live deferred Start.  
 2. **Shipped in v1.3.59:** Rec A+B combined for daily fills — `piercePts=15` · `bankPiercePts=30` · `bounceOrPierceMult=0.25` · `cap=40` · strat storage **v25**.  
-3. Keep confirm ON · peak150 softOFF · RR2 · lots 1/1/1.
+3. **Shipped in v1.3.61:** peak trail **150/75/75 → 400/200/200** (hold longer; stop rocket cut&rehunt) · soft OFF · confirm ON · strat storage **v26**.

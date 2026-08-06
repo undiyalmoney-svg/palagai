@@ -3,7 +3,7 @@ import { SrTrapConfirmManagedStrategy } from './sr-trap-confirm.managed-strategy
 import { DEFAULT_CHANNEL_ASSIGNMENTS, MANAGED_STRATEGY_IDS } from '../config/managed-strategy-ids';
 
 describe('SrTrapConfirmManagedStrategy', () => {
-  it('is indices default with daily-fill DNA (pierce15 · Bank30 · OR bounce · peak₹150 · 2R)', () => {
+  it('is indices default with daily-fill DNA (pierce15 · Bank30 · OR bounce · peak₹400 · 2R)', () => {
     const s = new SrTrapConfirmManagedStrategy();
     s.initialize();
     expect(s.id).toBe(MANAGED_STRATEGY_IDS.SR_TRAP_CONFIRM);
@@ -17,9 +17,9 @@ describe('SrTrapConfirmManagedStrategy', () => {
     expect(s.getSettings().extras['bankPiercePts']).toBe(30);
     expect(s.getSettings().extras['bounceOrPierceMult']).toBe(0.25);
     expect(s.getSettings().extras['bounceOrPierceCap']).toBe(40);
-    expect(s.getSettings().extras['profitLockArmRs']).toBe(150);
-    expect(s.getSettings().extras['profitLockLockRs']).toBe(75);
-    expect(s.getSettings().extras['profitLockGivebackRs']).toBe(75);
+    expect(s.getSettings().extras['profitLockArmRs']).toBe(400);
+    expect(s.getSettings().extras['profitLockLockRs']).toBe(200);
+    expect(s.getSettings().extras['profitLockGivebackRs']).toBe(200);
     expect(s.getSettings().extras['slConfirmCutoffEnabled']).toBe(false);
     expect(s.supports).toContain('nifty');
     expect(s.supports).toContain('bank');
