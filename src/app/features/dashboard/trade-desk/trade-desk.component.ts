@@ -60,9 +60,12 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
   protected readonly appBuildLabel = APP_BUILD_LABEL;
 
   protected readonly mode = signal<PaperDeskMode>('testing');
-  /** Default both dates to yesterday so Testing opens on the last completed session. */
-  protected fromDate = yesterdayIso();
-  protected toDate = yesterdayIso();
+  /**
+   * Default Testing window = today (IST).
+   * Yesterday-only hid “today’s DNA ₹” that research / agent reports show.
+   */
+  protected fromDate = todayIso();
+  protected toDate = todayIso();
   /** When Live + checked, places real Kite MIS orders. */
   protected realOrders = false;
   protected realOrdersAck = false;
@@ -591,9 +594,15 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
     this.toDate = todayIso();
   }
 
+  /** Single-session Testing = today IST. */
+  protected setTestingToday(): void {
+    this.fromDate = todayIso();
+    this.toDate = todayIso();
+  }
+
   /**
-   * One money number for Testing + Live paper/results.
-   * Prefer net after charges (closest to live); else option/fill ₹.
+   * Option / Kite-style Profit ₹ (premium × lot − charges when known).
+   * Not the same as Index ₹ proxy used in research reports.
    */
   protected primaryProfitRs(): number {
     const t = this.resultView().totals;
@@ -601,6 +610,14 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
       return t.optionNetAfterChargesRs;
     }
     return t.optionNetRs ?? 0;
+  }
+
+  /**
+   * Index/futures ₹ proxy — same metric as desk DNA reports
+   * (Nifty ₹65 · Bank ₹30 · Crude ₹10 × pts × lots).
+   */
+  protected indexProxyProfitRs(): number {
+    return this.resultView().totals.pointsMoneyRs ?? 0;
   }
 
   /** Per-trade profit — same basis as primary (net if present). */

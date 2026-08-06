@@ -110,6 +110,14 @@
           type="button"
           class="preset-btn"
           [disabled]="busy() || snapshot().running"
+          (click)="setTestingToday()"
+        >
+          Today
+        </button>
+        <button
+          type="button"
+          class="preset-btn"
+          [disabled]="busy() || snapshot().running"
           (click)="setTestingRange(14)"
         >
           14d
@@ -417,10 +425,24 @@
         [class.up]="primaryProfitRs() > 0"
         [class.down]="primaryProfitRs() < 0"
       >
-        <span>Profit ₹</span>
+        <span>Option / fill ₹</span>
         <strong
           >{{ primaryProfitRs() > 0 ? '+' : '' }}{{ primaryProfitRs() | number: '1.0-0' }}</strong
         >
+        <small class="profit-sub">premium × lot{{ snapshot().realOrders ? ' · Kite' : '' }}</small>
+      </div>
+      <div
+        class="stat profit-hero"
+        [class.up]="indexProxyProfitRs() > 0"
+        [class.down]="indexProxyProfitRs() < 0"
+        title="Same Index ₹ as DNA reports: Nifty×65 · Bank×30 · Crude×10 × pts × lots"
+      >
+        <span>Index ₹</span>
+        <strong
+          >{{ indexProxyProfitRs() > 0 ? '+' : ''
+          }}{{ indexProxyProfitRs() | number: '1.0-0' }}</strong
+        >
+        <small class="profit-sub">fut/index proxy · DNA report</small>
       </div>
       <div class="stat">
         <span>Trades</span>
@@ -431,6 +453,12 @@
         <strong>{{ resultView().totals.wins }} / {{ resultView().totals.losses }}</strong>
       </div>
     </div>
+    @if (mode() === 'testing' && dayProfitLock) {
+      <p class="banner info profit-lock-note">
+        Day profit lock is ON (~₹3k combined) — Trap stops new entries after the lock. Turn it off
+        and re-run Testing to match uncapped DNA Index ₹ reports.
+      </p>
+    }
 
     @if (resultView().dayStats.tradingDays) {
       <div class="day-stats">
