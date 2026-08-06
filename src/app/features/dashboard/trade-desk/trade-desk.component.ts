@@ -541,7 +541,11 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
     }
     const norm = ts.replace('T', ' ');
     const m = norm.match(/\b(\d{2}:\d{2})\b/);
-    return m?.[1] ?? norm.slice(11, 16) || '—';
+    if (m?.[1]) {
+      return m[1];
+    }
+    const slice = norm.slice(11, 16);
+    return slice.length === 5 ? slice : '—';
   }
 
   protected fmtWeekday(ts: string | null | undefined): string {
