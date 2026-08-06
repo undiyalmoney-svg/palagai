@@ -295,6 +295,22 @@ export function replayPaperOnCrude(params: {
   optionPrefixes?: string[];
   strikeStep?: number;
   syntheticName?: string;
+  /**
+   * Live money: fire open/close on bars after `afterBarTime` so placeEntry runs
+   * even when Crude opens and SL inside one poll (same miss mode as index).
+   */
+  liveHook?: {
+    afterBarTime?: string | null;
+    onOpen?: (open: {
+      direction: 'BUY' | 'SELL';
+      entryTime: string;
+      indexEntry: number;
+      indexStop: number;
+      option: PaperTrade['option'];
+      optionEntryPremium: number | null;
+    }) => void;
+    onClose?: (entryTime: string) => void;
+  };
 }): CrudeReplayResult {
   const {
     instrumentId,
@@ -311,6 +327,10 @@ export function replayPaperOnCrude(params: {
   const tradeParams = params.tradeParams ?? resolveCrudeStrategyProfile('selective');
   const dayLossStopPts = params.dayLossStopPts ?? tradeParams.dayLossStopPts;
   const dayProfitLockPts = tradeParams.dayProfitLockPts;
+  const liveHook = params.liveHook;
+  const afterBar = liveHook?.afterBarTime ?? null;
+  const hookActive = (barTime: string): boolean =>
+    !!liveHook && (!afterBar || barTime > afterBar);
   const optionResolve = {
     prefixes: params.optionPrefixes,
     strikeStep: params.strikeStep,
@@ -360,6 +380,9 @@ export function replayPaperOnCrude(params: {
           lotsMultiplier,
         });
         trades.push(closed);
+        if (hookActive(candle.date)) {
+          liveHook?.onClose?.(closed.entryTime);
+        }
         recordCrudeTradeClosed(
           state,
           closed.indexPoints,
@@ -520,6 +543,16 @@ export function replayPaperOnCrude(params: {
       peakMfePts: 0,
       riskPts: Math.abs(signal.entryPrice - signal.stopLoss),
     };
+    if (hookActive(candle.date)) {
+      liveHook?.onOpen?.({
+        direction: signal.action,
+        entryTime: candle.date,
+        indexEntry: signal.entryPrice,
+        indexStop: signal.stopLoss,
+        option,
+        optionEntryPremium: entryPremium,
+      });
+    }
     lastSignal = `${signal.action} @ ${signal.entryPrice.toFixed(1)} · ${option.tradingSymbol}`;
   }
 
@@ -542,6 +575,9 @@ export function replayPaperOnCrude(params: {
       lotsMultiplier,
     });
     trades.push(closed);
+    if (hookActive(last.date)) {
+      liveHook?.onClose?.(closed.entryTime);
+    }
     recordCrudeTradeClosed(
       state,
       closed.indexPoints,

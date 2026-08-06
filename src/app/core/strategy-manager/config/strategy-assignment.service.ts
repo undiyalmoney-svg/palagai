@@ -20,10 +20,10 @@ import { StrategySettings } from '../models/strategy-settings.model';
 import { StrategyRegistryService } from '../registry/strategy-registry.service';
 
 /**
- * v27 — Monster 5-day-green: peak₹150 · ≤2/day · dayStop40 (doc 47).
- * Drops v26 so peak400 hold-longer cannot stick when green-week DNA wins.
+ * v28 — Live-safe: peak₹400 back · Crude full-day SL50/TP200 (doc 48).
+ * Drops v27 so monster peak150 / Crude first-win cannot stick for Live money.
  */
-const STORAGE_KEY = 'palagai_strategy_assignments_v27';
+const STORAGE_KEY = 'palagai_strategy_assignments_v28';
 const LEGACY_STORAGE_KEYS = [
   'palagai_strategy_assignments_v1',
   'palagai_strategy_assignments_v2',
@@ -51,6 +51,7 @@ const LEGACY_STORAGE_KEYS = [
   'palagai_strategy_assignments_v24',
   'palagai_strategy_assignments_v25',
   'palagai_strategy_assignments_v26',
+  'palagai_strategy_assignments_v27',
 ] as const;
 
 export interface ChannelAssignment {

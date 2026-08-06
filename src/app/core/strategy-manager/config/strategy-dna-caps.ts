@@ -32,16 +32,15 @@ export const PROTECTION_DNA_EXTRAS: Record<string, number | boolean> = {
 };
 
 /**
- * Monster 5-day-green Trap DNA (doc 47): maximize all-week green on desk.
- * pierce15 · Bank pierce30 · bounce OR · peak₹150 · soft OFF · confirm ON · ≤2/day.
- * Peak150 + max2 (not unlimited) — high green streak without All-Green charge churn.
+ * Live-safe Trap DNA (v1.3.65): pierce15 · Bank30 · bounce OR · peak₹400 · soft OFF.
+ * peak₹150 caused Live tuck-tuck ₹8–10 cut&rehunt — do NOT reintroduce for "green %" hunts.
  */
 export const TRAP_1LOT_DAILY_DNA_EXTRAS: Record<string, number | boolean | string> = {
   piercePts: 15,
   bankPiercePts: 30,
-  profitLockArmRs: 150,
-  profitLockLockRs: 75,
-  profitLockGivebackRs: 75,
+  profitLockArmRs: 400,
+  profitLockLockRs: 200,
+  profitLockGivebackRs: 200,
   slConfirmCutoffEnabled: false,
   slConfirmCutoffFracR: 0,
   slConfirmCutoffMaxMfeR: 0,
@@ -77,8 +76,8 @@ export function dnaCapsForStrategy(
 ): StrategyDnaCaps {
   switch (strategyId) {
     case MANAGED_STRATEGY_IDS.SR_TRAP_CONFIRM:
-      /** Monster green: ≤2 fills/index/day · RR2 · desk lock ₹3k. */
-      return { maxTradesPerDay: 2, targetRMultiple: 2 };
+      /** Live-safe: unlimited fills · RR2 · desk lock ₹3k · peak₹400 holds winners. */
+      return { maxTradesPerDay: 0, targetRMultiple: 2 };
     case MANAGED_STRATEGY_IDS.ALIGN_COMBO_GENIE:
       return channel === 'bank'
         ? { maxTradesPerDay: 0, targetRMultiple: 1.5 }

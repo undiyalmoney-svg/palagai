@@ -143,6 +143,8 @@ interface CrudeLiveState {
   futuresToken: number;
   futuresSymbol: string;
   candles: Candle[];
+  /** Live money: only hook placeEntry/Exit for bars after this candle time. */
+  lastLiveEventAt: string | null;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -161,6 +163,8 @@ export class PaperTradeDeskService {
   ];
 
   private liveTimer: ReturnType<typeof setInterval> | null = null;
+  /** Prevent overlapping tickLive polls (15s tick can outrun itself). */
+  private liveTickInFlight = false;
   private liveLegs: LiveLeg[] = [];
   private crudeLive: CrudeLiveState | null = null;
   private natGasLive: CrudeLiveState | null = null;
@@ -1169,6 +1173,7 @@ export class PaperTradeDeskService {
           futuresToken: future.instrumentToken,
           futuresSymbol: future.tradingSymbol,
           candles,
+          lastLiveEventAt: null,
         };
       }
 
@@ -1193,16 +1198,19 @@ export class PaperTradeDeskService {
           futuresToken: future.instrumentToken,
           futuresSymbol: future.tradingSymbol,
           candles,
+          lastLiveEventAt: null,
         };
       }
 
       await this.tickLive(true);
       this.assertActive(runId);
 
-      // Live money + index: poll faster so Trap open→SL inside one 5m bar still hits Kite.
-      // Crude-only can stay at 60s (holds longer).
+      // Live money: poll faster so open→SL inside one bar still hits Kite (index + Crude).
       const tickMs =
-        this.realOrders && (this.deskRunOptions.enableNifty || this.deskRunOptions.enableBank)
+        this.realOrders &&
+        (this.deskRunOptions.enableNifty ||
+          this.deskRunOptions.enableBank ||
+          this.deskRunOptions.enableCrude)
           ? 15_000
           : 60_000;
       this.liveTimer = setInterval(() => {
@@ -1279,6 +1287,7 @@ export class PaperTradeDeskService {
         futuresToken: future.instrumentToken,
         futuresSymbol: future.tradingSymbol,
         candles,
+        lastLiveEventAt: null,
       };
     }
 
@@ -1300,11 +1309,24 @@ export class PaperTradeDeskService {
         futuresToken: future.instrumentToken,
         futuresSymbol: future.tradingSymbol,
         candles,
+        lastLiveEventAt: null,
       };
     }
   }
 
   private async tickLive(initial: boolean): Promise<void> {
+    if (this.liveTickInFlight) {
+      return;
+    }
+    this.liveTickInFlight = true;
+    try {
+      await this.tickLiveBody(initial);
+    } finally {
+      this.liveTickInFlight = false;
+    }
+  }
+
+  private async tickLiveBody(initial: boolean): Promise<void> {
     const today = todayIso();
     const now = istNowHhMm();
     const anyIndexLegs = this.liveLegs.length > 0;
@@ -1567,9 +1589,39 @@ export class PaperTradeDeskService {
       }
     }
 
+    const mcxBrokerEvents: IndexLiveBrokerEvent[] = [];
     if (crudeSessionActive && this.crudeLive) {
       const crudeTradeParams = resolveCrudeStrategyProfile('selective');
       const crudeDayLossPts = resolveCrudeProfileDayLossPts(crudeTradeParams, false);
+      const crudeHook =
+        this.realOrders && !initial
+          ? {
+              afterBarTime: this.crudeLive.lastLiveEventAt,
+              onOpen: (o: {
+                direction: 'BUY' | 'SELL';
+                entryTime: string;
+                indexEntry: number;
+                indexStop: number;
+                option: PaperTrade['option'];
+                optionEntryPremium: number | null;
+              }) => {
+                mcxBrokerEvents.push({
+                  kind: 'open',
+                  instrumentId: CRUDE_OIL_MINI_INSTRUMENT.id,
+                  instrumentName: `${CRUDE_OIL_MINI_INSTRUMENT.name} (${this.crudeLive!.futuresSymbol})`,
+                  open: o,
+                });
+              },
+              onClose: (entryTime: string) => {
+                mcxBrokerEvents.push({
+                  kind: 'close',
+                  instrumentId: CRUDE_OIL_MINI_INSTRUMENT.id,
+                  instrumentName: `${CRUDE_OIL_MINI_INSTRUMENT.name} (${this.crudeLive!.futuresSymbol})`,
+                  entryTime,
+                });
+              },
+            }
+          : undefined;
       const replay = replayPaperOnCrude({
         instrumentId: CRUDE_OIL_MINI_INSTRUMENT.id,
         instrumentName: `${CRUDE_OIL_MINI_INSTRUMENT.name} (${this.crudeLive.futuresSymbol})`,
@@ -1585,7 +1637,10 @@ export class PaperTradeDeskService {
         enableMorning: crudeTradeParams.defaultEnableMorning,
         enableEvening: crudeTradeParams.defaultEnableEvening,
         tradeParams: crudeTradeParams,
+        liveHook: crudeHook,
       });
+      this.crudeLive.lastLiveEventAt =
+        this.crudeLive.candles.at(-1)?.date ?? this.crudeLive.lastLiveEventAt;
       crudeTrades = replay.trades;
       statuses.push(
         withLiveFields({
@@ -1616,6 +1671,11 @@ export class PaperTradeDeskService {
           maxTradesPerDay: crudeTradeParams.maxEveningTradesDay,
         }),
       );
+      // Place/exit Crude on Kite as bars open/close — same miss fix as Nifty/Bank.
+      if (this.realOrders && mcxBrokerEvents.length) {
+        await this.flushIndexLiveBrokerEvents(authorization, mcxBrokerEvents, allInstruments);
+        allInstruments = this.instrumentStore.allInstruments();
+      }
     }
 
     if (natGasSessionActive && this.natGasLive) {
@@ -2117,7 +2177,7 @@ export class PaperTradeDeskService {
               : 'Preview ATM (spot fallback) · Selective',
           tradesToday: 0,
           strategyId: 'crude-selective',
-          strategyName: 'Selective (eve Trap SL30/TP60 · first-win · ≤2)',
+          strategyName: 'Selective (Trap SL50/TP200 · ≤4 · lock ₹1k)',
         }),
       );
     }

@@ -39,7 +39,8 @@ Those two files are the product “secret sauce.” Docs 01–03 expand them **l
 22. Use **44** for **missed CE/PE audit** (Aug 3–4) — confirm fails vs exact 1-lot ₹ vs friend 3k/4k.  
 23. Use **45** for **Trap wide-range days** (Jul 28–31 vs Aug 3–4) — OR-scaled bounce pierce / Bank pierce; do not kill confirm. Peak trail hold-longer (arm₹400) in v1.3.61.  
 24. Use **46** for **Crude min-trade max-profit** — Trap SL50/TP200 · ≤4/day · day lock ₹1k (v1.3.63).  
-25. Use **47** for **Monster 5-day-green desk** — Index peak₹150≤2 + Crude eve first-win (v1.3.64).
+25. Use **47** for **Monster 5-day-green desk** — Index peak₹150≤2 + Crude eve first-win (v1.3.64; superseded for Live by **48**).  
+26. Use **48** for **Live-safe tomorrow** — peak₹400 + Crude liveHook + no first-win (v1.3.65).
 
 ## Not in the deploy
 Angular assets come from `src/` + `public/` only (`angular.json`).  

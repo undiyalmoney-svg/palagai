@@ -797,6 +797,9 @@ export function replayPaperOnIndex(params: {
         strategyName: isKutty ? KUTTY_NAME : strategy.name,
       });
       trades.push(closed);
+      if (hookActive(candle.date)) {
+        liveHook?.onClose?.(closed.entryTime);
+      }
       if (isKutty) {
         recordKuttyClosed(kuttyState);
         kuttyMargin.usedRs = Math.max(0, kuttyMargin.usedRs - KUTTY_MARGIN_PER_TRADE_RS);

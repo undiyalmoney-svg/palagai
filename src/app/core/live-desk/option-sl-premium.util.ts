@@ -54,15 +54,17 @@ export function computeProtectiveSlTrigger(params: {
   const mcx = isMcxOptionContext(params.exchange, params.tradingSymbol);
   const delta = mcx ? 1 : 0.5;
   const fromRisk = fill - risk * delta;
-  const fromMinGap = mcx ? fill - mcxMinSlGapPts(fill) : fromRisk;
+  // NFO: never park SL within ~3% / ₹3 of fill — stops tuck-tuck ₹8–10 after peak trail.
+  const nfoMinGap = Math.max(3, fill * 0.03);
+  const fromMinGap = mcx ? fill - mcxMinSlGapPts(fill) : fill - nfoMinGap;
   let trigger = roundOptionPremiumTick(Math.max(0.05, Math.min(fromRisk, fromMinGap)));
 
   const ltp = params.ltp;
   if (ltp != null && ltp > 0 && trigger >= ltp - 0.049) {
     const cushion = Math.max(
       risk * delta,
-      mcx ? mcxMinSlGapPts(ltp) : ltp * 0.02,
-      mcx ? 25 : 2,
+      mcx ? mcxMinSlGapPts(ltp) : Math.max(nfoMinGap, ltp * 0.03),
+      mcx ? 25 : 3,
     );
     trigger = roundOptionPremiumTick(Math.max(0.05, ltp - cushion));
   }

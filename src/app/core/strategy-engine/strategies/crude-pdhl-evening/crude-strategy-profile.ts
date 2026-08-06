@@ -1,7 +1,7 @@
 /**
  * Crude Oil Mini strategy profiles for the Crude Desk.
  *
- * - selective: Trap SL30/TP60 · first-win · ≤2 · 18:30–22:00 (Trade Desk default · 5-day green)
+ * - selective: Trap SL50/TP200 · ≤4/day · day lock ₹1k · 10:00–23:00 (Trade Desk default · live-safe)
  * - all-green: Session OR 09:00–09:30 · entries →23:00 · per-trade SL/trail (Experiments picker only)
  * - daily-profit: Trap-style evening PDHL + confirm · tight SL/TP
  * - champion: hunt pair (larger SL/TP)
@@ -165,33 +165,33 @@ export const CRUDE_ALL_GREEN_PARAMS: CrudeTradeParams = {
 };
 
 /**
- * Selective — monster 5-day-green Crude leg (doc 47).
- * Evening Trap + confirm · SL30/TP60 · first-win · ≤2/day.
- * Paired with Index peak₹150≤2: overlap desk ~98% green · ~93% rolling-5 all-green.
- * Not a Crude-alone max-₹ book — optimized so Crude does not spoil the week.
+ * Selective — live-safe Crude (doc 46 + 48).
+ * Trap + confirm · SL50/TP200 · max 4/day · day lock ₹1k · 10:00–23:00.
+ * No first-win (that stopped the book after one green). No unlimited (charge burn).
  */
 export const CRUDE_SELECTIVE_PARAMS: CrudeTradeParams = {
   profileId: 'selective',
-  label: 'Selective (eve Trap SL30/TP60 · first-win · ≤2)',
-  stopPts: 30,
-  morningTargetPts: 60,
-  eveningTargetPts: 60,
+  label: 'Selective (Trap SL50/TP200 · ≤4 · lock ₹1k)',
+  stopPts: 50,
+  morningTargetPts: 200,
+  eveningTargetPts: 200,
   targetRMultiple: 0,
   dayLossStopPts: 0,
   strictDayLossPts: 0,
-  dayProfitLockPts: 0,
+  /** ₹1,000 lock @ ₹10/pt — stop hunting after a solid green day. */
+  dayProfitLockPts: 100,
   entryMode: 'trap-confirm',
   requireConfirm: true,
-  firstWinLock: true,
-  eveningEntryStart: '18:30',
-  eveningEntryEnd: '22:00',
+  firstWinLock: false,
+  eveningEntryStart: '10:00',
+  eveningEntryEnd: CRUDE_SOR_ENTRY_END,
   sessionOrStart: CRUDE_SOR_OR_START,
   sessionOrEnd: CRUDE_SOR_OR_END,
   maxOrWidth: 0,
-  maxEveningTradesDay: 2,
+  maxEveningTradesDay: 4,
   defaultEnableMorning: false,
   defaultEnableEvening: true,
-  dailyBandLabel: '18:30–22:00 · Trap SL30/TP60 · first-win · ≤2/day',
+  dailyBandLabel: '10:00–23:00 · Trap SL50/TP200 · confirm · ≤4/day · lock ₹1k',
   piercePts: 0,
   trapEntryStyle: 'both',
   ...PROTECT_OFF,

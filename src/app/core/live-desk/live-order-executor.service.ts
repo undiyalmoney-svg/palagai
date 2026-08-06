@@ -687,11 +687,25 @@ export class LiveOrderExecutorService {
     if (fillPremium <= 0) return;
 
     const indexRisk = Math.abs(open.indexEntry - open.indexStop);
+    // Always fetch LTP on amend so peak-trail cannot slam SL into the print (₹8–10 tuck).
+    let ltp: number | null = null;
+    try {
+      const exchange = (pos.exchange === 'MCX' ? 'MCX' : 'NFO') as 'NFO' | 'MCX';
+      ltp = await this.resolveOptionLtp(
+        authorization,
+        pos.tradingSymbol,
+        exchange,
+        fillPremium,
+      );
+    } catch {
+      ltp = null;
+    }
     const nextTrigger = computeProtectiveSlTrigger({
       fillPremium,
       indexRiskPts: indexRisk,
       exchange: pos.exchange,
       tradingSymbol: pos.tradingSymbol,
+      ltp,
     });
     const prevTrigger = pos.slTrigger ?? 0;
 
