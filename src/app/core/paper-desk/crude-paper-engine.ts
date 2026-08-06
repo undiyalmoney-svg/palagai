@@ -564,19 +564,20 @@ export function replayPaperOnCrude(params: {
 
   if (open && forceCloseOpen) {
     const last = candles.at(-1)!;
+    const futPts =
+      open.direction === 'BUY' ? last.close - open.entry : open.entry - last.close;
+    const futLabel = `fut ${futPts >= 0 ? '+' : ''}${futPts.toFixed(1)}`;
+    const bookWindow =
+      open.book === 'morning'
+        ? 'Morning'
+        : `${tradeParams.eveningEntryStart}–${tradeParams.eveningEntryEnd}`;
     const closed = closePaperTrade({
       instrumentId,
       instrumentName,
       open,
       exitPrice: last.close,
       exitTime: last.date,
-      exitReason: `${MCX_CRUDE_SESSION.sessionCloseLabel} · ${
-        open.book === 'morning'
-          ? 'Morning 10:00–12:00'
-          : sessionOrMode
-            ? `${tradeParams.eveningEntryStart}–${tradeParams.eveningEntryEnd}`
-            : 'Evening 18:30–20:30'
-      }`,
+      exitReason: `${MCX_CRUDE_SESSION.sessionCloseLabel} · ${futLabel} · ${bookWindow}`,
       optionCandlesByToken,
       lotsMultiplier,
     });
