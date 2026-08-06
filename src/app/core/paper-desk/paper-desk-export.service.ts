@@ -28,31 +28,30 @@ export class PaperDeskExportService {
     const dayStats = snapshot.dayStats ?? emptyPaperDeskDayStats();
     const t = snapshot.totals;
     const fmtRs = (n: number) => `${n > 0 ? '+' : ''}${Math.round(n).toLocaleString('en-IN')}`;
-    const fmtPts = (n: number) => `${n > 0 ? '+' : ''}${n.toFixed(1)}`;
 
     const best = dayStats.bestDay
-      ? `${dayStats.bestDay.displayDate} · ${fmtRs(dayStats.bestDay.optionNetRs)} · ${fmtPts(dayStats.bestDay.indexNetPts)} pts · ${dayStats.bestDay.trades} trade(s)`
+      ? `${dayStats.bestDay.displayDate} · ${fmtRs(dayStats.bestDay.optionNetRs)} · ${dayStats.bestDay.trades} trade(s)`
       : '—';
     const worst = dayStats.worstDay
-      ? `${dayStats.worstDay.displayDate} · ${fmtRs(dayStats.worstDay.optionNetRs)} · ${fmtPts(dayStats.worstDay.indexNetPts)} pts · ${dayStats.worstDay.trades} trade(s)`
+      ? `${dayStats.worstDay.displayDate} · ${fmtRs(dayStats.worstDay.optionNetRs)} · ${dayStats.worstDay.trades} trade(s)`
       : '—';
 
     const topProfitRows = dayStats.topProfitDays
       .map(
         (d) =>
-          `<tr><td>${esc(d.displayDate)}</td><td>${esc(d.weekday)}</td><td>${d.trades}</td><td>${fmtRs(d.optionNetRs)}</td><td>${fmtPts(d.indexNetPts)}</td></tr>`,
+          `<tr><td>${esc(d.displayDate)}</td><td>${esc(d.weekday)}</td><td>${d.trades}</td><td>${fmtRs(d.optionNetRs)}</td></tr>`,
       )
       .join('');
     const topLossRows = dayStats.topLossDays
       .map(
         (d) =>
-          `<tr><td>${esc(d.displayDate)}</td><td>${esc(d.weekday)}</td><td>${d.trades}</td><td>${fmtRs(d.optionNetRs)}</td><td>${fmtPts(d.indexNetPts)}</td></tr>`,
+          `<tr><td>${esc(d.displayDate)}</td><td>${esc(d.weekday)}</td><td>${d.trades}</td><td>${fmtRs(d.optionNetRs)}</td></tr>`,
       )
       .join('');
     const weekdayRows = dayStats.byWeekday
       .map(
         (w) =>
-          `<tr><td>${esc(w.weekday)}</td><td>${w.trades}</td><td>${w.wins}/${w.losses}</td><td>${fmtRs(w.optionNetRs)}</td><td>${fmtPts(w.indexNetPts)}</td></tr>`,
+          `<tr><td>${esc(w.weekday)}</td><td>${w.trades}</td><td>${w.wins}/${w.losses}</td><td>${fmtRs(w.optionNetRs)}</td></tr>`,
       )
       .join('');
 
@@ -60,14 +59,14 @@ export class PaperDeskExportService {
       .slice(0, 500)
       .map((tr) => {
         const day = extractTradeDate(tr.entryTime);
+        const pnl = tr.netOptionPnlRs ?? tr.optionPnlRs;
         return `<tr>
           <td>${esc(formatDayOfWeek(day))}</td>
           <td>${esc(tr.entryTime.replace('T', ' ').slice(0, 16))}</td>
           <td>${esc(tr.instrumentName)}</td>
           <td>${tr.direction}</td>
           <td>${esc(tr.option?.tradingSymbol ?? '—')}</td>
-          <td>${tr.optionPnlRs != null ? fmtRs(tr.optionPnlRs) : '—'}</td>
-          <td>${fmtPts(tr.indexPoints)}</td>
+          <td>${pnl != null ? fmtRs(pnl) : '—'}</td>
           <td>${esc(tr.exitReason)}</td>
         </tr>`;
       })
@@ -94,11 +93,9 @@ export class PaperDeskExportService {
       <p class="meta">${esc(options.subtitle ?? '')}${options.subtitle ? ' · ' : ''}${esc(snapshot.fromDate)} → ${esc(snapshot.toDate)} · ${t.lotsUsed} lot(s) · ${dayStats.tradingDays} trading day(s)</p>
 
       <div class="cards">
+        <div class="card"><span>Profit ₹</span><strong class="${t.optionNetRs >= 0 ? 'up' : 'down'}">${fmtRs(t.optionNetRs)}</strong></div>
         <div class="card"><span>Trades</span><strong>${t.trades}</strong></div>
         <div class="card"><span>W / L</span><strong>${t.wins} / ${t.losses}</strong></div>
-        <div class="card"><span>Option ₹</span><strong class="${t.optionNetRs >= 0 ? 'up' : 'down'}">${fmtRs(t.optionNetRs)}</strong></div>
-        <div class="card"><span>Index / futures pts</span><strong class="${t.indexNetPts >= 0 ? 'up' : 'down'}">${fmtPts(t.indexNetPts)}</strong></div>
-        <div class="card"><span>Pts money ₹</span><strong class="${t.pointsMoneyRs >= 0 ? 'up' : 'down'}">${fmtRs(t.pointsMoneyRs)}</strong></div>
       </div>
 
       <h2>Most profitable day</h2>
@@ -107,20 +104,20 @@ export class PaperDeskExportService {
       <p>${esc(worst)}</p>
 
       <h2>Top profitable days</h2>
-      <table><thead><tr><th>Date</th><th>Day</th><th>Trades</th><th>Option ₹</th><th>Pts</th></tr></thead>
-      <tbody>${topProfitRows || '<tr><td colspan="5">None</td></tr>'}</tbody></table>
+      <table><thead><tr><th>Date</th><th>Day</th><th>Trades</th><th>Profit ₹</th></tr></thead>
+      <tbody>${topProfitRows || '<tr><td colspan="4">None</td></tr>'}</tbody></table>
 
       <h2>Most loss days</h2>
-      <table><thead><tr><th>Date</th><th>Day</th><th>Trades</th><th>Option ₹</th><th>Pts</th></tr></thead>
-      <tbody>${topLossRows || '<tr><td colspan="5">None</td></tr>'}</tbody></table>
+      <table><thead><tr><th>Date</th><th>Day</th><th>Trades</th><th>Profit ₹</th></tr></thead>
+      <tbody>${topLossRows || '<tr><td colspan="4">None</td></tr>'}</tbody></table>
 
       <h2>By weekday</h2>
-      <table><thead><tr><th>Day</th><th>Trades</th><th>W/L</th><th>Option ₹</th><th>Pts</th></tr></thead>
-      <tbody>${weekdayRows || '<tr><td colspan="5">—</td></tr>'}</tbody></table>
+      <table><thead><tr><th>Day</th><th>Trades</th><th>W/L</th><th>Profit ₹</th></tr></thead>
+      <tbody>${weekdayRows || '<tr><td colspan="4">—</td></tr>'}</tbody></table>
 
       <h2>Trades${snapshot.trades.length > 500 ? ' (first 500)' : ''}</h2>
-      <table><thead><tr><th>Day</th><th>Entry</th><th>Instrument</th><th>Dir</th><th>Option</th><th>Option ₹</th><th>Pts</th><th>Exit</th></tr></thead>
-      <tbody>${tradeRows || '<tr><td colspan="8">No trades</td></tr>'}</tbody></table>
+      <table><thead><tr><th>Day</th><th>Entry</th><th>Instrument</th><th>Dir</th><th>Option</th><th>Profit ₹</th><th>Exit</th></tr></thead>
+      <tbody>${tradeRows || '<tr><td colspan="7">No trades</td></tr>'}</tbody></table>
       </body></html>`;
   }
 }
