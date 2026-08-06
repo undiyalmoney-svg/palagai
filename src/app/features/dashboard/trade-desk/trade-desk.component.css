@@ -1420,6 +1420,77 @@
   -webkit-overflow-scrolling: touch;
 }
 
+/* Mobile: cards first (Profit ₹ + exit visible). Desktop keeps the wide table. */
+.trade-cards {
+  display: none;
+  flex-direction: column;
+  gap: 0.65rem;
+  margin-bottom: 0.75rem;
+}
+
+.trade-card {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--card);
+  padding: 0.85rem 0.95rem;
+  box-shadow: inset 3px 0 0 #94a3b8;
+}
+
+.trade-card.win {
+  box-shadow: inset 3px 0 0 #34d399;
+}
+
+.trade-card.loss {
+  box-shadow: inset 3px 0 0 #f87171;
+}
+
+.trade-card-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: flex-start;
+}
+
+.trade-card-pnl {
+  font-size: 1.15rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.trade-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.75rem;
+  margin-top: 0.45rem;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.trade-card-exit {
+  margin: 0.45rem 0 0;
+  font-size: 0.8rem;
+  color: var(--ink);
+  line-height: 1.35;
+}
+
+.trade-card-warn {
+  display: block;
+  margin-top: 0.35rem;
+  color: var(--warn);
+  font-weight: 600;
+}
+
+@media (max-width: 720px) {
+  .trade-cards {
+    display: flex;
+  }
+
+  .trade-table-desktop {
+    display: none;
+  }
+}
+
 table {
   width: 100%;
   border-collapse: collapse;

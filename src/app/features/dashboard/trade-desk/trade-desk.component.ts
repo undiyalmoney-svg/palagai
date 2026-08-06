@@ -534,6 +534,16 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
     return ts.replace('T', ' ').slice(0, 16);
   }
 
+  /** HH:MM only — Day column already has the date (stops mobile When wrap). */
+  protected fmtClock(ts: string | null | undefined): string {
+    if (!ts) {
+      return '—';
+    }
+    const norm = ts.replace('T', ' ');
+    const m = norm.match(/\b(\d{2}:\d{2})\b/);
+    return m?.[1] ?? norm.slice(11, 16) || '—';
+  }
+
   protected fmtWeekday(ts: string | null | undefined): string {
     if (!ts) {
       return '—';

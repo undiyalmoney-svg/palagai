@@ -844,8 +844,8 @@
         <h3>{{ snapshot().realOrders ? 'Kite fills' : 'Paper trades' }}</h3>
         <p>
           @if (snapshot().realOrders) {
-            Only legs with confirmed Kite ENTRY + EXIT/SL. Desk signals that never reached Kite are
-            hidden from Profit ₹ — see Event log (SKIP).
+            Only legs with confirmed Kite ENTRY + EXIT/SL. Older fills stay as booked — HOLD (no
+            market-dump on red option) applies to new Profit-drained exits. SKIP = never reached Kite.
           } @else {
             Desk replay of today’s closed legs (not Kite fills). Tick Real Orders to send MIS to Kite.
           }
@@ -860,7 +860,54 @@
           Download PDF
         </button>
       </div>
-      <div class="table-scroll">
+
+      <div class="trade-cards" aria-label="Closed trades">
+        @for (t of resultView().trades; track t.id) {
+          <article
+            class="trade-card"
+            [class.win]="t.outcome === 'WIN'"
+            [class.loss]="t.outcome === 'LOSS'"
+          >
+            <div class="trade-card-top">
+              <div class="stack">
+                <strong>{{ t.option?.tradingSymbol || t.instrumentName }}</strong>
+                <small
+                  >{{ fmtWeekday(t.entryTime) }} · {{ fmtClock(t.entryTime) }} →
+                  {{ fmtClock(t.exitTime) }}
+                  ·
+                  <span class="dir" [attr.data-dir]="t.direction">{{ t.direction }}</span></small
+                >
+              </div>
+              <div
+                class="trade-card-pnl num"
+                [class.up]="tradeProfitRs(t) > 0"
+                [class.down]="tradeProfitRs(t) < 0"
+              >
+                {{ tradeProfitRs(t) > 0 ? '+' : '' }}{{ tradeProfitRs(t) | number: '1.0-0' }}
+              </div>
+            </div>
+            <div class="trade-card-meta">
+              @if (t.optionEntryPremium != null && t.optionExitPremium != null) {
+                <span
+                  >{{ t.optionEntryPremium | number: '1.2-2' }} →
+                  {{ t.optionExitPremium | number: '1.2-2' }}</span
+                >
+              }
+              <span
+                >fut {{ t.indexPoints > 0 ? '+' : '' }}{{ t.indexPoints | number: '1.1-1' }} · idx ₹{{
+                  indexProxyRs(t) > 0 ? '+' : ''
+                }}{{ indexProxyRs(t) | number: '1.0-0' }}</span
+              >
+            </div>
+            <p class="trade-card-exit">{{ t.exitReason }}</p>
+            @if (futOptionDisagree(t)) {
+              <small class="trade-card-warn">Kite ₹ ≠ index (trail on fut — HOLD on new drains)</small>
+            }
+          </article>
+        }
+      </div>
+
+      <div class="table-scroll trade-table-desktop">
         <table>
           <thead>
             <tr>
@@ -885,8 +932,8 @@
                 </td>
                 <td>
                   <div class="stack">
-                    <strong>{{ fmtTime(t.entryTime) }}</strong>
-                    <small>{{ fmtTime(t.exitTime) }}</small>
+                    <strong>{{ fmtClock(t.entryTime) }}</strong>
+                    <small>{{ fmtClock(t.exitTime) }}</small>
                   </div>
                 </td>
                 <td>{{ t.instrumentName }}</td>
