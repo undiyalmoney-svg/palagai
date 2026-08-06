@@ -607,7 +607,7 @@
                   }
                 </strong>
                 <span>
-                  {{ o.direction }} {{ o.option?.tradingSymbol ?? 'ATM option' }}
+                  {{ optionLegLabel(o) }} · {{ o.option?.tradingSymbol ?? 'ATM option' }}
                   @if (snapshot().realOrders && s.brokerEntryOrderId) {
                     · Kite order active · waiting for target / SL / EMA / 15:15
                   } @else if (snapshot().realOrders) {
@@ -754,7 +754,7 @@
           </div>
           @if (s.openTrade; as o) {
             <div class="open-strip">
-              <span class="dir" [attr.data-dir]="o.direction">{{ o.direction }}</span>
+              <span class="dir" [attr.data-dir]="o.direction">{{ optionLegLabel(o) }}</span>
               <span>{{ o.option?.tradingSymbol ?? 'ATM option pending' }}</span>
               <span>
                 Idx E {{ o.indexEntry | number: '1.1-1' }} → Tgt {{ o.indexTarget | number: '1.1-1' }}
