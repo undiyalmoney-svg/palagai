@@ -43,7 +43,7 @@ import {
   enrichCrudeTradesWithOptionPremiums,
   replayPaperOnCrude,
 } from './crude-paper-engine';
-import { applyKiteFillPnl, deskLegHasKiteEntry } from './apply-kite-fill-pnl';
+import { deskLegHasKiteEntry, syncTradesToKiteFills } from './apply-kite-fill-pnl';
 import { enrichTradesWithCharges } from './trade-charges.util';
 import { buildPaperDeskDayStats, emptyPaperDeskDayStats } from './paper-desk-day-stats';
 import { MAX_OPTION_HISTORY_TOKENS, rankTokensByFrequency } from './option-history-tokens.util';
@@ -1879,7 +1879,13 @@ export class PaperTradeDeskService {
         }
       }
 
-      enriched = applyKiteFillPnl(enriched, this.liveOrders.getOrderSummary());
+      const nameById = new Map(statuses.map((s) => [s.instrumentId, s.instrumentName] as const));
+      // Kite fill pairs are Profit ₹ truth — including CE wins desk replay never built.
+      enriched = syncTradesToKiteFills(
+        enriched,
+        this.liveOrders.getOrderSummary(),
+        nameById,
+      );
       enriched = this.enrichMixedLots(enriched);
       this.logDeskOnlyLegsNotOnKite(enriched);
       for (const s of statuses) {
@@ -2593,6 +2599,28 @@ function isCancelledError(err: unknown): boolean {
   return err instanceof CancelledError || (err instanceof Error && err.message === 'CANCELLED');
 }
 
+/** Prefer option/Kite ₹ sign for W/L — Index outcome lied on Crude SL50 cards. */
+function tradeMoneyOutcome(t: {
+  netOptionPnlRs?: number | null;
+  optionPnlRs?: number | null;
+  moneyOutcome?: 'WIN' | 'LOSS' | 'FLAT';
+  outcome: 'WIN' | 'LOSS' | 'FLAT';
+  premiumEstimated?: boolean;
+}): 'WIN' | 'LOSS' | 'FLAT' {
+  if (t.moneyOutcome) {
+    return t.moneyOutcome;
+  }
+  const money = t.netOptionPnlRs ?? t.optionPnlRs;
+  if (money != null) {
+    return money > 0 ? 'WIN' : money < 0 ? 'LOSS' : 'FLAT';
+  }
+  // Estimated fut-proxy legs have no money — don't count Index SL as a loss.
+  if (t.premiumEstimated) {
+    return 'FLAT';
+  }
+  return t.outcome;
+}
+
 function summarize(
   trades: PaperTrade[],
   lotsUsedOrResolver: number | ((instrumentId: string) => number) = 1,
@@ -2618,8 +2646,8 @@ function summarize(
     trades.length === 0 ? 0 : pointsMoneyRs || indexNetPts * rupeesPerPoint * displayLots;
   return {
     trades: trades.length,
-    wins: trades.filter((t) => t.outcome === 'WIN').length,
-    losses: trades.filter((t) => t.outcome === 'LOSS').length,
+    wins: trades.filter((t) => tradeMoneyOutcome(t) === 'WIN').length,
+    losses: trades.filter((t) => tradeMoneyOutcome(t) === 'LOSS').length,
     indexNetPts,
     optionNetRs,
     lotsUsed: displayLots,

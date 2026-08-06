@@ -241,10 +241,12 @@ function closePaperTrade(params: {
         (optionExitPremium - open.optionEntryPremium) * open.option.lotSize * lots;
       premiumEstimated = false;
     } else {
+      // Do NOT invent option ₹ from fut pts (SL50 → fake −₹500). That number is
+      // Index proxy, not money — it made Crude look red while Kite CE was green.
       const estMove = estimatePremiumMove(indexPoints);
       const entryPx = open.optionEntryPremium ?? Math.max(10, Math.abs(estMove) + 20);
       optionExitPremium = entryPx + estMove;
-      optionPnlRs = estMove * open.option.lotSize * lots;
+      optionPnlRs = null;
       premiumEstimated = true;
     }
   }
@@ -268,7 +270,18 @@ function closePaperTrade(params: {
     optionExitPremium,
     optionPnlRs,
     premiumEstimated,
-    outcome: indexPoints > 0 ? 'WIN' : indexPoints < 0 ? 'LOSS' : 'FLAT',
+    outcome:
+      optionPnlRs != null
+        ? optionPnlRs > 0
+          ? 'WIN'
+          : optionPnlRs < 0
+            ? 'LOSS'
+            : 'FLAT'
+        : indexPoints > 0
+          ? 'WIN'
+          : indexPoints < 0
+            ? 'LOSS'
+            : 'FLAT',
   };
 }
 
@@ -678,22 +691,26 @@ export function enrichCrudeTradesWithOptionPremiums(
       lookupPremium(optionCandlesByToken.get(t.option.instrumentToken), t.exitTime, 'exit') ??
       t.optionExitPremium;
     if (entry != null && exit != null) {
+      const optionPnlRs = (exit - entry) * t.option.lotSize * lots;
       return {
         ...t,
         optionEntryPremium: entry,
         optionExitPremium: exit,
-        optionPnlRs: (exit - entry) * t.option.lotSize * lots,
+        optionPnlRs,
         premiumEstimated: false,
+        outcome: optionPnlRs > 0 ? 'WIN' : optionPnlRs < 0 ? 'LOSS' : 'FLAT',
       };
     }
     const estMove = estimatePremiumMove(t.indexPoints);
     const entryPx = entry ?? Math.max(10, Math.abs(estMove) + 20);
     const exitPx = exit ?? entryPx + estMove;
+    // Missing option bars → keep fut narrative, but leave Profit ₹ empty.
+    // Fake (exit−entry)×lot from Index pts was the “Crude −₹500 loss” lie.
     return {
       ...t,
       optionEntryPremium: entryPx,
       optionExitPremium: exitPx,
-      optionPnlRs: (exitPx - entryPx) * t.option.lotSize * lots,
+      optionPnlRs: null,
       premiumEstimated: true,
     };
   });

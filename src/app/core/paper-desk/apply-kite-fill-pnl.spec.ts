@@ -3,6 +3,7 @@ import {
   applyKiteFillPnl,
   deskLegHasKiteEntry,
   fillUnitsForPnl,
+  syncTradesToKiteFills,
 } from './apply-kite-fill-pnl';
 import { PaperTrade } from './paper-desk.models';
 
@@ -313,6 +314,58 @@ describe('applyKiteFillPnl', () => {
     // (330.9 − 292.65) × 10 = 382.5 — not ×1 (=38.25)
     expect(out[0]!.optionPnlRs).toBe(382.5);
     expect(out[0]!.option?.lotSize).toBe(10);
+  });
+
+  it('syncTradesToKiteFills keeps unmatched Crude CE wins (desk PE ghosts)', () => {
+    // Desk replay invented a PE Index-SL leg; Kite actually filled a CE winner.
+    const deskPe = trade({
+      id: 'desk-pe',
+      instrumentId: 'crude-oil-mini',
+      instrumentName: 'Crude Oil Mini',
+      direction: 'SELL',
+      indexPoints: -50,
+      optionPnlRs: null,
+      premiumEstimated: true,
+      outcome: 'LOSS',
+      option: {
+        tradingSymbol: 'CRUDEOILM26AUG7250PE',
+        instrumentToken: 1,
+        strike: 7250,
+        expiry: '2026-08-19',
+        optionType: 'PE',
+        lotSize: 10,
+        source: 'chain',
+        exchange: 'MCX',
+      },
+    });
+    const orders = [
+      {
+        instrumentId: 'crude-oil-mini',
+        tradingSymbol: 'CRUDEOILM26AUG7250CE',
+        quantity: 1,
+        leg: 'ENTRY',
+        status: 'COMPLETE',
+        averagePrice: 292.65,
+        at: '2026-08-06T17:46:32.000Z',
+      },
+      {
+        instrumentId: 'crude-oil-mini',
+        tradingSymbol: 'CRUDEOILM26AUG7250CE',
+        quantity: 1,
+        leg: 'EXIT',
+        status: 'COMPLETE',
+        averagePrice: 330.9,
+        at: '2026-08-06T18:45:21.000Z',
+      },
+    ];
+    const out = syncTradesToKiteFills([deskPe], orders, new Map([['crude-oil-mini', 'Crude Oil Mini']]));
+    const onKite = out.filter((t) => t.onKite);
+    expect(onKite).toHaveLength(1);
+    expect(onKite[0]!.option?.tradingSymbol).toBe('CRUDEOILM26AUG7250CE');
+    expect(onKite[0]!.optionPnlRs).toBe(382.5);
+    expect(onKite[0]!.outcome).toBe('WIN');
+    // Desk PE ghost remains unmatched (hidden from Live Profit ₹ by onKite filter).
+    expect(out.find((t) => t.id === 'desk-pe')?.onKite).toBeFalsy();
   });
 
   it('deskLegHasKiteEntry is true for ENTRY-only fills (not a miss)', () => {

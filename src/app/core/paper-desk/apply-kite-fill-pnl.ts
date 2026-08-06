@@ -1,6 +1,6 @@
 import { isMcxOptionContext } from '../live-desk/option-sl-premium.util';
 import { crudeMiniLotSize } from '../utils/crude-option.util';
-import { PaperTrade } from './paper-desk.models';
+import { PaperOptionContract, PaperTrade } from './paper-desk.models';
 
 /** Minimal order-book row needed to rebuild Kite Positions P&L. */
 export interface KiteFillOrderRow {
@@ -53,7 +53,25 @@ export function applyKiteFillPnl(
   trades: PaperTrade[],
   orderSummary: KiteFillOrderRow[],
 ): PaperTrade[] {
-  if (!trades.length || !orderSummary.length) {
+  return syncTradesToKiteFills(trades, orderSummary).filter((t) =>
+    trades.some((p) => p.id === t.id),
+  );
+}
+
+/**
+ * Live money truth: paper legs matched to Kite fills **plus** any Kite
+ * ENTRY→EXIT pairs the desk replay never invented (wrong CE/PE/strike).
+ *
+ * Today 2026-08-06: desk paper showed PE −₹500 Index SL cards while Kite
+ * held winning CE fills (+₹628.50 Crude). Unmatched CE pairs must still
+ * appear as Profit ₹.
+ */
+export function syncTradesToKiteFills(
+  trades: PaperTrade[],
+  orderSummary: KiteFillOrderRow[],
+  instrumentNames?: ReadonlyMap<string, string>,
+): PaperTrade[] {
+  if (!orderSummary.length) {
     return trades;
   }
 
@@ -63,7 +81,7 @@ export function applyKiteFillPnl(
   }
 
   const used = new Set<string>();
-  return trades.map((trade) => {
+  const overlaid = trades.map((trade) => {
     const pairs = pairsByInstrument.get(trade.instrumentId);
     if (!pairs?.length) {
       return trade;
@@ -100,38 +118,27 @@ export function applyKiteFillPnl(
     }
 
     used.add(pairKey(trade.instrumentId, bestIdx));
-    const pair = pairs[bestIdx]!;
-    const mcx = isMcxOptionContext(trade.option?.exchange, pair.tradingSymbol);
-    const units = fillUnitsForPnl({
-      tradingSymbol: pair.tradingSymbol,
-      quantity: pair.quantity,
-      lotSize: trade.option?.lotSize,
-      exchange: trade.option?.exchange,
-    });
-    const optionPnlRs = roundPaise((pair.exitAvg - pair.entryAvg) * units);
-    const nextLotSize = mcx
-      ? (pair.tradingSymbol || '').toUpperCase().startsWith('CRUDEOIL')
-        ? crudeMiniLotSize(trade.option?.lotSize)
-        : Math.max(1, trade.option?.lotSize || units)
-      : trade.option && trade.option.lotSize > 1
-        ? trade.option.lotSize
-        : Math.max(1, pair.quantity);
-
-    return {
-      ...trade,
-      optionEntryPremium: pair.entryAvg,
-      optionExitPremium: pair.exitAvg,
-      optionPnlRs,
-      premiumEstimated: false,
-      onKite: true,
-      option: trade.option
-        ? {
-            ...trade.option,
-            lotSize: nextLotSize,
-          }
-        : trade.option,
-    };
+    return overlayPairOnTrade(trade, pairs[bestIdx]!);
   });
+
+  const synthetics: PaperTrade[] = [];
+  for (const [instrumentId, pairs] of pairsByInstrument) {
+    for (let i = 0; i < pairs.length; i += 1) {
+      if (used.has(pairKey(instrumentId, i))) {
+        continue;
+      }
+      synthetics.push(
+        tradeFromKitePair({
+          instrumentId,
+          instrumentName: instrumentNames?.get(instrumentId) ?? instrumentId,
+          pair: pairs[i]!,
+          seq: synthetics.length + 1,
+        }),
+      );
+    }
+  }
+
+  return [...overlaid, ...synthetics];
 }
 
 interface FillPair {
@@ -141,6 +148,143 @@ interface FillPair {
   exitAvg: number;
   entryAt: string;
   exitAt: string;
+}
+
+function overlayPairOnTrade(trade: PaperTrade, pair: FillPair): PaperTrade {
+  const mcx = isMcxOptionContext(trade.option?.exchange, pair.tradingSymbol);
+  const units = fillUnitsForPnl({
+    tradingSymbol: pair.tradingSymbol,
+    quantity: pair.quantity,
+    lotSize: trade.option?.lotSize,
+    exchange: trade.option?.exchange,
+  });
+  const optionPnlRs = roundPaise((pair.exitAvg - pair.entryAvg) * units);
+  const nextLotSize = mcx
+    ? (pair.tradingSymbol || '').toUpperCase().startsWith('CRUDEOIL')
+      ? crudeMiniLotSize(trade.option?.lotSize)
+      : Math.max(1, trade.option?.lotSize || units)
+    : trade.option && trade.option.lotSize > 1
+      ? trade.option.lotSize
+      : Math.max(1, pair.quantity);
+  const outcome = moneyOutcome(optionPnlRs);
+
+  return {
+    ...trade,
+    optionEntryPremium: pair.entryAvg,
+    optionExitPremium: pair.exitAvg,
+    optionPnlRs,
+    premiumEstimated: false,
+    onKite: true,
+    outcome,
+    moneyOutcome: outcome,
+    option: trade.option
+      ? {
+          ...trade.option,
+          lotSize: nextLotSize,
+          tradingSymbol: pair.tradingSymbol || trade.option.tradingSymbol,
+          optionType: optionTypeFromSymbol(pair.tradingSymbol) ?? trade.option.optionType,
+        }
+      : optionContractFromSymbol(pair.tradingSymbol, nextLotSize),
+  };
+}
+
+function tradeFromKitePair(params: {
+  instrumentId: string;
+  instrumentName: string;
+  pair: FillPair;
+  seq: number;
+}): PaperTrade {
+  const { instrumentId, instrumentName, pair, seq } = params;
+  const sym = (pair.tradingSymbol || '').toUpperCase();
+  const mcx = isMcxOptionContext(null, sym);
+  const lotSize = sym.startsWith('CRUDEOIL')
+    ? crudeMiniLotSize(1)
+    : Math.max(1, pair.quantity);
+  const units = fillUnitsForPnl({
+    tradingSymbol: sym,
+    quantity: pair.quantity,
+    lotSize,
+    exchange: mcx ? 'MCX' : 'NFO',
+  });
+  const optionPnlRs = roundPaise((pair.exitAvg - pair.entryAvg) * units);
+  const outcome = moneyOutcome(optionPnlRs);
+  const ot = optionTypeFromSymbol(sym) ?? 'CE';
+  const entryTime = toDeskTs(pair.entryAt);
+  const exitTime = toDeskTs(pair.exitAt);
+
+  return {
+    id: `kite-${instrumentId}-${seq}-${sym}-${entryTime}`,
+    instrumentId,
+    instrumentName,
+    direction: ot === 'PE' ? 'SELL' : 'BUY',
+    indexEntry: 0,
+    indexStop: 0,
+    indexTarget: 0,
+    indexExit: 0,
+    indexPoints: 0,
+    entryTime,
+    exitTime,
+    exitReason: 'Kite fill · Positions ₹',
+    option: optionContractFromSymbol(sym, lotSize),
+    optionEntryPremium: pair.entryAvg,
+    optionExitPremium: pair.exitAvg,
+    optionPnlRs,
+    premiumEstimated: false,
+    onKite: true,
+    outcome,
+    moneyOutcome: outcome,
+  };
+}
+
+function optionContractFromSymbol(
+  tradingSymbol: string,
+  lotSize: number,
+): PaperOptionContract {
+  const sym = (tradingSymbol || '').toUpperCase();
+  const ot = optionTypeFromSymbol(sym) ?? 'CE';
+  const mcx = isMcxOptionContext(null, sym);
+  return {
+    tradingSymbol: sym || tradingSymbol,
+    instrumentToken: 0,
+    strike: strikeFromSymbol(sym) ?? 0,
+    expiry: '',
+    optionType: ot,
+    lotSize,
+    source: 'chain',
+    exchange: mcx ? 'MCX' : 'NFO',
+    product: 'MIS',
+  };
+}
+
+function optionTypeFromSymbol(symbol: string): 'CE' | 'PE' | null {
+  const s = (symbol || '').toUpperCase();
+  if (s.endsWith('CE')) {
+    return 'CE';
+  }
+  if (s.endsWith('PE')) {
+    return 'PE';
+  }
+  return null;
+}
+
+/** Best-effort strike parse: …7250CE / …58000CE */
+function strikeFromSymbol(symbol: string): number | null {
+  const m = /(\d{4,6})(CE|PE)$/i.exec(symbol || '');
+  if (!m) {
+    return null;
+  }
+  const n = Number(m[1]);
+  return Number.isFinite(n) ? n : null;
+}
+
+function moneyOutcome(pnl: number): 'WIN' | 'LOSS' | 'FLAT' {
+  if (pnl > 0) {
+    return 'WIN';
+  }
+  if (pnl < 0) {
+    return 'LOSS';
+  }
+  return 'FLAT';
 }
 
 function buildFillPairs(orderSummary: KiteFillOrderRow[]): Map<string, FillPair[]> {
@@ -226,6 +370,14 @@ function parseTs(value: string | null | undefined): number {
   return Number.isFinite(ms) ? ms : 0;
 }
 
+function toDeskTs(value: string): string {
+  if (!value) {
+    return value;
+  }
+  // Keep ISO; desk formatters accept both.
+  return value.includes('T') ? value : value.replace(' ', 'T');
+}
+
 /**
  * True when the Live money order book already has a COMPLETE ENTRY fill for this
  * desk leg's instrument (and symbol when known). Used so Event log SKIP does not
@@ -242,6 +394,8 @@ export function deskLegHasKiteEntry(
       isComplete(r.status) &&
       r.leg === 'ENTRY' &&
       hasAvg(r) &&
-      (!symbol || !(r.tradingSymbol || '').toUpperCase() || (r.tradingSymbol || '').toUpperCase() === symbol),
+      (!symbol ||
+        !(r.tradingSymbol || '').toUpperCase() ||
+        (r.tradingSymbol || '').toUpperCase() === symbol),
   );
 }

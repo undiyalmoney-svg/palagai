@@ -68,8 +68,20 @@ export function summarizePaperTrades(
   }, 0);
   return {
     trades: trades.length,
-    wins: trades.filter((t) => t.outcome === 'WIN').length,
-    losses: trades.filter((t) => t.outcome === 'LOSS').length,
+    wins: trades.filter((t) => {
+      const money = t.netOptionPnlRs ?? t.optionPnlRs;
+      if (t.moneyOutcome) return t.moneyOutcome === 'WIN';
+      if (money != null) return money > 0;
+      if (t.premiumEstimated) return false;
+      return t.outcome === 'WIN';
+    }).length,
+    losses: trades.filter((t) => {
+      const money = t.netOptionPnlRs ?? t.optionPnlRs;
+      if (t.moneyOutcome) return t.moneyOutcome === 'LOSS';
+      if (money != null) return money < 0;
+      if (t.premiumEstimated) return false;
+      return t.outcome === 'LOSS';
+    }).length,
     indexNetPts,
     optionNetRs,
     lotsUsed: displayLots,

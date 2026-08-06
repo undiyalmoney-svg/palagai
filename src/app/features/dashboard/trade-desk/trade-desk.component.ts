@@ -622,6 +622,14 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
     return t.optionPnlRs ?? 0;
   }
 
+  /** False when option bars missing — do not paint Index SL as a ₹ loss. */
+  protected hasTradeProfitRs(t: {
+    netOptionPnlRs?: number | null;
+    optionPnlRs?: number | null;
+  }): boolean {
+    return t.netOptionPnlRs != null || t.optionPnlRs != null;
+  }
+
   /**
    * Closed-leg side label — desk always buys the option (long CE/PE).
    * Bare "SELL" next to a PE looked like a short; premium drop then looked "should be green".

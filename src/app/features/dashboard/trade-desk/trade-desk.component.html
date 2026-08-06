@@ -853,9 +853,9 @@
         <h3>{{ snapshot().realOrders ? 'Kite fills' : 'Paper trades' }}</h3>
         <p>
           @if (snapshot().realOrders) {
-            Profit ₹ = Kite fill money (same as Positions).
+            Profit ₹ = Kite fill money (same as Positions). Desk PE ghosts stay hidden.
           } @else {
-            Profit ₹ = option premium money on closed legs.
+            Profit ₹ = real option premium only — not fut SL proxy (−₹500).
           }
         </p>
         <button
@@ -873,8 +873,8 @@
         @for (t of resultView().trades; track t.id) {
           <article
             class="trade-card"
-            [class.win]="tradeProfitRs(t) > 0"
-            [class.loss]="tradeProfitRs(t) < 0"
+            [class.win]="hasTradeProfitRs(t) && tradeProfitRs(t) > 0"
+            [class.loss]="hasTradeProfitRs(t) && tradeProfitRs(t) < 0"
           >
             <div class="trade-card-top">
               <div class="stack">
@@ -888,10 +888,14 @@
               </div>
               <div
                 class="trade-card-pnl num"
-                [class.up]="tradeProfitRs(t) > 0"
-                [class.down]="tradeProfitRs(t) < 0"
+                [class.up]="hasTradeProfitRs(t) && tradeProfitRs(t) > 0"
+                [class.down]="hasTradeProfitRs(t) && tradeProfitRs(t) < 0"
               >
-                {{ tradeProfitRs(t) > 0 ? '+' : '' }}{{ tradeProfitRs(t) | number: '1.0-0' }}
+                @if (hasTradeProfitRs(t)) {
+                  {{ tradeProfitRs(t) > 0 ? '+' : '' }}{{ tradeProfitRs(t) | number: '1.0-0' }}
+                } @else {
+                  —
+                }
               </div>
             </div>
             <div class="trade-card-meta">
@@ -923,7 +927,10 @@
           </thead>
           <tbody>
             @for (t of resultView().trades; track t.id) {
-              <tr [class.win]="tradeProfitRs(t) > 0" [class.loss]="tradeProfitRs(t) < 0">
+              <tr
+                [class.win]="hasTradeProfitRs(t) && tradeProfitRs(t) > 0"
+                [class.loss]="hasTradeProfitRs(t) && tradeProfitRs(t) < 0"
+              >
                 <td>
                   <div class="stack">
                     <strong>{{ fmtWeekday(t.entryTime) }}</strong>
@@ -951,7 +958,7 @@
                   }
                 </td>
                 <td>
-                  @if (t.optionEntryPremium != null && t.optionExitPremium != null) {
+                  @if (t.optionEntryPremium != null && t.optionExitPremium != null && hasTradeProfitRs(t)) {
                     {{ t.optionEntryPremium | number: '1.2-2' }} → {{ t.optionExitPremium | number: '1.2-2' }}
                   } @else {
                     —
@@ -959,13 +966,17 @@
                 </td>
                 <td
                   class="num"
-                  [class.up]="tradeProfitRs(t) > 0"
-                  [class.down]="tradeProfitRs(t) < 0"
+                  [class.up]="hasTradeProfitRs(t) && tradeProfitRs(t) > 0"
+                  [class.down]="hasTradeProfitRs(t) && tradeProfitRs(t) < 0"
                 >
-                  <strong
-                    >{{ tradeProfitRs(t) > 0 ? '+' : ''
-                    }}{{ tradeProfitRs(t) | number: '1.0-0' }}</strong
-                  >
+                  @if (hasTradeProfitRs(t)) {
+                    <strong
+                      >{{ tradeProfitRs(t) > 0 ? '+' : ''
+                      }}{{ tradeProfitRs(t) | number: '1.0-0' }}</strong
+                    >
+                  } @else {
+                    <strong class="muted">—</strong>
+                  }
                 </td>
                 <td><small>{{ t.exitReason }}</small></td>
               </tr>

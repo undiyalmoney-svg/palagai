@@ -78,9 +78,21 @@ export function buildPaperDeskDayStats(
       byDate.set(date, row);
     }
     row.trades += 1;
-    if (t.outcome === 'WIN') {
+    const money = t.netOptionPnlRs ?? t.optionPnlRs;
+    const wl =
+      t.moneyOutcome ??
+      (money != null
+        ? money > 0
+          ? 'WIN'
+          : money < 0
+            ? 'LOSS'
+            : 'FLAT'
+        : t.premiumEstimated
+          ? 'FLAT'
+          : t.outcome);
+    if (wl === 'WIN') {
       row.wins += 1;
-    } else if (t.outcome === 'LOSS') {
+    } else if (wl === 'LOSS') {
       row.losses += 1;
     }
     row.indexNetPts += t.indexPoints;
