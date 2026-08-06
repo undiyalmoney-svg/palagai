@@ -137,6 +137,112 @@ describe('applyKiteFillPnl', () => {
     expect(out[0]!.optionPnlRs).toBe(325.5);
   });
 
+  it('does not overlay a different symbol fill onto a paper leg', () => {
+    const trades = [
+      trade({
+        id: 'ce1',
+        instrumentId: 'banknifty',
+        instrumentName: 'Bank Nifty',
+        direction: 'BUY',
+        indexPoints: 8.8,
+        entryTime: '2026-08-06 10:00:00',
+        option: {
+          tradingSymbol: 'BANKNIFTY2580652000CE',
+          instrumentToken: 3,
+          strike: 52000,
+          expiry: '2026-08-06',
+          optionType: 'CE',
+          lotSize: 30,
+          source: 'chain',
+        },
+        optionPnlRs: 264,
+      }),
+    ];
+    const out = applyKiteFillPnl(trades, [
+      {
+        instrumentId: 'banknifty',
+        tradingSymbol: 'BANKNIFTY2580652000PE',
+        quantity: 30,
+        leg: 'ENTRY',
+        status: 'COMPLETE',
+        averagePrice: 200,
+        at: '2026-08-06T10:00:00.000Z',
+      },
+      {
+        instrumentId: 'banknifty',
+        tradingSymbol: 'BANKNIFTY2580652000PE',
+        quantity: 30,
+        leg: 'EXIT',
+        status: 'COMPLETE',
+        averagePrice: 180,
+        at: '2026-08-06T10:30:00.000Z',
+      },
+    ]);
+    // Must keep paper P&L — PE fills must not attach to CE paper leg.
+    expect(out[0]!.optionPnlRs).toBe(264);
+    expect(out[0]!.onKite).toBeUndefined();
+  });
+
+  it('pairs by nearest entry time when multiple same-symbol fills exist', () => {
+    const trades = [
+      trade({
+        id: 'later',
+        instrumentId: 'banknifty',
+        entryTime: '2026-08-06 11:00:00',
+        option: {
+          tradingSymbol: 'BANKNIFTY2580652000CE',
+          instrumentToken: 3,
+          strike: 52000,
+          expiry: '2026-08-06',
+          optionType: 'CE',
+          lotSize: 30,
+          source: 'chain',
+        },
+      }),
+    ];
+    const out = applyKiteFillPnl(trades, [
+      {
+        instrumentId: 'banknifty',
+        tradingSymbol: 'BANKNIFTY2580652000CE',
+        quantity: 30,
+        leg: 'ENTRY',
+        status: 'COMPLETE',
+        averagePrice: 100,
+        at: '2026-08-06T09:30:00.000Z',
+      },
+      {
+        instrumentId: 'banknifty',
+        tradingSymbol: 'BANKNIFTY2580652000CE',
+        quantity: 30,
+        leg: 'EXIT',
+        status: 'COMPLETE',
+        averagePrice: 90,
+        at: '2026-08-06T09:45:00.000Z',
+      },
+      {
+        instrumentId: 'banknifty',
+        tradingSymbol: 'BANKNIFTY2580652000CE',
+        quantity: 30,
+        leg: 'ENTRY',
+        status: 'COMPLETE',
+        averagePrice: 726,
+        at: '2026-08-06T11:00:00.000Z',
+      },
+      {
+        instrumentId: 'banknifty',
+        tradingSymbol: 'BANKNIFTY2580652000CE',
+        quantity: 30,
+        leg: 'EXIT',
+        status: 'COMPLETE',
+        averagePrice: 738.5,
+        at: '2026-08-06T11:40:00.000Z',
+      },
+    ]);
+    expect(out[0]!.optionEntryPremium).toBe(726);
+    expect(out[0]!.optionExitPremium).toBe(738.5);
+    expect(out[0]!.optionPnlRs).toBe(375);
+  });
+
   it('deskLegHasKiteEntry is true for ENTRY-only fills (not a miss)', () => {
     const t = trade({ id: 't1', instrumentId: 'nifty' });
     expect(

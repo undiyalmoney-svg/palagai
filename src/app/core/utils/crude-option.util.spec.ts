@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { Instrument } from '../models/instrument.model';
 import {
+  crudeMiniLotSize,
   isCrudeOptionExpiryDay,
   listCrudeOilMiniOptions,
   resolveAtmCrudeMiniOption,
   resolveCrudeFrontExpiry,
   listCrudeLiveExpiries,
+  toCrudePaperOption,
 } from './crude-option.util';
 
 function opt(
@@ -123,5 +125,25 @@ describe('crude option expiry roll', () => {
     );
     expect(expiry).toBe('2026-09-17');
     expect(atm.every((p) => p.expiry === '2026-09-17')).toBe(true);
+  });
+});
+
+describe('crudeMiniLotSize', () => {
+  it('floors CSV lot_size=1 up to 10 so Profit ₹ is not premium-delta only', () => {
+    expect(crudeMiniLotSize(1)).toBe(10);
+    expect(crudeMiniLotSize(0)).toBe(10);
+    expect(crudeMiniLotSize(10)).toBe(10);
+    expect(crudeMiniLotSize(100)).toBe(100);
+    const paper = toCrudePaperOption(
+      opt({
+        tradingSymbol: 'CRUDEOILM26AUG6200PE',
+        expiry: '2026-08-17',
+        strike: 6200,
+        instrumentType: 'PE',
+        lotSize: 1,
+      }),
+      'chain',
+    );
+    expect(paper.lotSize).toBe(10);
   });
 });

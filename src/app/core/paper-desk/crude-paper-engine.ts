@@ -310,7 +310,7 @@ export function replayPaperOnCrude(params: {
       option: PaperTrade['option'];
       optionEntryPremium: number | null;
     }) => void;
-    onClose?: (entryTime: string) => void;
+    onClose?: (entryTime: string, exitReason?: string) => void;
   };
 }): CrudeReplayResult {
   const {
@@ -387,7 +387,7 @@ export function replayPaperOnCrude(params: {
         });
         trades.push(closed);
         if (hookActive(candle.date)) {
-          liveHook?.onClose?.(closed.entryTime);
+          liveHook?.onClose?.(closed.entryTime, closed.exitReason);
         }
         recordCrudeTradeClosed(
           state,
@@ -583,7 +583,7 @@ export function replayPaperOnCrude(params: {
     });
     trades.push(closed);
     if (hookActive(last.date)) {
-      liveHook?.onClose?.(closed.entryTime);
+      liveHook?.onClose?.(closed.entryTime, closed.exitReason);
     }
     recordCrudeTradeClosed(
       state,

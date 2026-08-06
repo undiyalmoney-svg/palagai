@@ -19,6 +19,7 @@ import {
   PDHL_RUPEES_PER_POINT,
   deskDayProfitLockMoneyRs,
   deskStrictDayLossMoneyRs,
+  rupeesPerPointForInstrument,
 } from '../../../core/strategy-engine/strategies/pdhl-opening-range/pdhl-opening-range.evaluator';
 import { KiteSessionService } from '../../../core/kite/kite-session.service';
 import { LotsPreferenceService } from '../../../core/services/lots-preference.service';
@@ -597,6 +598,30 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
       return t.netOptionPnlRs;
     }
     return t.optionPnlRs ?? 0;
+  }
+
+  /**
+   * Index/futures money proxy (pts × ₹65/₹30/₹10 × lots) — not Kite option ₹.
+   * Shown under fut pts so "Profit drained · fut +8.8" is not read as option profit.
+   */
+  protected indexProxyRs(t: {
+    instrumentId: string;
+    indexPoints: number;
+  }): number {
+    const rpp = rupeesPerPointForInstrument(t.instrumentId);
+    const lots = this.lotsForInstrumentId(t.instrumentId);
+    return t.indexPoints * rpp * lots;
+  }
+
+  /** True when Kite/option ₹ disagrees in sign with index fut pts (Live hybrid). */
+  protected futOptionDisagree(t: {
+    indexPoints: number;
+    netOptionPnlRs?: number | null;
+    optionPnlRs?: number | null;
+    onKite?: boolean;
+  }): boolean {
+    const opt = this.tradeProfitRs(t);
+    return t.indexPoints * opt < 0;
   }
 }
 

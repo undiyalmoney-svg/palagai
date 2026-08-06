@@ -483,7 +483,8 @@ export function replayPaperOnIndex(params: {
   liveHook?: {
     afterBarTime?: string | null;
     onOpen?: (open: PaperLiveOpenHook) => void;
-    onClose?: (entryTime: string) => void;
+    /** exitReason lets Live money hold option when index "Profit drained" but option is red. */
+    onClose?: (entryTime: string, exitReason?: string) => void;
   };
 }): ReplayInstrumentResult {
   const {
@@ -615,7 +616,7 @@ export function replayPaperOnIndex(params: {
         });
         trades.push(closed);
         if (hookActive(candle.date)) {
-          liveHook?.onClose?.(closed.entryTime);
+          liveHook?.onClose?.(closed.entryTime, closed.exitReason);
         }
         if (isKutty) {
           recordKuttyClosed(kuttyState);
@@ -798,7 +799,7 @@ export function replayPaperOnIndex(params: {
       });
       trades.push(closed);
       if (hookActive(candle.date)) {
-        liveHook?.onClose?.(closed.entryTime);
+        liveHook?.onClose?.(closed.entryTime, closed.exitReason);
       }
       if (isKutty) {
         recordKuttyClosed(kuttyState);

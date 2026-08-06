@@ -918,8 +918,13 @@
                     >
                     <small class="muted"
                       >fut {{ t.indexPoints > 0 ? '+' : ''
-                      }}{{ t.indexPoints | number: '1.1-1' }}</small
+                      }}{{ t.indexPoints | number: '1.1-1' }}
+                      · idx ₹{{ indexProxyRs(t) > 0 ? '+' : ''
+                      }}{{ indexProxyRs(t) | number: '1.0-0' }}</small
                     >
+                    @if (futOptionDisagree(t)) {
+                      <small class="muted">Kite ₹ ≠ index (trail on fut)</small>
+                    }
                   </div>
                 </td>
                 <td><small>{{ t.exitReason }}</small></td>

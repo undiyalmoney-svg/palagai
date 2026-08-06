@@ -305,6 +305,12 @@ export function resolveAtmCrudeMiniOption(params: {
   };
 }
 
+/** CRUDEOILM options are 10-unit lots; never trust CSV lot_size=1 (understates ₹ ×10). */
+export function crudeMiniLotSize(lotSize: number | null | undefined): number {
+  const n = Math.floor(Number(lotSize) || 0);
+  return Math.max(10, n > 0 ? n : 10);
+}
+
 export function toCrudePaperOption(
   instrument: Instrument,
   source: 'chain' | 'synthetic',
@@ -315,7 +321,7 @@ export function toCrudePaperOption(
     strike: instrument.strike,
     expiry: instrument.expiry,
     optionType: instrument.instrumentType === 'PE' ? 'PE' : 'CE',
-    lotSize: instrument.lotSize > 0 ? instrument.lotSize : 10,
+    lotSize: crudeMiniLotSize(instrument.lotSize),
     source,
     exchange: 'MCX',
     product: 'MIS',
@@ -365,7 +371,7 @@ function toPick(item: Instrument, spot: number): CrudeOptionPick {
     strike: item.strike,
     expiry: item.expiry,
     tradingSymbol: item.tradingSymbol,
-    lotSize: item.lotSize > 0 ? item.lotSize : 10,
+    lotSize: crudeMiniLotSize(item.lotSize),
     lastPrice: item.lastPrice,
     distanceFromSpot: Math.abs(item.strike - spot),
   };

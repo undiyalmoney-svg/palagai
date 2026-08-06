@@ -137,7 +137,14 @@ type IndexLiveBrokerEvent =
         optionEntryPremium: number | null;
       };
     }
-  | { kind: 'close'; instrumentId: string; instrumentName: string; entryTime: string };
+  | {
+      kind: 'close';
+      instrumentId: string;
+      instrumentName: string;
+      entryTime: string;
+      /** Paper exit reason — Live may hold option when index drained but option red. */
+      exitReason?: string;
+    };
 
 interface CrudeLiveState {
   futuresToken: number;
@@ -1490,12 +1497,13 @@ export class PaperTradeDeskService {
                     open: o,
                   });
                 },
-                onClose: (entryTime: string) => {
+                onClose: (entryTime: string, exitReason?: string) => {
                   indexBrokerEvents.push({
                     kind: 'close',
                     instrumentId: leg.instrument.id,
                     instrumentName: leg.instrument.name,
                     entryTime,
+                    exitReason,
                   });
                 },
               }
@@ -1612,12 +1620,13 @@ export class PaperTradeDeskService {
                   open: o,
                 });
               },
-              onClose: (entryTime: string) => {
+              onClose: (entryTime: string, exitReason?: string) => {
                 mcxBrokerEvents.push({
                   kind: 'close',
                   instrumentId: CRUDE_OIL_MINI_INSTRUMENT.id,
                   instrumentName: `${CRUDE_OIL_MINI_INSTRUMENT.name} (${this.crudeLive!.futuresSymbol})`,
                   entryTime,
+                  exitReason,
                 });
               },
             }
@@ -2009,6 +2018,7 @@ export class PaperTradeDeskService {
           instrumentName: ev.instrumentName,
           lots: this.lotsForInstrument(ev.instrumentId),
           open: null,
+          closeReason: ev.exitReason,
         });
       }
       await delay(300);
