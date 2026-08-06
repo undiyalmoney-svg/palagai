@@ -32,6 +32,11 @@ import { DeskChannel } from '../../../core/strategy-manager/models/desk-channel.
 import { UiDialogService } from '../../../shared/ui/dialog/ui-dialog.service';
 import { APP_BUILD_LABEL } from '../../../core/config/app-build';
 import { DAILY_3K_DESK_PRESET } from '../../../core/paper-desk/daily-3k-desk-preset';
+import {
+  computeOptionTargetPremium,
+  computeProtectiveSlTrigger,
+  optionPremiumDelta,
+} from '../../../core/live-desk/option-sl-premium.util';
 
 @Component({
   selector: 'app-trade-desk',
@@ -472,30 +477,53 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
       .join('  |  ');
   }
 
-  /** Option SL premium proxy: entry − |index entry − stop| × 0.5 (same as live SL-M). */
+  /**
+   * Option SL premium proxy — same util as live SL-M.
+   * NFO ≈ 0.5Δ; Crude/NatGas MCX ≈ 1.0Δ + min gap (not hardcoded 0.5).
+   */
   protected optionStopPremium(open: {
     indexEntry: number;
     indexStop: number;
     optionEntryPremium: number | null;
+    option?: { exchange?: string; tradingSymbol?: string } | null;
   }): number | null {
     if (open.optionEntryPremium == null || open.optionEntryPremium <= 0) {
       return null;
     }
-    const indexRisk = Math.abs(open.indexEntry - open.indexStop);
-    return Math.max(0.05, Math.round((open.optionEntryPremium - indexRisk * 0.5) / 0.05) * 0.05);
+    return computeProtectiveSlTrigger({
+      fillPremium: open.optionEntryPremium,
+      indexRiskPts: Math.abs(open.indexEntry - open.indexStop),
+      exchange: open.option?.exchange,
+      tradingSymbol: open.option?.tradingSymbol,
+    });
   }
 
-  /** Option target premium proxy: entry + |index target − entry| × 0.5. */
+  /** Option target premium proxy — exchange-aware delta (MCX 1.0 / NFO 0.5). */
   protected optionTargetPremium(open: {
     indexEntry: number;
     indexTarget: number;
     optionEntryPremium: number | null;
+    option?: { exchange?: string; tradingSymbol?: string } | null;
   }): number | null {
     if (open.optionEntryPremium == null || open.optionEntryPremium <= 0) {
       return null;
     }
-    const indexReward = Math.abs(open.indexTarget - open.indexEntry);
-    return Math.max(0.05, Math.round((open.optionEntryPremium + indexReward * 0.5) / 0.05) * 0.05);
+    return computeOptionTargetPremium({
+      fillPremium: open.optionEntryPremium,
+      indexRewardPts: Math.abs(open.indexTarget - open.indexEntry),
+      exchange: open.option?.exchange,
+      tradingSymbol: open.option?.tradingSymbol,
+    });
+  }
+
+  /** UI note: which delta the option SL/target row uses. */
+  protected optionDeltaNote(open: {
+    option?: { exchange?: string; tradingSymbol?: string } | null;
+  }): string {
+    const d = optionPremiumDelta(open.option?.exchange, open.option?.tradingSymbol);
+    return d >= 1
+      ? 'Option SL/Tgt ≈ index pts × 1.0 (MCX Crude/NG — same as live SL-M)'
+      : 'Option SL/Tgt ≈ index pts × 0.5 (NFO — same as live SL-M)';
   }
 
   protected fmtTime(ts: string | null | undefined): string {

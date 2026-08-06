@@ -679,7 +679,7 @@
                   </div>
                 </div>
                 <small class="levels-note">
-                  Option target ≈ entry + |index target − entry| × 0.5 (same delta used for SL-M)
+                  {{ optionDeltaNote(o) }}
                 </small>
               </div>
 
@@ -911,7 +911,16 @@
                   }
                 </td>
                 <td class="num" [class.up]="tradeProfitRs(t) > 0" [class.down]="tradeProfitRs(t) < 0">
-                  {{ tradeProfitRs(t) > 0 ? '+' : '' }}{{ tradeProfitRs(t) | number: '1.0-0' }}
+                  <div class="stack">
+                    <strong
+                      >{{ tradeProfitRs(t) > 0 ? '+' : ''
+                      }}{{ tradeProfitRs(t) | number: '1.0-0' }}</strong
+                    >
+                    <small class="muted"
+                      >fut {{ t.indexPoints > 0 ? '+' : ''
+                      }}{{ t.indexPoints | number: '1.1-1' }}</small
+                    >
+                  </div>
                 </td>
                 <td><small>{{ t.exitReason }}</small></td>
               </tr>

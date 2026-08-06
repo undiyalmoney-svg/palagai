@@ -204,8 +204,9 @@ function lookupPremium(
   return edge === 'entry' ? best.open : best.close;
 }
 
+/** MCX Crude options ≈ 1.0Δ (not NFO 0.5) when option candles are missing. */
 function estimatePremiumMove(points: number): number {
-  return points * 0.5;
+  return points * 1;
 }
 
 let tradeSeq = 0;
@@ -369,13 +370,18 @@ export function replayPaperOnCrude(params: {
               : open.book === 'evening'
                 ? 'Evening'
                 : 'Trap';
+        const futPts =
+          open.direction === 'BUY'
+            ? exit.exitPrice - open.entry
+            : open.entry - exit.exitPrice;
+        const futLabel = `fut ${futPts >= 0 ? '+' : ''}${futPts.toFixed(1)}`;
         const closed = closePaperTrade({
           instrumentId,
           instrumentName,
           open,
           exitPrice: exit.exitPrice,
           exitTime: candle.date,
-          exitReason: `${exit.reason} · ${bookLabel}`,
+          exitReason: `${exit.reason} · ${futLabel} · ${bookLabel}`,
           optionCandlesByToken,
           lotsMultiplier,
         });
