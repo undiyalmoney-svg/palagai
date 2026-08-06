@@ -6,7 +6,7 @@
       <p class="pg-lede">
         @if (showCrude() || showNatGas()) {
           Nifty, Bank, Crude &amp; Nat Gas Mini — Strat for indices; Crude
-          <strong>Selective</strong> (max 2/day · SL30/TP60 · 10:00–22:00); Nat Gas
+          <strong>Selective</strong> (SL30/TP60 · unlimited · 10:00–23:00); Nat Gas
           <strong>Daily Profit (NG)</strong>. Index until 15:15 · MCX continues evening.
         } @else {
           Nifty &amp; Bank Nifty — Strat for indices. Session until 15:15.
@@ -200,7 +200,7 @@
       @if (showCrude()) {
         <label
           class="desk-check"
-          title="Selective · 10:00–22:00 · SL30/TP60 · max 2/day · continues past 15:15 on MCX"
+          title="Selective · 10:00–23:00 · SL30/TP60 · unlimited · continues past 15:15 on MCX"
         >
           <input type="checkbox" [(ngModel)]="enableCrude" [disabled]="busy() || snapshot().running" />
           <span>Crude Oil Mini</span>

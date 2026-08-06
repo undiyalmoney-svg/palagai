@@ -1,7 +1,7 @@
 /**
  * Crude Oil Mini strategy profiles for the Crude Desk.
  *
- * - selective: charge-aware · max 2/day · SL30/TP60 · 10:00–22:00 (Trade Desk default · doc 41/43)
+ * - selective: SL30/TP60 · confirm · 10:00–23:00 · unlimited (Trade Desk default)
  * - all-green: Session OR 09:00–09:30 · entries →23:00 · per-trade SL/trail (Experiments picker only)
  * - daily-profit: Trap-style evening PDHL + confirm · tight SL/TP
  * - champion: hunt pair (larger SL/TP)
@@ -165,32 +165,32 @@ export const CRUDE_ALL_GREEN_PARAMS: CrudeTradeParams = {
 };
 
 /**
- * Selective — charge-aware Crude (doc 41/43 1-lot Daily).
- * 1-lot hunt: SL30/TP60 · session 10:00–22:00 · max 2/day · no OR skip
- * pairs with Trap pierce10 for ~87–89% desk days ≥₹1k at 1/1/1.
+ * Selective — quality Crude (SL30/TP60 · confirm · trail OFF).
+ * Owner: remove max-2 / day-stop so good Crude days can keep filling.
+ * Not All-Green (no peak-trail churn / 12 tpd charge burn).
  */
 export const CRUDE_SELECTIVE_PARAMS: CrudeTradeParams = {
   profileId: 'selective',
-  label: 'Selective (≤2/day · SL30/TP60)',
+  label: 'Selective (SL30/TP60 · unlimited)',
   stopPts: 30,
   morningTargetPts: 60,
   eveningTargetPts: 60,
   targetRMultiple: 0,
-  dayLossStopPts: 40,
-  strictDayLossPts: 40,
+  dayLossStopPts: 0,
+  strictDayLossPts: 0,
   dayProfitLockPts: 0,
   entryMode: 'session-or',
   requireConfirm: true,
   firstWinLock: false,
   eveningEntryStart: '10:00',
-  eveningEntryEnd: '22:00',
+  eveningEntryEnd: CRUDE_SOR_ENTRY_END,
   sessionOrStart: CRUDE_SOR_OR_START,
   sessionOrEnd: CRUDE_SOR_OR_END,
   maxOrWidth: 0,
-  maxEveningTradesDay: 2,
+  maxEveningTradesDay: 0,
   defaultEnableMorning: false,
   defaultEnableEvening: true,
-  dailyBandLabel: '10:00–22:00 · SL30/TP60 · confirm · max 2/day · no OR skip',
+  dailyBandLabel: '10:00–23:00 · SL30/TP60 · confirm · unlimited · no day stop',
   ...PROTECT_OFF,
 };
 

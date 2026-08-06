@@ -18,7 +18,7 @@
 |---|---|---:|
 | Nifty 50 | Trap + confirm · **pierce 10** · peak-trail **arm₹150** · **soft OFF** · **2R** | **1** |
 | Bank Nifty | same | **1** |
-| Crude Oil Mini | Selective **SL30/TP60** · **10:00–22:00** · max 2/day · confirm | **1** |
+| Crude Oil Mini | Selective **SL30/TP60** · **10:00–23:00** · unlimited · confirm | **1** |
 
 Desk defaults: **day profit lock +₹3,000** on · **strict day stop** off (opt in) · Nat Gas/Kutty off.
 
@@ -60,6 +60,6 @@ Day lock ₹3k puts hit days into the **₹1k–₹3k band**.
 ## Wired changes (v1.3.52)
 
 1. Trap DNA → pierce**10** · peak**150/75/75** · soft **OFF** · RR**2** (strat storage **v23**).  
-2. Crude Selective → SL**30**/TP**60** · 10:00–22:00 · max 2.  
+2. Crude Selective → SL**30**/TP**60** · 10:00–23:00 · unlimited (v1.3.62; was max 2).  
 3. Desk day profit lock **₹5,000 → ₹3,000**.  
 4. Preset lots **1/1/1**.
