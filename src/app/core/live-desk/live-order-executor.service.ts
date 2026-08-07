@@ -11,6 +11,7 @@ import {
   mergeSummaryRows,
   summaryRowsFromKiteOrderBook,
 } from './kite-order-book-fills.util';
+import { isSameBarReentry, sameBarReentryReason } from './reentry-cooldown.util';
 
 export interface LiveBrokerPosition {
   instrumentId: string;
@@ -148,6 +149,9 @@ export class LiveOrderExecutorService {
   private readonly events: LiveOrderEvent[] = [];
   private readonly summary = new Map<string, LiveOrderSummaryRow>();
   private readonly instrumentNames = new Map<string, string>();
+  /** Bar time of the last leg closed per instrument — blocks same-candle re-entry. */
+  private readonly lastExitBarByInstrument = new Map<string, string>();
+  private readonly sameBarReentryLogged = new Set<string>();
   /** Number of lots (exchange lot size × this). Testing never uses this. */
   private lotsMultiplier = 1;
   /** Per-desk-instrument lots so Nifty / Bank / Crude can differ on one Live run. */
@@ -515,6 +519,30 @@ export class LiveOrderExecutorService {
     }
 
     if (open && (!current || current.status === 'flat' || current.status === 'error')) {
+      if (
+        isSameBarReentry({
+          signalEntryTime: open.entryTime,
+          lastExitEntryTime: this.lastExitBarByInstrument.get(params.instrumentId),
+        })
+      ) {
+        const key = `${params.instrumentId}:${open.entryTime}`;
+        if (!this.sameBarReentryLogged.has(key)) {
+          this.sameBarReentryLogged.add(key);
+          this.pushEvent({
+            at: new Date().toISOString(),
+            instrumentId: params.instrumentId,
+            instrumentName: params.instrumentName,
+            action: 'SKIP',
+            detail: sameBarReentryReason(
+              open.entryTime,
+              this.lastExitBarByInstrument.get(params.instrumentId),
+            ),
+            tradingSymbol: open.option?.tradingSymbol,
+          });
+        }
+        await this.refreshSummaryStatuses(params.authorization);
+        return;
+      }
       // Safety: if broker already has this option open, adopt instead of second entry.
       if (open.option?.tradingSymbol) {
         const existing = this.positionsBySymbol.get(open.option.tradingSymbol.toUpperCase());
@@ -1127,6 +1155,9 @@ export class LiveOrderExecutorService {
     }
 
     this.exitingSymbols.add(sym);
+    // Remember which bar we just traded so the next signal in the same candle
+    // cannot re-enter and pay the spread again.
+    this.lastExitBarByInstrument.set(pos.instrumentId, latest.entryTime);
     const exitingPos: LiveBrokerPosition = { ...latest, status: 'exiting', lastError: null };
     this.positions.set(pos.instrumentId, exitingPos);
     this.positionsBySymbol.set(sym, exitingPos);
@@ -1366,6 +1397,7 @@ export class LiveOrderExecutorService {
         lastError: null,
       });
       this.positionsBySymbol.delete(pos.tradingSymbol.toUpperCase());
+      this.lastExitBarByInstrument.set(pos.instrumentId, pos.entryTime);
       this.pushEvent({
         at: new Date().toISOString(),
         instrumentId: pos.instrumentId,

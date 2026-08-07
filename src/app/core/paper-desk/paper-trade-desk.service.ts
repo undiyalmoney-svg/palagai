@@ -49,6 +49,7 @@ import {
   nowIstStamp,
   staleStartReason,
 } from '../live-desk/live-start-guard.util';
+import { dropFormingBars } from './forming-bar.util';
 import { enrichTradesWithCharges } from './trade-charges.util';
 import { buildPaperDeskDayStats, emptyPaperDeskDayStats } from './paper-desk-day-stats';
 import { MAX_OPTION_HISTORY_TOKENS, rankTokensByFrequency } from './option-history-tokens.util';
@@ -1419,12 +1420,14 @@ export class PaperTradeDeskService {
           if (initial && leg.candles.length) {
             // already warm
           } else if (initial) {
-            leg.candles = await this.fetch5m({
-              instrumentToken: leg.instrument.instrumentToken,
-              from: `${shiftDate(today, -12)} 09:00:00`,
-              to: `${today} 15:30:00`,
-              authorization,
-            });
+            leg.candles = dropFormingBars(
+              await this.fetch5m({
+                instrumentToken: leg.instrument.instrumentToken,
+                from: `${shiftDate(today, -12)} 09:00:00`,
+                to: `${today} 15:30:00`,
+                authorization,
+              }),
+            );
           } else {
             const todayBars = await this.fetch5m({
               instrumentToken: leg.instrument.instrumentToken,
@@ -1433,7 +1436,9 @@ export class PaperTradeDeskService {
               authorization,
             });
             const prior = leg.candles.filter((c) => datePart(c.date) !== today);
-            leg.candles = [...prior, ...todayBars];
+            // Forming bar repaints between 15s ticks — that churned three Bank
+            // round trips inside one candle on 2026-08-07.
+            leg.candles = dropFormingBars([...prior, ...todayBars]);
           }
         } catch {
           // keep previous candles
@@ -1453,7 +1458,7 @@ export class PaperTradeDeskService {
           authorization,
         });
         const prior = this.crudeLive.candles.filter((c) => datePart(c.date) !== today);
-        this.crudeLive.candles = [...prior, ...todayBars];
+        this.crudeLive.candles = dropFormingBars([...prior, ...todayBars]);
       } catch {
         // keep previous
       }
@@ -1471,7 +1476,7 @@ export class PaperTradeDeskService {
           authorization,
         });
         const prior = this.natGasLive.candles.filter((c) => datePart(c.date) !== today);
-        this.natGasLive.candles = [...prior, ...todayBars];
+        this.natGasLive.candles = dropFormingBars([...prior, ...todayBars]);
       } catch {
         // keep previous
       }
