@@ -46,24 +46,34 @@ function trade(p: Partial<PaperTrade>): PaperTrade {
 }
 
 describe('isRestingExit', () => {
-  it('stop and target rest at the exchange', () => {
+  it('stop, target, and peak-trail drain rest at the exchange (SL-M)', () => {
     expect(isRestingExit('Stop loss hit')).toBe(true);
     expect(isRestingExit('Target hit')).toBe(true);
+    expect(isRestingExit('Profit drained — cut & rehunt')).toBe(true);
   });
 
-  it('anything the desk decides does not', () => {
-    expect(isRestingExit('Profit drained — cut & rehunt')).toBe(false);
+  it('desk-decided soft exits do not rest', () => {
     expect(isRestingExit('EMA-20 exit')).toBe(false);
+    expect(isRestingExit('Session exit')).toBe(false);
   });
 });
 
 describe('executableFill', () => {
-  it('enters at the open after the signal bar, exits at the open after the exit bar', () => {
-    const f = executableFill(trade({}), idx, series);
-    // signal 10:00 → fill 10:05 open 109; decided exit 10:05 → fill 10:10 open 117
+  it('peak-trail drain fills at the trail level (resting SL-M), not next open', () => {
+    const f = executableFill(
+      trade({
+        exitReason: 'Profit drained — cut & rehunt',
+        exitTime: '10:05',
+        indexExit: 118,
+        indexPoints: 10,
+      }),
+      idx,
+      series,
+    );
+    // signal 10:00 → fill 10:05 open 109; trail SL fills intrabar at 118
     expect(f.entryPrice).toBe(109);
-    expect(f.exitPrice).toBe(117);
-    expect(f.indexPoints).toBe(8);
+    expect(f.exitPrice).toBe(118);
+    expect(f.indexPoints).toBe(9);
   });
 
   it('a resting stop still fills intrabar at its level', () => {
@@ -77,20 +87,56 @@ describe('executableFill', () => {
     expect(f.indexPoints).toBe(-9);
   });
 
-  it('drops a decided exit that lands on our entry bar — nothing to hold', () => {
-    const f = executableFill(trade({ entryTime: '10:00', exitTime: '10:00' }), idx, series);
+  it('drops when resting exit is before we could enter', () => {
+    const f = executableFill(
+      trade({ entryTime: '10:00', exitTime: '10:00', exitReason: 'Stop loss hit' }),
+      idx,
+      series,
+    );
     expect(f.indexPoints).toBeNull();
   });
 
-  it('drops a trade with no bar left to fill on', () => {
-    const f = executableFill(trade({ entryTime: '10:15', exitTime: '10:15' }), idx, series);
+  it('drops a trade with no bar left to enter on', () => {
+    const f = executableFill(
+      trade({
+        entryTime: '10:15',
+        exitTime: '10:15',
+        exitReason: 'EMA-20 exit',
+      }),
+      idx,
+      series,
+    );
     expect(f.indexPoints).toBeNull();
   });
 
-  it('reverses correctly for a SELL', () => {
-    const f = executableFill(trade({ direction: 'SELL' }), idx, series);
-    // in 109, out 117, short → -8
-    expect(f.indexPoints).toBe(-8);
+  it('SELL trail drain: entry next open, exit at resting trail level', () => {
+    const f = executableFill(
+      trade({
+        direction: 'SELL',
+        indexExit: 112,
+        exitReason: 'Profit drained — cut & rehunt',
+      }),
+      idx,
+      series,
+    );
+    expect(f.entryPrice).toBe(109);
+    expect(f.exitPrice).toBe(112);
+    expect(f.indexPoints).toBe(-3);
+  });
+
+  it('desk-decided exit still uses next-bar open', () => {
+    const f = executableFill(
+      trade({
+        exitReason: 'EMA-20 exit',
+        exitTime: '10:05',
+        indexExit: 118,
+      }),
+      idx,
+      series,
+    );
+    expect(f.entryPrice).toBe(109);
+    expect(f.exitPrice).toBe(117);
+    expect(f.indexPoints).toBe(8);
   });
 });
 
@@ -103,14 +149,22 @@ describe('repriceTradesToExecutableFills', () => {
       byInstrument,
     );
     expect(out!.modelledIndexPoints).toBe(10);
-    expect(out!.indexPoints).toBe(8);
-    expect(out!.optionPnlRs).toBeCloseTo(800, 6);
-    expect(out!.netOptionPnlRs).toBeCloseTo(760, 6);
+    // trail resting: entry 109 → exit 118 → +9
+    expect(out!.indexPoints).toBe(9);
+    expect(out!.optionPnlRs).toBeCloseTo(900, 6);
+    expect(out!.netOptionPnlRs).toBeCloseTo(855, 6);
   });
 
   it('REGRESSION: a modelled winner that is unreachable is not reported as a fill', () => {
     const out = repriceTradesToExecutableFills(
-      [trade({ entryTime: '10:15', exitTime: '10:15', indexPoints: 50 })],
+      [
+        trade({
+          entryTime: '10:15',
+          exitTime: '10:15',
+          indexPoints: 50,
+          exitReason: 'EMA-20 exit',
+        }),
+      ],
       byInstrument,
     );
     expect(out).toEqual([]);
@@ -122,11 +176,46 @@ describe('repriceTradesToExecutableFills', () => {
     expect(out).toEqual([t]);
   });
 
-  it('flips outcome when a modelled winner is really a loser', () => {
+  it('REGRESSION Aug7 −₹33: peak-trail must not flip via next-open', () => {
+    // Old bug: profit-drained treated as decided → exit next open → false red.
     const [out] = repriceTradesToExecutableFills(
-      [trade({ direction: 'SELL', outcome: 'WIN' })],
+      [
+        trade({
+          direction: 'SELL',
+          indexEntry: 120,
+          indexExit: 110,
+          indexPoints: 10,
+          entryTime: '10:00',
+          exitTime: '10:05',
+          exitReason: 'Profit drained — cut & rehunt',
+          outcome: 'WIN',
+          optionPnlRs: 500,
+        }),
+      ],
       byInstrument,
     );
-    expect(out!.outcome).toBe('LOSS');
+    expect(out).toBeTruthy();
+    expect(out!.indexExit).toBe(110);
+    // Must NOT use 10:10 open 117 as exit (that painted false option losses).
+    expect(out!.indexExit).not.toBe(117);
+  });
+
+  it('does not scale real option OHLC money by the index entry-lag ratio', () => {
+    const [out] = repriceTradesToExecutableFills(
+      [
+        trade({
+          premiumEstimated: false,
+          optionPnlRs: 216,
+          netOptionPnlRs: 200,
+          indexPoints: 10,
+        }),
+      ],
+      byInstrument,
+    );
+    // Index still repriced (entry lag), but real option ₹ stays as measured.
+    expect(out!.indexPoints).toBe(9);
+    expect(out!.optionPnlRs).toBe(216);
+    expect(out!.netOptionPnlRs).toBe(200);
+    expect(out!.moneyOutcome).toBe('WIN');
   });
 });

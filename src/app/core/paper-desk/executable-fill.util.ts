@@ -16,10 +16,23 @@ import { PaperTrade } from './paper-desk.models';
  * has to show the real number or it is not a test.
  */
 
-/** Stops and targets rest at the exchange, so they still fill intrabar. */
+/**
+ * Exits that rest at the exchange (SL-M / target) still fill intrabar.
+ *
+ * Peak-trail "Profit drained — cut & rehunt" is the protective SL ratcheted up
+ * on Kite (MODIFY_SL) — same as stop loss, NOT a desk MARKET decision. Treating
+ * it as next-bar-open was the −₹33 class bug: index model green, paper option
+ * fills flipped red on the following open.
+ */
 export function isRestingExit(exitReason: string): boolean {
   const r = (exitReason ?? '').toLowerCase();
-  return r.includes('stop loss') || r.includes('target');
+  return (
+    r.includes('stop loss') ||
+    r.includes('target') ||
+    r.includes('profit drained') ||
+    r.includes('cut & rehunt') ||
+    r.includes('cut and rehunt')
+  );
 }
 
 export interface ExecutableFill {
@@ -107,17 +120,34 @@ export function repriceTradesToExecutableFills(
       continue;
     }
     const scale = t.indexPoints !== 0 ? fill.indexPoints / t.indexPoints : 0;
+    // Delta-estimated option ₹ tracks index points — scale with the fill.
+    // Real option OHLC already priced the premium path; scaling it by the
+    // index entry-lag ratio is what flipped Aug-7 24550 PE +₹216 → −₹158.
+    const scaleOption = t.premiumEstimated === true;
+    const optionPnlRs =
+      t.optionPnlRs == null || !scaleOption ? t.optionPnlRs : t.optionPnlRs * scale;
+    const netOptionPnlRs =
+      t.netOptionPnlRs == null || !scaleOption
+        ? t.netOptionPnlRs
+        : t.netOptionPnlRs * scale;
+    const moneyOutcome: PaperTrade['moneyOutcome'] =
+      optionPnlRs == null
+        ? undefined
+        : optionPnlRs > 0
+          ? 'WIN'
+          : optionPnlRs < 0
+            ? 'LOSS'
+            : 'FLAT';
     out.push({
       ...t,
       modelledIndexPoints: t.indexPoints,
       indexPoints: fill.indexPoints,
       indexEntry: fill.entryPrice ?? t.indexEntry,
       indexExit: fill.exitPrice ?? t.indexExit,
-      // Option money moves with the index move it came from.
-      optionPnlRs: t.optionPnlRs == null ? null : t.optionPnlRs * scale,
-      netOptionPnlRs: t.netOptionPnlRs == null ? null : t.netOptionPnlRs * scale,
+      optionPnlRs,
+      netOptionPnlRs,
       outcome: fill.indexPoints > 0 ? 'WIN' : fill.indexPoints < 0 ? 'LOSS' : 'FLAT',
-      moneyOutcome: undefined,
+      moneyOutcome,
     });
   }
   return out;
