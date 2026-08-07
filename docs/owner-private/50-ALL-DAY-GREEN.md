@@ -1,9 +1,9 @@
 # 50 — All-day-green Trap DNA
 
 **Date:** 2026-08-07  
-**Build:** v1.3.87 · `all-day-green`  
+**Build:** v1.3.88 · `hands-off-agent` (DNA from v1.3.87 `all-day-green`)  
 **Script:** `scripts/all-day-green-monster-hunt.py`  
-**Ask:** Every day green — find the method.
+**Ask:** Every day green — find the method. Hands-off: Start / Stop only.
 
 ## Method found
 
@@ -46,8 +46,11 @@ On the **full trading calendar** (not just days with fills):
 
 Same DNA. Live only places Kite orders. Early peak₹100 locks winners before giveback turns the day red — that is the green engine.
 
-## Ops
+## Ops (hands-off)
 
-1. Deploy **v1.3.87**. Storage **v29** resets Trap DNA.  
-2. Trade Desk: capital → auto lots **N×1 B×1** · Crude off · Start.  
-3. Re-hunt: `python3 scripts/all-day-green-monster-hunt.py`
+1. Deploy **v1.3.88**. Hard-refresh Trade Desk — badge must show `hands-off-agent`.  
+2. **Get Token** once.  
+3. Press **Start** any morning (6:30 or 10:00 — your call). Do not select lots/books/DNA.  
+4. Leave the tab open. After **15:15** press **Stop**.  
+5. Capital guards auto-on: day profit lock + strict day stop. Crude/Kutty OFF.  
+6. Re-hunt: `python3 scripts/all-day-green-monster-hunt.py`

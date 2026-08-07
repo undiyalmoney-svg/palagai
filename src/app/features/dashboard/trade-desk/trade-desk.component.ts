@@ -65,7 +65,10 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
   /** Visible build stamp so you can confirm deploy (e.g. v1.3.41 · …). */
   protected readonly appBuildLabel = APP_BUILD_LABEL;
 
-  protected readonly mode = signal<PaperDeskMode>('testing');
+  /** Hands-off agent defaults to Live — client only presses Start / Stop. */
+  protected readonly mode = signal<PaperDeskMode>('live');
+  /** When true, Live hides knobs; Start applies the full agent plan. */
+  protected readonly handsOffAgent = true;
   /**
    * Default Testing window = today (IST).
    * Yesterday-only hid “today’s DNA ₹” that research / agent reports show.
@@ -182,9 +185,11 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
     if (this.snapshot().running) {
       this.mode.set('live');
       this.realOrders = this.snapshot().realOrders;
+      this.realOrdersAck = true;
       this.capitalPlan = planLotsForCapital(this.capitalRs);
     } else {
-      // Capital → auto lots · Trap live-safe · profit lock on.
+      // Hands-off: Live · capital → lots · all-green DNA · capital guards on.
+      this.mode.set('live');
       this.applyCapitalAgentPreset();
     }
     // Friends: no Kutty. Crude/Nat Gas only if module granted.
@@ -240,8 +245,8 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Agent preset: Trap DNA + capital → lots + books + day lock.
-   * Client only refreshes the access token and presses Start.
+   * Hands-off agent preset — client only presses Start / Stop after 15:15.
+   * Capital, lots, books, DNA, Live money, day lock + strict stop all auto.
    */
   private applyCapitalAgentPreset(): void {
     if (this.busy() || this.snapshot().running) {
@@ -249,13 +254,13 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
     }
     const p = DAILY_3K_DESK_PRESET;
     this.assignments.forceTrapDefaultsForDaily3k();
-    this.strictDayStop = p.strictDayStop;
-    this.dayProfitLock = p.dayProfitLock;
+    this.strictDayStop = true; // capital must not drain
+    this.dayProfitLock = true;
     this.autoLotsFromCapital = true;
-    if (this.showKutty()) {
-      this.enableKutty = p.enableKutty;
-      this.kuttyAlone = p.kuttyAlone;
-    }
+    this.enableKutty = false;
+    this.kuttyAlone = false;
+    this.realOrders = true;
+    this.realOrdersAck = true;
     this.applyCapitalAllocation();
     this.error.set('');
   }
@@ -406,24 +411,24 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
   protected async onStart(): Promise<void> {
     this.error.set('');
     if (!this.kiteSession.getAuthorizationHeader()) {
-      this.error.set('No Kite session. Open Get Token and paste your access token, then try again.');
+      this.error.set('No Kite session. Open Get Token once, then press Start.');
       return;
     }
-    // Re-size from capital right before Start so the agent always trades the plan.
-    this.capitalRs = Math.max(
-      10_000,
-      Math.floor(Number(this.capitalRs) || DEFAULT_TRADING_CAPITAL_RS),
-    );
-    this.capitalPreference.set(this.capitalRs);
-    if (this.autoLotsFromCapital) {
-      this.applyCapitalAllocation();
+    // Hands-off: re-apply the full agent plan every Start (any morning time OK).
+    if (this.handsOffAgent && this.mode() === 'live') {
+      this.applyCapitalAgentPreset();
+    } else {
+      this.capitalRs = Math.max(
+        10_000,
+        Math.floor(Number(this.capitalRs) || DEFAULT_TRADING_CAPITAL_RS),
+      );
+      this.capitalPreference.set(this.capitalRs);
+      if (this.autoLotsFromCapital) {
+        this.applyCapitalAllocation();
+      }
     }
     if (!this.enableNifty && !this.enableBank && !this.anyMcxSelected()) {
-      this.error.set(
-        this.showCrude() || this.showNatGas()
-          ? 'Select at least one: Nifty 50, Bank Nifty, Crude Oil Mini, or Natural Gas Mini.'
-          : 'Select at least one: Nifty 50 or Bank Nifty.',
-      );
+      this.error.set('Agent plan has no books — check capital preference (min ₹10,000).');
       return;
     }
 
@@ -442,11 +447,14 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
         }
         await this.desk.runTesting(this.fromDate, this.toDate, runOpts);
       } else {
-        if (this.realOrders && !this.realOrdersAck) {
+        // Hands-off Live money: no checkboxes, no confirm dialog — Start is the only action.
+        if (this.handsOffAgent) {
+          this.realOrders = true;
+          this.realOrdersAck = true;
+        } else if (this.realOrders && !this.realOrdersAck) {
           this.error.set('Tick the confirmation box before starting Live money.');
           return;
-        }
-        if (this.realOrders) {
+        } else if (this.realOrders) {
           const riskBits = [
             this.strictDayStop
               ? `strict day stop −₹${this.strictStopMoneyRs().toLocaleString('en-IN')}`

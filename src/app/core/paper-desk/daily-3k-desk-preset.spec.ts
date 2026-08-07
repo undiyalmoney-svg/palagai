@@ -12,6 +12,6 @@ describe('DAILY_3K_DESK_PRESET', () => {
     expect(DAILY_3K_DESK_PRESET.enableNatGas).toBe(false);
     expect(DAILY_3K_DESK_PRESET.enableKutty).toBe(false);
     expect(DAILY_3K_DESK_PRESET.dayProfitLock).toBe(true);
-    expect(DAILY_3K_DESK_PRESET.strictDayStop).toBe(false);
+    expect(DAILY_3K_DESK_PRESET.strictDayStop).toBe(true);
   });
 });

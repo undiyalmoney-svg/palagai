@@ -19,8 +19,8 @@ export const DAILY_3K_DESK_PRESET = {
   kuttyAlone: false,
   /** Cap new entries after ~+₹3k combined (above the ₹2k daily target). */
   dayProfitLock: true,
-  /** Off by default — user opts in for harder capital protection. */
-  strictDayStop: false,
+  /** On for hands-off agent — capital must not drain. */
+  strictDayStop: true,
   /** Trading capital the auto-lot planner assumes. */
   capitalRs: 40_000,
   researchNote:

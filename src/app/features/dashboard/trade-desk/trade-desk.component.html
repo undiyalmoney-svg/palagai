@@ -2,11 +2,16 @@
   <header class="hero pg-page-hero">
     <div class="hero-copy">
       <p class="pg-eyebrow">Strategy Manager → Trade Desk</p>
-      <h1>Trade Desk</h1>
+      <h1>{{ handsOffAgent && mode() === 'live' ? 'Live Agent' : 'Trade Desk' }}</h1>
       <p class="pg-lede">
-        Enter capital → desk auto-allocates lots and trades Trap / Crude Selective.
-        Your job: <strong>Get Token</strong> daily, press <strong>Start</strong>, keep this tab open.
-        Always <strong>buy</strong> CE/PE — never short options.
+        @if (handsOffAgent && mode() === 'live') {
+          <strong>Get Token</strong> → press <strong>Start</strong> (any morning time) → leave the tab open →
+          <strong>Stop after 3:15</strong>. No other clicks. Capital guards stay on.
+        } @else {
+          Enter capital → desk auto-allocates lots and trades Trap / Crude Selective.
+          Your job: <strong>Get Token</strong> daily, press <strong>Start</strong>, keep this tab open.
+          Always <strong>buy</strong> CE/PE — never short options.
+        }
       </p>
     </div>
     <div class="hero-meta">
@@ -29,7 +34,12 @@
   <div class="active-strategy-bar" role="status" aria-live="polite">
     <div class="active-strategy-label">
       <span class="as-kicker">Active now · {{ activeStrategies().modeLabel }}</span>
-      @if (kuttyAlone && showKutty()) {
+      @if (handsOffAgent && mode() === 'live') {
+        <strong class="as-name">All-day green · Trap DNA</strong>
+        <span class="as-meta"
+          >{{ allocationSummary() }} · peak₹100 · max 3/day · day lock + strict stop</span
+        >
+      } @else if (kuttyAlone && showKutty()) {
         <strong class="as-name"
           >Kutty alone{{ enableCrude && showCrude() ? ' + Crude Selective' : ''
           }}{{ enableNatGas && showNatGas() ? ' + Nat Gas Daily Profit' : '' }}</strong
@@ -60,7 +70,7 @@
         >
       }
     </div>
-    @if (!(kuttyAlone && showKutty())) {
+    @if (!(handsOffAgent && mode() === 'live') && !(kuttyAlone && showKutty())) {
       <a class="as-link" routerLink="/dashboard/strategy-manager">Change in Strat</a>
     }
   </div>
@@ -134,6 +144,25 @@
           120d
         </button>
       </div>
+    } @else if (handsOffAgent) {
+      <div class="hands-off-agent" role="status" aria-label="Hands-off live agent">
+        <strong>Hands-off · all-day-green DNA</strong>
+        <span
+          >Start any morning (6:30 or 10:00 — your call). Do nothing until after
+          <b>3:15</b>, then Stop. Capital must not drain: day lock + strict day stop.</span
+        >
+        <div class="agent-locked">
+          <span>Capital ₹{{ capitalRs | number: '1.0-0' }} · {{ allocationSummary() }}</span>
+          <span
+            >Premium ~₹{{ capitalPlan.estimatedPremiumRs | number: '1.0-0' }} · target ~₹{{
+              capitalPlan.dailyTargetRs | number: '1.0-0'
+            }}/day · lock +₹{{ profitLockMoneyRs() | number: '1.0-0' }} · stop −₹{{
+              strictStopMoneyRs() | number: '1.0-0'
+            }}</span
+          >
+          <span>Real MIS · Trap peak₹100 · Nifty+Bank · Crude OFF · Kutty OFF</span>
+        </div>
+      </div>
     } @else {
       <div class="live-hint">
         <strong>Today</strong>
@@ -141,177 +170,179 @@
       </div>
     }
 
-    <div class="capital-agent" role="group" aria-label="Capital and auto lots">
-      <label class="field capital-field">
-        <span>Total capital (₹)</span>
-        <input
-          type="number"
-          min="10000"
-          step="1000"
-          [(ngModel)]="capitalRs"
-          (ngModelChange)="onCapitalChange()"
-          [disabled]="busy() || snapshot().running"
-        />
-      </label>
-      <label class="desk-check auto-lots-check">
-        <input
-          type="checkbox"
-          [(ngModel)]="autoLotsFromCapital"
-          (ngModelChange)="onAutoLotsToggle()"
-          [disabled]="busy() || snapshot().running"
-        />
-        <span>Auto lots from capital</span>
-      </label>
-      <div class="capital-plan-summary">
-        <strong>{{ allocationSummary() }}</strong>
-        <span
-          >Budget ₹{{ capitalPlan.premiumBudgetRs | number: '1.0-0' }} · premium ~₹{{
-            capitalPlan.estimatedPremiumRs | number: '1.0-0'
-          }}
-          · target ~₹{{ capitalPlan.dailyTargetRs | number: '1.0-0' }}/day · 10-day ~₹{{
-            capitalPlan.tenDayGoalRs | number: '1.0-0'
-          }}</span
-        >
+    @if (!(handsOffAgent && mode() === 'live')) {
+      <div class="capital-agent" role="group" aria-label="Capital and auto lots">
+        <label class="field capital-field">
+          <span>Total capital (₹)</span>
+          <input
+            type="number"
+            min="10000"
+            step="1000"
+            [(ngModel)]="capitalRs"
+            (ngModelChange)="onCapitalChange()"
+            [disabled]="busy() || snapshot().running"
+          />
+        </label>
+        <label class="desk-check auto-lots-check">
+          <input
+            type="checkbox"
+            [(ngModel)]="autoLotsFromCapital"
+            (ngModelChange)="onAutoLotsToggle()"
+            [disabled]="busy() || snapshot().running"
+          />
+          <span>Auto lots from capital</span>
+        </label>
+        <div class="capital-plan-summary">
+          <strong>{{ allocationSummary() }}</strong>
+          <span
+            >Budget ₹{{ capitalPlan.premiumBudgetRs | number: '1.0-0' }} · premium ~₹{{
+              capitalPlan.estimatedPremiumRs | number: '1.0-0'
+            }}
+            · target ~₹{{ capitalPlan.dailyTargetRs | number: '1.0-0' }}/day · 10-day ~₹{{
+              capitalPlan.tenDayGoalRs | number: '1.0-0'
+            }}</span
+          >
+        </div>
       </div>
-    </div>
 
-    <div class="lots-row" role="group" aria-label="Lots per book">
-      <label class="field lots-field">
-        <span>Nifty lots</span>
-        <input
-          type="number"
-          min="1"
-          step="1"
-          [(ngModel)]="niftyLots"
-          (ngModelChange)="onLotsChange('nifty')"
-          [disabled]="
-            busy() || snapshot().running || !enableNifty || autoLotsFromCapital
-          "
-        />
-      </label>
-      <label class="field lots-field">
-        <span>Bank lots</span>
-        <input
-          type="number"
-          min="1"
-          step="1"
-          [(ngModel)]="bankLots"
-          (ngModelChange)="onLotsChange('bank')"
-          [disabled]="busy() || snapshot().running || !enableBank || autoLotsFromCapital"
-        />
-      </label>
-      @if (showCrude()) {
+      <div class="lots-row" role="group" aria-label="Lots per book">
         <label class="field lots-field">
-          <span>Crude lots</span>
+          <span>Nifty lots</span>
           <input
             type="number"
             min="1"
             step="1"
-            [(ngModel)]="crudeLots"
-            (ngModelChange)="onLotsChange('crude')"
+            [(ngModel)]="niftyLots"
+            (ngModelChange)="onLotsChange('nifty')"
             [disabled]="
-              busy() || snapshot().running || !enableCrude || autoLotsFromCapital
+              busy() || snapshot().running || !enableNifty || autoLotsFromCapital
             "
           />
         </label>
-      }
-      @if (showNatGas()) {
         <label class="field lots-field">
-          <span>Nat Gas lots</span>
+          <span>Bank lots</span>
           <input
             type="number"
             min="1"
             step="1"
-            [(ngModel)]="natGasLots"
-            (ngModelChange)="onLotsChange('natgas')"
-            [disabled]="
-              busy() || snapshot().running || !enableNatGas || autoLotsFromCapital
-            "
+            [(ngModel)]="bankLots"
+            (ngModelChange)="onLotsChange('bank')"
+            [disabled]="busy() || snapshot().running || !enableBank || autoLotsFromCapital"
           />
         </label>
-      }
-    </div>
+        @if (showCrude()) {
+          <label class="field lots-field">
+            <span>Crude lots</span>
+            <input
+              type="number"
+              min="1"
+              step="1"
+              [(ngModel)]="crudeLots"
+              (ngModelChange)="onLotsChange('crude')"
+              [disabled]="
+                busy() || snapshot().running || !enableCrude || autoLotsFromCapital
+              "
+            />
+          </label>
+        }
+        @if (showNatGas()) {
+          <label class="field lots-field">
+            <span>Nat Gas lots</span>
+            <input
+              type="number"
+              min="1"
+              step="1"
+              [(ngModel)]="natGasLots"
+              (ngModelChange)="onLotsChange('natgas')"
+              [disabled]="
+                busy() || snapshot().running || !enableNatGas || autoLotsFromCapital
+              "
+            />
+          </label>
+        }
+      </div>
 
-    <div class="desk-toggles" role="group" aria-label="Books and day risk">
-      <label class="desk-check">
-        <input type="checkbox" [(ngModel)]="enableNifty" [disabled]="busy() || snapshot().running" />
-        <span>Nifty 50</span>
-      </label>
-      <label class="desk-check">
-        <input type="checkbox" [(ngModel)]="enableBank" [disabled]="busy() || snapshot().running" />
-        <span>Bank Nifty</span>
-      </label>
-      @if (showCrude()) {
-        <label
-          class="desk-check"
-          title="Selective · Trap SL50/TP200 · unlimited · 10:00–23:00 · continues past 15:15 on MCX"
-        >
-          <input type="checkbox" [(ngModel)]="enableCrude" [disabled]="busy() || snapshot().running" />
-          <span>Crude Oil Mini</span>
+      <div class="desk-toggles" role="group" aria-label="Books and day risk">
+        <label class="desk-check">
+          <input type="checkbox" [(ngModel)]="enableNifty" [disabled]="busy() || snapshot().running" />
+          <span>Nifty 50</span>
         </label>
-      }
-      @if (showNatGas()) {
+        <label class="desk-check">
+          <input type="checkbox" [(ngModel)]="enableBank" [disabled]="busy() || snapshot().running" />
+          <span>Bank Nifty</span>
+        </label>
+        @if (showCrude()) {
+          <label
+            class="desk-check"
+            title="Selective · Trap SL50/TP200 · unlimited · 10:00–23:00 · continues past 15:15 on MCX"
+          >
+            <input type="checkbox" [(ngModel)]="enableCrude" [disabled]="busy() || snapshot().running" />
+            <span>Crude Oil Mini</span>
+          </label>
+        }
+        @if (showNatGas()) {
+          <label
+            class="desk-check"
+            title="Daily Profit NG · trap SL1.5/TP3 · max 1/day · continues past 15:15 on MCX"
+          >
+            <input
+              type="checkbox"
+              [(ngModel)]="enableNatGas"
+              [disabled]="busy() || snapshot().running"
+            />
+            <span>Natural Gas Mini</span>
+          </label>
+        }
         <label
           class="desk-check"
-          title="Daily Profit NG · trap SL1.5/TP3 · max 1/day · continues past 15:15 on MCX"
+          title="Stops new entries after about −₹2,950 × lots day loss (split if both books on). 3 lots ≈ −₹8,850."
         >
           <input
             type="checkbox"
-            [(ngModel)]="enableNatGas"
+            [(ngModel)]="strictDayStop"
             [disabled]="busy() || snapshot().running"
           />
-          <span>Natural Gas Mini</span>
-        </label>
-      }
-      <label
-        class="desk-check"
-        title="Stops new entries after about −₹2,950 × lots day loss (split if both books on). 3 lots ≈ −₹8,850."
-      >
-        <input
-          type="checkbox"
-          [(ngModel)]="strictDayStop"
-          [disabled]="busy() || snapshot().running"
-        />
-        <span>Strict day stop (−₹{{ strictStopMoneyRs() | number: '1.0-0' }})</span>
-      </label>
-      <label
-        class="desk-check"
-        title="Stops new entries after about +₹3,000 × lots day profit (split if both books on). 1 lot → ₹3k · 3 lots → ₹9k."
-      >
-        <input
-          type="checkbox"
-          [(ngModel)]="dayProfitLock"
-          [disabled]="busy() || snapshot().running"
-        />
-        <span>Day profit lock (+₹{{ profitLockMoneyRs() | number: '1.0-0' }})</span>
-      </label>
-      @if (showKutty()) {
-        <label
-          class="desk-check"
-          title="Background Kutty · only when Strat path is free · waits if Trap/Strat is armed or entering · yields on Strat entry"
-        >
-          <input
-            type="checkbox"
-            [(ngModel)]="enableKutty"
-            [disabled]="busy() || snapshot().running || kuttyAlone"
-            (ngModelChange)="onEnableKuttyChange()"
-          />
-          <span>Kutty scalp</span>
+          <span>Strict day stop (−₹{{ strictStopMoneyRs() | number: '1.0-0' }})</span>
         </label>
         <label
           class="desk-check"
-          title="Trade Kutty only — Trap/Strat entries off. Uncheck to run Strat again (with optional Kutty background)."
+          title="Stops new entries after about +₹3,000 × lots day profit (split if both books on). 1 lot → ₹3k · 3 lots → ₹9k."
         >
           <input
             type="checkbox"
-            [(ngModel)]="kuttyAlone"
+            [(ngModel)]="dayProfitLock"
             [disabled]="busy() || snapshot().running"
-            (ngModelChange)="onKuttyAloneChange()"
           />
-          <span>Kutty alone (no Strat)</span>
+          <span>Day profit lock (+₹{{ profitLockMoneyRs() | number: '1.0-0' }})</span>
         </label>
-      }
-    </div>
+        @if (showKutty()) {
+          <label
+            class="desk-check"
+            title="Background Kutty · only when Strat path is free · waits if Trap/Strat is armed or entering · yields on Strat entry"
+          >
+            <input
+              type="checkbox"
+              [(ngModel)]="enableKutty"
+              [disabled]="busy() || snapshot().running || kuttyAlone"
+              (ngModelChange)="onEnableKuttyChange()"
+            />
+            <span>Kutty scalp</span>
+          </label>
+          <label
+            class="desk-check"
+            title="Trade Kutty only — Trap/Strat entries off. Uncheck to run Strat again (with optional Kutty background)."
+          >
+            <input
+              type="checkbox"
+              [(ngModel)]="kuttyAlone"
+              [disabled]="busy() || snapshot().running"
+              (ngModelChange)="onKuttyAloneChange()"
+            />
+            <span>Kutty alone (no Strat)</span>
+          </label>
+        }
+      </div>
+    }
 
     @if (mode() === 'testing') {
       <div class="weekday-filter" role="group" aria-label="Result weekdays">
@@ -332,42 +363,44 @@
 
     @if (mode() === 'live') {
       <aside class="agent-ops" aria-label="Daily client checklist">
-        <p class="agent-ops-kicker">Your daily job</p>
+        <p class="agent-ops-kicker">Your only job</p>
         <ol class="agent-ops-list">
           <li [class.done]="hasKiteSession()">
-            <a routerLink="/dashboard/get-token">Get Token</a> — paste today’s access token
+            <a routerLink="/dashboard/get-token">Get Token</a> — once per day
           </li>
-          <li>Confirm capital ₹{{ capitalRs | number: '1.0-0' }} · {{ allocationSummary() }}</li>
-          <li>Tick Live money (if real orders) → press <strong>Start</strong></li>
-          <li>Keep this browser tab open all day — desk scans &amp; trades for you</li>
+          <li>Press <strong>Start</strong> — any morning time is fine</li>
+          <li>Leave this tab open — do not touch anything</li>
+          <li>After <strong>3:15</strong> press <strong>Stop</strong></li>
         </ol>
       </aside>
-      <label class="real-orders">
-        <input
-          type="checkbox"
-          [(ngModel)]="realOrders"
-          [disabled]="busy() || snapshot().running"
-        />
-        <span
-          >Live money — real Kite MIS (N×{{ niftyLots }} · B×{{ bankLots
-          }}{{ showCrude() ? ' · C×' + crudeLots : ''
-          }}{{ showNatGas() ? ' · NG×' + natGasLots : '' }})</span
-        >
-      </label>
-      @if (realOrders) {
-        <label class="real-orders ack">
+      @if (!handsOffAgent) {
+        <label class="real-orders">
           <input
             type="checkbox"
-            [(ngModel)]="realOrdersAck"
+            [(ngModel)]="realOrders"
             [disabled]="busy() || snapshot().running"
           />
-          <span>I understand this uses real money</span>
+          <span
+            >Live money — real Kite MIS (N×{{ niftyLots }} · B×{{ bankLots
+            }}{{ showCrude() ? ' · C×' + crudeLots : ''
+            }}{{ showNatGas() ? ' · NG×' + natGasLots : '' }})</span
+          >
         </label>
+        @if (realOrders) {
+          <label class="real-orders ack">
+            <input
+              type="checkbox"
+              [(ngModel)]="realOrdersAck"
+              [disabled]="busy() || snapshot().running"
+            />
+            <span>I understand this uses real money</span>
+          </label>
+        }
+        <p class="start-anytime-note">
+          Start anytime. Capital auto-sizes lots. Desk replays the day, then takes the next
+          fresh signal — never chases a pre-Start trade at market. Leave the tab open.
+        </p>
       }
-      <p class="start-anytime-note">
-        Start anytime. Capital auto-sizes lots. Desk replays the day, then takes the next
-        fresh signal — never chases a pre-Start trade at market. Leave the tab open.
-      </p>
     }
 
     <div class="actions">

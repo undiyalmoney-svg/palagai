@@ -192,6 +192,40 @@
   color: var(--pg-ink, #0f172a);
 }
 
+.hands-off-agent {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  width: 100%;
+  margin: 0.15rem 0 0;
+  padding: 0.9rem 1.05rem;
+  border-radius: 12px;
+  border: 1px solid #86efac;
+  background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 55%, #f8fafc 100%);
+}
+
+.hands-off-agent > strong {
+  font-size: 0.95rem;
+  color: #14532d;
+}
+
+.hands-off-agent > span {
+  font-size: 0.86rem;
+  line-height: 1.4;
+  color: #166534;
+}
+
+.hands-off-agent .agent-locked {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  margin-top: 0.25rem;
+  padding-top: 0.55rem;
+  border-top: 1px solid #bbf7d0;
+  font-size: 0.8rem;
+  color: #15803d;
+}
+
 .agent-ops {
   width: 100%;
   margin: 0.35rem 0 0;
