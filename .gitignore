@@ -54,3 +54,4 @@ Thumbs.db
 /scripts/yt-video/node_modules/
 /Palagai-YouTube-Promo.mp4
 scripts/__pycache__/
+.kite-app-credentials
