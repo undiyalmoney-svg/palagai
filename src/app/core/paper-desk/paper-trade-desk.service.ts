@@ -50,6 +50,10 @@ import {
   staleStartReason,
 } from '../live-desk/live-start-guard.util';
 import { dropFormingBars } from './forming-bar.util';
+import {
+  missedRoundTripReason,
+  splitCompletedRoundTrips,
+} from './completed-round-trip.util';
 import { enrichTradesWithCharges } from './trade-charges.util';
 import { buildPaperDeskDayStats, emptyPaperDeskDayStats } from './paper-desk-day-stats';
 import { MAX_OPTION_HISTORY_TOKENS, rankTokensByFrequency } from './option-history-tokens.util';
@@ -193,6 +197,8 @@ export class PaperTradeDeskService {
   private liveStartedAt: string | null = null;
   /** Instruments already reported as "signal predates Start" (log once). */
   private readonly staleStartLogged = new Set<string>();
+  /** Round trips already reported as finished-before-we-saw-them (log once). */
+  private readonly missedRoundTripLogged = new Set<string>();
   /** Fallback lots (legacy). Prefer per-book lots below. */
   private lotsMultiplier = 1;
   private niftyLots = 1;
@@ -1139,6 +1145,7 @@ export class PaperTradeDeskService {
       this.liveTrades = [];
       this.loggedDeskOnlyTradeIds.clear();
       this.staleStartLogged.clear();
+      this.missedRoundTripLogged.clear();
       // Start anytime: the replay rebuilds the whole day, so remember when the
       // user actually pressed Start and only take signals from here on.
       this.liveStartedAt = nowIstStamp();
@@ -2024,8 +2031,10 @@ export class PaperTradeDeskService {
   }
 
   /**
-   * Live money: apply Trap open/close from newly seen bars immediately.
-   * End-of-tick sync alone misses legs that open and SL inside one 5m/15s poll.
+   * Live money: apply Trap open/close from newly seen bars.
+   *
+   * Round trips that already finished are reported, not placed — buying and
+   * selling them now captures the spread, never the modelled move.
    */
   private async flushIndexLiveBrokerEvents(
     authorization: string,
@@ -2033,7 +2042,20 @@ export class PaperTradeDeskService {
     instruments: Instrument[],
   ): Promise<void> {
     let allInstruments = instruments;
-    for (const ev of events) {
+    const { actionable, missed } = splitCompletedRoundTrips(events);
+    for (const m of missed) {
+      const key = `${m.instrumentId}:${m.entryTime}`;
+      if (this.missedRoundTripLogged.has(key)) {
+        continue;
+      }
+      this.missedRoundTripLogged.add(key);
+      this.liveOrders.pushDeskSkipEvent({
+        instrumentId: m.instrumentId,
+        instrumentName: m.instrumentName,
+        detail: missedRoundTripReason(m.entryTime, m.exitReason),
+      });
+    }
+    for (const ev of actionable) {
       if (ev.kind === 'open') {
         // Defense in depth: bar hooks only fire for new bars, but never let a
         // pre-Start bar reach placeEntry if the watermark is ever missing.
