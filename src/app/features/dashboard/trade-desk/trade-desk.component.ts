@@ -32,6 +32,7 @@ import { DeskChannel } from '../../../core/strategy-manager/models/desk-channel.
 import { UiDialogService } from '../../../shared/ui/dialog/ui-dialog.service';
 import { APP_BUILD_LABEL } from '../../../core/config/app-build';
 import { DAILY_3K_DESK_PRESET } from '../../../core/paper-desk/daily-3k-desk-preset';
+import { planLotsForCapital } from '../../../core/paper-desk/capital-plan.util';
 import {
   computeOptionTargetPremium,
   computeProtectiveSlTrigger,
@@ -201,23 +202,24 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Default Daily ₹1k–₹3k desk: Trap N×1 · Bank×1 · Crude Selective×1 · profit lock on.
-   * Strict day stop stays off unless the user checks it. Does not start a run.
+   * Default ₹40k capital desk: auto lots from capital planner · Trap live-safe ·
+   * Crude Selective · day profit lock on. Strict day stop off unless checked.
    */
   private applyDaily3kPreset(): void {
     if (this.busy() || this.snapshot().running) {
       return;
     }
     const p = DAILY_3K_DESK_PRESET;
+    const plan = planLotsForCapital(p.capitalRs);
     this.assignments.forceTrapDefaultsForDaily3k();
-    this.niftyLots = p.niftyLots;
-    this.bankLots = p.bankLots;
-    this.crudeLots = p.crudeLots;
-    this.natGasLots = p.natGasLots;
-    this.lotsPreference.set(p.niftyLots);
-    this.enableNifty = p.enableNifty;
-    this.enableBank = p.enableBank;
-    this.enableCrude = this.showCrude() && p.enableCrude;
+    this.niftyLots = Math.max(1, plan.niftyLots || p.niftyLots);
+    this.bankLots = Math.max(1, plan.bankLots > 0 ? plan.bankLots : p.bankLots);
+    this.crudeLots = Math.max(1, plan.crudeLots > 0 ? plan.crudeLots : p.crudeLots);
+    this.natGasLots = 1;
+    this.lotsPreference.set(this.niftyLots);
+    this.enableNifty = plan.enableNifty;
+    this.enableBank = plan.enableBank;
+    this.enableCrude = this.showCrude() && plan.enableCrude;
     this.enableNatGas = false;
     this.strictDayStop = p.strictDayStop;
     this.dayProfitLock = p.dayProfitLock;
