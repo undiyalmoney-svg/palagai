@@ -44,6 +44,11 @@ import {
   replayPaperOnCrude,
 } from './crude-paper-engine';
 import { deskLegHasKiteEntry, syncTradesToKiteFills } from './apply-kite-fill-pnl';
+import {
+  isStaleStartSignal,
+  nowIstStamp,
+  staleStartReason,
+} from '../live-desk/live-start-guard.util';
 import { enrichTradesWithCharges } from './trade-charges.util';
 import { buildPaperDeskDayStats, emptyPaperDeskDayStats } from './paper-desk-day-stats';
 import { MAX_OPTION_HISTORY_TOKENS, rankTokensByFrequency } from './option-history-tokens.util';
@@ -183,6 +188,10 @@ export class PaperTradeDeskService {
   private historicalCalls = 0;
   private lastRangeDays = 0;
   private realOrders = false;
+  /** IST stamp of the Start press — signals older than this are not chased. */
+  private liveStartedAt: string | null = null;
+  /** Instruments already reported as "signal predates Start" (log once). */
+  private readonly staleStartLogged = new Set<string>();
   /** Fallback lots (legacy). Prefer per-book lots below. */
   private lotsMultiplier = 1;
   private niftyLots = 1;
@@ -1128,6 +1137,10 @@ export class PaperTradeDeskService {
       this.lastIndexStatuses = [];
       this.liveTrades = [];
       this.loggedDeskOnlyTradeIds.clear();
+      this.staleStartLogged.clear();
+      // Start anytime: the replay rebuilds the whole day, so remember when the
+      // user actually pressed Start and only take signals from here on.
+      this.liveStartedAt = nowIstStamp();
 
       // Always register selected index books — fetch lookback even before 09:15 so they
       // auto-join the tick loop when the cash session opens (any morning Start time).
@@ -1761,6 +1774,8 @@ export class PaperTradeDeskService {
 
     if (this.realOrders) {
       allInstruments = this.instrumentStore.allInstruments();
+      /** instrumentId → why a pre-Start signal was not sent to Kite. */
+      const staleStartIds = new Map<string, string>();
       for (const s of statuses) {
         if (s.openTrade && !this.isMcxInstrumentId(s.instrumentId)) {
           const kind: IndexOptionKind =
@@ -1819,21 +1834,49 @@ export class PaperTradeDeskService {
           s.chosenBias = s.openTrade.direction;
         }
 
+        // Start anytime: never send a leg the strategy opened before Start as a
+        // fresh MARKET entry — that chases an edge that is hours old. Legs Kite
+        // already holds keep being managed (SL amend / exit) as normal.
+        const stale = isStaleStartSignal({
+          signalEntryTime: s.openTrade?.entryTime,
+          deskStartedAt: this.liveStartedAt,
+          hasBrokerPosition: this.liveOrders.hasOpenPositionFor(
+            s.instrumentId,
+            s.openTrade?.option?.tradingSymbol,
+          ),
+        });
+        if (stale && s.openTrade) {
+          staleStartIds.set(
+            s.instrumentId,
+            staleStartReason(s.openTrade.entryTime, this.liveStartedAt),
+          );
+          if (!this.staleStartLogged.has(s.instrumentId)) {
+            this.staleStartLogged.add(s.instrumentId);
+            this.liveOrders.pushDeskSkipEvent({
+              instrumentId: s.instrumentId,
+              instrumentName: s.instrumentName,
+              detail: staleStartReason(s.openTrade.entryTime, this.liveStartedAt),
+              tradingSymbol: s.openTrade.option?.tradingSymbol,
+            });
+          }
+        }
+
         await this.liveOrders.syncInstrument({
           authorization,
           instrumentId: s.instrumentId,
           instrumentName: s.instrumentName,
           lots: this.lotsForInstrument(s.instrumentId),
-          open: s.openTrade
-            ? {
-                direction: s.openTrade.direction,
-                entryTime: s.openTrade.entryTime,
-                indexEntry: s.openTrade.indexEntry,
-                indexStop: s.openTrade.indexStop,
-                option: s.openTrade.option,
-                optionEntryPremium: s.openTrade.optionEntryPremium,
-              }
-            : null,
+          open:
+            s.openTrade && !stale
+              ? {
+                  direction: s.openTrade.direction,
+                  entryTime: s.openTrade.entryTime,
+                  indexEntry: s.openTrade.indexEntry,
+                  indexStop: s.openTrade.indexStop,
+                  option: s.openTrade.option,
+                  optionEntryPremium: s.openTrade.optionEntryPremium,
+                }
+              : null,
         });
         await delay(350);
       }
@@ -1842,7 +1885,13 @@ export class PaperTradeDeskService {
         s.brokerSlTrigger = pos?.slTrigger ?? null;
         s.brokerSlOrderId = pos?.slOrderId ?? null;
         s.brokerEntryOrderId = pos?.entryOrderId ?? null;
-        if (s.openTrade && !s.brokerEntryOrderId) {
+        const staleReason = staleStartIds.get(s.instrumentId);
+        s.preStartSignal = !!staleReason;
+        if (staleReason) {
+          // Pre-Start signal: deliberately not on Kite, so don't call it a block.
+          s.kiteBlockReason = staleReason;
+          s.livePhaseLabel = 'Pre-Start signal · waiting for a fresh one';
+        } else if (s.openTrade && !s.brokerEntryOrderId) {
           if (!this.isMcxInstrumentId(s.instrumentId)) {
             const kind: IndexOptionKind =
               s.instrumentId === NIFTY_50_INSTRUMENT.id ? 'nifty' : 'banknifty';
@@ -1981,6 +2030,26 @@ export class PaperTradeDeskService {
     let allInstruments = instruments;
     for (const ev of events) {
       if (ev.kind === 'open') {
+        // Defense in depth: bar hooks only fire for new bars, but never let a
+        // pre-Start bar reach placeEntry if the watermark is ever missing.
+        if (
+          isStaleStartSignal({
+            signalEntryTime: ev.open.entryTime,
+            deskStartedAt: this.liveStartedAt,
+            hasBrokerPosition: this.liveOrders.hasOpenPositionFor(
+              ev.instrumentId,
+              ev.open.option?.tradingSymbol,
+            ),
+          })
+        ) {
+          this.liveOrders.pushDeskSkipEvent({
+            instrumentId: ev.instrumentId,
+            instrumentName: ev.instrumentName,
+            detail: staleStartReason(ev.open.entryTime, this.liveStartedAt),
+            tradingSymbol: ev.open.option?.tradingSymbol,
+          });
+          continue;
+        }
         let option = ev.open.option;
         if (!option || option.source === 'synthetic' || option.instrumentToken <= 0) {
           const kind: IndexOptionKind =

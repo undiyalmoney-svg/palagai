@@ -205,6 +205,18 @@ export class LiveOrderExecutorService {
     return [...this.positions.values()];
   }
 
+  /**
+   * True when Kite already holds this leg — by desk instrument or by symbol
+   * (adopted orphans are keyed by symbol until the desk remaps them).
+   */
+  hasOpenPositionFor(instrumentId: string, tradingSymbol?: string | null): boolean {
+    if (this.positions.get(instrumentId)?.status === 'open') {
+      return true;
+    }
+    const sym = (tradingSymbol ?? '').toUpperCase();
+    return !!sym && this.positionsBySymbol.get(sym)?.status === 'open';
+  }
+
   getEvents(): LiveOrderEvent[] {
     return [...this.events];
   }

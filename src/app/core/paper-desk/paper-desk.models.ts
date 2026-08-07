@@ -117,6 +117,12 @@ export interface PaperInstrumentStatus {
    * (synthetic option, API error, Real Orders off, etc.).
    */
   kiteBlockReason: string | null;
+  /**
+   * Live money: the open desk leg was signalled before Start, so it was
+   * deliberately not sent to Kite. Not an error — the desk waits for a fresh
+   * signal instead of chasing an hours-old entry at market.
+   */
+  preStartSignal?: boolean;
 }
 
 export interface PaperDeskSnapshot {

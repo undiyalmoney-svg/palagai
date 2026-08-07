@@ -318,6 +318,11 @@
           <span>I understand this uses real money</span>
         </label>
       }
+      <p class="start-anytime-note">
+        Start anytime. The desk replays the whole day first, so levels, day count and
+        the profit lock are already correct. It takes the next fresh signal —
+        a trade that opened before you pressed Start is never chased at market.
+      </p>
     }
 
     <div class="actions">
@@ -627,8 +632,14 @@
               </div>
 
               @if (s.kiteBlockReason) {
-                <div class="kite-block-banner" role="alert">
-                  <strong>Kite order blocked</strong>
+                <div
+                  class="kite-block-banner"
+                  [class.pre-start]="s.preStartSignal"
+                  [attr.role]="s.preStartSignal ? 'status' : 'alert'"
+                >
+                  <strong>{{
+                    s.preStartSignal ? 'Started mid-signal — not chased' : 'Kite order blocked'
+                  }}</strong>
                   <span>{{ s.kiteBlockReason }}</span>
                 </div>
               }
