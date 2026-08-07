@@ -32,7 +32,12 @@ import { DeskChannel } from '../../../core/strategy-manager/models/desk-channel.
 import { UiDialogService } from '../../../shared/ui/dialog/ui-dialog.service';
 import { APP_BUILD_LABEL } from '../../../core/config/app-build';
 import { DAILY_3K_DESK_PRESET } from '../../../core/paper-desk/daily-3k-desk-preset';
-import { planLotsForCapital } from '../../../core/paper-desk/capital-plan.util';
+import {
+  CapitalLotPlan,
+  DEFAULT_TRADING_CAPITAL_RS,
+  planLotsForCapital,
+} from '../../../core/paper-desk/capital-plan.util';
+import { CapitalPreferenceService } from '../../../core/services/capital-preference.service';
 import {
   computeOptionTargetPremium,
   computeProtectiveSlTrigger,
@@ -51,6 +56,7 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
   private readonly deskExport = inject(PaperDeskExportService);
   private readonly kiteSession = inject(KiteSessionService);
   private readonly lotsPreference = inject(LotsPreferenceService);
+  private readonly capitalPreference = inject(CapitalPreferenceService);
   private readonly auth = inject(AuthService);
   private readonly uiDialog = inject(UiDialogService);
   private readonly assignments = inject(StrategyAssignmentService);
@@ -69,7 +75,15 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
   /** When Live + checked, places real Kite MIS orders. */
   protected realOrders = false;
   protected realOrdersAck = false;
-  /** Per-book lots (exchange lot × this). Defaults from shared preference. */
+  /**
+   * Total trading capital (₹). Desk auto-allocates lots from this.
+   * Client sets capital once; daily job is Get Token + Start + keep tab open.
+   */
+  protected capitalRs = DEFAULT_TRADING_CAPITAL_RS;
+  /** When true (default), lot inputs are driven by capital — not hand-edited. */
+  protected autoLotsFromCapital = true;
+  protected capitalPlan: CapitalLotPlan = planLotsForCapital(DEFAULT_TRADING_CAPITAL_RS);
+  /** Per-book lots (exchange lot × this). Defaults from capital plan. */
   protected niftyLots = 1;
   protected bankLots = 1;
   protected crudeLots = 1;
@@ -163,13 +177,15 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
   });
 
   ngOnInit(): void {
+    this.capitalRs = this.capitalPreference.get();
     // Live continues in the root desk service across tab switches — restore UI mode.
     if (this.snapshot().running) {
       this.mode.set('live');
       this.realOrders = this.snapshot().realOrders;
+      this.capitalPlan = planLotsForCapital(this.capitalRs);
     } else {
-      // Default desk = Daily ₹1k–₹3k (Trap 1/1/1 · profit lock on · strict stop off).
-      this.applyDaily3kPreset();
+      // Capital → auto lots · Trap live-safe · profit lock on.
+      this.applyCapitalAgentPreset();
     }
     // Friends: no Kutty. Crude/Nat Gas only if module granted.
     if (!this.showKutty()) {
@@ -188,7 +204,29 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
     // Do not stopLive — Trade Desk + MCX books must keep polling when you switch tabs.
   }
 
+  /** Capital changed → re-allocate lots (unless Live is already running). */
+  protected onCapitalChange(): void {
+    this.capitalRs = Math.max(
+      10_000,
+      Math.floor(Number(this.capitalRs) || DEFAULT_TRADING_CAPITAL_RS),
+    );
+    this.capitalPreference.set(this.capitalRs);
+    if (this.busy() || this.snapshot().running) {
+      return;
+    }
+    this.applyCapitalAllocation();
+  }
+
+  protected onAutoLotsToggle(): void {
+    if (this.autoLotsFromCapital && !(this.busy() || this.snapshot().running)) {
+      this.applyCapitalAllocation();
+    }
+  }
+
   protected onLotsChange(book: 'nifty' | 'bank' | 'crude' | 'natgas'): void {
+    if (this.autoLotsFromCapital) {
+      return;
+    }
     if (book === 'nifty') {
       this.niftyLots = Math.max(1, Math.floor(Number(this.niftyLots)) || 1);
       this.lotsPreference.set(this.niftyLots);
@@ -202,16 +240,31 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Default ₹40k capital desk: auto lots from capital planner · Trap live-safe ·
-   * Crude Selective · day profit lock on. Strict day stop off unless checked.
+   * Agent preset: Trap DNA + capital → lots + books + day lock.
+   * Client only refreshes the access token and presses Start.
    */
-  private applyDaily3kPreset(): void {
+  private applyCapitalAgentPreset(): void {
     if (this.busy() || this.snapshot().running) {
       return;
     }
     const p = DAILY_3K_DESK_PRESET;
-    const plan = planLotsForCapital(p.capitalRs);
     this.assignments.forceTrapDefaultsForDaily3k();
+    this.strictDayStop = p.strictDayStop;
+    this.dayProfitLock = p.dayProfitLock;
+    this.autoLotsFromCapital = true;
+    if (this.showKutty()) {
+      this.enableKutty = p.enableKutty;
+      this.kuttyAlone = p.kuttyAlone;
+    }
+    this.applyCapitalAllocation();
+    this.error.set('');
+  }
+
+  /** Size books from total capital. */
+  private applyCapitalAllocation(): void {
+    const plan = planLotsForCapital(this.capitalRs);
+    this.capitalPlan = plan;
+    const p = DAILY_3K_DESK_PRESET;
     this.niftyLots = Math.max(1, plan.niftyLots || p.niftyLots);
     this.bankLots = Math.max(1, plan.bankLots > 0 ? plan.bankLots : p.bankLots);
     this.crudeLots = Math.max(1, plan.crudeLots > 0 ? plan.crudeLots : p.crudeLots);
@@ -221,13 +274,19 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
     this.enableBank = plan.enableBank;
     this.enableCrude = this.showCrude() && plan.enableCrude;
     this.enableNatGas = false;
-    this.strictDayStop = p.strictDayStop;
-    this.dayProfitLock = p.dayProfitLock;
-    if (this.showKutty()) {
-      this.enableKutty = p.enableKutty;
-      this.kuttyAlone = p.kuttyAlone;
-    }
-    this.error.set('');
+  }
+
+  protected allocationSummary(): string {
+    const bits = [
+      this.enableNifty ? `Nifty ×${this.niftyLots}` : null,
+      this.enableBank ? `Bank ×${this.bankLots}` : null,
+      this.enableCrude && this.showCrude() ? `Crude ×${this.crudeLots}` : null,
+    ].filter(Boolean);
+    return bits.join(' · ') || 'no books';
+  }
+
+  protected hasKiteSession(): boolean {
+    return !!this.kiteSession.getAuthorizationHeader();
   }
 
   private lotsForInstrumentId(instrumentId: string): number {
@@ -298,8 +357,11 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
     return Math.max(1, Math.floor(Number(this.niftyLots)) || 1);
   }
 
-  /** Day profit lock money band at current lots (1→₹3k, 3→₹9k). */
+  /** Day profit lock money band — capital plan when auto lots, else ₹3k × lots. */
   protected profitLockMoneyRs(): number {
+    if (this.autoLotsFromCapital && this.capitalPlan.dayProfitLockRs > 0) {
+      return this.capitalPlan.dayProfitLockRs;
+    }
     return deskDayProfitLockMoneyRs(this.deskRiskLots());
   }
 
@@ -345,6 +407,15 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
     if (!this.kiteSession.getAuthorizationHeader()) {
       this.error.set('No Kite session. Open Get Token and paste your access token, then try again.');
       return;
+    }
+    // Re-size from capital right before Start so the agent always trades the plan.
+    this.capitalRs = Math.max(
+      10_000,
+      Math.floor(Number(this.capitalRs) || DEFAULT_TRADING_CAPITAL_RS),
+    );
+    this.capitalPreference.set(this.capitalRs);
+    if (this.autoLotsFromCapital) {
+      this.applyCapitalAllocation();
     }
     if (!this.enableNifty && !this.enableBank && !this.anyMcxSelected()) {
       this.error.set(

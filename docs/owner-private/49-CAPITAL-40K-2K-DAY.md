@@ -81,9 +81,15 @@ Recent (≥2026-06) with lock: avg **~₹2,218/day** · ≥₹2k **73.5%**.
 
 Same Trap / Selective DNA drives both. Live only adds Kite MARKET + SL-M. Do **not** reintroduce peak₹150 for paper-green hunts (doc 48 tuck-tuck).
 
+## Client job (agent mode)
+
+1. Set **Total capital (₹)** once (default ₹40k) — desk auto-allocates lots.  
+2. Each morning: **Get Token** → paste access token.  
+3. Trade Desk → Live → Live money → **Start**.  
+4. **Keep the browser tab open** all day — desk scans, sizes, and trades.
+
 ## Ops
 
-1. Badge **v1.3.84+**.  
-2. Trade Desk loads capital plan (N/B/C ×1 · lock on).  
-3. Start **Live money** after Get Token.  
-4. Re-hunt: `python3 scripts/capital-40k-2k-day-hunt.py`
+1. Badge **v1.3.86+ · capital-agent**.  
+2. Trade Desk capital field + auto lots (persisted).  
+3. Re-hunt: `python3 scripts/capital-40k-2k-day-hunt.py`

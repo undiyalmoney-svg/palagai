@@ -150,6 +150,83 @@
   width: 4.5rem;
 }
 
+.capital-agent {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem 1rem;
+  width: 100%;
+  margin: 0.25rem 0 0;
+  padding: 0.85rem 1rem;
+  border-radius: 12px;
+  border: 1px solid var(--pg-line, #e5e7eb);
+  background: linear-gradient(180deg, #f8fafc, #fff);
+}
+
+.capital-field {
+  min-width: 9rem;
+}
+
+.capital-field input {
+  width: 8.5rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.auto-lots-check {
+  margin: 0 0 0.35rem;
+}
+
+.capital-plan-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 12rem;
+  flex: 1 1 14rem;
+  font-size: 0.82rem;
+  color: var(--pg-muted, #64748b);
+}
+
+.capital-plan-summary strong {
+  font-size: 0.95rem;
+  color: var(--pg-ink, #0f172a);
+}
+
+.agent-ops {
+  width: 100%;
+  margin: 0.35rem 0 0;
+  padding: 0.85rem 1rem;
+  border-radius: 12px;
+  border: 1px solid #99f6e4;
+  background: #f0fdfa;
+}
+
+.agent-ops-kicker {
+  margin: 0 0 0.4rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #0f766e;
+}
+
+.agent-ops-list {
+  margin: 0;
+  padding-left: 1.2rem;
+  font-size: 0.86rem;
+  color: #134e4a;
+  line-height: 1.45;
+}
+
+.agent-ops-list li.done {
+  color: #047857;
+}
+
+.agent-ops-list a {
+  color: #0f766e;
+  font-weight: 700;
+}
+
 .desk-toggles {
   display: flex;
   flex-wrap: wrap;
