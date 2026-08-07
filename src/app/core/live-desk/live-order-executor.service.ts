@@ -336,7 +336,8 @@ export class LiveOrderExecutorService {
           tradingSymbol: symbol,
           instrumentToken: Number(row.instrument_token ?? 0),
           quantity: Math.abs(qty),
-          direction: 'BUY',
+          // Desk direction is the index/futures side: long CE = BUY, long PE = SELL.
+          direction: symbol.endsWith('PE') ? 'SELL' : 'BUY',
           entryOrderId: null,
           slOrderId: pendingSl?.order_id ?? null,
           exitOrderId: null,
@@ -495,10 +496,22 @@ export class LiveOrderExecutorService {
     }
 
     // Open paper + open broker:
-    //  - same leg → amend SL if index stop moved (BE / trail)
-    //  - different leg (Kutty→Strat / drain→rehunt / new option) → exit then enter
+    //  - same contract → amend SL if index stop moved (BE / trail)
+    //  - different contract (Kutty→Strat / new strike) → exit then enter
     if (open && current?.status === 'open') {
       if (liveOpenMatchesBroker(current, open)) {
+        await this.syncProtectiveSl(params.authorization, current, open);
+        await this.refreshSummaryStatuses(params.authorization);
+        return;
+      }
+      // A contract switch inside a candle we already traded is churn, not a
+      // handoff. Hold what we have and let the existing SL work.
+      if (
+        isSameBarReentry({
+          signalEntryTime: open.entryTime,
+          lastExitEntryTime: this.lastExitBarByInstrument.get(params.instrumentId),
+        })
+      ) {
         await this.syncProtectiveSl(params.authorization, current, open);
         await this.refreshSummaryStatuses(params.authorization);
         return;
@@ -508,7 +521,7 @@ export class LiveOrderExecutorService {
         instrumentId: params.instrumentId,
         instrumentName: params.instrumentName,
         action: 'EXIT',
-        detail: `Handoff — paper flipped leg · was ${current.tradingSymbol} @ ${current.entryTime} → ${open.option?.tradingSymbol ?? '?'} @ ${open.entryTime}`,
+        detail: `Handoff — paper flipped contract · was ${current.tradingSymbol} @ ${current.entryTime} → ${open.option?.tradingSymbol ?? '?'} @ ${open.entryTime}`,
         tradingSymbol: current.tradingSymbol,
         quantity: current.quantity,
       });
