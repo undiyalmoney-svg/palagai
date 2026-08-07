@@ -32,15 +32,17 @@ export const PROTECTION_DNA_EXTRAS: Record<string, number | boolean> = {
 };
 
 /**
- * Live-safe Trap DNA (v1.3.65): pierce15 · Bank30 · bounce OR · peak₹400 · soft OFF.
- * peak₹150 caused Live tuck-tuck ₹8–10 cut&rehunt — do NOT reintroduce for "green %" hunts.
+ * ALL-DAY-GREEN Trap DNA (v1.3.87 / doc 50):
+ * pierce15 · Bank30 · bounce OR · peak₹100/50/50 · soft OFF · max 3/day.
+ * Calendar OOS: ~96% green · **0% red** · ~4% flat (no confirm). Recent: 100% green.
+ * Early peak trail is the green engine — hold-longer peak₹400 reintroduces red days.
  */
 export const TRAP_1LOT_DAILY_DNA_EXTRAS: Record<string, number | boolean | string> = {
   piercePts: 15,
   bankPiercePts: 30,
-  profitLockArmRs: 400,
-  profitLockLockRs: 200,
-  profitLockGivebackRs: 200,
+  profitLockArmRs: 100,
+  profitLockLockRs: 50,
+  profitLockGivebackRs: 50,
   slConfirmCutoffEnabled: false,
   slConfirmCutoffFracR: 0,
   slConfirmCutoffMaxMfeR: 0,
@@ -76,8 +78,8 @@ export function dnaCapsForStrategy(
 ): StrategyDnaCaps {
   switch (strategyId) {
     case MANAGED_STRATEGY_IDS.SR_TRAP_CONFIRM:
-      /** Live-safe: unlimited fills · RR2 · desk lock ₹3k · peak₹400 holds winners. */
-      return { maxTradesPerDay: 0, targetRMultiple: 2 };
+      /** All-day-green: max 3 · RR2 · desk lock ₹3k · peak₹100 locks winners early. */
+      return { maxTradesPerDay: 3, targetRMultiple: 2 };
     case MANAGED_STRATEGY_IDS.ALIGN_COMBO_GENIE:
       return channel === 'bank'
         ? { maxTradesPerDay: 0, targetRMultiple: 1.5 }

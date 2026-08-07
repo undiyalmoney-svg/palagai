@@ -8,7 +8,7 @@ describe('DAILY_3K_DESK_PRESET', () => {
     expect(DAILY_3K_DESK_PRESET.crudeLots).toBe(1);
     expect(DAILY_3K_DESK_PRESET.enableNifty).toBe(true);
     expect(DAILY_3K_DESK_PRESET.enableBank).toBe(true);
-    expect(DAILY_3K_DESK_PRESET.enableCrude).toBe(true);
+    expect(DAILY_3K_DESK_PRESET.enableCrude).toBe(false);
     expect(DAILY_3K_DESK_PRESET.enableNatGas).toBe(false);
     expect(DAILY_3K_DESK_PRESET.enableKutty).toBe(false);
     expect(DAILY_3K_DESK_PRESET.dayProfitLock).toBe(true);

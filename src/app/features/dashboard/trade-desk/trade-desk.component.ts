@@ -267,12 +267,13 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
     const p = DAILY_3K_DESK_PRESET;
     this.niftyLots = Math.max(1, plan.niftyLots || p.niftyLots);
     this.bankLots = Math.max(1, plan.bankLots > 0 ? plan.bankLots : p.bankLots);
-    this.crudeLots = Math.max(1, plan.crudeLots > 0 ? plan.crudeLots : p.crudeLots);
+    // All-green plan keeps Crude at 0 lots / off unless user opts in later.
+    this.crudeLots = plan.crudeLots > 0 ? plan.crudeLots : 1;
     this.natGasLots = 1;
     this.lotsPreference.set(this.niftyLots);
     this.enableNifty = plan.enableNifty;
     this.enableBank = plan.enableBank;
-    this.enableCrude = this.showCrude() && plan.enableCrude;
+    this.enableCrude = this.showCrude() && plan.enableCrude && p.enableCrude;
     this.enableNatGas = false;
   }
 

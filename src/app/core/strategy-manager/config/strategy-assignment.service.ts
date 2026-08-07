@@ -20,10 +20,10 @@ import { StrategySettings } from '../models/strategy-settings.model';
 import { StrategyRegistryService } from '../registry/strategy-registry.service';
 
 /**
- * v28 — Live-safe: peak₹400 back · Crude full-day SL50/TP200 (doc 48).
- * Drops v27 so monster peak150 / Crude first-win cannot stick for Live money.
+ * v29 — All-day-green: Trap peak₹100/50/50 · max 3/day · dayStop 60 (doc 50).
+ * Drops v28 peak₹400 so red-day DNA cannot stick after green hunt.
  */
-const STORAGE_KEY = 'palagai_strategy_assignments_v28';
+const STORAGE_KEY = 'palagai_strategy_assignments_v29';
 const LEGACY_STORAGE_KEYS = [
   'palagai_strategy_assignments_v1',
   'palagai_strategy_assignments_v2',
@@ -52,6 +52,7 @@ const LEGACY_STORAGE_KEYS = [
   'palagai_strategy_assignments_v25',
   'palagai_strategy_assignments_v26',
   'palagai_strategy_assignments_v27',
+  'palagai_strategy_assignments_v28',
 ] as const;
 
 export interface ChannelAssignment {
