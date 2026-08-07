@@ -16,7 +16,10 @@ import {
   adoptedEntryOrderPlaceholder,
   findCompletedEntryOrderId,
 } from './live-adopt.util';
-import { effectiveCloseReason } from './live-drain-hold.util';
+import {
+  effectiveCloseReason,
+  shouldHoldForRestingSlm,
+} from './live-drain-hold.util';
 
 export interface LiveBrokerPosition {
   instrumentId: string;
@@ -445,8 +448,7 @@ export class LiveOrderExecutorService {
     lots?: number;
     /**
      * Paper exit reason for close sync (open=null).
-     * "Profit drained" + option LTP still below entry → hold for SL-M instead of
-     * market-dumping a red option while index trail says green.
+     * "Profit drained" → always hold for resting SL-M (paper≡live; never MARKET dump).
      */
     closeReason?: string | null;
   }): Promise<void> {
@@ -719,7 +721,7 @@ export class LiveOrderExecutorService {
         closeReason: params.closeReason,
         drainHoldLatched: this.drainHoldInstruments.has(params.instrumentId),
       });
-      const held = await this.maybeHoldDrainWhileOptionRed(
+      const held = await this.maybeHoldDrainForRestingSlm(
         params.authorization,
         current,
         closeReason,
@@ -738,35 +740,36 @@ export class LiveOrderExecutorService {
   }
 
   /**
-   * Index/futures peak-trail can arm on pts×₹30/65 while the ATM option never made
-   * that money. Market-exiting on "Profit drained" then books option losses with a
-   * green fut label — owner "same issue". Hold and let SL-M work when option is red.
+   * Peak-trail "Profit drained" ≡ paper resting SL-M fill.
+   * Always HOLD and amend protective SL — never MARKET dump (green or red option).
+   * That MARKET path was the live twin of the Aug-7 −₹33 paper bug.
    */
-  private async maybeHoldDrainWhileOptionRed(
+  private async maybeHoldDrainForRestingSlm(
     authorization: string,
     pos: LiveBrokerPosition,
     closeReason: string | null | undefined,
   ): Promise<boolean> {
-    const reason = (closeReason ?? '').toLowerCase();
-    if (!reason.includes('profit drained')) {
+    if (!shouldHoldForRestingSlm(closeReason)) {
+      return false;
+    }
+    if (!pos.tradingSymbol) {
       return false;
     }
     const fill = pos.entryPremium ?? 0;
-    if (!(fill > 0) || !pos.tradingSymbol) {
-      return false;
-    }
     const exchange = (pos.exchange === 'MCX' ? 'MCX' : 'NFO') as 'NFO' | 'MCX';
     let ltp: number | null = null;
     try {
-      ltp = await this.resolveOptionLtp(authorization, pos.tradingSymbol, exchange, fill);
+      ltp = await this.resolveOptionLtp(
+        authorization,
+        pos.tradingSymbol,
+        exchange,
+        fill > 0 ? fill : 1,
+      );
     } catch {
       ltp = null;
     }
-    if (ltp == null || !(ltp > 0) || ltp >= fill - 0.049) {
-      return false;
-    }
 
-    // Tighten protective SL under current LTP; do not MARKET SELL the red print.
+    // Tighten protective SL to the trail; do not MARKET SELL.
     const fakeOpen: LiveOpenSignal = {
       direction: pos.direction,
       entryTime: pos.entryTime,
@@ -784,16 +787,19 @@ export class LiveOrderExecutorService {
         exchange,
         product: pos.product,
       },
-      optionEntryPremium: fill,
+      optionEntryPremium: fill > 0 ? fill : null,
     };
     await this.syncProtectiveSl(authorization, pos, fakeOpen);
+    const ltpBit =
+      ltp != null && ltp > 0
+        ? `option LTP ${ltp.toFixed(2)}${fill > 0 ? ` vs entry ${fill.toFixed(2)}` : ''}`
+        : 'option LTP n/a';
     this.pushEvent({
       at: new Date().toISOString(),
       instrumentId: pos.instrumentId,
       action: 'HOLD',
       detail:
-        `Index profit-drained but option LTP ${ltp.toFixed(2)} < entry ${fill.toFixed(2)} — ` +
-        `hold for SL-M (no market dump)`,
+        `Profit drained — hold for resting SL-M (${ltpBit}; no market dump)`,
       tradingSymbol: pos.tradingSymbol,
       quantity: pos.quantity,
     });

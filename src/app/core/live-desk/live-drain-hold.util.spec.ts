@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { effectiveCloseReason, isProfitDrainedReason } from './live-drain-hold.util';
+import {
+  effectiveCloseReason,
+  isProfitDrainedReason,
+  shouldHoldForRestingSlm,
+} from './live-drain-hold.util';
+import { isRestingExit } from '../paper-desk/executable-fill.util';
 
 describe('live-drain-hold.util', () => {
   it('passes through an explicit close reason', () => {
@@ -24,8 +29,17 @@ describe('live-drain-hold.util', () => {
     expect(effectiveCloseReason({ closeReason: null, drainHoldLatched: false })).toBeNull();
   });
 
-  it('detects profit-drained wording', () => {
+  it('detects profit-drained / cut & rehunt wording', () => {
     expect(isProfitDrainedReason('Profit drained — cut & rehunt')).toBe(true);
+    expect(isProfitDrainedReason('cut & rehunt')).toBe(true);
     expect(isProfitDrainedReason('Stop loss hit')).toBe(false);
+  });
+
+  it('paper resting trail and live SL-M hold stay aligned', () => {
+    const trail = 'Profit drained — cut & rehunt';
+    expect(isRestingExit(trail)).toBe(true);
+    expect(shouldHoldForRestingSlm(trail)).toBe(true);
+    expect(shouldHoldForRestingSlm('End of range')).toBe(false);
+    expect(isRestingExit('End of range')).toBe(false);
   });
 });

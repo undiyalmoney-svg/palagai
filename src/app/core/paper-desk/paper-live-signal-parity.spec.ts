@@ -4,9 +4,13 @@
  */
 import { describe, expect, it } from 'vitest';
 import { dropFormingBars } from './forming-bar.util';
-import { repriceTradesToExecutableFills } from './executable-fill.util';
+import {
+  isRestingExit,
+  repriceTradesToExecutableFills,
+} from './executable-fill.util';
 import { replayPaperOnIndex } from './paper-desk-engine';
 import { SrTrapConfirmManagedStrategy } from '../strategy-manager/modules/sr-trap-confirm.managed-strategy';
+import { shouldHoldForRestingSlm } from '../live-desk/live-drain-hold.util';
 import type { Candle } from '../models/candle.model';
 import type { PaperTrade } from './paper-desk.models';
 
@@ -138,5 +142,36 @@ describe('paper ≡ live signal path', () => {
     for (const t of a) {
       expect(t.indexPoints).not.toBeNull();
     }
+  });
+
+  it('profit-drained: paper resting fill ≡ live SL-M hold (no MARKET dump)', () => {
+    const candles = dropFormingBars(
+      buildDaySeries(),
+      new Date('2026-08-07T15:30:00+05:30'),
+    );
+    const strat = new SrTrapConfirmManagedStrategy();
+    strat.initialize();
+    const raw = replayPaperOnIndex({
+      instrumentId: 'nifty',
+      instrumentName: 'Nifty 50',
+      kind: 'nifty',
+      candles,
+      fromDate: '2026-08-07',
+      toDate: '2026-08-07',
+      instruments: [],
+      optionCandlesByToken: new Map(),
+      neededOptionTokens: new Set(),
+      strategy: strat,
+      forceCloseOpen: true,
+      lotsMultiplier: 1,
+      enableKutty: false,
+    }).trades;
+    const drained = raw.filter((t) => isRestingExit(t.exitReason) && /profit drained/i.test(t.exitReason));
+    // Synthetic day may or may not produce trail exits; contract still locked.
+    for (const t of drained) {
+      expect(shouldHoldForRestingSlm(t.exitReason)).toBe(true);
+    }
+    expect(shouldHoldForRestingSlm('Profit drained — cut & rehunt')).toBe(true);
+    expect(isRestingExit('Profit drained — cut & rehunt')).toBe(true);
   });
 });

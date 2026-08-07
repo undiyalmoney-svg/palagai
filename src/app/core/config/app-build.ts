@@ -4,5 +4,5 @@
  */
 export const APP_VERSION = '1.3.93';
 /** Short build tag for this fix train. */
-export const APP_BUILD = '2026.08.07-trail-resting-fill';
+export const APP_BUILD = '2026.08.07-paper-live-trail-slm';
 export const APP_BUILD_LABEL = `v${APP_VERSION} · ${APP_BUILD}`;
