@@ -1870,6 +1870,12 @@ export class PaperTradeDeskService {
             s.instrumentId,
             s.openTrade?.option?.tradingSymbol,
           ),
+          // Judge on price, not the clock: a 50-pt Crude leg is still worth
+          // joining after 20 minutes; a one-bar index leg is not.
+          signalEntryPrice: s.openTrade?.indexEntry,
+          signalStopPrice: s.openTrade?.indexStop,
+          currentPrice: s.indexSpot,
+          direction: s.openTrade?.direction,
         });
         if (stale && s.openTrade) {
           staleStartIds.set(

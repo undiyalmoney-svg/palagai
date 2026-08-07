@@ -102,6 +102,78 @@ describe('isStaleStartSignal', () => {
   });
 });
 
+describe('price-based staleness (Crude can join a leg opened earlier)', () => {
+  const started = '2026-08-07 14:40:00';
+  // Real Crude leg: SELL @ 7421, stop 7471 → 50 pts of risk, ~16 pts of drift allowed.
+  const crude = {
+    signalEntryTime: '2026-08-07 14:25:00',
+    deskStartedAt: started,
+    hasBrokerPosition: false,
+    signalEntryPrice: 7421,
+    signalStopPrice: 7471,
+    direction: 'SELL' as const,
+  };
+
+  it('takes the leg while price is still near the signal', () => {
+    expect(isStaleStartSignal({ ...crude, currentPrice: 7430 })).toBe(false);
+  });
+
+  it('refuses once the move has largely happened without us', () => {
+    // Short signalled at 7421; price already 7390, so 31 of the move is gone.
+    expect(isStaleStartSignal({ ...crude, currentPrice: 7390 })).toBe(true);
+  });
+
+  it('takes it when price came back toward the stop — same target, less risk', () => {
+    expect(isStaleStartSignal({ ...crude, currentPrice: 7440 })).toBe(false);
+  });
+
+  it('a tight-risk index leg refuses a drift Crude would accept', () => {
+    // Nifty SELL 24600, stop 24612 → 12 pts risk, ~4 allowed. 9 pts already gone.
+    expect(
+      isStaleStartSignal({
+        signalEntryTime: '2026-08-07 13:10:00',
+        deskStartedAt: started,
+        hasBrokerPosition: false,
+        signalEntryPrice: 24600,
+        signalStopPrice: 24612,
+        direction: 'SELL',
+        currentPrice: 24591,
+      }),
+    ).toBe(true);
+    // The same 9 points is nothing against Crude's 50-pt risk.
+    expect(isStaleStartSignal({ ...crude, currentPrice: 7412 })).toBe(false);
+  });
+
+  it('a long CE leg uses the same rule in reverse', () => {
+    const ce = {
+      signalEntryTime: '2026-08-07 14:25:00',
+      deskStartedAt: started,
+      hasBrokerPosition: false,
+      signalEntryPrice: 7421,
+      signalStopPrice: 7371,
+      direction: 'BUY' as const,
+    };
+    expect(isStaleStartSignal({ ...ce, currentPrice: 7430 })).toBe(false);
+    expect(isStaleStartSignal({ ...ce, currentPrice: 7460 })).toBe(true);
+  });
+
+  it('falls back to the clock when levels are missing', () => {
+    expect(
+      isStaleStartSignal({
+        signalEntryTime: '2026-08-07 10:30:00',
+        deskStartedAt: started,
+        hasBrokerPosition: false,
+      }),
+    ).toBe(true);
+  });
+
+  it('never blocks a leg Kite already holds, however far price ran', () => {
+    expect(isStaleStartSignal({ ...crude, currentPrice: 7999, hasBrokerPosition: true })).toBe(
+      false,
+    );
+  });
+});
+
 describe('labels', () => {
   it('formats IST clock', () => {
     expect(istClock('2026-08-06 14:45:00')).toBe('14:45');

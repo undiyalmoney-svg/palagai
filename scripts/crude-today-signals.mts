@@ -71,31 +71,43 @@ console.log(
   `profile: ${params.label} · entryMode ${params.entryMode} · window ${params.eveningEntryStart}-${params.eveningEntryEnd} · SL${params.stopPts}/TP${params.eveningTargetPts} · confirm ${params.requireConfirm}`,
 );
 
-const out = replayPaperOnCrude({
-  instrumentId: 'crude-oil-mini',
-  instrumentName: 'Crude Oil Mini',
-  candles: live,
-  fromDate: today,
-  toDate: today,
-  instruments: [],
-  optionCandlesByToken: new Map(),
-  neededOptionTokens: new Set(),
-  forceCloseOpen: false,
-  lotsMultiplier: 1,
-  enableMorning: params.defaultEnableMorning,
-  enableEvening: params.defaultEnableEvening,
-  tradeParams: params,
-  dayLossStopPts: params.dayLossStopPts,
-});
-
-console.log(`\nclosed trades today: ${out.trades.length}`);
-for (const t of out.trades) {
-  console.log(
-    `  ${t.entryTime.slice(11, 16)}→${t.exitTime.slice(11, 16)} ${t.direction} fut ${t.indexPoints.toFixed(1)} · ${t.exitReason}`,
-  );
+function replay(series: Candle[], label: string) {
+  const out = replayPaperOnCrude({
+    instrumentId: 'crude-oil-mini',
+    instrumentName: 'Crude Oil Mini',
+    candles: series,
+    fromDate: today,
+    toDate: today,
+    instruments: [],
+    optionCandlesByToken: new Map(),
+    neededOptionTokens: new Set(),
+    forceCloseOpen: false,
+    lotsMultiplier: 1,
+    enableMorning: params.defaultEnableMorning,
+    enableEvening: params.defaultEnableEvening,
+    tradeParams: params,
+    dayLossStopPts: params.dayLossStopPts,
+  });
+  console.log(`\n--- ${label} (${series.length} bars) ---`);
+  console.log(`closed trades today: ${out.trades.length}`);
+  for (const t of out.trades) {
+    console.log(
+      `  ${t.entryTime.slice(11, 16)}→${t.exitTime.slice(11, 16)} ${t.direction} fut ${t.indexPoints.toFixed(1)} · ${t.exitReason}`,
+    );
+  }
+  if (out.open) {
+    const o = out.open as unknown as Record<string, unknown>;
+    console.log(
+      `open leg now: YES ${out.open.direction} · entryTime ${String(o['entryTime'])} · entry ${String(o['entry'])} · stop ${String(o['stop'])} · target ${String(o['target'])}`,
+    );
+  } else {
+    console.log('open leg now: no');
+  }
+  console.log(`last signal: ${out.lastSignal}`);
 }
-console.log(`open leg now: ${out.open ? 'YES ' + JSON.stringify(out.open.direction) : 'no'}`);
-console.log(`last signal text: ${out.lastSignal}`);
+
+replay(live, 'closed bars only (v1.3.79+)');
+replay(raw, 'including the forming bar (pre-v1.3.79)');
 
 const day = live.filter((c) => c.date.slice(11, 16) >= '10:00');
 if (day.length) {
