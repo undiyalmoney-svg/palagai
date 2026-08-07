@@ -16,6 +16,7 @@ import {
   adoptedEntryOrderPlaceholder,
   findCompletedEntryOrderId,
 } from './live-adopt.util';
+import { effectiveCloseReason } from './live-drain-hold.util';
 
 export interface LiveBrokerPosition {
   instrumentId: string;
@@ -156,6 +157,11 @@ export class LiveOrderExecutorService {
   /** Bar time of the last leg closed per instrument — blocks same-candle re-entry. */
   private readonly lastExitBarByInstrument = new Map<string, string>();
   private readonly sameBarReentryLogged = new Set<string>();
+  /**
+   * After HOLD on profit-drained + option red, status sync often omits closeReason.
+   * Latch so the next open:null does not MARKET-dump the red print.
+   */
+  private readonly drainHoldInstruments = new Set<string>();
   /** Number of lots (exchange lot size × this). Testing never uses this. */
   private lotsMultiplier = 1;
   /** Per-desk-instrument lots so Nifty / Bank / Crude can differ on one Live run. */
@@ -170,6 +176,9 @@ export class LiveOrderExecutorService {
     this.summary.clear();
     this.exitingSymbols.clear();
     this.lotsByInstrument.clear();
+    this.drainHoldInstruments.clear();
+    this.sameBarReentryLogged.clear();
+    this.lastExitBarByInstrument.clear();
   }
 
   /**
@@ -188,6 +197,8 @@ export class LiveOrderExecutorService {
       this.positions.delete(id);
       this.summary.delete(id);
       this.lotsByInstrument.delete(id);
+      this.drainHoldInstruments.delete(id);
+      this.lastExitBarByInstrument.delete(id);
     }
     for (let i = this.events.length - 1; i >= 0; i -= 1) {
       if (idSet.has(this.events[i]!.instrumentId)) {
@@ -703,12 +714,20 @@ export class LiveOrderExecutorService {
         };
         this.positions.set(params.instrumentId, current);
       }
+      // Status sync often omits closeReason after a prior HOLD — latch restores it.
+      const closeReason = effectiveCloseReason({
+        closeReason: params.closeReason,
+        drainHoldLatched: this.drainHoldInstruments.has(params.instrumentId),
+      });
       const held = await this.maybeHoldDrainWhileOptionRed(
         params.authorization,
         current,
-        params.closeReason,
+        closeReason,
       );
-      if (!held) {
+      if (held) {
+        this.drainHoldInstruments.add(params.instrumentId);
+      } else {
+        this.drainHoldInstruments.delete(params.instrumentId);
         await this.placeExit(params.authorization, current);
       }
       await this.refreshSummaryStatuses(params.authorization);

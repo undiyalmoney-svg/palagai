@@ -445,6 +445,11 @@ export class PaperTradeDeskService {
   }
 
   /** Resolve Strategy Manager primary + apply desk risk to Champion and Trap/index DNA. */
+  /**
+   * Paper and Live must resolve the same strategy module + DNA.
+   * Mode only selects which assignment slot is read; Trade Desk hands-off
+   * forces paper≡live Trap via `forceTrapDefaultsForDaily3k`.
+   */
   private resolveDeskStrategy(kind: IndexOptionKind, mode: 'paper' | 'live') {
     const channel = this.channelForKind(kind);
     const instrumentId = kind === 'nifty' ? NIFTY_50_INSTRUMENT.id : BANK_NIFTY_INSTRUMENT.id;
@@ -692,7 +697,8 @@ export class PaperTradeDeskService {
             authorization,
             runId,
           });
-          candleMap.set(instrument.id, candles);
+          // Same closed-bar series Live uses — never replay a forming 5m bar.
+          candleMap.set(instrument.id, dropFormingBars(candles));
         }
 
         let crudeCandles: Candle[] = [];
@@ -704,13 +710,15 @@ export class PaperTradeDeskService {
           this.patchMessage(
             `Batch ${b + 1}/${batches.length}: loading ${crudeFuture.tradingSymbol} 5m…`,
           );
-          crudeCandles = await this.fetch5m({
-            instrumentToken: crudeFuture.instrumentToken,
-            from: `${lookbackFrom} 09:00:00`,
-            to: `${batch.toDate} 23:30:00`,
-            authorization,
-            runId,
-          });
+          crudeCandles = dropFormingBars(
+            await this.fetch5m({
+              instrumentToken: crudeFuture.instrumentToken,
+              from: `${lookbackFrom} 09:00:00`,
+              to: `${batch.toDate} 23:30:00`,
+              authorization,
+              runId,
+            }),
+          );
         }
 
         let natGasCandles: Candle[] = [];
@@ -722,13 +730,15 @@ export class PaperTradeDeskService {
           this.patchMessage(
             `Batch ${b + 1}/${batches.length}: loading ${natGasFuture.tradingSymbol} 5m…`,
           );
-          natGasCandles = await this.fetch5m({
-            instrumentToken: natGasFuture.instrumentToken,
-            from: `${lookbackFrom} 09:00:00`,
-            to: `${batch.toDate} 23:30:00`,
-            authorization,
-            runId,
-          });
+          natGasCandles = dropFormingBars(
+            await this.fetch5m({
+              instrumentToken: natGasFuture.instrumentToken,
+              from: `${lookbackFrom} 09:00:00`,
+              to: `${batch.toDate} 23:30:00`,
+              authorization,
+              runId,
+            }),
+          );
         }
 
         const needed = new Set<number>();
@@ -1175,13 +1185,15 @@ export class PaperTradeDeskService {
           }
           let candles: Candle[] = [];
           try {
-            candles = await this.fetch5m({
-              instrumentToken: row.instrument.instrumentToken,
-              from: `${lookbackFrom} 09:00:00`,
-              to: `${today} 15:30:00`,
-              authorization,
-              runId,
-            });
+            candles = dropFormingBars(
+              await this.fetch5m({
+                instrumentToken: row.instrument.instrumentToken,
+                from: `${lookbackFrom} 09:00:00`,
+                to: `${today} 15:30:00`,
+                authorization,
+                runId,
+              }),
+            );
           } catch {
             candles = [];
           }
@@ -1191,7 +1203,8 @@ export class PaperTradeDeskService {
             candles,
             processedThrough: -1,
             resultTrades: [],
-            lastLiveEventAt: null,
+            // Watermark = last *closed* bar so the next completed bar still hooks once.
+            lastLiveEventAt: candles.at(-1)?.date ?? null,
           });
         }
       }
@@ -1204,18 +1217,20 @@ export class PaperTradeDeskService {
         if (this.liveLegs.length) {
           await delay(1500);
         }
-        const candles = await this.fetch5m({
-          instrumentToken: future.instrumentToken,
-          from: `${lookbackFrom} 09:00:00`,
-          to: `${today} 23:30:00`,
-          authorization,
-          runId,
-        });
+        const candles = dropFormingBars(
+          await this.fetch5m({
+            instrumentToken: future.instrumentToken,
+            from: `${lookbackFrom} 09:00:00`,
+            to: `${today} 23:30:00`,
+            authorization,
+            runId,
+          }),
+        );
         this.crudeLive = {
           futuresToken: future.instrumentToken,
           futuresSymbol: future.tradingSymbol,
           candles,
-          lastLiveEventAt: null,
+          lastLiveEventAt: candles.at(-1)?.date ?? null,
         };
       }
 
@@ -1229,18 +1244,20 @@ export class PaperTradeDeskService {
         if (this.liveLegs.length || this.crudeLive) {
           await delay(1500);
         }
-        const candles = await this.fetch5m({
-          instrumentToken: future.instrumentToken,
-          from: `${lookbackFrom} 09:00:00`,
-          to: `${today} 23:30:00`,
-          authorization,
-          runId,
-        });
+        const candles = dropFormingBars(
+          await this.fetch5m({
+            instrumentToken: future.instrumentToken,
+            from: `${lookbackFrom} 09:00:00`,
+            to: `${today} 23:30:00`,
+            authorization,
+            runId,
+          }),
+        );
         this.natGasLive = {
           futuresToken: future.instrumentToken,
           futuresSymbol: future.tradingSymbol,
           candles,
-          lastLiveEventAt: null,
+          lastLiveEventAt: candles.at(-1)?.date ?? null,
         };
       }
 
@@ -1730,6 +1747,37 @@ export class PaperTradeDeskService {
       const natGasTradeParams = resolveCrudeStrategyProfile('daily-profit-ng');
       const natGasDayLossPts = resolveCrudeProfileDayLossPts(natGasTradeParams, false);
       const natGasResolve = this.natGasOptionResolve();
+      const natGasBrokerEvents: IndexLiveBrokerEvent[] = [];
+      const natGasHook =
+        this.realOrders && !initial
+          ? {
+              afterBarTime: this.natGasLive.lastLiveEventAt,
+              onOpen: (o: {
+                direction: 'BUY' | 'SELL';
+                entryTime: string;
+                indexEntry: number;
+                indexStop: number;
+                option: PaperTrade['option'];
+                optionEntryPremium: number | null;
+              }) => {
+                natGasBrokerEvents.push({
+                  kind: 'open',
+                  instrumentId: NATGAS_MINI_INSTRUMENT.id,
+                  instrumentName: `${NATGAS_MINI_INSTRUMENT.name} (${this.natGasLive!.futuresSymbol})`,
+                  open: o,
+                });
+              },
+              onClose: (entryTime: string, exitReason?: string) => {
+                natGasBrokerEvents.push({
+                  kind: 'close',
+                  instrumentId: NATGAS_MINI_INSTRUMENT.id,
+                  instrumentName: `${NATGAS_MINI_INSTRUMENT.name} (${this.natGasLive!.futuresSymbol})`,
+                  entryTime,
+                  exitReason,
+                });
+              },
+            }
+          : undefined;
       const replay = replayPaperOnCrude({
         instrumentId: NATGAS_MINI_INSTRUMENT.id,
         instrumentName: `${NATGAS_MINI_INSTRUMENT.name} (${this.natGasLive.futuresSymbol})`,
@@ -1745,8 +1793,11 @@ export class PaperTradeDeskService {
         enableMorning: natGasTradeParams.defaultEnableMorning,
         enableEvening: natGasTradeParams.defaultEnableEvening,
         tradeParams: natGasTradeParams,
+        liveHook: natGasHook,
         ...natGasResolve,
       });
+      this.natGasLive.lastLiveEventAt =
+        this.natGasLive.candles.at(-1)?.date ?? this.natGasLive.lastLiveEventAt;
       natGasTrades = replay.trades;
       statuses.push(
         withLiveFields({
@@ -1777,18 +1828,39 @@ export class PaperTradeDeskService {
           maxTradesPerDay: natGasTradeParams.maxEveningTradesDay,
         }),
       );
+      // Nat Gas on Kite as bars open/close — same path as Crude / index.
+      if (this.realOrders && natGasBrokerEvents.length) {
+        await this.flushIndexLiveBrokerEvents(authorization, natGasBrokerEvents, allInstruments);
+        allInstruments = this.instrumentStore.allInstruments();
+      }
     }
 
+    // Same option lookback as Testing (−12d) so premium attach matches.
     const optionCandles = await this.fetchOptionHistories(
       [...needed],
-      shiftDate(today, -5),
+      shiftDate(today, -12),
       today,
       authorization,
       undefined,
       mcxEnabled ? '23:30:00' : '15:30:00',
     );
+    // Paper ≡ Live signal money: executable fills (next-bar open), then charges.
+    // Live money Profit ₹ still overlays Kite fills below when realOrders.
+    const seriesForFills = new Map<string, Candle[]>();
+    for (const leg of this.liveLegs) {
+      seriesForFills.set(leg.instrument.id, leg.candles);
+    }
+    if (this.crudeLive) {
+      seriesForFills.set(CRUDE_OIL_MINI_INSTRUMENT.id, this.crudeLive.candles);
+    }
+    if (this.natGasLive) {
+      seriesForFills.set(NATGAS_MINI_INSTRUMENT.id, this.natGasLive.candles);
+    }
     let enriched = this.enrichMixedLots(
-      this.premiumEnrichMixed(indexTrades, [...crudeTrades, ...natGasTrades], optionCandles),
+      repriceTradesToExecutableFills(
+        this.premiumEnrichMixed(indexTrades, [...crudeTrades, ...natGasTrades], optionCandles),
+        seriesForFills,
+      ),
     );
 
     for (const s of statuses) {
@@ -1893,6 +1965,12 @@ export class PaperTradeDeskService {
           }
         }
 
+        // Pass last exit reason so profit-drained HOLD is not MARKET-dumped on the
+        // status sync that follows flush (paper already booked the candle exit).
+        const lastExit = enriched
+          .filter((t) => t.instrumentId === s.instrumentId)
+          .sort((a, b) => a.exitTime.localeCompare(b.exitTime))
+          .at(-1);
         await this.liveOrders.syncInstrument({
           authorization,
           instrumentId: s.instrumentId,
@@ -1909,6 +1987,8 @@ export class PaperTradeDeskService {
                   optionEntryPremium: s.openTrade.optionEntryPremium,
                 }
               : null,
+          closeReason:
+            s.openTrade && !stale ? undefined : (lastExit?.exitReason ?? undefined),
         });
         await delay(350);
       }
