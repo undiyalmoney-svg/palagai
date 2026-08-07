@@ -1,20 +1,14 @@
 /**
- * Trade Desk default book — ₹40k capital plan (doc 49).
- * Target ~₹2k/day · Trap live-safe DNA · auto lots 1/1/1 · profit lock on.
- * Applied on desk load — no Apply button.
+ * Trade Desk default book — ₹40k capital plan (doc 49 / 50).
+ * Nifty + Bank only · Trap all-green DNA · Crude not on this desk.
  */
 export const DAILY_3K_DESK_PRESET = {
   id: 'daily-3k',
   label: 'All-day green · ₹40k',
   niftyLots: 1,
   bankLots: 1,
-  crudeLots: 1,
-  natGasLots: 1,
   enableNifty: true,
   enableBank: true,
-  /** Crude OFF — all-green hunt: Crude added red days. */
-  enableCrude: false,
-  enableNatGas: false,
   enableKutty: false,
   kuttyAlone: false,
   /** Cap new entries after ~+₹3k combined (above the ₹2k daily target). */

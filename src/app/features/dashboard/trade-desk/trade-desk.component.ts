@@ -24,7 +24,6 @@ import { KiteSessionService } from '../../../core/kite/kite-session.service';
 import { LotsPreferenceService } from '../../../core/services/lots-preference.service';
 import { formatUnknownError } from '../../../core/utils/kite-error.util';
 import { extractTradeDate, formatDayOfWeek, formatDisplayDate } from '../../../core/utils/trade-date.util';
-import { AuthService } from '../../../core/auth/auth.service';
 import { StrategyAssignmentService } from '../../../core/strategy-manager/config/strategy-assignment.service';
 import { StrategyRegistryService } from '../../../core/strategy-manager/registry/strategy-registry.service';
 import { dnaCapsForStrategy } from '../../../core/strategy-manager/config/strategy-dna-caps';
@@ -38,11 +37,7 @@ import {
   planLotsForCapital,
 } from '../../../core/paper-desk/capital-plan.util';
 import { CapitalPreferenceService } from '../../../core/services/capital-preference.service';
-import {
-  computeOptionTargetPremium,
-  computeProtectiveSlTrigger,
-  optionPremiumDelta,
-} from '../../../core/live-desk/option-sl-premium.util';
+import { computeOptionTargetPremium } from '../../../core/live-desk/option-sl-premium.util';
 
 @Component({
   selector: 'app-trade-desk',
@@ -57,7 +52,6 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
   private readonly kiteSession = inject(KiteSessionService);
   private readonly lotsPreference = inject(LotsPreferenceService);
   private readonly capitalPreference = inject(CapitalPreferenceService);
-  private readonly auth = inject(AuthService);
   private readonly uiDialog = inject(UiDialogService);
   private readonly assignments = inject(StrategyAssignmentService);
   private readonly registry = inject(StrategyRegistryService);
@@ -89,31 +83,17 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
   /** Per-book lots (exchange lot × this). Defaults from capital plan. */
   protected niftyLots = 1;
   protected bankLots = 1;
-  protected crudeLots = 1;
-  protected natGasLots = 1;
 
-  /** Trade Desk book + risk checkboxes (Testing + Live). All books ON by default. */
+  /** Index books only — Crude/Nat Gas are not on Trade Desk. */
   protected enableNifty = true;
   protected enableBank = true;
-  protected enableCrude = true;
-  /** Off until Nat Gas DNA is fully vetted — opt in for Testing / Live. */
-  protected enableNatGas = false;
-  /** Combined strict day loss ≈ −₹2,950 × lots — off by default; user must opt in. */
-  protected strictDayStop = false;
-  /** Combined day profit lock ≈ +₹3,000 × lots (1→₹3k, 3→₹9k) — on by default. */
+  /** Combined strict day loss ≈ −₹2,950 × lots — on for hands-off agent. */
+  protected strictDayStop = true;
+  /** Combined day profit lock ≈ +₹3,000 × lots (1→₹3k, 3→₹9k). */
   protected dayProfitLock = true;
-  /** Background Kutty scalp — owner only in UI; off by default (Daily desk). */
+  /** Kutty off — not part of the agent desk. */
   protected enableKutty = false;
-  /** Kutty only — no Trap/Strat entries. Off by default. */
   protected kuttyAlone = false;
-
-  /** Owner (Devil) sees Kutty controls; friends do not. */
-  protected readonly showKutty = computed(
-    () => this.auth.currentUser()?.role === 'owner',
-  );
-  /** Crude / Nat Gas controls if user has crude module (owner always has it). */
-  protected readonly showCrude = computed(() => this.auth.hasModule('crude'));
-  protected readonly showNatGas = computed(() => this.auth.hasModule('crude'));
 
   /** Testing result filter: Mon–Fri (fetch all, show selected weekdays). */
   protected readonly weekdayOptions = PAPER_WEEKDAY_OPTIONS;
@@ -143,17 +123,6 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
       modeLabel: assignMode === 'live' ? 'Live' : 'Paper',
       nifty: row('nifty'),
       bank: row('bank'),
-      crude: {
-        channel: 'crude' as const,
-        id: 'crude-selective',
-        name: 'Selective',
-        maxTradesLabel: 'unlimited · SL50/TP200',
-      },
-      natgas: {
-        id: 'natgas-daily-profit-ng',
-        name: 'Daily Profit (NG)',
-        maxTradesLabel: '1t/day',
-      },
       same: map.nifty[assignMode] === map.bank[assignMode],
     };
   });
@@ -192,21 +161,12 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
       this.mode.set('live');
       this.applyCapitalAgentPreset();
     }
-    // Friends: no Kutty. Crude/Nat Gas only if module granted.
-    if (!this.showKutty()) {
-      this.enableKutty = false;
-      this.kuttyAlone = false;
-    }
-    if (!this.showCrude()) {
-      this.enableCrude = false;
-    }
-    if (!this.showNatGas()) {
-      this.enableNatGas = false;
-    }
+    this.enableKutty = false;
+    this.kuttyAlone = false;
   }
 
   ngOnDestroy(): void {
-    // Do not stopLive — Trade Desk + MCX books must keep polling when you switch tabs.
+    // Do not stopLive — desk keeps polling when you switch tabs.
   }
 
   /** Capital changed → re-allocate lots (unless Live is already running). */
@@ -228,19 +188,15 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
     }
   }
 
-  protected onLotsChange(book: 'nifty' | 'bank' | 'crude' | 'natgas'): void {
+  protected onLotsChange(book: 'nifty' | 'bank'): void {
     if (this.autoLotsFromCapital) {
       return;
     }
     if (book === 'nifty') {
       this.niftyLots = Math.max(1, Math.floor(Number(this.niftyLots)) || 1);
       this.lotsPreference.set(this.niftyLots);
-    } else if (book === 'bank') {
-      this.bankLots = Math.max(1, Math.floor(Number(this.bankLots)) || 1);
-    } else if (book === 'natgas') {
-      this.natGasLots = Math.max(1, Math.floor(Number(this.natGasLots)) || 1);
     } else {
-      this.crudeLots = Math.max(1, Math.floor(Number(this.crudeLots)) || 1);
+      this.bankLots = Math.max(1, Math.floor(Number(this.bankLots)) || 1);
     }
   }
 
@@ -271,28 +227,22 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
     this.error.set('');
   }
 
-  /** Size books from total capital. */
+  /** Size Nifty+Bank from total capital. */
   private applyCapitalAllocation(): void {
     const plan = planLotsForCapital(this.capitalRs);
     this.capitalPlan = plan;
     const p = DAILY_3K_DESK_PRESET;
     this.niftyLots = Math.max(1, plan.niftyLots || p.niftyLots);
     this.bankLots = Math.max(1, plan.bankLots > 0 ? plan.bankLots : p.bankLots);
-    // All-green plan keeps Crude at 0 lots / off unless user opts in later.
-    this.crudeLots = plan.crudeLots > 0 ? plan.crudeLots : 1;
-    this.natGasLots = 1;
     this.lotsPreference.set(this.niftyLots);
     this.enableNifty = plan.enableNifty;
     this.enableBank = plan.enableBank;
-    this.enableCrude = this.showCrude() && plan.enableCrude && p.enableCrude;
-    this.enableNatGas = false;
   }
 
   protected allocationSummary(): string {
     const bits = [
       this.enableNifty ? `Nifty ×${this.niftyLots}` : null,
       this.enableBank ? `Bank ×${this.bankLots}` : null,
-      this.enableCrude && this.showCrude() ? `Crude ×${this.crudeLots}` : null,
     ].filter(Boolean);
     return bits.join(' · ') || 'no books';
   }
@@ -303,12 +253,6 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
 
   private lotsForInstrumentId(instrumentId: string): number {
     const id = instrumentId.toLowerCase();
-    if (id.includes('natgas') || id.includes('naturalgas')) {
-      return this.natGasLots;
-    }
-    if (id.includes('crude')) {
-      return this.crudeLots;
-    }
     if (id.includes('bank')) {
       return this.bankLots;
     }
@@ -346,24 +290,18 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
   }
 
   private buildRunOptions(): TradeDeskRunOptions {
-    const kuttyAlone = this.showKutty() && this.kuttyAlone;
-    const enableKutty = this.showKutty() && (kuttyAlone || this.enableKutty);
-    const enableCrude = this.showCrude() && this.enableCrude;
-    const enableNatGas = this.showNatGas() && this.enableNatGas;
     return {
       lots: this.niftyLots,
       niftyLots: this.niftyLots,
       bankLots: this.bankLots,
-      crudeLots: this.crudeLots,
-      natGasLots: this.natGasLots,
       enableNifty: this.enableNifty,
       enableBank: this.enableBank,
-      enableCrude,
-      enableNatGas,
+      enableCrude: false,
+      enableNatGas: false,
       strictDayStop: this.strictDayStop,
       dayProfitLock: this.dayProfitLock,
-      enableKutty,
-      kuttyAlone,
+      enableKutty: false,
+      kuttyAlone: false,
     };
   }
 
@@ -390,36 +328,12 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
     return deskStrictDayLossMoneyRs(this.deskRiskLots());
   }
 
-  protected onKuttyAloneChange(): void {
-    if (this.kuttyAlone) {
-      this.enableKutty = true;
-    }
-  }
-
-  protected onEnableKuttyChange(): void {
-    if (!this.enableKutty) {
-      this.kuttyAlone = false;
-    }
-  }
-
   private selectedBooksLabel(): string {
     const parts = [
       this.enableNifty ? `Nifty 50 ×${this.niftyLots}` : null,
       this.enableBank ? `Bank Nifty ×${this.bankLots}` : null,
-      this.enableCrude && this.showCrude()
-        ? `Crude Oil Mini ×${this.crudeLots} (Selective · Trap SL50/TP200 · unlimited)`
-        : null,
-      this.enableNatGas && this.showNatGas()
-        ? `Natural Gas Mini ×${this.natGasLots} (Daily Profit NG)`
-        : null,
     ].filter(Boolean);
     return parts.join(' + ') || 'none';
-  }
-
-  private anyMcxSelected(): boolean {
-    return (
-      (!!this.enableCrude && this.showCrude()) || (!!this.enableNatGas && this.showNatGas())
-    );
   }
 
   protected async onStart(): Promise<void> {
@@ -441,15 +355,13 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
         this.applyCapitalAllocation();
       }
     }
-    if (!this.enableNifty && !this.enableBank && !this.anyMcxSelected()) {
+    if (!this.enableNifty && !this.enableBank) {
       this.error.set('Agent plan has no books — check capital preference (min ₹10,000).');
       return;
     }
 
     this.niftyLots = Math.max(1, Math.floor(Number(this.niftyLots)) || 1);
     this.bankLots = Math.max(1, Math.floor(Number(this.bankLots)) || 1);
-    this.crudeLots = Math.max(1, Math.floor(Number(this.crudeLots)) || 1);
-    this.natGasLots = Math.max(1, Math.floor(Number(this.natGasLots)) || 1);
     this.lotsPreference.set(this.niftyLots);
     const runOpts = this.buildRunOptions();
 
@@ -476,7 +388,6 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
             this.dayProfitLock
               ? `day profit lock +₹${this.profitLockMoneyRs().toLocaleString('en-IN')}`
               : null,
-            this.anyMcxSelected() ? 'MCX books continue past 15:15' : null,
           ]
             .filter(Boolean)
             .join(', ');
@@ -546,8 +457,6 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
       lotsByBook: {
         nifty: this.niftyLots,
         bank: this.bankLots,
-        crude: this.crudeLots,
-        natgas: this.natGasLots,
       },
     });
   });
@@ -576,28 +485,7 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
       .join('  |  ');
   }
 
-  /**
-   * Option SL premium proxy — same util as live SL-M.
-   * NFO ≈ 0.5Δ; Crude/NatGas MCX ≈ 1.0Δ + min gap (not hardcoded 0.5).
-   */
-  protected optionStopPremium(open: {
-    indexEntry: number;
-    indexStop: number;
-    optionEntryPremium: number | null;
-    option?: { exchange?: string; tradingSymbol?: string } | null;
-  }): number | null {
-    if (open.optionEntryPremium == null || open.optionEntryPremium <= 0) {
-      return null;
-    }
-    return computeProtectiveSlTrigger({
-      fillPremium: open.optionEntryPremium,
-      indexRiskPts: Math.abs(open.indexEntry - open.indexStop),
-      exchange: open.option?.exchange,
-      tradingSymbol: open.option?.tradingSymbol,
-    });
-  }
-
-  /** Option target premium proxy — exchange-aware delta (MCX 1.0 / NFO 0.5). */
+  /** Option target premium proxy — NFO ATM delta. */
   protected optionTargetPremium(open: {
     indexEntry: number;
     indexTarget: number;
@@ -613,16 +501,6 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
       exchange: open.option?.exchange,
       tradingSymbol: open.option?.tradingSymbol,
     });
-  }
-
-  /** UI note: which delta the option SL/target row uses. */
-  protected optionDeltaNote(open: {
-    option?: { exchange?: string; tradingSymbol?: string } | null;
-  }): string {
-    const d = optionPremiumDelta(open.option?.exchange, open.option?.tradingSymbol);
-    return d >= 1
-      ? 'Option SL/Tgt ≈ index pts × 1.0 (MCX Crude/NG — same as live SL-M)'
-      : 'Option SL/Tgt ≈ index pts × 0.5 (NFO — same as live SL-M)';
   }
 
   protected fmtTime(ts: string | null | undefined): string {
@@ -675,10 +553,7 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
       },
       {
         title: 'Trade Desk Results',
-        subtitle:
-          this.showCrude() || this.showNatGas()
-            ? `Nifty / Bank / Crude / Nat Gas paper · days ${view.weekdayLabel}`
-            : `Nifty / Bank paper · days ${view.weekdayLabel}`,
+        subtitle: `Nifty / Bank · days ${view.weekdayLabel}`,
       },
     );
   }
