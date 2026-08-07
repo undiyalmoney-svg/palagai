@@ -16,8 +16,8 @@ describe('SrTrapConfirmManagedStrategy', () => {
     expect(s.getSettings().profitProtectLockR).toBe(0);
     expect(s.getSettings().extras['piercePts']).toBe(15);
     expect(s.getSettings().extras['bankPiercePts']).toBe(30);
-    expect(s.getSettings().extras['bounceOrPierceMult']).toBe(0.25);
-    expect(s.getSettings().extras['bounceOrPierceCap']).toBe(40);
+    expect(s.getSettings().extras['bounceOrPierceMult']).toBe(0);
+    expect(s.getSettings().extras['bounceOrPierceCap']).toBe(0);
     expect(s.getSettings().extras['profitLockArmRs']).toBe(100);
     expect(s.getSettings().extras['profitLockLockRs']).toBe(50);
     expect(s.getSettings().extras['profitLockGivebackRs']).toBe(50);

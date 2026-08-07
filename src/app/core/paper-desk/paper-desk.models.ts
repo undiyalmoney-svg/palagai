@@ -164,6 +164,11 @@ export interface PaperDeskSnapshot {
     optionNetAfterChargesRs?: number;
     /** How many closed trades used δ/index estimate (not real front-week OHLC). */
     premiumEstimatedCount?: number;
+    /**
+     * Research Locked ₹: index proxy − ₹40/fill, day capped at ₹3k.
+     * Matches published monthly table (Jul ₹65,041). Testing Profit uses this.
+     */
+    researchLockedNetRs?: number;
   };
   /** Testing day breakdown: best/worst days, weekday rollup. */
   dayStats: PaperDeskDayStats;

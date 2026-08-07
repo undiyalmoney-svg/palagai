@@ -32,10 +32,9 @@ export const PROTECTION_DNA_EXTRAS: Record<string, number | boolean> = {
 };
 
 /**
- * ALL-DAY-GREEN Trap DNA (v1.3.87 / doc 50):
- * pierce15 · Bank30 · bounce OR · peak₹100/50/50 · soft OFF · max 3/day.
- * Calendar OOS: ~96% green · **0% red** · ~4% flat (no confirm). Recent: 100% green.
- * Early peak trail is the green engine — hold-longer peak₹400 reintroduces red days.
+ * ALL-DAY-GREEN Trap DNA (Locked monthly table):
+ * pierce15 · Bank30 · peak₹100/50/50 · soft OFF · max 3/day · bounceOR widen OFF.
+ * Published Locked: Jan₹53k … Jul₹65,041 … (index proxy − ₹40, day cap ₹3k).
  */
 export const TRAP_1LOT_DAILY_DNA_EXTRAS: Record<string, number | boolean | string> = {
   piercePts: 15,
@@ -48,9 +47,13 @@ export const TRAP_1LOT_DAILY_DNA_EXTRAS: Record<string, number | boolean | strin
   slConfirmCutoffMaxMfeR: 0,
   slConfirmSoftRs: 0,
   trapMode: 'both',
-  /** Wide-day bounce so Bank/Nifty don't sit dump on large OR. */
-  bounceOrPierceMult: 0.25,
-  bounceOrPierceCap: 40,
+  /**
+   * Must stay 0 — bounce-OR widen was a DNA drift that broke the published
+   * Locked monthly table (Jul ₹65,041 → Paper showed ~₹20k option noise).
+   * Hunt DNA: p15/B30 peak100 max3 stop60 · post-hoc lock ₹3k.
+   */
+  bounceOrPierceMult: 0,
+  bounceOrPierceCap: 0,
 };
 
 /** @deprecated alias — prefer TRAP_1LOT_DAILY_DNA_EXTRAS */

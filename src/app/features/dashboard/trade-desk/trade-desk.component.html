@@ -192,7 +192,7 @@
         [class.up]="primaryProfitRs() > 0"
         [class.down]="primaryProfitRs() < 0"
       >
-        <span>Profit ₹</span>
+        <span>{{ mode() === 'testing' ? 'Locked ₹' : 'Profit ₹' }}</span>
         <strong
           >{{ primaryProfitRs() > 0 ? '+' : '' }}{{ primaryProfitRs() | number: '1.0-0' }}</strong
         >

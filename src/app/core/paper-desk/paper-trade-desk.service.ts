@@ -47,6 +47,7 @@ import {
   splitCompletedRoundTrips,
 } from './completed-round-trip.util';
 import { repriceTradesToExecutableFills } from './executable-fill.util';
+import { researchLockedNetRs } from './research-locked-pnl.util';
 import { enrichTradesWithCharges } from './trade-charges.util';
 import { buildPaperDeskDayStats, emptyPaperDeskDayStats } from './paper-desk-day-stats';
 import { MAX_OPTION_HISTORY_TOKENS, rankTokensByFrequency } from './option-history-tokens.util';
@@ -383,6 +384,12 @@ export class PaperTradeDeskService {
     const pdhl = this.pdhlOverridesFor(instrumentId);
     this.strategyManager.applyChampionDeskOverrides(pdhl ?? null);
     const resolved = this.strategyManager.resolve(channel, mode);
+    /**
+     * Research Locked months (Jul ₹65,041) use a *post-hoc* ₹3k day cap on index
+     * proxy — they do NOT stop entries mid-day. In-strategy dayProfitLockPts is
+     * Live capital protection only. Testing/paper must keep dayProfitLockPts=0
+     * so Profit ₹ can match the published Locked table.
+     */
     this.strategyManager.applyIndexDeskRiskSettings(
       resolved.primary,
       buildIndexDeskRiskSettings({
@@ -390,7 +397,7 @@ export class PaperTradeDeskService {
         enableNifty: this.deskRunOptions.enableNifty,
         enableBank: this.deskRunOptions.enableBank,
         strictDayStop: this.deskRunOptions.strictDayStop,
-        dayProfitLock: this.deskRunOptions.dayProfitLock,
+        dayProfitLock: mode === 'live' ? this.deskRunOptions.dayProfitLock : false,
       }),
     );
     return resolved;
@@ -694,14 +701,10 @@ export class PaperTradeDeskService {
         );
         this.assertActive(runId);
 
-        // Testing must report fills Live can actually get: the replay exits at
-        // intrabar stop/target/trail levels, but the desk only sees a 5m bar
-        // after it closes. Without this, Testing shows several times the money.
-        const seriesForFills = new Map<string, Candle[]>(candleMap);
-        const enriched = repriceTradesToExecutableFills(
-          this.premiumEnrichIndex(batchIndexTrades, optionCandles),
-          seriesForFills,
-        );
+        // Testing Profit ₹ = research Locked index (published monthly table).
+        // Do NOT reprice to next-bar executable here — that meter is Live honesty;
+        // Locked months (Jul ₹65,041) are modelled peak-trail + post-hoc ₹3k.
+        const enriched = this.premiumEnrichIndex(batchIndexTrades, optionCandles);
         allEnriched.push(...enriched);
 
         for (const [id, acc] of statusAcc) {
@@ -754,6 +757,15 @@ export class PaperTradeDeskService {
           })),
       );
       const dayStats = buildPaperDeskDayStats(sorted);
+      const totals = summarize(sorted, (id) => this.lotsForInstrument(id), this.lotsMultiplier);
+      const lockedRs = researchLockedNetRs(sorted, {
+        lotsForInstrument: (id) => this.lotsForInstrument(id),
+      });
+      totals.researchLockedNetRs = lockedRs;
+      // Testing Profit ₹ = published Locked index table (Jul ₹65,041), not δ-option.
+      totals.optionNetRs = lockedRs;
+      totals.optionNetAfterChargesRs = lockedRs;
+      totals.optionChargesRs = 0;
 
       this.snapshot.set({
         mode: 'testing',
@@ -763,10 +775,10 @@ export class PaperTradeDeskService {
         marketOpen: true,
         realOrders: false,
         lastTickAt: null,
-        message: `Testing complete · ${sorted.length} paper trade(s) · ${batches.length} batch(es) · ${this.deskOptionsLabel()} · ${this.kiteStatsLabel()}`,
+        message: `Testing complete · ${sorted.length} paper trade(s) · Locked ₹${Math.round(lockedRs).toLocaleString('en-IN')} · ${batches.length} batch(es) · ${this.deskOptionsLabel()} · ${this.kiteStatsLabel()}`,
         statuses,
         trades: sorted,
-        totals: summarize(sorted, (id) => this.lotsForInstrument(id), this.lotsMultiplier),
+        totals,
         dayStats,
         kiteStats: this.kiteStats(),
         orderEvents: [],

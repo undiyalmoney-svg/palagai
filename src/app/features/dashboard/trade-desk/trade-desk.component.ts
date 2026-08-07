@@ -571,11 +571,16 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * One Profit ₹ — Kite fill money on Live, option premium money on paper/Testing.
-   * No Index ₹ / Opt dual numbers in the UI.
+   * One Profit ₹:
+   *  - Testing → research Locked index ₹ (published monthly table, Jul ₹65,041)
+   *  - Live money → Kite fills
+   *  - Live paper → option premium when available
    */
   protected primaryProfitRs(): number {
     const t = this.resultView().totals;
+    if (this.mode() === 'testing' && t.researchLockedNetRs != null) {
+      return t.researchLockedNetRs;
+    }
     if (t.optionNetAfterChargesRs != null) {
       return t.optionNetAfterChargesRs;
     }

@@ -24,7 +24,7 @@ import {
 
 /**
  * S/R Trap + Confirm — default Nifty/Bank Paper+Live.
- * Live-safe DNA: pierce15 · Bank30 · bounce OR · peak₹400 · soft OFF · 2R.
+ * All-day-green DNA: pierce15 · Bank30 · peak₹100 · max3 · 2R · Locked ₹3k table.
  */
 @Injectable({ providedIn: 'root' })
 export class SrTrapConfirmManagedStrategy implements IManagedStrategy {
@@ -32,7 +32,7 @@ export class SrTrapConfirmManagedStrategy implements IManagedStrategy {
   readonly name = 'Trap';
   readonly version = '1.1.0';
   readonly description =
-    'Default · Trap confirm · pierce15 · Bank pierce30 · OR bounce · 2R · peak₹400 · soft OFF.';
+    'Default · Trap confirm · pierce15 · Bank pierce30 · peak₹100 · max3 · 2R · Locked monthly DNA.';
   readonly supports: readonly DeskChannel[] = ['nifty', 'bank'];
 
   readonly defaultSettings = defaultStrategySettings({
@@ -73,8 +73,9 @@ export class SrTrapConfirmManagedStrategy implements IManagedStrategy {
       slConfirmCutoffFracR: 0,
       slConfirmCutoffMaxMfeR: 0,
       slConfirmSoftRs: 0,
-      bounceOrPierceMult: 0.25,
-      bounceOrPierceCap: 40,
+      /** 0 = research Locked table DNA (do not widen bounce with OR). */
+      bounceOrPierceMult: 0,
+      bounceOrPierceCap: 0,
     },
   });
 
