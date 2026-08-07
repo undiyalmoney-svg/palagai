@@ -7,13 +7,9 @@ import { KiteSessionService } from '../kite/kite-session.service';
 import { InstrumentStoreService } from '../services/instrument-store.service';
 import {
   BANK_NIFTY_INSTRUMENT,
-  CRUDE_OIL_MINI_INSTRUMENT,
-  NATGAS_MINI_INSTRUMENT,
   NIFTY_50_INSTRUMENT,
   TesterInstrument,
 } from '../constants/instruments.const';
-import { MCX_MINI_ASSETS } from '../config/mcx-mini-asset';
-import { MCX_CRUDE_SESSION } from '../config/session.config';
 import {
   assertKiteHistoricalSuccess,
   extractKiteApiError,
@@ -39,10 +35,6 @@ import {
   replayPaperOnIndex,
   toOptionContract,
 } from './paper-desk-engine';
-import {
-  enrichCrudeTradesWithOptionPremiums,
-  replayPaperOnCrude,
-} from './crude-paper-engine';
 import { deskLegHasKiteEntry, syncTradesToKiteFills } from './apply-kite-fill-pnl';
 import {
   isStaleStartSignal,
@@ -66,20 +58,6 @@ import {
   deskStrictDayLossMoneyRs,
   rupeesPerPointForInstrument,
 } from '../strategy-engine/strategies/pdhl-opening-range/pdhl-opening-range.evaluator';
-import { CRUDE_EXIT_BY } from '../strategy-engine/strategies/crude-pdhl-evening/crude-pdhl-evening.evaluator';
-import {
-  resolveCrudeProfileDayLossPts,
-  resolveCrudeStrategyProfile,
-} from '../strategy-engine/strategies/crude-pdhl-evening/crude-strategy-profile';
-import {
-  resolveCrudeOilMiniFuturesToken,
-  resolveNatGasMiniFuturesToken,
-} from '../utils/instrument-resolver.util';
-import {
-  countCrudeMiniOptions,
-  resolveAtmCrudeMiniOption,
-  toCrudePaperOption,
-} from '../utils/crude-option.util';
 import { StrategyManagerService } from '../strategy-manager/runtime/strategy-manager.service';
 import { StrategyEventLogger } from '../strategy-manager/runtime/strategy-event-logger.service';
 import { ShadowBookService } from '../strategy-manager/runtime/shadow-book.service';
@@ -105,14 +83,26 @@ export interface TradeDeskRunOptions {
   /** Per-book lots (exchange lot × this). */
   niftyLots?: number;
   bankLots?: number;
+  /**
+   * @deprecated Ignored — Trade Desk is Nifty+Bank only.
+   * Kept so callers (UI preset) still type-check.
+   */
   crudeLots?: number;
+  /**
+   * @deprecated Ignored — Trade Desk is Nifty+Bank only.
+   */
   natGasLots?: number;
   realOrders?: boolean;
   enableNifty?: boolean;
   enableBank?: boolean;
-  /** Crude Oil Mini Selective parallel book on Trade Desk. Default on from UI. */
+  /**
+   * @deprecated Always forced false — Trade Desk is Nifty+Bank only.
+   * Kept so callers (UI) still type-check.
+   */
   enableCrude?: boolean;
-  /** Natural Gas Mini Daily Profit NG parallel book. Default off — opt in from UI. */
+  /**
+   * @deprecated Always forced false — Trade Desk is Nifty+Bank only.
+   */
   enableNatGas?: boolean;
   /** Combined strict day loss ≈ −₹2,950 (split if both index books on). */
   strictDayStop?: boolean;
@@ -157,14 +147,6 @@ type IndexLiveBrokerEvent =
       exitReason?: string;
     };
 
-interface CrudeLiveState {
-  futuresToken: number;
-  futuresSymbol: string;
-  candles: Candle[];
-  /** Live money: only hook placeEntry/Exit for bars after this candle time. */
-  lastLiveEventAt: string | null;
-}
-
 @Injectable({ providedIn: 'root' })
 export class PaperTradeDeskService {
   private readonly kiteApi = inject(KiteApiService);
@@ -184,10 +166,6 @@ export class PaperTradeDeskService {
   /** Prevent overlapping tickLive polls (15s tick can outrun itself). */
   private liveTickInFlight = false;
   private liveLegs: LiveLeg[] = [];
-  private crudeLive: CrudeLiveState | null = null;
-  private natGasLive: CrudeLiveState | null = null;
-  /** Last index statuses kept after 15:30 while MCX books continue. */
-  private lastIndexStatuses: PaperInstrumentStatus[] = [];
   private liveTrades: PaperTrade[] = [];
   /** Dedup Event log for desk-only legs (never on Kite). */
   private loggedDeskOnlyTradeIds = new Set<string>();
@@ -204,8 +182,6 @@ export class PaperTradeDeskService {
   private lotsMultiplier = 1;
   private niftyLots = 1;
   private bankLots = 1;
-  private crudeLots = 1;
-  private natGasLots = 1;
   private deskRunOptions: Required<
     Pick<
       TradeDeskRunOptions,
@@ -221,7 +197,7 @@ export class PaperTradeDeskService {
   > = {
     enableNifty: true,
     enableBank: true,
-    enableCrude: true,
+    enableCrude: false,
     enableNatGas: false,
     strictDayStop: false,
     dayProfitLock: false,
@@ -296,13 +272,11 @@ export class PaperTradeDeskService {
   private normalizeDeskOptions(options?: TradeDeskRunOptions): void {
     const enableNifty = options?.enableNifty !== false;
     const enableBank = options?.enableBank !== false;
-    const enableCrude = options?.enableCrude !== false;
-    // Nat Gas is opt-in (unlike Crude) until the book is fully analyzed.
-    const enableNatGas = !!options?.enableNatGas;
-    if (!enableNifty && !enableBank && !enableCrude && !enableNatGas) {
-      throw new Error(
-        'Select at least one book: Nifty 50, Bank Nifty, Crude Oil Mini, or Natural Gas Mini.',
-      );
+    // Trade Desk is Nifty+Bank only — ignore caller enableCrude / enableNatGas.
+    const enableCrude = false;
+    const enableNatGas = false;
+    if (!enableNifty && !enableBank) {
+      throw new Error('Select at least one book: Nifty 50 or Bank Nifty.');
     }
     const kuttyAlone = !!options?.kuttyAlone;
     this.deskRunOptions = {
@@ -319,28 +293,6 @@ export class PaperTradeDeskService {
     this.lotsMultiplier = fallback;
     this.niftyLots = Math.max(1, Math.floor(options?.niftyLots ?? fallback) || 1);
     this.bankLots = Math.max(1, Math.floor(options?.bankLots ?? fallback) || 1);
-    this.crudeLots = Math.max(1, Math.floor(options?.crudeLots ?? fallback) || 1);
-    this.natGasLots = Math.max(1, Math.floor(options?.natGasLots ?? fallback) || 1);
-  }
-
-  private natGasOptionResolve() {
-    const a = MCX_MINI_ASSETS.natgas;
-    return {
-      optionPrefixes: [a.futPrefix, ...a.altFutPrefixes],
-      strikeStep: a.strikeStep,
-      syntheticName: a.futPrefix,
-    };
-  }
-
-  private anyMcxBookEnabled(): boolean {
-    return this.deskRunOptions.enableCrude || this.deskRunOptions.enableNatGas;
-  }
-
-  private isMcxInstrumentId(instrumentId: string): boolean {
-    return (
-      instrumentId === CRUDE_OIL_MINI_INSTRUMENT.id ||
-      instrumentId === NATGAS_MINI_INSTRUMENT.id
-    );
   }
 
   private lotsForInstrument(instrumentId: string): number {
@@ -349,12 +301,6 @@ export class PaperTradeDeskService {
     }
     if (instrumentId === BANK_NIFTY_INSTRUMENT.id) {
       return this.bankLots;
-    }
-    if (instrumentId === CRUDE_OIL_MINI_INSTRUMENT.id) {
-      return this.crudeLots;
-    }
-    if (instrumentId === NATGAS_MINI_INSTRUMENT.id) {
-      return this.natGasLots;
     }
     return this.lotsMultiplier;
   }
@@ -366,15 +312,9 @@ export class PaperTradeDeskService {
     if (this.deskRunOptions.enableBank) {
       this.liveOrders.setLotsForInstrument(BANK_NIFTY_INSTRUMENT.id, this.bankLots);
     }
-    if (this.deskRunOptions.enableCrude) {
-      this.liveOrders.setLotsForInstrument(CRUDE_OIL_MINI_INSTRUMENT.id, this.crudeLots);
-    }
-    if (this.deskRunOptions.enableNatGas) {
-      this.liveOrders.setLotsForInstrument(NATGAS_MINI_INSTRUMENT.id, this.natGasLots);
-    }
   }
 
-  /** Apply charge estimates with per-book lots (Nifty / Bank / Crude may differ). */
+  /** Apply charge estimates with per-book lots (Nifty / Bank may differ). */
   private enrichMixedLots(trades: PaperTrade[]): PaperTrade[] {
     const byId = new Map<string, PaperTrade[]>();
     for (const t of trades) {
@@ -389,9 +329,8 @@ export class PaperTradeDeskService {
     return out;
   }
 
-  private premiumEnrichMixed(
+  private premiumEnrichIndex(
     indexTrades: PaperTrade[],
-    mcxTrades: PaperTrade[],
     optionCandles: Map<number, Candle[]>,
   ): PaperTrade[] {
     const byId = new Map<string, PaperTrade[]>();
@@ -406,19 +345,7 @@ export class PaperTradeDeskService {
         ...enrichTradesWithOptionPremiums(list, optionCandles, this.lotsForInstrument(id)),
       );
     }
-    const mcxById = new Map<string, PaperTrade[]>();
-    for (const t of mcxTrades) {
-      const list = mcxById.get(t.instrumentId) ?? [];
-      list.push(t);
-      mcxById.set(t.instrumentId, list);
-    }
-    const enrichedMcx: PaperTrade[] = [];
-    for (const [id, list] of mcxById) {
-      enrichedMcx.push(
-        ...enrichCrudeTradesWithOptionPremiums(list, optionCandles, this.lotsForInstrument(id)),
-      );
-    }
-    return [...enrichedIndex, ...enrichedMcx];
+    return enrichedIndex;
   }
 
   private activeInstruments(): Array<{ instrument: TesterInstrument; kind: IndexOptionKind }> {
@@ -556,8 +483,6 @@ export class PaperTradeDeskService {
     const books = [
       this.deskRunOptions.enableNifty ? `Nifty×${this.niftyLots}` : null,
       this.deskRunOptions.enableBank ? `Bank×${this.bankLots}` : null,
-      this.deskRunOptions.enableCrude ? `Crude×${this.crudeLots}` : null,
-      this.deskRunOptions.enableNatGas ? `NG×${this.natGasLots}` : null,
     ]
       .filter(Boolean)
       .join('+');
@@ -578,8 +503,6 @@ export class PaperTradeDeskService {
         : this.deskRunOptions.enableKutty
           ? 'Kutty on'
           : null,
-      this.deskRunOptions.enableCrude ? 'Crude Selective' : null,
-      this.deskRunOptions.enableNatGas ? 'Nat Gas Daily Profit' : null,
     ]
       .filter(Boolean)
       .join(', ');
@@ -615,42 +538,10 @@ export class PaperTradeDeskService {
     try {
       this.assertActive(runId);
       const authorization = this.requireAuth();
-      const allInstruments = await this.loadOptionInstruments({
-        requireCrude: this.deskRunOptions.enableCrude,
-        requireNatGas: this.deskRunOptions.enableNatGas,
-      });
+      const allInstruments = await this.loadOptionInstruments();
       this.assertActive(runId);
 
       const active = this.activeInstruments();
-      let crudeFuture: { instrumentToken: number; tradingSymbol: string } | null = null;
-      let natGasFuture: { instrumentToken: number; tradingSymbol: string } | null = null;
-      if (this.deskRunOptions.enableCrude) {
-        const resolvedFuture = resolveCrudeOilMiniFuturesToken(allInstruments);
-        if (!resolvedFuture) {
-          throw new Error('No live CRUDEOILM futures contract. Settings → Refresh Instruments.');
-        }
-        crudeFuture = {
-          instrumentToken: resolvedFuture.instrumentToken,
-          tradingSymbol: resolvedFuture.tradingSymbol,
-        };
-      }
-      if (this.deskRunOptions.enableNatGas) {
-        const resolvedFuture = resolveNatGasMiniFuturesToken(allInstruments);
-        if (!resolvedFuture) {
-          throw new Error(
-            'No live NATGASMINI futures after refresh. Open Get Token if expired, then Settings → Refresh Instruments, and confirm badge shows v1.3.42+.',
-          );
-        }
-        natGasFuture = {
-          instrumentToken: resolvedFuture.instrumentToken,
-          tradingSymbol: resolvedFuture.tradingSymbol,
-        };
-      }
-      const crudeTradeParams = resolveCrudeStrategyProfile('selective');
-      const crudeDayLossPts = resolveCrudeProfileDayLossPts(crudeTradeParams, false);
-      const natGasTradeParams = resolveCrudeStrategyProfile('daily-profit-ng');
-      const natGasDayLossPts = resolveCrudeProfileDayLossPts(natGasTradeParams, false);
-      const natGasResolve = this.natGasOptionResolve();
 
       const allEnriched: PaperTrade[] = [];
       const statusAcc = new Map<
@@ -701,51 +592,9 @@ export class PaperTradeDeskService {
           candleMap.set(instrument.id, dropFormingBars(candles));
         }
 
-        let crudeCandles: Candle[] = [];
-        if (crudeFuture) {
-          this.assertActive(runId);
-          if (active.length > 0 || b > 0) {
-            await delay(1500);
-          }
-          this.patchMessage(
-            `Batch ${b + 1}/${batches.length}: loading ${crudeFuture.tradingSymbol} 5m…`,
-          );
-          crudeCandles = dropFormingBars(
-            await this.fetch5m({
-              instrumentToken: crudeFuture.instrumentToken,
-              from: `${lookbackFrom} 09:00:00`,
-              to: `${batch.toDate} 23:30:00`,
-              authorization,
-              runId,
-            }),
-          );
-        }
-
-        let natGasCandles: Candle[] = [];
-        if (natGasFuture) {
-          this.assertActive(runId);
-          if (active.length > 0 || b > 0 || crudeFuture) {
-            await delay(1500);
-          }
-          this.patchMessage(
-            `Batch ${b + 1}/${batches.length}: loading ${natGasFuture.tradingSymbol} 5m…`,
-          );
-          natGasCandles = dropFormingBars(
-            await this.fetch5m({
-              instrumentToken: natGasFuture.instrumentToken,
-              from: `${lookbackFrom} 09:00:00`,
-              to: `${batch.toDate} 23:30:00`,
-              authorization,
-              runId,
-            }),
-          );
-        }
-
         const needed = new Set<number>();
         const emptyOpt = new Map<number, Candle[]>();
         const batchIndexTrades: PaperTrade[] = [];
-        let batchCrudeTrades: PaperTrade[] = [];
-        let batchNatGasTrades: PaperTrade[] = [];
         /** Per-instrument entry map for shadow (full batch). */
         const primaryActionsById = new Map<string, Map<string, string>>();
 
@@ -812,79 +661,6 @@ export class PaperTradeDeskService {
           }
         }
 
-        if (crudeFuture) {
-          const crudeReplay = replayPaperOnCrude({
-            instrumentId: CRUDE_OIL_MINI_INSTRUMENT.id,
-            instrumentName: `${CRUDE_OIL_MINI_INSTRUMENT.name} (${crudeFuture.tradingSymbol})`,
-            candles: crudeCandles,
-            fromDate: batch.fromDate,
-            toDate: batch.toDate,
-            instruments: allInstruments,
-            optionCandlesByToken: emptyOpt,
-            neededOptionTokens: needed,
-            lotsMultiplier: this.crudeLots,
-            dayLossStopPts: crudeDayLossPts,
-            enableMorning: crudeTradeParams.defaultEnableMorning,
-            enableEvening: crudeTradeParams.defaultEnableEvening,
-            tradeParams: crudeTradeParams,
-          });
-          batchCrudeTrades = crudeReplay.trades;
-          const prev = statusAcc.get(CRUDE_OIL_MINI_INSTRUMENT.id);
-          const batchIndexNet = Object.values(crudeReplay.dayNetByDate).reduce((a, v) => a + v, 0);
-          statusAcc.set(CRUDE_OIL_MINI_INSTRUMENT.id, {
-            instrumentId: CRUDE_OIL_MINI_INSTRUMENT.id,
-            instrumentName: `${CRUDE_OIL_MINI_INSTRUMENT.name} (${crudeFuture.tradingSymbol})`,
-            lastBarTime: crudeCandles.at(-1)?.date ?? prev?.lastBarTime ?? null,
-            dayNetIndexPts: (prev?.dayNetIndexPts ?? 0) + batchIndexNet,
-            dayNetOptionRs: prev?.dayNetOptionRs ?? 0,
-            chosenOption: crudeReplay.chosenOption ?? prev?.chosenOption ?? null,
-            chosenBias: crudeReplay.chosenBias ?? prev?.chosenBias ?? null,
-            indexSpot: crudeReplay.indexSpot ?? prev?.indexSpot ?? null,
-            chosenAsOf: crudeReplay.chosenAsOf ?? prev?.chosenAsOf ?? null,
-            lastSignal: crudeReplay.lastSignal || prev?.lastSignal || 'Waiting',
-            strategyId: 'crude-selective',
-            strategyName: crudeTradeParams.label,
-            maxTradesPerDay: crudeTradeParams.maxEveningTradesDay,
-          });
-        }
-
-        if (natGasFuture) {
-          const natGasReplay = replayPaperOnCrude({
-            instrumentId: NATGAS_MINI_INSTRUMENT.id,
-            instrumentName: `${NATGAS_MINI_INSTRUMENT.name} (${natGasFuture.tradingSymbol})`,
-            candles: natGasCandles,
-            fromDate: batch.fromDate,
-            toDate: batch.toDate,
-            instruments: allInstruments,
-            optionCandlesByToken: emptyOpt,
-            neededOptionTokens: needed,
-            lotsMultiplier: this.natGasLots,
-            dayLossStopPts: natGasDayLossPts,
-            enableMorning: natGasTradeParams.defaultEnableMorning,
-            enableEvening: natGasTradeParams.defaultEnableEvening,
-            tradeParams: natGasTradeParams,
-            ...natGasResolve,
-          });
-          batchNatGasTrades = natGasReplay.trades;
-          const prev = statusAcc.get(NATGAS_MINI_INSTRUMENT.id);
-          const batchIndexNet = Object.values(natGasReplay.dayNetByDate).reduce((a, v) => a + v, 0);
-          statusAcc.set(NATGAS_MINI_INSTRUMENT.id, {
-            instrumentId: NATGAS_MINI_INSTRUMENT.id,
-            instrumentName: `${NATGAS_MINI_INSTRUMENT.name} (${natGasFuture.tradingSymbol})`,
-            lastBarTime: natGasCandles.at(-1)?.date ?? prev?.lastBarTime ?? null,
-            dayNetIndexPts: (prev?.dayNetIndexPts ?? 0) + batchIndexNet,
-            dayNetOptionRs: prev?.dayNetOptionRs ?? 0,
-            chosenOption: natGasReplay.chosenOption ?? prev?.chosenOption ?? null,
-            chosenBias: natGasReplay.chosenBias ?? prev?.chosenBias ?? null,
-            indexSpot: natGasReplay.indexSpot ?? prev?.indexSpot ?? null,
-            chosenAsOf: natGasReplay.chosenAsOf ?? prev?.chosenAsOf ?? null,
-            lastSignal: natGasReplay.lastSignal || prev?.lastSignal || 'Waiting',
-            strategyId: 'natgas-daily-profit-ng',
-            strategyName: natGasTradeParams.label,
-            maxTradesPerDay: natGasTradeParams.maxEveningTradesDay,
-          });
-        }
-
         for (const { instrument, kind } of active) {
           const resolved = this.resolveDeskStrategy(kind, 'paper');
           if (!resolved.shadow) {
@@ -914,7 +690,7 @@ export class PaperTradeDeskService {
           batch.toDate,
           authorization,
           runId,
-          this.anyMcxBookEnabled() ? '23:30:00' : '15:30:00',
+          '15:30:00',
         );
         this.assertActive(runId);
 
@@ -922,18 +698,8 @@ export class PaperTradeDeskService {
         // intrabar stop/target/trail levels, but the desk only sees a 5m bar
         // after it closes. Without this, Testing shows several times the money.
         const seriesForFills = new Map<string, Candle[]>(candleMap);
-        if (crudeCandles.length) {
-          seriesForFills.set(CRUDE_OIL_MINI_INSTRUMENT.id, crudeCandles);
-        }
-        if (natGasCandles.length) {
-          seriesForFills.set(NATGAS_MINI_INSTRUMENT.id, natGasCandles);
-        }
         const enriched = repriceTradesToExecutableFills(
-          this.premiumEnrichMixed(
-            batchIndexTrades,
-            [...batchCrudeTrades, ...batchNatGasTrades],
-            optionCandles,
-          ),
+          this.premiumEnrichIndex(batchIndexTrades, optionCandles),
           seriesForFills,
         );
         allEnriched.push(...enriched);
@@ -972,7 +738,6 @@ export class PaperTradeDeskService {
       );
       this.strategyPerf.recordMany(
         sorted
-          .filter((t) => !this.isMcxInstrumentId(t.instrumentId))
           .map((t) => ({
             strategyId: t.strategyId ?? 'unknown',
             channel:
@@ -1033,11 +798,7 @@ export class PaperTradeDeskService {
     this.normalizeDeskOptions(options);
     this.realOrders = !!environment.allowLiveMoney && !!options?.realOrders;
     const active = this.activeInstruments();
-    const clearIds = [
-      ...active.map((i) => i.instrument.id),
-      ...(this.deskRunOptions.enableCrude ? [CRUDE_OIL_MINI_INSTRUMENT.id] : []),
-      ...(this.deskRunOptions.enableNatGas ? [NATGAS_MINI_INSTRUMENT.id] : []),
-    ];
+    const clearIds = active.map((i) => i.instrument.id);
     // Soft clear — never wipe the other desk's open SL / adopt map.
     this.liveOrders.clearInstruments(clearIds);
     this.liveOrders.setLotsMultiplier(this.lotsMultiplier);
@@ -1046,30 +807,23 @@ export class PaperTradeDeskService {
     const now = istNowHhMm();
     const anyIndex = this.deskRunOptions.enableNifty || this.deskRunOptions.enableBank;
     const indexOpen = now >= '09:15' && now <= '15:30';
-    const mcxOpen =
-      now >= MCX_CRUDE_SESSION.marketOpen && now <= MCX_CRUDE_SESSION.marketClose;
-    const sessionOpenNow = (anyIndex && indexOpen) || (this.anyMcxBookEnabled() && mcxOpen);
+    const sessionOpenNow = anyIndex && indexOpen;
     // Allow Start any morning time — selected books arm automatically at their open.
-    const canDeferStart = anyIndex || this.anyMcxBookEnabled();
+    const canDeferStart = anyIndex;
 
     if (!sessionOpenNow && !canDeferStart) {
       try {
         const allInstruments = await this.loadOptionInstruments({
           patchStatus: false,
           requireMinimum: false,
-          requireCrude: this.deskRunOptions.enableCrude,
-          requireNatGas: this.deskRunOptions.enableNatGas,
         });
-        const statuses = await this.previewChosenInstruments(today, allInstruments, active, {
-          includeCrude: this.deskRunOptions.enableCrude,
-          includeNatGas: this.deskRunOptions.enableNatGas,
-        });
+        const statuses = await this.previewChosenInstruments(today, allInstruments, active);
         this.snapshot.set({
           ...emptySnapshot('live'),
           fromDate: today,
           toDate: today,
           marketOpen: false,
-          message: `Outside hours for selected books (now ${now}). Index 09:15–15:30 · MCX ${MCX_CRUDE_SESSION.marketOpen}–${MCX_CRUDE_SESSION.marketClose}. Showing ATM picks — use Testing after hours.`,
+          message: `Outside hours for selected books (now ${now}). Index 09:15–15:30. Showing ATM picks — use Testing after hours.`,
           statuses,
           kiteStats: this.kiteStats(),
         });
@@ -1095,7 +849,7 @@ export class PaperTradeDeskService {
       marketOpen: sessionOpenNow,
       realOrders: this.realOrders,
       message: !sessionOpenNow
-        ? `Live armed — waiting for open (now ${now}). Index 09:15 · MCX ${MCX_CRUDE_SESSION.marketOpen}. Selected books auto-join.`
+        ? `Live armed — waiting for open (now ${now}). Index 09:15. Selected books auto-join.`
         : this.realOrders
           ? `Starting LIVE MONEY desk (${this.deskOptionsLabel()})…`
           : `Starting live paper (${this.deskOptionsLabel()})…`,
@@ -1105,10 +859,8 @@ export class PaperTradeDeskService {
     try {
       this.assertActive(runId);
       const authorization = this.requireAuth();
-      const allInstruments = await this.loadOptionInstruments({
+      await this.loadOptionInstruments({
         patchStatus: false,
-        requireCrude: this.deskRunOptions.enableCrude,
-        requireNatGas: this.deskRunOptions.enableNatGas,
       });
       // Live money needs a fresh NFO dump — stale/empty cache → synthetic options → no Kite orders.
       // Tuesday Nifty expiry rolls to next weekly — force refresh so Aug+1 week is in cache.
@@ -1163,9 +915,6 @@ export class PaperTradeDeskService {
       const lookbackFrom = shiftDate(today, -12);
 
       this.liveLegs = [];
-      this.crudeLive = null;
-      this.natGasLive = null;
-      this.lastIndexStatuses = [];
       this.liveTrades = [];
       this.loggedDeskOnlyTradeIds.clear();
       this.staleStartLogged.clear();
@@ -1209,67 +958,13 @@ export class PaperTradeDeskService {
         }
       }
 
-      if (this.deskRunOptions.enableCrude && mcxOpen) {
-        const future = resolveCrudeOilMiniFuturesToken(allInstruments);
-        if (!future) {
-          throw new Error('No live CRUDEOILM futures contract.');
-        }
-        if (this.liveLegs.length) {
-          await delay(1500);
-        }
-        const candles = dropFormingBars(
-          await this.fetch5m({
-            instrumentToken: future.instrumentToken,
-            from: `${lookbackFrom} 09:00:00`,
-            to: `${today} 23:30:00`,
-            authorization,
-            runId,
-          }),
-        );
-        this.crudeLive = {
-          futuresToken: future.instrumentToken,
-          futuresSymbol: future.tradingSymbol,
-          candles,
-          lastLiveEventAt: candles.at(-1)?.date ?? null,
-        };
-      }
-
-      if (this.deskRunOptions.enableNatGas && mcxOpen) {
-        const future = resolveNatGasMiniFuturesToken(allInstruments);
-        if (!future) {
-          throw new Error(
-            'No live NATGASMINI futures after refresh. Confirm badge shows v1.3.42+, then Settings → Refresh Instruments.',
-          );
-        }
-        if (this.liveLegs.length || this.crudeLive) {
-          await delay(1500);
-        }
-        const candles = dropFormingBars(
-          await this.fetch5m({
-            instrumentToken: future.instrumentToken,
-            from: `${lookbackFrom} 09:00:00`,
-            to: `${today} 23:30:00`,
-            authorization,
-            runId,
-          }),
-        );
-        this.natGasLive = {
-          futuresToken: future.instrumentToken,
-          futuresSymbol: future.tradingSymbol,
-          candles,
-          lastLiveEventAt: candles.at(-1)?.date ?? null,
-        };
-      }
-
       await this.tickLive(true);
       this.assertActive(runId);
 
-      // Live money: poll faster so open→SL inside one bar still hits Kite (index + Crude).
+      // Live money: poll faster so open→SL inside one bar still hits Kite.
       const tickMs =
         this.realOrders &&
-        (this.deskRunOptions.enableNifty ||
-          this.deskRunOptions.enableBank ||
-          this.deskRunOptions.enableCrude)
+        (this.deskRunOptions.enableNifty || this.deskRunOptions.enableBank)
           ? 15_000
           : 60_000;
       this.liveTimer = setInterval(() => {
@@ -1316,63 +1011,6 @@ export class PaperTradeDeskService {
     }
   }
 
-  /**
-   * When Live was started before MCX open, arm Crude/Nat Gas on the first in-hours tick.
-   */
-  private async ensureMcxLiveBooksArmed(today: string): Promise<void> {
-    const authorization = this.requireAuth();
-    const lookbackFrom = shiftDate(today, -12);
-    let allInstruments = this.instrumentStore.allInstruments();
-    if (!allInstruments.length) {
-      allInstruments = await this.loadOptionInstruments({
-        patchStatus: false,
-        requireCrude: this.deskRunOptions.enableCrude,
-        requireNatGas: this.deskRunOptions.enableNatGas,
-      });
-    }
-
-    if (this.deskRunOptions.enableCrude && !this.crudeLive) {
-      const future = resolveCrudeOilMiniFuturesToken(allInstruments);
-      if (!future) {
-        throw new Error('No live CRUDEOILM futures contract.');
-      }
-      const candles = await this.fetch5m({
-        instrumentToken: future.instrumentToken,
-        from: `${lookbackFrom} 09:00:00`,
-        to: `${today} 23:30:00`,
-        authorization,
-      });
-      this.crudeLive = {
-        futuresToken: future.instrumentToken,
-        futuresSymbol: future.tradingSymbol,
-        candles,
-        lastLiveEventAt: null,
-      };
-    }
-
-    if (this.deskRunOptions.enableNatGas && !this.natGasLive) {
-      const future = resolveNatGasMiniFuturesToken(allInstruments);
-      if (!future) {
-        throw new Error('No live NATGASMINI futures contract.');
-      }
-      if (this.crudeLive) {
-        await delay(1200);
-      }
-      const candles = await this.fetch5m({
-        instrumentToken: future.instrumentToken,
-        from: `${lookbackFrom} 09:00:00`,
-        to: `${today} 23:30:00`,
-        authorization,
-      });
-      this.natGasLive = {
-        futuresToken: future.instrumentToken,
-        futuresSymbol: future.tradingSymbol,
-        candles,
-        lastLiveEventAt: null,
-      };
-    }
-  }
-
   private async tickLive(initial: boolean): Promise<void> {
     if (this.liveTickInFlight) {
       return;
@@ -1389,35 +1027,8 @@ export class PaperTradeDeskService {
     const today = todayIso();
     const now = istNowHhMm();
     const anyIndexLegs = this.liveLegs.length > 0;
-    const mcxHours =
-      now >= MCX_CRUDE_SESSION.marketOpen && now <= MCX_CRUDE_SESSION.marketClose;
-    const wantsMcx = this.deskRunOptions.enableCrude || this.deskRunOptions.enableNatGas;
 
-    // Deferred morning Start: arm MCX books on the first tick inside MCX hours.
-    if (mcxHours && wantsMcx && (!this.crudeLive || !this.natGasLive)) {
-      try {
-        await this.ensureMcxLiveBooksArmed(today);
-      } catch {
-        // keep waiting — next tick retries
-      }
-    }
-
-    const crudeEnabled = this.deskRunOptions.enableCrude && !!this.crudeLive;
-    const natGasEnabled = this.deskRunOptions.enableNatGas && !!this.natGasLive;
-    const mcxEnabled = crudeEnabled || natGasEnabled;
-
-    if (mcxEnabled || (wantsMcx && anyIndexLegs)) {
-      if (now > MCX_CRUDE_SESSION.marketClose) {
-        this.snapshot.update((s) => ({
-          ...s,
-          marketOpen: false,
-          running: false,
-          message: `Market closed (after ${MCX_CRUDE_SESSION.marketClose}). Live desk stopped.`,
-        }));
-        this.stopLive();
-        return;
-      }
-    } else if (now > '15:30') {
+    if (now > '15:30') {
       this.snapshot.update((s) => ({
         ...s,
         marketOpen: false,
@@ -1429,18 +1040,12 @@ export class PaperTradeDeskService {
     }
 
     const indexSessionActive = anyIndexLegs && now >= '09:15' && now <= '15:30';
-    const mcxSessionActive =
-      mcxEnabled &&
-      now >= MCX_CRUDE_SESSION.marketOpen &&
-      now <= MCX_CRUDE_SESSION.marketClose;
-    const crudeSessionActive = crudeEnabled && mcxSessionActive;
-    const natGasSessionActive = natGasEnabled && mcxSessionActive;
 
-    if (!indexSessionActive && !mcxSessionActive) {
+    if (!indexSessionActive) {
       this.snapshot.update((s) => ({
         ...s,
         marketOpen: false,
-        message: `Waiting for open. Now ${now} · Index 09:15 · MCX ${MCX_CRUDE_SESSION.marketOpen}`,
+        message: `Waiting for open. Now ${now} · Index 09:15`,
       }));
       return;
     }
@@ -1484,47 +1089,9 @@ export class PaperTradeDeskService {
       }
     }
 
-    if (crudeSessionActive && this.crudeLive && !initial) {
-      try {
-        if (this.liveLegs.length) {
-          await delay(1200);
-        }
-        const todayBars = await this.fetch5m({
-          instrumentToken: this.crudeLive.futuresToken,
-          from: `${today} 09:00:00`,
-          to: `${today} 23:30:00`,
-          authorization,
-        });
-        const prior = this.crudeLive.candles.filter((c) => datePart(c.date) !== today);
-        this.crudeLive.candles = dropFormingBars([...prior, ...todayBars]);
-      } catch {
-        // keep previous
-      }
-    }
-
-    if (natGasSessionActive && this.natGasLive && !initial) {
-      try {
-        if (this.liveLegs.length || this.crudeLive) {
-          await delay(1200);
-        }
-        const todayBars = await this.fetch5m({
-          instrumentToken: this.natGasLive.futuresToken,
-          from: `${today} 09:00:00`,
-          to: `${today} 23:30:00`,
-          authorization,
-        });
-        const prior = this.natGasLive.candles.filter((c) => datePart(c.date) !== today);
-        this.natGasLive.candles = dropFormingBars([...prior, ...todayBars]);
-      } catch {
-        // keep previous
-      }
-    }
-
     const needed = new Set<number>();
     const emptyOpt = new Map<number, Candle[]>();
     const indexTrades: PaperTrade[] = [];
-    let crudeTrades: PaperTrade[] = [];
-    let natGasTrades: PaperTrade[] = [];
     const statuses: PaperInstrumentStatus[] = [];
     const kuttyMargin = { usedRs: 0, trapOpenLegs: 0 };
 
@@ -1633,204 +1200,9 @@ export class PaperTradeDeskService {
           }),
         );
       }
-      this.lastIndexStatuses = statuses.map((s) => ({ ...s }));
-      // Place/exit Nifty+Bank on Kite as soon as new bars open/close — before Crude
-      // fetch delay. Fixes "only Crude gets placed" when Trap opens&closes in one poll.
+      // Place/exit Nifty+Bank on Kite as soon as new bars open/close.
       if (this.realOrders && indexBrokerEvents.length) {
         await this.flushIndexLiveBrokerEvents(authorization, indexBrokerEvents, allInstruments);
-        allInstruments = this.instrumentStore.allInstruments();
-      }
-    } else if (anyIndexLegs && this.lastIndexStatuses.length) {
-      for (const s of this.lastIndexStatuses) {
-        statuses.push({
-          ...s,
-          openTrade: null,
-          lastSignal: 'Index session closed (15:15) · MCX continues',
-          livePhase: s.livePhase === 'in_trade' ? 'exited' : s.livePhase,
-          livePhaseLabel:
-            s.livePhase === 'in_trade' ? 'Index session closed' : s.livePhaseLabel,
-        });
-      }
-    }
-
-    const mcxBrokerEvents: IndexLiveBrokerEvent[] = [];
-    if (crudeSessionActive && this.crudeLive) {
-      const crudeTradeParams = resolveCrudeStrategyProfile('selective');
-      const crudeDayLossPts = resolveCrudeProfileDayLossPts(crudeTradeParams, false);
-      const crudeHook =
-        this.realOrders && !initial
-          ? {
-              afterBarTime: this.crudeLive.lastLiveEventAt,
-              onOpen: (o: {
-                direction: 'BUY' | 'SELL';
-                entryTime: string;
-                indexEntry: number;
-                indexStop: number;
-                option: PaperTrade['option'];
-                optionEntryPremium: number | null;
-              }) => {
-                mcxBrokerEvents.push({
-                  kind: 'open',
-                  instrumentId: CRUDE_OIL_MINI_INSTRUMENT.id,
-                  instrumentName: `${CRUDE_OIL_MINI_INSTRUMENT.name} (${this.crudeLive!.futuresSymbol})`,
-                  open: o,
-                });
-              },
-              onClose: (entryTime: string, exitReason?: string) => {
-                mcxBrokerEvents.push({
-                  kind: 'close',
-                  instrumentId: CRUDE_OIL_MINI_INSTRUMENT.id,
-                  instrumentName: `${CRUDE_OIL_MINI_INSTRUMENT.name} (${this.crudeLive!.futuresSymbol})`,
-                  entryTime,
-                  exitReason,
-                });
-              },
-            }
-          : undefined;
-      const replay = replayPaperOnCrude({
-        instrumentId: CRUDE_OIL_MINI_INSTRUMENT.id,
-        instrumentName: `${CRUDE_OIL_MINI_INSTRUMENT.name} (${this.crudeLive.futuresSymbol})`,
-        candles: this.crudeLive.candles,
-        fromDate: today,
-        toDate: today,
-        instruments: allInstruments,
-        optionCandlesByToken: emptyOpt,
-        neededOptionTokens: needed,
-        forceCloseOpen: now >= CRUDE_EXIT_BY,
-        lotsMultiplier: this.crudeLots,
-        dayLossStopPts: crudeDayLossPts,
-        enableMorning: crudeTradeParams.defaultEnableMorning,
-        enableEvening: crudeTradeParams.defaultEnableEvening,
-        tradeParams: crudeTradeParams,
-        liveHook: crudeHook,
-      });
-      this.crudeLive.lastLiveEventAt =
-        this.crudeLive.candles.at(-1)?.date ?? this.crudeLive.lastLiveEventAt;
-      crudeTrades = replay.trades;
-      statuses.push(
-        withLiveFields({
-          instrumentId: CRUDE_OIL_MINI_INSTRUMENT.id,
-          instrumentName: `${CRUDE_OIL_MINI_INSTRUMENT.name} (${this.crudeLive.futuresSymbol})`,
-          lastBarTime: this.crudeLive.candles.at(-1)?.date ?? null,
-          dayNetIndexPts: replay.trades.reduce((a, t) => a + t.indexPoints, 0),
-          dayNetOptionRs: 0,
-          openTrade: replay.open
-            ? {
-                direction: replay.open.direction,
-                indexEntry: replay.open.entry,
-                indexStop: replay.open.stop,
-                indexTarget: replay.open.target,
-                entryTime: replay.open.entryTime,
-                option: replay.open.option,
-                optionEntryPremium: replay.open.optionEntryPremium,
-              }
-            : null,
-          chosenOption: replay.chosenOption,
-          chosenBias: replay.chosenBias,
-          indexSpot: replay.indexSpot,
-          chosenAsOf: replay.chosenAsOf,
-          lastSignal: replay.lastSignal,
-          tradesToday: replay.trades.length,
-          strategyId: 'crude-selective',
-          strategyName: crudeTradeParams.label,
-          maxTradesPerDay: crudeTradeParams.maxEveningTradesDay,
-        }),
-      );
-      // Place/exit Crude on Kite as bars open/close — same miss fix as Nifty/Bank.
-      if (this.realOrders && mcxBrokerEvents.length) {
-        await this.flushIndexLiveBrokerEvents(authorization, mcxBrokerEvents, allInstruments);
-        allInstruments = this.instrumentStore.allInstruments();
-      }
-    }
-
-    if (natGasSessionActive && this.natGasLive) {
-      const natGasTradeParams = resolveCrudeStrategyProfile('daily-profit-ng');
-      const natGasDayLossPts = resolveCrudeProfileDayLossPts(natGasTradeParams, false);
-      const natGasResolve = this.natGasOptionResolve();
-      const natGasBrokerEvents: IndexLiveBrokerEvent[] = [];
-      const natGasHook =
-        this.realOrders && !initial
-          ? {
-              afterBarTime: this.natGasLive.lastLiveEventAt,
-              onOpen: (o: {
-                direction: 'BUY' | 'SELL';
-                entryTime: string;
-                indexEntry: number;
-                indexStop: number;
-                option: PaperTrade['option'];
-                optionEntryPremium: number | null;
-              }) => {
-                natGasBrokerEvents.push({
-                  kind: 'open',
-                  instrumentId: NATGAS_MINI_INSTRUMENT.id,
-                  instrumentName: `${NATGAS_MINI_INSTRUMENT.name} (${this.natGasLive!.futuresSymbol})`,
-                  open: o,
-                });
-              },
-              onClose: (entryTime: string, exitReason?: string) => {
-                natGasBrokerEvents.push({
-                  kind: 'close',
-                  instrumentId: NATGAS_MINI_INSTRUMENT.id,
-                  instrumentName: `${NATGAS_MINI_INSTRUMENT.name} (${this.natGasLive!.futuresSymbol})`,
-                  entryTime,
-                  exitReason,
-                });
-              },
-            }
-          : undefined;
-      const replay = replayPaperOnCrude({
-        instrumentId: NATGAS_MINI_INSTRUMENT.id,
-        instrumentName: `${NATGAS_MINI_INSTRUMENT.name} (${this.natGasLive.futuresSymbol})`,
-        candles: this.natGasLive.candles,
-        fromDate: today,
-        toDate: today,
-        instruments: allInstruments,
-        optionCandlesByToken: emptyOpt,
-        neededOptionTokens: needed,
-        forceCloseOpen: now >= CRUDE_EXIT_BY,
-        lotsMultiplier: this.natGasLots,
-        dayLossStopPts: natGasDayLossPts,
-        enableMorning: natGasTradeParams.defaultEnableMorning,
-        enableEvening: natGasTradeParams.defaultEnableEvening,
-        tradeParams: natGasTradeParams,
-        liveHook: natGasHook,
-        ...natGasResolve,
-      });
-      this.natGasLive.lastLiveEventAt =
-        this.natGasLive.candles.at(-1)?.date ?? this.natGasLive.lastLiveEventAt;
-      natGasTrades = replay.trades;
-      statuses.push(
-        withLiveFields({
-          instrumentId: NATGAS_MINI_INSTRUMENT.id,
-          instrumentName: `${NATGAS_MINI_INSTRUMENT.name} (${this.natGasLive.futuresSymbol})`,
-          lastBarTime: this.natGasLive.candles.at(-1)?.date ?? null,
-          dayNetIndexPts: replay.trades.reduce((a, t) => a + t.indexPoints, 0),
-          dayNetOptionRs: 0,
-          openTrade: replay.open
-            ? {
-                direction: replay.open.direction,
-                indexEntry: replay.open.entry,
-                indexStop: replay.open.stop,
-                indexTarget: replay.open.target,
-                entryTime: replay.open.entryTime,
-                option: replay.open.option,
-                optionEntryPremium: replay.open.optionEntryPremium,
-              }
-            : null,
-          chosenOption: replay.chosenOption,
-          chosenBias: replay.chosenBias,
-          indexSpot: replay.indexSpot,
-          chosenAsOf: replay.chosenAsOf,
-          lastSignal: replay.lastSignal,
-          tradesToday: replay.trades.length,
-          strategyId: 'natgas-daily-profit-ng',
-          strategyName: natGasTradeParams.label,
-          maxTradesPerDay: natGasTradeParams.maxEveningTradesDay,
-        }),
-      );
-      // Nat Gas on Kite as bars open/close — same path as Crude / index.
-      if (this.realOrders && natGasBrokerEvents.length) {
-        await this.flushIndexLiveBrokerEvents(authorization, natGasBrokerEvents, allInstruments);
         allInstruments = this.instrumentStore.allInstruments();
       }
     }
@@ -1842,7 +1214,7 @@ export class PaperTradeDeskService {
       today,
       authorization,
       undefined,
-      mcxEnabled ? '23:30:00' : '15:30:00',
+      '15:30:00',
     );
     // Paper ≡ Live signal money: executable fills (next-bar open), then charges.
     // Live money Profit ₹ still overlays Kite fills below when realOrders.
@@ -1850,15 +1222,9 @@ export class PaperTradeDeskService {
     for (const leg of this.liveLegs) {
       seriesForFills.set(leg.instrument.id, leg.candles);
     }
-    if (this.crudeLive) {
-      seriesForFills.set(CRUDE_OIL_MINI_INSTRUMENT.id, this.crudeLive.candles);
-    }
-    if (this.natGasLive) {
-      seriesForFills.set(NATGAS_MINI_INSTRUMENT.id, this.natGasLive.candles);
-    }
     let enriched = this.enrichMixedLots(
       repriceTradesToExecutableFills(
-        this.premiumEnrichMixed(indexTrades, [...crudeTrades, ...natGasTrades], optionCandles),
+        this.premiumEnrichIndex(indexTrades, optionCandles),
         seriesForFills,
       ),
     );
@@ -1875,7 +1241,7 @@ export class PaperTradeDeskService {
       /** instrumentId → why a pre-Start signal was not sent to Kite. */
       const staleStartIds = new Map<string, string>();
       for (const s of statuses) {
-        if (s.openTrade && !this.isMcxInstrumentId(s.instrumentId)) {
+        if (s.openTrade) {
           const kind: IndexOptionKind =
             s.instrumentId === NIFTY_50_INSTRUMENT.id ? 'nifty' : 'banknifty';
           let resolved = resolveAtmWeeklyOption({
@@ -1904,32 +1270,6 @@ export class PaperTradeDeskService {
           s.openTrade = { ...s.openTrade, option: fresh };
           s.chosenOption = fresh;
           s.chosenBias = s.openTrade.direction;
-        } else if (s.openTrade && s.instrumentId === CRUDE_OIL_MINI_INSTRUMENT.id) {
-          const resolved = resolveAtmCrudeMiniOption({
-            instruments: allInstruments,
-            direction: s.openTrade.direction,
-            spot: s.openTrade.indexEntry,
-            asOfDateTime: s.openTrade.entryTime,
-          });
-          const fresh = toCrudePaperOption(resolved.instrument, resolved.source);
-          s.openTrade = { ...s.openTrade, option: fresh };
-          s.chosenOption = fresh;
-          s.chosenBias = s.openTrade.direction;
-        } else if (s.openTrade && s.instrumentId === NATGAS_MINI_INSTRUMENT.id) {
-          const ng = this.natGasOptionResolve();
-          const resolved = resolveAtmCrudeMiniOption({
-            instruments: allInstruments,
-            direction: s.openTrade.direction,
-            spot: s.openTrade.indexEntry,
-            asOfDateTime: s.openTrade.entryTime,
-            prefixes: ng.optionPrefixes,
-            strikeStep: ng.strikeStep,
-            syntheticName: ng.syntheticName,
-          });
-          const fresh = toCrudePaperOption(resolved.instrument, resolved.source);
-          s.openTrade = { ...s.openTrade, option: fresh };
-          s.chosenOption = fresh;
-          s.chosenBias = s.openTrade.direction;
         }
 
         // Start anytime: never send a leg the strategy opened before Start as a
@@ -1942,8 +1282,7 @@ export class PaperTradeDeskService {
             s.instrumentId,
             s.openTrade?.option?.tradingSymbol,
           ),
-          // Judge on price, not the clock: a 50-pt Crude leg is still worth
-          // joining after 20 minutes; a one-bar index leg is not.
+          // Judge on price vs stop, not only the clock.
           signalEntryPrice: s.openTrade?.indexEntry,
           signalStopPrice: s.openTrade?.indexStop,
           currentPrice: s.indexSpot,
@@ -2018,29 +1357,23 @@ export class PaperTradeDeskService {
           s.kiteBlockReason = staleReason;
           s.livePhaseLabel = 'Pre-Start signal · waiting for a fresh one';
         } else if (s.openTrade && !s.brokerEntryOrderId) {
-          if (!this.isMcxInstrumentId(s.instrumentId)) {
-            const kind: IndexOptionKind =
-              s.instrumentId === NIFTY_50_INSTRUMENT.id ? 'nifty' : 'banknifty';
-            const chainGap =
-              s.openTrade.option?.source === 'synthetic'
-                ? describeOptionChainGap({
-                    instruments: allInstruments,
-                    kind,
-                    direction: s.openTrade.direction,
-                    spot: s.openTrade.indexEntry,
-                    asOfDateTime: s.openTrade.entryTime,
-                  })
-                : null;
-            s.kiteBlockReason =
-              this.liveOrders.getLastBlockReason(s.instrumentId) ??
-              (chainGap
-                ? `Synthetic/missing NFO option — ${chainGap}`
-                : 'Kite entry not confirmed — see Event log');
-          } else {
-            s.kiteBlockReason =
-              this.liveOrders.getLastBlockReason(s.instrumentId) ??
-              'Kite entry not confirmed — see Event log';
-          }
+          const kind: IndexOptionKind =
+            s.instrumentId === NIFTY_50_INSTRUMENT.id ? 'nifty' : 'banknifty';
+          const chainGap =
+            s.openTrade.option?.source === 'synthetic'
+              ? describeOptionChainGap({
+                  instruments: allInstruments,
+                  kind,
+                  direction: s.openTrade.direction,
+                  spot: s.openTrade.indexEntry,
+                  asOfDateTime: s.openTrade.entryTime,
+                })
+              : null;
+          s.kiteBlockReason =
+            this.liveOrders.getLastBlockReason(s.instrumentId) ??
+            (chainGap
+              ? `Synthetic/missing NFO option — ${chainGap}`
+              : 'Kite entry not confirmed — see Event log');
           s.livePhaseLabel = `Signal only · not on Kite`;
         } else {
           s.kiteBlockReason = null;
@@ -2119,12 +1452,6 @@ export class PaperTradeDeskService {
       deskOnlyCount > 0
         ? ` · ${deskOnlyCount} desk signal(s) NOT on Kite (hidden from Profit ₹)`
         : '';
-    const clockMsg =
-      mcxEnabled && now >= '15:15'
-        ? ' · Index closed · MCX continues'
-        : mcxEnabled
-          ? ' · Index→15:15 · MCX→23:10'
-          : '';
     this.snapshot.set({
       mode: 'live',
       running: true,
@@ -2133,7 +1460,7 @@ export class PaperTradeDeskService {
       marketOpen: true,
       realOrders: this.realOrders,
       lastTickAt: new Date().toISOString(),
-      message: `${moneyTag} · alive ${now}${clockMsg} · waiting ${waiting} · in trade ${inTrade}${targets ? ` · target hit ${targets}` : ''}${openMsg}${blockedMsg}${deskOnlyMsg} · ${this.kiteStatsLabel()}`,
+      message: `${moneyTag} · alive ${now} · waiting ${waiting} · in trade ${inTrade}${targets ? ` · target hit ${targets}` : ''}${openMsg}${blockedMsg}${deskOnlyMsg} · ${this.kiteStatsLabel()}`,
       statuses,
       trades: displayTrades.sort((a, b) => b.entryTime.localeCompare(a.entryTime)),
       totals: summarize(displayTrades, (id) => this.lotsForInstrument(id), this.lotsMultiplier),
@@ -2290,10 +1617,7 @@ export class PaperTradeDeskService {
     today: string,
     allInstruments: Instrument[],
     activeRows: Array<{ instrument: TesterInstrument; kind: IndexOptionKind }> = this.instruments,
-    opts: { includeCrude?: boolean; includeNatGas?: boolean } | boolean = {},
   ): Promise<PaperInstrumentStatus[]> {
-    const includeCrude = typeof opts === 'boolean' ? opts : !!opts.includeCrude;
-    const includeNatGas = typeof opts === 'boolean' ? false : !!opts.includeNatGas;
     const authorization = this.kiteSession.getAuthorizationHeader();
     const statuses: PaperInstrumentStatus[] = [];
 
@@ -2354,122 +1678,6 @@ export class PaperTradeDeskService {
           chosenAsOf: asOf,
           lastSignal: spot != null ? `Preview ATM @ ${spot.toFixed(1)}` : 'Preview ATM (spot fallback)',
           tradesToday: 0,
-        }),
-      );
-    }
-
-    if (includeCrude) {
-      const future = resolveCrudeOilMiniFuturesToken(allInstruments);
-      let spot: number | null = null;
-      let asOf = `${today} 15:15:00`;
-      let symbol = CRUDE_OIL_MINI_INSTRUMENT.tradingSymbol;
-      if (future && authorization) {
-        symbol = future.tradingSymbol;
-        try {
-          if (activeRows.length) {
-            await delay(1200);
-          }
-          const candles = await this.fetch5m({
-            instrumentToken: future.instrumentToken,
-            from: `${shiftDate(today, -5)} 09:00:00`,
-            to: `${today} 23:30:00`,
-            authorization,
-          });
-          const last = candles.at(-1);
-          if (last) {
-            spot = last.close;
-            asOf = last.date;
-          }
-        } catch {
-          // preview without spot
-        }
-      }
-      const resolved = resolveAtmCrudeMiniOption({
-        instruments: allInstruments,
-        direction: 'BUY',
-        spot: spot ?? 7600,
-        asOfDateTime: asOf,
-      });
-      const chosenOption = toCrudePaperOption(resolved.instrument, resolved.source);
-      statuses.push(
-        withLiveFields({
-          instrumentId: CRUDE_OIL_MINI_INSTRUMENT.id,
-          instrumentName: `${CRUDE_OIL_MINI_INSTRUMENT.name} (${symbol})`,
-          lastBarTime: asOf,
-          dayNetIndexPts: 0,
-          dayNetOptionRs: 0,
-          openTrade: null,
-          chosenOption,
-          chosenBias: 'BUY',
-          indexSpot: spot ?? chosenOption.strike,
-          chosenAsOf: asOf,
-          lastSignal:
-            spot != null
-              ? `Preview ATM @ ${spot.toFixed(1)} · Selective`
-              : 'Preview ATM (spot fallback) · Selective',
-          tradesToday: 0,
-          strategyId: 'crude-selective',
-          strategyName: 'Selective (Trap SL50/TP200 · unlimited)',
-        }),
-      );
-    }
-
-    if (includeNatGas) {
-      const future = resolveNatGasMiniFuturesToken(allInstruments);
-      let spot: number | null = null;
-      let asOf = `${today} 15:15:00`;
-      let symbol = NATGAS_MINI_INSTRUMENT.tradingSymbol;
-      if (future && authorization) {
-        symbol = future.tradingSymbol;
-        try {
-          if (activeRows.length || includeCrude) {
-            await delay(1200);
-          }
-          const candles = await this.fetch5m({
-            instrumentToken: future.instrumentToken,
-            from: `${shiftDate(today, -5)} 09:00:00`,
-            to: `${today} 23:30:00`,
-            authorization,
-          });
-          const last = candles.at(-1);
-          if (last) {
-            spot = last.close;
-            asOf = last.date;
-          }
-        } catch {
-          // preview without spot
-        }
-      }
-      const ng = this.natGasOptionResolve();
-      const resolved = resolveAtmCrudeMiniOption({
-        instruments: allInstruments,
-        direction: 'BUY',
-        spot: spot ?? 250,
-        asOfDateTime: asOf,
-        prefixes: ng.optionPrefixes,
-        strikeStep: ng.strikeStep,
-        syntheticName: ng.syntheticName,
-      });
-      const chosenOption = toCrudePaperOption(resolved.instrument, resolved.source);
-      statuses.push(
-        withLiveFields({
-          instrumentId: NATGAS_MINI_INSTRUMENT.id,
-          instrumentName: `${NATGAS_MINI_INSTRUMENT.name} (${symbol})`,
-          lastBarTime: asOf,
-          dayNetIndexPts: 0,
-          dayNetOptionRs: 0,
-          openTrade: null,
-          chosenOption,
-          chosenBias: 'BUY',
-          indexSpot: spot ?? chosenOption.strike,
-          chosenAsOf: asOf,
-          lastSignal:
-            spot != null
-              ? `Preview ATM @ ${spot.toFixed(1)} · Daily Profit (NG)`
-              : 'Preview ATM (spot fallback) · Daily Profit (NG)',
-          tradesToday: 0,
-          strategyId: 'natgas-daily-profit-ng',
-          strategyName: 'Daily Profit (NG)',
         }),
       );
     }
@@ -2608,18 +1816,10 @@ export class PaperTradeDeskService {
   private async loadOptionInstruments(options?: {
     patchStatus?: boolean;
     requireMinimum?: boolean;
-    requireCrude?: boolean;
-    requireNatGas?: boolean;
   }): Promise<Instrument[]> {
     const patchStatus = options?.patchStatus !== false;
     const requireMinimum = options?.requireMinimum !== false;
-    const requireCrude = !!options?.requireCrude;
-    const requireNatGas = !!options?.requireNatGas;
-    const natGasPrefixes = this.natGasOptionResolve().optionPrefixes;
-    const needIndex =
-      this.deskRunOptions.enableNifty ||
-      this.deskRunOptions.enableBank ||
-      (!requireCrude && !requireNatGas);
+    const needIndex = this.deskRunOptions.enableNifty || this.deskRunOptions.enableBank;
 
     await this.instrumentStore.ensureLoaded();
     let allInstruments = this.instrumentStore.allInstruments();
@@ -2643,54 +1843,10 @@ export class PaperTradeDeskService {
       }
     }
 
-    if (requireCrude && countCrudeMiniOptions(allInstruments) < 20) {
-      if (patchStatus) {
-        this.patchMessage('Refreshing MCX crude instruments…');
-      }
-      const refreshed = await this.instrumentStore.refreshBestEffort(true);
-      allInstruments = this.instrumentStore.allInstruments();
-      if (!refreshed && requireMinimum && countCrudeMiniOptions(allInstruments) < 5) {
-        throw new Error(
-          'Could not load MCX crude options. Check internet, then Settings → Refresh Instruments.',
-        );
-      }
-    }
-
-    const natGasFutMissing = requireNatGas && !resolveNatGasMiniFuturesToken(allInstruments);
-    if (
-      requireNatGas &&
-      (natGasFutMissing || countCrudeMiniOptions(allInstruments, natGasPrefixes) < 20)
-    ) {
-      if (patchStatus) {
-        this.patchMessage(
-          natGasFutMissing
-            ? 'Nat Gas futures missing from cache — refreshing instruments…'
-            : 'Refreshing MCX Nat Gas instruments…',
-        );
-      }
-      const refreshed = await this.instrumentStore.refreshBestEffort(true);
-      allInstruments = this.instrumentStore.allInstruments();
-      if (
-        !refreshed &&
-        requireMinimum &&
-        (countCrudeMiniOptions(allInstruments, natGasPrefixes) < 5 ||
-          !resolveNatGasMiniFuturesToken(allInstruments))
-      ) {
-        throw new Error(
-          'Could not load MCX Nat Gas instruments. Check internet / Get Token, then Settings → Refresh Instruments.',
-        );
-      }
-    }
-
     if (patchStatus) {
-      const bits = [
-        needIndex ? `${countIndexOptions(allInstruments)} index options` : null,
-        requireCrude ? `${countCrudeMiniOptions(allInstruments)} crude options` : null,
-        requireNatGas
-          ? `${countCrudeMiniOptions(allInstruments, natGasPrefixes)} natgas options`
-          : null,
-      ].filter(Boolean);
-      this.patchMessage(`Instruments ready · ${bits.join(' · ')}`);
+      this.patchMessage(
+        `Instruments ready · ${countIndexOptions(allInstruments)} index options`,
+      );
     }
 
     return allInstruments;
@@ -2815,7 +1971,7 @@ function isCancelledError(err: unknown): boolean {
   return err instanceof CancelledError || (err instanceof Error && err.message === 'CANCELLED');
 }
 
-/** Prefer option/Kite ₹ sign for W/L — Index outcome lied on Crude SL50 cards. */
+/** Prefer option/Kite ₹ sign for W/L when available. */
 function tradeMoneyOutcome(t: {
   netOptionPnlRs?: number | null;
   optionPnlRs?: number | null;
@@ -2853,7 +2009,7 @@ function summarize(
   const indexNetPts = trades.reduce((a, t) => a + t.indexPoints, 0);
   const optionNetRs = trades.reduce((a, t) => a + (t.optionPnlRs ?? 0), 0);
   const optionChargesRs = trades.reduce((a, t) => a + (t.chargesRs ?? 0), 0);
-  // Prefer per-instrument ₹/pt (Nifty 65 / Bank 30 / Crude 10) × per-book lots.
+  // Prefer per-instrument ₹/pt (Nifty 65 / Bank 30) × per-book lots.
   const pointsMoneyRs = trades.reduce((a, t) => {
     const rpp = rupeesPerPointForInstrument(t.instrumentId) || rupeesPerPoint;
     return a + t.indexPoints * rpp * lotsFor(t.instrumentId);
