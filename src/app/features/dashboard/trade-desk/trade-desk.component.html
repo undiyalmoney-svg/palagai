@@ -866,13 +866,13 @@
           @if (snapshot().realOrders) {
             Profit ₹ = Kite fill money (same as Positions). Desk PE ghosts stay hidden.
           } @else {
-            Profit ₹ = option premium × lot.
+            Profit ₹ = option premium × lot, filled the way Live can: entry at the next bar's
+            open, stop and target intrabar. Signals that finish before the desk could act are
+            not counted.
             @if (resultView().totals.premiumEstimatedCount) {
               {{ resultView().totals.premiumEstimatedCount }} of
               {{ resultView().totals.trades }} leg(s) estimated at ATM delta (no option bars) —
               marked <em>est.</em>
-            } @else {
-              All legs priced from real option bars.
             }
           }
         </p>

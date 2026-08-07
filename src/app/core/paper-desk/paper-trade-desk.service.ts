@@ -54,6 +54,7 @@ import {
   missedRoundTripReason,
   splitCompletedRoundTrips,
 } from './completed-round-trip.util';
+import { repriceTradesToExecutableFills } from './executable-fill.util';
 import { enrichTradesWithCharges } from './trade-charges.util';
 import { buildPaperDeskDayStats, emptyPaperDeskDayStats } from './paper-desk-day-stats';
 import { MAX_OPTION_HISTORY_TOKENS, rankTokensByFrequency } from './option-history-tokens.util';
@@ -907,10 +908,23 @@ export class PaperTradeDeskService {
         );
         this.assertActive(runId);
 
-        const enriched = this.premiumEnrichMixed(
-          batchIndexTrades,
-          [...batchCrudeTrades, ...batchNatGasTrades],
-          optionCandles,
+        // Testing must report fills Live can actually get: the replay exits at
+        // intrabar stop/target/trail levels, but the desk only sees a 5m bar
+        // after it closes. Without this, Testing shows several times the money.
+        const seriesForFills = new Map<string, Candle[]>(candleMap);
+        if (crudeCandles.length) {
+          seriesForFills.set(CRUDE_OIL_MINI_INSTRUMENT.id, crudeCandles);
+        }
+        if (natGasCandles.length) {
+          seriesForFills.set(NATGAS_MINI_INSTRUMENT.id, natGasCandles);
+        }
+        const enriched = repriceTradesToExecutableFills(
+          this.premiumEnrichMixed(
+            batchIndexTrades,
+            [...batchCrudeTrades, ...batchNatGasTrades],
+            optionCandles,
+          ),
+          seriesForFills,
         );
         allEnriched.push(...enriched);
 

@@ -52,6 +52,11 @@ export interface PaperTrade {
   optionEntryEdge?: 'open' | 'close';
   /** Index-points outcome (legacy desk win/loss). */
   outcome: 'WIN' | 'LOSS' | 'FLAT';
+  /**
+   * Points the replay would have booked at signal/stop/target levels, before
+   * repricing to fills the desk can actually get. Reference only.
+   */
+  modelledIndexPoints?: number;
   /** Strategy Manager id that generated this trade. */
   strategyId?: string;
   strategyName?: string;
