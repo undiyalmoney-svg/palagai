@@ -41,9 +41,10 @@ export interface PaperTrade {
   optionEntryPremium: number | null;
   optionExitPremium: number | null;
   /**
-   * Main P&L (Kite Positions style for long CE/PE):
-   * (exitPremium − entryPremium) × lotSize × lots.
-   * Live money overlays Kite order average_price fills when present.
+   * Main P&L (owner dictation · long CE/PE):
+   * (exitPremium − entryPremium) × lotSize × lots
+   * e.g. 365→370 = ₹5 · Nifty×65 · Bank×30 · Crude Mini×10.
+   * Live money overlays Kite average_price fills when present.
    * Gross of estimated charges — see netOptionPnlRs.
    */
   optionPnlRs: number | null;

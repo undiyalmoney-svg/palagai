@@ -17,7 +17,11 @@ export const ATM_OPTION_DELTA = {
   natgas: 0.55,
 } as const;
 
-/** Contract size (units per lot) per book — Kite Positions multiplier. */
+/**
+ * Contract size (units per lot) for Profit ₹:
+ * premium move × BOOK_LOT_SIZE × lots
+ * (Nifty 65 / Bank 30 / Crudeoil Mini 10 — current NSE/MCX lots).
+ */
 export const BOOK_LOT_SIZE = {
   nifty: 65,
   bank: 30,
