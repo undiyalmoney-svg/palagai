@@ -151,8 +151,19 @@
           >Start any morning (6:30 or 10:00 — your call). Do nothing until after
           <b>3:15</b>, then Stop. Capital must not drain: day lock + strict day stop.</span
         >
+        <label class="field capital-field agent-capital">
+          <span>Total capital (₹) — edit when profits grow</span>
+          <input
+            type="number"
+            min="10000"
+            step="1000"
+            [(ngModel)]="capitalRs"
+            (ngModelChange)="onCapitalChange()"
+            [disabled]="busy() || snapshot().running"
+          />
+        </label>
         <div class="agent-locked">
-          <span>Capital ₹{{ capitalRs | number: '1.0-0' }} · {{ allocationSummary() }}</span>
+          <span>{{ allocationSummary() }} · auto lots from capital</span>
           <span
             >Premium ~₹{{ capitalPlan.estimatedPremiumRs | number: '1.0-0' }} · target ~₹{{
               capitalPlan.dailyTargetRs | number: '1.0-0'

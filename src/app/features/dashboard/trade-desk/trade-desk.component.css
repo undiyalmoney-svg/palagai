@@ -215,6 +215,21 @@
   color: #166534;
 }
 
+.hands-off-agent .agent-capital {
+  margin: 0.35rem 0 0;
+  max-width: 16rem;
+}
+
+.hands-off-agent .agent-capital span {
+  color: #14532d;
+  font-weight: 600;
+}
+
+.hands-off-agent .agent-capital input {
+  width: 100%;
+  margin-top: 0.25rem;
+}
+
 .hands-off-agent .agent-locked {
   display: flex;
   flex-direction: column;
