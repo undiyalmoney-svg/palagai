@@ -61,20 +61,19 @@ export function planLotsForCapital(capitalRs: number = DEFAULT_TRADING_CAPITAL_R
   const capital = Math.max(10_000, Math.floor(Number(capitalRs) || DEFAULT_TRADING_CAPITAL_RS));
   const premiumBudgetRs = Math.floor(capital * PREMIUM_BUDGET_FRAC);
 
+  // All-day-green hunt: Crude OFF by default (adds red days). Nifty+Bank only.
   const candidates: Array<{ nifty: number; bank: number; crude: number }> = [
-    { nifty: 1, bank: 1, crude: 1 },
     { nifty: 1, bank: 1, crude: 0 },
-    { nifty: 1, bank: 0, crude: 1 },
     { nifty: 1, bank: 0, crude: 0 },
     { nifty: 0, bank: 1, crude: 0 },
   ];
 
-  // If capital grows, allow 2 lots on the cheapest high-edge book only when safe.
-  if (premiumBudgetRs >= cost({ nifty: 2, bank: 1, crude: 1 })) {
-    candidates.unshift({ nifty: 2, bank: 1, crude: 1 });
+  // If capital grows, allow 2 lots on index books only when safe.
+  if (premiumBudgetRs >= cost({ nifty: 2, bank: 1, crude: 0 })) {
+    candidates.unshift({ nifty: 2, bank: 1, crude: 0 });
   }
-  if (premiumBudgetRs >= cost({ nifty: 1, bank: 2, crude: 1 })) {
-    candidates.unshift({ nifty: 1, bank: 2, crude: 1 });
+  if (premiumBudgetRs >= cost({ nifty: 1, bank: 2, crude: 0 })) {
+    candidates.unshift({ nifty: 1, bank: 2, crude: 0 });
   }
 
   let chosen: { nifty: number; bank: number; crude: number } | null = null;

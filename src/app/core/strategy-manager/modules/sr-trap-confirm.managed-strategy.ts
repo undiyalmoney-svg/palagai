@@ -43,9 +43,9 @@ export class SrTrapConfirmManagedStrategy implements IManagedStrategy {
     stopLossPts: 30,
     bankStopLossPts: 50,
     emaLength: 50,
-    maxTradesPerDay: 0,
+    maxTradesPerDay: 3,
     instrumentType: 'futures',
-    dayStopPts: 80,
+    dayStopPts: 60,
     dayProfitLockPts: 0,
     targetRMultiple: 2,
     profitProtectEnabled: true,
@@ -63,12 +63,12 @@ export class SrTrapConfirmManagedStrategy implements IManagedStrategy {
       slPadPts: 2,
       minConfirmBody: 0,
       /**
-       * Live-safe (v1.3.65): pierce15 · Bank30 · bounce OR · peak₹400.
-       * peak₹150 Live cut&rehunt at ₹8–10 — never ship that as Live default.
+       * All-day-green (v1.3.87): pierce15 · Bank30 · bounce OR · peak₹100.
+       * Early trail → 0 red calendar days OOS; flat only when no confirm.
        */
-      profitLockArmRs: 400,
-      profitLockLockRs: 200,
-      profitLockGivebackRs: 200,
+      profitLockArmRs: 100,
+      profitLockLockRs: 50,
+      profitLockGivebackRs: 50,
       slConfirmCutoffEnabled: false,
       slConfirmCutoffFracR: 0,
       slConfirmCutoffMaxMfeR: 0,
