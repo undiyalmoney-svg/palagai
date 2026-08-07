@@ -567,7 +567,21 @@ export class CrudePaperDeskService {
             }
           : null,
       });
-      const pos = this.liveOrders.getPositions().find((p) => p.instrumentId === status.instrumentId);
+      const openSymbols = new Set(
+        status.openTrade?.option?.tradingSymbol
+          ? [status.openTrade.option.tradingSymbol.toUpperCase()]
+          : [],
+      );
+      await this.liveOrders.exitUnmappedOrphans(authorization, openSymbols);
+      const pos =
+        this.liveOrders.getPositions().find((p) => p.instrumentId === status.instrumentId) ??
+        this.liveOrders.getPositions().find(
+          (p) =>
+            !!status.openTrade?.option?.tradingSymbol &&
+            p.tradingSymbol.toUpperCase() ===
+              status.openTrade.option.tradingSymbol.toUpperCase() &&
+            (p.status === 'open' || p.status === 'exiting'),
+        );
       status.brokerSlTrigger = pos?.slTrigger ?? null;
       status.brokerSlOrderId = pos?.slOrderId ?? null;
       status.brokerEntryOrderId = pos?.entryOrderId ?? null;

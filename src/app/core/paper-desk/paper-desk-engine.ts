@@ -278,9 +278,13 @@ export function applyEstimatedOptionPnl(params: {
 }
 
 /**
- * Single source of truth for long-option money (Kite Positions style):
- *   (exitPremium − entryPremium) × lotSize × lots
- * e.g. (82 − 72) × 65 × 1 = 650.
+ * Single source of truth for long-option money (owner P&L dictation):
+ *   premium move × lotSize × lots
+ *   e.g. 365 → 370 = ₹5 premium move
+ *     Nifty 50:      ₹5 × 65 = ₹325
+ *     Bank Nifty:    ₹5 × 30 = ₹150
+ *     Crudeoil Mini: ₹5 × 10 = ₹50
+ * (NSE/MCX contract sizes — Nifty is 65, not 60.)
  */
 export function computeOptionPnl(params: {
   entryPremium: number;

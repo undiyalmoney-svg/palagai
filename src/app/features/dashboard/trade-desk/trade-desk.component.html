@@ -4,14 +4,9 @@
       <p class="pg-eyebrow">Strategy Manager → Trade Desk</p>
       <h1>Trade Desk</h1>
       <p class="pg-lede">
-        @if (showCrude() || showNatGas()) {
-          Nifty, Bank, Crude &amp; Nat Gas Mini — Strat for indices; Crude
-          <strong>Selective</strong> (Trap SL50/TP200 · unlimited · 10:00–23:00). Always
-          <strong>buy</strong> CE/PE (fut BUY→long CE, fut SELL→long PE) — never short options. Nat Gas
-          <strong>Daily Profit (NG)</strong>. Index until 15:15 · MCX continues evening.
-        } @else {
-          Nifty &amp; Bank Nifty — Strat for indices. Session until 15:15.
-        }
+        Enter capital → desk auto-allocates lots and trades Trap / Crude Selective.
+        Your job: <strong>Get Token</strong> daily, press <strong>Start</strong>, keep this tab open.
+        Always <strong>buy</strong> CE/PE — never short options.
       </p>
     </div>
     <div class="hero-meta">
@@ -146,6 +141,40 @@
       </div>
     }
 
+    <div class="capital-agent" role="group" aria-label="Capital and auto lots">
+      <label class="field capital-field">
+        <span>Total capital (₹)</span>
+        <input
+          type="number"
+          min="10000"
+          step="1000"
+          [(ngModel)]="capitalRs"
+          (ngModelChange)="onCapitalChange()"
+          [disabled]="busy() || snapshot().running"
+        />
+      </label>
+      <label class="desk-check auto-lots-check">
+        <input
+          type="checkbox"
+          [(ngModel)]="autoLotsFromCapital"
+          (ngModelChange)="onAutoLotsToggle()"
+          [disabled]="busy() || snapshot().running"
+        />
+        <span>Auto lots from capital</span>
+      </label>
+      <div class="capital-plan-summary">
+        <strong>{{ allocationSummary() }}</strong>
+        <span
+          >Budget ₹{{ capitalPlan.premiumBudgetRs | number: '1.0-0' }} · premium ~₹{{
+            capitalPlan.estimatedPremiumRs | number: '1.0-0'
+          }}
+          · target ~₹{{ capitalPlan.dailyTargetRs | number: '1.0-0' }}/day · 10-day ~₹{{
+            capitalPlan.tenDayGoalRs | number: '1.0-0'
+          }}</span
+        >
+      </div>
+    </div>
+
     <div class="lots-row" role="group" aria-label="Lots per book">
       <label class="field lots-field">
         <span>Nifty lots</span>
@@ -155,7 +184,9 @@
           step="1"
           [(ngModel)]="niftyLots"
           (ngModelChange)="onLotsChange('nifty')"
-          [disabled]="busy() || snapshot().running || !enableNifty"
+          [disabled]="
+            busy() || snapshot().running || !enableNifty || autoLotsFromCapital
+          "
         />
       </label>
       <label class="field lots-field">
@@ -166,7 +197,7 @@
           step="1"
           [(ngModel)]="bankLots"
           (ngModelChange)="onLotsChange('bank')"
-          [disabled]="busy() || snapshot().running || !enableBank"
+          [disabled]="busy() || snapshot().running || !enableBank || autoLotsFromCapital"
         />
       </label>
       @if (showCrude()) {
@@ -178,7 +209,9 @@
             step="1"
             [(ngModel)]="crudeLots"
             (ngModelChange)="onLotsChange('crude')"
-            [disabled]="busy() || snapshot().running || !enableCrude"
+            [disabled]="
+              busy() || snapshot().running || !enableCrude || autoLotsFromCapital
+            "
           />
         </label>
       }
@@ -191,7 +224,9 @@
             step="1"
             [(ngModel)]="natGasLots"
             (ngModelChange)="onLotsChange('natgas')"
-            [disabled]="busy() || snapshot().running || !enableNatGas"
+            [disabled]="
+              busy() || snapshot().running || !enableNatGas || autoLotsFromCapital
+            "
           />
         </label>
       }
@@ -296,6 +331,17 @@
     }
 
     @if (mode() === 'live') {
+      <aside class="agent-ops" aria-label="Daily client checklist">
+        <p class="agent-ops-kicker">Your daily job</p>
+        <ol class="agent-ops-list">
+          <li [class.done]="hasKiteSession()">
+            <a routerLink="/dashboard/get-token">Get Token</a> — paste today’s access token
+          </li>
+          <li>Confirm capital ₹{{ capitalRs | number: '1.0-0' }} · {{ allocationSummary() }}</li>
+          <li>Tick Live money (if real orders) → press <strong>Start</strong></li>
+          <li>Keep this browser tab open all day — desk scans &amp; trades for you</li>
+        </ol>
+      </aside>
       <label class="real-orders">
         <input
           type="checkbox"
@@ -319,9 +365,8 @@
         </label>
       }
       <p class="start-anytime-note">
-        Start anytime. The desk replays the whole day first, so levels, day count and
-        the profit lock are already correct. It takes the next fresh signal —
-        a trade that opened before you pressed Start is never chased at market.
+        Start anytime. Capital auto-sizes lots. Desk replays the day, then takes the next
+        fresh signal — never chases a pre-Start trade at market. Leave the tab open.
       </p>
     }
 

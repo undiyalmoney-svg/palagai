@@ -53,6 +53,18 @@ describe('computeOptionPnl', () => {
     ).toBe(650);
   });
 
+  it('owner dictation: 365→370 = ₹5 × lot (Nifty65 / Bank30 / Crude10)', () => {
+    expect(
+      computeOptionPnl({ entryPremium: 365, exitPremium: 370, lotSize: 65, lots: 1 }),
+    ).toBe(325);
+    expect(
+      computeOptionPnl({ entryPremium: 365, exitPremium: 370, lotSize: 30, lots: 1 }),
+    ).toBe(150);
+    expect(
+      computeOptionPnl({ entryPremium: 365, exitPremium: 370, lotSize: 10, lots: 1 }),
+    ).toBe(50);
+  });
+
   it('scales by lots', () => {
     expect(
       computeOptionPnl({ entryPremium: 72, exitPremium: 82, lotSize: 65, lots: 2 }),

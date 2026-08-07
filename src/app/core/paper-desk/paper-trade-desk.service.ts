@@ -1912,8 +1912,22 @@ export class PaperTradeDeskService {
         });
         await delay(350);
       }
+      // Restart orphans with no matching paper signal must exit (cancel SL → MARKET).
+      const openSymbols = new Set(
+        statuses
+          .filter((s) => !!s.openTrade?.option?.tradingSymbol && !staleStartIds.has(s.instrumentId))
+          .map((s) => s.openTrade!.option!.tradingSymbol.toUpperCase()),
+      );
+      await this.liveOrders.exitUnmappedOrphans(authorization, openSymbols);
       for (const s of statuses) {
-        const pos = this.liveOrders.getPositions().find((p) => p.instrumentId === s.instrumentId);
+        const pos =
+          this.liveOrders.getPositions().find((p) => p.instrumentId === s.instrumentId) ??
+          this.liveOrders.getPositions().find(
+            (p) =>
+              !!s.openTrade?.option?.tradingSymbol &&
+              p.tradingSymbol.toUpperCase() === s.openTrade.option.tradingSymbol.toUpperCase() &&
+              (p.status === 'open' || p.status === 'exiting'),
+          );
         s.brokerSlTrigger = pos?.slTrigger ?? null;
         s.brokerSlOrderId = pos?.slOrderId ?? null;
         s.brokerEntryOrderId = pos?.entryOrderId ?? null;
