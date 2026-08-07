@@ -12,6 +12,10 @@ import {
   summaryRowsFromKiteOrderBook,
 } from './kite-order-book-fills.util';
 import { isSameBarReentry, sameBarReentryReason } from './reentry-cooldown.util';
+import {
+  adoptedEntryOrderPlaceholder,
+  findCompletedEntryOrderId,
+} from './live-adopt.util';
 
 export interface LiveBrokerPosition {
   instrumentId: string;
@@ -295,6 +299,7 @@ export class LiveOrderExecutorService {
   /**
    * On Live money start: adopt open NFO/MCX legs tagged PALAGAI* so restart
    * does not double-enter. Places missing SL-M when needed.
+   * Recovers entry order ids so the desk does not show "NOT ON KITE" for live legs.
    */
   async reconcileFromBroker(authorization: string): Promise<string> {
     let adopted = 0;
@@ -330,6 +335,9 @@ export class LiveOrderExecutorService {
         const pendingSl = findPendingOptionSl(orders, symbol);
         const entryAvg = Number(row.average_price ?? 0) || Number(row.last_price ?? 0) || 1;
         const orphanId = `orphan:${symbol}`;
+        const recoveredEntryId = findCompletedEntryOrderId(orders, symbol);
+        const entryOrderId =
+          recoveredEntryId ?? adoptedEntryOrderPlaceholder(pendingSl?.order_id ?? null);
 
         const pos: LiveBrokerPosition = {
           instrumentId: orphanId,
@@ -338,7 +346,7 @@ export class LiveOrderExecutorService {
           quantity: Math.abs(qty),
           // Desk direction is the index/futures side: long CE = BUY, long PE = SELL.
           direction: symbol.endsWith('PE') ? 'SELL' : 'BUY',
-          entryOrderId: null,
+          entryOrderId,
           slOrderId: pendingSl?.order_id ?? null,
           exitOrderId: null,
           entryPremium: entryAvg,
@@ -361,7 +369,7 @@ export class LiveOrderExecutorService {
           detail: `Adopted open ${exchange} ${product} ${symbol} qty ${pos.quantity} @ ~${entryAvg.toFixed(2)}`,
           tradingSymbol: symbol,
           quantity: pos.quantity,
-          orderId: pendingSl?.order_id,
+          orderId: recoveredEntryId ?? pendingSl?.order_id,
         });
 
         if (!pos.slOrderId && entryAvg > 0) {
@@ -386,6 +394,35 @@ export class LiveOrderExecutorService {
       return `Reconcile failed: ${this.formatErr(err)}`;
     }
     return `Reconcile · adopted ${adopted} · SL placed ${slPlaced}`;
+  }
+
+  /**
+   * After each Live tick: exit adopted orphans that no paper book still wants.
+   * Prevents restart from leaving a broker long with only an SL and no desk owner
+   * (paper flat / session already closed that leg).
+   */
+  async exitUnmappedOrphans(
+    authorization: string,
+    openSymbols: ReadonlySet<string>,
+  ): Promise<number> {
+    let exited = 0;
+    for (const pos of [...this.positions.values()]) {
+      if (!pos.instrumentId.startsWith('orphan:')) continue;
+      if (pos.status !== 'open') continue;
+      const sym = (pos.tradingSymbol || '').toUpperCase();
+      if (!sym || openSymbols.has(sym)) continue;
+      this.pushEvent({
+        at: new Date().toISOString(),
+        instrumentId: pos.instrumentId,
+        action: 'EXIT',
+        detail: `Orphan ${sym} has no open paper signal after restart — cancel SL + MARKET exit`,
+        tradingSymbol: pos.tradingSymbol,
+        quantity: pos.quantity,
+      });
+      const ok = await this.placeExit(authorization, pos);
+      if (ok) exited += 1;
+    }
+    return exited;
   }
 
   async syncInstrument(params: {
@@ -430,8 +467,8 @@ export class LiveOrderExecutorService {
     let current = this.positions.get(params.instrumentId) ?? null;
 
     // Exit already in flight — wait only while the lock is held. If status is stuck
-    // on 'exiting' after the lock cleared (bug / API fail), recover so the next
-    // paper signal can placeEntry (otherwise the book is dead until Live restart).
+    // on 'exiting' after the lock cleared, restore open and retry exit when still long
+    // (never force-flat while broker qty > 0 — that enables a double BUY).
     if (current?.status === 'exiting') {
       const sym = (current.tradingSymbol || '').toUpperCase();
       if (sym && this.exitingSymbols.has(sym)) {
@@ -442,28 +479,35 @@ export class LiveOrderExecutorService {
         ? await this.readBrokerLongQty(params.authorization, current)
         : 0;
       if (brokerQty != null && brokerQty > 0) {
-        // Still long at broker — finish the exit next, don't start a second SELL race.
-        await this.refreshSummaryStatuses(params.authorization);
-        return;
+        const recovered: LiveBrokerPosition = {
+          ...current,
+          status: 'open',
+          lastError: current.lastError ?? 'Exit incomplete — retrying',
+        };
+        this.positions.set(params.instrumentId, recovered);
+        this.positionsBySymbol.set(sym, recovered);
+        current = recovered;
+        // Fall through so open/null paper paths can placeExit again.
+      } else {
+        this.positions.set(params.instrumentId, {
+          ...current,
+          status: 'flat',
+          lastError: null,
+        });
+        if (sym) {
+          this.positionsBySymbol.delete(sym);
+        }
+        this.pushEvent({
+          at: new Date().toISOString(),
+          instrumentId: params.instrumentId,
+          instrumentName: params.instrumentName,
+          action: 'EXIT',
+          detail: `Recovered stuck exiting state for ${current.tradingSymbol || params.instrumentId} — marked flat for re-entry`,
+          tradingSymbol: current.tradingSymbol,
+          quantity: current.quantity,
+        });
+        current = this.positions.get(params.instrumentId) ?? null;
       }
-      this.positions.set(params.instrumentId, {
-        ...current,
-        status: 'flat',
-        lastError: null,
-      });
-      if (sym) {
-        this.positionsBySymbol.delete(sym);
-      }
-      this.pushEvent({
-        at: new Date().toISOString(),
-        instrumentId: params.instrumentId,
-        instrumentName: params.instrumentName,
-        action: 'EXIT',
-        detail: `Recovered stuck exiting state for ${current.tradingSymbol || params.instrumentId} — marked flat for re-entry`,
-        tradingSymbol: current.tradingSymbol,
-        quantity: current.quantity,
-      });
-      current = this.positions.get(params.instrumentId) ?? null;
     } else if (
       current?.tradingSymbol &&
       this.exitingSymbols.has(current.tradingSymbol.toUpperCase())
@@ -525,13 +569,69 @@ export class LiveOrderExecutorService {
         tradingSymbol: current.tradingSymbol,
         quantity: current.quantity,
       });
-      await this.placeExit(params.authorization, current);
+      const exited = await this.placeExit(params.authorization, current);
+      if (!exited) {
+        // Still long / SL cancel unknown — never place a second entry on top.
+        await this.refreshSummaryStatuses(params.authorization);
+        return;
+      }
+      const stillLong = await this.readBrokerLongQty(params.authorization, current);
+      if (stillLong != null && stillLong > 0) {
+        this.pushEvent({
+          at: new Date().toISOString(),
+          instrumentId: params.instrumentId,
+          instrumentName: params.instrumentName,
+          action: 'SKIP',
+          detail: `Handoff deferred — broker still long ${current.tradingSymbol} qty ${stillLong}`,
+          tradingSymbol: current.tradingSymbol,
+          quantity: stillLong,
+        });
+        await this.refreshSummaryStatuses(params.authorization);
+        return;
+      }
       await this.placeEntry(params.authorization, params.instrumentId, open);
       await this.refreshSummaryStatuses(params.authorization);
       return;
     }
 
-    if (open && (!current || current.status === 'flat' || current.status === 'error')) {
+    // Failed prior exit left status 'error' while broker may still be long.
+    // Never treat that as a re-entry slot — recover to open + retry exit, or clear if flat.
+    if (open && current?.status === 'error') {
+      const qty = current.tradingSymbol
+        ? await this.readBrokerLongQty(params.authorization, current)
+        : 0;
+      if (qty != null && qty > 0) {
+        const recovered: LiveBrokerPosition = {
+          ...current,
+          status: 'open',
+          lastError: current.lastError,
+        };
+        this.positions.set(params.instrumentId, recovered);
+        this.positionsBySymbol.set(current.tradingSymbol.toUpperCase(), recovered);
+        this.pushEvent({
+          at: new Date().toISOString(),
+          instrumentId: params.instrumentId,
+          instrumentName: params.instrumentName,
+          action: 'HOLD',
+          detail: `Prior exit error but broker still long ${current.tradingSymbol} — retry manage/exit (no re-entry)`,
+          tradingSymbol: current.tradingSymbol,
+          quantity: qty,
+        });
+        await this.refreshSummaryStatuses(params.authorization);
+        return;
+      }
+      this.positions.set(params.instrumentId, {
+        ...current,
+        status: 'flat',
+        lastError: null,
+      });
+      if (current.tradingSymbol) {
+        this.positionsBySymbol.delete(current.tradingSymbol.toUpperCase());
+      }
+      current = this.positions.get(params.instrumentId) ?? null;
+    }
+
+    if (open && (!current || current.status === 'flat')) {
       if (
         isSameBarReentry({
           signalEntryTime: open.entryTime,
@@ -580,7 +680,29 @@ export class LiveOrderExecutorService {
       return;
     }
 
-    if (!open && current && current.status === 'open') {
+    if (!open && current && (current.status === 'open' || current.status === 'error')) {
+      if (current.status === 'error') {
+        const qty = current.tradingSymbol
+          ? await this.readBrokerLongQty(params.authorization, current)
+          : 0;
+        if (qty != null && qty <= 0) {
+          this.positions.set(params.instrumentId, {
+            ...current,
+            status: 'flat',
+            lastError: null,
+          });
+          if (current.tradingSymbol) {
+            this.positionsBySymbol.delete(current.tradingSymbol.toUpperCase());
+          }
+          await this.refreshSummaryStatuses(params.authorization);
+          return;
+        }
+        current = {
+          ...current,
+          status: 'open',
+        };
+        this.positions.set(params.instrumentId, current);
+      }
       const held = await this.maybeHoldDrainWhileOptionRed(
         params.authorization,
         current,
@@ -1058,18 +1180,31 @@ export class LiveOrderExecutorService {
   /**
    * Before MARKET exit: cancel every pending protective SL-M for this symbol.
    * Covers known slOrderId and ghost SLs (place succeeded, response lost).
-   * Returns 'filled' when the known SL already completed (position already flat).
+   * Returns:
+   *  - 'filled' when the known SL already completed (position already flat)
+   *  - 'cleared' when pending SLs are cancelled / none remain
+   *  - 'blocked' when SL status/cancel is unknown — caller must NOT MARKET exit
+   *    (MARKET + live SL-M can naked-short the option)
    */
   private async cancelPendingSlBeforeExit(
     authorization: string,
     pos: LiveBrokerPosition,
-  ): Promise<'filled' | 'cleared'> {
-    const orders = await this.fetchOrders(authorization);
+  ): Promise<'filled' | 'cleared' | 'blocked'> {
+    let orders: KiteOrderRow[] = [];
+    let bookOk = true;
+    try {
+      const book = (await firstValueFrom(this.kiteApi.getOrders(authorization))) as KiteOrdersBook;
+      orders = book.data ?? [];
+    } catch {
+      bookOk = false;
+      orders = [];
+    }
     const cancelIds = new Set<string>();
 
     if (pos.slOrderId) {
       const known = orders.find((o) => o.order_id === pos.slOrderId);
-      const knownStatus = (known?.status ?? (await this.getOrderStatus(authorization, pos.slOrderId))) ?? null;
+      const knownStatus =
+        (known?.status ?? (await this.getOrderStatus(authorization, pos.slOrderId))) ?? null;
       if (knownStatus === 'COMPLETE') {
         this.positions.set(pos.instrumentId, {
           ...pos,
@@ -1090,7 +1225,28 @@ export class LiveOrderExecutorService {
       }
       if (knownStatus && isCancellable(knownStatus)) {
         cancelIds.add(pos.slOrderId);
+      } else if (!knownStatus) {
+        this.pushEvent({
+          at: new Date().toISOString(),
+          instrumentId: pos.instrumentId,
+          action: 'ERROR',
+          detail: `SL-M ${pos.slOrderId} status unknown — defer MARKET exit (avoid live SL + SELL)`,
+          orderId: pos.slOrderId,
+          tradingSymbol: pos.tradingSymbol,
+          quantity: pos.quantity,
+        });
+        return 'blocked';
       }
+    } else if (!bookOk) {
+      this.pushEvent({
+        at: new Date().toISOString(),
+        instrumentId: pos.instrumentId,
+        action: 'ERROR',
+        detail: `Order book unavailable before exit — defer MARKET exit (ghost SL risk)`,
+        tradingSymbol: pos.tradingSymbol,
+        quantity: pos.quantity,
+      });
+      return 'blocked';
     }
 
     for (const row of findAllPendingOptionSl(orders, pos.tradingSymbol)) {
@@ -1099,6 +1255,7 @@ export class LiveOrderExecutorService {
       }
     }
 
+    let cancelFailed = false;
     for (const orderId of cancelIds) {
       try {
         const status =
@@ -1121,16 +1278,21 @@ export class LiveOrderExecutorService {
           quantity: pos.quantity,
         });
       } catch (err) {
+        cancelFailed = true;
         this.pushEvent({
           at: new Date().toISOString(),
           instrumentId: pos.instrumentId,
           action: 'ERROR',
-          detail: `Cancel SL-M ${orderId} failed: ${this.formatErr(err)} — will still try MARKET exit`,
+          detail: `Cancel SL-M ${orderId} failed: ${this.formatErr(err)} — defer MARKET exit`,
           orderId,
           tradingSymbol: pos.tradingSymbol,
           quantity: pos.quantity,
         });
       }
+    }
+
+    if (cancelFailed) {
+      return 'blocked';
     }
 
     if (cancelIds.size > 0) {
@@ -1148,12 +1310,13 @@ export class LiveOrderExecutorService {
   /**
    * Cutoff / target exit: cancel pending SL-M, then MARKET SELL only if broker still long.
    * Never naked-shorts CE/PE. Concurrent duplicate exits are blocked per symbol.
+   * @returns true when flat at broker (exit done / already flat); false when deferred/failed.
    */
-  private async placeExit(authorization: string, pos: LiveBrokerPosition): Promise<void> {
+  private async placeExit(authorization: string, pos: LiveBrokerPosition): Promise<boolean> {
     const sym = pos.tradingSymbol.toUpperCase();
     const latest = this.positions.get(pos.instrumentId) ?? pos;
     if (latest.status !== 'open') {
-      return;
+      return latest.status === 'flat';
     }
     if (this.exitingSymbols.has(sym)) {
       this.pushEvent({
@@ -1164,7 +1327,7 @@ export class LiveOrderExecutorService {
         tradingSymbol: pos.tradingSymbol,
         quantity: pos.quantity,
       });
-      return;
+      return false;
     }
 
     this.exitingSymbols.add(sym);
@@ -1178,12 +1341,22 @@ export class LiveOrderExecutorService {
     try {
       const slGate = await this.cancelPendingSlBeforeExit(authorization, exitingPos);
       if (slGate === 'filled') {
-        return;
+        return true;
+      }
+      if (slGate === 'blocked') {
+        const cur = this.positions.get(pos.instrumentId) ?? exitingPos;
+        this.positions.set(pos.instrumentId, {
+          ...cur,
+          status: 'open',
+          lastError: 'SL cancel unverified — exit deferred',
+        });
+        this.positionsBySymbol.set(sym, this.positions.get(pos.instrumentId)!);
+        return false;
       }
       // Re-read in case cancel / SL fill updated memory.
       pos = this.positions.get(pos.instrumentId) ?? exitingPos;
       if (pos.status === 'flat') {
-        return;
+        return true;
       }
 
       const brokerLongQty = await this.readBrokerLongQty(authorization, pos);
@@ -1206,7 +1379,7 @@ export class LiveOrderExecutorService {
             tradingSymbol: pos.tradingSymbol,
             quantity: pos.quantity,
           });
-          return;
+          return true;
         }
         sellQty = Math.max(0, Math.floor(pos.quantity) || 0) || null;
       } else {
@@ -1228,12 +1401,12 @@ export class LiveOrderExecutorService {
             tradingSymbol: pos.tradingSymbol,
             quantity: pos.quantity,
           });
-          return;
+          return true;
         }
       }
       if (sellQty == null) {
-        // Positions API failed and remembered qty is 0 — never leave status 'exiting'
-        // (that permanently blocks placeEntry until Live restart).
+        // Positions API failed and remembered qty is 0 — mark flat only when we
+        // truly have no size to sell; do not invent a MARKET SELL.
         this.positions.set(pos.instrumentId, {
           ...pos,
           slOrderId: null,
@@ -1250,7 +1423,7 @@ export class LiveOrderExecutorService {
           tradingSymbol: pos.tradingSymbol,
           quantity: pos.quantity,
         });
-        return;
+        return true;
       }
 
       const response = await firstValueFrom(
@@ -1288,38 +1461,43 @@ export class LiveOrderExecutorService {
         tradingSymbol: pos.tradingSymbol,
         quantity: sellQty,
       });
+      return true;
     } catch (err) {
       const message = this.formatErr(err);
       const cur = this.positions.get(pos.instrumentId) ?? pos;
+      // Keep status open so the next tick retries exit — never 'error'→placeEntry while long.
       this.positions.set(pos.instrumentId, {
         ...cur,
-        status: 'error',
+        status: 'open',
         lastError: message,
       });
+      this.positionsBySymbol.set(sym, this.positions.get(pos.instrumentId)!);
       this.pushEvent({
         at: new Date().toISOString(),
         instrumentId: pos.instrumentId,
         action: 'ERROR',
-        detail: `Exit failed: ${message}`,
+        detail: `Exit failed: ${message} — will retry (no re-entry while long)`,
         tradingSymbol: pos.tradingSymbol,
         quantity: pos.quantity,
       });
+      return false;
     } finally {
       this.exitingSymbols.delete(sym);
       // Safety net: never leave a book stuck on 'exiting' after the lock is gone.
+      // Prefer open (retry exit) over flat (can double-buy while broker still long).
       const cur = this.positions.get(pos.instrumentId);
       if (cur?.status === 'exiting') {
         this.positions.set(pos.instrumentId, {
           ...cur,
-          status: 'flat',
-          lastError: null,
+          status: 'open',
+          lastError: cur.lastError ?? 'Exit incomplete — will retry',
         });
-        this.positionsBySymbol.delete(sym);
+        this.positionsBySymbol.set(sym, this.positions.get(pos.instrumentId)!);
         this.pushEvent({
           at: new Date().toISOString(),
           instrumentId: pos.instrumentId,
-          action: 'EXIT',
-          detail: `Exit path left ${pos.tradingSymbol} stuck exiting — forced flat for re-entry`,
+          action: 'HOLD',
+          detail: `Exit path left ${pos.tradingSymbol} stuck exiting — restored open for retry`,
           tradingSymbol: pos.tradingSymbol,
           quantity: pos.quantity,
         });
