@@ -2,7 +2,7 @@
  * KING-LEVEL NSE equity research — Nifty-universe stocks for EOD daily profit.
  * Capital plan: ₹60,000 · prefer almost-all green days · small losses OK if day ends green.
  *
- *   KITE_AUTH='token 5bnh1ybdrifvu18e:ACCESS' npx tsx scripts/research-stocks-daily-king.ts
+ *   KITE_AUTH='token <api_key>:<access_token>' npx tsx scripts/research-stocks-daily-king.ts
  *
  * Enforces ≥3s between historical candle fetches.
  */
