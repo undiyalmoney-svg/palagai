@@ -215,6 +215,20 @@
   color: #166534;
 }
 
+.agent-capital {
+  margin: 0.15rem 0 0;
+  max-width: 14rem;
+}
+
+.agent-locked.compact {
+  width: 100%;
+  margin: 0;
+  padding: 0.35rem 0 0;
+  border: none;
+  font-size: 0.82rem;
+  color: var(--pg-muted, #64748b);
+}
+
 .hands-off-agent .agent-capital {
   margin: 0.35rem 0 0;
   max-width: 16rem;

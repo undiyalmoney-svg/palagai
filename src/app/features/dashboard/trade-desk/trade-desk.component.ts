@@ -259,8 +259,14 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
     this.autoLotsFromCapital = true;
     this.enableKutty = false;
     this.kuttyAlone = false;
-    this.realOrders = true;
-    this.realOrdersAck = true;
+    // Live money only on Live tab — Paper never places Kite orders.
+    if (this.mode() === 'live') {
+      this.realOrders = true;
+      this.realOrdersAck = true;
+    } else {
+      this.realOrders = false;
+      this.realOrdersAck = false;
+    }
     this.applyCapitalAllocation();
     this.error.set('');
   }
@@ -328,6 +334,14 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
     if (mode === 'testing') {
       this.realOrders = false;
       this.realOrdersAck = false;
+    }
+    // Hands-off: always the same books/DNA/guards — no leftover toggles.
+    if (this.handsOffAgent && !this.snapshot().running) {
+      this.applyCapitalAgentPreset();
+      if (mode === 'testing') {
+        this.realOrders = false;
+        this.realOrdersAck = false;
+      }
     }
   }
 
@@ -414,8 +428,8 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
       this.error.set('No Kite session. Open Get Token once, then press Start.');
       return;
     }
-    // Hands-off: re-apply the full agent plan every Start (any morning time OK).
-    if (this.handsOffAgent && this.mode() === 'live') {
+    // Hands-off: same plan for Paper and Live — only Kite I/O differs on Live.
+    if (this.handsOffAgent) {
       this.applyCapitalAgentPreset();
     } else {
       this.capitalRs = Math.max(

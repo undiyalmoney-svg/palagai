@@ -1,78 +1,29 @@
 <section class="desk pg-page">
   <header class="hero pg-page-hero">
     <div class="hero-copy">
-      <p class="pg-eyebrow">Strategy Manager → Trade Desk</p>
-      <h1>{{ handsOffAgent && mode() === 'live' ? 'Live Agent' : 'Trade Desk' }}</h1>
+      <p class="pg-eyebrow">Trade Desk</p>
+      <h1>Trading Agent</h1>
       <p class="pg-lede">
-        @if (handsOffAgent && mode() === 'live') {
-          <strong>Get Token</strong> → set capital if it changed → press <strong>Start</strong> → leave the tab open →
-          <strong>Stop after 3:15</strong>. Lots/books stay auto. Capital guards stay on.
-        } @else {
-          Enter capital → desk auto-allocates lots and trades Trap / Crude Selective.
-          Your job: <strong>Get Token</strong> daily, press <strong>Start</strong>, keep this tab open.
-          Always <strong>buy</strong> CE/PE — never short options.
-        }
+        <strong>Get Token</strong> → set capital if needed → <strong>Start</strong> → leave tab open →
+        <strong>Stop after 3:15</strong>.
       </p>
     </div>
     <div class="hero-meta">
       <span class="pg-badge pg-badge-neutral mono" title="Deployed app build">{{
         appBuildLabel
       }}</span>
-      <span class="pg-badge pg-badge-neutral" [class.pg-badge-bull]="mode() === 'live'">{{
-        mode() === 'live' ? (realOrders ? 'Live money' : 'Live paper') : 'Backtest'
-      }}</span>
-      <span
-        class="pg-badge"
-        [class.pg-badge-bear]="realOrders && mode() === 'live'"
-        [class.pg-badge-neutral]="!(realOrders && mode() === 'live')"
-      >
-        {{ realOrders && mode() === 'live' ? 'REAL ORDERS' : 'Paper only' }}
+      <span class="pg-badge" [class.pg-badge-bull]="mode() === 'live'" [class.pg-badge-neutral]="mode() !== 'live'">
+        {{ mode() === 'live' ? 'Live' : 'Paper' }}
       </span>
     </div>
   </header>
 
   <div class="active-strategy-bar" role="status" aria-live="polite">
     <div class="active-strategy-label">
-      <span class="as-kicker">Active now · {{ activeStrategies().modeLabel }}</span>
-      @if (handsOffAgent && mode() === 'live') {
-        <strong class="as-name">All-day green · Trap DNA</strong>
-        <span class="as-meta"
-          >{{ allocationSummary() }} · peak₹100 · max 3/day · day lock + strict stop</span
-        >
-      } @else if (kuttyAlone && showKutty()) {
-        <strong class="as-name"
-          >Kutty alone{{ enableCrude && showCrude() ? ' + Crude Selective' : ''
-          }}{{ enableNatGas && showNatGas() ? ' + Nat Gas Daily Profit' : '' }}</strong
-        >
-        <span class="as-meta">No Trap/Strat · ₹600 TP / ₹200 SL · ∞ trades</span>
-      } @else if (activeStrategies().same) {
-        <strong class="as-name"
-          >{{ activeStrategies().nifty.name
-          }}{{ enableCrude && showCrude() ? ' · Crude Selective' : ''
-          }}{{ enableNatGas && showNatGas() ? ' · Nat Gas Daily Profit' : '' }}</strong
-        >
-        <span class="as-meta"
-          >Nifty + Bank · {{ activeStrategies().nifty.maxTradesLabel
-          }}{{ showKutty() && enableKutty ? ' · +Kutty' : ''
-          }}{{ (enableCrude && showCrude()) || (enableNatGas && showNatGas()) ? ' · MCX →23:10' : '' }}</span
-        >
-      } @else {
-        <strong class="as-name"
-          >Nifty {{ activeStrategies().nifty.name }} · Bank {{ activeStrategies().bank.name
-          }}{{ enableCrude && showCrude() ? ' · Crude Selective' : ''
-          }}{{ enableNatGas && showNatGas() ? ' · Nat Gas Daily Profit' : '' }}</strong
-        >
-        <span class="as-meta"
-          >{{ activeStrategies().nifty.maxTradesLabel }} /
-          {{ activeStrategies().bank.maxTradesLabel
-          }}{{ showKutty() && enableKutty ? ' · +Kutty' : ''
-          }}{{ (enableCrude && showCrude()) || (enableNatGas && showNatGas()) ? ' · MCX →23:10' : '' }}</span
-        >
-      }
+      <span class="as-kicker">Running</span>
+      <strong class="as-name">All-day green · Trap</strong>
+      <span class="as-meta">{{ allocationSummary() }} · auto lots · day lock + strict stop</span>
     </div>
-    @if (!(handsOffAgent && mode() === 'live') && !(kuttyAlone && showKutty())) {
-      <a class="as-link" routerLink="/dashboard/strategy-manager">Change in Strat</a>
-    }
   </div>
 
   <div class="mode-switch" role="tablist" aria-label="Desk mode">
@@ -83,8 +34,8 @@
       [class.active]="mode() === 'testing'"
       (click)="setMode('testing')"
     >
-      <span class="mode-title">Testing</span>
-      <span class="mode-sub">From → To · one-shot fetch · anytime</span>
+      <span class="mode-title">Paper</span>
+      <span class="mode-sub">Check dates · same strategy as Live</span>
     </button>
     <button
       type="button"
@@ -94,9 +45,7 @@
       (click)="setMode('live')"
     >
       <span class="mode-title">Live</span>
-      <span class="mode-sub"
-        >Today · Index→15:15{{ showCrude() || showNatGas() ? ' · MCX→23:10' : '' }}</span
-      >
+      <span class="mode-sub">Today · real MIS · Stop after 3:15</span>
     </button>
   </div>
 
@@ -110,308 +59,42 @@
         <span>To</span>
         <input type="date" [(ngModel)]="toDate" [disabled]="busy() || snapshot().running" />
       </label>
-      <div class="range-presets" role="group" aria-label="Quick date ranges">
-        <button
-          type="button"
-          class="preset-btn"
-          [disabled]="busy() || snapshot().running"
-          (click)="setTestingToday()"
-        >
-          Today
-        </button>
-        <button
-          type="button"
-          class="preset-btn"
-          [disabled]="busy() || snapshot().running"
-          (click)="setTestingRange(14)"
-        >
-          14d
-        </button>
-        <button
-          type="button"
-          class="preset-btn"
-          [disabled]="busy() || snapshot().running"
-          (click)="setTestingRange(60)"
-        >
-          60d
-        </button>
-        <button
-          type="button"
-          class="preset-btn"
-          [disabled]="busy() || snapshot().running"
-          (click)="setTestingRange(120)"
-        >
-          120d
-        </button>
-      </div>
-    } @else if (handsOffAgent) {
-      <div class="hands-off-agent" role="status" aria-label="Hands-off live agent">
-        <strong>Hands-off · all-day-green DNA</strong>
-        <span
-          >Start any morning (6:30 or 10:00 — your call). Do nothing until after
-          <b>3:15</b>, then Stop. Capital must not drain: day lock + strict day stop.</span
-        >
-        <label class="field capital-field agent-capital">
-          <span>Total capital (₹) — edit when profits grow</span>
-          <input
-            type="number"
-            min="10000"
-            step="1000"
-            [(ngModel)]="capitalRs"
-            (ngModelChange)="onCapitalChange()"
-            [disabled]="busy() || snapshot().running"
-          />
-        </label>
-        <div class="agent-locked">
-          <span>{{ allocationSummary() }} · auto lots from capital</span>
-          <span
-            >Premium ~₹{{ capitalPlan.estimatedPremiumRs | number: '1.0-0' }} · target ~₹{{
-              capitalPlan.dailyTargetRs | number: '1.0-0'
-            }}/day · lock +₹{{ profitLockMoneyRs() | number: '1.0-0' }} · stop −₹{{
-              strictStopMoneyRs() | number: '1.0-0'
-            }}</span
-          >
-          <span>Real MIS · Trap peak₹100 · Nifty+Bank · Crude OFF · Kutty OFF</span>
-        </div>
-      </div>
-    } @else {
-      <div class="live-hint">
-        <strong>Today</strong>
-        <span>{{ realOrders ? 'Real MIS orders on signals' : 'Auto paper on selected indices' }} · market hours only</span>
-      </div>
+      <button
+        type="button"
+        class="preset-btn"
+        [disabled]="busy() || snapshot().running"
+        (click)="setTestingToday()"
+      >
+        Today
+      </button>
     }
 
-    @if (!(handsOffAgent && mode() === 'live')) {
-      <div class="capital-agent" role="group" aria-label="Capital and auto lots">
-        <label class="field capital-field">
-          <span>Total capital (₹)</span>
-          <input
-            type="number"
-            min="10000"
-            step="1000"
-            [(ngModel)]="capitalRs"
-            (ngModelChange)="onCapitalChange()"
-            [disabled]="busy() || snapshot().running"
-          />
-        </label>
-        <label class="desk-check auto-lots-check">
-          <input
-            type="checkbox"
-            [(ngModel)]="autoLotsFromCapital"
-            (ngModelChange)="onAutoLotsToggle()"
-            [disabled]="busy() || snapshot().running"
-          />
-          <span>Auto lots from capital</span>
-        </label>
-        <div class="capital-plan-summary">
-          <strong>{{ allocationSummary() }}</strong>
-          <span
-            >Budget ₹{{ capitalPlan.premiumBudgetRs | number: '1.0-0' }} · premium ~₹{{
-              capitalPlan.estimatedPremiumRs | number: '1.0-0'
-            }}
-            · target ~₹{{ capitalPlan.dailyTargetRs | number: '1.0-0' }}/day · 10-day ~₹{{
-              capitalPlan.tenDayGoalRs | number: '1.0-0'
-            }}</span
-          >
-        </div>
-      </div>
+    <label class="field capital-field agent-capital">
+      <span>Capital (₹)</span>
+      <input
+        type="number"
+        min="10000"
+        step="1000"
+        [(ngModel)]="capitalRs"
+        (ngModelChange)="onCapitalChange()"
+        [disabled]="busy() || snapshot().running"
+      />
+    </label>
 
-      <div class="lots-row" role="group" aria-label="Lots per book">
-        <label class="field lots-field">
-          <span>Nifty lots</span>
-          <input
-            type="number"
-            min="1"
-            step="1"
-            [(ngModel)]="niftyLots"
-            (ngModelChange)="onLotsChange('nifty')"
-            [disabled]="
-              busy() || snapshot().running || !enableNifty || autoLotsFromCapital
-            "
-          />
-        </label>
-        <label class="field lots-field">
-          <span>Bank lots</span>
-          <input
-            type="number"
-            min="1"
-            step="1"
-            [(ngModel)]="bankLots"
-            (ngModelChange)="onLotsChange('bank')"
-            [disabled]="busy() || snapshot().running || !enableBank || autoLotsFromCapital"
-          />
-        </label>
-        @if (showCrude()) {
-          <label class="field lots-field">
-            <span>Crude lots</span>
-            <input
-              type="number"
-              min="1"
-              step="1"
-              [(ngModel)]="crudeLots"
-              (ngModelChange)="onLotsChange('crude')"
-              [disabled]="
-                busy() || snapshot().running || !enableCrude || autoLotsFromCapital
-              "
-            />
-          </label>
-        }
-        @if (showNatGas()) {
-          <label class="field lots-field">
-            <span>Nat Gas lots</span>
-            <input
-              type="number"
-              min="1"
-              step="1"
-              [(ngModel)]="natGasLots"
-              (ngModelChange)="onLotsChange('natgas')"
-              [disabled]="
-                busy() || snapshot().running || !enableNatGas || autoLotsFromCapital
-              "
-            />
-          </label>
-        }
-      </div>
-
-      <div class="desk-toggles" role="group" aria-label="Books and day risk">
-        <label class="desk-check">
-          <input type="checkbox" [(ngModel)]="enableNifty" [disabled]="busy() || snapshot().running" />
-          <span>Nifty 50</span>
-        </label>
-        <label class="desk-check">
-          <input type="checkbox" [(ngModel)]="enableBank" [disabled]="busy() || snapshot().running" />
-          <span>Bank Nifty</span>
-        </label>
-        @if (showCrude()) {
-          <label
-            class="desk-check"
-            title="Selective · Trap SL50/TP200 · unlimited · 10:00–23:00 · continues past 15:15 on MCX"
-          >
-            <input type="checkbox" [(ngModel)]="enableCrude" [disabled]="busy() || snapshot().running" />
-            <span>Crude Oil Mini</span>
-          </label>
-        }
-        @if (showNatGas()) {
-          <label
-            class="desk-check"
-            title="Daily Profit NG · trap SL1.5/TP3 · max 1/day · continues past 15:15 on MCX"
-          >
-            <input
-              type="checkbox"
-              [(ngModel)]="enableNatGas"
-              [disabled]="busy() || snapshot().running"
-            />
-            <span>Natural Gas Mini</span>
-          </label>
-        }
-        <label
-          class="desk-check"
-          title="Stops new entries after about −₹2,950 × lots day loss (split if both books on). 3 lots ≈ −₹8,850."
-        >
-          <input
-            type="checkbox"
-            [(ngModel)]="strictDayStop"
-            [disabled]="busy() || snapshot().running"
-          />
-          <span>Strict day stop (−₹{{ strictStopMoneyRs() | number: '1.0-0' }})</span>
-        </label>
-        <label
-          class="desk-check"
-          title="Stops new entries after about +₹3,000 × lots day profit (split if both books on). 1 lot → ₹3k · 3 lots → ₹9k."
-        >
-          <input
-            type="checkbox"
-            [(ngModel)]="dayProfitLock"
-            [disabled]="busy() || snapshot().running"
-          />
-          <span>Day profit lock (+₹{{ profitLockMoneyRs() | number: '1.0-0' }})</span>
-        </label>
-        @if (showKutty()) {
-          <label
-            class="desk-check"
-            title="Background Kutty · only when Strat path is free · waits if Trap/Strat is armed or entering · yields on Strat entry"
-          >
-            <input
-              type="checkbox"
-              [(ngModel)]="enableKutty"
-              [disabled]="busy() || snapshot().running || kuttyAlone"
-              (ngModelChange)="onEnableKuttyChange()"
-            />
-            <span>Kutty scalp</span>
-          </label>
-          <label
-            class="desk-check"
-            title="Trade Kutty only — Trap/Strat entries off. Uncheck to run Strat again (with optional Kutty background)."
-          >
-            <input
-              type="checkbox"
-              [(ngModel)]="kuttyAlone"
-              [disabled]="busy() || snapshot().running"
-              (ngModelChange)="onKuttyAloneChange()"
-            />
-            <span>Kutty alone (no Strat)</span>
-          </label>
-        }
-      </div>
-    }
-
-    @if (mode() === 'testing') {
-      <div class="weekday-filter" role="group" aria-label="Result weekdays">
-        <span class="weekday-filter-label">Result days</span>
-        @for (d of weekdayOptions; track d.key) {
-          <button
-            type="button"
-            class="weekday-chip"
-            [class.on]="isWeekdayOn(d.key)"
-            (click)="toggleWeekday(d.key)"
-          >
-            {{ d.short }}
-          </button>
-        }
-        <small>Fetch all · show selected Mon–Fri only</small>
-      </div>
-    }
+    <div class="agent-locked compact">
+      <span>{{ allocationSummary() }} · target ~₹{{ capitalPlan.dailyTargetRs | number: '1.0-0' }}/day</span>
+    </div>
 
     @if (mode() === 'live') {
-      <aside class="agent-ops" aria-label="Daily client checklist">
-        <p class="agent-ops-kicker">Your only job</p>
+      <aside class="agent-ops" aria-label="Daily steps">
         <ol class="agent-ops-list">
           <li [class.done]="hasKiteSession()">
-            <a routerLink="/dashboard/get-token">Get Token</a> — once per day
+            <a routerLink="/dashboard/get-token">Get Token</a>
           </li>
-          <li>Update capital if profits grew (lots auto-size)</li>
-          <li>Press <strong>Start</strong> — any morning time is fine</li>
-          <li>Leave this tab open — after <strong>3:15</strong> press <strong>Stop</strong></li>
+          <li>Start (any morning)</li>
+          <li>Stop after <strong>3:15</strong></li>
         </ol>
       </aside>
-      @if (!handsOffAgent) {
-        <label class="real-orders">
-          <input
-            type="checkbox"
-            [(ngModel)]="realOrders"
-            [disabled]="busy() || snapshot().running"
-          />
-          <span
-            >Live money — real Kite MIS (N×{{ niftyLots }} · B×{{ bankLots
-            }}{{ showCrude() ? ' · C×' + crudeLots : ''
-            }}{{ showNatGas() ? ' · NG×' + natGasLots : '' }})</span
-          >
-        </label>
-        @if (realOrders) {
-          <label class="real-orders ack">
-            <input
-              type="checkbox"
-              [(ngModel)]="realOrdersAck"
-              [disabled]="busy() || snapshot().running"
-            />
-            <span>I understand this uses real money</span>
-          </label>
-        }
-        <p class="start-anytime-note">
-          Start anytime. Capital auto-sizes lots. Desk replays the day, then takes the next
-          fresh signal — never chases a pre-Start trade at market. Leave the tab open.
-        </p>
-      }
     }
 
     <div class="actions">
@@ -446,21 +129,16 @@
       <span class="pulse" aria-hidden="true"></span>
       <strong>I'm alive</strong>
       <span>Last tick {{ fmtTime(snapshot().lastTickAt) }} IST</span>
-      <span class="sep">·</span>
-      <span>{{ snapshot().realOrders ? 'Live money' : 'Live paper' }}</span>
     </div>
   }
 
   @if (liveAssistant(); as assist) {
     <aside class="live-assistant" role="status" aria-live="polite" [attr.data-tone]="assist.tone">
       <div class="la-head">
-        <span class="la-kicker">Live assistant · desk books</span>
+        <span class="la-kicker">Status</span>
         <span class="phase-pill" [attr.data-phase]="assist.tone">{{ assist.headline }}</span>
       </div>
       <p class="la-detail">{{ assist.detail }}</p>
-      @if (assist.clockNote) {
-        <p class="la-clock">{{ assist.clockNote }}</p>
-      }
       @if (assist.lines.length) {
         <ul class="la-lines">
           @for (line of assist.lines; track line.name) {
@@ -479,11 +157,6 @@
       @if (assist.nextAction) {
         <p class="la-next"><span>Next</span> {{ assist.nextAction }}</p>
       }
-      <p class="la-foot">
-        Updates every live tick (~60s) · keep this tab open{{
-          showCrude() || showNatGas() ? ' · Experiments MCX desks still separate' : ''
-        }}
-      </p>
     </aside>
   }
 
@@ -494,9 +167,9 @@
         <strong>{{
           snapshot().realOrders
             ? hasKiteOpenTrade()
-              ? 'ON KITE · LIVE MONEY'
-              : 'LIVE MONEY · waiting for confirmed Kite order'
-            : 'PAPER TRADE LIVE'
+              ? 'ON KITE'
+              : 'Waiting for Kite order'
+            : 'In trade'
         }}</strong>
         <span>{{ marketLiveSummary() }}</span>
       </div>
@@ -534,17 +207,12 @@
       </div>
     </div>
 
-    @if (resultView().dayStats.tradingDays) {
+    @if (mode() === 'testing' && resultView().dayStats.tradingDays > 1) {
       <div class="day-stats">
         <div class="day-stats-head">
           <div>
             <h3>Day breakdown</h3>
-            <p>
-              {{ resultView().dayStats.tradingDays }} trading day(s) · ranked by Profit ₹
-              @if (resultView().filtered) {
-                · {{ resultView().weekdayLabel }}
-              }
-            </p>
+            <p>{{ resultView().dayStats.tradingDays }} trading day(s)</p>
           </div>
           <button
             mat-stroked-button
@@ -556,27 +224,9 @@
             Download PDF
           </button>
         </div>
-
-        <div class="day-highlights">
-          @if (resultView().dayStats.bestDay; as best) {
-            <div class="day-card up">
-              <span>Most profitable day</span>
-              <strong>{{ best.displayDate }}</strong>
-              <em>{{ best.optionNetRs > 0 ? '+' : '' }}{{ best.optionNetRs | number: '1.0-0' }} · {{ best.trades }} trade(s)</em>
-            </div>
-          }
-          @if (resultView().dayStats.worstDay; as worst) {
-            <div class="day-card down">
-              <span>Most loss day</span>
-              <strong>{{ worst.displayDate }}</strong>
-              <em>{{ worst.optionNetRs > 0 ? '+' : '' }}{{ worst.optionNetRs | number: '1.0-0' }} · {{ worst.trades }} trade(s)</em>
-            </div>
-          }
-        </div>
-
         <div class="day-tables">
           <div class="day-table-block">
-            <h4>Top profitable days</h4>
+            <h4>By day</h4>
             <div class="table-scroll">
               <table>
                 <thead>
@@ -595,26 +245,7 @@
                       <td>{{ d.trades }}</td>
                       <td class="num up">{{ d.optionNetRs > 0 ? '+' : '' }}{{ d.optionNetRs | number: '1.0-0' }}</td>
                     </tr>
-                  } @empty {
-                    <tr><td colspan="4" class="muted">No profit days</td></tr>
                   }
-                </tbody>
-              </table>
-            </div>
-          </div>
-          <div class="day-table-block">
-            <h4>Most loss days</h4>
-            <div class="table-scroll">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Date</th>
-                    <th>Day</th>
-                    <th>Trades</th>
-                    <th>Profit ₹</th>
-                  </tr>
-                </thead>
-                <tbody>
                   @for (d of resultView().dayStats.topLossDays; track d.date) {
                     <tr>
                       <td>{{ d.displayDate }}</td>
@@ -622,44 +253,12 @@
                       <td>{{ d.trades }}</td>
                       <td class="num down">{{ d.optionNetRs | number: '1.0-0' }}</td>
                     </tr>
-                  } @empty {
-                    <tr><td colspan="4" class="muted">No loss days</td></tr>
                   }
                 </tbody>
               </table>
             </div>
           </div>
         </div>
-
-        @if (resultView().dayStats.byWeekday.length) {
-          <div class="day-table-block weekday-block">
-            <h4>By weekday</h4>
-            <div class="table-scroll">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Day</th>
-                    <th>Trades</th>
-                    <th>W / L</th>
-                    <th>Profit ₹</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  @for (w of resultView().dayStats.byWeekday; track w.weekday) {
-                    <tr>
-                      <td>{{ w.weekday }}</td>
-                      <td>{{ w.trades }}</td>
-                      <td>{{ w.wins }} / {{ w.losses }}</td>
-                      <td class="num" [class.up]="w.optionNetRs > 0" [class.down]="w.optionNetRs < 0">
-                        {{ w.optionNetRs > 0 ? '+' : '' }}{{ w.optionNetRs | number: '1.0-0' }}
-                      </td>
-                    </tr>
-                  }
-                </tbody>
-              </table>
-            </div>
-          </div>
-        }
       </div>
     }
 
@@ -676,21 +275,11 @@
           <header>
             <h2>{{ s.instrumentName }}</h2>
             <p>{{ s.lastSignal }}</p>
-            @if (s.strategyName) {
-              <p class="strategy-running">Running · {{ s.strategyName }}</p>
-            }
           </header>
 
           <div class="phase-pill" [attr.data-phase]="s.livePhase">
             {{ s.livePhaseLabel }}
           </div>
-
-          @if (s.livePhase === 'target_hit') {
-            <div class="target-banner" role="status">
-              <strong>Target achieved</strong>
-              <span>{{ s.lastExitReason }} · {{ fmtTime(s.lastExitTime) }}</span>
-            </div>
-          }
 
           @if (s.openTrade; as o) {
             <div
@@ -698,213 +287,57 @@
               role="status"
               [class.blocked]="snapshot().realOrders && !s.brokerEntryOrderId"
             >
-              <div class="trade-live-head">
-                <strong>
-                  @if (snapshot().realOrders && s.brokerEntryOrderId) {
-                    Live on Kite
-                  } @else if (snapshot().realOrders) {
-                    Desk signal · NOT on Kite
-                  } @else {
-                    Trade open (paper)
-                  }
-                </strong>
-                <span>
-                  {{ optionLegLabel(o) }} · {{ o.option?.tradingSymbol ?? 'ATM option' }}
-                  @if (snapshot().realOrders && s.brokerEntryOrderId) {
-                    · Kite order active · waiting for target / SL / EMA / 15:15
-                  } @else if (snapshot().realOrders) {
-                    · check Event log / Instruments refresh
-                  } @else {
-                    · tick Real Orders to send MIS to Kite
-                  }
-                </span>
+              <div class="tlp-head">
+                <strong>{{ optionLegLabel(o) }}</strong>
+                <span>{{ o.option?.tradingSymbol || 'ATM' }}</span>
               </div>
-
-              @if (s.kiteBlockReason) {
-                <div
-                  class="kite-block-banner"
-                  [class.pre-start]="s.preStartSignal"
-                  [attr.role]="s.preStartSignal ? 'status' : 'alert'"
-                >
-                  <strong>{{
-                    s.preStartSignal ? 'Started mid-signal — not chased' : 'Kite order blocked'
-                  }}</strong>
-                  <span>{{ s.kiteBlockReason }}</span>
-                </div>
-              }
-
-              <div class="levels-block">
-                <p class="levels-caption">Index levels</p>
-                <div class="levels-row levels-row-live">
-                  <div>
-                    <span>Entry</span>
-                    <strong>{{ o.indexEntry | number: '1.1-1' }}</strong>
-                  </div>
-                  <div>
-                    <span>SL</span>
-                    <strong class="sl">{{ o.indexStop | number: '1.1-1' }}</strong>
-                  </div>
-                  <div>
-                    <span>Target</span>
-                    <strong class="tgt">{{ o.indexTarget | number: '1.1-1' }}</strong>
-                  </div>
-                </div>
-              </div>
-
-              <div class="levels-block">
-                <p class="levels-caption">Option prices</p>
-                <div class="levels-row levels-row-live">
-                  <div>
-                    <span>Entry</span>
-                    <strong>
-                      @if (o.optionEntryPremium != null) {
-                        {{ o.optionEntryPremium | number: '1.2-2' }}
-                      } @else {
-                        —
-                      }
-                    </strong>
-                  </div>
-                  <div>
-                    <span>SL-M</span>
-                    <strong class="sl">
-                      @if (s.brokerSlTrigger != null) {
-                        {{ s.brokerSlTrigger | number: '1.2-2' }}
-                      } @else if (optionStopPremium(o); as stopPrem) {
-                        {{ stopPrem | number: '1.2-2' }}
-                      } @else {
-                        —
-                      }
-                    </strong>
-                  </div>
-                  <div>
-                    <span>Target</span>
-                    <strong class="tgt">
-                      @if (optionTargetPremium(o); as tgtPrem) {
-                        {{ tgtPrem | number: '1.2-2' }}
-                      } @else {
-                        —
-                      }
-                    </strong>
-                  </div>
-                </div>
-                <small class="levels-note">
-                  {{ optionDeltaNote(o) }}
-                </small>
-              </div>
-
-              @if (s.brokerEntryOrderId || s.brokerSlTrigger != null) {
-                <div class="broker-live-meta">
+              @if (snapshot().realOrders) {
+                <p class="tlp-kite">
                   @if (s.brokerEntryOrderId) {
-                    <span>Entry order {{ s.brokerEntryOrderId }}</span>
+                    On Kite · entry {{ s.brokerEntryOrderId }}
+                  } @else {
+                    Waiting for Kite entry…
                   }
-                  @if (s.brokerSlOrderId) {
-                    <span>SL-M order {{ s.brokerSlOrderId }}</span>
-                  }
-                </div>
+                </p>
               }
             </div>
-          } @else if (s.livePhase === 'waiting') {
-            <p class="waiting-copy">
-              @if (s.lastSignal && s.lastSignal !== 'Waiting') {
-                {{ s.instrumentName }} · {{ s.lastSignal }}
-              } @else {
-                Scanning for {{ s.strategyName || 'assigned strategy' }} — no setup yet
-              }
-            </p>
-          } @else if (s.lastExitReason) {
-            <p class="waiting-copy">Last exit: {{ s.lastExitReason }} · {{ fmtTime(s.lastExitTime) }}</p>
           }
 
-          <div class="chosen-option" [class.missing]="!s.chosenOption" [class.synthetic]="s.chosenOption?.source === 'synthetic'">
-            <span class="chosen-label">Chosen instrument</span>
-            @if (s.chosenOption; as opt) {
-              <strong class="chosen-symbol">{{ opt.tradingSymbol }}</strong>
-              <div class="chosen-meta">
-                @if (s.chosenBias) {
-                  <span class="dir" [attr.data-dir]="s.chosenBias">{{ s.chosenBias }} → {{ opt.optionType }}</span>
-                }
-                <span>Strike {{ opt.strike | number: '1.0-0' }}</span>
-                <span>Exp {{ opt.expiry || '—' }}</span>
-                @if (opt.instrumentToken > 0) {
-                  <span>Token {{ opt.instrumentToken }}</span>
-                }
-                <span>Lot {{ opt.lotSize }}</span>
-                @if (opt.source === 'synthetic') {
-                  <span class="est">synthetic (not in today’s chain)</span>
-                } @else {
-                  <span class="ok">from Kite chain</span>
-                }
-              </div>
-              @if (s.indexSpot != null) {
-                <small>ATM vs spot {{ s.indexSpot | number: '1.1-1' }} · as of {{ fmtTime(s.chosenAsOf) }}</small>
-              }
-            } @else {
-              <strong class="chosen-symbol muted">No option resolved yet</strong>
-              <small>Press Start · needs index candles + instruments (Settings → Refresh if empty)</small>
-            }
-          </div>
-
-          <div class="status-metrics">
+          <dl class="status-stats">
             <div>
-              <span>Profit ₹</span>
-              <strong [class.up]="s.dayNetOptionRs > 0" [class.down]="s.dayNetOptionRs < 0">
+              <dt>Day ₹</dt>
+              <dd
+                class="num"
+                [class.up]="s.dayNetOptionRs > 0"
+                [class.down]="s.dayNetOptionRs < 0"
+              >
                 {{ s.dayNetOptionRs > 0 ? '+' : '' }}{{ s.dayNetOptionRs | number: '1.0-0' }}
-              </strong>
+              </dd>
             </div>
             <div>
-              <span>Closed</span>
-              <strong>
-                {{ s.tradesToday }}@if (s.maxTradesPerDay && s.maxTradesPerDay > 0) {
-                  / {{ s.maxTradesPerDay }}
-                }
-              </strong>
+              <dt>Trades</dt>
+              <dd>{{ s.tradesToday }}</dd>
             </div>
-          </div>
-          @if (s.openTrade; as o) {
-            <div class="open-strip">
-              <span class="dir" [attr.data-dir]="o.direction">{{ optionLegLabel(o) }}</span>
-              <span>{{ o.option?.tradingSymbol ?? 'ATM option pending' }}</span>
-              <span>
-                Idx E {{ o.indexEntry | number: '1.1-1' }} → Tgt {{ o.indexTarget | number: '1.1-1' }}
-                @if (o.optionEntryPremium != null) {
-                  · Opt E {{ o.optionEntryPremium | number: '1.2-2' }}
-                }
-                @if (optionTargetPremium(o); as tgtPrem) {
-                  → Tgt {{ tgtPrem | number: '1.2-2' }}
-                }
-              </span>
-            </div>
-          }
+          </dl>
         </article>
       }
     </div>
   }
 
-  @if (snapshot().orderSummary.length || snapshot().orderEvents.length) {
-    <div class="trades-block orders-block">
-      <div class="trades-head">
-        <h3>Live order summary</h3>
-        <p>
-          Full Kite session book — Nifty ×{{ niftyLots }} · Bank ×{{ bankLots
-          }}{{ showCrude() ? ' · Crude ×' + crudeLots : ''
-          }}{{ showNatGas() ? ' · Nat Gas ×' + natGasLots : '' }} · statuses refresh every tick
-        </p>
-      </div>
+  @if (mode() === 'live' && snapshot().realOrders && (snapshot().orderSummary.length || snapshot().orderEvents.length)) {
+    <div class="orders-block">
+      <h3>Kite orders</h3>
       @if (snapshot().orderSummary.length) {
         <div class="table-scroll">
-          <table class="order-summary-table">
+          <table>
             <thead>
               <tr>
-                <th>When</th>
-                <th>Index</th>
+                <th>Time</th>
+                <th>Book</th>
                 <th>Symbol</th>
-                <th>Qty</th>
                 <th>Leg</th>
-                <th>Side</th>
-                <th>Order ID</th>
                 <th>Status</th>
                 <th>Avg</th>
-                <th>Trigger</th>
               </tr>
             </thead>
             <tbody>
@@ -913,15 +346,11 @@
                   <td>{{ fmtTime(r.at) }}</td>
                   <td>{{ r.instrumentName }}</td>
                   <td class="mono">{{ r.tradingSymbol }}</td>
-                  <td>{{ r.quantity }}</td>
                   <td><span class="leg-pill">{{ r.leg }}</span></td>
-                  <td>{{ r.side }}</td>
-                  <td class="mono">{{ r.orderId }}</td>
                   <td>
                     <span class="status-pill" [attr.data-status]="r.status">{{ r.status }}</span>
                   </td>
                   <td>{{ r.averagePrice != null ? (r.averagePrice | number: '1.2-2') : '—' }}</td>
-                  <td>{{ r.triggerPrice != null ? (r.triggerPrice | number: '1.2-2') : '—' }}</td>
                 </tr>
               }
             </tbody>
@@ -930,15 +359,12 @@
       }
       @if (snapshot().orderEvents.length) {
         <details class="order-log-details" [open]="hasKiteBlockEvents()">
-          <summary>Event log ({{ snapshot().orderEvents.length }})</summary>
+          <summary>Events ({{ snapshot().orderEvents.length }})</summary>
           <ul class="order-log">
             @for (e of snapshot().orderEvents; track e.at + e.detail) {
               <li [attr.data-action]="e.action">
                 <strong>{{ e.action }}</strong>
                 <span>{{ e.instrumentName || e.instrumentId }} · {{ e.detail }}</span>
-                @if (e.orderId) {
-                  <small>Order {{ e.orderId }}</small>
-                }
               </li>
             }
           </ul>
@@ -950,21 +376,7 @@
   @if (resultView().trades.length) {
     <div class="trades-block">
       <div class="trades-head">
-        <h3>{{ snapshot().realOrders ? 'Kite fills' : 'Paper trades' }}</h3>
-        <p>
-          @if (snapshot().realOrders) {
-            Profit ₹ = Kite fill money (same as Positions). Desk PE ghosts stay hidden.
-          } @else {
-            Profit ₹ = option premium × lot, filled the way Live can: entry at the next bar's
-            open, stop and target intrabar. Signals that finish before the desk could act are
-            not counted.
-            @if (resultView().totals.premiumEstimatedCount) {
-              {{ resultView().totals.premiumEstimatedCount }} of
-              {{ resultView().totals.trades }} leg(s) estimated at ATM delta (no option bars) —
-              marked <em>est.</em>
-            }
-          }
-        </p>
+        <h3>{{ snapshot().realOrders ? 'Kite fills' : 'Trades' }}</h3>
         <button
           mat-stroked-button
           type="button"
@@ -1012,87 +424,10 @@
                   {{ t.optionExitPremium | number: '1.2-2' }}</span
                 >
               }
-              @if (t.premiumEstimated) {
-                <span class="est-tag">est. — no option bars</span>
-              }
             </div>
             <p class="trade-card-exit">{{ t.exitReason }}</p>
           </article>
         }
-      </div>
-
-      <div class="table-scroll trade-table-desktop">
-        <table>
-          <thead>
-            <tr>
-              <th>Day</th>
-              <th>When</th>
-              <th>Index</th>
-              <th>Dir</th>
-              <th>Instrument</th>
-              <th>Prem in/out</th>
-              <th>Profit ₹</th>
-              <th>Exit</th>
-            </tr>
-          </thead>
-          <tbody>
-            @for (t of resultView().trades; track t.id) {
-              <tr
-                [class.win]="hasTradeProfitRs(t) && tradeProfitRs(t) > 0"
-                [class.loss]="hasTradeProfitRs(t) && tradeProfitRs(t) < 0"
-              >
-                <td>
-                  <div class="stack">
-                    <strong>{{ fmtWeekday(t.entryTime) }}</strong>
-                    <small>{{ fmtDisplayDate(t.entryTime) }}</small>
-                  </div>
-                </td>
-                <td>
-                  <div class="stack">
-                    <strong>{{ fmtClock(t.entryTime) }}</strong>
-                    <small>{{ fmtClock(t.exitTime) }}</small>
-                  </div>
-                </td>
-                <td>{{ t.instrumentName }}</td>
-                <td>
-                  <span class="dir" [attr.data-dir]="t.direction">{{ optionLegLabel(t) }}</span>
-                </td>
-                <td>
-                  @if (t.option; as opt) {
-                    <div class="stack">
-                      <strong>{{ opt.tradingSymbol }}</strong>
-                      <small>bought {{ opt.optionType }} · {{ opt.strike | number: '1.0-0' }}</small>
-                    </div>
-                  } @else {
-                    <span class="muted">—</span>
-                  }
-                </td>
-                <td>
-                  @if (t.optionEntryPremium != null && t.optionExitPremium != null && hasTradeProfitRs(t)) {
-                    {{ t.optionEntryPremium | number: '1.2-2' }} → {{ t.optionExitPremium | number: '1.2-2' }}
-                  } @else {
-                    —
-                  }
-                </td>
-                <td
-                  class="num"
-                  [class.up]="hasTradeProfitRs(t) && tradeProfitRs(t) > 0"
-                  [class.down]="hasTradeProfitRs(t) && tradeProfitRs(t) < 0"
-                >
-                  @if (hasTradeProfitRs(t)) {
-                    <strong
-                      >{{ tradeProfitRs(t) > 0 ? '+' : ''
-                      }}{{ tradeProfitRs(t) | number: '1.0-0' }}</strong
-                    >
-                  } @else {
-                    <strong class="muted">—</strong>
-                  }
-                </td>
-                <td><small>{{ t.exitReason }}</small></td>
-              </tr>
-            }
-          </tbody>
-        </table>
       </div>
     </div>
   }
