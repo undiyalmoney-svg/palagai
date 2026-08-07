@@ -5,8 +5,8 @@
       <h1>{{ handsOffAgent && mode() === 'live' ? 'Live Agent' : 'Trade Desk' }}</h1>
       <p class="pg-lede">
         @if (handsOffAgent && mode() === 'live') {
-          <strong>Get Token</strong> → press <strong>Start</strong> (any morning time) → leave the tab open →
-          <strong>Stop after 3:15</strong>. No other clicks. Capital guards stay on.
+          <strong>Get Token</strong> → set capital if it changed → press <strong>Start</strong> → leave the tab open →
+          <strong>Stop after 3:15</strong>. Lots/books stay auto. Capital guards stay on.
         } @else {
           Enter capital → desk auto-allocates lots and trades Trap / Crude Selective.
           Your job: <strong>Get Token</strong> daily, press <strong>Start</strong>, keep this tab open.
@@ -379,9 +379,9 @@
           <li [class.done]="hasKiteSession()">
             <a routerLink="/dashboard/get-token">Get Token</a> — once per day
           </li>
+          <li>Update capital if profits grew (lots auto-size)</li>
           <li>Press <strong>Start</strong> — any morning time is fine</li>
-          <li>Leave this tab open — do not touch anything</li>
-          <li>After <strong>3:15</strong> press <strong>Stop</strong></li>
+          <li>Leave this tab open — after <strong>3:15</strong> press <strong>Stop</strong></li>
         </ol>
       </aside>
       @if (!handsOffAgent) {
