@@ -1,6 +1,9 @@
 /**
  * Angular-free entry for Server Live strategy bundle (esbuild → Order-API).
  * Exports Trap / Genie adapters + replay + ATM helpers used by the DO worker.
+ *
+ * Trap DNA MUST match Trade Desk / SrTrapConfirmManagedStrategy
+ * (pierce20 · Bank40 · peak₹100 · max3 · 3.5R · dayStop 60).
  */
 import {
   BANK_NIFTY_INSTRUMENT,
@@ -19,6 +22,10 @@ import {
   resolveCrudeStrategyProfile,
 } from '../../src/app/core/strategy-engine/strategies/crude-pdhl-evening/crude-strategy-profile';
 import { MANAGED_STRATEGY_IDS } from '../../src/app/core/strategy-manager/config/managed-strategy-ids';
+import {
+  TRAP_1LOT_DAILY_DNA_EXTRAS,
+  dnaCapsForStrategy,
+} from '../../src/app/core/strategy-manager/config/strategy-dna-caps';
 import {
   applySlConfirmCutoff,
   armPeakTrailFloor,
@@ -54,6 +61,9 @@ import { resolveAtmWeeklyOption } from '../../src/app/core/utils/option-chain.ut
 import { resolveAtmCrudeMiniOption } from '../../src/app/core/utils/crude-option.util';
 import { resolveCrudeOilMiniFuturesToken } from '../../src/app/core/utils/instrument-resolver.util';
 
+const trapCaps = dnaCapsForStrategy(MANAGED_STRATEGY_IDS.SR_TRAP_CONFIRM, 'nifty');
+
+/** Same DNA as Trade Desk Trap (Paper ≡ Local Live ≡ Autobot). */
 const TRAP_DEFAULTS = defaultStrategySettings({
   entryTimeStart: '09:45',
   entryTimeEnd: '14:45',
@@ -62,11 +72,11 @@ const TRAP_DEFAULTS = defaultStrategySettings({
   stopLossPts: 30,
   bankStopLossPts: 50,
   emaLength: 50,
-  maxTradesPerDay: 0,
+  maxTradesPerDay: trapCaps.maxTradesPerDay,
   instrumentType: 'futures',
-  dayStopPts: 80,
+  dayStopPts: 60,
   dayProfitLockPts: 0,
-  targetRMultiple: 3.5,
+  targetRMultiple: trapCaps.targetRMultiple ?? 3.5,
   profitProtectEnabled: true,
   profitProtectArmR: 1,
   profitProtectLockR: 0,
@@ -75,18 +85,11 @@ const TRAP_DEFAULTS = defaultStrategySettings({
   extras: {
     trapMode: 'both',
     swingLb: 5,
-    piercePts: 3,
     minRiskPts: 4,
     maxRiskPts: 28,
     slPadPts: 2,
     minConfirmBody: 0,
-    profitLockArmRs: 600,
-    profitLockLockRs: 300,
-    profitLockGivebackRs: 300,
-    slConfirmCutoffEnabled: true,
-    slConfirmCutoffFracR: 0.55,
-    slConfirmCutoffMaxMfeR: 0.75,
-    slConfirmSoftRs: 700,
+    ...TRAP_1LOT_DAILY_DNA_EXTRAS,
   },
 });
 
@@ -124,8 +127,9 @@ function createTrapStrategy(): IManagedStrategy {
   const api: IManagedStrategy = {
     id: MANAGED_STRATEGY_IDS.SR_TRAP_CONFIRM,
     name: 'Trap',
-    version: '1.0.0',
-    description: 'Server Live Trap',
+    version: '1.2.0',
+    description:
+      'Server Live Trap · pierce20 · Bank40 · peak₹100 · max3 · 3.5R · Paper≡Live',
     supports: ['nifty', 'bank'],
     defaultSettings: TRAP_DEFAULTS,
     initialize(partial) {
