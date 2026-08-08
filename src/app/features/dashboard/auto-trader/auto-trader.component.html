@@ -149,16 +149,17 @@
     }
   </div>
 
-  @if (mode() === 'live') {
-    <div class="control-bar sub-actions">
-      <button mat-stroked-button type="button" (click)="pushKiteAuth()" [disabled]="busy()">
-        Push Kite token to server
-      </button>
+  <div class="control-bar sub-actions">
+    <a mat-stroked-button routerLink="/dashboard/get-token">Get Token</a>
+    <button mat-stroked-button type="button" (click)="pushKiteAuth()" [disabled]="busy()">
+      Push Kite token to server
+    </button>
+    @if (mode() === 'live') {
       <button mat-stroked-button type="button" (click)="refreshStatus()" [disabled]="busy()">
         Refresh
       </button>
-    </div>
-  }
+    }
+  </div>
 
   <!-- ── PAPER: backend backtest results (same engine as Live) ── -->
   @if (mode() === 'paper') {
@@ -276,7 +277,8 @@
     } @else {
       <p class="pg-lede sub">
         Pick a From → To range and press <strong>Run Paper backtest</strong>. The DigitalOcean backend
-        replays those days on the same Trap engine as Live and returns trades + P&amp;L.
+        replays those days on the same Trap engine as Live and returns trades + P&amp;L. Needs a Kite
+        token — <strong>Get Token</strong>, or <strong>Push Kite token to server</strong> once.
       </p>
     }
   }

@@ -338,11 +338,6 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
    */
   protected async runBacktest(): Promise<void> {
     this.backtestError.set('');
-    const kite = this.kiteSession.getAuthorizationHeader();
-    if (!kite) {
-      this.backtestError.set('No Kite session — open Get Token first, then run Paper.');
-      return;
-    }
     if (!this.fromDate || !this.toDate || this.fromDate > this.toDate) {
       this.backtestError.set('Pick a valid From → To range.');
       return;
@@ -353,6 +348,10 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
       this.backtestError.set('Desk plan has no books — check capital (min ₹10,000).');
       return;
     }
+    // Send the browser Kite session if present; otherwise the backend falls back
+    // to the token pushed via "Push Kite token to server".
+    const kite = this.kiteSession.getAuthorizationHeader();
+    const headers: Record<string, string> = kite ? { 'X-Kite-Authorization': kite } : {};
     this.backtestBusy.set(true);
     try {
       const res = await firstValueFrom(
@@ -373,7 +372,7 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
             dayProfitLock: this.dayProfitLock,
             strictDayStop: this.strictDayStop,
           },
-          { headers: { 'X-Kite-Authorization': kite } },
+          { headers },
         ),
       );
       this.backtest.set(res);
@@ -381,7 +380,8 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
         `Paper backtest ${res.fromDate} → ${res.toDate}: ${res.totals.trades} trades · net ₹${res.totals.optionNetAfterChargesRs.toLocaleString('en-IN')} (backend replay).`,
       );
     } catch (err) {
-      this.backtestError.set(formatUnknownError(err, 'Backtest'));
+      const backendMsg = (err as { error?: { message?: string } })?.error?.message;
+      this.backtestError.set(backendMsg || formatUnknownError(err, 'Backtest'));
     } finally {
       this.backtestBusy.set(false);
     }
