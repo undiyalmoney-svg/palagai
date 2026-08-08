@@ -1,16 +1,30 @@
-import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
+import { DecimalPipe } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { firstValueFrom } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 import { KiteSessionService } from '../../../core/kite/kite-session.service';
 import { KiteApiService } from '../../../core/kite/kite-api.service';
 import { formatUnknownError } from '../../../core/utils/kite-error.util';
 import { UiDialogService } from '../../../shared/ui/dialog/ui-dialog.service';
+import { APP_BUILD_LABEL } from '../../../core/config/app-build';
+import {
+  CapitalLotPlan,
+  DEFAULT_TRADING_CAPITAL_RS,
+  planLotsForCapital,
+} from '../../../core/paper-desk/capital-plan.util';
+import { CapitalPreferenceService } from '../../../core/services/capital-preference.service';
 
 type BankStrategy = 'trap' | 'genie';
 type RunStatus = 'running' | 'stopping' | 'stopped' | 'error' | 'unknown';
+
+/** Same ₹ bands as Trade Desk + Order-API daily-desk-defaults (1-lot base). */
+const DAY_PROFIT_LOCK_PER_LOT_RS = 3_000;
+const STRICT_DAY_STOP_PER_LOT_RS = 2_950;
 
 interface LiveStatus {
   status: RunStatus;
@@ -28,6 +42,8 @@ interface LiveStatus {
     bankStrategy: BankStrategy;
     niftyStrategy: 'trap';
     crudeStrategy: 'selective' | 'all-green';
+    dayProfitLock?: boolean;
+    strictDayStop?: boolean;
     realOrders: boolean;
   } | null;
   events?: Array<{ at: string; action: string; detail: string }>;
@@ -42,7 +58,7 @@ interface OrderCheckLine {
 @Component({
   selector: 'app-auto-trader',
   standalone: true,
-  imports: [FormsModule, MatButtonModule],
+  imports: [FormsModule, DecimalPipe, MatButtonModule, MatProgressSpinnerModule, RouterLink],
   templateUrl: './auto-trader.component.html',
   styleUrl: './auto-trader.component.css',
 })
@@ -51,9 +67,13 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
   private readonly kiteSession = inject(KiteSessionService);
   private readonly kiteApi = inject(KiteApiService);
   private readonly uiDialog = inject(UiDialogService);
+  private readonly capitalPreference = inject(CapitalPreferenceService);
   private pollTimer: ReturnType<typeof setInterval> | null = null;
 
-  /** Same-origin proxy → DO Order-API /live (new paths only). */
+  /** Visible build stamp — same badge as Trade Desk so deploys are verifiable. */
+  protected readonly appBuildLabel = APP_BUILD_LABEL;
+
+  /** Same-origin proxy → DO Order-API /live (server-side control plane). */
   private readonly liveApiBase =
     (environment as { liveApiBaseUrl?: string }).liveApiBaseUrl || '/api/live';
 
@@ -64,15 +84,25 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
   private readonly testSymbol = 'RELIANCE';
   private readonly testExchange = 'NSE';
 
+  /**
+   * Capital → lots, exactly like Trade Desk. Client sets capital once; the
+   * desk plan sizes Nifty + Bank books and the ₹ lock / strict-stop bands.
+   */
+  protected capitalRs = DEFAULT_TRADING_CAPITAL_RS;
+  protected capitalDraft = String(DEFAULT_TRADING_CAPITAL_RS);
+  protected capitalPlan: CapitalLotPlan = planLotsForCapital(DEFAULT_TRADING_CAPITAL_RS);
+
+  /** Index books only — Crude is not on the desk (fee protection). */
   protected enableNifty = true;
   protected enableBank = true;
-  /** Off by default — Aug 3 All-Green Autobot fee churn (~₹1k). Opt in only. */
-  protected enableCrude = false;
   protected niftyLots = 1;
   protected bankLots = 1;
-  protected crudeLots = 1;
-  /** Only Bank is selectable — Nifty=Trap, Crude=Selective (charge-aware) when enabled. */
+  /** Daily path: Trap (Genie only if explicitly chosen). */
   protected bankStrategy: BankStrategy = 'trap';
+  /** Desk risk guards — on by default (capital must not drain). */
+  protected dayProfitLock = true;
+  protected strictDayStop = true;
+  /** When true, the server places real MIS orders via the static-IP Order-API. */
   protected realOrders = false;
   protected testQty = 1;
 
@@ -85,10 +115,19 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
     message: 'Not connected yet',
   });
   protected readonly note = signal(
-    'Server Live on DigitalOcean every 60s. Crude is OFF by default (fee protection). If you enable it, DNA is Selective · max 1/day. Push Kite token, then Start — paper first.',
+    'Server Live on DigitalOcean keeps scanning after Chrome / Wi‑Fi dies. Same desk DNA as Trade Desk: Trap · pierce20/B40 · peak ₹100 · max 3 · lock ₹3k. Set capital → Push Kite token → Start.',
   );
 
+  protected readonly running = computed(() => this.status().status === 'running');
+  protected readonly locked = computed(() => this.busy() || this.running());
+
   ngOnInit(): void {
+    this.capitalRs = this.capitalPreference.get() || DEFAULT_TRADING_CAPITAL_RS;
+    if (this.capitalRs < 10_000) {
+      this.capitalRs = DEFAULT_TRADING_CAPITAL_RS;
+    }
+    this.capitalDraft = String(this.capitalRs);
+    this.applyCapitalAllocation();
     void this.refreshStatus();
     this.pollTimer = setInterval(() => void this.refreshStatus(), 15_000);
   }
@@ -100,21 +139,93 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
     }
   }
 
+  /** Commit capital on blur / Enter only — never while typing (keeps field editable). */
+  protected commitCapital(): void {
+    const parsed = Math.floor(Number(String(this.capitalDraft).replace(/[,_\s]/g, '')));
+    const next = Math.max(
+      10_000,
+      Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_TRADING_CAPITAL_RS,
+    );
+    this.capitalRs = next;
+    this.capitalDraft = String(next);
+    this.capitalPreference.set(next);
+    if (this.locked()) {
+      return;
+    }
+    this.applyCapitalAllocation();
+  }
+
+  protected onCapitalDraftChange(raw: string): void {
+    this.capitalDraft = raw;
+  }
+
+  /** Size Nifty + Bank from total capital — more capital → more lots. */
+  private applyCapitalAllocation(): void {
+    const plan = planLotsForCapital(this.capitalRs);
+    this.capitalPlan = plan;
+    this.enableNifty = plan.enableNifty;
+    this.enableBank = plan.enableBank;
+    this.niftyLots = plan.enableNifty ? Math.max(1, plan.niftyLots) : 0;
+    this.bankLots = plan.enableBank ? Math.max(1, plan.bankLots) : 0;
+  }
+
+  protected allocationSummary(): string {
+    const bits = [
+      this.enableNifty ? `Nifty ×${this.niftyLots}` : null,
+      this.enableBank ? `Bank ×${this.bankLots}` : null,
+    ].filter(Boolean);
+    return bits.join(' · ') || 'no books';
+  }
+
+  protected hasKiteSession(): boolean {
+    return !!this.kiteSession.getAuthorizationHeader();
+  }
+
+  /** Lots used for ₹ lock/stop labels (Nifty when on; else Bank). */
+  protected deskRiskLots(): number {
+    if (this.enableBank && !this.enableNifty) {
+      return Math.max(1, Math.floor(Number(this.bankLots)) || 1);
+    }
+    return Math.max(1, Math.floor(Number(this.niftyLots)) || 1);
+  }
+
+  protected profitLockMoneyRs(): number {
+    if (this.capitalPlan.dayProfitLockRs > 0) {
+      return this.capitalPlan.dayProfitLockRs;
+    }
+    return DAY_PROFIT_LOCK_PER_LOT_RS * this.deskRiskLots();
+  }
+
+  protected strictStopMoneyRs(): number {
+    return STRICT_DAY_STOP_PER_LOT_RS * this.deskRiskLots();
+  }
+
+  protected riskLabels(): string[] {
+    const parts: string[] = [];
+    if (this.strictDayStop) {
+      parts.push(`strict −₹${this.strictStopMoneyRs().toLocaleString('en-IN')}`);
+    }
+    if (this.dayProfitLock) {
+      parts.push(`profit lock +₹${this.profitLockMoneyRs().toLocaleString('en-IN')}`);
+    }
+    return parts;
+  }
+
   protected async refreshStatus(): Promise<void> {
     try {
       const res = await firstValueFrom(
         this.http.get<LiveStatus>(`${this.liveApiBase}/status`),
       );
       this.status.set(res);
-      // Only mirror books while running — do not re-check Crude from an old All-Green session.
+      // Mirror the running server config into the UI (so the desk shows truth).
       if (res.config && res.status === 'running') {
         this.enableNifty = !!res.config.enableNifty;
         this.enableBank = !!res.config.enableBank;
-        this.enableCrude = !!res.config.enableCrude;
         this.niftyLots = res.config.niftyLots || 1;
         this.bankLots = res.config.bankLots || 1;
-        this.crudeLots = res.config.crudeLots || 1;
         this.bankStrategy = res.config.bankStrategy === 'genie' ? 'genie' : 'trap';
+        this.dayProfitLock = res.config.dayProfitLock !== false;
+        this.strictDayStop = res.config.strictDayStop !== false;
         this.realOrders = !!res.config.realOrders;
       }
     } catch {
@@ -129,15 +240,21 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
   }
 
   protected async start(): Promise<void> {
+    this.commitCapital();
+    this.applyCapitalAllocation();
+    if (!this.enableNifty && !this.enableBank) {
+      this.note.set('Desk plan has no books — check capital (min ₹10,000).');
+      return;
+    }
     if (this.realOrders) {
+      const riskBits = this.riskLabels().join(' · ');
       const ok = await this.uiDialog.confirm({
         title: 'Start server live with real money?',
         message:
-          'Orders go via DigitalOcean static IP Order-API.\nChrome can close — worker keeps scanning.\n\nNifty = Trap · Bank = ' +
-          (this.bankStrategy === 'genie' ? 'Genie' : 'Trap') +
-          (this.enableCrude
-            ? ' · Crude = Selective (max 1/day)'
-            : ' · Crude = OFF'),
+          `Real Kite MIS orders on ATM options via the DigitalOcean static-IP Order-API.\n` +
+          `Books: ${this.allocationSummary()} · Trap DNA.\n` +
+          (riskBits ? `Risk: ${riskBits}.\n` : '') +
+          `\nChrome can close — the server worker keeps scanning.`,
         confirmLabel: 'Start live',
         cancelLabel: 'Cancel',
         tone: 'danger',
@@ -152,13 +269,15 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
         this.http.post(`${this.liveApiBase}/start`, {
           enableNifty: this.enableNifty,
           enableBank: this.enableBank,
-          enableCrude: this.enableCrude,
+          enableCrude: false,
           niftyLots: Math.max(1, Math.floor(this.niftyLots) || 1),
           bankLots: Math.max(1, Math.floor(this.bankLots) || 1),
-          crudeLots: Math.max(1, Math.floor(this.crudeLots) || 1),
+          crudeLots: 1,
           bankStrategy: this.bankStrategy,
           niftyStrategy: 'trap',
           crudeStrategy: 'selective',
+          dayProfitLock: this.dayProfitLock,
+          strictDayStop: this.strictDayStop,
           realOrders: this.realOrders,
         }),
       );
@@ -209,6 +328,13 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
     } finally {
       this.busy.set(false);
     }
+  }
+
+  protected fmtTime(ts: string | null | undefined): string {
+    if (!ts) {
+      return '—';
+    }
+    return ts.replace('T', ' ').slice(0, 16);
   }
 
   /** 1) Order-API health — proves static-IP door is up (no money). */
