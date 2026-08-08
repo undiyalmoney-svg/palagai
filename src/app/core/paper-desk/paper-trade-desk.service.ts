@@ -41,6 +41,7 @@ import {
   nowIstStamp,
   staleStartReason,
 } from '../live-desk/live-start-guard.util';
+import { INDEX_SESSION_EXIT_HHMM } from '../live-desk/live-drain-hold.util';
 import { dropFormingBars } from './forming-bar.util';
 import {
   missedRoundTripReason,
@@ -232,7 +233,7 @@ export class PaperTradeDeskService {
   cancelRun(options?: { silent?: boolean }): void {
     const wasBusy = this.busy();
     this.runGeneration += 1;
-    this.stopLive();
+    void this.stopLive({ flatten: this.snapshot().realOrders });
     this.busy.set(false);
     if (options?.silent) {
       return;
@@ -1018,7 +1019,7 @@ export class PaperTradeDeskService {
         message: formatUnknownError(err, 'Testing'),
         kiteStats: this.kiteStats(),
       });
-      this.stopLive();
+      void this.stopLive({ flatten: false });
       throw err;
     } finally {
       if (runId === this.runGeneration) {
@@ -1027,21 +1028,47 @@ export class PaperTradeDeskService {
     }
   }
 
-  stopLive(): void {
+  /**
+   * Stop polling. On Live money, MARKET-flatten any open MIS first
+   * (owner Stop after 15:15 must square off — never leave drain-HOLD legs).
+   */
+  async stopLive(opts?: { flatten?: boolean; reason?: string }): Promise<void> {
     if (this.liveTimer) {
       clearInterval(this.liveTimer);
       this.liveTimer = null;
     }
     const cur = this.snapshot();
-    if (cur.mode === 'live' && cur.running) {
+    let flattenBit = '';
+    const doFlatten = opts?.flatten !== false && cur.mode === 'live' && cur.realOrders;
+    if (doFlatten) {
+      try {
+        const authorization = this.kiteSession.getAuthorizationHeader();
+        if (authorization && this.liveOrders.hasOpenPositions()) {
+          const r = await this.liveOrders.flattenAllOpen(
+            authorization,
+            opts?.reason ?? 'Stop — flatten open MIS',
+          );
+          flattenBit =
+            r.attempted > 0
+              ? ` · flattened ${r.flat}/${r.attempted}`
+              : ' · no open MIS';
+        } else if (authorization) {
+          flattenBit = ' · no open MIS';
+        }
+      } catch (err) {
+        flattenBit = ` · flatten failed: ${formatUnknownError(err, 'flatten')}`;
+      }
+    }
+    if (cur.mode === 'live' && (cur.running || flattenBit)) {
+      const base = cur.message.includes('complete')
+        ? cur.message
+        : cur.realOrders
+          ? `Live money stopped${flattenBit}`
+          : 'Live paper stopped';
       this.snapshot.set({
         ...cur,
         running: false,
-        message: cur.message.includes('complete')
-          ? cur.message
-          : cur.realOrders
-            ? 'Live money stopped — check Kite for open MIS positions'
-            : 'Live paper stopped',
+        message: base,
         orderEvents: this.liveOrders.getEvents(),
         orderSummary: this.liveOrders.getOrderSummary(),
       });
@@ -1065,18 +1092,25 @@ export class PaperTradeDeskService {
     const now = istNowHhMm();
     const anyIndexLegs = this.liveLegs.length > 0;
 
+    // Backup stop after broker square-off window; primary EOD is 15:15 flatten below.
     if (now > '15:30') {
+      await this.stopLive({
+        flatten: true,
+        reason: 'Market closed (after 15:30) — flatten open MIS',
+      });
       this.snapshot.update((s) => ({
         ...s,
         marketOpen: false,
         running: false,
-        message: 'Market closed (after 15:30). Live paper stopped.',
+        message: s.realOrders
+          ? 'Market closed (after 15:30). Live money stopped — MIS flattened.'
+          : 'Market closed (after 15:30). Live paper stopped.',
       }));
-      this.stopLive();
       return;
     }
 
     const indexSessionActive = anyIndexLegs && now >= '09:15' && now <= '15:30';
+    const sessionClosed = now >= INDEX_SESSION_EXIT_HHMM;
 
     if (!indexSessionActive) {
       this.snapshot.update((s) => ({
@@ -1335,20 +1369,23 @@ export class PaperTradeDeskService {
         // Start anytime: never send a leg the strategy opened before Start as a
         // fresh MARKET entry — that chases an edge that is hours old. Legs Kite
         // already holds keep being managed (SL amend / exit) as normal.
-        const stale = isStaleStartSignal({
-          signalEntryTime: s.openTrade?.entryTime,
-          deskStartedAt: this.liveStartedAt,
-          hasBrokerPosition: this.liveOrders.hasOpenPositionFor(
-            s.instrumentId,
-            s.openTrade?.option?.tradingSymbol,
-          ),
-          // Judge on price vs stop, not only the clock.
-          signalEntryPrice: s.openTrade?.indexEntry,
-          signalStopPrice: s.openTrade?.indexStop,
-          currentPrice: s.indexSpot,
-          direction: s.openTrade?.direction,
-        });
-        if (stale && s.openTrade) {
+        // At/after 15:15: never new MARKET entry — only flatten.
+        const stale = sessionClosed
+          ? true
+          : isStaleStartSignal({
+              signalEntryTime: s.openTrade?.entryTime,
+              deskStartedAt: this.liveStartedAt,
+              hasBrokerPosition: this.liveOrders.hasOpenPositionFor(
+                s.instrumentId,
+                s.openTrade?.option?.tradingSymbol,
+              ),
+              // Judge on price vs stop, not only the clock.
+              signalEntryPrice: s.openTrade?.indexEntry,
+              signalStopPrice: s.openTrade?.indexStop,
+              currentPrice: s.indexSpot,
+              direction: s.openTrade?.direction,
+            });
+        if (stale && s.openTrade && !sessionClosed) {
           staleStartIds.set(
             s.instrumentId,
             staleStartReason(s.openTrade.entryTime, this.liveStartedAt),
@@ -1366,28 +1403,32 @@ export class PaperTradeDeskService {
 
         // Pass last exit reason so profit-drained HOLD is not MARKET-dumped on the
         // status sync that follows flush (paper already booked the candle exit).
+        // At 15:15+ force EOD closeReason so drain latch cannot block flatten.
         const lastExit = enriched
           .filter((t) => t.instrumentId === s.instrumentId)
           .sort((a, b) => a.exitTime.localeCompare(b.exitTime))
           .at(-1);
+        const allowNewEntry = !!s.openTrade && !stale && !sessionClosed;
         await this.liveOrders.syncInstrument({
           authorization,
           instrumentId: s.instrumentId,
           instrumentName: s.instrumentName,
           lots: this.lotsForInstrument(s.instrumentId),
-          open:
-            s.openTrade && !stale
-              ? {
-                  direction: s.openTrade.direction,
-                  entryTime: s.openTrade.entryTime,
-                  indexEntry: s.openTrade.indexEntry,
-                  indexStop: s.openTrade.indexStop,
-                  option: s.openTrade.option,
-                  optionEntryPremium: s.openTrade.optionEntryPremium,
-                }
-              : null,
-          closeReason:
-            s.openTrade && !stale ? undefined : (lastExit?.exitReason ?? undefined),
+          open: allowNewEntry
+            ? {
+                direction: s.openTrade!.direction,
+                entryTime: s.openTrade!.entryTime,
+                indexEntry: s.openTrade!.indexEntry,
+                indexStop: s.openTrade!.indexStop,
+                option: s.openTrade!.option,
+                optionEntryPremium: s.openTrade!.optionEntryPremium,
+              }
+            : null,
+          closeReason: sessionClosed
+            ? 'EOD / session exit'
+            : allowNewEntry
+              ? undefined
+              : (lastExit?.exitReason ?? undefined),
         });
         await delay(350);
       }
@@ -1398,6 +1439,11 @@ export class PaperTradeDeskService {
           .map((s) => s.openTrade!.option!.tradingSymbol.toUpperCase()),
       );
       await this.liveOrders.exitUnmappedOrphans(authorization, openSymbols);
+
+      // 15:15+: square off every remaining MIS (including drain-HOLD latches).
+      if (sessionClosed) {
+        await this.liveOrders.flattenAllOpen(authorization, 'EOD / session exit 15:15');
+      }
       for (const s of statuses) {
         const pos =
           this.liveOrders.getPositions().find((p) => p.instrumentId === s.instrumentId) ??
@@ -1512,15 +1558,23 @@ export class PaperTradeDeskService {
       deskOnlyCount > 0
         ? ` · ${deskOnlyCount} desk signal(s) NOT on Kite (hidden from Profit ₹)`
         : '';
+    const brokerStillOpen = this.realOrders && this.liveOrders.hasOpenPositions();
+    // After 15:15: keep polling only while MIS still open (retry flatten); else stop.
+    const keepRunning = !sessionClosed || brokerStillOpen;
+    const eodMsg = sessionClosed
+      ? brokerStillOpen
+        ? `${moneyTag} · ${now} · EOD 15:15 — flattening remaining MIS…`
+        : `${moneyTag} · Session complete 15:15 — all flat. Live stopped.`
+      : `${moneyTag} · alive ${now} · waiting ${waiting} · in trade ${inTrade}${targets ? ` · target hit ${targets}` : ''}${openMsg}${blockedMsg}${deskOnlyMsg} · ${this.kiteStatsLabel()}`;
     this.snapshot.set({
       mode: 'live',
-      running: true,
+      running: keepRunning,
       fromDate: today,
       toDate: today,
-      marketOpen: true,
+      marketOpen: !sessionClosed,
       realOrders: this.realOrders,
       lastTickAt: new Date().toISOString(),
-      message: `${moneyTag} · alive ${now} · waiting ${waiting} · in trade ${inTrade}${targets ? ` · target hit ${targets}` : ''}${openMsg}${blockedMsg}${deskOnlyMsg} · ${this.kiteStatsLabel()}`,
+      message: eodMsg,
       statuses,
       trades: displayTrades.sort((a, b) => b.entryTime.localeCompare(a.entryTime)),
       totals: summarize(displayTrades, (id) => this.lotsForInstrument(id), this.lotsMultiplier),
@@ -1529,6 +1583,10 @@ export class PaperTradeDeskService {
       orderEvents: this.liveOrders.getEvents(),
       orderSummary: this.liveOrders.getOrderSummary(),
     });
+    if (sessionClosed && !brokerStillOpen && this.liveTimer) {
+      clearInterval(this.liveTimer);
+      this.liveTimer = null;
+    }
   }
 
   /**
@@ -2101,13 +2159,9 @@ function todayIso(): string {
   return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
 }
 
+/** IST HH:mm — always zero-padded with colon (never locale `15.15`). */
 function istNowHhMm(): string {
-  return new Date().toLocaleTimeString('en-IN', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-    timeZone: 'Asia/Kolkata',
-  });
+  return nowIstStamp().slice(11, 16);
 }
 
 function delay(ms: number): Promise<void> {

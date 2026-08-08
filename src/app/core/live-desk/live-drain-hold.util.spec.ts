@@ -42,4 +42,22 @@ describe('live-drain-hold.util', () => {
     expect(shouldHoldForRestingSlm('End of range')).toBe(false);
     expect(isRestingExit('End of range')).toBe(false);
   });
+
+  it('never HOLDs drain after 15:15 — must MARKET flatten', () => {
+    const trail = 'Profit drained — cut & rehunt';
+    expect(shouldHoldForRestingSlm(trail, { nowHhMm: '15:15' })).toBe(false);
+    expect(shouldHoldForRestingSlm(trail, { nowHhMm: '15:20' })).toBe(false);
+    expect(shouldHoldForRestingSlm(trail, { sessionClosed: true })).toBe(false);
+    expect(shouldHoldForRestingSlm(trail, { nowHhMm: '14:50' })).toBe(true);
+  });
+
+  it('sessionClosed clears drain latch to EOD reason', () => {
+    expect(
+      effectiveCloseReason({
+        closeReason: null,
+        drainHoldLatched: true,
+        sessionClosed: true,
+      }),
+    ).toBe('EOD / session exit');
+  });
 });

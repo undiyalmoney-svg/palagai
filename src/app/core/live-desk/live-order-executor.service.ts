@@ -18,10 +18,12 @@ import {
 } from './live-adopt.util';
 import {
   effectiveCloseReason,
+  INDEX_SESSION_EXIT_HHMM,
   shouldHoldForRestingSlm,
 } from './live-drain-hold.util';
 import { optionTrailSlTrigger } from '../paper-desk/option-peak-trail.util';
 import { TRAP_1LOT_DAILY_DNA_EXTRAS } from '../strategy-manager/config/strategy-dna-caps';
+import { nowIstStamp } from './live-start-guard.util';
 
 export interface LiveBrokerPosition {
   instrumentId: string;
@@ -414,6 +416,56 @@ export class LiveOrderExecutorService {
     return `Reconcile · adopted ${adopted} · SL placed ${slPlaced}`;
   }
 
+  /** True when any managed leg is still open/exiting at the broker. */
+  hasOpenPositions(): boolean {
+    for (const pos of this.positions.values()) {
+      if (pos.status === 'open' || pos.status === 'exiting') {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Cancel SL-M + MARKET exit every open leg (Stop after 15:15 / auto EOD).
+   * Overrides drain-HOLD latch — session must square off.
+   */
+  async flattenAllOpen(
+    authorization: string,
+    reason = 'EOD / session exit',
+  ): Promise<{ attempted: number; flat: number }> {
+    let attempted = 0;
+    let flat = 0;
+    this.drainHoldInstruments.clear();
+    for (const pos of [...this.positions.values()]) {
+      if (pos.status !== 'open' && pos.status !== 'exiting') {
+        continue;
+      }
+      if (pos.status === 'exiting') {
+        // Allow placeExit to run again after a deferred attempt.
+        this.positions.set(pos.instrumentId, { ...pos, status: 'open' });
+        if (pos.tradingSymbol) {
+          this.exitingSymbols.delete(pos.tradingSymbol.toUpperCase());
+        }
+      }
+      attempted += 1;
+      this.pushEvent({
+        at: new Date().toISOString(),
+        instrumentId: pos.instrumentId,
+        action: 'EXIT',
+        detail: `${reason} — flatten ${pos.tradingSymbol}`,
+        tradingSymbol: pos.tradingSymbol,
+        quantity: pos.quantity,
+      });
+      const ok = await this.placeExit(authorization, this.positions.get(pos.instrumentId) ?? pos);
+      if (ok) {
+        flat += 1;
+      }
+    }
+    await this.refreshSummaryStatuses(authorization);
+    return { attempted, flat };
+  }
+
   /**
    * After each Live tick: exit adopted orphans that no paper book still wants.
    * Prevents restart from leaving a broker long with only an SL and no desk owner
@@ -721,14 +773,19 @@ export class LiveOrderExecutorService {
         this.positions.set(params.instrumentId, current);
       }
       // Status sync often omits closeReason after a prior HOLD — latch restores it.
+      // At/after 15:15, never restore drain — MARKET flatten.
+      const nowHhMm = nowIstStamp().slice(11, 16);
+      const sessionClosed = nowHhMm >= INDEX_SESSION_EXIT_HHMM;
       const closeReason = effectiveCloseReason({
         closeReason: params.closeReason,
         drainHoldLatched: this.drainHoldInstruments.has(params.instrumentId),
+        sessionClosed,
       });
       const held = await this.maybeHoldDrainForRestingSlm(
         params.authorization,
         current,
         closeReason,
+        { sessionClosed, nowHhMm },
       );
       if (held) {
         this.drainHoldInstruments.add(params.instrumentId);
@@ -752,8 +809,14 @@ export class LiveOrderExecutorService {
     authorization: string,
     pos: LiveBrokerPosition,
     closeReason: string | null | undefined,
+    opts?: { sessionClosed?: boolean; nowHhMm?: string },
   ): Promise<boolean> {
-    if (!shouldHoldForRestingSlm(closeReason)) {
+    if (
+      !shouldHoldForRestingSlm(closeReason, {
+        sessionClosed: opts?.sessionClosed,
+        nowHhMm: opts?.nowHhMm,
+      })
+    ) {
       return false;
     }
     if (!pos.tradingSymbol) {

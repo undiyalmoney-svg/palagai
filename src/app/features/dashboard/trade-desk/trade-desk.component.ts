@@ -430,12 +430,16 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
     }
   }
 
-  protected onStop(): void {
+  protected async onStop(): Promise<void> {
     if (this.busy()) {
       this.desk.cancelRun();
       return;
     }
-    this.desk.stopLive();
+    // After 15:15 (or anytime): cancel SL-M + MARKET flatten open MIS, then stop.
+    await this.desk.stopLive({
+      flatten: true,
+      reason: 'Stop — flatten open MIS',
+    });
   }
 
   protected hasOpenTrade(): boolean {
