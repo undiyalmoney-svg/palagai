@@ -1,6 +1,12 @@
 /**
  * Capital-aware desk sizing for long CE/PE index books (Nifty + Bank only).
  * More capital → more lots (premium budget = 60% of capital).
+ *
+ * Scaling contract (Paper ≡ Live):
+ * - Lots ↑ with capital (balanced N+B pairs).
+ * - Day lock / strict stop money ≈ 1-lot band × riskLots (index pts stay fixed).
+ * - Option peak-trail DNA is 1-lot (arm₹100); runtime scales × lots so premium
+ *   distance to arm/floor stays the same when you raise capital.
  */
 
 export const DEFAULT_TRADING_CAPITAL_RS = 40_000;
@@ -23,6 +29,13 @@ export const MAX_LOTS_PER_BOOK = 30;
 /** Research Locked day band at 1 lot (scales × lots). */
 export const DAY_PROFIT_LOCK_PER_LOT_RS = 3_000;
 
+/** Trap option-trail DNA at 1 lot — runtime × lots (see option-peak-trail.util). */
+export const OPTION_TRAIL_PER_LOT_RS = {
+  armRs: 100,
+  lockRs: 50,
+  givebackRs: 50,
+} as const;
+
 export type CapitalBook = keyof typeof ATM_PREMIUM_RS_PER_LOT;
 
 export interface CapitalLotPlan {
@@ -36,6 +49,10 @@ export interface CapitalLotPlan {
   dailyTargetRs: number;
   tenDayGoalRs: number;
   dayProfitLockRs: number;
+  /** riskLots = max(N,B,1) — used for day lock + trail scale. */
+  riskLots: number;
+  /** Option trail arm ₹ after lot scale (DNA × riskLots). */
+  optionTrailArmRs: number;
   note: string;
 }
 
@@ -86,6 +103,7 @@ export function planLotsForCapital(capitalRs: number = DEFAULT_TRADING_CAPITAL_R
   const estimatedPremiumRs = cost({ nifty: niftyLots, bank: bankLots });
   const riskLots = Math.max(niftyLots, bankLots, 1);
   const dayProfitLockRs = DAY_PROFIT_LOCK_PER_LOT_RS * riskLots;
+  const optionTrailArmRs = OPTION_TRAIL_PER_LOT_RS.armRs * riskLots;
   // Target sits under the lock band (~⅔ of locked day at 1-lot DNA).
   const dailyTargetRs = Math.round(dayProfitLockRs * (2_000 / 3_000));
   const tenDayGoalRs = dailyTargetRs * 10;
@@ -101,9 +119,12 @@ export function planLotsForCapital(capitalRs: number = DEFAULT_TRADING_CAPITAL_R
     dailyTargetRs,
     tenDayGoalRs,
     dayProfitLockRs,
+    riskLots,
+    optionTrailArmRs,
     note:
       `Capital ₹${capital.toLocaleString('en-IN')} · premium budget ₹${premiumBudgetRs.toLocaleString('en-IN')} · ` +
       `lots N${niftyLots}/B${bankLots} · lock ~₹${dayProfitLockRs.toLocaleString('en-IN')}/day · ` +
+      `trail arm ₹${optionTrailArmRs.toLocaleString('en-IN')} · ` +
       `target ~₹${dailyTargetRs.toLocaleString('en-IN')}/day`,
   };
 }

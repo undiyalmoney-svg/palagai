@@ -25,7 +25,10 @@ import {
   armPeakTrailFloor,
   recordRuleTradeClosed,
 } from './index-rule.engine';
-import { evaluateOptionPeakTrail } from '../../paper-desk/option-peak-trail.util';
+import {
+  evaluateOptionPeakTrail,
+  optionPeakTrailSettingsFromExtras,
+} from '../../paper-desk/option-peak-trail.util';
 
 export type SrTrapMode = 'trap' | 'both';
 
@@ -324,11 +327,11 @@ export function srTrapExitLogic(
   settings: StrategySettings,
   ctx: StrategyContext,
 ): ManagedExitDecision | null {
-  const extras = settings.extras ?? {};
-  const armRs = typeof extras['profitLockArmRs'] === 'number' ? extras['profitLockArmRs'] : 600;
-  const lockRs = typeof extras['profitLockLockRs'] === 'number' ? extras['profitLockLockRs'] : 300;
-  const givebackRs =
-    typeof extras['profitLockGivebackRs'] === 'number' ? extras['profitLockGivebackRs'] : 300;
+  // DNA extras are 1-lot; option MFE ₹ includes lots — scale trail with fill size.
+  const { armRs, lockRs, givebackRs } = optionPeakTrailSettingsFromExtras(
+    settings.extras,
+    open.lotsMultiplier,
+  );
 
   const optionMarksKnown =
     typeof open.optionPeakMfeRs === 'number' &&
