@@ -20,5 +20,23 @@ describe('planLotsForCapital', () => {
     const p = planLotsForCapital(20_000);
     expect(p.estimatedPremiumRs).toBeLessThanOrEqual(p.premiumBudgetRs);
     expect(p.enableNifty || p.enableBank).toBe(true);
+    expect(p.niftyLots + p.bankLots).toBeGreaterThanOrEqual(1);
+  });
+
+  it('scales lots when capital grows — ₹6L must not stay at N1/B2', () => {
+    const p = planLotsForCapital(600_000);
+    expect(p.premiumBudgetRs).toBe(360_000);
+    // Balanced scale: floor(360k / 22k) = 16 pair lots
+    expect(p.niftyLots).toBeGreaterThanOrEqual(16);
+    expect(p.bankLots).toBeGreaterThanOrEqual(16);
+    expect(p.estimatedPremiumRs).toBeLessThanOrEqual(p.premiumBudgetRs);
+    expect(p.dayProfitLockRs).toBe(3_000 * Math.max(p.niftyLots, p.bankLots));
+  });
+
+  it('₹1L is larger than ₹40k', () => {
+    const a = planLotsForCapital(40_000);
+    const b = planLotsForCapital(100_000);
+    expect(b.niftyLots + b.bankLots).toBeGreaterThan(a.niftyLots + a.bankLots);
+    expect(b.estimatedPremiumRs).toBeLessThanOrEqual(b.premiumBudgetRs);
   });
 });

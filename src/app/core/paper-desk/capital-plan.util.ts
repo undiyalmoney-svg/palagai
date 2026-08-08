@@ -1,6 +1,6 @@
 /**
  * Capital-aware desk sizing for long CE/PE index books (Nifty + Bank only).
- * ₹40k plan → auto lots so concurrent ATM premium stays inside a safe budget.
+ * More capital → more lots (premium budget = 60% of capital).
  */
 
 export const DEFAULT_TRADING_CAPITAL_RS = 40_000;
@@ -16,6 +16,12 @@ export const ATM_PREMIUM_RS_PER_LOT = {
   nifty: 10_000,
   bank: 12_000,
 } as const;
+
+/** Safety ceiling — beyond this, size by hand; margin/liquidity risk rises fast. */
+export const MAX_LOTS_PER_BOOK = 30;
+
+/** Research Locked day band at 1 lot (scales × lots). */
+export const DAY_PROFIT_LOCK_PER_LOT_RS = 3_000;
 
 export type CapitalBook = keyof typeof ATM_PREMIUM_RS_PER_LOT;
 
@@ -37,56 +43,67 @@ function cost(lots: { nifty: number; bank: number }): number {
   return lots.nifty * ATM_PREMIUM_RS_PER_LOT.nifty + lots.bank * ATM_PREMIUM_RS_PER_LOT.bank;
 }
 
+function clampLots(n: number): number {
+  return Math.max(0, Math.min(MAX_LOTS_PER_BOOK, Math.floor(n)));
+}
+
 /**
  * Pick lots for a capital base. Nifty+Bank only (Trade Desk has no Crude).
+ * Scales both books together as capital grows — ₹6L must not stay stuck at N1/B2.
  */
 export function planLotsForCapital(capitalRs: number = DEFAULT_TRADING_CAPITAL_RS): CapitalLotPlan {
   const capital = Math.max(10_000, Math.floor(Number(capitalRs) || DEFAULT_TRADING_CAPITAL_RS));
   const premiumBudgetRs = Math.floor(capital * PREMIUM_BUDGET_FRAC);
 
-  const candidates: Array<{ nifty: number; bank: number }> = [
-    { nifty: 1, bank: 1 },
-    { nifty: 1, bank: 0 },
-    { nifty: 0, bank: 1 },
-  ];
+  const unitPair = ATM_PREMIUM_RS_PER_LOT.nifty + ATM_PREMIUM_RS_PER_LOT.bank;
+  let niftyLots = 0;
+  let bankLots = 0;
 
-  if (premiumBudgetRs >= cost({ nifty: 2, bank: 1 })) {
-    candidates.unshift({ nifty: 2, bank: 1 });
-  }
-  if (premiumBudgetRs >= cost({ nifty: 1, bank: 2 })) {
-    candidates.unshift({ nifty: 1, bank: 2 });
-  }
-
-  let chosen: { nifty: number; bank: number } | null = null;
-  for (const c of candidates) {
-    if (cost(c) <= premiumBudgetRs) {
-      chosen = c;
-      break;
+  // Prefer balanced N+B: each "pair lot" costs ~₹22k premium proxy.
+  const pairLots = clampLots(Math.floor(premiumBudgetRs / unitPair));
+  if (pairLots >= 1) {
+    niftyLots = pairLots;
+    bankLots = pairLots;
+    // Spend leftover budget on the cheaper book (Nifty) first, then Bank.
+    let left = premiumBudgetRs - cost({ nifty: niftyLots, bank: bankLots });
+    while (left >= ATM_PREMIUM_RS_PER_LOT.nifty && niftyLots < MAX_LOTS_PER_BOOK) {
+      niftyLots += 1;
+      left -= ATM_PREMIUM_RS_PER_LOT.nifty;
     }
-  }
-  if (!chosen) {
-    chosen =
-      candidates.find((c) => cost(c) <= premiumBudgetRs) ?? { nifty: 1, bank: 0 };
+    while (left >= ATM_PREMIUM_RS_PER_LOT.bank && bankLots < MAX_LOTS_PER_BOOK) {
+      bankLots += 1;
+      left -= ATM_PREMIUM_RS_PER_LOT.bank;
+    }
+  } else if (premiumBudgetRs >= ATM_PREMIUM_RS_PER_LOT.nifty) {
+    niftyLots = 1;
+  } else if (premiumBudgetRs >= ATM_PREMIUM_RS_PER_LOT.bank) {
+    bankLots = 1;
+  } else {
+    // Below one ATM lot proxy — still arm Nifty ×1 so the desk is not empty.
+    niftyLots = 1;
   }
 
-  const estimatedPremiumRs = cost(chosen);
-  const dailyTargetRs = Math.round(capital * 0.05);
+  const estimatedPremiumRs = cost({ nifty: niftyLots, bank: bankLots });
+  const riskLots = Math.max(niftyLots, bankLots, 1);
+  const dayProfitLockRs = DAY_PROFIT_LOCK_PER_LOT_RS * riskLots;
+  // Target sits under the lock band (~⅔ of locked day at 1-lot DNA).
+  const dailyTargetRs = Math.round(dayProfitLockRs * (2_000 / 3_000));
   const tenDayGoalRs = dailyTargetRs * 10;
-  const dayProfitLockRs = Math.round(capital * 0.075);
 
   return {
     capitalRs: capital,
     premiumBudgetRs,
-    niftyLots: chosen.nifty,
-    bankLots: chosen.bank,
-    enableNifty: chosen.nifty > 0,
-    enableBank: chosen.bank > 0,
+    niftyLots,
+    bankLots,
+    enableNifty: niftyLots > 0,
+    enableBank: bankLots > 0,
     estimatedPremiumRs,
     dailyTargetRs,
     tenDayGoalRs,
     dayProfitLockRs,
     note:
       `Capital ₹${capital.toLocaleString('en-IN')} · premium budget ₹${premiumBudgetRs.toLocaleString('en-IN')} · ` +
-      `lots N${chosen.nifty}/B${chosen.bank} · target ~₹${dailyTargetRs.toLocaleString('en-IN')}/day`,
+      `lots N${niftyLots}/B${bankLots} · lock ~₹${dayProfitLockRs.toLocaleString('en-IN')}/day · ` +
+      `target ~₹${dailyTargetRs.toLocaleString('en-IN')}/day`,
   };
 }

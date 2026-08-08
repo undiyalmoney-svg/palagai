@@ -227,16 +227,16 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
     this.error.set('');
   }
 
-  /** Size Nifty+Bank from total capital. */
+  /** Size Nifty+Bank from total capital — more capital → more lots. */
   private applyCapitalAllocation(): void {
     const plan = planLotsForCapital(this.capitalRs);
     this.capitalPlan = plan;
-    const p = DAILY_3K_DESK_PRESET;
-    this.niftyLots = Math.max(1, plan.niftyLots || p.niftyLots);
-    this.bankLots = Math.max(1, plan.bankLots > 0 ? plan.bankLots : p.bankLots);
-    this.lotsPreference.set(this.niftyLots);
     this.enableNifty = plan.enableNifty;
     this.enableBank = plan.enableBank;
+    this.niftyLots = plan.enableNifty ? Math.max(1, plan.niftyLots) : 0;
+    this.bankLots = plan.enableBank ? Math.max(1, plan.bankLots) : 0;
+    // Preference store keeps a single "primary" lot hint (Nifty when on).
+    this.lotsPreference.set(Math.max(this.niftyLots, this.bankLots, 1));
   }
 
   protected allocationSummary(): string {
