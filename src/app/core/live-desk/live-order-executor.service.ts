@@ -20,6 +20,8 @@ import {
   effectiveCloseReason,
   shouldHoldForRestingSlm,
 } from './live-drain-hold.util';
+import { optionTrailSlTrigger } from '../paper-desk/option-peak-trail.util';
+import { TRAP_1LOT_DAILY_DNA_EXTRAS } from '../strategy-manager/config/strategy-dna-caps';
 
 export interface LiveBrokerPosition {
   instrumentId: string;
@@ -41,6 +43,8 @@ export interface LiveBrokerPosition {
   /** Index levels used to size / amend protective SL-M. */
   indexEntry?: number;
   indexStop?: number;
+  /** Running option-premium peak MFE in ₹ (Paper≡Live trail). */
+  optionPeakMfeRs?: number;
 }
 
 export interface LiveOrderEvent {
@@ -1018,14 +1022,38 @@ export class LiveOrderExecutorService {
     } catch {
       ltp = null;
     }
-    const nextTrigger = computeProtectiveSlTrigger({
-      fillPremium,
-      indexRiskPts: indexRisk,
-      exchange: pos.exchange,
-      tradingSymbol: pos.tradingSymbol,
-      ltp,
+
+    // Paper≡Live: once option MFE clears arm ₹, trail SL-M in option premium space.
+    let optionPeakMfeRs = pos.optionPeakMfeRs ?? 0;
+    if (ltp != null && ltp > 0 && pos.quantity > 0) {
+      const mfeRs = Math.max(0, (ltp - fillPremium) * pos.quantity);
+      optionPeakMfeRs = Math.max(optionPeakMfeRs, mfeRs);
+    }
+    const armRs = Number(TRAP_1LOT_DAILY_DNA_EXTRAS['profitLockArmRs'] ?? 100);
+    const lockRs = Number(TRAP_1LOT_DAILY_DNA_EXTRAS['profitLockLockRs'] ?? 50);
+    const givebackRs = Number(TRAP_1LOT_DAILY_DNA_EXTRAS['profitLockGivebackRs'] ?? 50);
+    const optionTrigger = optionTrailSlTrigger({
+      entryPremium: fillPremium,
+      optionPeakMfeRs,
+      lotUnits: pos.quantity,
+      armRs,
+      lockRs,
+      givebackRs,
+      prevTrigger: pos.slTrigger,
     });
+
+    const nextTrigger =
+      optionTrigger != null
+        ? optionTrigger
+        : computeProtectiveSlTrigger({
+            fillPremium,
+            indexRiskPts: indexRisk,
+            exchange: pos.exchange,
+            tradingSymbol: pos.tradingSymbol,
+            ltp,
+          });
     const prevTrigger = pos.slTrigger ?? 0;
+    pos = { ...pos, optionPeakMfeRs };
 
     // Only tighten / move when meaningfully different (≥ 1 tick).
     if (Math.abs(nextTrigger - prevTrigger) < 0.049) {
@@ -1075,7 +1103,10 @@ export class LiveOrderExecutorService {
         at: new Date().toISOString(),
         instrumentId: pos.instrumentId,
         action: 'MODIFY_SL',
-        detail: `SL-M trigger ${prevTrigger} → ${nextTrigger} (index SL ${open.indexStop.toFixed(1)})`,
+        detail:
+          optionTrigger != null
+            ? `SL-M trigger ${prevTrigger} → ${nextTrigger} (option trail peak ₹${Math.round(optionPeakMfeRs)})`
+            : `SL-M trigger ${prevTrigger} → ${nextTrigger} (index SL ${open.indexStop.toFixed(1)})`,
         orderId: pos.slOrderId,
         tradingSymbol: pos.tradingSymbol,
         quantity: pos.quantity,

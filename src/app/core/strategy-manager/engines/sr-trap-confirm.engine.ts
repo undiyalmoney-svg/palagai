@@ -25,6 +25,7 @@ import {
   armPeakTrailFloor,
   recordRuleTradeClosed,
 } from './index-rule.engine';
+import { evaluateOptionPeakTrail } from '../../paper-desk/option-peak-trail.util';
 
 export type SrTrapMode = 'trap' | 'both';
 
@@ -323,8 +324,23 @@ export function srTrapExitLogic(
   settings: StrategySettings,
   ctx: StrategyContext,
 ): ManagedExitDecision | null {
-  // Peak-trail DNA (extras): arm → lock floor → cut & rehunt on giveback.
-  const armed = armPeakTrailFloor(candle, open, settings, ctx.instrumentId ?? '');
+  const extras = settings.extras ?? {};
+  const armRs = typeof extras['profitLockArmRs'] === 'number' ? extras['profitLockArmRs'] : 600;
+  const lockRs = typeof extras['profitLockLockRs'] === 'number' ? extras['profitLockLockRs'] : 300;
+  const givebackRs =
+    typeof extras['profitLockGivebackRs'] === 'number' ? extras['profitLockGivebackRs'] : 300;
+
+  const optionMarksKnown =
+    typeof open.optionPeakMfeRs === 'number' &&
+    open.optionEntryPremium != null &&
+    open.optionEntryPremium > 0 &&
+    open.optionBarLow != null &&
+    open.optionLotUnits != null &&
+    open.optionLotUnits > 0;
+
+  // Keep index peak updated for diagnostics; index trail only when no option marks.
+  const armedIndex = armPeakTrailFloor(candle, open, settings, ctx.instrumentId ?? '');
+
   // Research: briefly-green SL confirm (MFE < 0.75R + 0.55R / ₹700 soft).
   const cutoff = applySlConfirmCutoff(candle, open, settings, ctx.instrumentId ?? '');
   if (cutoff) {
@@ -339,12 +355,34 @@ export function srTrapExitLogic(
     seriesAt(ctx),
   );
   if (exit) {
-    if (armed && exit.reason === 'Stop loss hit') {
+    if (!optionMarksKnown && armedIndex && exit.reason === 'Stop loss hit') {
       return { ...exit, reason: 'Profit drained — cut & rehunt' };
     }
     return exit;
   }
-  if (!armed) {
+
+  // Paper≡Live: option-native peak trail when premiums are known.
+  if (optionMarksKnown) {
+    const trail = evaluateOptionPeakTrail({
+      entryPremium: open.optionEntryPremium!,
+      optionPeakMfeRs: open.optionPeakMfeRs!,
+      optionBarLow: open.optionBarLow!,
+      lotUnits: open.optionLotUnits!,
+      armRs,
+      lockRs,
+      givebackRs,
+    });
+    if (trail?.hit) {
+      return {
+        exitPrice: candle.close,
+        reason: 'Profit drained — cut & rehunt',
+        optionExitPremium: trail.floorPremium,
+      };
+    }
+    return null;
+  }
+
+  if (!armedIndex) {
     return null;
   }
   // Close has fallen through the peak-trail floor (stop already ratcheted).

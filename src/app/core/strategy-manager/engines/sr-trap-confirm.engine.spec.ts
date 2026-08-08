@@ -132,22 +132,7 @@ describe('Trap peak-trail drain (arm ₹600 / giveback ₹300)', () => {
     expect(open.stop).toBeCloseTo(52000 - 600 / 30, 5);
   });
 
-  it('does not arm when option MFE is known but still below arm ₹', () => {
-    const open: ManagedOpenPosition = {
-      direction: 'BUY',
-      entry: 25000,
-      stop: 24980,
-      target: 25070,
-      entryTime: '2026-07-28T10:00:00+05:30',
-      peakMfePts: 0,
-      optionPeakMfeRs: 40, // option never cleared ₹600 arm
-    };
-    const candle = bar({ open: 25010, high: 25000 + 900 / 65, low: 25008, close: 25012 });
-    expect(armTrapProfitDrainFloor(candle, open, niftySettings(), 'NIFTY 50')).toBe(false);
-    expect(open.stop).toBe(24980);
-  });
-
-  it('arms when option MFE clears arm ₹ alongside index peak', () => {
+  it('does not index-arm when option marks are known (option-native trail)', () => {
     const open: ManagedOpenPosition = {
       direction: 'BUY',
       entry: 25000,
@@ -158,7 +143,44 @@ describe('Trap peak-trail drain (arm ₹600 / giveback ₹300)', () => {
       optionPeakMfeRs: 650,
     };
     const candle = bar({ open: 25010, high: 25000 + 900 / 65, low: 25008, close: 25012 });
-    expect(armTrapProfitDrainFloor(candle, open, niftySettings(), 'NIFTY 50')).toBe(true);
-    expect(open.stop).toBeCloseTo(25000 + 600 / 65, 5);
+    // Index trail stays off — option path owns drain exits.
+    expect(armTrapProfitDrainFloor(candle, open, niftySettings(), 'NIFTY 50')).toBe(false);
+    expect(open.stop).toBe(24980);
+  });
+
+  it('option-native drain exits at option floor premium', () => {
+    const open: ManagedOpenPosition = {
+      direction: 'BUY',
+      entry: 25000,
+      stop: 24980,
+      target: 25070,
+      entryTime: '2026-07-28T10:00:00+05:30',
+      peakMfePts: 0,
+      optionPeakMfeRs: 200,
+      optionEntryPremium: 100,
+      optionBarLow: 102.3, // ≈ 100 + 150/65
+      optionLotUnits: 65,
+    };
+    const settings = defaultStrategySettings({
+      exitTime: '15:15',
+      targetRMultiple: 3.5,
+      extras: {
+        profitLockArmRs: 100,
+        profitLockLockRs: 50,
+        profitLockGivebackRs: 50,
+        slConfirmCutoffEnabled: false,
+      },
+    });
+    const candle = bar({
+      date: '2026-07-28T10:20:00+05:30',
+      open: 25010,
+      high: 25012,
+      low: 25005,
+      close: 25008,
+    });
+    const exit = srTrapExitLogic(candle, open, [25000, 25014, 25008], settings, ctx());
+    expect(exit).not.toBeNull();
+    expect(exit!.reason).toBe('Profit drained — cut & rehunt');
+    expect(exit!.optionExitPremium).toBeCloseTo(102.3, 1);
   });
 });

@@ -480,8 +480,9 @@ export function armPeakTrailFloor(
     return false;
   }
 
-  // Paper≡Live: do not arm index trail while option money never cleared arm ₹.
-  if (typeof open.optionPeakMfeRs === 'number' && open.optionPeakMfeRs < armRs) {
+  // When option marks exist, trail is option-native (srTrapExitLogic) — do not
+  // ratchet index stop (that path caused Locked-green / option-red drains).
+  if (typeof open.optionPeakMfeRs === 'number') {
     return false;
   }
 

@@ -234,6 +234,29 @@ export function lookupPremium(
   return edge === 'open' ? best.open : best.close;
 }
 
+/** Option bar low at/before `when` (same trading day). */
+export function lookupOptionBarLow(
+  optionCandles: Candle[] | undefined,
+  when: string,
+): number | null {
+  if (!optionCandles?.length) {
+    return null;
+  }
+  const target = normalizeMinute(when);
+  const targetDay = target.slice(0, 10);
+  let best: Candle | null = null;
+  for (const c of optionCandles) {
+    const norm = normalizeMinute(c.date);
+    if (norm.slice(0, 10) !== targetDay) {
+      continue;
+    }
+    if (norm <= target) {
+      best = c;
+    }
+  }
+  return best ? best.low : null;
+}
+
 /**
  * Peak favorable option ₹ from entry through `asOf` (long CE/PE only).
  * Returns null when marks are missing — caller keeps index-only trail arm.
@@ -347,6 +370,8 @@ function closePaperTrade(params: {
   lotsMultiplier?: number;
   strategyId?: string;
   strategyName?: string;
+  /** Resting option trail fill (Paper≡Live SL-M). */
+  optionExitPremium?: number | null;
 }): PaperTrade {
   const { open } = params;
   const lots = Math.max(1, Math.floor(params.lotsMultiplier ?? 1) || 1);
@@ -361,13 +386,21 @@ function closePaperTrade(params: {
   let optionEntryPremium = open.optionEntryPremium;
 
   if (open.option) {
+    const restingOpt =
+      params.optionExitPremium != null && params.optionExitPremium > 0
+        ? params.optionExitPremium
+        : null;
     const useEstimate =
-      open.option.source === 'synthetic' ||
-      open.option.instrumentToken <= 0 ||
-      open.premiumEstimated ||
-      isLevelExitReason(params.exitReason);
+      restingOpt == null &&
+      (open.option.source === 'synthetic' ||
+        open.option.instrumentToken <= 0 ||
+        open.premiumEstimated ||
+        isLevelExitReason(params.exitReason));
 
-    if (!useEstimate) {
+    if (restingOpt != null) {
+      optionExitPremium = restingOpt;
+      premiumEstimated = false;
+    } else if (!useEstimate) {
       optionExitPremium = lookupPremium(
         params.optionCandlesByToken.get(open.option.instrumentToken),
         params.exitTime,
@@ -609,19 +642,25 @@ export function replayPaperOnIndex(params: {
         if (isKutty) {
           exit = kuttyExitLogic(candle, open);
         } else {
+          const optBars = open.option
+            ? optionCandlesByToken.get(open.option.instrumentToken)
+            : undefined;
           const optMfe = computeOptionPeakMfeRs({
             entryPremium: open.optionEntryPremium,
             entryTime: open.entryTime,
             asOfTime: candle.date,
-            optionCandles: open.option
-              ? optionCandlesByToken.get(open.option.instrumentToken)
-              : undefined,
+            optionCandles: optBars,
             lotSize: open.option?.lotSize ?? 0,
             lotsMultiplier,
           });
           if (optMfe != null) {
             open.optionPeakMfeRs = Math.max(open.optionPeakMfeRs ?? 0, optMfe);
           }
+          const optBarLow = lookupOptionBarLow(optBars, candle.date);
+          const lotUnits =
+            open.option && open.option.lotSize > 0
+              ? open.option.lotSize * Math.max(1, Math.floor(lotsMultiplier) || 1)
+              : null;
           const managedOpen: ManagedOpenPosition = {
             direction: open.direction,
             entry: open.entry,
@@ -632,6 +671,9 @@ export function replayPaperOnIndex(params: {
             peakMfePts: open.mfeIndexPts ?? 0,
             initialRiskPts: open.initialRiskPts ?? Math.abs(open.entry - open.stop),
             optionPeakMfeRs: open.optionPeakMfeRs ?? optMfe,
+            optionEntryPremium: open.optionEntryPremium,
+            optionBarLow: optBarLow,
+            optionLotUnits: lotUnits,
           };
           exit = strategy.exitLogic(candle, managedOpen, closes, ctx);
           // Profit-protect may ratchet stop; swing_trail updates separate trail.
@@ -666,6 +708,7 @@ export function replayPaperOnIndex(params: {
           lotsMultiplier,
           strategyId: isKutty ? KUTTY_ID : strategy.id,
           strategyName: isKutty ? KUTTY_NAME : strategy.name,
+          optionExitPremium: exit.optionExitPremium ?? null,
         });
         trades.push(closed);
         if (hookActive(candle.date)) {
@@ -953,6 +996,16 @@ export function enrichTradesWithOptionPremiums(
   const lots = Math.max(1, Math.floor(lotsMultiplier) || 1);
   return trades.map((t) => {
     if (!t.option) {
+      return t;
+    }
+
+    // Already priced at resting option trail / fill — do not overwrite with bar close.
+    if (
+      t.premiumEstimated === false &&
+      t.optionEntryPremium != null &&
+      t.optionExitPremium != null &&
+      t.optionPnlRs != null
+    ) {
       return t;
     }
 

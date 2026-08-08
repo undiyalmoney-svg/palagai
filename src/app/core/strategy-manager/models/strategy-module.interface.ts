@@ -38,16 +38,23 @@ export interface ManagedOpenPosition {
   initialRiskPts?: number;
   /**
    * Option-premium peak MFE in ₹ (long option: (high−entry)×lot×lots).
-   * When set, peak-trail arms only after this clears `profitLockArmRs`
-   * (paper≡live — index-only arm caused Locked-green / option-red drains).
+   * When set (marks known), peak-trail is option-native — index trail is off.
    * Omit / null when option marks are unknown → index-only arm (research Locked).
    */
   optionPeakMfeRs?: number | null;
+  /** Entry option premium (Live fill / paper OHLC). */
+  optionEntryPremium?: number | null;
+  /** Current option bar low (paper) or LTP proxy (live). */
+  optionBarLow?: number | null;
+  /** lotSize × lots for option ₹ ↔ premium conversion. */
+  optionLotUnits?: number | null;
 }
 
 export interface ManagedExitDecision {
   exitPrice: number;
   reason: string;
+  /** Resting option exit premium when trail hits in option space. */
+  optionExitPremium?: number;
 }
 
 /**

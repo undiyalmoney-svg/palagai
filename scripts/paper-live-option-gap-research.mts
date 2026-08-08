@@ -393,7 +393,15 @@ async function main() {
 
       const tok = t.option?.instrumentToken;
       if (!tok || !optMap.has(tok)) continue;
-      const net = realOptNet(t, optMap.get(tok)!, candles, idx);
+      // Prefer engine option ₹ (includes option-native trail floor fills).
+      const engineNet =
+        t.netOptionPnlRs != null
+          ? t.netOptionPnlRs
+          : t.optionPnlRs != null && t.premiumEstimated === false
+            ? t.optionPnlRs
+            : null;
+      const net =
+        engineNet != null ? engineNet : realOptNet(t, optMap.get(tok)!, candles, idx);
       if (net == null) continue;
       realDay.set(d, (realDay.get(d) ?? 0) + net);
       realDaysCovered.add(d);
@@ -408,7 +416,10 @@ async function main() {
           exit: t.exitTime.slice(11, 16),
           indexPts: +t.indexPoints.toFixed(2),
           deltaOpt: +deltaOptNet(t.indexPoints, t.instrumentId).toFixed(0),
-          realOpt: net,
+          realOpt: +Number(net).toFixed(2),
+          enginePriced: engineNet != null,
+          entryPrem: t.optionEntryPremium,
+          exitPrem: t.optionExitPremium,
           reason: (t.exitReason ?? '').slice(0, 40),
           drained: /profit drained/i.test(t.exitReason ?? ''),
         });
