@@ -85,7 +85,12 @@
     </label>
 
     <div class="agent-locked compact">
-      <span>{{ allocationSummary() }} · target ~₹{{ capitalPlan.dailyTargetRs | number: '1.0-0' }}/day</span>
+      <span
+        >{{ allocationSummary() }} · lock ~₹{{ capitalPlan.dayProfitLockRs | number: '1.0-0' }}/day ·
+        trail arm ₹{{ capitalPlan.optionTrailArmRs | number: '1.0-0' }} · target ~₹{{
+          capitalPlan.dailyTargetRs | number: '1.0-0'
+        }}/day</span
+      >
     </div>
 
     @if (mode() === 'live') {

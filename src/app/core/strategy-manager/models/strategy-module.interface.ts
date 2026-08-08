@@ -48,6 +48,12 @@ export interface ManagedOpenPosition {
   optionBarLow?: number | null;
   /** lotSize × lots for option ₹ ↔ premium conversion. */
   optionLotUnits?: number | null;
+  /**
+   * Working lot multiplier for this fill (desk capital plan).
+   * Option trail DNA is 1-lot; scale arm/lock/giveback × this so Paper≡Live
+   * when capital (and lots) rise.
+   */
+  lotsMultiplier?: number | null;
 }
 
 export interface ManagedExitDecision {

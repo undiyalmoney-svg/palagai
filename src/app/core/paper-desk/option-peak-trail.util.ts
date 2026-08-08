@@ -3,6 +3,10 @@
  *
  * When option marks exist, trail arm / floor / hit are in option ₹, not index pts.
  * Index-only trail stays for research Locked (no option OHLC).
+ *
+ * DNA extras store **1-lot** arm/lock/giveback. Option MFE ₹ already includes
+ * lots (`Δpremium × lotSize × lots`), so callers must scale trail ₹ × lots —
+ * otherwise multi-lot capital arms instantly and chops Live.
  */
 import { roundOptionPremiumTick } from '../live-desk/option-sl-premium.util';
 
@@ -12,16 +16,39 @@ export type OptionPeakTrailSettings = {
   givebackRs: number;
 };
 
+/** Clamp lot multiplier used for trail / day-money scaling. */
+export function clampTrailLots(lots: number | null | undefined): number {
+  return Math.max(1, Math.floor(Number(lots) || 1) || 1);
+}
+
+/**
+ * Scale 1-lot DNA trail bands to the working lot size.
+ * ₹40k → ×1 (arm₹100); ₹6L → ×16 (arm₹1,600) so premium distance stays equal.
+ */
+export function scaleOptionPeakTrailSettings(
+  base: OptionPeakTrailSettings,
+  lots: number | null | undefined,
+): OptionPeakTrailSettings {
+  const n = clampTrailLots(lots);
+  return {
+    armRs: base.armRs * n,
+    lockRs: base.lockRs * n,
+    givebackRs: base.givebackRs * n,
+  };
+}
+
 export function optionPeakTrailSettingsFromExtras(
   extras: Record<string, unknown> | null | undefined,
+  lots: number | null | undefined = 1,
 ): OptionPeakTrailSettings {
   const x = extras ?? {};
-  return {
+  const base: OptionPeakTrailSettings = {
     armRs: typeof x['profitLockArmRs'] === 'number' ? x['profitLockArmRs'] : 600,
     lockRs: typeof x['profitLockLockRs'] === 'number' ? x['profitLockLockRs'] : 300,
     givebackRs:
       typeof x['profitLockGivebackRs'] === 'number' ? x['profitLockGivebackRs'] : 300,
   };
+  return scaleOptionPeakTrailSettings(base, lots);
 }
 
 /**

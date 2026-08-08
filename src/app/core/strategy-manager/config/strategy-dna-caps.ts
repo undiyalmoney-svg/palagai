@@ -32,15 +32,15 @@ export const PROTECTION_DNA_EXTRAS: Record<string, number | boolean> = {
 };
 
 /**
- * Option-₹ hunt DNA (₹40k N1/B1, Paper≡Live path):
- * pierce20 · Bank40 · peak₹100/50/50 · soft OFF · max 3/day · RR 3.5 · bounceOR OFF.
- * Max 3/book (≤6 desk) — max5 hit 10 fills/day; scrap + charges ate edge
- * (10× tiny wins ≈ loss after Zerodha FO round-trip). Charge-quality report:
- * max3 keeps pierce20 edge vs old baseline with fewer scrap trades.
+ * Option-₹ hunt DNA (₹40k N1/B1, Paper≡Live≡Autobot path):
+ * pierce20 · Bank40 · peak₹100/50/50 **per lot** · soft OFF · max 3/day · RR 3.5 · bounceOR OFF.
+ * Max 3/book (≤6 desk) — max5 hit 10 fills/day; scrap + charges ate edge.
+ * Raise capital → more lots; trail ₹ scales × lots at runtime (same premium distance).
  */
 export const TRAP_1LOT_DAILY_DNA_EXTRAS: Record<string, number | boolean | string> = {
   piercePts: 20,
   bankPiercePts: 40,
+  /** 1-lot bands — Paper/Live multiply by lotsMultiplier. */
   profitLockArmRs: 100,
   profitLockLockRs: 50,
   profitLockGivebackRs: 50,
