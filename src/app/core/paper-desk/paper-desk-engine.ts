@@ -76,6 +76,8 @@ export interface IndexOpenPaper {
   mfeIndexPts?: number;
   /** Running max adverse excursion (index pts, ≥ 0). */
   maeIndexPts?: number;
+  /** Running option-premium peak MFE in ₹ (long option). */
+  optionPeakMfeRs?: number;
   /** |entry − stop| at fill — used by SL confirm cutoff after stop ratchets. */
   initialRiskPts?: number;
   entryReason?: string;
@@ -230,6 +232,40 @@ export function lookupPremium(
     return null;
   }
   return edge === 'open' ? best.open : best.close;
+}
+
+/**
+ * Peak favorable option ₹ from entry through `asOf` (long CE/PE only).
+ * Returns null when marks are missing — caller keeps index-only trail arm.
+ */
+export function computeOptionPeakMfeRs(params: {
+  entryPremium: number | null | undefined;
+  entryTime: string;
+  asOfTime: string;
+  optionCandles: Candle[] | undefined;
+  lotSize: number;
+  lotsMultiplier?: number;
+}): number | null {
+  const entry = params.entryPremium;
+  if (!(entry != null && entry > 0) || !params.optionCandles?.length) {
+    return null;
+  }
+  const lot = Math.max(1, Math.floor(params.lotSize) || 1);
+  const lots = Math.max(1, Math.floor(params.lotsMultiplier ?? 1) || 1);
+  const from = normalizeMinute(params.entryTime);
+  const to = normalizeMinute(params.asOfTime);
+  let peakPrem = 0;
+  for (const c of params.optionCandles) {
+    const t = normalizeMinute(c.date);
+    if (t < from || t > to) {
+      continue;
+    }
+    peakPrem = Math.max(peakPrem, c.high - entry);
+  }
+  if (!(peakPrem > 0)) {
+    return 0;
+  }
+  return Math.round(peakPrem * lot * lots * 100) / 100;
 }
 
 /** Prefer the OHLC side that matches the strategy's index fill price. */
@@ -573,6 +609,19 @@ export function replayPaperOnIndex(params: {
         if (isKutty) {
           exit = kuttyExitLogic(candle, open);
         } else {
+          const optMfe = computeOptionPeakMfeRs({
+            entryPremium: open.optionEntryPremium,
+            entryTime: open.entryTime,
+            asOfTime: candle.date,
+            optionCandles: open.option
+              ? optionCandlesByToken.get(open.option.instrumentToken)
+              : undefined,
+            lotSize: open.option?.lotSize ?? 0,
+            lotsMultiplier,
+          });
+          if (optMfe != null) {
+            open.optionPeakMfeRs = Math.max(open.optionPeakMfeRs ?? 0, optMfe);
+          }
           const managedOpen: ManagedOpenPosition = {
             direction: open.direction,
             entry: open.entry,
@@ -582,6 +631,7 @@ export function replayPaperOnIndex(params: {
             trail: open.trail ?? null,
             peakMfePts: open.mfeIndexPts ?? 0,
             initialRiskPts: open.initialRiskPts ?? Math.abs(open.entry - open.stop),
+            optionPeakMfeRs: open.optionPeakMfeRs ?? optMfe,
           };
           exit = strategy.exitLogic(candle, managedOpen, closes, ctx);
           // Profit-protect may ratchet stop; swing_trail updates separate trail.

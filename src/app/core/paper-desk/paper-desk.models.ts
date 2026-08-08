@@ -166,7 +166,8 @@ export interface PaperDeskSnapshot {
     premiumEstimatedCount?: number;
     /**
      * Research Locked ₹: index proxy − ₹40/fill, day capped at ₹3k.
-     * Matches published monthly table (Jul ₹65,041). Testing Profit uses this.
+     * Matches published monthly table (Jul ₹65,041). Side meter only —
+     * Testing Profit ₹ is option money (same basis as Live).
      */
     researchLockedNetRs?: number;
   };

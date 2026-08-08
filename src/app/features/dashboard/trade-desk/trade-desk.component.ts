@@ -589,20 +589,21 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * One Profit ₹:
-   *  - Testing → research Locked index ₹ (published monthly table, Jul ₹65,041)
-   *  - Live money → Kite fills
-   *  - Live paper → option premium when available
+   * One Profit ₹ — option money for Testing and Live (Kite fills overlay on Live money).
+   * Research Locked ₹ is a side meter only.
    */
   protected primaryProfitRs(): number {
     const t = this.resultView().totals;
-    if (this.mode() === 'testing' && t.researchLockedNetRs != null) {
-      return t.researchLockedNetRs;
-    }
     if (t.optionNetAfterChargesRs != null) {
       return t.optionNetAfterChargesRs;
     }
     return t.optionNetRs ?? 0;
+  }
+
+  /** Published Locked index table (Jul ₹65,041) — research side meter. */
+  protected lockedResearchRs(): number | null {
+    const v = this.resultView().totals.researchLockedNetRs;
+    return v == null ? null : v;
   }
 
   /** Per-trade profit — same basis as primary (net if present). */

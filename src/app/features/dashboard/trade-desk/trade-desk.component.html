@@ -195,11 +195,20 @@
         [class.up]="primaryProfitRs() > 0"
         [class.down]="primaryProfitRs() < 0"
       >
-        <span>{{ mode() === 'testing' ? 'Locked ₹' : 'Profit ₹' }}</span>
+        <span>Profit ₹</span>
         <strong
           >{{ primaryProfitRs() > 0 ? '+' : '' }}{{ primaryProfitRs() | number: '1.0-0' }}</strong
         >
       </div>
+      @if (mode() === 'testing' && lockedResearchRs() != null) {
+        <div class="stat">
+          <span>Locked ₹</span>
+          <strong
+            >{{ lockedResearchRs()! > 0 ? '+' : ''
+            }}{{ lockedResearchRs()! | number: '1.0-0' }}</strong
+          >
+        </div>
+      }
       <div class="stat">
         <span>Trades</span>
         <strong>{{ resultView().totals.trades }}</strong>

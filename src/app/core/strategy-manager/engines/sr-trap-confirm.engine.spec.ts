@@ -131,4 +131,34 @@ describe('Trap peak-trail drain (arm ₹600 / giveback ₹300)', () => {
     expect(armTrapProfitDrainFloor(run, open, settings, 'NIFTY BANK')).toBe(true);
     expect(open.stop).toBeCloseTo(52000 - 600 / 30, 5);
   });
+
+  it('does not arm when option MFE is known but still below arm ₹', () => {
+    const open: ManagedOpenPosition = {
+      direction: 'BUY',
+      entry: 25000,
+      stop: 24980,
+      target: 25070,
+      entryTime: '2026-07-28T10:00:00+05:30',
+      peakMfePts: 0,
+      optionPeakMfeRs: 40, // option never cleared ₹600 arm
+    };
+    const candle = bar({ open: 25010, high: 25000 + 900 / 65, low: 25008, close: 25012 });
+    expect(armTrapProfitDrainFloor(candle, open, niftySettings(), 'NIFTY 50')).toBe(false);
+    expect(open.stop).toBe(24980);
+  });
+
+  it('arms when option MFE clears arm ₹ alongside index peak', () => {
+    const open: ManagedOpenPosition = {
+      direction: 'BUY',
+      entry: 25000,
+      stop: 24980,
+      target: 25070,
+      entryTime: '2026-07-28T10:00:00+05:30',
+      peakMfePts: 0,
+      optionPeakMfeRs: 650,
+    };
+    const candle = bar({ open: 25010, high: 25000 + 900 / 65, low: 25008, close: 25012 });
+    expect(armTrapProfitDrainFloor(candle, open, niftySettings(), 'NIFTY 50')).toBe(true);
+    expect(open.stop).toBeCloseTo(25000 + 600 / 65, 5);
+  });
 });

@@ -36,6 +36,13 @@ export interface ManagedOpenPosition {
   peakMfePts?: number;
   /** Initial risk |entry − stop| at fill (for SL confirm cutoff; stop may ratchet later). */
   initialRiskPts?: number;
+  /**
+   * Option-premium peak MFE in ₹ (long option: (high−entry)×lot×lots).
+   * When set, peak-trail arms only after this clears `profitLockArmRs`
+   * (paper≡live — index-only arm caused Locked-green / option-red drains).
+   * Omit / null when option marks are unknown → index-only arm (research Locked).
+   */
+  optionPeakMfeRs?: number | null;
 }
 
 export interface ManagedExitDecision {

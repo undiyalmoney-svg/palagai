@@ -142,7 +142,7 @@ async function tryLoadNfo(): Promise<Instrument[]> {
       out.push({
         instrumentToken: +p[0]!,
         exchangeToken: +p[1]! || 0,
-        tradingsymbol: p[2]!,
+        tradingSymbol: p[2]!,
         name,
         lastPrice: 0,
         expiry: p[5]!,

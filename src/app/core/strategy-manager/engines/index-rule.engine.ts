@@ -449,6 +449,10 @@ export function applyIndexRuleProfitProtect(
  * After peak MFE ≥ armRs, trail stop from peak:
  *   floorRs = max(lockRs, peakRs − givebackRs)
  * Shared by Trap + Genie. Champion: arm ₹600 / lock ₹300 / giveback ₹300.
+ *
+ * Option gate (reports/paper-live-gap): when `optionPeakMfeRs` is known, also
+ * require option ₹ MFE ≥ armRs before arming. Index-only arm was the main
+ * Locked-green / Live-option-red drain path.
  */
 export function armPeakTrailFloor(
   candle: Candle,
@@ -473,6 +477,11 @@ export function armPeakTrailFloor(
   open.peakMfePts = peak;
 
   if (peak < armPts) {
+    return false;
+  }
+
+  // Paper≡Live: do not arm index trail while option money never cleared arm ₹.
+  if (typeof open.optionPeakMfeRs === 'number' && open.optionPeakMfeRs < armRs) {
     return false;
   }
 

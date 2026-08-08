@@ -387,8 +387,8 @@ export class PaperTradeDeskService {
     /**
      * Research Locked months (Jul ₹65,041) use a *post-hoc* ₹3k day cap on index
      * proxy — they do NOT stop entries mid-day. In-strategy dayProfitLockPts is
-     * Live capital protection only. Testing/paper must keep dayProfitLockPts=0
-     * so Profit ₹ can match the published Locked table.
+     * Live capital protection only. Testing keeps dayProfitLockPts=0 so the
+     * Locked side meter can still match the published table; Profit ₹ is option money.
      */
     this.strategyManager.applyIndexDeskRiskSettings(
       resolved.primary,
@@ -551,6 +551,8 @@ export class PaperTradeDeskService {
       const active = this.activeInstruments();
 
       const allEnriched: PaperTrade[] = [];
+      /** Index-only trades (no option-MFE gate) for published Locked ₹ side meter. */
+      const allLockedIndexTrades: PaperTrade[] = [];
       const statusAcc = new Map<
         string,
         {
@@ -601,12 +603,53 @@ export class PaperTradeDeskService {
 
         const needed = new Set<number>();
         const emptyOpt = new Map<number, Candle[]>();
-        const batchIndexTrades: PaperTrade[] = [];
         /** Per-instrument entry map for shadow (full batch). */
         const primaryActionsById = new Map<string, Map<string, string>>();
-
-        // Day-interleaved Nifty+Bank so shared Kutty margin matches Live same-day concurrency.
         const days = chunkInclusiveDateRange(batch.fromDate, batch.toDate, 1);
+
+        // Pass 1 — index-only (no option OHLC): discover ATM tokens + Locked meter trades.
+        for (const dayChunk of days) {
+          const day = dayChunk.fromDate;
+          for (const { instrument, kind } of active) {
+            const candles = candleMap.get(instrument.id) ?? [];
+            const resolved = this.resolveDeskStrategy(kind, 'paper');
+            const discover = replayPaperOnIndex({
+              instrumentId: instrument.id,
+              instrumentName: instrument.name,
+              kind,
+              candles,
+              fromDate: day,
+              toDate: day,
+              instruments: allInstruments,
+              optionCandlesByToken: emptyOpt,
+              neededOptionTokens: needed,
+              lotsMultiplier: this.lotsForInstrument(instrument.id),
+              strategy: resolved.primary,
+              enableKutty: false,
+              kuttyAlone: false,
+            });
+            allLockedIndexTrades.push(...discover.trades);
+          }
+        }
+
+        this.assertActive(runId);
+        if (needed.size) {
+          this.patchMessage(
+            `Batch ${b + 1}/${batches.length}: loading ${needed.size} option contract(s)…`,
+          );
+        }
+        const optionCandles = await this.fetchOptionHistories(
+          [...needed],
+          lookbackFrom,
+          batch.toDate,
+          authorization,
+          runId,
+          '15:30:00',
+        );
+        this.assertActive(runId);
+
+        // Pass 2 — same DNA with option OHLC so peak-trail option-MFE gate = Live.
+        const batchIndexTrades: PaperTrade[] = [];
         for (const dayChunk of days) {
           const day = dayChunk.fromDate;
           const kuttyMargin = { usedRs: 0, trapOpenLegs: 0 };
@@ -621,8 +664,8 @@ export class PaperTradeDeskService {
               fromDate: day,
               toDate: day,
               instruments: allInstruments,
-              optionCandlesByToken: emptyOpt,
-              neededOptionTokens: needed,
+              optionCandlesByToken: optionCandles,
+              neededOptionTokens: new Set(),
               lotsMultiplier: this.lotsForInstrument(instrument.id),
               strategy: resolved.primary,
               enableKutty: this.deskRunOptions.enableKutty,
@@ -685,26 +728,11 @@ export class PaperTradeDeskService {
           });
         }
 
-        this.assertActive(runId);
-        if (needed.size) {
-          this.patchMessage(
-            `Batch ${b + 1}/${batches.length}: loading ${needed.size} option contract(s)…`,
-          );
-        }
-        const optionCandles = await this.fetchOptionHistories(
-          [...needed],
-          lookbackFrom,
-          batch.toDate,
-          authorization,
-          runId,
-          '15:30:00',
+        // Testing Profit ₹ = option money (same executable path as Live paper).
+        const enriched = repriceTradesToExecutableFills(
+          this.premiumEnrichIndex(batchIndexTrades, optionCandles),
+          candleMap,
         );
-        this.assertActive(runId);
-
-        // Testing Profit ₹ = research Locked index (published monthly table).
-        // Do NOT reprice to next-bar executable here — that meter is Live honesty;
-        // Locked months (Jul ₹65,041) are modelled peak-trail + post-hoc ₹3k.
-        const enriched = this.premiumEnrichIndex(batchIndexTrades, optionCandles);
         allEnriched.push(...enriched);
 
         for (const [id, acc] of statusAcc) {
@@ -758,14 +786,11 @@ export class PaperTradeDeskService {
       );
       const dayStats = buildPaperDeskDayStats(sorted);
       const totals = summarize(sorted, (id) => this.lotsForInstrument(id), this.lotsMultiplier);
-      const lockedRs = researchLockedNetRs(sorted, {
+      // Locked ₹ from index-only pass (published Jul ₹65,041) — not option-gated trades.
+      const lockedRs = researchLockedNetRs(allLockedIndexTrades, {
         lotsForInstrument: (id) => this.lotsForInstrument(id),
       });
       totals.researchLockedNetRs = lockedRs;
-      // Testing Profit ₹ = published Locked index table (Jul ₹65,041), not δ-option.
-      totals.optionNetRs = lockedRs;
-      totals.optionNetAfterChargesRs = lockedRs;
-      totals.optionChargesRs = 0;
 
       this.snapshot.set({
         mode: 'testing',
@@ -775,7 +800,7 @@ export class PaperTradeDeskService {
         marketOpen: true,
         realOrders: false,
         lastTickAt: null,
-        message: `Testing complete · ${sorted.length} paper trade(s) · Locked ₹${Math.round(lockedRs).toLocaleString('en-IN')} · ${batches.length} batch(es) · ${this.deskOptionsLabel()} · ${this.kiteStatsLabel()}`,
+        message: `Testing complete · ${sorted.length} paper trade(s) · Profit ₹${Math.round(totals.optionNetAfterChargesRs ?? totals.optionNetRs).toLocaleString('en-IN')} · Locked ₹${Math.round(lockedRs).toLocaleString('en-IN')} · ${batches.length} batch(es) · ${this.deskOptionsLabel()} · ${this.kiteStatsLabel()}`,
         statuses,
         trades: sorted,
         totals,
@@ -1106,10 +1131,42 @@ export class PaperTradeDeskService {
     const indexTrades: PaperTrade[] = [];
     const statuses: PaperInstrumentStatus[] = [];
     const kuttyMargin = { usedRs: 0, trapOpenLegs: 0 };
+    let optionCandles = new Map<number, Candle[]>();
 
     const indexBrokerEvents: IndexLiveBrokerEvent[] = [];
 
     if (indexSessionActive) {
+      // Pass 1 — discover ATM tokens (no broker hook; Kutty off).
+      for (const leg of this.liveLegs) {
+        const resolved = this.resolveDeskStrategy(leg.kind, 'live');
+        replayPaperOnIndex({
+          instrumentId: leg.instrument.id,
+          instrumentName: leg.instrument.name,
+          kind: leg.kind,
+          candles: leg.candles,
+          fromDate: today,
+          toDate: today,
+          instruments: allInstruments,
+          optionCandlesByToken: emptyOpt,
+          neededOptionTokens: needed,
+          forceCloseOpen: now >= '15:15',
+          lotsMultiplier: this.lotsForInstrument(leg.instrument.id),
+          strategy: resolved.primary,
+          enableKutty: false,
+          kuttyAlone: false,
+        });
+      }
+
+      // Same lookback as Testing — feed option OHLC into exit DNA (MFE trail gate).
+      optionCandles = await this.fetchOptionHistories(
+        [...needed],
+        shiftDate(today, -12),
+        today,
+        authorization,
+        undefined,
+        '15:30:00',
+      );
+
       for (const leg of this.liveLegs) {
         const resolved = this.resolveDeskStrategy(leg.kind, 'live');
         const primaryActions = new Map<string, string>();
@@ -1151,8 +1208,8 @@ export class PaperTradeDeskService {
           fromDate: today,
           toDate: today,
           instruments: allInstruments,
-          optionCandlesByToken: emptyOpt,
-          neededOptionTokens: needed,
+          optionCandlesByToken: optionCandles,
+          neededOptionTokens: new Set(),
           forceCloseOpen: now >= '15:15',
           lotsMultiplier: this.lotsForInstrument(leg.instrument.id),
           strategy: resolved.primary,
@@ -1219,15 +1276,6 @@ export class PaperTradeDeskService {
       }
     }
 
-    // Same option lookback as Testing (−12d) so premium attach matches.
-    const optionCandles = await this.fetchOptionHistories(
-      [...needed],
-      shiftDate(today, -12),
-      today,
-      authorization,
-      undefined,
-      '15:30:00',
-    );
     // Paper ≡ Live signal money: executable fills (next-bar open), then charges.
     // Live money Profit ₹ still overlays Kite fills below when realOrders.
     const seriesForFills = new Map<string, Candle[]>();
