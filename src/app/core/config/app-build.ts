@@ -2,7 +2,7 @@
  * App release identity — bump on every main push the user must verify in UI.
  * Shown in Trade Desk “What the app trades on” card.
  */
-export const APP_VERSION = '1.3.103';
+export const APP_VERSION = '1.3.104';
 /** Short build tag for this fix train. */
-export const APP_BUILD = '2026.08.08-fewer-trades-charges';
+export const APP_BUILD = '2026.08.08-live-tick-resilience';
 export const APP_BUILD_LABEL = `v${APP_VERSION} · ${APP_BUILD}`;

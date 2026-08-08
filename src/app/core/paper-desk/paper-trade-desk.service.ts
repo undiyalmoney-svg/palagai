@@ -1082,6 +1082,14 @@ export class PaperTradeDeskService {
     this.liveTickInFlight = true;
     try {
       await this.tickLiveBody(initial);
+    } catch (err) {
+      // Hands-off: never let a dead token / transient Kite error kill the poll
+      // loop silently. Surface the fault; next 15s tick retries (or owner Get Token).
+      const msg = formatUnknownError(err, 'Live tick');
+      this.snapshot.update((s) => ({
+        ...s,
+        message: `Live tick error — retrying: ${msg}`,
+      }));
     } finally {
       this.liveTickInFlight = false;
     }
