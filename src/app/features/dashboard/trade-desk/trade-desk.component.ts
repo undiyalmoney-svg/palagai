@@ -77,6 +77,11 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
    * Client sets capital once; daily job is Get Token + Start + keep tab open.
    */
   protected capitalRs = DEFAULT_TRADING_CAPITAL_RS;
+  /**
+   * Draft string while the capital field is being edited.
+   * Do NOT clamp on every keystroke — that made the input uneditable.
+   */
+  protected capitalDraft = String(DEFAULT_TRADING_CAPITAL_RS);
   /** When true (default), lot inputs are driven by capital — not hand-edited. */
   protected autoLotsFromCapital = true;
   protected capitalPlan: CapitalLotPlan = planLotsForCapital(DEFAULT_TRADING_CAPITAL_RS);
@@ -150,6 +155,7 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.capitalRs = this.capitalPreference.get();
+    this.capitalDraft = String(this.capitalRs);
     // Live continues in the root desk service across tab switches — restore UI mode.
     if (this.snapshot().running) {
       this.mode.set('live');
@@ -160,6 +166,8 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
       // Hands-off: Live · capital → lots · all-green DNA · capital guards on.
       this.mode.set('live');
       this.applyCapitalAgentPreset();
+      // Preset must not wipe a saved capital the user typed earlier.
+      this.capitalDraft = String(this.capitalRs);
     }
     this.enableKutty = false;
     this.kuttyAlone = false;
@@ -169,17 +177,28 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
     // Do not stopLive — desk keeps polling when you switch tabs.
   }
 
-  /** Capital changed → re-allocate lots (unless Live is already running). */
-  protected onCapitalChange(): void {
-    this.capitalRs = Math.max(
+  /**
+   * Commit capital on blur / Enter only — never while typing.
+   * Clamping on ngModelChange was resetting the field every keystroke.
+   */
+  protected commitCapital(): void {
+    const parsed = Math.floor(Number(String(this.capitalDraft).replace(/[,_\s]/g, '')));
+    const next = Math.max(
       10_000,
-      Math.floor(Number(this.capitalRs) || DEFAULT_TRADING_CAPITAL_RS),
+      Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_TRADING_CAPITAL_RS,
     );
-    this.capitalPreference.set(this.capitalRs);
+    this.capitalRs = next;
+    this.capitalDraft = String(next);
+    this.capitalPreference.set(next);
     if (this.busy() || this.snapshot().running) {
       return;
     }
     this.applyCapitalAllocation();
+  }
+
+  /** Keep draft in sync while typing; do not normalize yet. */
+  protected onCapitalDraftChange(raw: string): void {
+    this.capitalDraft = raw;
   }
 
   protected onAutoLotsToggle(): void {

@@ -72,12 +72,15 @@
     <label class="field capital-field agent-capital">
       <span>Capital (₹)</span>
       <input
-        type="number"
-        min="10000"
-        step="1000"
-        [(ngModel)]="capitalRs"
-        (ngModelChange)="onCapitalChange()"
+        type="text"
+        inputmode="numeric"
+        autocomplete="off"
+        [ngModel]="capitalDraft"
+        (ngModelChange)="onCapitalDraftChange($event)"
+        (blur)="commitCapital()"
+        (keydown.enter)="$event.preventDefault(); commitCapital()"
         [disabled]="busy() || snapshot().running"
+        placeholder="e.g. 600000"
       />
     </label>
 
