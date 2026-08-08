@@ -361,18 +361,13 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
       this.error.set('No Kite session. Open Get Token once, then press Start.');
       return;
     }
+    // Commit any in-progress capital typing before sizing / start.
+    this.commitCapital();
     // Hands-off: same plan for Paper and Live — only Kite I/O differs on Live.
     if (this.handsOffAgent) {
       this.applyCapitalAgentPreset();
-    } else {
-      this.capitalRs = Math.max(
-        10_000,
-        Math.floor(Number(this.capitalRs) || DEFAULT_TRADING_CAPITAL_RS),
-      );
-      this.capitalPreference.set(this.capitalRs);
-      if (this.autoLotsFromCapital) {
-        this.applyCapitalAllocation();
-      }
+    } else if (this.autoLotsFromCapital) {
+      this.applyCapitalAllocation();
     }
     if (!this.enableNifty && !this.enableBank) {
       this.error.set('Agent plan has no books — check capital preference (min ₹10,000).');
