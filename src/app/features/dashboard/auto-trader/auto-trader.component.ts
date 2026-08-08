@@ -55,6 +55,53 @@ interface OrderCheckLine {
   message: string;
 }
 
+interface BacktestTrade {
+  id: string;
+  instrumentName: string;
+  direction: 'BUY' | 'SELL';
+  entryTime: string;
+  exitTime: string;
+  exitReason: string;
+  option?: { tradingSymbol?: string; optionType?: 'CE' | 'PE' | string } | null;
+  optionEntryPremium?: number | null;
+  optionExitPremium?: number | null;
+  optionPnlRs?: number | null;
+  netOptionPnlRs?: number | null;
+}
+
+interface BacktestResult {
+  fromDate: string;
+  toDate: string;
+  riskLabels: string[];
+  books: Array<{
+    label: string;
+    strategy: string;
+    trades: number;
+    wins: number;
+    losses: number;
+    optionNetAfterChargesRs: number;
+  }>;
+  totals: {
+    trades: number;
+    wins: number;
+    losses: number;
+    optionNetRs: number;
+    optionNetAfterChargesRs: number;
+  };
+  dayStats: Array<{ date: string; trades: number; optionNetRs: number }>;
+  trades: BacktestTrade[];
+}
+
+function todayIso(): string {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+}
+
+function shiftDays(days: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  return d.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+}
+
 @Component({
   selector: 'app-auto-trader',
   standalone: true,
@@ -111,6 +158,13 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
   protected readonly mode = signal<'paper' | 'live'>('paper');
   protected testQty = 1;
 
+  /** Paper backtest window (IST). Paper runs a From→To replay on the backend. */
+  protected fromDate = todayIso();
+  protected toDate = todayIso();
+  protected readonly backtestBusy = signal(false);
+  protected readonly backtestError = signal('');
+  protected readonly backtest = signal<BacktestResult | null>(null);
+
   protected readonly busy = signal(false);
   protected readonly orderBusy = signal(false);
   protected readonly lastTestOrderId = signal<string | null>(null);
@@ -120,7 +174,7 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
     message: 'Not connected yet',
   });
   protected readonly note = signal(
-    'Same desk as Trade Desk, run on the backend. Paper and Live both fetch data and run the Trap replay on DigitalOcean — Chrome can close. Paper simulates (no real orders); Live places real MIS. Set capital → Push Kite token → Start.',
+    'Same desk as Trade Desk, run on the backend. Paper replays a From→To range on DigitalOcean and returns trades + P&L; Live runs the server worker and places real MIS. Get Token first (Paper uses it to pull historical data).',
   );
 
   protected readonly running = computed(() => this.status().status === 'running');
@@ -222,6 +276,113 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
       parts.push(`profit lock +₹${this.profitLockMoneyRs().toLocaleString('en-IN')}`);
     }
     return parts;
+  }
+
+  // ── Paper backtest (date range, backend-driven — same engine as Live) ──
+  protected setTestingToday(): void {
+    this.fromDate = todayIso();
+    this.toDate = todayIso();
+  }
+
+  protected setTestingRange(daysBack: number): void {
+    this.fromDate = shiftDays(-Math.abs(daysBack));
+    this.toDate = todayIso();
+  }
+
+  /** One Profit ₹ — charges-adjusted option money (Trade Desk basis). */
+  protected primaryProfitRs(): number {
+    const t = this.backtest()?.totals;
+    if (!t) {
+      return 0;
+    }
+    return t.optionNetAfterChargesRs ?? t.optionNetRs ?? 0;
+  }
+
+  protected tradeProfitRs(t: BacktestTrade): number {
+    if (t.netOptionPnlRs != null) {
+      return t.netOptionPnlRs;
+    }
+    return t.optionPnlRs ?? 0;
+  }
+
+  protected hasTradeProfitRs(t: BacktestTrade): boolean {
+    return t.netOptionPnlRs != null || t.optionPnlRs != null;
+  }
+
+  protected optionLegLabel(t: BacktestTrade): string {
+    const ot = (t.option?.optionType ?? '').toUpperCase();
+    if (ot === 'CE' || ot === 'PE') {
+      return `Long ${ot} · fut ${t.direction}`;
+    }
+    return t.direction === 'BUY' ? 'Long CE · fut BUY' : 'Long PE · fut SELL';
+  }
+
+  protected fmtClock(ts: string | null | undefined): string {
+    if (!ts) {
+      return '—';
+    }
+    const m = String(ts).match(/\b(\d{2}:\d{2})\b/);
+    return m?.[1] ?? (String(ts).slice(11, 16) || '—');
+  }
+
+  protected fmtDay(ts: string | null | undefined): string {
+    return ts ? String(ts).slice(0, 10) : '—';
+  }
+
+  /**
+   * Paper Start = backend backtest over From→To. The browser's Kite session is
+   * sent via X-Kite-Authorization so the server can pull historical candles;
+   * it is read-only (no orders). Same replay engine Live uses.
+   */
+  protected async runBacktest(): Promise<void> {
+    this.backtestError.set('');
+    const kite = this.kiteSession.getAuthorizationHeader();
+    if (!kite) {
+      this.backtestError.set('No Kite session — open Get Token first, then run Paper.');
+      return;
+    }
+    if (!this.fromDate || !this.toDate || this.fromDate > this.toDate) {
+      this.backtestError.set('Pick a valid From → To range.');
+      return;
+    }
+    this.commitCapital();
+    this.applyCapitalAllocation();
+    if (!this.enableNifty && !this.enableBank) {
+      this.backtestError.set('Desk plan has no books — check capital (min ₹10,000).');
+      return;
+    }
+    this.backtestBusy.set(true);
+    try {
+      const res = await firstValueFrom(
+        this.http.post<BacktestResult>(
+          `${this.liveApiBase}/backtest`,
+          {
+            fromDate: this.fromDate,
+            toDate: this.toDate,
+            enableNifty: this.enableNifty,
+            enableBank: this.enableBank,
+            enableCrude: false,
+            niftyLots: Math.max(1, Math.floor(this.niftyLots) || 1),
+            bankLots: Math.max(1, Math.floor(this.bankLots) || 1),
+            crudeLots: 1,
+            bankStrategy: this.bankStrategy,
+            niftyStrategy: 'trap',
+            crudeStrategy: 'selective',
+            dayProfitLock: this.dayProfitLock,
+            strictDayStop: this.strictDayStop,
+          },
+          { headers: { 'X-Kite-Authorization': kite } },
+        ),
+      );
+      this.backtest.set(res);
+      this.note.set(
+        `Paper backtest ${res.fromDate} → ${res.toDate}: ${res.totals.trades} trades · net ₹${res.totals.optionNetAfterChargesRs.toLocaleString('en-IN')} (backend replay).`,
+      );
+    } catch (err) {
+      this.backtestError.set(formatUnknownError(err, 'Backtest'));
+    } finally {
+      this.backtestBusy.set(false);
+    }
   }
 
   protected async refreshStatus(): Promise<void> {

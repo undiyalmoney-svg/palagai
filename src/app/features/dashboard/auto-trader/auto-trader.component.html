@@ -4,9 +4,9 @@
       <p class="pg-eyebrow">Auto Bot · Server Desk</p>
       <h1>Trading Agent</h1>
       <p class="pg-lede">
-        <strong>Get Token</strong> → <strong>Push token</strong> → pick
-        <strong>Paper</strong> or <strong>Live</strong> → <strong>Start</strong> →
-        <strong>Stop after 3:15</strong>. The DigitalOcean backend runs both — Chrome can close.
+        Same desk as the Trade Desk, run on the backend. <strong>Paper</strong> replays a
+        From→To range on DigitalOcean and returns trades + P&amp;L; <strong>Live</strong> places real
+        MIS on the droplet. <strong>Get Token</strong> → pick a mode → run.
       </p>
     </div>
     <div class="hero-meta">
@@ -38,7 +38,7 @@
       (click)="setMode('paper')"
     >
       <span class="mode-title">Paper</span>
-      <span class="mode-sub">Backend fetches data · simulates · no real orders</span>
+      <span class="mode-sub">Backend replays From→To · trades + P&amp;L · no real orders</span>
     </button>
     <button
       type="button"
@@ -66,127 +66,283 @@
         (ngModelChange)="onCapitalDraftChange($event)"
         (blur)="commitCapital()"
         (keydown.enter)="$event.preventDefault(); commitCapital()"
-        [disabled]="locked()"
+        [disabled]="locked() || backtestBusy()"
         placeholder="40000"
       />
     </label>
 
     <div class="agent-locked compact">
       <span>
-        {{ mode() === 'live' ? 'Live · real MIS' : 'Paper · simulated' }} ·
+        {{ mode() === 'live' ? 'Live · real MIS' : 'Paper · backend replay' }} ·
         {{ allocationSummary() }} · target ~₹{{ capitalPlan.dailyTargetRs | number: '1.0-0' }}/day
       </span>
     </div>
 
-    <aside class="agent-ops" aria-label="Daily steps">
-      <ol class="agent-ops-list">
-        <li [class.done]="hasKiteSession()">
-          <a routerLink="/dashboard/get-token">Get Token</a>
-        </li>
-        <li>Push token · Start</li>
-        <li>Stop after <strong>3:15</strong></li>
-      </ol>
-    </aside>
-
-    <div class="actions">
-      @if (busy() || running()) {
-        <button mat-stroked-button type="button" class="stop-btn" (click)="stop()" [disabled]="busy()">
-          Stop
-        </button>
-      }
-      <button
-        mat-flat-button
-        type="button"
-        class="start-btn"
-        [disabled]="busy() || running()"
-        (click)="start()"
-      >
-        @if (busy()) {
-          <span class="start-btn-inner">
-            <mat-spinner diameter="16" />
-            <span>Working…</span>
-          </span>
-        } @else if (running()) {
-          <span class="start-btn-inner">{{ mode() === 'live' ? 'Live' : 'Paper' }} running</span>
-        } @else {
-          <span class="start-btn-inner">Start {{ mode() === 'live' ? 'Live' : 'Paper' }}</span>
-        }
+    @if (mode() === 'paper') {
+      <label class="field">
+        <span>From</span>
+        <input type="date" [(ngModel)]="fromDate" [disabled]="backtestBusy()" />
+      </label>
+      <label class="field">
+        <span>To</span>
+        <input type="date" [(ngModel)]="toDate" [disabled]="backtestBusy()" />
+      </label>
+      <button type="button" class="preset-btn" [disabled]="backtestBusy()" (click)="setTestingToday()">
+        Today
       </button>
-    </div>
-  </div>
-
-  <div class="control-bar sub-actions">
-    <button mat-stroked-button type="button" (click)="pushKiteAuth()" [disabled]="busy()">
-      Push Kite token to server
-    </button>
-    <button mat-stroked-button type="button" (click)="refreshStatus()" [disabled]="busy()">
-      Refresh
-    </button>
-  </div>
-
-  @if (running()) {
-    <div class="alive-bar" role="status">
-      <span class="pulse" aria-hidden="true"></span>
-      <strong>I'm alive</strong>
-      <span>
-        @if (status().lastHeartbeatAt) {
-          Last tick {{ status().heartbeatAgeSec ?? '?' }}s ago
-        } @else {
-          Waiting for first heartbeat…
-        }
-      </span>
-    </div>
-  }
-
-  @if (status().message) {
-    <p class="banner info" [class.warn]="status().stale">{{ status().message }}</p>
-  }
-
-  <div class="totals totals-simple">
-    <div class="stat primary" [class.up]="running()">
-      <span>Server</span>
-      <strong>{{ status().status }}</strong>
-    </div>
-    <div class="stat">
-      <span>Mode</span>
-      <strong>{{ mode() === 'live' ? 'Live (real MIS)' : 'Paper (sim)' }}</strong>
-    </div>
-    <div class="stat">
-      <span>Heartbeat</span>
-      <strong>
-        @if (status().lastHeartbeatAt) {
-          {{ status().heartbeatAgeSec ?? '?' }}s
-        } @else {
-          —
-        }
-      </strong>
-    </div>
-    <div class="stat">
-      <span>Books</span>
-      <strong>{{ allocationSummary() }}</strong>
-    </div>
-    <div class="stat">
-      <span>Risk</span>
-      <strong>{{ riskLabels().join(' · ') || 'off' }}</strong>
-    </div>
-  </div>
-
-  <div class="orders-block">
-    <h3>Recent events</h3>
-    @if (!(status().events?.length)) {
-      <p class="pg-lede sub">No events yet — Push token, Start, then Refresh (heartbeat ~60s).</p>
+      <button type="button" class="preset-btn" [disabled]="backtestBusy()" (click)="setTestingRange(10)">
+        10d
+      </button>
+      <div class="actions">
+        <button
+          mat-flat-button
+          type="button"
+          class="start-btn"
+          [disabled]="backtestBusy()"
+          (click)="runBacktest()"
+        >
+          @if (backtestBusy()) {
+            <span class="start-btn-inner">
+              <mat-spinner diameter="16" />
+              <span>Replaying…</span>
+            </span>
+          } @else {
+            <span class="start-btn-inner">Run Paper backtest</span>
+          }
+        </button>
+      </div>
     } @else {
-      <ul class="order-log">
-        @for (e of status().events!; track e.at + e.action + e.detail) {
-          <li>
-            <time>{{ e.at }}</time>
-            <strong>{{ e.action }}</strong>
-            <span>{{ e.detail }}</span>
+      <aside class="agent-ops" aria-label="Daily steps">
+        <ol class="agent-ops-list">
+          <li [class.done]="hasKiteSession()">
+            <a routerLink="/dashboard/get-token">Get Token</a>
           </li>
+          <li>Push token · Start</li>
+          <li>Stop after <strong>3:15</strong></li>
+        </ol>
+      </aside>
+      <div class="actions">
+        @if (busy() || running()) {
+          <button mat-stroked-button type="button" class="stop-btn" (click)="stop()" [disabled]="busy()">
+            Stop
+          </button>
         }
-      </ul>
+        <button
+          mat-flat-button
+          type="button"
+          class="start-btn"
+          [disabled]="busy() || running()"
+          (click)="start()"
+        >
+          @if (busy()) {
+            <span class="start-btn-inner">
+              <mat-spinner diameter="16" />
+              <span>Working…</span>
+            </span>
+          } @else if (running()) {
+            <span class="start-btn-inner">Live running</span>
+          } @else {
+            <span class="start-btn-inner">Start Live</span>
+          }
+        </button>
+      </div>
     }
   </div>
+
+  @if (mode() === 'live') {
+    <div class="control-bar sub-actions">
+      <button mat-stroked-button type="button" (click)="pushKiteAuth()" [disabled]="busy()">
+        Push Kite token to server
+      </button>
+      <button mat-stroked-button type="button" (click)="refreshStatus()" [disabled]="busy()">
+        Refresh
+      </button>
+    </div>
+  }
+
+  <!-- ── PAPER: backend backtest results (same engine as Live) ── -->
+  @if (mode() === 'paper') {
+    @if (backtestError()) {
+      <p class="banner err" role="alert">{{ backtestError() }}</p>
+    }
+    @if (backtest(); as bt) {
+      <div class="totals totals-simple">
+        <div
+          class="stat primary profit-hero"
+          [class.up]="primaryProfitRs() > 0"
+          [class.down]="primaryProfitRs() < 0"
+        >
+          <span>Profit ₹</span>
+          <strong>{{ primaryProfitRs() > 0 ? '+' : '' }}{{ primaryProfitRs() | number: '1.0-0' }}</strong>
+        </div>
+        <div class="stat">
+          <span>Trades</span>
+          <strong>{{ bt.totals.trades }}</strong>
+        </div>
+        <div class="stat">
+          <span>W / L</span>
+          <strong>{{ bt.totals.wins }} / {{ bt.totals.losses }}</strong>
+        </div>
+        <div class="stat">
+          <span>Window</span>
+          <strong>{{ bt.fromDate }} → {{ bt.toDate }}</strong>
+        </div>
+      </div>
+
+      @if (bt.dayStats.length > 1) {
+        <div class="day-stats">
+          <div class="day-stats-head">
+            <div>
+              <h3>Day breakdown</h3>
+              <p>{{ bt.dayStats.length }} trading day(s)</p>
+            </div>
+          </div>
+          <div class="day-tables">
+            <div class="day-table-block">
+              <div class="table-scroll">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Trades</th>
+                      <th>Profit ₹</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (d of bt.dayStats; track d.date) {
+                      <tr>
+                        <td>{{ d.date }}</td>
+                        <td>{{ d.trades }}</td>
+                        <td class="num" [class.up]="d.optionNetRs > 0" [class.down]="d.optionNetRs < 0">
+                          {{ d.optionNetRs > 0 ? '+' : '' }}{{ d.optionNetRs | number: '1.0-0' }}
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      }
+
+      @if (bt.trades.length) {
+        <div class="trades-block">
+          <div class="trades-head">
+            <h3>Trades</h3>
+          </div>
+          <div class="trade-cards" aria-label="Backtest trades">
+            @for (t of bt.trades; track t.id) {
+              <article
+                class="trade-card"
+                [class.win]="hasTradeProfitRs(t) && tradeProfitRs(t) > 0"
+                [class.loss]="hasTradeProfitRs(t) && tradeProfitRs(t) < 0"
+              >
+                <div class="trade-card-top">
+                  <div class="stack">
+                    <strong>{{ t.option?.tradingSymbol || t.instrumentName }}</strong>
+                    <small>
+                      {{ fmtDay(t.entryTime) }} · {{ fmtClock(t.entryTime) }} → {{ fmtClock(t.exitTime) }}
+                      · <span class="dir" [attr.data-dir]="t.direction">{{ optionLegLabel(t) }}</span>
+                    </small>
+                  </div>
+                  <div
+                    class="trade-card-pnl num"
+                    [class.up]="hasTradeProfitRs(t) && tradeProfitRs(t) > 0"
+                    [class.down]="hasTradeProfitRs(t) && tradeProfitRs(t) < 0"
+                  >
+                    @if (hasTradeProfitRs(t)) {
+                      {{ tradeProfitRs(t) > 0 ? '+' : '' }}{{ tradeProfitRs(t) | number: '1.0-0' }}
+                    } @else {
+                      —
+                    }
+                  </div>
+                </div>
+                <div class="trade-card-meta">
+                  @if (t.optionEntryPremium != null && t.optionExitPremium != null) {
+                    <span>{{ t.optionEntryPremium | number: '1.2-2' }} → {{ t.optionExitPremium | number: '1.2-2' }}</span>
+                  }
+                </div>
+                <p class="trade-card-exit">{{ t.exitReason }}</p>
+              </article>
+            }
+          </div>
+        </div>
+      } @else {
+        <p class="pg-lede sub">
+          No trades in {{ bt.fromDate }} → {{ bt.toDate }} for this desk. Try a wider range.
+        </p>
+      }
+    } @else {
+      <p class="pg-lede sub">
+        Pick a From → To range and press <strong>Run Paper backtest</strong>. The DigitalOcean backend
+        replays those days on the same Trap engine as Live and returns trades + P&amp;L.
+      </p>
+    }
+  }
+
+  <!-- ── LIVE: server session status + events ── -->
+  @if (mode() === 'live') {
+    @if (running()) {
+      <div class="alive-bar" role="status">
+        <span class="pulse" aria-hidden="true"></span>
+        <strong>I'm alive</strong>
+        <span>
+          @if (status().lastHeartbeatAt) {
+            Last tick {{ status().heartbeatAgeSec ?? '?' }}s ago
+          } @else {
+            Waiting for first heartbeat…
+          }
+        </span>
+      </div>
+    }
+
+    @if (status().message) {
+      <p class="banner info" [class.warn]="status().stale">{{ status().message }}</p>
+    }
+
+    <div class="totals totals-simple">
+      <div class="stat primary" [class.up]="running()">
+        <span>Server</span>
+        <strong>{{ status().status }}</strong>
+      </div>
+      <div class="stat">
+        <span>Heartbeat</span>
+        <strong>
+          @if (status().lastHeartbeatAt) {
+            {{ status().heartbeatAgeSec ?? '?' }}s
+          } @else {
+            —
+          }
+        </strong>
+      </div>
+      <div class="stat">
+        <span>Books</span>
+        <strong>{{ allocationSummary() }}</strong>
+      </div>
+      <div class="stat">
+        <span>Risk</span>
+        <strong>{{ riskLabels().join(' · ') || 'off' }}</strong>
+      </div>
+    </div>
+
+    <div class="orders-block">
+      <h3>Recent events</h3>
+      @if (!(status().events?.length)) {
+        <p class="pg-lede sub">No events yet — Push token, Start, then Refresh (heartbeat ~60s).</p>
+      } @else {
+        <ul class="order-log">
+          @for (e of status().events!; track e.at + e.action + e.detail) {
+            <li>
+              <time>{{ e.at }}</time>
+              <strong>{{ e.action }}</strong>
+              <span>{{ e.detail }}</span>
+            </li>
+          }
+        </ul>
+      }
+    </div>
+  }
 
   <div class="orders-block order-check">
     <h3>Order path check</h3>
