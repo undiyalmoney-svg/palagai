@@ -32,13 +32,14 @@ export const PROTECTION_DNA_EXTRAS: Record<string, number | boolean> = {
 };
 
 /**
- * ALL-DAY-GREEN Trap DNA (Locked monthly table):
- * pierce15 · Bank30 · peak₹100/50/50 · soft OFF · max 3/day · bounceOR widen OFF.
- * Published Locked: Jan₹53k … Jul₹65,041 … (index proxy − ₹40, day cap ₹3k).
+ * Option-₹ hunt DNA (₹40k N1/B1, Paper≡Live path):
+ * pierce20 · Bank40 · peak₹100/50/50 · soft OFF · max 5/day · RR 3.5 · bounceOR OFF.
+ * Research (reports/option-profit-40k): +51% option ₹ vs old pierce15/max3/RR2 on Jul–Aug
+ * real OHLC; +30% Δ-option Jan–Aug under Live ₹3k day lock.
  */
 export const TRAP_1LOT_DAILY_DNA_EXTRAS: Record<string, number | boolean | string> = {
-  piercePts: 15,
-  bankPiercePts: 30,
+  piercePts: 20,
+  bankPiercePts: 40,
   profitLockArmRs: 100,
   profitLockLockRs: 50,
   profitLockGivebackRs: 50,
@@ -47,11 +48,7 @@ export const TRAP_1LOT_DAILY_DNA_EXTRAS: Record<string, number | boolean | strin
   slConfirmCutoffMaxMfeR: 0,
   slConfirmSoftRs: 0,
   trapMode: 'both',
-  /**
-   * Must stay 0 — bounce-OR widen was a DNA drift that broke the published
-   * Locked monthly table (Jul ₹65,041 → Paper showed ~₹20k option noise).
-   * Hunt DNA: p15/B30 peak100 max3 stop60 · post-hoc lock ₹3k.
-   */
+  /** Must stay 0 — bounce-OR widen drifts DNA and hurts option money. */
   bounceOrPierceMult: 0,
   bounceOrPierceCap: 0,
 };
@@ -81,8 +78,8 @@ export function dnaCapsForStrategy(
 ): StrategyDnaCaps {
   switch (strategyId) {
     case MANAGED_STRATEGY_IDS.SR_TRAP_CONFIRM:
-      /** All-day-green: max 3 · RR2 · desk lock ₹3k · peak₹100 locks winners early. */
-      return { maxTradesPerDay: 3, targetRMultiple: 2 };
+      /** Option-₹ hunt: max 5 · RR3.5 · desk lock ₹3k · peak₹100 · pierce20/40. */
+      return { maxTradesPerDay: 5, targetRMultiple: 3.5 };
     case MANAGED_STRATEGY_IDS.ALIGN_COMBO_GENIE:
       return channel === 'bank'
         ? { maxTradesPerDay: 0, targetRMultiple: 1.5 }

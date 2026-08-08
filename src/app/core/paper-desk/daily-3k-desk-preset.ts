@@ -4,7 +4,7 @@
  */
 export const DAILY_3K_DESK_PRESET = {
   id: 'daily-3k',
-  label: 'All-day green · ₹40k',
+  label: 'Option ₹ · ₹40k',
   niftyLots: 1,
   bankLots: 1,
   enableNifty: true,
@@ -18,7 +18,7 @@ export const DAILY_3K_DESK_PRESET = {
   /** Trading capital the auto-lot planner assumes. */
   capitalRs: 40_000,
   researchNote:
-    '₹40k · Trap all-green peak₹100 · N+B only · max 3/day · lock ₹3k · confirm ON',
+    '₹40k · Trap pierce20/B40 · peak₹100 · max5 · 3.5R · lock ₹3k · option-₹ hunt',
 } as const;
 
 export type Daily3kDeskPreset = typeof DAILY_3K_DESK_PRESET;

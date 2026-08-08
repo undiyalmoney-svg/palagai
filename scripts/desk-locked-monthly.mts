@@ -1,5 +1,6 @@
 /**
- * Assert Paper Trap DNA reproduces the published Locked monthly table.
+ * Assert Paper Trap DNA reproduces the research Locked monthly side meter.
+ * (Option-₹ hunt DNA pierce20/max5/3.5R — Locked is index proxy only.)
  *
  *   npx tsx scripts/desk-locked-monthly.mts
  */
@@ -11,15 +12,16 @@ import { researchLockedByMonth } from '../src/app/core/paper-desk/research-locke
 import { SrTrapConfirmManagedStrategy } from '../src/app/core/strategy-manager/modules/sr-trap-confirm.managed-strategy';
 import type { Candle } from '../src/app/core/models/candle.model';
 
+/** Side-meter Locked ₹ under option-₹ hunt DNA (pierce20 · max5 · 3.5R). */
 const TARGET: Record<string, number> = {
-  '2026-01': 53474,
-  '2026-02': 56229,
-  '2026-03': 45835,
-  '2026-04': 47878,
-  '2026-05': 47122,
-  '2026-06': 57159,
-  '2026-07': 65041,
-  '2026-08': 14545,
+  '2026-01': 53723,
+  '2026-02': 59323,
+  '2026-03': 49104,
+  '2026-04': 51349,
+  '2026-05': 50190,
+  '2026-06': 61340,
+  '2026-07': 69000,
+  '2026-08': 15000,
 };
 
 function load(file: string): Candle[] {
@@ -53,16 +55,17 @@ function run(kind: 'nifty' | 'banknifty', id: string, file: string) {
   const strat = new SrTrapConfirmManagedStrategy();
   strat.initialize();
   const x = strat.getSettings().extras ?? {};
-  if (Number(x['bounceOrPierceMult'] ?? 0) !== 0) {
+  if (Number(x['piercePts'] ?? 0) !== 20 || Number(x['bankPiercePts'] ?? 0) !== 40) {
     throw new Error(
-      `DNA drift: bounceOrPierceMult=${x['bounceOrPierceMult']} (must be 0 for Locked table)`,
+      `DNA drift: pierce=${x['piercePts']}/${x['bankPiercePts']} (need 20/40)`,
     );
+  }
+  if (strat.getSettings().maxTradesPerDay !== 5) {
+    throw new Error(`DNA drift: maxTrades=${strat.getSettings().maxTradesPerDay} (need 5)`);
   }
   strat.updateSettings({
     dayStopPts: 60,
     dayProfitLockPts: 0,
-    maxTradesPerDay: 3,
-    targetRMultiple: 2,
   });
   return replayPaperOnIndex({
     instrumentId: id,
@@ -96,7 +99,7 @@ for (const [m, t] of Object.entries(TARGET)) {
   );
 }
 if (!ok) {
-  console.error('\nLOCKED MONTHLY MISMATCH — Paper DNA ≠ published table');
+  console.error('\nLOCKED MONTHLY MISMATCH — update TARGET after intentional DNA change');
   process.exit(1);
 }
-console.log('\nLOCKED MONTHLY MATCH — Jul ₹65,041 and all months OK');
+console.log('\nLOCKED MONTHLY MATCH — option-₹ hunt DNA side meter OK');

@@ -24,15 +24,15 @@ import {
 
 /**
  * S/R Trap + Confirm — default Nifty/Bank Paper+Live.
- * All-day-green DNA: pierce15 · Bank30 · peak₹100 · max3 · 2R · Locked ₹3k table.
+ * Option-₹ DNA (₹40k): pierce20 · Bank40 · peak₹100 · max5 · 3.5R.
  */
 @Injectable({ providedIn: 'root' })
 export class SrTrapConfirmManagedStrategy implements IManagedStrategy {
   readonly id = MANAGED_STRATEGY_IDS.SR_TRAP_CONFIRM;
   readonly name = 'Trap';
-  readonly version = '1.1.0';
+  readonly version = '1.2.0';
   readonly description =
-    'Default · Trap confirm · pierce15 · Bank pierce30 · peak₹100 · max3 · 2R · Locked monthly DNA.';
+    'Default · Trap confirm · pierce20 · Bank pierce40 · peak₹100 · max5 · 3.5R · option-₹ hunt.';
   readonly supports: readonly DeskChannel[] = ['nifty', 'bank'];
 
   readonly defaultSettings = defaultStrategySettings({
@@ -43,11 +43,11 @@ export class SrTrapConfirmManagedStrategy implements IManagedStrategy {
     stopLossPts: 30,
     bankStopLossPts: 50,
     emaLength: 50,
-    maxTradesPerDay: 3,
+    maxTradesPerDay: 5,
     instrumentType: 'futures',
     dayStopPts: 60,
     dayProfitLockPts: 0,
-    targetRMultiple: 2,
+    targetRMultiple: 3.5,
     profitProtectEnabled: true,
     profitProtectArmR: 1,
     profitProtectLockR: 0,
@@ -56,16 +56,13 @@ export class SrTrapConfirmManagedStrategy implements IManagedStrategy {
     extras: {
       trapMode: 'both',
       swingLb: 5,
-      piercePts: 15,
-      bankPiercePts: 30,
+      piercePts: 20,
+      bankPiercePts: 40,
       minRiskPts: 4,
       maxRiskPts: 28,
       slPadPts: 2,
       minConfirmBody: 0,
-      /**
-       * All-day-green (v1.3.87): pierce15 · Bank30 · bounce OR · peak₹100.
-       * Early trail → 0 red calendar days OOS; flat only when no confirm.
-       */
+      /** Option-₹ hunt: early peak trail still on; wider pierce + more trades + 3.5R. */
       profitLockArmRs: 100,
       profitLockLockRs: 50,
       profitLockGivebackRs: 50,
@@ -73,7 +70,6 @@ export class SrTrapConfirmManagedStrategy implements IManagedStrategy {
       slConfirmCutoffFracR: 0,
       slConfirmCutoffMaxMfeR: 0,
       slConfirmSoftRs: 0,
-      /** 0 = research Locked table DNA (do not widen bounce with OR). */
       bounceOrPierceMult: 0,
       bounceOrPierceCap: 0,
     },
