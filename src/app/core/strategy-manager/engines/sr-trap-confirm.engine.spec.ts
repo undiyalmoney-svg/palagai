@@ -160,6 +160,7 @@ describe('Trap peak-trail drain (arm ₹600 / giveback ₹300)', () => {
       optionEntryPremium: 100,
       optionBarLow: 102.3, // ≈ 100 + 150/65
       optionLotUnits: 65,
+      lotsMultiplier: 1,
     };
     const settings = defaultStrategySettings({
       exitTime: '15:15',
@@ -182,5 +183,50 @@ describe('Trap peak-trail drain (arm ₹600 / giveback ₹300)', () => {
     expect(exit).not.toBeNull();
     expect(exit!.reason).toBe('Profit drained — cut & rehunt');
     expect(exit!.optionExitPremium).toBeCloseTo(102.3, 1);
+  });
+
+  it('multi-lot does not drain on 1-lot MFE — trail scales with lots', () => {
+    const settings = defaultStrategySettings({
+      exitTime: '15:15',
+      targetRMultiple: 3.5,
+      extras: {
+        profitLockArmRs: 100,
+        profitLockLockRs: 50,
+        profitLockGivebackRs: 50,
+        slConfirmCutoffEnabled: false,
+      },
+    });
+    const candle = bar({
+      date: '2026-07-28T10:20:00+05:30',
+      open: 25010,
+      high: 25012,
+      low: 25005,
+      close: 25008,
+    });
+    // Same premium path as 1-lot winner, but 2 lots → MFE ₹200 arms only after scale.
+    const early: ManagedOpenPosition = {
+      direction: 'BUY',
+      entry: 25000,
+      stop: 24980,
+      target: 25070,
+      entryTime: '2026-07-28T10:00:00+05:30',
+      peakMfePts: 0,
+      optionPeakMfeRs: 100,
+      optionEntryPremium: 100,
+      optionBarLow: 99,
+      optionLotUnits: 130,
+      lotsMultiplier: 2,
+    };
+    expect(srTrapExitLogic(candle, early, [25000, 25014, 25008], settings, ctx())).toBeNull();
+
+    const armed: ManagedOpenPosition = {
+      ...early,
+      optionPeakMfeRs: 400,
+      // floor = max(100, 400-100)=300 → floorPrem = 100 + 300/130 ≈ 102.31
+      optionBarLow: 102.3,
+    };
+    const exit = srTrapExitLogic(candle, armed, [25000, 25014, 25008], settings, ctx());
+    expect(exit?.reason).toBe('Profit drained — cut & rehunt');
+    expect(exit?.optionExitPremium).toBeCloseTo(100 + 300 / 130, 1);
   });
 });

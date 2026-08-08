@@ -32,14 +32,16 @@ export const PROTECTION_DNA_EXTRAS: Record<string, number | boolean> = {
 };
 
 /**
- * Option-₹ hunt DNA (₹40k N1/B1, Paper≡Live path):
- * pierce20 · Bank40 · peak₹100/50/50 · soft OFF · max 5/day · RR 3.5 · bounceOR OFF.
+ * Option-₹ hunt DNA (₹40k N1/B1 baseline, Paper≡Live path):
+ * pierce20 · Bank40 · peak₹100/50/50 **per lot** · soft OFF · max 5/day · RR 3.5 · bounceOR OFF.
  * Research (reports/option-profit-40k): +51% option ₹ vs old pierce15/max3/RR2 on Jul–Aug
  * real OHLC; +30% Δ-option Jan–Aug under Live ₹3k day lock.
+ * Raise capital → more lots; trail ₹ scales × lots at runtime (same premium distance).
  */
 export const TRAP_1LOT_DAILY_DNA_EXTRAS: Record<string, number | boolean | string> = {
   piercePts: 20,
   bankPiercePts: 40,
+  /** 1-lot bands — Paper/Live multiply by lotsMultiplier. */
   profitLockArmRs: 100,
   profitLockLockRs: 50,
   profitLockGivebackRs: 50,
