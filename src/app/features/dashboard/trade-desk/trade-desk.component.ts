@@ -154,7 +154,11 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
   });
 
   ngOnInit(): void {
-    this.capitalRs = this.capitalPreference.get();
+    // Default trading capital is ₹40k (saved preference overrides only after user edits).
+    this.capitalRs = this.capitalPreference.get() || DEFAULT_TRADING_CAPITAL_RS;
+    if (this.capitalRs < 10_000) {
+      this.capitalRs = DEFAULT_TRADING_CAPITAL_RS;
+    }
     this.capitalDraft = String(this.capitalRs);
     // Live continues in the root desk service across tab switches — restore UI mode.
     if (this.snapshot().running) {
@@ -167,7 +171,7 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
       this.mode.set('live');
       this.applyCapitalAgentPreset();
       // Preset must not wipe a saved capital the user typed earlier.
-      this.capitalDraft = String(this.capitalRs);
+      this.capitalDraft = String(this.capitalRs || DEFAULT_TRADING_CAPITAL_RS);
     }
     this.enableKutty = false;
     this.kuttyAlone = false;
