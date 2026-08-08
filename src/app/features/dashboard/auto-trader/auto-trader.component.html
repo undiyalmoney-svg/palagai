@@ -1,20 +1,21 @@
 <section class="desk pg-page">
   <header class="hero pg-page-hero">
     <div class="hero-copy">
-      <p class="pg-eyebrow">Auto Bot · Server Live</p>
+      <p class="pg-eyebrow">Auto Bot · Server Desk</p>
       <h1>Trading Agent</h1>
       <p class="pg-lede">
-        <strong>Get Token</strong> → set capital if needed → <strong>Push token</strong> →
-        <strong>Start</strong> → <strong>Stop after 3:15</strong>. Runs on the server — Chrome can close.
+        <strong>Get Token</strong> → <strong>Push token</strong> → pick
+        <strong>Paper</strong> or <strong>Live</strong> → <strong>Start</strong> →
+        <strong>Stop after 3:15</strong>. The DigitalOcean backend runs both — Chrome can close.
       </p>
     </div>
     <div class="hero-meta">
       <span class="pg-badge pg-badge-neutral mono" title="Deployed app build">{{ appBuildLabel }}</span>
       <span
         class="pg-badge"
-        [class.pg-badge-bull]="running()"
-        [class.pg-badge-neutral]="!running()"
-        >{{ running() ? 'Live' : status().status }}</span
+        [class.pg-badge-bull]="mode() === 'live'"
+        [class.pg-badge-neutral]="mode() !== 'live'"
+        >{{ mode() === 'live' ? 'Live' : 'Paper' }}</span
       >
     </div>
   </header>
@@ -25,6 +26,31 @@
       <strong class="as-name">All-day green · Trap</strong>
       <span class="as-meta">{{ allocationSummary() }} · auto lots · day lock + strict stop</span>
     </div>
+  </div>
+
+  <div class="mode-switch" role="tablist" aria-label="Desk mode">
+    <button
+      type="button"
+      role="tab"
+      class="mode-btn"
+      [class.active]="mode() === 'paper'"
+      [disabled]="locked()"
+      (click)="setMode('paper')"
+    >
+      <span class="mode-title">Paper</span>
+      <span class="mode-sub">Backend fetches data · simulates · no real orders</span>
+    </button>
+    <button
+      type="button"
+      role="tab"
+      class="mode-btn"
+      [class.active]="mode() === 'live'"
+      [disabled]="locked()"
+      (click)="setMode('live')"
+    >
+      <span class="mode-title">Live</span>
+      <span class="mode-sub">DigitalOcean · real MIS · Stop after 3:15</span>
+    </button>
   </div>
 
   <p class="banner info">{{ note() }}</p>
@@ -46,16 +72,11 @@
     </label>
 
     <div class="agent-locked compact">
-      <span>{{ allocationSummary() }} · target ~₹{{ capitalPlan.dailyTargetRs | number: '1.0-0' }}/day</span>
+      <span>
+        {{ mode() === 'live' ? 'Live · real MIS' : 'Paper · simulated' }} ·
+        {{ allocationSummary() }} · target ~₹{{ capitalPlan.dailyTargetRs | number: '1.0-0' }}/day
+      </span>
     </div>
-
-    <label class="field realmoney">
-      <span>Real money</span>
-      <label class="realmoney-check">
-        <input type="checkbox" [(ngModel)]="realOrders" [disabled]="locked()" />
-        <span>Server MIS via static-IP Order-API</span>
-      </label>
-    </label>
 
     <aside class="agent-ops" aria-label="Daily steps">
       <ol class="agent-ops-list">
@@ -86,9 +107,9 @@
             <span>Working…</span>
           </span>
         } @else if (running()) {
-          <span class="start-btn-inner">Live running</span>
+          <span class="start-btn-inner">{{ mode() === 'live' ? 'Live' : 'Paper' }} running</span>
         } @else {
-          <span class="start-btn-inner">Start</span>
+          <span class="start-btn-inner">Start {{ mode() === 'live' ? 'Live' : 'Paper' }}</span>
         }
       </button>
     </div>
@@ -125,6 +146,10 @@
     <div class="stat primary" [class.up]="running()">
       <span>Server</span>
       <strong>{{ status().status }}</strong>
+    </div>
+    <div class="stat">
+      <span>Mode</span>
+      <strong>{{ mode() === 'live' ? 'Live (real MIS)' : 'Paper (sim)' }}</strong>
     </div>
     <div class="stat">
       <span>Heartbeat</span>

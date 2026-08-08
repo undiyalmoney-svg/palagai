@@ -102,8 +102,13 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
   /** Desk risk guards — on by default (capital must not drain). */
   protected dayProfitLock = true;
   protected strictDayStop = true;
-  /** When true, the server places real MIS orders via the static-IP Order-API. */
-  protected realOrders = false;
+  /**
+   * Paper vs Live — same two modes as Trade Desk, both run on the backend:
+   *  - paper: server worker fetches data (instruments + 5m candles) and
+   *    simulates the same Trap replay — no real orders.
+   *  - live: DigitalOcean Order-API places real MIS orders on ATM options.
+   */
+  protected readonly mode = signal<'paper' | 'live'>('paper');
   protected testQty = 1;
 
   protected readonly busy = signal(false);
@@ -115,11 +120,19 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
     message: 'Not connected yet',
   });
   protected readonly note = signal(
-    'Server Live on DigitalOcean keeps scanning after Chrome / Wi‑Fi dies. Same desk DNA as Trade Desk: Trap · pierce20/B40 · peak ₹100 · max 3 · lock ₹3k. Set capital → Push Kite token → Start.',
+    'Same desk as Trade Desk, run on the backend. Paper and Live both fetch data and run the Trap replay on DigitalOcean — Chrome can close. Paper simulates (no real orders); Live places real MIS. Set capital → Push Kite token → Start.',
   );
 
   protected readonly running = computed(() => this.status().status === 'running');
   protected readonly locked = computed(() => this.busy() || this.running());
+
+  /** Switch Paper ⇆ Live (blocked while a server session is running). */
+  protected setMode(next: 'paper' | 'live'): void {
+    if (this.locked()) {
+      return;
+    }
+    this.mode.set(next);
+  }
 
   ngOnInit(): void {
     this.capitalRs = this.capitalPreference.get() || DEFAULT_TRADING_CAPITAL_RS;
@@ -226,7 +239,7 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
         this.bankStrategy = res.config.bankStrategy === 'genie' ? 'genie' : 'trap';
         this.dayProfitLock = res.config.dayProfitLock !== false;
         this.strictDayStop = res.config.strictDayStop !== false;
-        this.realOrders = !!res.config.realOrders;
+        this.mode.set(res.config.realOrders ? 'live' : 'paper');
       }
     } catch {
       this.status.set({
@@ -246,10 +259,11 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
       this.note.set('Desk plan has no books — check capital (min ₹10,000).');
       return;
     }
-    if (this.realOrders) {
+    const realOrders = this.mode() === 'live';
+    if (realOrders) {
       const riskBits = this.riskLabels().join(' · ');
       const ok = await this.uiDialog.confirm({
-        title: 'Start server live with real money?',
+        title: 'Start server LIVE with real money?',
         message:
           `Real Kite MIS orders on ATM options via the DigitalOcean static-IP Order-API.\n` +
           `Books: ${this.allocationSummary()} · Trap DNA.\n` +
@@ -278,11 +292,11 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
           crudeStrategy: 'selective',
           dayProfitLock: this.dayProfitLock,
           strictDayStop: this.strictDayStop,
-          realOrders: this.realOrders,
+          realOrders,
         }),
       );
       this.note.set(
-        'Server Live started — strategy worker on DO (60s). Watch Recent events for DATA / SIGNAL / ENTRY.',
+        `Server ${realOrders ? 'LIVE' : 'PAPER'} started — worker on DO (60s). Watch Recent events for DATA / SIGNAL / ENTRY${realOrders ? ' / order fills' : ' (simulated)'}.`,
       );
       await this.refreshStatus();
     } catch (err) {
