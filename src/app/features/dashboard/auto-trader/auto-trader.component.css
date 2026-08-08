@@ -1940,3 +1940,9 @@ td small {
 .orders-block .order-log.check-log li.err {
   color: var(--pg-danger, #e5484d);
 }
+
+/* Trade Desk hides .trade-cards on desktop (it uses a table there). The Auto Bot
+ * only renders cards, so show them at every width. */
+.trades-block .trade-cards {
+  display: flex;
+}
