@@ -321,8 +321,10 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
     if (!ts) {
       return '—';
     }
-    const m = String(ts).match(/\b(\d{2}:\d{2})\b/);
-    return m?.[1] ?? (String(ts).slice(11, 16) || '—');
+    // Replace the ISO 'T' with a space so HH:MM sits on a word boundary.
+    const norm = String(ts).replace('T', ' ');
+    const m = norm.match(/\b(\d{2}:\d{2})\b/);
+    return m?.[1] ?? (norm.slice(11, 16) || '—');
   }
 
   protected fmtDay(ts: string | null | undefined): string {
