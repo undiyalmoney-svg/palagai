@@ -1,6 +1,6 @@
 /**
  * Assert Paper Trap DNA reproduces the research Locked monthly side meter.
- * (Option-₹ hunt DNA pierce20/max5/3.5R — Locked is index proxy only.)
+ * (Option-₹ hunt DNA pierce20/max3/3.5R — Locked is index proxy only.)
  *
  *   npx tsx scripts/desk-locked-monthly.mts
  */
@@ -12,15 +12,15 @@ import { researchLockedByMonth } from '../src/app/core/paper-desk/research-locke
 import { SrTrapConfirmManagedStrategy } from '../src/app/core/strategy-manager/modules/sr-trap-confirm.managed-strategy';
 import type { Candle } from '../src/app/core/models/candle.model';
 
-/** Side-meter Locked ₹ under option-₹ hunt DNA (pierce20 · max5 · 3.5R). */
+/** Side-meter Locked ₹ under option-₹ hunt DNA (pierce20 · max3 · 3.5R). */
 const TARGET: Record<string, number> = {
   '2026-01': 53723,
-  '2026-02': 59323,
+  '2026-02': 58674,
   '2026-03': 49104,
-  '2026-04': 51349,
+  '2026-04': 50270,
   '2026-05': 50190,
   '2026-06': 61340,
-  '2026-07': 69000,
+  '2026-07': 66533,
   '2026-08': 15000,
 };
 
@@ -60,8 +60,8 @@ function run(kind: 'nifty' | 'banknifty', id: string, file: string) {
       `DNA drift: pierce=${x['piercePts']}/${x['bankPiercePts']} (need 20/40)`,
     );
   }
-  if (strat.getSettings().maxTradesPerDay !== 5) {
-    throw new Error(`DNA drift: maxTrades=${strat.getSettings().maxTradesPerDay} (need 5)`);
+  if (strat.getSettings().maxTradesPerDay !== 3) {
+    throw new Error(`DNA drift: maxTrades=${strat.getSettings().maxTradesPerDay} (need 3)`);
   }
   strat.updateSettings({
     dayStopPts: 60,

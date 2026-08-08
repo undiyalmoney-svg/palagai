@@ -33,9 +33,10 @@ export const PROTECTION_DNA_EXTRAS: Record<string, number | boolean> = {
 
 /**
  * Option-₹ hunt DNA (₹40k N1/B1, Paper≡Live path):
- * pierce20 · Bank40 · peak₹100/50/50 · soft OFF · max 5/day · RR 3.5 · bounceOR OFF.
- * Research (reports/option-profit-40k): +51% option ₹ vs old pierce15/max3/RR2 on Jul–Aug
- * real OHLC; +30% Δ-option Jan–Aug under Live ₹3k day lock.
+ * pierce20 · Bank40 · peak₹100/50/50 · soft OFF · max 3/day · RR 3.5 · bounceOR OFF.
+ * Max 3/book (≤6 desk) — max5 hit 10 fills/day; scrap + charges ate edge
+ * (10× tiny wins ≈ loss after Zerodha FO round-trip). Charge-quality report:
+ * max3 keeps pierce20 edge vs old baseline with fewer scrap trades.
  */
 export const TRAP_1LOT_DAILY_DNA_EXTRAS: Record<string, number | boolean | string> = {
   piercePts: 20,
@@ -78,8 +79,8 @@ export function dnaCapsForStrategy(
 ): StrategyDnaCaps {
   switch (strategyId) {
     case MANAGED_STRATEGY_IDS.SR_TRAP_CONFIRM:
-      /** Option-₹ hunt: max 5 · RR3.5 · desk lock ₹3k · peak₹100 · pierce20/40. */
-      return { maxTradesPerDay: 5, targetRMultiple: 3.5 };
+      /** Option-₹ hunt: max 3 · RR3.5 · desk lock ₹3k · peak₹100 · pierce20/40. */
+      return { maxTradesPerDay: 3, targetRMultiple: 3.5 };
     case MANAGED_STRATEGY_IDS.ALIGN_COMBO_GENIE:
       return channel === 'bank'
         ? { maxTradesPerDay: 0, targetRMultiple: 1.5 }

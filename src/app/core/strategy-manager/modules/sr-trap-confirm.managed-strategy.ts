@@ -24,7 +24,8 @@ import {
 
 /**
  * S/R Trap + Confirm — default Nifty/Bank Paper+Live.
- * Option-₹ DNA (₹40k): pierce20 · Bank40 · peak₹100 · max5 · 3.5R.
+ * Option-₹ DNA (₹40k): pierce20 · Bank40 · peak₹100 · max3 · 3.5R.
+ * Max 3/book caps scrap fills — charges turn 10× tiny wins into a loss.
  */
 @Injectable({ providedIn: 'root' })
 export class SrTrapConfirmManagedStrategy implements IManagedStrategy {
@@ -32,7 +33,7 @@ export class SrTrapConfirmManagedStrategy implements IManagedStrategy {
   readonly name = 'Trap';
   readonly version = '1.2.0';
   readonly description =
-    'Default · Trap confirm · pierce20 · Bank pierce40 · peak₹100 · max5 · 3.5R · option-₹ hunt.';
+    'Default · Trap confirm · pierce20 · Bank pierce40 · peak₹100 · max3 · 3.5R · option-₹ hunt.';
   readonly supports: readonly DeskChannel[] = ['nifty', 'bank'];
 
   readonly defaultSettings = defaultStrategySettings({
@@ -43,7 +44,7 @@ export class SrTrapConfirmManagedStrategy implements IManagedStrategy {
     stopLossPts: 30,
     bankStopLossPts: 50,
     emaLength: 50,
-    maxTradesPerDay: 5,
+    maxTradesPerDay: 3,
     instrumentType: 'futures',
     dayStopPts: 60,
     dayProfitLockPts: 0,
