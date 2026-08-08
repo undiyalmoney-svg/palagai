@@ -449,9 +449,9 @@ async function main() {
     s.extras?.['profitLockGivebackRs'] === 50 &&
     s.extras?.['piercePts'] === 20 &&
     s.extras?.['bankPiercePts'] === 40 &&
-    s.maxTradesPerDay === 5 &&
+    s.maxTradesPerDay === 3 &&
     s.targetRMultiple === 3.5;
-  console.log('Trap pierce20/B40 · peak₹100 · max5 · 3.5R:', dnaOk ? 'PASS' : 'FAIL');
+  console.log('Trap pierce20/B40 · peak₹100 · max3 · 3.5R:', dnaOk ? 'PASS' : 'FAIL');
 
   // Aug-7 specific regression (the −₹33 day).
   if (DAY === '2026-08-07') {
