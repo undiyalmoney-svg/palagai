@@ -1,6 +1,7 @@
 /**
  * Server Live strategy worker — Trade Desk parity:
- * Trap pierce20/B40 · peak₹100 · max3 · 3.5R · lock ₹3k · strict stop.
+ * Trap pierce20/B40 · peak₹100 · max3 · 3.5R · lock ₹3k · option −₹350 stand-down.
+ * Fetches option OHLC (same as Trade Desk) so stand-down uses premium ₹, not index pts.
  * Crude Selective only when enabled (OFF by default).
  * Places orders via live-broker → kite.service (does NOT touch kiteOrders.controller).
  */
@@ -223,9 +224,15 @@ class LiveWorker {
       const enableKutty = !!config.enableKutty;
       const riskLots = Math.max(config.niftyLots || 1, config.bankLots || 1, 1);
 
-      /** Closed-leg option ₹ (or index-pt proxy) — doc 51 stand-down after scrap stack. */
+      /**
+       * Closed-leg option ₹ — prefer net-after-charges, then gross option ₹,
+       * else index-pt proxy (only when option OHLC missing).
+       */
       const bookOptionNet = (instrumentId, trades, lots) =>
         (trades || []).reduce((a, t) => {
+          if (t.netOptionPnlRs != null && Number.isFinite(t.netOptionPnlRs)) {
+            return a + t.netOptionPnlRs;
+          }
           if (t.optionPnlRs != null && Number.isFinite(t.optionPnlRs)) {
             return a + t.optionPnlRs;
           }
@@ -233,12 +240,76 @@ class LiveWorker {
           return a + (Number(t.indexPoints) || 0) * rs * lots;
         }, 0);
 
-      let niftyOptionNet = 0;
-      let bankOptionNet = 0;
       let niftyReplay = null;
       let bankReplay = null;
       let bankStrategyName = 'Trap';
 
+      // Pass 1 — discover ATM option tokens (Trade Desk parity).
+      if (config.enableNifty && indexSession) {
+        const strategy = createTrapStrategy();
+        strategy.initialize(trapInitOverrides(config, NIFTY_50_INSTRUMENT.id));
+        replayPaperOnIndex({
+          instrumentId: NIFTY_50_INSTRUMENT.id,
+          instrumentName: NIFTY_50_INSTRUMENT.name,
+          kind: 'nifty',
+          candles: this.candles.nifty,
+          fromDate: today,
+          toDate: today,
+          instruments: this.instruments,
+          optionCandlesByToken: emptyOpt,
+          neededOptionTokens: needed,
+          forceCloseOpen: now >= '15:15',
+          lotsMultiplier: config.niftyLots || 1,
+          strategy,
+          enableKutty: false,
+          kuttyAlone: false,
+        });
+      }
+      if (config.enableBank && indexSession) {
+        const strategy =
+          config.bankStrategy === 'genie' ? createGenieStrategy() : createTrapStrategy();
+        if (config.bankStrategy !== 'genie') {
+          strategy.initialize(trapInitOverrides(config, BANK_NIFTY_INSTRUMENT.id));
+        } else {
+          strategy.initialize();
+        }
+        replayPaperOnIndex({
+          instrumentId: BANK_NIFTY_INSTRUMENT.id,
+          instrumentName: BANK_NIFTY_INSTRUMENT.name,
+          kind: 'banknifty',
+          candles: this.candles.bank,
+          fromDate: today,
+          toDate: today,
+          instruments: this.instruments,
+          optionCandlesByToken: emptyOpt,
+          neededOptionTokens: needed,
+          forceCloseOpen: now >= '15:15',
+          lotsMultiplier: config.bankLots || 1,
+          strategy,
+          enableKutty: false,
+          kuttyAlone: false,
+        });
+      }
+
+      // Fetch option 5m OHLC so stand-down / trail use premium ₹ (not index proxy).
+      const optionCandlesByToken = new Map();
+      const optFrom = addDaysIso(today, -LOOKBACK_DAYS);
+      for (const token of needed) {
+        try {
+          const bars = await fetchHistorical5m(authorization, token, optFrom, today);
+          optionCandlesByToken.set(token, bars || []);
+        } catch (err) {
+          this.pushEvent(
+            'DATA',
+            `Option OHLC miss token ${token}: ${err?.message || err}`,
+          );
+          optionCandlesByToken.set(token, []);
+        }
+      }
+
+      // Pass 2 — real replay with option bars (current-tick option ₹ for stand-down).
+      let niftyOptionNet = 0;
+      let bankOptionNet = 0;
       if (config.enableNifty && indexSession) {
         const strategy = createTrapStrategy();
         strategy.initialize(trapInitOverrides(config, NIFTY_50_INSTRUMENT.id));
@@ -250,8 +321,8 @@ class LiveWorker {
           fromDate: today,
           toDate: today,
           instruments: this.instruments,
-          optionCandlesByToken: emptyOpt,
-          neededOptionTokens: needed,
+          optionCandlesByToken,
+          neededOptionTokens: new Set(),
           forceCloseOpen: now >= '15:15',
           lotsMultiplier: config.niftyLots || 1,
           strategy,
@@ -282,8 +353,8 @@ class LiveWorker {
           fromDate: today,
           toDate: today,
           instruments: this.instruments,
-          optionCandlesByToken: emptyOpt,
-          neededOptionTokens: needed,
+          optionCandlesByToken,
+          neededOptionTokens: new Set(),
           forceCloseOpen: now >= '15:15',
           lotsMultiplier: config.bankLots || 1,
           strategy,

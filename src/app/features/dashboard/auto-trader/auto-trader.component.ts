@@ -25,6 +25,8 @@ type RunStatus = 'running' | 'stopping' | 'stopped' | 'error' | 'unknown';
 /** Same ₹ bands as Trade Desk + Order-API daily-desk-defaults (1-lot base). */
 const DAY_PROFIT_LOCK_PER_LOT_RS = 3_000;
 const STRICT_DAY_STOP_PER_LOT_RS = 2_950;
+/** Same option-₹ stand-down as Trade Desk / Order-API (doc 51). */
+const OPTION_DAY_LOSS_PER_LOT_RS = 350;
 
 interface LiveStatus {
   status: RunStatus;
@@ -267,6 +269,10 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
     return STRICT_DAY_STOP_PER_LOT_RS * this.deskRiskLots();
   }
 
+  protected optionDayLossMoneyRs(): number {
+    return OPTION_DAY_LOSS_PER_LOT_RS * this.deskRiskLots();
+  }
+
   protected riskLabels(): string[] {
     const parts: string[] = [];
     if (this.strictDayStop) {
@@ -275,6 +281,7 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
     if (this.dayProfitLock) {
       parts.push(`profit lock +₹${this.profitLockMoneyRs().toLocaleString('en-IN')}`);
     }
+    parts.push(`option stop −₹${this.optionDayLossMoneyRs().toLocaleString('en-IN')}`);
     return parts;
   }
 

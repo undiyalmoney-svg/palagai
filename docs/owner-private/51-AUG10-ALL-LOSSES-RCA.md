@@ -1,6 +1,6 @@
 # 51 — 2026-08-10 all losses RCA (−₹592.85)
 
-**Build fix:** v1.3.107 · `trade-desk-option-stop` (was v1.3.106 Autobot DNA)  
+**Build fix:** v1.3.108 · `autobot-option-stop` (Trade Desk + Autobot parity)  
 **Positions (MIS, qty 0):**
 
 | Leg | P&L |
@@ -45,7 +45,9 @@ v1.3.107: enrich **before** flush, gate opens on **current-tick** option ₹, su
 1. Autobot Trap DNA ≡ Trade Desk: **pierce20 · Bank40 · peak₹100 · max3 · 3.5R · dayStop 60**  
 2. Option-₹ day-loss stand-down at **−₹350/lot** combined — blocks the 3rd scratch after −₹381 Bank.  
 3. Trade Desk flush uses current-tick enriched option ₹ (not prior snapshot).  
-4. Patch bundle: `docs/owner-private/patches/autobot-desk-parity-310a/` (bot cannot push Order-API).
+4. **Autobot** two-pass replay + **option OHLC fetch** so stand-down uses premium ₹ (not index proxy).  
+5. Auto Bot UI shows option stop −₹350 (same as Trade Desk).  
+6. Patch bundle: `docs/owner-private/patches/autobot-desk-parity-310a/` (bot cannot push Order-API).
 
 ## Ops (do this before next Live start)
 
@@ -60,5 +62,5 @@ cd /var/www/Palagai-Order-API && git pull && pm2 restart trading-backend
 node -e 'const c=require("./live/strategy-core.cjs"); const t=c.createTrapStrategy(); t.initialize(); console.log(t.getSettings().maxTradesPerDay, t.getSettings().extras.piercePts, t.getSettings().extras.profitLockArmRs)'
 ```
 
-Hard-refresh Trade Desk / Auto Bot — badge must show **v1.3.107 · trade-desk-option-stop**.  
+Hard-refresh Trade Desk / Auto Bot — badge must show **v1.3.108 · autobot-option-stop**.  
 Do **not** press Test BUY on RELIANCE during the cash session unless you intend a smoke fill.

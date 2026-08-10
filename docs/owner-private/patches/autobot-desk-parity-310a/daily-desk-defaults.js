@@ -6,8 +6,8 @@
  * Index only by default (Crude OFF — fee protection).
  */
 
-const APP_VERSION = '1.3.107';
-const APP_BUILD = '2026.08.10-trade-desk-option-stop';
+const APP_VERSION = '1.3.108';
+const APP_BUILD = '2026.08.10-autobot-option-stop';
 
 /** Base ₹ bands at 1 lot (combined index books). */
 const DAY_PROFIT_LOCK_RS = 3000;
@@ -40,7 +40,7 @@ const DAILY_3K_PRESET = {
   /** On for hands-off — capital must not drain (Trade Desk parity). */
   strictDayStop: true,
   researchNote:
-    '₹40k · Trap pierce20/B40 · peak₹100 · max3 · 3.5R · lock ₹3k · option-₹ hunt',
+    '₹40k · Trap pierce20/B40 · peak₹100 · max3 · 3.5R · lock ₹3k · option −₹350 stand-down',
 };
 
 function rsPerPointForInstrument(instrumentId) {
@@ -109,6 +109,8 @@ function riskStatusLabels(config) {
   if (config?.dayProfitLock) {
     parts.push(`profit lock +₹${profitLockMoneyRs(lots).toLocaleString('en-IN')}`);
   }
+  // Always on — real brake for MIS premium scrap (doc 51 / Trade Desk parity).
+  parts.push(`option stop −₹${optionDayLossMoneyRs(lots).toLocaleString('en-IN')}`);
   return parts;
 }
 
