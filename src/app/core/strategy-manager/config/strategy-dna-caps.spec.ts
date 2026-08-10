@@ -13,13 +13,13 @@ describe('dnaCapsForStrategy', () => {
     }
   });
 
-  it('caps Trap at 5/day · 3.5R for option-₹ hunt DNA', () => {
+  it('caps Trap at 3/day · 3.5R (charge-aware; avoid 10 scrap fills)', () => {
     expect(dnaCapsForStrategy(MANAGED_STRATEGY_IDS.SR_TRAP_CONFIRM, 'nifty')).toEqual({
-      maxTradesPerDay: 5,
+      maxTradesPerDay: 3,
       targetRMultiple: 3.5,
     });
     expect(dnaCapsForStrategy(MANAGED_STRATEGY_IDS.SR_TRAP_CONFIRM, 'bank').maxTradesPerDay).toBe(
-      5,
+      3,
     );
   });
 

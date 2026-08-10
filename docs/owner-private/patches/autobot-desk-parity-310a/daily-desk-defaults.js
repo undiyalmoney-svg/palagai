@@ -1,0 +1,162 @@
+/**
+ * Daily desk DNA — must match Trade Desk Local Live (palagai.app) + Autobot.
+ * Point thresholds use the 1-lot ₹ band; money at stop ≈ band × lots (do not multiply points by lots).
+ *
+ * Trap: pierce20 · Bank40 · peak₹100 · max3 · 3.5R · lock ₹3k · strict stop on.
+ * Index only by default (Crude OFF — fee protection).
+ */
+
+const APP_VERSION = '1.3.108';
+const APP_BUILD = '2026.08.10-autobot-option-stop';
+
+/** Base ₹ bands at 1 lot (combined index books). */
+const DAY_PROFIT_LOCK_RS = 3000;
+const STRICT_DAY_STOP_RS = 2950;
+/** Option-₹ stand-down (doc 51) — index pts day-stop does not cover premium scrap. */
+const OPTION_DAY_LOSS_RS = 350;
+
+/** ₹ per index point (same as Trade Desk). */
+const NIFTY_RS_PER_POINT = 65;
+const BANK_RS_PER_POINT = 30;
+const CRUDE_RS_PER_POINT = 10;
+
+const DAILY_3K_PRESET = {
+  id: 'daily-3k',
+  label: 'Option ₹ · ₹40k',
+  niftyLots: 1,
+  bankLots: 1,
+  crudeLots: 1,
+  enableNifty: true,
+  enableBank: true,
+  /** Off by default — fee protection (same as Auto Trader UI). */
+  enableCrude: false,
+  enableNatGas: false,
+  enableKutty: false,
+  kuttyAlone: false,
+  niftyStrategy: 'trap',
+  bankStrategy: 'trap',
+  crudeStrategy: 'selective',
+  dayProfitLock: true,
+  /** On for hands-off — capital must not drain (Trade Desk parity). */
+  strictDayStop: true,
+  researchNote:
+    '₹40k · Trap pierce20/B40 · peak₹100 · max3 · 3.5R · lock ₹3k · option −₹350 stand-down',
+};
+
+function rsPerPointForInstrument(instrumentId) {
+  const id = String(instrumentId || '').toLowerCase();
+  if (id.includes('natgas') || id.includes('naturalgas')) return 50;
+  if (id.includes('crude')) return CRUDE_RS_PER_POINT;
+  if (id.includes('bank')) return BANK_RS_PER_POINT;
+  return NIFTY_RS_PER_POINT;
+}
+
+function deskRiskLots(config) {
+  if (!config) return 1;
+  if (config.enableBank && !config.enableNifty) {
+    return Math.max(1, Math.floor(Number(config.bankLots)) || 1);
+  }
+  return Math.max(1, Math.floor(Number(config.niftyLots)) || 1);
+}
+
+function profitLockMoneyRs(lots) {
+  return DAY_PROFIT_LOCK_RS * Math.max(1, Math.floor(Number(lots)) || 1);
+}
+
+function strictStopMoneyRs(lots) {
+  return STRICT_DAY_STOP_RS * Math.max(1, Math.floor(Number(lots)) || 1);
+}
+
+function optionDayLossMoneyRs(lots) {
+  return OPTION_DAY_LOSS_RS * Math.max(1, Math.floor(Number(lots)) || 1);
+}
+
+function isOptionDayLossBreached(combinedOptionNetRs, lots = 1) {
+  const floor = -optionDayLossMoneyRs(lots);
+  return Number.isFinite(combinedOptionNetRs) && combinedOptionNetRs <= floor;
+}
+
+/**
+ * Index point overrides for Trap day risk — mirrors Trade Desk.
+ * Share 50/50 when both Nifty + Bank are on. Points are NOT lot-multiplied.
+ */
+function indexDayRiskOverrides({
+  instrumentId,
+  enableNifty,
+  enableBank,
+  dayProfitLock,
+  strictDayStop,
+}) {
+  if (!dayProfitLock && !strictDayStop) return null;
+  const share = enableNifty && enableBank ? 0.5 : 1;
+  const rs = rsPerPointForInstrument(instrumentId);
+  const out = {};
+  if (strictDayStop) {
+    out.dayStopPts = Math.max(1, Math.round((STRICT_DAY_STOP_RS * share) / rs));
+  }
+  if (dayProfitLock) {
+    out.dayProfitLockPts = Math.max(1, Math.round((DAY_PROFIT_LOCK_RS * share) / rs));
+  }
+  return out;
+}
+
+function riskStatusLabels(config) {
+  const lots = deskRiskLots(config);
+  const parts = [];
+  if (config?.strictDayStop) {
+    parts.push(`strict −₹${strictStopMoneyRs(lots).toLocaleString('en-IN')}`);
+  }
+  if (config?.dayProfitLock) {
+    parts.push(`profit lock +₹${profitLockMoneyRs(lots).toLocaleString('en-IN')}`);
+  }
+  // Always on — real brake for MIS premium scrap (doc 51 / Trade Desk parity).
+  parts.push(`option stop −₹${optionDayLossMoneyRs(lots).toLocaleString('en-IN')}`);
+  return parts;
+}
+
+function normalizeStartConfig(config = {}) {
+  const preset = DAILY_3K_PRESET;
+  const hasBookFlag =
+    config.enableNifty != null ||
+    config.enableBank != null ||
+    config.enableCrude != null;
+
+  return {
+    enableNifty: hasBookFlag ? !!config.enableNifty : preset.enableNifty,
+    enableBank: hasBookFlag ? !!config.enableBank : preset.enableBank,
+    enableCrude: hasBookFlag ? !!config.enableCrude : preset.enableCrude,
+    niftyLots: Math.max(1, Math.floor(Number(config.niftyLots)) || preset.niftyLots),
+    bankLots: Math.max(1, Math.floor(Number(config.bankLots)) || preset.bankLots),
+    crudeLots: Math.max(1, Math.floor(Number(config.crudeLots)) || preset.crudeLots),
+    // Daily path: Trap only (Genie only if client explicitly asks).
+    bankStrategy: config.bankStrategy === 'genie' ? 'genie' : 'trap',
+    niftyStrategy: 'trap',
+    crudeStrategy: config.crudeStrategy === 'all-green' ? 'all-green' : 'selective',
+    // Desk risk: profit lock ON unless client opts out; strict ON unless client opts out.
+    dayProfitLock: config.dayProfitLock !== false,
+    strictDayStop: config.strictDayStop !== false,
+    enableKutty: !!config.enableKutty,
+    kuttyAlone: !!config.kuttyAlone,
+    realOrders: !!config.realOrders,
+  };
+}
+
+module.exports = {
+  APP_VERSION,
+  APP_BUILD,
+  DAY_PROFIT_LOCK_RS,
+  STRICT_DAY_STOP_RS,
+  OPTION_DAY_LOSS_RS,
+  NIFTY_RS_PER_POINT,
+  BANK_RS_PER_POINT,
+  DAILY_3K_PRESET,
+  rsPerPointForInstrument,
+  deskRiskLots,
+  profitLockMoneyRs,
+  strictStopMoneyRs,
+  optionDayLossMoneyRs,
+  isOptionDayLossBreached,
+  indexDayRiskOverrides,
+  riskStatusLabels,
+  normalizeStartConfig,
+};

@@ -23,8 +23,12 @@
   <div class="active-strategy-bar" role="status" aria-live="polite">
     <div class="active-strategy-label">
       <span class="as-kicker">Server desk</span>
-      <strong class="as-name">All-day green · Trap</strong>
-      <span class="as-meta">{{ allocationSummary() }} · auto lots · day lock + strict stop</span>
+      <strong class="as-name">Trap · option ₹</strong>
+      <span class="as-meta"
+        >{{ allocationSummary() }} · pierce20/B40 · max3 · option stop −₹{{
+          optionDayLossMoneyRs() | number: '1.0-0'
+        }}</span
+      >
     </div>
   </div>
 
@@ -74,7 +78,10 @@
     <div class="agent-locked compact">
       <span>
         {{ mode() === 'live' ? 'Live · real MIS' : 'Paper · backend replay' }} ·
-        {{ allocationSummary() }} · target ~₹{{ capitalPlan.dailyTargetRs | number: '1.0-0' }}/day
+        {{ allocationSummary() }} · lock ~₹{{ profitLockMoneyRs() | number: '1.0-0' }}/day · option
+        stop −₹{{ optionDayLossMoneyRs() | number: '1.0-0' }} · target ~₹{{
+          capitalPlan.dailyTargetRs | number: '1.0-0'
+        }}/day
       </span>
     </div>
 

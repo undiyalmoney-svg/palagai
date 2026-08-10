@@ -18,7 +18,7 @@ export const DAILY_3K_DESK_PRESET = {
   /** Trading capital the auto-lot planner assumes. */
   capitalRs: 40_000,
   researchNote:
-    '₹40k · Trap pierce20/B40 · peak₹100 · max5 · 3.5R · lock ₹3k · option-₹ hunt',
+    '₹40k · Trap pierce20/B40 · peak₹100 · max3 · 3.5R · lock ₹3k · option −₹350 stand-down',
 } as const;
 
 export type Daily3kDeskPreset = typeof DAILY_3K_DESK_PRESET;

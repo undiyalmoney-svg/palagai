@@ -48,6 +48,12 @@ import {
   splitCompletedRoundTrips,
 } from './completed-round-trip.util';
 import { repriceTradesToExecutableFills } from './executable-fill.util';
+import {
+  combinedOptionDayNetRs,
+  isOptionDayLossBreached,
+  optionDayLossLegKey,
+  optionDayLossReason,
+} from './option-day-loss.util';
 import { researchLockedNetRs } from './research-locked-pnl.util';
 import { enrichTradesWithCharges } from './trade-charges.util';
 import { buildPaperDeskDayStats, emptyPaperDeskDayStats } from './paper-desk-day-stats';
@@ -1082,6 +1088,14 @@ export class PaperTradeDeskService {
     this.liveTickInFlight = true;
     try {
       await this.tickLiveBody(initial);
+    } catch (err) {
+      // Hands-off: never let a dead token / transient Kite error kill the poll
+      // loop silently. Surface the fault; next 15s tick retries (or owner Get Token).
+      const msg = formatUnknownError(err, 'Live tick');
+      this.snapshot.update((s) => ({
+        ...s,
+        message: `Live tick error — retrying: ${msg}`,
+      }));
     } finally {
       this.liveTickInFlight = false;
     }
@@ -1303,15 +1317,11 @@ export class PaperTradeDeskService {
           }),
         );
       }
-      // Place/exit Nifty+Bank on Kite as soon as new bars open/close.
-      if (this.realOrders && indexBrokerEvents.length) {
-        await this.flushIndexLiveBrokerEvents(authorization, indexBrokerEvents, allInstruments);
-        allInstruments = this.instrumentStore.allInstruments();
-      }
     }
 
     // Paper ≡ Live signal money: executable fills (next-bar open), then charges.
-    // Live money Profit ₹ still overlays Kite fills below when realOrders.
+    // Enrich BEFORE broker flush so option-₹ stand-down sees this tick's closes
+    // (Bank −309 + Nifty open in one batch must block the open — doc 51).
     const seriesForFills = new Map<string, Candle[]>();
     for (const leg of this.liveLegs) {
       seriesForFills.set(leg.instrument.id, leg.candles);
@@ -1325,9 +1335,22 @@ export class PaperTradeDeskService {
 
     for (const s of statuses) {
       const mine = enriched.filter((t) => t.instrumentId === s.instrumentId);
-      s.dayNetOptionRs = mine.reduce((a, t) => a + (t.optionPnlRs ?? 0), 0);
+      s.dayNetOptionRs = mine.reduce(
+        (a, t) => a + (t.netOptionPnlRs ?? t.optionPnlRs ?? 0),
+        0,
+      );
       s.tradesToday = mine.length;
       applyLivePhase(s, mine, true);
+    }
+
+    if (indexSessionActive && this.realOrders && indexBrokerEvents.length) {
+      await this.flushIndexLiveBrokerEvents(
+        authorization,
+        indexBrokerEvents,
+        allInstruments,
+        enriched,
+      );
+      allInstruments = this.instrumentStore.allInstruments();
     }
 
     if (this.realOrders) {
@@ -1408,7 +1431,32 @@ export class PaperTradeDeskService {
           .filter((t) => t.instrumentId === s.instrumentId)
           .sort((a, b) => a.exitTime.localeCompare(b.exitTime))
           .at(-1);
-        const allowNewEntry = !!s.openTrade && !stale && !sessionClosed;
+        const combinedOptionNet = statuses.reduce(
+          (a, row) => a + (row.dayNetOptionRs ?? 0),
+          0,
+        );
+        const riskLots = Math.max(this.niftyLots, this.bankLots, 1);
+        const optionDayLoss = isOptionDayLossBreached(combinedOptionNet, riskLots);
+        const alreadyOnBroker = this.liveOrders.hasOpenPositionFor(
+          s.instrumentId,
+          s.openTrade?.option?.tradingSymbol,
+        );
+        // Stand-down blocks new entries only — never flatten a leg already on Kite.
+        const blockNewDueToOptionLoss = optionDayLoss && !alreadyOnBroker;
+        if (blockNewDueToOptionLoss && s.openTrade && !stale && !sessionClosed) {
+          const key = `opt-day-loss:${s.instrumentId}`;
+          if (!this.staleStartLogged.has(key)) {
+            this.staleStartLogged.add(key);
+            this.liveOrders.pushDeskSkipEvent({
+              instrumentId: s.instrumentId,
+              instrumentName: s.instrumentName,
+              detail: optionDayLossReason(combinedOptionNet, riskLots),
+              tradingSymbol: s.openTrade.option?.tradingSymbol,
+            });
+          }
+        }
+        const allowNewEntry =
+          !!s.openTrade && !stale && !sessionClosed && !blockNewDueToOptionLoss;
         await this.liveOrders.syncInstrument({
           authorization,
           instrumentId: s.instrumentId,
@@ -1599,6 +1647,7 @@ export class PaperTradeDeskService {
     authorization: string,
     events: IndexLiveBrokerEvent[],
     instruments: Instrument[],
+    enrichedTrades: PaperTrade[] = [],
   ): Promise<void> {
     let allInstruments = instruments;
     const { actionable, missed } = splitCompletedRoundTrips(events);
@@ -1614,6 +1663,16 @@ export class PaperTradeDeskService {
         detail: missedRoundTripReason(m.entryTime, m.exitReason),
       });
     }
+    // Missed same-batch round trips never hit Kite — exclude from stand-down math.
+    const missedKeys = new Set(
+      missed.map((m) => optionDayLossLegKey(m.instrumentId, m.entryTime)),
+    );
+    // Current-tick enriched option ₹ (includes this tick's closes). Do NOT use the
+    // prior snapshot — Bank −309 + Nifty open in one flush must stand down.
+    const riskLots = Math.max(this.niftyLots, this.bankLots, 1);
+    const combinedOptionNet = combinedOptionDayNetRs(enrichedTrades, missedKeys);
+    const optionDayLoss = isOptionDayLossBreached(combinedOptionNet, riskLots);
+
     for (const ev of actionable) {
       if (ev.kind === 'open') {
         // Defense in depth: bar hooks only fire for new bars, but never let a
@@ -1632,6 +1691,15 @@ export class PaperTradeDeskService {
             instrumentId: ev.instrumentId,
             instrumentName: ev.instrumentName,
             detail: staleStartReason(ev.open.entryTime, this.liveStartedAt),
+            tradingSymbol: ev.open.option?.tradingSymbol,
+          });
+          continue;
+        }
+        if (optionDayLoss) {
+          this.liveOrders.pushDeskSkipEvent({
+            instrumentId: ev.instrumentId,
+            instrumentName: ev.instrumentName,
+            detail: optionDayLossReason(combinedOptionNet, riskLots),
             tradingSymbol: ev.open.option?.tradingSymbol,
           });
           continue;

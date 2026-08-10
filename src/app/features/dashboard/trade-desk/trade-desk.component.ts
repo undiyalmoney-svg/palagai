@@ -36,6 +36,7 @@ import {
   DEFAULT_TRADING_CAPITAL_RS,
   planLotsForCapital,
 } from '../../../core/paper-desk/capital-plan.util';
+import { deskOptionDayLossMoneyRs } from '../../../core/paper-desk/option-day-loss.util';
 import { CapitalPreferenceService } from '../../../core/services/capital-preference.service';
 import { computeOptionTargetPremium } from '../../../core/live-desk/option-sl-premium.util';
 
@@ -351,6 +352,11 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
     return deskStrictDayLossMoneyRs(this.deskRiskLots());
   }
 
+  /** Option-₹ stand-down (doc 51) — real brake for MIS premium scrap. */
+  protected optionDayLossMoneyRs(): number {
+    return deskOptionDayLossMoneyRs(this.deskRiskLots());
+  }
+
   private selectedBooksLabel(): string {
     const parts = [
       this.enableNifty ? `Nifty 50 ×${this.niftyLots}` : null,
@@ -406,6 +412,7 @@ export class TradeDeskComponent implements OnInit, OnDestroy {
             this.dayProfitLock
               ? `day profit lock +₹${this.profitLockMoneyRs().toLocaleString('en-IN')}`
               : null,
+            `option stand-down −₹${this.optionDayLossMoneyRs().toLocaleString('en-IN')}`,
           ]
             .filter(Boolean)
             .join(', ');

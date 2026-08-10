@@ -674,6 +674,7 @@ export function replayPaperOnIndex(params: {
             optionEntryPremium: open.optionEntryPremium,
             optionBarLow: optBarLow,
             optionLotUnits: lotUnits,
+            lotsMultiplier,
           };
           exit = strategy.exitLogic(candle, managedOpen, closes, ctx);
           // Profit-protect may ratchet stop; swing_trail updates separate trail.

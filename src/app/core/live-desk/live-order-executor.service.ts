@@ -21,7 +21,10 @@ import {
   INDEX_SESSION_EXIT_HHMM,
   shouldHoldForRestingSlm,
 } from './live-drain-hold.util';
-import { optionTrailSlTrigger } from '../paper-desk/option-peak-trail.util';
+import {
+  optionPeakTrailSettingsFromExtras,
+  optionTrailSlTrigger,
+} from '../paper-desk/option-peak-trail.util';
 import { TRAP_1LOT_DAILY_DNA_EXTRAS } from '../strategy-manager/config/strategy-dna-caps';
 import { nowIstStamp } from './live-start-guard.util';
 
@@ -1087,14 +1090,16 @@ export class LiveOrderExecutorService {
     }
 
     // Paper≡Live: once option MFE clears arm ₹, trail SL-M in option premium space.
+    // DNA arm/lock/giveback are 1-lot; MFE ₹ = Δpremium×qty already includes lots.
     let optionPeakMfeRs = pos.optionPeakMfeRs ?? 0;
     if (ltp != null && ltp > 0 && pos.quantity > 0) {
       const mfeRs = Math.max(0, (ltp - fillPremium) * pos.quantity);
       optionPeakMfeRs = Math.max(optionPeakMfeRs, mfeRs);
     }
-    const armRs = Number(TRAP_1LOT_DAILY_DNA_EXTRAS['profitLockArmRs'] ?? 100);
-    const lockRs = Number(TRAP_1LOT_DAILY_DNA_EXTRAS['profitLockLockRs'] ?? 50);
-    const givebackRs = Number(TRAP_1LOT_DAILY_DNA_EXTRAS['profitLockGivebackRs'] ?? 50);
+    const { armRs, lockRs, givebackRs } = optionPeakTrailSettingsFromExtras(
+      TRAP_1LOT_DAILY_DNA_EXTRAS,
+      this.lotsFor(pos.instrumentId),
+    );
     const optionTrigger = optionTrailSlTrigger({
       entryPremium: fillPremium,
       optionPeakMfeRs,
