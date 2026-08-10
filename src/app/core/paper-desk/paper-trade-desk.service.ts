@@ -48,6 +48,7 @@ import {
   splitCompletedRoundTrips,
 } from './completed-round-trip.util';
 import { repriceTradesToExecutableFills } from './executable-fill.util';
+import { isOptionDayLossBreached, optionDayLossReason } from './option-day-loss.util';
 import { researchLockedNetRs } from './research-locked-pnl.util';
 import { enrichTradesWithCharges } from './trade-charges.util';
 import { buildPaperDeskDayStats, emptyPaperDeskDayStats } from './paper-desk-day-stats';
@@ -1416,7 +1417,32 @@ export class PaperTradeDeskService {
           .filter((t) => t.instrumentId === s.instrumentId)
           .sort((a, b) => a.exitTime.localeCompare(b.exitTime))
           .at(-1);
-        const allowNewEntry = !!s.openTrade && !stale && !sessionClosed;
+        const combinedOptionNet = statuses.reduce(
+          (a, row) => a + (row.dayNetOptionRs ?? 0),
+          0,
+        );
+        const riskLots = Math.max(this.niftyLots, this.bankLots, 1);
+        const optionDayLoss = isOptionDayLossBreached(combinedOptionNet, riskLots);
+        const alreadyOnBroker = this.liveOrders.hasOpenPositionFor(
+          s.instrumentId,
+          s.openTrade?.option?.tradingSymbol,
+        );
+        // Stand-down blocks new entries only — never flatten a leg already on Kite.
+        const blockNewDueToOptionLoss = optionDayLoss && !alreadyOnBroker;
+        if (blockNewDueToOptionLoss && s.openTrade && !stale && !sessionClosed) {
+          const key = `opt-day-loss:${s.instrumentId}`;
+          if (!this.staleStartLogged.has(key)) {
+            this.staleStartLogged.add(key);
+            this.liveOrders.pushDeskSkipEvent({
+              instrumentId: s.instrumentId,
+              instrumentName: s.instrumentName,
+              detail: optionDayLossReason(combinedOptionNet, riskLots),
+              tradingSymbol: s.openTrade.option?.tradingSymbol,
+            });
+          }
+        }
+        const allowNewEntry =
+          !!s.openTrade && !stale && !sessionClosed && !blockNewDueToOptionLoss;
         await this.liveOrders.syncInstrument({
           authorization,
           instrumentId: s.instrumentId,
@@ -1622,6 +1648,13 @@ export class PaperTradeDeskService {
         detail: missedRoundTripReason(m.entryTime, m.exitReason),
       });
     }
+    // Prior tick's option ₹ (Kite/paper) — stop stacking scrap after −₹350/lot.
+    const priorOptionNet = (this.state().statuses ?? []).reduce(
+      (a, s) => a + (s.dayNetOptionRs ?? 0),
+      0,
+    );
+    const riskLots = Math.max(this.niftyLots, this.bankLots, 1);
+    const optionDayLoss = isOptionDayLossBreached(priorOptionNet, riskLots);
     for (const ev of actionable) {
       if (ev.kind === 'open') {
         // Defense in depth: bar hooks only fire for new bars, but never let a
@@ -1640,6 +1673,15 @@ export class PaperTradeDeskService {
             instrumentId: ev.instrumentId,
             instrumentName: ev.instrumentName,
             detail: staleStartReason(ev.open.entryTime, this.liveStartedAt),
+            tradingSymbol: ev.open.option?.tradingSymbol,
+          });
+          continue;
+        }
+        if (optionDayLoss) {
+          this.liveOrders.pushDeskSkipEvent({
+            instrumentId: ev.instrumentId,
+            instrumentName: ev.instrumentName,
+            detail: optionDayLossReason(priorOptionNet, riskLots),
             tradingSymbol: ev.open.option?.tradingSymbol,
           });
           continue;

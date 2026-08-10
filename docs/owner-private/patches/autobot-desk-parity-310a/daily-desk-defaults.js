@@ -6,12 +6,14 @@
  * Index only by default (Crude OFF — fee protection).
  */
 
-const APP_VERSION = '1.3.105';
-const APP_BUILD = '2026.08.08-autobot-desk-parity';
+const APP_VERSION = '1.3.106';
+const APP_BUILD = '2026.08.10-stop-red-day';
 
 /** Base ₹ bands at 1 lot (combined index books). */
 const DAY_PROFIT_LOCK_RS = 3000;
 const STRICT_DAY_STOP_RS = 2950;
+/** Option-₹ stand-down (doc 51) — index pts day-stop does not cover premium scrap. */
+const OPTION_DAY_LOSS_RS = 350;
 
 /** ₹ per index point (same as Trade Desk). */
 const NIFTY_RS_PER_POINT = 65;
@@ -63,6 +65,15 @@ function profitLockMoneyRs(lots) {
 
 function strictStopMoneyRs(lots) {
   return STRICT_DAY_STOP_RS * Math.max(1, Math.floor(Number(lots)) || 1);
+}
+
+function optionDayLossMoneyRs(lots) {
+  return OPTION_DAY_LOSS_RS * Math.max(1, Math.floor(Number(lots)) || 1);
+}
+
+function isOptionDayLossBreached(combinedOptionNetRs, lots = 1) {
+  const floor = -optionDayLossMoneyRs(lots);
+  return Number.isFinite(combinedOptionNetRs) && combinedOptionNetRs <= floor;
 }
 
 /**
@@ -133,6 +144,7 @@ module.exports = {
   APP_BUILD,
   DAY_PROFIT_LOCK_RS,
   STRICT_DAY_STOP_RS,
+  OPTION_DAY_LOSS_RS,
   NIFTY_RS_PER_POINT,
   BANK_RS_PER_POINT,
   DAILY_3K_PRESET,
@@ -140,6 +152,8 @@ module.exports = {
   deskRiskLots,
   profitLockMoneyRs,
   strictStopMoneyRs,
+  optionDayLossMoneyRs,
+  isOptionDayLossBreached,
   indexDayRiskOverrides,
   riskStatusLabels,
   normalizeStartConfig,

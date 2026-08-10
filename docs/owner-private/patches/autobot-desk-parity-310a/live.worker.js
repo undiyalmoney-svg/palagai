@@ -19,7 +19,13 @@ const {
 } = require('./strategy-core.cjs');
 const { fetchInstruments, fetchHistorical5m } = require('./kite-market');
 const { LiveBroker } = require('./live-broker');
-const { indexDayRiskOverrides, riskStatusLabels } = require('./daily-desk-defaults');
+const {
+  indexDayRiskOverrides,
+  riskStatusLabels,
+  isOptionDayLossBreached,
+  optionDayLossMoneyRs,
+  rsPerPointForInstrument,
+} = require('./daily-desk-defaults');
 
 const CRUDE_EXIT_BY = '23:10';
 const LOOKBACK_DAYS = 12;
@@ -102,6 +108,9 @@ class LiveWorker {
     this.warmed = false;
     this.tickBusy = false;
     this.lastSignals = { nifty: '', bank: '', crude: '' };
+    /** entryTime of last open we allowed onto the broker (per book). */
+    this.lastSyncedOpen = { nifty: null, bank: null };
+    this._optionDayLossLogged = false;
   }
 
   authHeader() {
@@ -212,11 +221,28 @@ class LiveWorker {
       const indexSession = now >= '09:15' && now <= '15:30';
       const crudeSession = now >= '09:00' && now <= '23:15';
       const enableKutty = !!config.enableKutty;
+      const riskLots = Math.max(config.niftyLots || 1, config.bankLots || 1, 1);
+
+      /** Closed-leg option ₹ (or index-pt proxy) — doc 51 stand-down after scrap stack. */
+      const bookOptionNet = (instrumentId, trades, lots) =>
+        (trades || []).reduce((a, t) => {
+          if (t.optionPnlRs != null && Number.isFinite(t.optionPnlRs)) {
+            return a + t.optionPnlRs;
+          }
+          const rs = rsPerPointForInstrument(instrumentId);
+          return a + (Number(t.indexPoints) || 0) * rs * lots;
+        }, 0);
+
+      let niftyOptionNet = 0;
+      let bankOptionNet = 0;
+      let niftyReplay = null;
+      let bankReplay = null;
+      let bankStrategyName = 'Trap';
 
       if (config.enableNifty && indexSession) {
         const strategy = createTrapStrategy();
         strategy.initialize(trapInitOverrides(config, NIFTY_50_INSTRUMENT.id));
-        const replay = replayPaperOnIndex({
+        niftyReplay = replayPaperOnIndex({
           instrumentId: NIFTY_50_INSTRUMENT.id,
           instrumentName: NIFTY_50_INSTRUMENT.name,
           kind: 'nifty',
@@ -232,20 +258,11 @@ class LiveWorker {
           enableKutty,
           kuttyAlone: !!config.kuttyAlone,
         });
-        await this.broker.syncInstrument({
-          authorization,
-          instrumentId: NIFTY_50_INSTRUMENT.id,
-          instrumentName: 'Nifty Trap',
-          open: toLiveOpen(replay.open),
-          lots: config.niftyLots || 1,
-        });
-        const niftySig =
-          `Nifty Trap · ${replay.lastSignal}` +
-          (replay.open ? ` · OPEN ${replay.open.direction}` : '');
-        if (niftySig !== this.lastSignals.nifty) {
-          this.lastSignals.nifty = niftySig;
-          this.pushEvent('SIGNAL', niftySig);
-        }
+        niftyOptionNet = bookOptionNet(
+          NIFTY_50_INSTRUMENT.id,
+          niftyReplay.trades,
+          config.niftyLots || 1,
+        );
       }
 
       if (config.enableBank && indexSession) {
@@ -256,7 +273,8 @@ class LiveWorker {
         } else {
           strategy.initialize();
         }
-        const replay = replayPaperOnIndex({
+        bankStrategyName = strategy.name;
+        bankReplay = replayPaperOnIndex({
           instrumentId: BANK_NIFTY_INSTRUMENT.id,
           instrumentName: BANK_NIFTY_INSTRUMENT.name,
           kind: 'banknifty',
@@ -272,16 +290,66 @@ class LiveWorker {
           enableKutty,
           kuttyAlone: !!config.kuttyAlone,
         });
+        bankOptionNet = bookOptionNet(
+          BANK_NIFTY_INSTRUMENT.id,
+          bankReplay.trades,
+          config.bankLots || 1,
+        );
+      }
+
+      const combinedOptionNet = niftyOptionNet + bankOptionNet;
+      const optionDayLoss = isOptionDayLossBreached(combinedOptionNet, riskLots);
+      if (optionDayLoss && !this._optionDayLossLogged) {
+        this._optionDayLossLogged = true;
+        this.pushEvent(
+          'SKIP',
+          `Option day-loss stand-down · net ₹${combinedOptionNet.toFixed(0)} ≤ −₹${optionDayLossMoneyRs(riskLots)} — no new entries`,
+        );
+      }
+
+      if (config.enableNifty && indexSession && niftyReplay) {
+        const candidate = toLiveOpen(niftyReplay.open);
+        // Keep managing an open we already synced; block only brand-new entries after −₹350.
+        const keepExisting =
+          !!candidate && this.lastSyncedOpen.nifty === candidate.entryTime;
+        const niftyOpen =
+          optionDayLoss && candidate && !keepExisting ? null : candidate;
+        await this.broker.syncInstrument({
+          authorization,
+          instrumentId: NIFTY_50_INSTRUMENT.id,
+          instrumentName: 'Nifty Trap',
+          open: niftyOpen,
+          lots: config.niftyLots || 1,
+        });
+        this.lastSyncedOpen.nifty = niftyOpen?.entryTime ?? null;
+        const niftySig =
+          `Nifty Trap · ${niftyReplay.lastSignal}` +
+          (niftyOpen ? ` · OPEN ${niftyOpen.direction}` : '') +
+          (optionDayLoss && !niftyOpen ? ' · DAY-LOSS SKIP' : '');
+        if (niftySig !== this.lastSignals.nifty) {
+          this.lastSignals.nifty = niftySig;
+          this.pushEvent('SIGNAL', niftySig);
+        }
+      }
+
+      if (config.enableBank && indexSession && bankReplay) {
+        const candidate = toLiveOpen(bankReplay.open);
+        const keepExisting =
+          !!candidate && this.lastSyncedOpen.bank === candidate.entryTime;
+        const bankOpen =
+          optionDayLoss && candidate && !keepExisting ? null : candidate;
         await this.broker.syncInstrument({
           authorization,
           instrumentId: BANK_NIFTY_INSTRUMENT.id,
           instrumentName: `Bank ${config.bankStrategy === 'genie' ? 'Genie' : 'Trap'}`,
-          open: toLiveOpen(replay.open),
+          open: bankOpen,
           lots: config.bankLots || 1,
         });
+        this.lastSyncedOpen.bank = bankOpen?.entryTime ?? null;
         const bankSig =
-          `Bank ${strategy.name} · ${replay.lastSignal}` +
-          (replay.open ? ` · OPEN ${replay.open.direction}` : '');
+          `Bank ${bankStrategyName} · ${bankReplay.lastSignal}` +
+          (bankOpen ? ` · OPEN ${bankOpen.direction}` : '') +
+          (optionDayLoss && !bankOpen ? ' · DAY-LOSS SKIP' : '');
         if (bankSig !== this.lastSignals.bank) {
           this.lastSignals.bank = bankSig;
           this.pushEvent('SIGNAL', bankSig);
@@ -350,6 +418,8 @@ class LiveWorker {
     this.warmed = false;
     this.broker.clear();
     this.lastSignals = { nifty: '', bank: '', crude: '' };
+    this.lastSyncedOpen = { nifty: null, bank: null };
+    this._optionDayLossLogged = false;
   }
 }
 
