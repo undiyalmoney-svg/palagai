@@ -41,7 +41,7 @@ Those two files are the product “secret sauce.” Docs 01–03 expand them **l
 24. Use **46** for **Crude min-trade max-profit** — Trap SL50/TP200 · ≤4/day · day lock ₹1k (v1.3.63).  
 25. Use **47** for **Monster 5-day-green desk** — Index peak₹150≤2 + Crude eve first-win (v1.3.64; superseded for Live by **48**).  
 26. Use **48** for **Live-safe tomorrow** — peak₹400 + Crude liveHook + no first-win (v1.3.65).
-27. Use **51** for **2026-08-10 all-losses RCA** — Autobot stale pierce3 DNA + option −₹350 stand-down (v1.3.106).
+27. Use **51** for **2026-08-10 all-losses RCA** — Autobot stale pierce3 + Trade Desk option-stop flush fix (v1.3.107).
 
 ## Not in the deploy
 Angular assets come from `src/` + `public/` only (`angular.json`).  

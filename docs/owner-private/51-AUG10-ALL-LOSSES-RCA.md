@@ -1,6 +1,6 @@
 # 51 — 2026-08-10 all losses RCA (−₹592.85)
 
-**Build fix:** v1.3.106 · `stop-red-day`  
+**Build fix:** v1.3.107 · `trade-desk-option-stop` (was v1.3.106 Autobot DNA)  
 **Positions (MIS, qty 0):**
 
 | Leg | P&L |
@@ -27,11 +27,25 @@ Auto Bot / Order-API was still on **stale Trap DNA** in `strategy-core.cjs`:
 
 Index `dayStopPts` did **not** save the day: option premium lost hundreds while index-point net stayed under the stop.
 
+## Trade Desk check (browser Live)
+
+DNA on Trade Desk was already correct (pierce20 / max3 / peak₹100) after Start.
+What was still wrong for a desk-shaped day:
+
+| Issue | Effect |
+|---|---|
+| `strictDayStop` is **index pts** (~₹2,950 band) | −₹72 / −₹309 option scratches never trip it |
+| Option stand-down used **prior-tick** snapshot | Same-tick Bank close + Nifty open still placed the 3rd fill |
+| UI said “All-day green · strict stop” | Hid the real option −₹350 brake |
+
+v1.3.107: enrich **before** flush, gate opens on **current-tick** option ₹, surface option stop in the bar.
+
 ## Wired fix
 
 1. Autobot Trap DNA ≡ Trade Desk: **pierce20 · Bank40 · peak₹100 · max3 · 3.5R · dayStop 60**  
 2. Option-₹ day-loss stand-down at **−₹350/lot** combined — blocks the 3rd scratch after −₹381 Bank.  
-3. Patch bundle: `docs/owner-private/patches/autobot-desk-parity-310a/` (bot cannot push Order-API).
+3. Trade Desk flush uses current-tick enriched option ₹ (not prior snapshot).  
+4. Patch bundle: `docs/owner-private/patches/autobot-desk-parity-310a/` (bot cannot push Order-API).
 
 ## Ops (do this before next Live start)
 
@@ -46,5 +60,5 @@ cd /var/www/Palagai-Order-API && git pull && pm2 restart trading-backend
 node -e 'const c=require("./live/strategy-core.cjs"); const t=c.createTrapStrategy(); t.initialize(); console.log(t.getSettings().maxTradesPerDay, t.getSettings().extras.piercePts, t.getSettings().extras.profitLockArmRs)'
 ```
 
-Hard-refresh Auto Bot — badge must show **v1.3.106 · stop-red-day**.  
+Hard-refresh Trade Desk / Auto Bot — badge must show **v1.3.107 · trade-desk-option-stop**.  
 Do **not** press Test BUY on RELIANCE during the cash session unless you intend a smoke fill.

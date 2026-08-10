@@ -6,8 +6,8 @@
  * Index only by default (Crude OFF — fee protection).
  */
 
-const APP_VERSION = '1.3.106';
-const APP_BUILD = '2026.08.10-stop-red-day';
+const APP_VERSION = '1.3.107';
+const APP_BUILD = '2026.08.10-trade-desk-option-stop';
 
 /** Base ₹ bands at 1 lot (combined index books). */
 const DAY_PROFIT_LOCK_RS = 3000;

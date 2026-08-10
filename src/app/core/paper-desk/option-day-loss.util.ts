@@ -7,6 +7,10 @@
  *
  * When combined closed option ₹ ≤ −threshold, block new entries for the day.
  * Threshold scales with lots (1-lot band × lots). ₹350 stops the 3rd fill after −₹381.
+ *
+ * Trade Desk must gate on **current-tick** enriched option ₹ (not the prior
+ * snapshot) — otherwise a Bank close + Nifty open in one flush still places
+ * the third scratch.
  */
 
 /**
@@ -38,4 +42,54 @@ export function optionDayLossReason(
     `Option day-loss stand-down · net ₹${combinedOptionNetRs.toFixed(0)} ` +
     `≤ −₹${floor} — no new entries today (index pts day-stop does not cover premium).`
   );
+}
+
+export function optionDayLossLegKey(instrumentId: string, entryTime: string): string {
+  return `${instrumentId}::${entryTime}`;
+}
+
+export interface OptionDayLossTradeLike {
+  instrumentId: string;
+  entryTime: string;
+  optionPnlRs?: number | null;
+  netOptionPnlRs?: number | null;
+}
+
+/**
+ * Combined closed option ₹ for Live stand-down.
+ * Prefer net-after-charges; skip same-batch missed round trips (never on Kite).
+ */
+export function combinedOptionDayNetRs(
+  trades: readonly OptionDayLossTradeLike[],
+  excludeLegKeys?: ReadonlySet<string>,
+): number {
+  let sum = 0;
+  for (const t of trades) {
+    const key = optionDayLossLegKey(t.instrumentId, t.entryTime);
+    if (excludeLegKeys?.has(key)) {
+      continue;
+    }
+    const pnl =
+      t.netOptionPnlRs != null && Number.isFinite(t.netOptionPnlRs)
+        ? t.netOptionPnlRs
+        : t.optionPnlRs;
+    if (pnl != null && Number.isFinite(pnl)) {
+      sum += pnl;
+    }
+  }
+  return sum;
+}
+
+/**
+ * Running net across a flush batch: apply each close's option ₹ before the next open.
+ * Used so Bank close (−309) blocks Nifty open in the same tick.
+ */
+export function runningOptionNetAfterClose(
+  runningNetRs: number,
+  closedPnlRs: number | null | undefined,
+): number {
+  if (closedPnlRs == null || !Number.isFinite(closedPnlRs)) {
+    return runningNetRs;
+  }
+  return runningNetRs + closedPnlRs;
 }
