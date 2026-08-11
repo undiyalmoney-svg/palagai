@@ -4,13 +4,14 @@
       <p class="pg-eyebrow">Auto Bot · Server Desk</p>
       <h1>Trading Agent</h1>
       <p class="pg-lede">
-        Same desk as the Trade Desk, run on the backend. <strong>Paper</strong> replays a
-        From→To range on DigitalOcean and returns trades + P&amp;L; <strong>Live</strong> places real
-        MIS on the droplet. <strong>Get Token</strong> → pick a mode → run.
+        {{ deskSupportLine }}. <strong>Get Token</strong> → pick Paper or Live → run.
       </p>
     </div>
     <div class="hero-meta">
-      <span class="pg-badge pg-badge-neutral mono" title="Deployed app build">{{ appBuildLabel }}</span>
+      <span class="pg-badge pg-badge-neutral mono" title="Order-API /live appBuild">{{ displayAppBuild() }}</span>
+      @if (paperLivePath) {
+        <span class="pg-badge pg-badge-neutral" title="Paper uses the same filtered path as Live">Paper≡Live</span>
+      }
       <span
         class="pg-badge"
         [class.pg-badge-bull]="mode() === 'live'"
@@ -23,13 +24,16 @@
   <div class="active-strategy-bar" role="status" aria-live="polite">
     <div class="active-strategy-label">
       <span class="as-kicker">Server desk</span>
-      <strong class="as-name">Trap · option ₹</strong>
+      <strong class="as-name">{{ deskLabel }}</strong>
       <span class="as-meta"
-        >{{ allocationSummary() }} · pierce20/B40 · max3 · option stop −₹{{
+        >{{ allocationSummary() }} · Nifty → Bank after Nifty → Crude after NSE · option stop −₹{{
           optionDayLossMoneyRs() | number: '1.0-0'
         }}</span
       >
     </div>
+    @if (crudeStatusChip(); as crudeChip) {
+      <span class="crude-chip" title="Crude stays armed; entries gate after 15:30 IST">{{ crudeChip }}</span>
+    }
   </div>
 
   <div class="mode-switch" role="tablist" aria-label="Desk mode">
@@ -58,6 +62,74 @@
   </div>
 
   <p class="banner info">{{ note() }}</p>
+
+  <!-- All3 books: Nifty / Bank / Crude — light control rows, not promo cards -->
+  <div class="books-panel" aria-label="Books">
+    <div class="books-head">
+      <strong>Books</strong>
+      <span>{{ deskSupportLine }}</span>
+    </div>
+
+    <div class="book-row">
+      <label class="book-check">
+        <input type="checkbox" [(ngModel)]="enableNifty" [disabled]="locked() || backtestBusy()" />
+        <span class="book-name">Nifty</span>
+      </label>
+      <label class="field lots-field">
+        <span>Lots</span>
+        <input
+          type="number"
+          min="1"
+          [(ngModel)]="niftyLots"
+          [disabled]="locked() || backtestBusy() || !enableNifty"
+        />
+      </label>
+      <span class="book-help">Trap · primary</span>
+    </div>
+
+    @if (showBankBook()) {
+      <div class="book-row">
+        <label class="book-check">
+          <input type="checkbox" [(ngModel)]="enableBank" [disabled]="locked() || backtestBusy()" />
+          <span class="book-name">Bank</span>
+        </label>
+        <label class="field lots-field">
+          <span>Lots</span>
+          <input
+            type="number"
+            min="1"
+            [(ngModel)]="bankLots"
+            [disabled]="locked() || backtestBusy() || !enableBank"
+          />
+        </label>
+        <span class="book-help">Entries only after Nifty trades today</span>
+      </div>
+    }
+
+    @if (showCrudeBook()) {
+      <div class="book-row crude-row">
+        <label class="book-check">
+          <input
+            type="checkbox"
+            [(ngModel)]="enableCrude"
+            [disabled]="locked() || backtestBusy() || crudeAllowed"
+            title="Server forces Crude ON when crudeAllowed"
+          />
+          <span class="book-name">Crude</span>
+        </label>
+        <label class="field lots-field">
+          <span>Lots</span>
+          <input
+            type="number"
+            min="1"
+            [(ngModel)]="crudeLots"
+            [disabled]="locked() || backtestBusy() || !enableCrude"
+          />
+        </label>
+        <span class="book-help">After NSE close · 16:00–21:00 · gate 15:30</span>
+      </div>
+    }
+  </div>
 
   <div class="control-bar">
     <label class="field capital-field agent-capital">
@@ -195,7 +267,32 @@
           <span>Window</span>
           <strong>{{ bt.fromDate }} → {{ bt.toDate }}</strong>
         </div>
+        @if (bt.paperLivePath || paperLivePath) {
+          <div class="stat">
+            <span>Path</span>
+            <strong>Paper≡Live</strong>
+          </div>
+        }
       </div>
+
+      @if (bt.books?.length) {
+        <div class="book-summary" aria-label="Per-book summary">
+          @for (b of bt.books; track b.label + b.strategy) {
+            <div class="book-summary-row">
+              <strong>{{ b.label }}</strong>
+              <span>{{ b.strategy }}</span>
+              <span>{{ b.trades }} trades · {{ b.wins }}/{{ b.losses }}</span>
+              <span
+                class="num"
+                [class.up]="b.optionNetAfterChargesRs > 0"
+                [class.down]="b.optionNetAfterChargesRs < 0"
+              >
+                {{ b.optionNetAfterChargesRs > 0 ? '+' : '' }}{{ b.optionNetAfterChargesRs | number: '1.0-0' }}
+              </span>
+            </div>
+          }
+        </div>
+      }
 
       @if (bt.dayStats.length > 1) {
         <div class="day-stats">
@@ -238,6 +335,9 @@
         <div class="trades-block">
           <div class="trades-head">
             <h3>Trades</h3>
+            <span class="trades-net"
+              >Net ₹{{ bt.totals.optionNetAfterChargesRs | number: '1.0-0' }}</span
+            >
           </div>
           <div class="trade-cards" aria-label="Backtest trades">
             @for (t of bt.trades; track t.id) {
@@ -248,7 +348,10 @@
               >
                 <div class="trade-card-top">
                   <div class="stack">
-                    <strong>{{ t.option?.tradingSymbol || t.instrumentName }}</strong>
+                    <strong>
+                      <span class="book-tag">{{ tradeBookLabel(t) }}</span>
+                      {{ t.option?.tradingSymbol || t.instrumentName }}
+                    </strong>
                     <small>
                       {{ fmtDay(t.entryTime) }} · {{ fmtClock(t.entryTime) }} → {{ fmtClock(t.exitTime) }}
                       · <span class="dir" [attr.data-dir]="t.direction">{{ optionLegLabel(t) }}</span>
@@ -284,7 +387,7 @@
     } @else {
       <p class="pg-lede sub">
         Pick a From → To range and press <strong>Run Paper backtest</strong>. The DigitalOcean backend
-        replays those days on the same Trap engine as Live and returns trades + P&amp;L. Needs a Kite
+        replays those days on the same All3 Paper≡Live path as Live and returns trades + P&amp;L. Needs a Kite
         token — <strong>Get Token</strong>, or <strong>Push Kite token to server</strong> once.
       </p>
     }
@@ -303,6 +406,9 @@
             Waiting for first heartbeat…
           }
         </span>
+        @if (crudeStatusChip(); as crudeChip) {
+          <span class="crude-chip inline">{{ crudeChip }}</span>
+        }
       </div>
     }
 
@@ -330,6 +436,10 @@
         <strong>{{ allocationSummary() }}</strong>
       </div>
       <div class="stat">
+        <span>Crude</span>
+        <strong>{{ status().config?.enableCrude || status().books?.crude ? 'ON · gated 15:30' : '—' }}</strong>
+      </div>
+      <div class="stat">
         <span>Risk</span>
         <strong>{{ riskLabels().join(' · ') || 'off' }}</strong>
       </div>
@@ -342,7 +452,7 @@
       } @else {
         <ul class="order-log">
           @for (e of status().events!; track e.at + e.action + e.detail) {
-            <li>
+            <li [class.notable]="isNotableEvent(e)">
               <time>{{ e.at }}</time>
               <strong>{{ e.action }}</strong>
               <span>{{ e.detail }}</span>
@@ -367,6 +477,9 @@
       <div class="actions">
         <button mat-stroked-button type="button" (click)="pingOrderApi()" [disabled]="orderBusy()">
           1 · Ping Order-API
+        </button>
+        <button mat-stroked-button type="button" (click)="pingLiveHealth()" [disabled]="orderBusy()">
+          Live health
         </button>
         <button mat-flat-button color="warn" type="button" (click)="placeTestBuy()" [disabled]="orderBusy()">
           2 · Test BUY

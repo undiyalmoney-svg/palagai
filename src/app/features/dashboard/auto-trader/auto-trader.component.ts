@@ -20,6 +20,7 @@ import {
 import { CapitalPreferenceService } from '../../../core/services/capital-preference.service';
 
 type BankStrategy = 'trap' | 'genie';
+type CrudeStrategy = 'live-crude-green' | 'selective' | 'all-green';
 type RunStatus = 'running' | 'stopping' | 'stopped' | 'error' | 'unknown';
 
 /** Same ₹ bands as Trade Desk + Order-API daily-desk-defaults (1-lot base). */
@@ -28,12 +29,68 @@ const STRICT_DAY_STOP_PER_LOT_RS = 2_950;
 /** Same option-₹ stand-down as Trade Desk / Order-API (doc 51). */
 const OPTION_DAY_LOSS_PER_LOT_RS = 350;
 
+/** Server All3 capital ladder (one-leg: same capital rotates across books). */
+const ALL3_LOTS_CAPITAL_2X_RS = 75_000;
+
+interface LiveBooks {
+  nifty?: boolean;
+  bank?: boolean;
+  crude?: boolean;
+  bankAllowed?: boolean;
+  crudeAllowed?: boolean;
+  crudeStrategy?: string;
+  crudeWindow?: string;
+  crudeAfterIndexClose?: boolean;
+  bankOnlyAfterNifty?: boolean;
+  label?: string;
+}
+
+interface LivePreset {
+  enableNifty?: boolean;
+  enableBank?: boolean;
+  enableCrude?: boolean;
+  niftyLots?: number;
+  bankLots?: number;
+  crudeLots?: number;
+  crudeStrategy?: CrudeStrategy | string;
+  crudeAfterIndexClose?: boolean;
+  bankOnlyAfterNifty?: boolean;
+  paperLivePath?: boolean;
+  dayProfitLock?: boolean;
+  strictDayStop?: boolean;
+  dnaId?: string;
+  label?: string;
+}
+
+interface LiveDefaults {
+  appBuild?: string;
+  version?: string;
+  preset?: LivePreset;
+  books?: LiveBooks;
+  uiHint?: string;
+}
+
+interface LiveHealth {
+  appBuild?: string;
+  version?: string;
+  crudeAllowed?: boolean;
+  bankAllowed?: boolean;
+  bankOnlyAfterNifty?: boolean;
+  paperLivePath?: boolean;
+  crudeDna?: string;
+  trapDna?: string;
+  defaults?: LivePreset;
+  books?: LiveBooks;
+}
+
 interface LiveStatus {
   status: RunStatus;
   message?: string;
   lastHeartbeatAt?: string | null;
   heartbeatAgeSec?: number | null;
   stale?: boolean;
+  appBuild?: string;
+  books?: LiveBooks;
   config?: {
     enableNifty: boolean;
     enableBank: boolean;
@@ -43,12 +100,22 @@ interface LiveStatus {
     crudeLots: number;
     bankStrategy: BankStrategy;
     niftyStrategy: 'trap';
-    crudeStrategy: 'selective' | 'all-green';
+    crudeStrategy: CrudeStrategy;
+    crudeAfterIndexClose?: boolean;
+    bankOnlyAfterNifty?: boolean;
     dayProfitLock?: boolean;
     strictDayStop?: boolean;
     realOrders: boolean;
+    capital?: number;
+    capitalRs?: number;
   } | null;
   events?: Array<{ at: string; action: string; detail: string }>;
+  trades?: Array<Record<string, unknown>>;
+  totals?: {
+    optionNetAfterChargesRs?: number;
+    optionNetRs?: number;
+    trades?: number;
+  };
 }
 
 interface OrderCheckLine {
@@ -60,6 +127,7 @@ interface OrderCheckLine {
 interface BacktestTrade {
   id: string;
   instrumentName: string;
+  book?: string;
   direction: 'BUY' | 'SELL';
   entryTime: string;
   exitTime: string;
@@ -71,18 +139,21 @@ interface BacktestTrade {
   netOptionPnlRs?: number | null;
 }
 
+interface BacktestBookRow {
+  label: string;
+  strategy: string;
+  trades: number;
+  wins: number;
+  losses: number;
+  optionNetAfterChargesRs: number;
+}
+
 interface BacktestResult {
   fromDate: string;
   toDate: string;
   riskLabels: string[];
-  books: Array<{
-    label: string;
-    strategy: string;
-    trades: number;
-    wins: number;
-    losses: number;
-    optionNetAfterChargesRs: number;
-  }>;
+  paperLivePath?: boolean;
+  books: BacktestBookRow[];
   totals: {
     trades: number;
     wins: number;
@@ -104,6 +175,17 @@ function shiftDays(days: number): string {
   return d.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
 }
 
+function normalizeCrudeStrategy(raw: unknown): CrudeStrategy {
+  const s = String(raw || '').toLowerCase();
+  if (s === 'all-green') {
+    return 'all-green';
+  }
+  if (s === 'selective') {
+    return 'selective';
+  }
+  return 'live-crude-green';
+}
+
 @Component({
   selector: 'app-auto-trader',
   standalone: true,
@@ -119,8 +201,9 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
   private readonly capitalPreference = inject(CapitalPreferenceService);
   private pollTimer: ReturnType<typeof setInterval> | null = null;
 
-  /** Visible build stamp — same badge as Trade Desk so deploys are verifiable. */
+  /** Local UI badge — overridden by server appBuild from /live/health or /live/defaults when available. */
   protected readonly appBuildLabel = APP_BUILD_LABEL;
+  protected readonly serverAppBuild = signal('');
 
   /** Same-origin proxy → DO Order-API /live (server-side control plane). */
   private readonly liveApiBase =
@@ -134,20 +217,32 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
   private readonly testExchange = 'NSE';
 
   /**
-   * Capital → lots, exactly like Trade Desk. Client sets capital once; the
-   * desk plan sizes Nifty + Bank books and the ₹ lock / strict-stop bands.
+   * Capital → lots. All3 one-leg desk reuses the same capital across Nifty → Bank → Crude;
+   * do not hard-off Crude/Bank from capital heuristics.
    */
   protected capitalRs = DEFAULT_TRADING_CAPITAL_RS;
   protected capitalDraft = String(DEFAULT_TRADING_CAPITAL_RS);
   protected capitalPlan: CapitalLotPlan = planLotsForCapital(DEFAULT_TRADING_CAPITAL_RS);
 
-  /** Index books only — Crude is not on the desk (fee protection). */
+  /** All3 books — Nifty Trap → Bank after Nifty → Crude LIVE_CRUDE_GREEN after NSE. */
   protected enableNifty = true;
   protected enableBank = true;
+  protected enableCrude = true;
   protected niftyLots = 1;
   protected bankLots = 1;
+  protected crudeLots = 1;
+  /** From /live/defaults|/live/health — controls row visibility (not capital heuristics). */
+  protected bankAllowed = true;
+  protected crudeAllowed = true;
+  protected bankOnlyAfterNifty = true;
+  protected crudeAfterIndexClose = true;
+  protected paperLivePath = true;
+  protected crudeWindow = '16:00–21:00 IST (gate 15:30)';
+  protected deskLabel = 'All3 · Nifty→Bank→Crude';
+  protected deskSupportLine = 'Nifty → Bank after Nifty → Crude after NSE · Paper≡Live';
   /** Daily path: Trap (Genie only if explicitly chosen). */
   protected bankStrategy: BankStrategy = 'trap';
+  protected crudeStrategy: CrudeStrategy = 'live-crude-green';
   /** Desk risk guards — on by default (capital must not drain). */
   protected dayProfitLock = true;
   protected strictDayStop = true;
@@ -176,11 +271,39 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
     message: 'Not connected yet',
   });
   protected readonly note = signal(
-    'Same desk as Trade Desk, run on the backend. Paper replays a From→To range on DigitalOcean and returns trades + P&L; Live runs the server worker and places real MIS. Get Token first (Paper uses it to pull historical data).',
+    'All3 server desk: Nifty Trap → Bank after Nifty → Crude after NSE. Paper≡Live path. Get Token first, then run.',
   );
 
   protected readonly running = computed(() => this.status().status === 'running');
   protected readonly locked = computed(() => this.busy() || this.running());
+
+  /** Build stamp: prefer live server appBuild so deploy is verifiable. */
+  protected readonly displayAppBuild = computed(() => {
+    const server = this.serverAppBuild() || this.status().appBuild;
+    return server ? String(server) : this.appBuildLabel;
+  });
+
+  /** Visibility from server allow-flags — not capital heuristics. */
+  protected showBankBook(): boolean {
+    return this.bankAllowed !== false;
+  }
+
+  protected showCrudeBook(): boolean {
+    return this.crudeAllowed !== false;
+  }
+
+  /** Crude status chip — ON when config/books say so; never imply off just because before 15:30. */
+  protected crudeStatusChip(): string | null {
+    const s = this.status();
+    const on =
+      s.config?.enableCrude === true ||
+      s.books?.crude === true ||
+      (this.showCrudeBook() && this.enableCrude);
+    if (!on) {
+      return null;
+    }
+    return 'Crude ON · after 15:30';
+  }
 
   /** Switch Paper ⇆ Live (blocked while a server session is running). */
   protected setMode(next: 'paper' | 'live'): void {
@@ -196,7 +319,8 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
       this.capitalRs = DEFAULT_TRADING_CAPITAL_RS;
     }
     this.capitalDraft = String(this.capitalRs);
-    this.applyCapitalAllocation();
+    this.applyCapitalAllocation({ armAllowedBooks: true });
+    void this.loadLiveDefaults();
     void this.refreshStatus();
     this.pollTimer = setInterval(() => void this.refreshStatus(), 15_000);
   }
@@ -228,20 +352,48 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
     this.capitalDraft = raw;
   }
 
-  /** Size Nifty + Bank from total capital — more capital → more lots. */
-  private applyCapitalAllocation(): void {
+  /**
+   * Size lots from capital. Crude stays ON when server-allowed (one-leg reuses capital);
+   * Bank lots resize but user can uncheck Bank. Never hard-hide Crude for low capital.
+   */
+  private applyCapitalAllocation(opts?: { armAllowedBooks?: boolean }): void {
     const plan = planLotsForCapital(this.capitalRs);
     this.capitalPlan = plan;
-    this.enableNifty = plan.enableNifty;
-    this.enableBank = plan.enableBank;
-    this.niftyLots = plan.enableNifty ? Math.max(1, plan.niftyLots) : 0;
-    this.bankLots = plan.enableBank ? Math.max(1, plan.bankLots) : 0;
+
+    // All3 ladder (server maps capital alone): ₹12k+ → 1/1/1, ₹75k+ → 2/2/2.
+    // Prefer plan lots when larger (higher capital scales N/B); Crude matches that lot count.
+    const ladderLots = this.capitalRs >= ALL3_LOTS_CAPITAL_2X_RS ? 2 : 1;
+    const niftyLots = Math.max(ladderLots, plan.niftyLots || 1);
+    const bankLots = Math.max(ladderLots, plan.bankLots || 1);
+
+    this.enableNifty = true;
+    this.niftyLots = niftyLots;
+
+    if (this.bankAllowed !== false) {
+      this.bankLots = bankLots;
+      if (opts?.armAllowedBooks) {
+        this.enableBank = true;
+      }
+    } else {
+      this.enableBank = false;
+      this.bankLots = Math.max(1, bankLots);
+    }
+
+    if (this.crudeAllowed !== false) {
+      // Server forces Crude ON when crudeAllowed — keep checked even at low capital.
+      this.enableCrude = true;
+      this.crudeLots = Math.max(ladderLots, niftyLots);
+    } else {
+      this.enableCrude = false;
+      this.crudeLots = Math.max(1, this.crudeLots || 1);
+    }
   }
 
   protected allocationSummary(): string {
     const bits = [
       this.enableNifty ? `Nifty ×${this.niftyLots}` : null,
-      this.enableBank ? `Bank ×${this.bankLots}` : null,
+      this.showBankBook() && this.enableBank ? `Bank ×${this.bankLots}` : null,
+      this.showCrudeBook() && this.enableCrude ? `Crude ×${this.crudeLots}` : null,
     ].filter(Boolean);
     return bits.join(' · ') || 'no books';
   }
@@ -316,6 +468,24 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
     return t.netOptionPnlRs != null || t.optionPnlRs != null;
   }
 
+  /** Normalize book label for trade rows (Nifty / Bank / Crude). */
+  protected tradeBookLabel(t: BacktestTrade): string {
+    const raw = String(t.book || t.instrumentName || '').toLowerCase();
+    if (raw.includes('crude')) {
+      return 'Crude';
+    }
+    if (raw.includes('bank')) {
+      return 'Bank';
+    }
+    if (raw.includes('nifty') || raw.includes('nse:n')) {
+      return 'Nifty';
+    }
+    if (t.book) {
+      return String(t.book);
+    }
+    return t.instrumentName || '—';
+  }
+
   protected optionLegLabel(t: BacktestTrade): string {
     const ot = (t.option?.optionType ?? '').toUpperCase();
     if (ot === 'CE' || ot === 'PE') {
@@ -338,6 +508,131 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
     return ts ? String(ts).slice(0, 10) : '—';
   }
 
+  protected isNotableEvent(e: { action: string; detail: string }): boolean {
+    const action = String(e.action || '').toUpperCase();
+    const detail = String(e.detail || '');
+    if (action === 'CRUDE_ON') {
+      return true;
+    }
+    return /crude|wait nifty|nifty first/i.test(`${action} ${detail}`);
+  }
+
+  /** Build Start / Paper payload aligned with Order-API All3 normalizeStartConfig. */
+  private buildLivePayload(realOrders: boolean): Record<string, unknown> {
+    const enableCrude = this.showCrudeBook() ? true : !!this.enableCrude;
+    const enableBank = this.showBankBook() ? !!this.enableBank : false;
+    return {
+      enableNifty: true,
+      enableBank,
+      enableCrude,
+      niftyLots: Math.max(1, Math.floor(this.niftyLots) || 1),
+      bankLots: Math.max(1, Math.floor(this.bankLots) || 1),
+      crudeLots: Math.max(1, Math.floor(this.crudeLots) || 1),
+      crudeStrategy: this.crudeStrategy || 'live-crude-green',
+      crudeAfterIndexClose: this.crudeAfterIndexClose !== false,
+      bankOnlyAfterNifty: this.bankOnlyAfterNifty !== false,
+      dayProfitLock: this.dayProfitLock,
+      strictDayStop: this.strictDayStop,
+      realOrders,
+      capital: this.capitalRs,
+      capitalRs: this.capitalRs,
+      bankStrategy: this.bankStrategy,
+      niftyStrategy: 'trap',
+    };
+  }
+
+  /** Pull All3 preset / books / appBuild from Order-API. */
+  private async loadLiveDefaults(): Promise<void> {
+    try {
+      const [defaults, health] = await Promise.all([
+        firstValueFrom(this.http.get<LiveDefaults>(`${this.liveApiBase}/defaults`)).catch(
+          () => null,
+        ),
+        firstValueFrom(this.http.get<LiveHealth>(`${this.liveApiBase}/health`)).catch(() => null),
+      ]);
+
+      const preset = defaults?.preset ?? health?.defaults ?? null;
+      const books = defaults?.books ?? health?.books ?? null;
+
+      if (defaults?.appBuild || health?.appBuild) {
+        this.serverAppBuild.set(String(defaults?.appBuild || health?.appBuild));
+      }
+
+      if (health?.bankAllowed != null) {
+        this.bankAllowed = health.bankAllowed !== false;
+      } else if (books?.bankAllowed != null) {
+        this.bankAllowed = books.bankAllowed !== false;
+      }
+
+      if (health?.crudeAllowed != null) {
+        this.crudeAllowed = health.crudeAllowed !== false;
+      } else if (books?.crudeAllowed != null) {
+        this.crudeAllowed = books.crudeAllowed !== false;
+      }
+
+      if (health?.bankOnlyAfterNifty != null) {
+        this.bankOnlyAfterNifty = health.bankOnlyAfterNifty !== false;
+      } else if (books?.bankOnlyAfterNifty != null) {
+        this.bankOnlyAfterNifty = books.bankOnlyAfterNifty !== false;
+      } else if (preset?.bankOnlyAfterNifty != null) {
+        this.bankOnlyAfterNifty = preset.bankOnlyAfterNifty !== false;
+      }
+
+      if (preset?.crudeAfterIndexClose != null) {
+        this.crudeAfterIndexClose = preset.crudeAfterIndexClose !== false;
+      } else if (books?.crudeAfterIndexClose != null) {
+        this.crudeAfterIndexClose = books.crudeAfterIndexClose !== false;
+      }
+
+      if (health?.paperLivePath != null) {
+        this.paperLivePath = !!health.paperLivePath;
+      } else if (preset?.paperLivePath != null) {
+        this.paperLivePath = !!preset.paperLivePath;
+      }
+
+      if (books?.crudeWindow) {
+        this.crudeWindow = String(books.crudeWindow);
+      }
+
+      const label = preset?.label || books?.label;
+      if (label) {
+        this.deskLabel = String(label);
+      }
+      if (books?.label) {
+        this.deskSupportLine = `${books.label} · Paper≡Live`;
+      } else {
+        this.deskSupportLine = 'Nifty → Bank after Nifty → Crude after NSE · Paper≡Live';
+      }
+
+      if (preset) {
+        this.enableNifty = preset.enableNifty !== false;
+        this.enableBank = this.bankAllowed ? preset.enableBank !== false : false;
+        // Server forces Crude ON when allowed — bind enableCrude from defaults.
+        this.enableCrude = this.crudeAllowed ? preset.enableCrude !== false : false;
+        if (this.crudeAllowed && preset.enableCrude == null) {
+          this.enableCrude = true;
+        }
+        this.niftyLots = Math.max(1, Math.floor(Number(preset.niftyLots)) || this.niftyLots);
+        this.bankLots = Math.max(1, Math.floor(Number(preset.bankLots)) || this.bankLots);
+        this.crudeLots = Math.max(1, Math.floor(Number(preset.crudeLots)) || this.crudeLots);
+        this.crudeStrategy = normalizeCrudeStrategy(preset.crudeStrategy);
+        this.dayProfitLock = preset.dayProfitLock !== false;
+        this.strictDayStop = preset.strictDayStop !== false;
+      } else if (this.crudeAllowed) {
+        this.enableCrude = true;
+        this.crudeStrategy = 'live-crude-green';
+      }
+
+      // Re-apply capital sizing; arm Bank/Crude from server allow-flags.
+      this.applyCapitalAllocation({ armAllowedBooks: true });
+    } catch {
+      // Keep local All3 defaults when defaults/health are unreachable.
+      if (this.crudeAllowed) {
+        this.enableCrude = true;
+      }
+    }
+  }
+
   /**
    * Paper Start = backend backtest over From→To. The browser's Kite session is
    * sent via X-Kite-Authorization so the server can pull historical candles;
@@ -351,7 +646,7 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
     }
     this.commitCapital();
     this.applyCapitalAllocation();
-    if (!this.enableNifty && !this.enableBank) {
+    if (!this.enableNifty && !this.enableBank && !this.enableCrude) {
       this.backtestError.set('Desk plan has no books — check capital (min ₹10,000).');
       return;
     }
@@ -361,30 +656,22 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
     const headers: Record<string, string> = kite ? { 'X-Kite-Authorization': kite } : {};
     this.backtestBusy.set(true);
     try {
+      const body = {
+        ...this.buildLivePayload(false),
+        fromDate: this.fromDate,
+        toDate: this.toDate,
+      };
+      // Backtest is always paper — strip realOrders confusion if server ignores it.
+      delete (body as { realOrders?: boolean }).realOrders;
       const res = await firstValueFrom(
-        this.http.post<BacktestResult>(
-          `${this.liveApiBase}/backtest`,
-          {
-            fromDate: this.fromDate,
-            toDate: this.toDate,
-            enableNifty: this.enableNifty,
-            enableBank: this.enableBank,
-            enableCrude: false,
-            niftyLots: Math.max(1, Math.floor(this.niftyLots) || 1),
-            bankLots: Math.max(1, Math.floor(this.bankLots) || 1),
-            crudeLots: 1,
-            bankStrategy: this.bankStrategy,
-            niftyStrategy: 'trap',
-            crudeStrategy: 'selective',
-            dayProfitLock: this.dayProfitLock,
-            strictDayStop: this.strictDayStop,
-          },
-          { headers },
-        ),
+        this.http.post<BacktestResult>(`${this.liveApiBase}/backtest`, body, { headers }),
       );
       this.backtest.set(res);
+      if (res.paperLivePath != null) {
+        this.paperLivePath = !!res.paperLivePath;
+      }
       this.note.set(
-        `Paper backtest ${res.fromDate} → ${res.toDate}: ${res.totals.trades} trades · net ₹${res.totals.optionNetAfterChargesRs.toLocaleString('en-IN')} (backend replay).`,
+        `Paper backtest ${res.fromDate} → ${res.toDate}: ${res.totals.trades} trades · net ₹${res.totals.optionNetAfterChargesRs.toLocaleString('en-IN')} (Paper≡Live backend replay).`,
       );
     } catch (err) {
       const backendMsg = (err as { error?: { message?: string } })?.error?.message;
@@ -400,15 +687,50 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
         this.http.get<LiveStatus>(`${this.liveApiBase}/status`),
       );
       this.status.set(res);
+      if (res.appBuild) {
+        this.serverAppBuild.set(String(res.appBuild));
+      }
+      if (res.books) {
+        if (res.books.bankAllowed != null) {
+          this.bankAllowed = res.books.bankAllowed !== false;
+        }
+        if (res.books.crudeAllowed != null) {
+          this.crudeAllowed = res.books.crudeAllowed !== false;
+        }
+        if (res.books.bankOnlyAfterNifty != null) {
+          this.bankOnlyAfterNifty = res.books.bankOnlyAfterNifty !== false;
+        }
+        if (res.books.crudeAfterIndexClose != null) {
+          this.crudeAfterIndexClose = res.books.crudeAfterIndexClose !== false;
+        }
+        if (res.books.crudeWindow) {
+          this.crudeWindow = String(res.books.crudeWindow);
+        }
+        if (res.books.label) {
+          this.deskSupportLine = `${res.books.label} · Paper≡Live`;
+        }
+        if (res.books.crudeStrategy) {
+          this.crudeStrategy = normalizeCrudeStrategy(res.books.crudeStrategy);
+        }
+      }
       // Mirror the running server config into the UI (so the desk shows truth).
       if (res.config && res.status === 'running') {
         this.enableNifty = !!res.config.enableNifty;
         this.enableBank = !!res.config.enableBank;
+        this.enableCrude = !!res.config.enableCrude;
         this.niftyLots = res.config.niftyLots || 1;
         this.bankLots = res.config.bankLots || 1;
+        this.crudeLots = res.config.crudeLots || 1;
         this.bankStrategy = res.config.bankStrategy === 'genie' ? 'genie' : 'trap';
+        this.crudeStrategy = normalizeCrudeStrategy(res.config.crudeStrategy);
         this.dayProfitLock = res.config.dayProfitLock !== false;
         this.strictDayStop = res.config.strictDayStop !== false;
+        if (res.config.bankOnlyAfterNifty != null) {
+          this.bankOnlyAfterNifty = res.config.bankOnlyAfterNifty !== false;
+        }
+        if (res.config.crudeAfterIndexClose != null) {
+          this.crudeAfterIndexClose = res.config.crudeAfterIndexClose !== false;
+        }
         this.mode.set(res.config.realOrders ? 'live' : 'paper');
       }
     } catch {
@@ -425,7 +747,7 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
   protected async start(): Promise<void> {
     this.commitCapital();
     this.applyCapitalAllocation();
-    if (!this.enableNifty && !this.enableBank) {
+    if (!this.enableNifty && !this.enableBank && !this.enableCrude) {
       this.note.set('Desk plan has no books — check capital (min ₹10,000).');
       return;
     }
@@ -436,7 +758,8 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
         title: 'Start server LIVE with real money?',
         message:
           `Real Kite MIS orders on ATM options via the DigitalOcean static-IP Order-API.\n` +
-          `Books: ${this.allocationSummary()} · Trap DNA.\n` +
+          `Books: ${this.allocationSummary()} · ${this.deskLabel}.\n` +
+          `Path: Nifty → Bank after Nifty → Crude after NSE.\n` +
           (riskBits ? `Risk: ${riskBits}.\n` : '') +
           `\nChrome can close — the server worker keeps scanning.`,
         confirmLabel: 'Start live',
@@ -450,23 +773,10 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
     this.busy.set(true);
     try {
       await firstValueFrom(
-        this.http.post(`${this.liveApiBase}/start`, {
-          enableNifty: this.enableNifty,
-          enableBank: this.enableBank,
-          enableCrude: false,
-          niftyLots: Math.max(1, Math.floor(this.niftyLots) || 1),
-          bankLots: Math.max(1, Math.floor(this.bankLots) || 1),
-          crudeLots: 1,
-          bankStrategy: this.bankStrategy,
-          niftyStrategy: 'trap',
-          crudeStrategy: 'selective',
-          dayProfitLock: this.dayProfitLock,
-          strictDayStop: this.strictDayStop,
-          realOrders,
-        }),
+        this.http.post(`${this.liveApiBase}/start`, this.buildLivePayload(realOrders)),
       );
       this.note.set(
-        `Server ${realOrders ? 'LIVE' : 'PAPER'} started — worker on DO (60s). Watch Recent events for DATA / SIGNAL / ENTRY${realOrders ? ' / order fills' : ' (simulated)'}.`,
+        `Server ${realOrders ? 'LIVE' : 'PAPER'} started — All3 worker on DO (60s). Watch events for DATA / SIGNAL / CRUDE_ON / ENTRY${realOrders ? ' / order fills' : ' (simulated)'}.`,
       );
       await this.refreshStatus();
     } catch (err) {
@@ -528,6 +838,29 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
     try {
       const res = await firstValueFrom(this.kiteApi.pingOrderBackend());
       this.pushOrderLog('ok', `Order-API health OK · ${JSON.stringify(res)}`);
+    } catch (err) {
+      this.pushOrderLog('err', this.fmtOrderErr(err));
+    } finally {
+      this.orderBusy.set(false);
+    }
+  }
+
+  /** Also ping /live/health so All3 flags (crudeAllowed) are visible in the log. */
+  protected async pingLiveHealth(): Promise<void> {
+    this.orderBusy.set(true);
+    this.pushOrderLog('info', `GET ${this.liveApiBase}/health`);
+    try {
+      const res = await firstValueFrom(this.http.get<LiveHealth>(`${this.liveApiBase}/health`));
+      if (res.appBuild) {
+        this.serverAppBuild.set(String(res.appBuild));
+      }
+      if (res.crudeAllowed != null) {
+        this.crudeAllowed = res.crudeAllowed !== false;
+      }
+      if (res.bankAllowed != null) {
+        this.bankAllowed = res.bankAllowed !== false;
+      }
+      this.pushOrderLog('ok', `Live health OK · ${JSON.stringify(res)}`);
     } catch (err) {
       this.pushOrderLog('err', this.fmtOrderErr(err));
     } finally {

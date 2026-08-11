@@ -54,6 +54,10 @@
   box-shadow: var(--pg-shadow-soft);
 }
 
+.active-strategy-bar .crude-chip {
+  flex: 0 0 auto;
+}
+
 .active-strategy-label {
   display: flex;
   flex-wrap: wrap;
@@ -419,6 +423,183 @@
 
 .lots-row .lots-field input {
   width: 4.5rem;
+}
+
+/* All3 books panel — light control rows (not promo cards) */
+.books-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  margin: 0 0 1rem;
+  padding: 0.85rem 1rem;
+  border-radius: 14px;
+  border: 1px solid var(--pg-line, #e5e7eb);
+  background: linear-gradient(180deg, #f8fafc 0%, #fff 70%);
+}
+
+.books-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0.75rem;
+  margin-bottom: 0.25rem;
+}
+
+.books-head strong {
+  font-size: 0.92rem;
+  color: var(--pg-ink, #0f172a);
+}
+
+.books-head span {
+  font-size: 0.78rem;
+  color: var(--pg-muted, #64748b);
+}
+
+.book-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55rem 0.85rem;
+  padding: 0.35rem 0;
+  border-top: 1px solid rgba(148, 163, 184, 0.22);
+}
+
+.book-row:first-of-type {
+  border-top: none;
+}
+
+.book-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 6.5rem;
+  font-size: 0.9rem;
+  font-weight: 650;
+  color: var(--pg-ink, #0f172a);
+  cursor: pointer;
+}
+
+.book-check input {
+  width: 1rem;
+  height: 1rem;
+  accent-color: #0f766e;
+}
+
+.book-name {
+  letter-spacing: -0.01em;
+}
+
+.book-help {
+  flex: 1 1 12rem;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  color: var(--pg-muted, #64748b);
+}
+
+.book-row .lots-field {
+  min-width: 4.75rem;
+}
+
+.book-row .lots-field input {
+  width: 4.25rem;
+  min-width: 4.25rem;
+  height: 38px;
+}
+
+.crude-row .book-name {
+  color: #0f766e;
+}
+
+.crude-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.28rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #115e59;
+  background: #ccfbf1;
+  border: 1px solid #99f6e4;
+  white-space: nowrap;
+}
+
+.crude-chip.inline {
+  margin-left: 0.15rem;
+}
+
+.book-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin: 0 0 1rem;
+  padding: 0.65rem 0.85rem;
+  border-radius: 12px;
+  border: 1px solid var(--pg-line, #e5e7eb);
+  background: #fff;
+}
+
+.book-summary-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0.75rem;
+  font-size: 0.84rem;
+  color: var(--pg-muted, #64748b);
+}
+
+.book-summary-row strong {
+  min-width: 4.5rem;
+  color: var(--pg-ink, #0f172a);
+}
+
+.book-tag {
+  display: inline-block;
+  margin-right: 0.35rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 6px;
+  font-size: 0.68rem;
+  font-weight: 750;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: #0f766e;
+  background: rgba(15, 118, 110, 0.1);
+  vertical-align: 0.1em;
+}
+
+.trades-net {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--pg-muted, #64748b);
+}
+
+.order-log li.notable {
+  background: rgba(204, 251, 241, 0.55);
+  border-radius: 8px;
+}
+
+.order-log li.notable strong {
+  color: #0f766e;
+}
+
+@media (max-width: 640px) {
+  .books-panel {
+    padding: 0.75rem 0.8rem;
+  }
+
+  .book-row {
+    gap: 0.4rem 0.6rem;
+  }
+
+  .book-help {
+    flex: 1 1 100%;
+    order: 3;
+  }
+
+  .crude-chip {
+    width: 100%;
+    justify-content: center;
+  }
 }
 
 .live-assistant {
