@@ -63,12 +63,13 @@
 
   <p class="banner info">{{ note() }}</p>
 
-  <!-- All3 books: Nifty / Bank / Crude — light control rows -->
+  <!-- All3 books: Nifty / Bank / Crude — shared deskLots from capital -->
   <div class="books-panel" aria-label="Books">
     <div class="books-head">
       <strong>Books</strong>
       <span>{{ deskSupportLine }}</span>
     </div>
+    <p class="desk-lots-hint">{{ deskLotsHelper() }}</p>
 
     <div class="book-row">
       <label class="book-check">
@@ -77,14 +78,7 @@
       </label>
       <label class="field lots-field">
         <span>Lots</span>
-        <input
-          type="number"
-          min="1"
-          max="2"
-          [(ngModel)]="niftyLots"
-          (ngModelChange)="onLotsEdited()"
-          [disabled]="locked() || backtestBusy() || !enableNifty"
-        />
+        <input type="number" [ngModel]="deskLots" readonly disabled title="deskLots from capital — same for all books" />
       </label>
       <span class="book-help">Trap · primary</span>
     </div>
@@ -97,19 +91,12 @@
         </label>
         <label class="field lots-field">
           <span>Lots</span>
-          <input
-            type="number"
-            min="1"
-            max="2"
-            [(ngModel)]="bankLots"
-            (ngModelChange)="onLotsEdited()"
-            [disabled]="locked() || backtestBusy() || !enableBank"
-          />
+          <input type="number" [ngModel]="deskLots" readonly disabled title="deskLots from capital — same for all books" />
         </label>
         <span class="book-help">
           Trap
           @if (bankOnlyAfterNifty) {
-            · Entries only after Nifty trades today
+            · after Nifty
           }
         </span>
       </div>
@@ -130,17 +117,17 @@
           <span>Lots</span>
           <input
             type="number"
-            min="1"
-            max="2"
-            [(ngModel)]="crudeLots"
-            (ngModelChange)="onLotsEdited()"
-            [disabled]="locked() || backtestBusy() || !enableCrude"
+            [ngModel]="deskLots"
+            readonly
+            disabled
+            title="Same deskLots as Nifty/Bank — no private Crude size"
           />
         </label>
         <span class="book-help">
-          {{ crudeStrategyDisplay() }} · {{ crudeWindow }}
+          {{ crudeStrategyDisplay() }}
+          <span class="crude-window-chip">{{ crudeWindow }}</span>
           <br />
-          Crude Mini: 1 lot = Kite order qty 1 (MCX).
+          Crude Mini: 1 lot = Kite qty 1 (MCX).
         </span>
       </div>
     } @else {
@@ -169,9 +156,8 @@
 
     <div class="agent-locked compact">
       <span>
-        {{ mode() === 'live' ? 'Live · real MIS' : 'Paper · backend replay' }} · capital →
-        {{ capitalLotsPreview() }} lot{{ capitalLotsPreview() === 1 ? '' : 's' }} (N/B/C) ·
-        {{ allocationSummary() }}
+        {{ mode() === 'live' ? 'Live · real MIS' : 'Paper · backend replay' }} · capital → deskLots
+        {{ capitalLotsPreview() }} (N=B=C) · {{ allocationSummary() }}
       </span>
     </div>
 

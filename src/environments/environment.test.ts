@@ -6,6 +6,6 @@ export const environment = {
   defaultLots: 1,
   allowLiveMoney: true,
   orderEgressIp: '168.144.28.89',
-  appVersion: '1.3.120',
-  appBuild: '2026.08.11-crude-qty-1lot',
+  appVersion: '1.3.122',
+  appBuild: '2026.08.11-capital-lot-ladder',
 };
