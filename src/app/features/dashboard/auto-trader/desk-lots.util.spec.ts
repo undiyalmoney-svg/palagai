@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { deskLotsForCapital } from './desk-lots.util';
 
-describe('deskLotsForCapital (Order-API 1.3.122 ladder)', () => {
+describe('deskLotsForCapital (Order-API 1.3.124 ladder)', () => {
   it('maps capital bands to shared deskLots', () => {
     expect(deskLotsForCapital(40_000)).toBe(1);
     expect(deskLotsForCapital(74_999)).toBe(1);

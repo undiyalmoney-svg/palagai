@@ -32,7 +32,7 @@
       >
     </div>
     @if (crudeStatusChip(); as crudeChip) {
-      <span class="crude-chip" title="Crude stays armed; entries gate after 15:30 IST">{{ crudeChip }}</span>
+      <span class="crude-chip" title="Crude hard gate 15:15 IST · entries 16:00–21:00">{{ crudeChip }}</span>
     }
   </div>
 
@@ -445,6 +445,14 @@
         <strong>{{ allocationSummary() }}</strong>
       </div>
       <div class="stat">
+        <span>Capital</span>
+        <strong>₹{{ displayCapitalRs() | number: '1.0-0' }}</strong>
+      </div>
+      <div class="stat">
+        <span>deskLots</span>
+        <strong>{{ status().config?.deskLots || status().books?.deskLots || deskLots }}</strong>
+      </div>
+      <div class="stat">
         <span>Crude</span>
         <strong>
           @if (status().config?.enableCrude || status().books?.crude || (showCrudeBook() && enableCrude)) {
@@ -466,7 +474,7 @@
       <h3>Recent events</h3>
       <p class="pg-lede sub event-legend">
         SIGNAL ≠ order. <strong>ENTRY</strong> = live order · <strong>SKIP</strong> = blocked ·
-        <strong>ERROR</strong> = fail.
+        <strong>ERROR</strong> = fail. Crude “OR too narrow” = intentional stand-down.
       </p>
       @if (!events().length) {
         <p class="pg-lede sub">No events yet — Push token, Start, then Refresh (heartbeat ~60s).</p>

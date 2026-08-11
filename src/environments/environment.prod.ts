@@ -10,6 +10,6 @@ export const environment = {
   defaultLots: 1,
   allowLiveMoney: true,
   orderEgressIp: '168.144.28.89',
-  appVersion: '1.3.122',
-  appBuild: '2026.08.11-capital-lot-ladder',
+  appVersion: '1.3.124',
+  appBuild: '2026.08.11-standdown-scale-lots',
 };

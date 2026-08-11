@@ -33,6 +33,7 @@ interface CapitalLotsHint {
   perLakhAbove?: number;
   at6L?: number;
   cap?: number;
+  note?: string;
 }
 
 interface LiveBooks {
@@ -287,7 +288,7 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
   protected bankOnlyAfterNifty = true;
   protected crudeAfterIndexClose = true;
   protected paperLivePath = true;
-  protected crudeWindow = '16:00–21:00 IST (gate 15:30)';
+  protected crudeWindow = '16:00–21:00 IST (hard gate 15:15)';
   protected deskLabel = 'All3 · Nifty→Bank→Crude';
   protected deskSupportLine = 'Nifty → Bank (after Nifty) → Crude after NSE';
   protected bankStrategy: BankStrategy = 'trap';
@@ -362,7 +363,7 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
     return crudeStrategyLabel(cfg || books || this.crudeStrategy);
   }
 
-  /** Crude status chip — ON when config/books say so; never imply off just because before 15:30. */
+  /** Crude status chip — ON when config/books say so; never imply off just because before hard gate. */
   protected crudeStatusChip(): string | null {
     if (!this.showCrudeBook()) {
       return 'Crude OFF';
@@ -375,7 +376,7 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
     if (!on) {
       return null;
     }
-    const window = this.crudeWindow || 'gate 15:30';
+    const window = this.crudeWindow || 'hard gate 15:15';
     return `Crude ON · ${window}`;
   }
 
@@ -384,12 +385,31 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
     return deskLotsForCapital(this.capitalRs);
   }
 
+  /** Resolved capital ₹ while running (server config) or local draft. */
+  protected displayCapitalRs(): number {
+    const cfg = this.status().config;
+    if (this.running() && cfg) {
+      const cap = Math.floor(Number(cfg.capitalRs ?? cfg.capital) || 0);
+      if (cap > 0) {
+        return cap;
+      }
+    }
+    return this.capitalRs;
+  }
+
   protected deskLotsHelper(): string {
     const hint = this.status().risk?.capitalHint || this.capitalHint;
     if (hint) {
       return hint;
     }
-    return `deskLots ${this.deskLots} from capital — same for all books (₹40k→1 · ₹80k→2 · ₹6L→6 · cap 10)`;
+    return `deskLots ${this.deskLots} from capital — same for all books (₹40k→1 · ₹4L→4 · ₹6L→6 · cap 10)`;
+  }
+
+  private formatCapitalLotsHint(c: CapitalLotsHint): string {
+    if (c.note) {
+      return String(c.note);
+    }
+    return `deskLots ladder: <75k→${c.under75k ?? 1} · ≥75k→${c.from75k ?? 2}+ · ₹6L→${c.at6L ?? 6} · cap ${c.cap ?? 10}`;
   }
 
   /** Switch Paper ⇆ Live (blocked while a server session is running). */
@@ -762,8 +782,7 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
       }
 
       if (books?.capitalLots) {
-        const c = books.capitalLots;
-        this.capitalHint = `deskLots ladder: <75k→${c.under75k ?? 1} · ≥75k→${c.from75k ?? 2}+ · ₹6L→${c.at6L ?? 6} · cap ${c.cap ?? 10}`;
+        this.capitalHint = this.formatCapitalLotsHint(books.capitalLots);
       }
       if (defaults?.uiHint) {
         // Keep as note hint once; don't overwrite active session notes every poll.
@@ -885,8 +904,7 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
           this.crudeStrategy = normalizeCrudeStrategy(res.books.crudeStrategy);
         }
         if (res.books.capitalLots) {
-          const c = res.books.capitalLots;
-          this.capitalHint = `deskLots ladder: <75k→${c.under75k ?? 1} · ≥75k→${c.from75k ?? 2}+ · ₹6L→${c.at6L ?? 6} · cap ${c.cap ?? 10}`;
+          this.capitalHint = this.formatCapitalLotsHint(res.books.capitalLots);
         }
       }
       if (res.risk?.capitalHint) {
