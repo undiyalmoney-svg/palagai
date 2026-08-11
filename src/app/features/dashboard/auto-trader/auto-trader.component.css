@@ -582,6 +582,62 @@
   color: #0f766e;
 }
 
+.order-log li[data-action='CRUDE_ON'],
+.order-log li[data-action='START'],
+.order-log li[data-action='WORKER'] {
+  border-color: #99f6e4;
+  background: #f0fdfa;
+}
+
+.order-log li[data-action='START_IGNORED'],
+.order-log li[data-action='AUTH_WAIT'],
+.order-log li[data-action='BANK_OFF'] {
+  border-color: #fde68a;
+  background: #fffbeb;
+}
+
+.order-log li[data-action='SIGNAL'] {
+  border-color: #bae6fd;
+  background: #f0f9ff;
+}
+
+.risk-strip {
+  width: 100%;
+  margin: 0;
+  padding: 0.35rem 0 0;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: var(--pg-muted, #64748b);
+}
+
+.risk-strip.live-risk {
+  margin: 0 0 1rem;
+  padding: 0.65rem 0.85rem;
+  border-radius: 10px;
+  border: 1px solid var(--pg-line, #e5e7eb);
+  background: #fff;
+}
+
+.auth-warn {
+  margin: 0.45rem 0 0;
+  font-size: 0.78rem;
+  font-weight: 650;
+  color: #9a3412;
+}
+
+.event-legend {
+  margin-top: -0.25rem;
+}
+
+.book-row.crude-off {
+  opacity: 0.75;
+}
+
+.book-row.crude-off .book-name {
+  min-width: 6.5rem;
+  font-weight: 650;
+}
+
 @media (max-width: 640px) {
   .books-panel {
     padding: 0.75rem 0.8rem;

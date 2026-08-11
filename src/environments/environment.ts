@@ -19,6 +19,6 @@ export const environment = {
   /** DigitalOcean order-backend static egress IP (whitelist in Kite). */
   orderEgressIp: '168.144.28.89',
   /** Must match src/app/core/config/app-build.ts — shown in UI. */
-  appVersion: '1.3.118',
-  appBuild: '2026.08.11-all3-ui-books',
+  appVersion: '1.3.120',
+  appBuild: '2026.08.11-crude-qty-1lot',
 };

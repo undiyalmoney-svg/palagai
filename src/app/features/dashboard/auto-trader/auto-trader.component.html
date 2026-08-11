@@ -4,11 +4,13 @@
       <p class="pg-eyebrow">Auto Bot · Server Desk</p>
       <h1>Trading Agent</h1>
       <p class="pg-lede">
-        {{ deskSupportLine }}. <strong>Get Token</strong> → pick Paper or Live → run.
+        {{ deskSupportLine }}. <strong>Get Token</strong> → Push token → pick Paper or Live → run.
       </p>
     </div>
     <div class="hero-meta">
-      <span class="pg-badge pg-badge-neutral mono" title="Order-API /live appBuild">{{ displayAppBuild() }}</span>
+      <span class="pg-badge pg-badge-neutral mono" title="Order-API /live version · appBuild">{{
+        displayAppBuild()
+      }}</span>
       @if (paperLivePath) {
         <span class="pg-badge pg-badge-neutral" title="Paper uses the same filtered path as Live">Paper≡Live</span>
       }
@@ -26,9 +28,7 @@
       <span class="as-kicker">Server desk</span>
       <strong class="as-name">{{ deskLabel }}</strong>
       <span class="as-meta"
-        >{{ allocationSummary() }} · Nifty → Bank after Nifty → Crude after NSE · option stop −₹{{
-          optionDayLossMoneyRs() | number: '1.0-0'
-        }}</span
+        >{{ allocationSummary() }} · Nifty/Bank Trap · {{ crudeStrategyDisplay() }} · after NSE</span
       >
     </div>
     @if (crudeStatusChip(); as crudeChip) {
@@ -63,7 +63,7 @@
 
   <p class="banner info">{{ note() }}</p>
 
-  <!-- All3 books: Nifty / Bank / Crude — light control rows, not promo cards -->
+  <!-- All3 books: Nifty / Bank / Crude — light control rows -->
   <div class="books-panel" aria-label="Books">
     <div class="books-head">
       <strong>Books</strong>
@@ -80,7 +80,9 @@
         <input
           type="number"
           min="1"
+          max="2"
           [(ngModel)]="niftyLots"
+          (ngModelChange)="onLotsEdited()"
           [disabled]="locked() || backtestBusy() || !enableNifty"
         />
       </label>
@@ -98,11 +100,18 @@
           <input
             type="number"
             min="1"
+            max="2"
             [(ngModel)]="bankLots"
+            (ngModelChange)="onLotsEdited()"
             [disabled]="locked() || backtestBusy() || !enableBank"
           />
         </label>
-        <span class="book-help">Entries only after Nifty trades today</span>
+        <span class="book-help">
+          Trap
+          @if (bankOnlyAfterNifty) {
+            · Entries only after Nifty trades today
+          }
+        </span>
       </div>
     }
 
@@ -122,11 +131,22 @@
           <input
             type="number"
             min="1"
+            max="2"
             [(ngModel)]="crudeLots"
+            (ngModelChange)="onLotsEdited()"
             [disabled]="locked() || backtestBusy() || !enableCrude"
           />
         </label>
-        <span class="book-help">After NSE close · 16:00–21:00 · gate 15:30</span>
+        <span class="book-help">
+          {{ crudeStrategyDisplay() }} · {{ crudeWindow }}
+          <br />
+          Crude Mini: 1 lot = Kite order qty 1 (MCX).
+        </span>
+      </div>
+    } @else {
+      <div class="book-row crude-off">
+        <span class="book-name">Crude</span>
+        <span class="book-help">OFF — server crudeAllowed=false</span>
       </div>
     }
   </div>
@@ -149,13 +169,13 @@
 
     <div class="agent-locked compact">
       <span>
-        {{ mode() === 'live' ? 'Live · real MIS' : 'Paper · backend replay' }} ·
-        {{ allocationSummary() }} · lock ~₹{{ profitLockMoneyRs() | number: '1.0-0' }}/day · option
-        stop −₹{{ optionDayLossMoneyRs() | number: '1.0-0' }} · target ~₹{{
-          capitalPlan.dailyTargetRs | number: '1.0-0'
-        }}/day
+        {{ mode() === 'live' ? 'Live · real MIS' : 'Paper · backend replay' }} · capital →
+        {{ capitalLotsPreview() }} lot{{ capitalLotsPreview() === 1 ? '' : 's' }} (N/B/C) ·
+        {{ allocationSummary() }}
       </span>
     </div>
+
+    <p class="risk-strip" aria-label="Risk">{{ riskStripText() }}</p>
 
     @if (mode() === 'paper') {
       <label class="field">
@@ -196,9 +216,12 @@
           <li [class.done]="hasKiteSession()">
             <a routerLink="/dashboard/get-token">Get Token</a>
           </li>
-          <li>Push token · Start</li>
+          <li [class.done]="authPresent()">Push token · Start</li>
           <li>Stop after <strong>3:15</strong></li>
         </ol>
+        @if (!authPresent()) {
+          <p class="auth-warn">Push Kite token before Live Start (authPresent required).</p>
+        }
       </aside>
       <div class="actions">
         @if (busy() || running()) {
@@ -240,7 +263,7 @@
     }
   </div>
 
-  <!-- ── PAPER: backend backtest results (same engine as Live) ── -->
+  <!-- ── PAPER: backend backtest results ── -->
   @if (mode() === 'paper') {
     @if (backtestError()) {
       <p class="banner err" role="alert">{{ backtestError() }}</p>
@@ -280,7 +303,7 @@
           @for (b of bt.books; track b.label + b.strategy) {
             <div class="book-summary-row">
               <strong>{{ b.label }}</strong>
-              <span>{{ b.strategy }}</span>
+              <span>{{ bookStrategyLabel(b) }}</span>
               <span>{{ b.trades }} trades · {{ b.wins }}/{{ b.losses }}</span>
               <span
                 class="num"
@@ -437,22 +460,37 @@
       </div>
       <div class="stat">
         <span>Crude</span>
-        <strong>{{ status().config?.enableCrude || status().books?.crude ? 'ON · gated 15:30' : '—' }}</strong>
+        <strong>
+          @if (status().config?.enableCrude || status().books?.crude || (showCrudeBook() && enableCrude)) {
+            ON · {{ crudeStrategyDisplay() }}
+          } @else {
+            —
+          }
+        </strong>
       </div>
       <div class="stat">
-        <span>Risk</span>
-        <strong>{{ riskLabels().join(' · ') || 'off' }}</strong>
+        <span>Auth</span>
+        <strong>{{ authPresent() ? 'token ok' : 'missing' }}</strong>
       </div>
     </div>
 
+    <p class="risk-strip live-risk" aria-label="Risk">{{ riskStripText() }}</p>
+
     <div class="orders-block">
       <h3>Recent events</h3>
-      @if (!(status().events?.length)) {
+      <p class="pg-lede sub event-legend">
+        SIGNAL ≠ order. <strong>ENTRY</strong> = live order · <strong>SKIP</strong> = blocked ·
+        <strong>ERROR</strong> = fail.
+      </p>
+      @if (!events().length) {
         <p class="pg-lede sub">No events yet — Push token, Start, then Refresh (heartbeat ~60s).</p>
       } @else {
         <ul class="order-log">
-          @for (e of status().events!; track e.at + e.action + e.detail) {
-            <li [class.notable]="isNotableEvent(e)">
+          @for (e of events(); track e.at + e.action + e.detail) {
+            <li
+              [attr.data-action]="eventActionClass(e.action)"
+              [class.notable]="isNotableEvent(e)"
+            >
               <time>{{ e.at }}</time>
               <strong>{{ e.action }}</strong>
               <span>{{ e.detail }}</span>
