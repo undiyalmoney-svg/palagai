@@ -275,7 +275,7 @@
         }
       </div>
 
-      @if (bt.books?.length) {
+      @if (bt.books.length) {
         <div class="book-summary" aria-label="Per-book summary">
           @for (b of bt.books; track b.label + b.strategy) {
             <div class="book-summary-row">
