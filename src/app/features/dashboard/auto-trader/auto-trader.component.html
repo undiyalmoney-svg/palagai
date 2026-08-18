@@ -145,8 +145,8 @@
           <input
             type="checkbox"
             [(ngModel)]="enableCrude"
-            [disabled]="locked() || backtestBusy() || crudeAllowed"
-            title="Server forces Crude ON when crudeAllowed"
+            [disabled]="locked() || backtestBusy()"
+            title="Include Crude on Start"
           />
           <span class="book-name">Crude</span>
         </label>

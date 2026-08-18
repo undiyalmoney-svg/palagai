@@ -536,8 +536,9 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
     }
 
     if (this.crudeAllowed !== false) {
-      // Server forces Crude ON when crudeAllowed — keep checked even at low capital.
-      this.enableCrude = true;
+      if (opts?.armAllowedBooks) {
+        this.enableCrude = true;
+      }
     } else {
       this.enableCrude = false;
     }
@@ -740,7 +741,7 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
    * Never send crudeStrategy: "selective".
    */
   private buildLivePayload(realOrders: boolean): Record<string, unknown> {
-    const enableCrude = this.showCrudeBook() ? true : !!this.enableCrude;
+    const enableCrude = this.showCrudeBook() ? !!this.enableCrude : false;
     const enableBank = this.showBankBook() ? !!this.enableBank : false;
     const niftyLots = this.asIntMin1(this.niftyLots, 1);
     const bankLots = this.asIntMin1(this.bankLots, 1);
