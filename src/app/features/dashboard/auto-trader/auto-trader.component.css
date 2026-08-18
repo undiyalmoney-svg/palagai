@@ -154,6 +154,14 @@
   width: 4.5rem;
 }
 
+.counts-field {
+  min-width: 7.25rem;
+}
+
+.counts-field input {
+  width: 5.5rem;
+}
+
 .capital-agent {
   display: flex;
   flex-wrap: wrap;
@@ -503,6 +511,16 @@
 .book-row .lots-field input {
   width: 4.25rem;
   min-width: 4.25rem;
+  height: 38px;
+}
+
+.book-row .counts-field {
+  min-width: 7.25rem;
+}
+
+.book-row .counts-field input {
+  width: 5.5rem;
+  min-width: 5.5rem;
   height: 38px;
 }
 

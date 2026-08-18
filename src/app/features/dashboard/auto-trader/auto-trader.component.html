@@ -70,6 +70,7 @@
       <span>{{ deskSupportLine }}</span>
     </div>
     <p class="desk-lots-hint">{{ deskLotsHelper() }}</p>
+    <p class="desk-lots-hint">{{ tradeCountsHint }}</p>
 
     <div class="book-row">
       <label class="book-check">
@@ -79,6 +80,17 @@
       <label class="field lots-field">
         <span>Lots</span>
         <input type="number" [ngModel]="deskLots" readonly disabled title="deskLots from capital — same for all books" />
+      </label>
+      <label class="field counts-field">
+        <span>Max trades today</span>
+        <input
+          type="number"
+          min="0"
+          step="1"
+          [(ngModel)]="niftyMaxTradesDay"
+          [disabled]="locked() || backtestBusy()"
+          title="0 = unlimited. Stop, then Start to apply."
+        />
       </label>
       <span class="book-help">Trap · primary</span>
     </div>
@@ -92,6 +104,17 @@
         <label class="field lots-field">
           <span>Lots</span>
           <input type="number" [ngModel]="deskLots" readonly disabled title="deskLots from capital — same for all books" />
+        </label>
+        <label class="field counts-field">
+          <span>Max trades today</span>
+          <input
+            type="number"
+            min="0"
+            step="1"
+            [(ngModel)]="bankMaxTradesDay"
+            [disabled]="locked() || backtestBusy()"
+            title="0 = unlimited. Stop, then Start to apply."
+          />
         </label>
         <span class="book-help">
           Trap
@@ -121,6 +144,17 @@
             readonly
             disabled
             title="Same deskLots as Nifty/Bank — no private Crude size"
+          />
+        </label>
+        <label class="field counts-field">
+          <span>Max trades today</span>
+          <input
+            type="number"
+            min="0"
+            step="1"
+            [(ngModel)]="crudeMaxTradesDay"
+            [disabled]="locked() || backtestBusy()"
+            title="0 = unlimited. Stop, then Start to apply."
           />
         </label>
         <span class="book-help">
@@ -451,6 +485,14 @@
       <div class="stat">
         <span>deskLots</span>
         <strong>{{ status().config?.deskLots || status().books?.deskLots || deskLots }}</strong>
+      </div>
+      <div class="stat">
+        <span>Max trades</span>
+        <strong>
+          N{{ tradeCountLabel(status().config?.niftyMaxTradesDay ?? niftyMaxTradesDay) }}
+          /B{{ tradeCountLabel(status().config?.bankMaxTradesDay ?? bankMaxTradesDay) }}
+          /C{{ tradeCountLabel(status().config?.crudeMaxTradesDay ?? crudeMaxTradesDay) }}
+        </strong>
       </div>
       <div class="stat">
         <span>Crude</span>

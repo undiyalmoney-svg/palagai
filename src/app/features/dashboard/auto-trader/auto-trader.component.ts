@@ -34,6 +34,7 @@ interface CapitalLotsHint {
   at6L?: number;
   cap?: number;
   note?: string;
+  tradeCounts?: string;
 }
 
 interface LiveBooks {
@@ -52,6 +53,9 @@ interface LiveBooks {
   niftyLots?: number;
   bankLots?: number;
   crudeLots?: number;
+  niftyMaxTradesDay?: number;
+  bankMaxTradesDay?: number;
+  crudeMaxTradesDay?: number;
   capitalLots?: CapitalLotsHint;
 }
 
@@ -63,6 +67,10 @@ interface LivePreset {
   niftyLots?: number;
   bankLots?: number;
   crudeLots?: number;
+  niftyMaxTradesDay?: number;
+  bankMaxTradesDay?: number;
+  crudeMaxTradesDay?: number;
+  capitalRs?: number;
   niftyStrategy?: string;
   bankStrategy?: string;
   crudeStrategy?: string;
@@ -147,6 +155,9 @@ interface LiveStatus {
     realOrders: boolean;
     capital?: number;
     capitalRs?: number;
+    niftyMaxTradesDay?: number;
+    bankMaxTradesDay?: number;
+    crudeMaxTradesDay?: number;
   } | null;
   events?: LiveEvent[];
   trades?: Array<Record<string, unknown>>;
@@ -282,6 +293,12 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
   protected niftyLots = 1;
   protected bankLots = 1;
   protected crudeLots = 1;
+  /** 0 = unlimited. N > 0 = max closed trades that book may open today. */
+  protected niftyMaxTradesDay = 0;
+  protected bankMaxTradesDay = 0;
+  protected crudeMaxTradesDay = 4;
+  protected tradeCountsHint =
+    '0 = unlimited. N > 0 = max closed trades that book may open today. Stop, then Start to apply.';
   /** From /live/defaults|/live/health — controls row visibility (not capital heuristics). */
   protected bankAllowed = true;
   protected crudeAllowed = true;
@@ -410,6 +427,20 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
       return String(c.note);
     }
     return `deskLots ladder: <75k→${c.under75k ?? 1} · ≥75k→${c.from75k ?? 2}+ · ₹6L→${c.at6L ?? 6} · cap ${c.cap ?? 10}`;
+  }
+
+  /** Integers ≥ 0. Empty/invalid → fallback (0 = unlimited). */
+  private asIntMin0(value: unknown, fallback: number): number {
+    const n = Math.floor(Number(value));
+    if (!Number.isFinite(n) || n < 0) {
+      return fallback;
+    }
+    return n;
+  }
+
+  protected tradeCountLabel(n: number): string {
+    return n <= 0 ? 'unlimited' : String(n);
+  }
   }
 
   /** Switch Paper ⇆ Live (blocked while a server session is running). */
@@ -697,7 +728,7 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
     // Ensure UI books are synced before Start.
     this.syncDeskLots(deskLotsForCapital(this.capitalRs));
 
-    // Prefer capitalRs only — server maps deskLots. Do not send conflicting per-book lots.
+    // Prefer capitalRs only — server maps deskLots. Do not send niftyLots/bankLots/crudeLots.
     return {
       realOrders,
       capitalRs: this.capitalRs,
@@ -705,6 +736,9 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
       enableNifty: true,
       enableBank,
       enableCrude,
+      niftyMaxTradesDay: this.asIntMin0(this.niftyMaxTradesDay, 0),
+      bankMaxTradesDay: this.asIntMin0(this.bankMaxTradesDay, 0),
+      crudeMaxTradesDay: this.asIntMin0(this.crudeMaxTradesDay, 4),
       dayProfitLock: this.dayProfitLock,
       strictDayStop: this.strictDayStop,
       crudeAfterIndexClose: this.crudeAfterIndexClose !== false,
@@ -783,6 +817,10 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
 
       if (books?.capitalLots) {
         this.capitalHint = this.formatCapitalLotsHint(books.capitalLots);
+        const countsHint = books.capitalLots.tradeCounts?.trim();
+        if (countsHint) {
+          this.tradeCountsHint = countsHint;
+        }
       }
       if (defaults?.uiHint) {
         // Keep as note hint once; don't overwrite active session notes every poll.
@@ -819,6 +857,19 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
       if (books?.crudeStrategy) {
         this.crudeStrategy = normalizeCrudeStrategy(books.crudeStrategy);
       }
+
+      this.niftyMaxTradesDay = this.asIntMin0(
+        books?.niftyMaxTradesDay ?? preset?.niftyMaxTradesDay,
+        0,
+      );
+      this.bankMaxTradesDay = this.asIntMin0(
+        books?.bankMaxTradesDay ?? preset?.bankMaxTradesDay,
+        0,
+      );
+      this.crudeMaxTradesDay = this.asIntMin0(
+        books?.crudeMaxTradesDay ?? preset?.crudeMaxTradesDay,
+        4,
+      );
 
       // Capital wins — sync shared deskLots (ignore stale per-book preset lots).
       this.applyCapitalAllocation({ armAllowedBooks: true });
@@ -923,6 +974,15 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
           res.config.crudeLots ||
           this.deskLots;
         this.syncDeskLots(resolved);
+        if (res.config.niftyMaxTradesDay != null) {
+          this.niftyMaxTradesDay = this.asIntMin0(res.config.niftyMaxTradesDay, 0);
+        }
+        if (res.config.bankMaxTradesDay != null) {
+          this.bankMaxTradesDay = this.asIntMin0(res.config.bankMaxTradesDay, 0);
+        }
+        if (res.config.crudeMaxTradesDay != null) {
+          this.crudeMaxTradesDay = this.asIntMin0(res.config.crudeMaxTradesDay, 4);
+        }
         this.bankStrategy = res.config.bankStrategy === 'genie' ? 'genie' : 'trap';
         this.crudeStrategy = normalizeCrudeStrategy(res.config.crudeStrategy);
         this.dayProfitLock = res.config.dayProfitLock !== false;
@@ -979,7 +1039,7 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
 
   protected async start(): Promise<void> {
     if (this.running()) {
-      this.note.set('Already running — Stop first to change books/lots (START_IGNORED).');
+      this.note.set('Already running — Stop first to change books/lots/trade counts (START_IGNORED).');
       return;
     }
     this.commitCapital();
@@ -1004,6 +1064,7 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
           `Books: ${this.allocationSummary()} · ${this.deskLabel}.\n` +
           `Crude: live-crude-green · 1 lot = Kite qty 1 (MCX).\n` +
           `Path: ${this.deskSupportLine}.\n` +
+          `Max trades today: Nifty ${this.tradeCountLabel(this.niftyMaxTradesDay)} · Bank ${this.tradeCountLabel(this.bankMaxTradesDay)} · Crude ${this.tradeCountLabel(this.crudeMaxTradesDay)}.\n` +
           (riskBits ? `Risk: ${riskBits}.\n` : '') +
           `\nChrome can close — the server worker keeps scanning.`,
         confirmLabel: 'Start live',
