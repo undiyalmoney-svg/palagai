@@ -272,11 +272,11 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
   private readonly testExchange = 'NSE';
 
   /**
-   * Capital → shared deskLots (Nifty = Bank = Crude). Capital wins; no private Crude size.
+   * Capital is a starting hint for lots. Each book’s lots are independently editable.
    */
   protected capitalRs = DEFAULT_TRADING_CAPITAL_RS;
   protected capitalDraft = String(DEFAULT_TRADING_CAPITAL_RS);
-  /** Shared lot size mirrored onto niftyLots/bankLots/crudeLots. */
+  /** Risk display — max of the three book lots. */
   protected deskLots = 1;
   protected capitalHint = '';
 
@@ -289,7 +289,7 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
   protected enableNifty = true;
   protected enableBank = true;
   protected enableCrude = true;
-  /** Always equal to deskLots — display only; capital drives sizing. */
+  /** Per-book lots — editable; sent on Start. */
   protected niftyLots = 1;
   protected bankLots = 1;
   protected crudeLots = 1;
@@ -419,7 +419,7 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
     if (hint) {
       return hint;
     }
-    return `deskLots ${this.deskLots} from capital — same for all books (₹40k→1 · ₹4L→4 · ₹6L→6 · cap 10)`;
+    return `Lots are per book (editable). Capital hint ₹40k→1 · ₹4L→4 · ₹6L→6 · cap 10. Stop → Start to apply.`;
   }
 
   private formatCapitalLotsHint(c: CapitalLotsHint): string {
@@ -436,6 +436,15 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
       return fallback;
     }
     return n;
+  }
+
+  /** Lots ≥ 1, capped at deskLots ladder max. */
+  private asIntMin1(value: unknown, fallback: number): number {
+    const n = Math.floor(Number(value));
+    if (!Number.isFinite(n) || n < 1) {
+      return Math.max(1, Math.min(DESK_LOTS_CAP, Math.floor(Number(fallback)) || 1));
+    }
+    return Math.min(DESK_LOTS_CAP, n);
   }
 
   protected tradeCountLabel(n: number): string {
@@ -457,6 +466,7 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
     }
     this.capitalDraft = String(this.capitalRs);
     this.applyCapitalAllocation({ armAllowedBooks: true });
+    this.seedLotsFromCapital();
     void this.loadLiveDefaults();
     void this.refreshStatus();
     this.pollTimer = setInterval(() => void this.refreshStatus(), 15_000);
@@ -480,39 +490,41 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
     this.capitalRs = next;
     this.capitalDraft = String(next);
     this.capitalPreference.set(next);
-    // Always sync deskLots immediately — even while running (display); apply needs Stop→Start.
     this.applyCapitalAllocation();
     if (this.running() && prev !== next) {
       this.note.set(
-        `Capital → deskLots ${this.deskLots}. Stop → Start to apply new capital/lots (START_IGNORED while running).`,
+        `Capital saved at ₹${next}. Lots stay as typed — Stop → Start to apply (START_IGNORED while running).`,
       );
     }
   }
 
   protected onCapitalDraftChange(raw: string): void {
     this.capitalDraft = raw;
-    // Live preview while typing (valid numbers only).
-    const parsed = Math.floor(Number(String(raw).replace(/[,_\s]/g, '')));
-    if (Number.isFinite(parsed) && parsed >= 10_000) {
-      this.syncDeskLots(deskLotsForCapital(parsed));
-    }
   }
 
-  /** Sync shared deskLots onto all three book lot fields. */
-  private syncDeskLots(lots: number): void {
-    const n = Math.max(1, Math.min(DESK_LOTS_CAP, Math.floor(Number(lots)) || 1));
-    this.deskLots = n;
+  /** Seed all three books from the capital ladder (initial / defaults only). */
+  private seedLotsFromCapital(): void {
+    const n = deskLotsForCapital(this.capitalRs);
     this.niftyLots = n;
     this.bankLots = n;
     this.crudeLots = n;
+    this.deskLots = n;
+  }
+
+  private refreshDeskLots(): void {
+    this.deskLots = Math.max(
+      1,
+      this.asIntMin1(this.niftyLots, 1),
+      this.asIntMin1(this.bankLots, 1),
+      this.asIntMin1(this.crudeLots, 1),
+    );
   }
 
   /**
-   * Size shared deskLots from capital (Order-API ladder). Nifty = Bank = Crude always.
+   * Arm allowed books. Does not overwrite typed lots.
    * Never hard-hide Crude for low capital.
    */
   private applyCapitalAllocation(opts?: { armAllowedBooks?: boolean }): void {
-    this.syncDeskLots(deskLotsForCapital(this.capitalRs));
     this.enableNifty = true;
 
     if (this.bankAllowed !== false) {
@@ -532,26 +544,22 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Books summary — while running, prefer resolved status.config deskLots (N/B/C equal).
+   * Books summary — while running, prefer resolved status.config per-book lots.
    */
   protected allocationSummary(): string {
     const cfg = this.status().config;
-    const books = this.status().books;
-    if (this.running() && (cfg || books)) {
-      const d =
-        cfg?.deskLots ||
-        books?.deskLots ||
-        cfg?.niftyLots ||
-        books?.niftyLots ||
-        this.deskLots;
+    if (this.running() && cfg) {
+      const n = this.asIntMin1(cfg.niftyLots, this.niftyLots);
+      const b = this.asIntMin1(cfg.bankLots, this.bankLots);
+      const c = this.asIntMin1(cfg.crudeLots, this.crudeLots);
       const bits = [
-        cfg?.enableNifty !== false ? `N${d}` : null,
-        cfg?.enableBank ? `B${d}` : this.showBankBook() && this.enableBank ? `B${d}` : null,
-        cfg?.enableCrude ? `C${d}` : this.showCrudeBook() && this.enableCrude ? `C${d}` : null,
+        cfg.enableNifty !== false ? `N${n}` : null,
+        cfg.enableBank ? `B${b}` : this.showBankBook() && this.enableBank ? `B${b}` : null,
+        cfg.enableCrude ? `C${c}` : this.showCrudeBook() && this.enableCrude ? `C${c}` : null,
       ].filter(Boolean);
-      return `${bits.join('/')} · deskLots ${d}`;
+      return bits.join('/');
     }
-    return `N${this.deskLots}/B${this.deskLots}/C${this.deskLots} · deskLots ${this.deskLots}`;
+    return `N${this.asIntMin1(this.niftyLots, 1)}/B${this.asIntMin1(this.bankLots, 1)}/C${this.asIntMin1(this.crudeLots, 1)}`;
   }
 
   protected hasKiteSession(): boolean {
@@ -566,10 +574,21 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
     if (risk?.riskLots && risk.riskLots > 0) {
       return risk.riskLots;
     }
-    if (this.running() && this.status().config?.deskLots) {
-      return this.status().config!.deskLots!;
+    if (this.running() && this.status().config) {
+      const cfg = this.status().config!;
+      return Math.max(
+        1,
+        this.asIntMin1(cfg.niftyLots, this.niftyLots),
+        this.asIntMin1(cfg.bankLots, this.bankLots),
+        this.asIntMin1(cfg.crudeLots, this.crudeLots),
+      );
     }
-    return Math.max(1, this.deskLots);
+    return Math.max(
+      1,
+      this.asIntMin1(this.niftyLots, 1),
+      this.asIntMin1(this.bankLots, 1),
+      this.asIntMin1(this.crudeLots, 1),
+    );
   }
 
   protected profitLockMoneyRs(): number {
@@ -717,17 +736,20 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Start payload — capitalRs drives server deskLots.
-   * Prefer not sending separate nifty/bank/crude lots; if ever needed they must equal deskLots.
+   * Start payload — send per-book lots and max trades with capitalRs.
    * Never send crudeStrategy: "selective".
    */
   private buildLivePayload(realOrders: boolean): Record<string, unknown> {
     const enableCrude = this.showCrudeBook() ? true : !!this.enableCrude;
     const enableBank = this.showBankBook() ? !!this.enableBank : false;
-    // Ensure UI books are synced before Start.
-    this.syncDeskLots(deskLotsForCapital(this.capitalRs));
+    const niftyLots = this.asIntMin1(this.niftyLots, 1);
+    const bankLots = this.asIntMin1(this.bankLots, 1);
+    const crudeLots = this.asIntMin1(this.crudeLots, 1);
+    this.niftyLots = niftyLots;
+    this.bankLots = bankLots;
+    this.crudeLots = crudeLots;
+    this.refreshDeskLots();
 
-    // Prefer capitalRs only — server maps deskLots. Do not send niftyLots/bankLots/crudeLots.
     return {
       realOrders,
       capitalRs: this.capitalRs,
@@ -735,6 +757,9 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
       enableNifty: true,
       enableBank,
       enableCrude,
+      niftyLots,
+      bankLots,
+      crudeLots,
       niftyMaxTradesDay: this.asIntMin0(this.niftyMaxTradesDay, 0),
       bankMaxTradesDay: this.asIntMin0(this.bankMaxTradesDay, 0),
       crudeMaxTradesDay: this.asIntMin0(this.crudeMaxTradesDay, 4),
@@ -870,8 +895,21 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
         4,
       );
 
-      // Capital wins — sync shared deskLots (ignore stale per-book preset lots).
       this.applyCapitalAllocation({ armAllowedBooks: true });
+      const fallbackLots = deskLotsForCapital(this.capitalRs);
+      this.niftyLots = this.asIntMin1(
+        books?.niftyLots ?? preset?.niftyLots ?? this.niftyLots,
+        fallbackLots,
+      );
+      this.bankLots = this.asIntMin1(
+        books?.bankLots ?? preset?.bankLots ?? this.bankLots,
+        fallbackLots,
+      );
+      this.crudeLots = this.asIntMin1(
+        books?.crudeLots ?? preset?.crudeLots ?? this.crudeLots,
+        fallbackLots,
+      );
+      this.refreshDeskLots();
     } catch {
       if (this.crudeAllowed) {
         this.enableCrude = true;
@@ -960,19 +998,15 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
       if (res.risk?.capitalHint) {
         this.capitalHint = String(res.risk.capitalHint);
       }
-      // Mirror running server config (source of truth) — shared deskLots for all books.
+      // Mirror running server config (source of truth) — per-book lots.
       if (res.config && res.status === 'running') {
         this.enableNifty = !!res.config.enableNifty;
         this.enableBank = !!res.config.enableBank;
         this.enableCrude = !!res.config.enableCrude;
-        const resolved =
-          res.config.deskLots ||
-          res.books?.deskLots ||
-          res.config.niftyLots ||
-          res.config.bankLots ||
-          res.config.crudeLots ||
-          this.deskLots;
-        this.syncDeskLots(resolved);
+        this.niftyLots = this.asIntMin1(res.config.niftyLots, this.niftyLots);
+        this.bankLots = this.asIntMin1(res.config.bankLots, this.bankLots);
+        this.crudeLots = this.asIntMin1(res.config.crudeLots, this.crudeLots);
+        this.refreshDeskLots();
         if (res.config.niftyMaxTradesDay != null) {
           this.niftyMaxTradesDay = this.asIntMin0(res.config.niftyMaxTradesDay, 0);
         }
@@ -1061,6 +1095,7 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
         message:
           `Real Kite MIS via DigitalOcean Order-API.\n` +
           `Books: ${this.allocationSummary()} · ${this.deskLabel}.\n` +
+          `Lots: Nifty ${this.asIntMin1(this.niftyLots, 1)} · Bank ${this.asIntMin1(this.bankLots, 1)} · Crude ${this.asIntMin1(this.crudeLots, 1)}.\n` +
           `Crude: live-crude-green · 1 lot = Kite qty 1 (MCX).\n` +
           `Path: ${this.deskSupportLine}.\n` +
           `Max trades today: Nifty ${this.tradeCountLabel(this.niftyMaxTradesDay)} · Bank ${this.tradeCountLabel(this.bankMaxTradesDay)} · Crude ${this.tradeCountLabel(this.crudeMaxTradesDay)}.\n` +

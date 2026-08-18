@@ -63,7 +63,7 @@
 
   <p class="banner info">{{ note() }}</p>
 
-  <!-- All3 books: Nifty / Bank / Crude — shared deskLots from capital -->
+  <!-- All3 books: Nifty / Bank / Crude — lots and max trades are per book -->
   <div class="books-panel" aria-label="Books">
     <div class="books-head">
       <strong>Books</strong>
@@ -79,7 +79,14 @@
       </label>
       <label class="field lots-field">
         <span>Lots</span>
-        <input type="number" [ngModel]="deskLots" readonly disabled title="deskLots from capital — same for all books" />
+        <input
+          type="number"
+          min="1"
+          step="1"
+          [(ngModel)]="niftyLots"
+          [disabled]="locked() || backtestBusy()"
+          title="Lots for this book. Stop, then Start to apply."
+        />
       </label>
       <label class="field lots-field">
         <span>Max trades today</span>
@@ -103,7 +110,14 @@
         </label>
         <label class="field lots-field">
           <span>Lots</span>
-          <input type="number" [ngModel]="deskLots" readonly disabled title="deskLots from capital — same for all books" />
+          <input
+            type="number"
+            min="1"
+            step="1"
+            [(ngModel)]="bankLots"
+            [disabled]="locked() || backtestBusy()"
+            title="Lots for this book. Stop, then Start to apply."
+          />
         </label>
         <label class="field lots-field">
           <span>Max trades today</span>
@@ -140,10 +154,11 @@
           <span>Lots</span>
           <input
             type="number"
-            [ngModel]="deskLots"
-            readonly
-            disabled
-            title="Same deskLots as Nifty/Bank — no private Crude size"
+            min="1"
+            step="1"
+            [(ngModel)]="crudeLots"
+            [disabled]="locked() || backtestBusy()"
+            title="Lots for this book. Stop, then Start to apply."
           />
         </label>
         <label class="field lots-field">
@@ -190,8 +205,8 @@
 
     <div class="agent-locked compact">
       <span>
-        {{ mode() === 'live' ? 'Live · real MIS' : 'Paper · backend replay' }} · capital → deskLots
-        {{ capitalLotsPreview() }} (N=B=C) · {{ allocationSummary() }}
+        {{ mode() === 'live' ? 'Live · real MIS' : 'Paper · backend replay' }} ·
+        {{ allocationSummary() }}
       </span>
     </div>
 
@@ -483,8 +498,12 @@
         <strong>₹{{ displayCapitalRs() | number: '1.0-0' }}</strong>
       </div>
       <div class="stat">
-        <span>deskLots</span>
-        <strong>{{ status().config?.deskLots || status().books?.deskLots || deskLots }}</strong>
+        <span>Lots</span>
+        <strong>
+          N{{ status().config?.niftyLots ?? niftyLots }}
+          /B{{ status().config?.bankLots ?? bankLots }}
+          /C{{ status().config?.crudeLots ?? crudeLots }}
+        </strong>
       </div>
       <div class="stat">
         <span>Max trades</span>
