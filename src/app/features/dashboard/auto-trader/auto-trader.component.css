@@ -154,14 +154,6 @@
   width: 4.5rem;
 }
 
-.counts-field {
-  min-width: 7.25rem;
-}
-
-.counts-field input {
-  width: 5.5rem;
-}
-
 .capital-agent {
   display: flex;
   flex-wrap: wrap;
@@ -274,15 +266,6 @@
   border-radius: 12px;
   border: 1px solid #99f6e4;
   background: #f0fdfa;
-}
-
-.agent-ops-kicker {
-  margin: 0 0 0.4rem;
-  font-size: 0.68rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: #0f766e;
 }
 
 .agent-ops-list {
@@ -418,22 +401,6 @@
   color: #991b1b;
 }
 
-.lots-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.55rem 0.75rem;
-  align-items: flex-end;
-}
-
-.lots-row .lots-field {
-  min-width: 5.5rem;
-}
-
-.lots-row .lots-field input {
-  width: 4.5rem;
-}
-
-/* All3 books panel — light control rows (not promo cards) */
 .books-panel {
   display: flex;
   flex-direction: column;
@@ -511,16 +478,6 @@
 .book-row .lots-field input {
   width: 4.25rem;
   min-width: 4.25rem;
-  height: 38px;
-}
-
-.book-row .counts-field {
-  min-width: 7.25rem;
-}
-
-.book-row .counts-field input {
-  width: 5.5rem;
-  min-width: 5.5rem;
   height: 38px;
 }
 
@@ -1841,7 +1798,6 @@
   -webkit-overflow-scrolling: touch;
 }
 
-/* Mobile: cards first (Profit ₹ + exit visible). Desktop keeps the wide table. */
 .trade-cards {
   display: none;
   flex-direction: column;
@@ -2157,7 +2113,6 @@ td small {
   }
 }
 
-/* ── Auto Bot (Server Live) additions — share the Trade Desk skin above ── */
 .control-bar.sub-actions {
   gap: 0.6rem;
 }
@@ -2222,8 +2177,6 @@ td small {
   color: var(--pg-danger, #e5484d);
 }
 
-/* Trade Desk hides .trade-cards on desktop (it uses a table there). The Auto Bot
- * only renders cards, so show them at every width. */
 .trades-block .trade-cards {
   display: flex;
 }

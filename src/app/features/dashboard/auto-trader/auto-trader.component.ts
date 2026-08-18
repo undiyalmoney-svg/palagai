@@ -441,7 +441,6 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
   protected tradeCountLabel(n: number): string {
     return n <= 0 ? 'unlimited' : String(n);
   }
-  }
 
   /** Switch Paper ⇆ Live (blocked while a server session is running). */
   protected setMode(next: 'paper' | 'live'): void {
