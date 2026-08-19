@@ -17,6 +17,8 @@ export interface KiteHistoricalRequest {
   from: string;
   to: string;
   authorization: string;
+  /** When true, appends `oi=1` so Kite returns open-interest as the 2nd candle column. */
+  oi?: boolean;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -58,6 +60,9 @@ export class KiteApiService {
       from: payload.from,
       to: payload.to,
     });
+    if (payload.oi) {
+      params.set('oi', '1');
+    }
 
     const url = `${this.kiteApiBaseUrl}/instruments/historical/${payload.instrumentToken}/${payload.interval}?${params.toString()}`;
 

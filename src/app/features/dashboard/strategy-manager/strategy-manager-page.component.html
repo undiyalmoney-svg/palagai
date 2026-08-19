@@ -1,343 +1,127 @@
-<div class="sm-page">
-  <header class="sm-hero">
+<div class="kh-page">
+  <header class="kh-hero">
     <div>
-      <p class="sm-kicker">Strategy Manager</p>
-      <h1>Multi-strategy control</h1>
-      <p class="sm-sub">
-        Switch Paper / Live / Shadow strategies per instrument without changing code.
-        Defaults: Nifty &amp; Bank → <strong>Donch Retest</strong> (∞ trades · day stop −40).
-        Stocks → <strong>Gap Fade</strong> (same as Stocks Desk).
-        Max trades unlocked for all strategies (∞). R targets still sync from research DNA.
+      <p class="kh-kicker">Strategy Data</p>
+      <h1>Kite Historical Data</h1>
+      <p class="kh-sub">
+        Fetch OHLC candles from Kite for any instrument token — the same auth as
+        Trade Desk (<code>token apiKey:accessToken</code>). Supports
+        <code>oi=1</code> for open-interest columns. Result is shown as JSON and
+        can be copied or downloaded as CSV.
       </p>
-    </div>
-    <div class="sm-hero-actions">
-      <button mat-stroked-button type="button" (click)="resetAssignments()">Reset assignments</button>
-      <button mat-stroked-button type="button" (click)="clearLogs()">Clear logs</button>
     </div>
   </header>
 
-  <section class="sm-channels" aria-label="Instrument channels">
-    @for (ch of channels; track ch) {
-      <button
-        type="button"
-        class="sm-channel"
-        [class.active]="selectedChannel() === ch"
-        (click)="selectChannel(ch)"
-      >
-        <strong>{{ channelLabels[ch] }}</strong>
-        <span>Paper · {{ strategyName(assignmentMap()[ch].paper) }}</span>
-        <span>Live · {{ strategyName(assignmentMap()[ch].live) }}</span>
-        <span>Shadow · {{ strategyName(assignmentMap()[ch].shadow) }}</span>
+  <section class="kh-controls" aria-label="Request parameters">
+    <label>
+      Instrument token
+      <input
+        type="text"
+        [ngModel]="instrumentToken()"
+        (ngModelChange)="instrumentToken.set($event)"
+        placeholder="12517890"
+      />
+    </label>
+
+    <label>
+      Interval
+      <select [ngModel]="interval()" (ngModelChange)="interval.set($event)">
+        @for (iv of intervals; track iv) {
+          <option [value]="iv">{{ iv }}</option>
+        }
+      </select>
+    </label>
+
+    <label class="kh-dt">
+      From
+      <span class="kh-dt-row">
+        <mat-form-field appearance="outline" class="kh-datefield">
+          <input
+            matInput
+            [matDatepicker]="fromPicker"
+            [value]="fromDateObj()"
+            (dateChange)="pickFromDate($event.value)"
+            placeholder="Date"
+          />
+          <mat-datepicker-toggle matIconSuffix [for]="fromPicker"></mat-datepicker-toggle>
+          <mat-datepicker #fromPicker></mat-datepicker>
+        </mat-form-field>
+        <input
+          class="kh-time"
+          type="text"
+          [ngModel]="fromTime()"
+          (ngModelChange)="setFromTime($event)"
+          placeholder="HH:MM:SS"
+        />
+      </span>
+    </label>
+
+    <label class="kh-dt">
+      To
+      <span class="kh-dt-row">
+        <mat-form-field appearance="outline" class="kh-datefield">
+          <input
+            matInput
+            [matDatepicker]="toPicker"
+            [value]="toDateObj()"
+            (dateChange)="pickToDate($event.value)"
+            placeholder="Date"
+          />
+          <mat-datepicker-toggle matIconSuffix [for]="toPicker"></mat-datepicker-toggle>
+          <mat-datepicker #toPicker></mat-datepicker>
+        </mat-form-field>
+        <input
+          class="kh-time"
+          type="text"
+          [ngModel]="toTime()"
+          (ngModelChange)="setToTime($event)"
+          placeholder="HH:MM:SS"
+        />
+      </span>
+    </label>
+
+    <label class="kh-check">
+      <input
+        type="checkbox"
+        [checked]="includeOi()"
+        (change)="includeOi.set($event.target.checked)"
+      />
+      Include OI (oi=1)
+    </label>
+  </section>
+
+  <div class="kh-actions">
+    <button mat-raised-button type="button" (click)="fetchData()" [disabled]="loading()">
+      {{ loading() ? 'Fetching…' : 'Fetch' }}
+    </button>
+    @if (rawJson()) {
+      <button mat-stroked-button type="button" (click)="copyJson()">
+        {{ copied() ? 'Copied ✓' : 'Copy JSON' }}
+      </button>
+      <button mat-stroked-button type="button" (click)="downloadCsv()">
+        Download CSV
       </button>
     }
-  </section>
+  </div>
 
-  <section class="sm-grid">
-    <article class="sm-panel">
-      <h2>Assignments · {{ channelLabels[selectedChannel()] }}</h2>
-      @if (selectedChannel() === 'stocks') {
-        <p class="sm-stocks-note">
-          Stocks default remains <strong>Gap Fade</strong> (unchanged).
-          <strong>Genie</strong> and other index strategies are selectable —
-          Donch / Trap / Genie activate paper + live together when you pick them.
-          Trade equities from <a routerLink="/dashboard/stocks">Stocks Desk</a>.
-        </p>
-      }
-      <label>
-        Paper strategy
-        <select
-          [ngModel]="assignmentMap()[selectedChannel()].paper"
-          (ngModelChange)="setAssignment('paper', $event)"
-        >
-          @for (s of channelStrategies(); track s.id) {
-            <option [value]="s.id">{{ s.name }}</option>
-          }
-        </select>
-      </label>
-      <label>
-        Live strategy
-        <select
-          [ngModel]="assignmentMap()[selectedChannel()].live"
-          (ngModelChange)="setAssignment('live', $event)"
-        >
-          @for (s of channelStrategies(); track s.id) {
-            <option [value]="s.id">{{ s.name }}</option>
-          }
-        </select>
-      </label>
-      <label>
-        Shadow strategy (signals only)
-        <select
-          [ngModel]="assignmentMap()[selectedChannel()].shadow ?? ''"
-          (ngModelChange)="setAssignment('shadow', $event)"
-        >
-          <option value="">— Off —</option>
-          @for (s of channelStrategies(); track s.id) {
-            <option [value]="s.id">{{ s.name }}</option>
-          }
-        </select>
-      </label>
+  @if (loading()) {
+    <div class="kh-loading">
+      <mat-progress-spinner mode="indeterminate" diameter="30"></mat-progress-spinner>
+      <span>Fetching from Kite…</span>
+    </div>
+  }
 
-      <div class="sm-status">
-        <h3>Desk status</h3>
-        <p><span>Mode</span> {{ deskSnap().mode }} · {{ deskSnap().running ? 'Running' : 'Idle' }}</p>
-        <p><span>Open trade</span> {{ openTradeLabel() }}</p>
-        <p><span>Today’s trades</span> {{ todayTradeCount() }}</p>
-        <p><span>Last message</span> {{ deskSnap().message || '—' }}</p>
+  @if (error(); as e) {
+    <p class="kh-error">{{ e }}</p>
+  }
+
+  @if (rawJson()) {
+    <section class="kh-result">
+      <div class="kh-meta">
+        <span>{{ candles().length }} candle(s)</span>
+        <span>instrument {{ instrumentToken().trim() }} · {{ interval() }}</span>
       </div>
-    </article>
-
-    <article class="sm-panel">
-      <h2>Strategy catalog</h2>
-      <p class="sm-hint">Settings below edit the selected module. Desk only uses Paper/Live assignments.</p>
-      <ul class="sm-catalog">
-        @for (s of channelStrategies(); track s.id) {
-          <li>
-            <button
-              type="button"
-              [class.active]="selectedStrategyId() === s.id"
-              (click)="selectStrategy(s.id)"
-            >
-              <strong>{{ s.name }}</strong>
-              @if (assignmentBadges(s.id); as badges) {
-                @if (badges) {
-                  <span class="sm-assign-badge">{{ badges }}</span>
-                }
-              }
-              <small>{{ s.id }} · v{{ s.version }}</small>
-              <em>{{ s.description }}</em>
-            </button>
-          </li>
-        }
-      </ul>
-    </article>
-
-    <article class="sm-panel">
-      <h2>Settings · {{ selectedStrategy()?.name || '—' }}</h2>
-      @if (editingAssigned(); as ed) {
-        @if (ed.isPaper || ed.isLive) {
-          <p class="sm-settings-banner ok">
-            Editing the strategy assigned to
-            {{ channelLabels[selectedChannel()] }}
-            {{ ed.isPaper && ed.isLive ? 'Paper + Live' : ed.isPaper ? 'Paper' : 'Live' }}.
-            Max trades / profit-protect here drive the Trade Desk.
-          </p>
-        } @else {
-          <p class="sm-settings-banner warn">
-            Not assigned to {{ channelLabels[selectedChannel()] }} Paper/Live.
-            Desk runs <strong>{{ ed.paperName }}</strong> (Paper) /
-            <strong>{{ ed.liveName }}</strong> (Live).
-            Edits here will not change today’s desk until you assign this strategy.
-            <button mat-stroked-button type="button" (click)="jumpToAssigned('paper')">
-              Edit Paper strategy
-            </button>
-          </p>
-        }
-      }
-      @if (selectedSettings(); as st) {
-        <div class="sm-settings">
-          <label>Entry start <input [ngModel]="st.entryTimeStart" (ngModelChange)="patchSetting('entryTimeStart', $event)" /></label>
-          <label>Entry end <input [ngModel]="st.entryTimeEnd" (ngModelChange)="patchSetting('entryTimeEnd', $event)" /></label>
-          <label>Exit time <input [ngModel]="st.exitTime" (ngModelChange)="patchSetting('exitTime', $event)" /></label>
-          <label>OR end <input [ngModel]="st.orEnd" (ngModelChange)="patchSetting('orEnd', $event)" /></label>
-          <label>Stop loss pts <input type="number" [ngModel]="st.stopLossPts" (ngModelChange)="patchSetting('stopLossPts', $event)" /></label>
-          <label>Bank stop pts <input type="number" [ngModel]="st.bankStopLossPts" (ngModelChange)="patchSetting('bankStopLossPts', $event)" /></label>
-          <label>EMA length <input type="number" [ngModel]="st.emaLength" (ngModelChange)="patchSetting('emaLength', $event)" /></label>
-          <label>Donchian length <input type="number" [ngModel]="st.donchianLength" (ngModelChange)="patchSetting('donchianLength', $event)" /></label>
-          <label>Swing lookback <input type="number" [ngModel]="st.swingLookback" (ngModelChange)="patchSetting('swingLookback', $event)" /></label>
-          <label>Vol expand ATR× <input type="number" step="0.1" [ngModel]="st.volExpandAtrMult" (ngModelChange)="patchSetting('volExpandAtrMult', $event)" /></label>
-          <label>Max trades/day <input type="number" [ngModel]="st.maxTradesPerDay" (ngModelChange)="patchSetting('maxTradesPerDay', $event)" /></label>
-          <p class="sm-setting-note">{{ dnaMaxTradesHint() }}</p>
-          @if (editingAssigned().isPaper || editingAssigned().isLive) {
-            <p class="sm-setting-note">
-              Desk today: {{ todayTradeCount() }} closed
-              · limit {{ st.maxTradesPerDay > 0 ? st.maxTradesPerDay : '∞' }}.
-              @if (st.maxTradesPerDay > 0 && todayTradeCount() >= st.maxTradesPerDay) {
-                Cap hit — raise Max trades/day to allow another entry (applies on next live refresh).
-              } @else if (st.maxTradesPerDay > 0) {
-                Room for {{ st.maxTradesPerDay - todayTradeCount() }} more today if a setup appears.
-              }
-            </p>
-          }
-          <label>Position lots <input type="number" [ngModel]="st.positionSizeLots" (ngModelChange)="patchSetting('positionSizeLots', $event)" /></label>
-          <label>Risk % <input type="number" step="0.1" [ngModel]="st.riskPercent" (ngModelChange)="patchSetting('riskPercent', $event)" /></label>
-          <label>Day stop pts <input type="number" [ngModel]="st.dayStopPts" (ngModelChange)="patchSetting('dayStopPts', $event)" /></label>
-          <label>Target R <input type="number" step="0.1" [ngModel]="st.targetRMultiple" (ngModelChange)="patchSetting('targetRMultiple', $event)" /></label>
-          <label>Profit protect
-            <select [ngModel]="st.profitProtectEnabled ? 'on' : 'off'" (ngModelChange)="patchSetting('profitProtectEnabled', $event === 'on' ? 'true' : 'false')">
-              <option value="on">on</option>
-              <option value="off">off</option>
-            </select>
-          </label>
-          <label>Protect arm R <input type="number" step="0.1" [ngModel]="st.profitProtectArmR" (ngModelChange)="patchSetting('profitProtectArmR', $event)" /></label>
-          <label>Protect lock R <input type="number" step="0.1" [ngModel]="st.profitProtectLockR" (ngModelChange)="patchSetting('profitProtectLockR', $event)" /></label>
-          <label>Regime filter
-            <select [ngModel]="st.regimeFilterEnabled ? 'on' : 'off'" (ngModelChange)="patchSetting('regimeFilterEnabled', $event === 'on' ? 'true' : 'false')">
-              <option value="on">on</option>
-              <option value="off">off</option>
-            </select>
-          </label>
-          <label>Min OR drive <input type="number" step="0.05" [ngModel]="st.regimeMinOrDriveFrac" (ngModelChange)="patchSetting('regimeMinOrDriveFrac', $event)" /></label>
-          <label>Max gap / ATR <input type="number" step="0.5" [ngModel]="st.regimeMaxGapAtr" (ngModelChange)="patchSetting('regimeMaxGapAtr', $event)" /></label>
-          <label>Instrument type
-            <select [ngModel]="st.instrumentType" (ngModelChange)="patchSetting('instrumentType', $event)">
-              <option value="index">index</option>
-              <option value="futures">futures</option>
-              <option value="options">options</option>
-              <option value="equity">equity</option>
-            </select>
-          </label>
-        </div>
-        <button mat-stroked-button type="button" (click)="resetSettings()">Reset strategy settings</button>
-      }
-    </article>
-
-    <article class="sm-panel">
-      <h2>Performance</h2>
-      <div class="sm-metrics">
-        <div>
-          <h3>Selected strategy</h3>
-          <p>Trades {{ selectedPerf().trades }}</p>
-          <p>Win rate {{ selectedPerf().winRate ?? '—' }}%</p>
-          <p>PF {{ selectedPerf().profitFactor ?? '—' }}</p>
-          <p>Expectancy {{ selectedPerf().expectancy ?? '—' }}</p>
-          <p>Max DD {{ selectedPerf().maxDrawdown ?? '—' }}</p>
-          <p>Net pts {{ selectedPerf().netPoints }}</p>
-        </div>
-        <div>
-          <h3>Paper assignment</h3>
-          <p>{{ strategyName(assignmentMap()[selectedChannel()].paper) }}</p>
-          <p>WR {{ paperPerf().winRate ?? '—' }}% · Exp {{ paperPerf().expectancy ?? '—' }}</p>
-          <p>Net {{ paperPerf().netPoints }} · n={{ paperPerf().trades }}</p>
-        </div>
-        <div>
-          <h3>Live assignment</h3>
-          <p>{{ strategyName(assignmentMap()[selectedChannel()].live) }}</p>
-          <p>WR {{ livePerf().winRate ?? '—' }}% · Exp {{ livePerf().expectancy ?? '—' }}</p>
-          <p>Net {{ livePerf().netPoints }} · n={{ livePerf().trades }}</p>
-        </div>
-      </div>
-      <button mat-stroked-button type="button" (click)="clearPerf()">Clear selected perf history</button>
-    </article>
-
-    <article class="sm-panel sm-wide">
-      <div class="sm-row-head">
-        <h2>Shadow comparison</h2>
-        <button mat-stroked-button type="button" (click)="clearShadow()">Clear shadow book</button>
-      </div>
-      @if (shadowStats(); as ss) {
-        <div class="sm-metrics">
-          <p>Signals {{ ss.signals }}</p>
-          <p>Trades {{ ss.trades }}</p>
-          <p>Win rate {{ ss.winRate ?? '—' }}%</p>
-          <p>Expectancy {{ ss.expectancy ?? '—' }}</p>
-          <p>PF {{ ss.profitFactor ?? '—' }}</p>
-          <p>Net pts {{ ss.netPoints }}</p>
-        </div>
-      } @else {
-        <p class="sm-muted">No shadow strategy selected for this channel.</p>
-      }
-      <div class="sm-tables">
-        <div>
-          <h3>Recent shadow signals</h3>
-          <div class="sm-table-scroll">
-            <table>
-              <thead>
-                <tr>
-                  <th>Time</th><th>Action</th><th>Entry</th><th>Primary</th><th>Reason</th>
-                </tr>
-              </thead>
-              <tbody>
-                @for (s of shadowSignals().slice(0, 12); track s.id) {
-                  @if (s.channel === selectedChannel()) {
-                    <tr>
-                      <td>{{ s.barTime }}</td>
-                      <td>{{ s.action }}</td>
-                      <td>{{ s.entryPrice | number: '1.1-1' }}</td>
-                      <td>{{ s.primaryAction || '—' }}</td>
-                      <td>{{ s.reason }}</td>
-                    </tr>
-                  }
-                }
-              </tbody>
-            </table>
-          </div>
-        </div>
-        <div>
-          <h3>Recent shadow trades</h3>
-          <div class="sm-table-scroll">
-            <table>
-              <thead>
-                <tr>
-                  <th>Entry</th><th>Dir</th><th>Pts</th><th>Exit reason</th>
-                </tr>
-              </thead>
-              <tbody>
-                @for (t of shadowTrades().slice(0, 12); track t.id) {
-                  @if (t.channel === selectedChannel()) {
-                    <tr>
-                      <td>{{ t.entryTime }}</td>
-                      <td>{{ t.direction }}</td>
-                      <td [class.win]="t.points > 0" [class.loss]="t.points < 0">{{ t.points | number: '1.1-1' }}</td>
-                      <td>{{ t.exitReason }}</td>
-                    </tr>
-                  }
-                }
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </article>
-
-    <article class="sm-panel sm-wide">
-      <h2>Strategy event log</h2>
-      <div class="sm-table-scroll">
-        <table>
-          <thead>
-            <tr>
-              <th>At</th><th>Type</th><th>Strategy</th><th>Mode</th><th>Message</th>
-            </tr>
-          </thead>
-          <tbody>
-            @for (e of eventLog().slice(0, 40); track e.at + e.message) {
-              <tr>
-                <td>{{ e.at }}</td>
-                <td>{{ e.type }}</td>
-                <td>{{ e.strategyName }}</td>
-                <td>{{ e.mode || '—' }}</td>
-                <td>{{ e.message }}</td>
-              </tr>
-            }
-          </tbody>
-        </table>
-      </div>
-    </article>
-
-    <article class="sm-panel sm-wide">
-      <h2>Historical desk trades (current snapshot)</h2>
-      <div class="sm-table-scroll">
-        <table>
-          <thead>
-            <tr>
-              <th>Strategy</th><th>Instrument</th><th>Dir</th><th>Entry</th><th>Exit</th><th>Pts</th><th>Exit reason</th>
-            </tr>
-          </thead>
-          <tbody>
-            @for (t of deskSnap().trades.slice().reverse().slice(0, 30); track t.id) {
-              <tr>
-                <td>{{ t.strategyName || t.strategyId || '—' }}</td>
-                <td>{{ t.instrumentName }}</td>
-                <td>{{ t.direction }}</td>
-                <td>{{ t.entryTime }}</td>
-                <td>{{ t.exitTime }}</td>
-                <td [class.win]="t.indexPoints > 0" [class.loss]="t.indexPoints < 0">{{ t.indexPoints | number: '1.1-1' }}</td>
-                <td>{{ t.exitReason }}</td>
-              </tr>
-            }
-          </tbody>
-        </table>
-      </div>
-    </article>
-  </section>
+      <pre class="kh-json">{{ rawJson() }}</pre>
+    </section>
+  }
 </div>

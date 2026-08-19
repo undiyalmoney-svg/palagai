@@ -94,8 +94,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
       subtitle: 'Manage live trading, testing and paper trading from one place.',
     },
     '/dashboard/strategy-manager': {
-      title: 'Strategy Manager',
-      subtitle: 'Assign and configure strategies for paper and live desks.',
+      title: 'Strategy Data',
+      subtitle: 'Fetch Kite historical candles and download as JSON / CSV.',
     },
     '/dashboard/crude-oil': {
       title: 'Experiments',
