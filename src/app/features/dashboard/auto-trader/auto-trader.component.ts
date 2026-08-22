@@ -305,8 +305,8 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
   protected bankMaxTradesDay = 3;
   protected crudeMaxTradesDay = 4;
   protected tradeCountsHint =
-    'Max closed trades per book per day. Capped at the strategy DNA limit (Nifty 3) — ' +
-    'you can lower it, not raise it. Stop, then Start to apply.';
+    'Decided by the server strategy (Nifty: 3/day). Shown for reference — ' +
+    'the desk sets trade count, entry, exit and instrument. You control LOTS.';
   /** From /live/defaults|/live/health — controls row visibility (not capital heuristics). */
   protected bankAllowed = true;
   protected crudeAllowed = true;
@@ -759,26 +759,21 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
     this.crudeLots = crudeLots;
     this.refreshDeskLots();
 
+    // OWNERSHIP CONTRACT: the UI sends LOTS (and capital) only. Trade counts,
+    // entry/exit, instrument selection and strategy choice are decided by the
+    // Order-API from the strategy DNA, and the server ignores client values for
+    // them - so sending them would be misleading noise, not control.
+    void enableBank;
+    void enableCrude;
     return {
       realOrders,
       capitalRs: this.capitalRs,
       capital: this.capitalRs,
-      enableNifty: true,
-      enableBank,
-      enableCrude,
       niftyLots,
       bankLots,
       crudeLots,
-      niftyMaxTradesDay: this.asIntMin0(this.niftyMaxTradesDay, 0),
-      bankMaxTradesDay: this.asIntMin0(this.bankMaxTradesDay, 0),
-      crudeMaxTradesDay: this.asIntMin0(this.crudeMaxTradesDay, 4),
       dayProfitLock: this.dayProfitLock,
       strictDayStop: this.strictDayStop,
-      crudeAfterIndexClose: this.crudeAfterIndexClose !== false,
-      bankOnlyAfterNifty: this.bankOnlyAfterNifty !== false,
-      crudeStrategy: 'live-crude-green',
-      bankStrategy: this.bankStrategy === 'genie' ? 'genie' : 'trap',
-      niftyStrategy: 'trap-v2',
     };
   }
 
