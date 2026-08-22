@@ -23,9 +23,19 @@ export const MANAGED_STRATEGY_IDS = {
   ALIGN_COMBO_GENIE: 'align-combo-genie',
   /**
    * S/R Trap + Confirm — liquidity sweep at swing S/R + next-bar confirm · 3.5R.
-   * **Default Nifty/Bank** Paper+Live (doc 33 RCA).
+   * Superseded by SR_TRAP_CONFIRM_V2 as the Nifty/Bank default — kept
+   * registered (not deleted) for comparison against the loss history it was
+   * live for.
    */
   SR_TRAP_CONFIRM: 'sr-trap-confirm',
+  /**
+   * S/R Trap + Confirm v2 — same sweep+confirm mechanics as SR_TRAP_CONFIRM,
+   * but with a single-source DNA (TRAP_V2_ENTRY_DNA_EXTRAS in
+   * strategy-dna-caps.ts, shared by this UI module and the Order-API live
+   * bundle) and an enforced hard ₹/lot option loss cap. **Default Nifty/Bank**
+   * Paper+Live.
+   */
+  SR_TRAP_CONFIRM_V2: 'sr-trap-confirm-v2',
   /** Stocks Desk champion — gap-up fade ₹500 book. */
   GAP_FADE_500: 'gap-fade-500',
 } as const;
@@ -35,18 +45,18 @@ export type ManagedStrategyId =
 
 /**
  * Research-backed defaults:
- * - Nifty/Bank: Trap (doc 31/33 · confirm edge · 3.5R · profit protect 1R→BE)
+ * - Nifty/Bank: Trap V2 (confirm edge · 3.5R · profit protect 1R→BE · hard ₹ loss cap)
  * - Stocks: GAP_FADE_500 (same DNA as Stocks Desk)
  */
 export const DEFAULT_CHANNEL_ASSIGNMENTS = {
   nifty: {
-    paper: MANAGED_STRATEGY_IDS.SR_TRAP_CONFIRM,
-    live: MANAGED_STRATEGY_IDS.SR_TRAP_CONFIRM,
+    paper: MANAGED_STRATEGY_IDS.SR_TRAP_CONFIRM_V2,
+    live: MANAGED_STRATEGY_IDS.SR_TRAP_CONFIRM_V2,
     shadow: null as string | null,
   },
   bank: {
-    paper: MANAGED_STRATEGY_IDS.SR_TRAP_CONFIRM,
-    live: MANAGED_STRATEGY_IDS.SR_TRAP_CONFIRM,
+    paper: MANAGED_STRATEGY_IDS.SR_TRAP_CONFIRM_V2,
+    live: MANAGED_STRATEGY_IDS.SR_TRAP_CONFIRM_V2,
     shadow: null as string | null,
   },
   stocks: {

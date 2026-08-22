@@ -48,6 +48,15 @@ export function computeProtectiveSlTrigger(params: {
   tradingSymbol?: string | null;
   /** Current option LTP when placing (optional; do not pass fill as fake LTP). */
   ltp?: number | null;
+  /**
+   * Hard ₹ loss ceiling for this position (already scaled by lots — e.g.
+   * dnaCapsForStrategy's maxOptionLossRs × lots), or 0/undefined for no cap.
+   * Applied AFTER every other adjustment so a wide structural stop (or an
+   * LTP cushion) can never push the allowed loss past this ceiling.
+   */
+  maxLossRs?: number | null;
+  /** Total option units in the position (lotSize × lots). Required with maxLossRs. */
+  lotUnits?: number | null;
 }): number {
   const fill = Math.max(0, params.fillPremium);
   const risk = Math.max(0, params.indexRiskPts);
@@ -68,6 +77,18 @@ export function computeProtectiveSlTrigger(params: {
     );
     trigger = roundOptionPremiumTick(Math.max(0.05, ltp - cushion));
   }
+
+  const maxLossRs = Math.max(0, Number(params.maxLossRs) || 0);
+  const lotUnits = Math.max(0, Number(params.lotUnits) || 0);
+  if (maxLossRs > 0 && lotUnits > 0) {
+    // Higher trigger = smaller loss (SELL stop on a long option). Clamping
+    // UP to the cap-derived trigger means the position can never lose more
+    // than maxLossRs, regardless of how wide the structural/LTP-cushion
+    // stop above computed out to.
+    const fromCap = fill - maxLossRs / lotUnits;
+    trigger = roundOptionPremiumTick(Math.max(trigger, fromCap));
+  }
+
   return trigger;
 }
 

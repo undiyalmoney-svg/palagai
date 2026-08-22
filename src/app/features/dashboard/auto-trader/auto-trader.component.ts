@@ -294,11 +294,19 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
   protected bankLots = 1;
   protected crudeLots = 1;
   /** 0 = unlimited. N > 0 = max closed trades that book may open today. */
-  protected niftyMaxTradesDay = 0;
-  protected bankMaxTradesDay = 0;
+  /**
+   * Default to the Trap V2 DNA cap (3), NOT 0. This value is sent on every
+   * Start, and 0 used to mean "unlimited" server-side — so a failed
+   * /live/defaults fetch silently re-armed the churn setting the Aug-10 RCA
+   * blamed for an all-red day. The server now clamps to the DNA cap as well
+   * (clampMaxTradesToDna); this is the matching client-side default.
+   */
+  protected niftyMaxTradesDay = 3;
+  protected bankMaxTradesDay = 3;
   protected crudeMaxTradesDay = 4;
   protected tradeCountsHint =
-    '0 = unlimited. N > 0 = max closed trades that book may open today. Stop, then Start to apply.';
+    'Max closed trades per book per day. Capped at the strategy DNA limit (Nifty 3) — ' +
+    'you can lower it, not raise it. Stop, then Start to apply.';
   /** From /live/defaults|/live/health — controls row visibility (not capital heuristics). */
   protected bankAllowed = true;
   protected crudeAllowed = true;
@@ -770,7 +778,7 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
       bankOnlyAfterNifty: this.bankOnlyAfterNifty !== false,
       crudeStrategy: 'live-crude-green',
       bankStrategy: this.bankStrategy === 'genie' ? 'genie' : 'trap',
-      niftyStrategy: 'trap',
+      niftyStrategy: 'trap-v2',
     };
   }
 
@@ -885,11 +893,11 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
 
       this.niftyMaxTradesDay = this.asIntMin0(
         books?.niftyMaxTradesDay ?? preset?.niftyMaxTradesDay,
-        0,
+        3,
       );
       this.bankMaxTradesDay = this.asIntMin0(
         books?.bankMaxTradesDay ?? preset?.bankMaxTradesDay,
-        0,
+        3,
       );
       this.crudeMaxTradesDay = this.asIntMin0(
         books?.crudeMaxTradesDay ?? preset?.crudeMaxTradesDay,

@@ -64,6 +64,33 @@ function num(v: unknown, fallback: number): number {
   return typeof v === 'number' && Number.isFinite(v) ? v : fallback;
 }
 
+/**
+ * Parse "09:45-10:30,11:00-12:00" into [[start,end],...].
+ * Empty / malformed → [] meaning "no window restriction" (backward compatible
+ * with entryTimeStart/entryTimeEnd only).
+ */
+function parseEntryWindows(raw: unknown): Array<[string, string]> {
+  if (typeof raw !== 'string' || !raw.trim()) {
+    return [];
+  }
+  const out: Array<[string, string]> = [];
+  for (const part of raw.split(',')) {
+    const [a, b] = part.trim().split('-');
+    if (/^\d{2}:\d{2}$/.test(a ?? '') && /^\d{2}:\d{2}$/.test(b ?? '')) {
+      out.push([a as string, b as string]);
+    }
+  }
+  return out;
+}
+
+/** Windows are [start, end) so adjacent windows cannot double-count a bar. */
+function inEntryWindows(time: string, windows: Array<[string, string]>): boolean {
+  if (!windows.length) {
+    return true;
+  }
+  return windows.some(([a, b]) => time >= a && time < b);
+}
+
 function readTrapExtras(settings: StrategySettings): {
   swingLb: number;
   piercePts: number;
@@ -77,6 +104,8 @@ function readTrapExtras(settings: StrategySettings): {
   /** Widen bounce pierce with morning OR (doc 45). 0 = off. */
   bounceOrPierceMult: number;
   bounceOrPierceCap: number;
+  /** Intraday entry windows; [] = unrestricted (entryTimeStart/End only). */
+  entryWindows: Array<[string, string]>;
 } {
   const x = settings.extras ?? {};
   const mode = x['trapMode'] === 'trap' ? 'trap' : 'both';
@@ -91,6 +120,7 @@ function readTrapExtras(settings: StrategySettings): {
     minConfirmBody: num(x['minConfirmBody'], 0),
     bounceOrPierceMult: Math.max(0, num(x['bounceOrPierceMult'], 0)),
     bounceOrPierceCap: Math.max(0, num(x['bounceOrPierceCap'], 0)),
+    entryWindows: parseEntryWindows(x['entryWindows']),
   };
 }
 
@@ -190,6 +220,11 @@ export function runSrTrapConfirm(
     if (time < settings.entryTimeStart || time > settings.entryTimeEnd) {
       return wait('Confirm outside entry window');
     }
+    // The fill happens on THIS bar, so the time-of-day filter must gate the
+    // fill bar (not just the signal bar) or trades leak into dead windows.
+    if (!inEntryWindows(time, extras.entryWindows)) {
+      return wait('Confirm outside active time window');
+    }
     const body = Math.abs(candle.close - candle.open);
     const bullOk =
       p.dir === 1 && candle.close > candle.open && candle.close > p.signalClose;
@@ -234,6 +269,13 @@ export function runSrTrapConfirm(
   }
   if (time > settings.entryTimeEnd) {
     return skip(`After entry window ${settings.entryTimeEnd}`);
+  }
+  // Research (5yr real-index BS backtest, train 2021-24 → holdout 2025-26):
+  // edge concentrates in 09:45-10:30 / 11:00-12:00 / 13:30-14:45; the
+  // 10:30-11:00 and 12:00-13:30 lull was flat-to-negative. Arming a signal
+  // outside these only to fill in a dead window is what we are cutting.
+  if (!inEntryWindows(time, extras.entryWindows)) {
+    return wait('Outside active time window');
   }
 
   const closes = series.map((c) => c.close);

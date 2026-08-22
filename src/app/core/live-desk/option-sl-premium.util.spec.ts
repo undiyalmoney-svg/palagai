@@ -47,4 +47,45 @@ describe('computeProtectiveSlTrigger', () => {
     });
     expect(t).toBeLessThan(544 - 20);
   });
+
+  it('caps the loss at maxLossRs even when structural risk alone would allow more', () => {
+    // Nifty weekly, 1 lot = 75 units, fill 60, max risk band 40pts × 0.5Δ = 20
+    // → uncapped structural loss = 20 × 75 = ₹1,500, far past a ₹300 cap.
+    const uncapped = computeProtectiveSlTrigger({
+      fillPremium: 60,
+      indexRiskPts: 40,
+      exchange: 'NFO',
+      tradingSymbol: 'NIFTY2580024250CE',
+    });
+    expect((60 - uncapped) * 75).toBeGreaterThan(300);
+
+    const capped = computeProtectiveSlTrigger({
+      fillPremium: 60,
+      indexRiskPts: 40,
+      exchange: 'NFO',
+      tradingSymbol: 'NIFTY2580024250CE',
+      maxLossRs: 300,
+      lotUnits: 75,
+    });
+    const lossRs = (60 - capped) * 75;
+    expect(lossRs).toBeLessThanOrEqual(300 + 0.05 * 75);
+  });
+
+  it('does not loosen the stop when maxLossRs is wider than the structural stop', () => {
+    const withoutCap = computeProtectiveSlTrigger({
+      fillPremium: 109.9,
+      indexRiskPts: 30,
+      exchange: 'NFO',
+      tradingSymbol: 'NIFTY2580024250CE',
+    });
+    const withWideCap = computeProtectiveSlTrigger({
+      fillPremium: 109.9,
+      indexRiskPts: 30,
+      exchange: 'NFO',
+      tradingSymbol: 'NIFTY2580024250CE',
+      maxLossRs: 100000,
+      lotUnits: 75,
+    });
+    expect(withWideCap).toBe(withoutCap);
+  });
 });

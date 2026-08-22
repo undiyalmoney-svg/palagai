@@ -26,6 +26,9 @@ import {
   optionTrailSlTrigger,
 } from '../paper-desk/option-peak-trail.util';
 import { TRAP_1LOT_DAILY_DNA_EXTRAS } from '../strategy-manager/config/strategy-dna-caps';
+import { StrategyAssignmentService } from '../strategy-manager/config/strategy-assignment.service';
+import { StrategyRegistryService } from '../strategy-manager/registry/strategy-registry.service';
+import { DeskChannel } from '../strategy-manager/models/desk-channel.model';
 import { nowIstStamp } from './live-start-guard.util';
 
 export interface LiveBrokerPosition {
@@ -159,6 +162,8 @@ export { liveOpenMatchesBroker } from './live-open-match.util';
 @Injectable({ providedIn: 'root' })
 export class LiveOrderExecutorService {
   private readonly kiteApi = inject(KiteApiService);
+  private readonly strategyAssignment = inject(StrategyAssignmentService);
+  private readonly strategyRegistry = inject(StrategyRegistryService);
 
   private readonly positions = new Map<string, LiveBrokerPosition>();
   /** Open broker legs keyed by option tradingsymbol (restart adopt). */
@@ -230,6 +235,27 @@ export class LiveOrderExecutorService {
 
   private lotsFor(instrumentId: string): number {
     return this.lotsByInstrument.get(instrumentId) ?? this.lotsMultiplier;
+  }
+
+  /**
+   * Hard ₹ loss cap (already scaled by lots) for the strategy currently
+   * assigned Live on this instrument's channel — read from the same
+   * settings.extras.maxOptionLossRs the strategy itself defines (e.g.
+   * TRAP_V2_ENTRY_DNA_EXTRAS), so this executor never invents its own number.
+   * Returns 0 when the assigned strategy has no cap configured.
+   */
+  private maxOptionLossRsFor(instrumentId: string): number {
+    const channel: DeskChannel | null = /bank/i.test(instrumentId)
+      ? 'bank'
+      : /nifty/i.test(instrumentId)
+        ? 'nifty'
+        : null;
+    if (!channel) return 0;
+    const strategyId = this.strategyAssignment.getStrategyId(channel, 'live');
+    const strategy = this.strategyRegistry.getById(strategyId);
+    const perLot = Number(strategy?.getSettings().extras?.['maxOptionLossRs']) || 0;
+    if (!(perLot > 0)) return 0;
+    return perLot * this.lotsFor(instrumentId);
   }
 
   getPositions(): LiveBrokerPosition[] {
@@ -964,6 +990,8 @@ export class LiveOrderExecutorService {
         exchange,
         tradingSymbol: option.tradingSymbol,
         ltp,
+        maxLossRs: this.maxOptionLossRsFor(instrumentId),
+        lotUnits: quantity,
       });
 
       let slOrderId: string | null = null;
@@ -1119,6 +1147,8 @@ export class LiveOrderExecutorService {
             exchange: pos.exchange,
             tradingSymbol: pos.tradingSymbol,
             ltp,
+            maxLossRs: this.maxOptionLossRsFor(pos.instrumentId),
+            lotUnits: pos.quantity,
           });
     const prevTrigger = pos.slTrigger ?? 0;
     pos = { ...pos, optionPeakMfeRs };

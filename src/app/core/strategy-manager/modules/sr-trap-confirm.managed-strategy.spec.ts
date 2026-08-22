@@ -1,9 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { SrTrapConfirmManagedStrategy } from './sr-trap-confirm.managed-strategy';
-import { DEFAULT_CHANNEL_ASSIGNMENTS, MANAGED_STRATEGY_IDS } from '../config/managed-strategy-ids';
+import { MANAGED_STRATEGY_IDS } from '../config/managed-strategy-ids';
 
+/**
+ * Superseded by SR_TRAP_CONFIRM_V2 (sr-trap-confirm-v2.managed-strategy.spec.ts)
+ * as the Nifty/Bank default — this strategy stays registered (not deleted)
+ * for comparison against the loss history it was live for, so its own
+ * settings are still worth pinning here.
+ */
 describe('SrTrapConfirmManagedStrategy', () => {
-  it('is indices default with option-₹ DNA (pierce20 · Bank40 · peak₹100 · max3 · 3.5R)', () => {
+  it('has option-₹ DNA (pierce20 · Bank40 · peak₹100 · max3 · 3.5R)', () => {
     const s = new SrTrapConfirmManagedStrategy();
     s.initialize();
     expect(s.id).toBe(MANAGED_STRATEGY_IDS.SR_TRAP_CONFIRM);
@@ -24,9 +30,5 @@ describe('SrTrapConfirmManagedStrategy', () => {
     expect(s.getSettings().extras['slConfirmCutoffEnabled']).toBe(false);
     expect(s.supports).toContain('nifty');
     expect(s.supports).toContain('bank');
-    expect(DEFAULT_CHANNEL_ASSIGNMENTS.nifty.paper).toBe(MANAGED_STRATEGY_IDS.SR_TRAP_CONFIRM);
-    expect(DEFAULT_CHANNEL_ASSIGNMENTS.nifty.live).toBe(MANAGED_STRATEGY_IDS.SR_TRAP_CONFIRM);
-    expect(DEFAULT_CHANNEL_ASSIGNMENTS.bank.paper).toBe(MANAGED_STRATEGY_IDS.SR_TRAP_CONFIRM);
-    expect(DEFAULT_CHANNEL_ASSIGNMENTS.bank.live).toBe(MANAGED_STRATEGY_IDS.SR_TRAP_CONFIRM);
   });
 });

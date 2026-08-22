@@ -31,11 +31,13 @@ __export(bundle_entry_exports, {
   BANK_NIFTY_INSTRUMENT: () => BANK_NIFTY_INSTRUMENT,
   CRUDE_OIL_MINI_INSTRUMENT: () => CRUDE_OIL_MINI_INSTRUMENT,
   NIFTY_50_INSTRUMENT: () => NIFTY_50_INSTRUMENT,
+  STRATEGY_BUNDLE_VERSION: () => STRATEGY_BUNDLE_VERSION,
   applySlConfirmCutoff: () => applySlConfirmCutoff,
   armPeakTrailFloor: () => armPeakTrailFloor,
   computeProtectiveSlTrigger: () => computeProtectiveSlTrigger,
   createGenieStrategy: () => createGenieStrategy,
   createTrapStrategy: () => createTrapStrategy,
+  createTrapStrategyV2: () => createTrapStrategyV2,
   effectiveProtectiveStop: () => effectiveProtectiveStop,
   replayPaperOnCrude: () => replayPaperOnCrude,
   replayPaperOnIndex: () => replayPaperOnIndex,
@@ -921,21 +923,31 @@ var MANAGED_STRATEGY_IDS = {
   ALIGN_COMBO_GENIE: "align-combo-genie",
   /**
    * S/R Trap + Confirm — liquidity sweep at swing S/R + next-bar confirm · 3.5R.
-   * **Default Nifty/Bank** Paper+Live (doc 33 RCA).
+   * Superseded by SR_TRAP_CONFIRM_V2 as the Nifty/Bank default — kept
+   * registered (not deleted) for comparison against the loss history it was
+   * live for.
    */
   SR_TRAP_CONFIRM: "sr-trap-confirm",
+  /**
+   * S/R Trap + Confirm v2 — same sweep+confirm mechanics as SR_TRAP_CONFIRM,
+   * but with a single-source DNA (TRAP_V2_ENTRY_DNA_EXTRAS in
+   * strategy-dna-caps.ts, shared by this UI module and the Order-API live
+   * bundle) and an enforced hard ₹/lot option loss cap. **Default Nifty/Bank**
+   * Paper+Live.
+   */
+  SR_TRAP_CONFIRM_V2: "sr-trap-confirm-v2",
   /** Stocks Desk champion — gap-up fade ₹500 book. */
   GAP_FADE_500: "gap-fade-500"
 };
 var DEFAULT_CHANNEL_ASSIGNMENTS = {
   nifty: {
-    paper: MANAGED_STRATEGY_IDS.SR_TRAP_CONFIRM,
-    live: MANAGED_STRATEGY_IDS.SR_TRAP_CONFIRM,
+    paper: MANAGED_STRATEGY_IDS.SR_TRAP_CONFIRM_V2,
+    live: MANAGED_STRATEGY_IDS.SR_TRAP_CONFIRM_V2,
     shadow: null
   },
   bank: {
-    paper: MANAGED_STRATEGY_IDS.SR_TRAP_CONFIRM,
-    live: MANAGED_STRATEGY_IDS.SR_TRAP_CONFIRM,
+    paper: MANAGED_STRATEGY_IDS.SR_TRAP_CONFIRM_V2,
+    live: MANAGED_STRATEGY_IDS.SR_TRAP_CONFIRM_V2,
     shadow: null
   },
   stocks: {
@@ -3855,10 +3867,33 @@ var TRAP_1LOT_DAILY_DNA_EXTRAS = {
   bounceOrPierceMult: 0,
   bounceOrPierceCap: 0
 };
+var TRAP_V2_ENTRY_DNA_EXTRAS = {
+  ...TRAP_1LOT_DAILY_DNA_EXTRAS,
+  /** Hard ₹/lot loss cap — read by computeProtectiveSlTrigger's maxLossRs param. */
+  maxOptionLossRs: 300,
+  /**
+   * Active intraday entry windows (IST), [start, end).
+   *
+   * Research: 5yr Black-Scholes backtest over REAL Nifty 5-min index candles
+   * (scripts/bs-backtest.js). Buckets selected on TRAIN 2021-24 only, then
+   * confirmed on untouched HOLDOUT 2025-26:
+   *   per-trade ₹183 → ₹275, profit factor 1.76 → 2.20, max DD −10.6k → −6.3k.
+   * The train lift (+₹66/trade) and holdout lift (+₹92/trade) are the same
+   * order of magnitude — the signature of a real effect rather than a fit.
+   *
+   * Cut windows are 10:30-11:00 and the 12:00-13:30 lunch lull, where the
+   * edge was flat-to-negative (13:00 bucket: positive in only 3 of 6 years).
+   * At ₹80/round-trip every removed marginal trade is a guaranteed saving,
+   * which is most of why this helps.
+   */
+  entryWindows: "09:45-10:30,11:00-12:00,13:30-14:45"
+};
 function dnaCapsForStrategy(strategyId, channel) {
   switch (strategyId) {
     case MANAGED_STRATEGY_IDS.SR_TRAP_CONFIRM:
       return { maxTradesPerDay: 3, targetRMultiple: 3.5 };
+    case MANAGED_STRATEGY_IDS.SR_TRAP_CONFIRM_V2:
+      return { maxTradesPerDay: 3, targetRMultiple: 3.5, maxOptionLossRs: 300 };
     case MANAGED_STRATEGY_IDS.ALIGN_COMBO_GENIE:
       return channel === "bank" ? { maxTradesPerDay: 0, targetRMultiple: 1.5 } : { maxTradesPerDay: 0, targetRMultiple: 3 };
     case MANAGED_STRATEGY_IDS.SMART_PULLBACK_PRO:
@@ -4467,6 +4502,12 @@ function computeProtectiveSlTrigger(params) {
     );
     trigger = roundOptionPremiumTick(Math.max(0.05, ltp - cushion));
   }
+  const maxLossRs = Math.max(0, Number(params.maxLossRs) || 0);
+  const lotUnits = Math.max(0, Number(params.lotUnits) || 0);
+  if (maxLossRs > 0 && lotUnits > 0) {
+    const fromCap = fill - maxLossRs / lotUnits;
+    trigger = roundOptionPremiumTick(Math.max(trigger, fromCap));
+  }
   return trigger;
 }
 
@@ -4532,6 +4573,25 @@ function recordSrTrapTradeClosed(state, points, dayStopPts, dayProfitLockPts = 0
 function num2(v, fallback) {
   return typeof v === "number" && Number.isFinite(v) ? v : fallback;
 }
+function parseEntryWindows(raw) {
+  if (typeof raw !== "string" || !raw.trim()) {
+    return [];
+  }
+  const out = [];
+  for (const part of raw.split(",")) {
+    const [a, b] = part.trim().split("-");
+    if (/^\d{2}:\d{2}$/.test(a ?? "") && /^\d{2}:\d{2}$/.test(b ?? "")) {
+      out.push([a, b]);
+    }
+  }
+  return out;
+}
+function inEntryWindows(time, windows) {
+  if (!windows.length) {
+    return true;
+  }
+  return windows.some(([a, b]) => time >= a && time < b);
+}
 function readTrapExtras(settings) {
   const x = settings.extras ?? {};
   const mode = x["trapMode"] === "trap" ? "trap" : "both";
@@ -4545,7 +4605,8 @@ function readTrapExtras(settings) {
     slPad: num2(x["slPadPts"], 2),
     minConfirmBody: num2(x["minConfirmBody"], 0),
     bounceOrPierceMult: Math.max(0, num2(x["bounceOrPierceMult"], 0)),
-    bounceOrPierceCap: Math.max(0, num2(x["bounceOrPierceCap"], 0))
+    bounceOrPierceCap: Math.max(0, num2(x["bounceOrPierceCap"], 0)),
+    entryWindows: parseEntryWindows(x["entryWindows"])
   };
 }
 function morningOrWidth(dayBars, orEnd) {
@@ -4626,6 +4687,9 @@ function runSrTrapConfirm(ctx, state, settings) {
     if (time < settings.entryTimeStart || time > settings.entryTimeEnd) {
       return wait6("Confirm outside entry window");
     }
+    if (!inEntryWindows(time, extras.entryWindows)) {
+      return wait6("Confirm outside active time window");
+    }
     const body = Math.abs(candle.close - candle.open);
     const bullOk = p.dir === 1 && candle.close > candle.open && candle.close > p.signalClose;
     const bearOk = p.dir === -1 && candle.close < candle.open && candle.close < p.signalClose;
@@ -4666,6 +4730,9 @@ function runSrTrapConfirm(ctx, state, settings) {
   }
   if (time > settings.entryTimeEnd) {
     return skip(`After entry window ${settings.entryTimeEnd}`);
+  }
+  if (!inEntryWindows(time, extras.entryWindows)) {
+    return wait6("Outside active time window");
   }
   const closes = series.map((c) => c.close);
   const ema = emaLast2(closes, settings.emaLength);
@@ -4857,6 +4924,28 @@ var TRAP_DEFAULTS = defaultStrategySettings({
     ...TRAP_1LOT_DAILY_DNA_EXTRAS
   }
 });
+var trapV2Caps = dnaCapsForStrategy(MANAGED_STRATEGY_IDS.SR_TRAP_CONFIRM_V2, "nifty");
+var TRAP_V2_DEFAULTS = defaultStrategySettings({
+  entryTimeStart: "09:45",
+  entryTimeEnd: "14:45",
+  exitTime: "15:15",
+  orEnd: "09:45",
+  stopLossPts: 30,
+  bankStopLossPts: 50,
+  emaLength: 50,
+  maxTradesPerDay: trapV2Caps.maxTradesPerDay,
+  instrumentType: "futures",
+  dayStopPts: 60,
+  dayProfitLockPts: 0,
+  targetRMultiple: trapV2Caps.targetRMultiple ?? 3.5,
+  profitProtectEnabled: true,
+  profitProtectArmR: 1,
+  profitProtectLockR: 0,
+  regimeFilterEnabled: false,
+  positionSizeLots: 1,
+  extras: { ...TRAP_V2_ENTRY_DNA_EXTRAS }
+});
+var STRATEGY_BUNDLE_VERSION = "sr-trap-v2.2026-08-22.2";
 var GENIE_DEFAULTS = defaultStrategySettings({
   entryTimeStart: "10:15",
   entryTimeEnd: "14:30",
@@ -4896,6 +4985,71 @@ function createTrapStrategy() {
     defaultSettings: TRAP_DEFAULTS,
     initialize(partial) {
       settings = mergeSettings(TRAP_DEFAULTS, partial);
+      state = createSrTrapDayState();
+    },
+    reset() {
+      state = createSrTrapDayState();
+    },
+    analyze(ctx) {
+      const signal = api.generateSignal(ctx);
+      return { lastReason: signal.reason, ...signal.analysis };
+    },
+    generateSignal(ctx) {
+      const bank = /bank/i.test(ctx.instrumentId ?? "");
+      const effective = mergeSettings(settings, {
+        extras: {
+          ...settings.extras,
+          maxRiskPts: bank ? 50 : 28,
+          minRiskPts: bank ? 8 : 4
+        }
+      });
+      return runSrTrapConfirm(ctx, state, effective);
+    },
+    calculateStopLoss(_ctx, entryPrice, direction) {
+      const bank = /bank/i.test(_ctx.instrumentId ?? "");
+      const cap = bank ? settings.bankStopLossPts : settings.stopLossPts;
+      return direction === "BUY" ? entryPrice - cap : entryPrice + cap;
+    },
+    calculateTarget(_ctx, entryPrice, stopLoss, direction) {
+      const risk = Math.abs(entryPrice - stopLoss);
+      const mult = settings.targetRMultiple > 0 ? settings.targetRMultiple : 3.5;
+      return {
+        target: direction === "BUY" ? entryPrice + risk * mult : entryPrice - risk * mult,
+        riskRewardRatio: mult
+      };
+    },
+    exitLogic(candle, open, closes, ctx) {
+      return srTrapExitLogic(candle, open, closes, settings, ctx);
+    },
+    onTradeClosed(points) {
+      recordSrTrapTradeClosed(
+        state,
+        points,
+        settings.dayStopPts,
+        settings.dayProfitLockPts ?? 0
+      );
+    },
+    getSettings() {
+      return { ...settings, extras: { ...settings.extras } };
+    },
+    updateSettings(partial) {
+      settings = mergeSettings(settings, partial);
+    }
+  };
+  return api;
+}
+function createTrapStrategyV2() {
+  let settings = mergeSettings(TRAP_V2_DEFAULTS, {});
+  let state = createSrTrapDayState();
+  const api = {
+    id: MANAGED_STRATEGY_IDS.SR_TRAP_CONFIRM_V2,
+    name: "Trap V2",
+    version: "2.0.0",
+    description: "Server Live Trap V2 \xB7 pierce20 \xB7 Bank40 \xB7 peak\u20B9100 \xB7 max3 \xB7 3.5R \xB7 hard \u20B9300/lot cap \xB7 Paper\u2261Live",
+    supports: ["nifty", "bank"],
+    defaultSettings: TRAP_V2_DEFAULTS,
+    initialize(partial) {
+      settings = mergeSettings(TRAP_V2_DEFAULTS, partial);
       state = createSrTrapDayState();
     },
     reset() {
@@ -5034,11 +5188,13 @@ function createGenieStrategy() {
   BANK_NIFTY_INSTRUMENT,
   CRUDE_OIL_MINI_INSTRUMENT,
   NIFTY_50_INSTRUMENT,
+  STRATEGY_BUNDLE_VERSION,
   applySlConfirmCutoff,
   armPeakTrailFloor,
   computeProtectiveSlTrigger,
   createGenieStrategy,
   createTrapStrategy,
+  createTrapStrategyV2,
   effectiveProtectiveStop,
   replayPaperOnCrude,
   replayPaperOnIndex,

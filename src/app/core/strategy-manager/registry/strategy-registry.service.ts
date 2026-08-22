@@ -12,6 +12,7 @@ import { SwingRetestEma50Rr2ManagedStrategy } from '../modules/swing-retest-ema5
 import { SmartPullbackProManagedStrategy } from '../modules/smart-pullback-pro.managed-strategy';
 import { AlignComboGenieManagedStrategy } from '../modules/align-combo-genie.managed-strategy';
 import { SrTrapConfirmManagedStrategy } from '../modules/sr-trap-confirm.managed-strategy';
+import { SrTrapConfirmV2ManagedStrategy } from '../modules/sr-trap-confirm-v2.managed-strategy';
 import { GapFade500ManagedStrategy } from '../modules/gap-fade-500.managed-strategy';
 import { AppLoggerService } from '../../shared/logging/app-logger.service';
 
@@ -33,12 +34,14 @@ export class StrategyRegistryService {
   private readonly smartPullbackPro = inject(SmartPullbackProManagedStrategy);
   private readonly alignComboGenie = inject(AlignComboGenieManagedStrategy);
   private readonly srTrapConfirm = inject(SrTrapConfirmManagedStrategy);
+  private readonly srTrapConfirmV2 = inject(SrTrapConfirmV2ManagedStrategy);
   private readonly gapFade500 = inject(GapFade500ManagedStrategy);
 
   private readonly modules: IManagedStrategy[];
 
   constructor() {
     this.modules = [
+      this.srTrapConfirmV2,
       this.srTrapConfirm,
       this.alignComboGenie,
       this.smartPullbackPro,

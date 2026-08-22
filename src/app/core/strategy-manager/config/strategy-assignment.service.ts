@@ -20,10 +20,12 @@ import { StrategySettings } from '../models/strategy-settings.model';
 import { StrategyRegistryService } from '../registry/strategy-registry.service';
 
 /**
- * v29 — All-day-green: Trap peak₹100/50/50 · max 3/day · dayStop 60 (doc 50).
- * Drops v28 peak₹400 so red-day DNA cannot stick after green hunt.
+ * v30 — Trap V2: single-source DNA (TRAP_V2_ENTRY_DNA_EXTRAS, shared with the
+ * Order-API live bundle — no more UI/live-engine drift) + enforced ₹300/lot
+ * hard stop. Bumped from v29 so a stale localStorage assignment cannot keep
+ * pointing at the retired sr-trap-confirm id/DNA.
  */
-const STORAGE_KEY = 'palagai_strategy_assignments_v29';
+const STORAGE_KEY = 'palagai_strategy_assignments_v30';
 const LEGACY_STORAGE_KEYS = [
   'palagai_strategy_assignments_v1',
   'palagai_strategy_assignments_v2',
@@ -53,6 +55,7 @@ const LEGACY_STORAGE_KEYS = [
   'palagai_strategy_assignments_v26',
   'palagai_strategy_assignments_v27',
   'palagai_strategy_assignments_v28',
+  'palagai_strategy_assignments_v29',
 ] as const;
 
 export interface ChannelAssignment {

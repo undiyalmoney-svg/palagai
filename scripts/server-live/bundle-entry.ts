@@ -24,6 +24,7 @@ import {
 import { MANAGED_STRATEGY_IDS } from '../../src/app/core/strategy-manager/config/managed-strategy-ids';
 import {
   TRAP_1LOT_DAILY_DNA_EXTRAS,
+  TRAP_V2_ENTRY_DNA_EXTRAS,
   dnaCapsForStrategy,
 } from '../../src/app/core/strategy-manager/config/strategy-dna-caps';
 import {
@@ -93,6 +94,45 @@ const TRAP_DEFAULTS = defaultStrategySettings({
   },
 });
 
+const trapV2Caps = dnaCapsForStrategy(MANAGED_STRATEGY_IDS.SR_TRAP_CONFIRM_V2, 'nifty');
+
+/**
+ * Trap V2 — SAME literal DNA object (TRAP_V2_ENTRY_DNA_EXTRAS) as the Angular
+ * Trade Desk's SrTrapConfirmV2ManagedStrategy. Both import it from
+ * strategy-dna-caps.ts; neither hardcodes its own copy, so Paper (Angular),
+ * Local Live (Angular), and Autobot (this Order-API bundle) cannot drift
+ * apart the way SR_TRAP_CONFIRM's DNA did (doc 51 RCA).
+ */
+const TRAP_V2_DEFAULTS = defaultStrategySettings({
+  entryTimeStart: '09:45',
+  entryTimeEnd: '14:45',
+  exitTime: '15:15',
+  orEnd: '09:45',
+  stopLossPts: 30,
+  bankStopLossPts: 50,
+  emaLength: 50,
+  maxTradesPerDay: trapV2Caps.maxTradesPerDay,
+  instrumentType: 'futures',
+  dayStopPts: 60,
+  dayProfitLockPts: 0,
+  targetRMultiple: trapV2Caps.targetRMultiple ?? 3.5,
+  profitProtectEnabled: true,
+  profitProtectArmR: 1,
+  profitProtectLockR: 0,
+  regimeFilterEnabled: false,
+  positionSizeLots: 1,
+  extras: { ...TRAP_V2_ENTRY_DNA_EXTRAS },
+});
+
+/**
+ * Bumped whenever TRAP_V2_DEFAULTS / TRAP_V2_ENTRY_DNA_EXTRAS changes.
+ * Order-API's strategy-bundle-guard compares this against the version it
+ * expects at boot, so a stale rebuilt-but-not-redeployed bundle fails loudly
+ * instead of silently trading last week's DNA (doc 51 RCA — the failure
+ * mode this guard exists to catch).
+ */
+const STRATEGY_BUNDLE_VERSION = 'sr-trap-v2.2026-08-22.2';
+
 const GENIE_DEFAULTS = defaultStrategySettings({
   entryTimeStart: '10:15',
   entryTimeEnd: '14:30',
@@ -134,6 +174,74 @@ function createTrapStrategy(): IManagedStrategy {
     defaultSettings: TRAP_DEFAULTS,
     initialize(partial) {
       settings = mergeSettings(TRAP_DEFAULTS, partial);
+      state = createSrTrapDayState();
+    },
+    reset() {
+      state = createSrTrapDayState();
+    },
+    analyze(ctx) {
+      const signal = api.generateSignal(ctx);
+      return { lastReason: signal.reason, ...signal.analysis };
+    },
+    generateSignal(ctx: StrategyContext): ManagedStrategySignal {
+      const bank = /bank/i.test(ctx.instrumentId ?? '');
+      const effective = mergeSettings(settings, {
+        extras: {
+          ...settings.extras,
+          maxRiskPts: bank ? 50 : 28,
+          minRiskPts: bank ? 8 : 4,
+        },
+      });
+      return runSrTrapConfirm(ctx, state, effective);
+    },
+    calculateStopLoss(_ctx, entryPrice, direction) {
+      const bank = /bank/i.test(_ctx.instrumentId ?? '');
+      const cap = bank ? settings.bankStopLossPts : settings.stopLossPts;
+      return direction === 'BUY' ? entryPrice - cap : entryPrice + cap;
+    },
+    calculateTarget(_ctx, entryPrice, stopLoss, direction) {
+      const risk = Math.abs(entryPrice - stopLoss);
+      const mult = settings.targetRMultiple > 0 ? settings.targetRMultiple : 3.5;
+      return {
+        target: direction === 'BUY' ? entryPrice + risk * mult : entryPrice - risk * mult,
+        riskRewardRatio: mult,
+      };
+    },
+    exitLogic(candle, open, closes, ctx): ManagedExitDecision | null {
+      return srTrapExitLogic(candle, open, closes, settings, ctx);
+    },
+    onTradeClosed(points: number) {
+      recordSrTrapTradeClosed(
+        state,
+        points,
+        settings.dayStopPts,
+        settings.dayProfitLockPts ?? 0,
+      );
+    },
+    getSettings() {
+      return { ...settings, extras: { ...settings.extras } };
+    },
+    updateSettings(partial) {
+      settings = mergeSettings(settings, partial);
+    },
+  };
+  return api;
+}
+
+/** Same sweep+confirm engine as createTrapStrategy, single-source V2 DNA. */
+function createTrapStrategyV2(): IManagedStrategy {
+  let settings = mergeSettings(TRAP_V2_DEFAULTS, {});
+  let state = createSrTrapDayState();
+  const api: IManagedStrategy = {
+    id: MANAGED_STRATEGY_IDS.SR_TRAP_CONFIRM_V2,
+    name: 'Trap V2',
+    version: '2.0.0',
+    description:
+      'Server Live Trap V2 · pierce20 · Bank40 · peak₹100 · max3 · 3.5R · hard ₹300/lot cap · Paper≡Live',
+    supports: ['nifty', 'bank'],
+    defaultSettings: TRAP_V2_DEFAULTS,
+    initialize(partial) {
+      settings = mergeSettings(TRAP_V2_DEFAULTS, partial);
       state = createSrTrapDayState();
     },
     reset() {
@@ -274,6 +382,8 @@ export {
   BANK_NIFTY_INSTRUMENT,
   CRUDE_OIL_MINI_INSTRUMENT,
   createTrapStrategy,
+  createTrapStrategyV2,
+  STRATEGY_BUNDLE_VERSION,
   createGenieStrategy,
   replayPaperOnIndex,
   replayPaperOnCrude,
