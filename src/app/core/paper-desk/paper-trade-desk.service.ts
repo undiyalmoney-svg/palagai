@@ -835,12 +835,50 @@ export class PaperTradeDeskService {
     }
   }
 
+  /**
+   * True when the Order-API Autobot session is live with real orders.
+   * Fails OPEN (returns false) if the status endpoint is unreachable - the
+   * guard must never block a legitimate manual desk just because the API is
+   * down, and the server-side one-leg/reconcile checks remain as backstops.
+   */
+  private async autobotIsLive(): Promise<boolean> {
+    try {
+      const base =
+        (environment as { liveApiBaseUrl?: string }).liveApiBaseUrl || '/api/live';
+      const res = await fetch(`${base}/status`, { credentials: 'include' });
+      if (!res.ok) return false;
+      const body = (await res.json()) as {
+        status?: string;
+        running?: boolean;
+        config?: { realOrders?: boolean };
+      };
+      const running = body?.running === true || body?.status === 'running';
+      return running && body?.config?.realOrders === true;
+    } catch {
+      return false;
+    }
+  }
+
   async startLive(options?: TradeDeskRunOptions): Promise<void> {
     this.cancelRun({ silent: true });
     const runId = this.runGeneration;
     this.resetKiteStats();
     this.normalizeDeskOptions(options);
     this.realOrders = !!environment.allowLiveMoney && !!options?.realOrders;
+    // DOUBLE-TRADE GUARD. Two independent paths can place real Nifty orders on
+    // the same Kite account: this browser desk (LiveOrderExecutorService) and
+    // the Order-API Autobot (live.worker.js). Both now run the same Trap V2
+    // strategy, so they generate the SAME signals and would open a duplicate
+    // position that neither knows about - and then fight over its stop.
+    // Refuse to arm real money while the server desk is live.
+    if (this.realOrders && (await this.autobotIsLive())) {
+      this.realOrders = false;
+      throw new Error(
+        'Autobot (Server Live) is already running with real orders. ' +
+          'Stop it in Auto Trader before starting Live money here, or both desks ' +
+          'will trade the same signal twice on one account.',
+      );
+    }
     const active = this.activeInstruments();
     const clearIds = active.map((i) => i.instrument.id);
     // Soft clear — never wipe the other desk's open SL / adopt map.

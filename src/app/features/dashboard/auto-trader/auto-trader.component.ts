@@ -302,6 +302,10 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
    * (clampMaxTradesToDna); this is the matching client-side default.
    */
   protected niftyMaxTradesDay = 3;
+  /** Server-decided cap, for display only (the UI cannot change it). */
+  protected serverNiftyMaxTrades(): number {
+    return this.status().config?.niftyMaxTradesDay ?? this.niftyMaxTradesDay;
+  }
   protected bankMaxTradesDay = 3;
   protected crudeMaxTradesDay = 4;
   protected tradeCountsHint =

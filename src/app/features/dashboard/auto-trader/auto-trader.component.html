@@ -63,7 +63,12 @@
 
   <p class="banner info">{{ note() }}</p>
 
-  <!-- All3 books: Nifty / Bank / Crude — lots and max trades are per book -->
+  <!--
+    Books. The UI owns LOTS only — trade count, entry, exit, instrument
+    selection and strategy are decided by the Order-API from the strategy DNA
+    (it ignores client values for them). Inputs for those were removed rather
+    than disabled, so the screen cannot imply control it does not have.
+  -->
   <div class="books-panel" aria-label="Books">
     <div class="books-head">
       <strong>Books</strong>
@@ -73,10 +78,7 @@
     <p class="desk-lots-hint">{{ tradeCountsHint }}</p>
 
     <div class="book-row">
-      <label class="book-check">
-        <input type="checkbox" [(ngModel)]="enableNifty" [disabled]="locked() || backtestBusy()" />
-        <span class="book-name">Nifty</span>
-      </label>
+      <span class="book-name">Nifty 50</span>
       <label class="field lots-field">
         <span>Lots</span>
         <input
@@ -85,29 +87,15 @@
           step="1"
           [(ngModel)]="niftyLots"
           [disabled]="locked() || backtestBusy()"
-          title="Lots for this book. Stop, then Start to apply."
+          title="Position size. Stop, then Start to apply."
         />
       </label>
-      <label class="field lots-field">
-        <span>Max trades today</span>
-        <input
-          type="number"
-          min="0"
-          step="1"
-          [(ngModel)]="niftyMaxTradesDay"
-          [disabled]="locked() || backtestBusy()"
-          title="0 = unlimited. Stop, then Start to apply."
-        />
-      </label>
-      <span class="book-help">Trap · primary</span>
+      <span class="book-help">Trap V2 · max {{ serverNiftyMaxTrades() }} trades/day (server)</span>
     </div>
 
     @if (showBankBook()) {
       <div class="book-row">
-        <label class="book-check">
-          <input type="checkbox" [(ngModel)]="enableBank" [disabled]="locked() || backtestBusy()" />
-          <span class="book-name">Bank</span>
-        </label>
+        <span class="book-name">Bank Nifty</span>
         <label class="field lots-field">
           <span>Lots</span>
           <input
@@ -116,40 +104,21 @@
             step="1"
             [(ngModel)]="bankLots"
             [disabled]="locked() || backtestBusy()"
-            title="Lots for this book. Stop, then Start to apply."
+            title="Position size. Stop, then Start to apply."
           />
         </label>
-        <label class="field lots-field">
-          <span>Max trades today</span>
-          <input
-            type="number"
-            min="0"
-            step="1"
-            [(ngModel)]="bankMaxTradesDay"
-            [disabled]="locked() || backtestBusy()"
-            title="0 = unlimited. Stop, then Start to apply."
-          />
-        </label>
-        <span class="book-help">
-          Trap
-          @if (bankOnlyAfterNifty) {
-            · after Nifty
-          }
-        </span>
+        <span class="book-help">Trap V2 · server-enabled</span>
+      </div>
+    } @else {
+      <div class="book-row crude-off">
+        <span class="book-name">Bank Nifty</span>
+        <span class="book-help">OFF — server bankAllowed=false</span>
       </div>
     }
 
     @if (showCrudeBook()) {
       <div class="book-row crude-row">
-        <label class="book-check">
-          <input
-            type="checkbox"
-            [(ngModel)]="enableCrude"
-            [disabled]="locked() || backtestBusy()"
-            title="Include Crude on Start"
-          />
-          <span class="book-name">Crude</span>
-        </label>
+        <span class="book-name">Crude</span>
         <label class="field lots-field">
           <span>Lots</span>
           <input
@@ -158,25 +127,12 @@
             step="1"
             [(ngModel)]="crudeLots"
             [disabled]="locked() || backtestBusy()"
-            title="Lots for this book. Stop, then Start to apply."
-          />
-        </label>
-        <label class="field lots-field">
-          <span>Max trades today</span>
-          <input
-            type="number"
-            min="0"
-            step="1"
-            [(ngModel)]="crudeMaxTradesDay"
-            [disabled]="locked() || backtestBusy()"
-            title="0 = unlimited. Stop, then Start to apply."
+            title="Position size. Stop, then Start to apply."
           />
         </label>
         <span class="book-help">
           {{ crudeStrategyDisplay() }}
           <span class="crude-window-chip">{{ crudeWindow }}</span>
-          <br />
-          Crude Mini: 1 lot = Kite qty 1 (MCX).
         </span>
       </div>
     } @else {
