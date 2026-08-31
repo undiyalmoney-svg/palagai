@@ -38,6 +38,8 @@ export const MANAGED_STRATEGY_IDS = {
   SR_TRAP_CONFIRM_V2: 'sr-trap-confirm-v2',
   /** Stocks Desk champion — gap-up fade ₹500 book. */
   GAP_FADE_500: 'gap-fade-500',
+  /** Exhaustion Fade — volume-climax blow-off fade on stocks. Paper-first. */
+  EXHAUSTION_FADE: 'exhaustion-fade-v1',
 } as const;
 
 export type ManagedStrategyId =

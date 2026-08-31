@@ -14,6 +14,7 @@ import { AlignComboGenieManagedStrategy } from '../modules/align-combo-genie.man
 import { SrTrapConfirmManagedStrategy } from '../modules/sr-trap-confirm.managed-strategy';
 import { SrTrapConfirmV2ManagedStrategy } from '../modules/sr-trap-confirm-v2.managed-strategy';
 import { GapFade500ManagedStrategy } from '../modules/gap-fade-500.managed-strategy';
+import { ExhaustionFadeManagedStrategy } from '../modules/exhaustion-fade.managed-strategy';
 import { AppLoggerService } from '../../shared/logging/app-logger.service';
 
 /**
@@ -36,6 +37,7 @@ export class StrategyRegistryService {
   private readonly srTrapConfirm = inject(SrTrapConfirmManagedStrategy);
   private readonly srTrapConfirmV2 = inject(SrTrapConfirmV2ManagedStrategy);
   private readonly gapFade500 = inject(GapFade500ManagedStrategy);
+  private readonly exhaustionFade = inject(ExhaustionFadeManagedStrategy);
 
   private readonly modules: IManagedStrategy[];
 
@@ -54,6 +56,7 @@ export class StrategyRegistryService {
       this.donchRetest,
       this.swingRetest,
       this.gapFade500,
+      this.exhaustionFade,
     ];
     for (const m of this.modules) {
       m.initialize();
