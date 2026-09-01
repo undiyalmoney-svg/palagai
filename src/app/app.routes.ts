@@ -12,6 +12,7 @@ import { LoginComponent } from './features/login/login.component';
 import { DashboardComponent } from './features/dashboard/dashboard.component';
 import { DashboardHomeComponent } from './features/dashboard/dashboard-home.component';
 import { TradeDeskComponent } from './features/dashboard/trade-desk/trade-desk.component';
+import { IndexDeskComponent } from './features/dashboard/index-desk/index-desk.component';
 import { OrderTestComponent } from './features/dashboard/order-test/order-test.component';
 import { GetTokenComponent } from './features/dashboard/get-token/get-token.component';
 import { SettingsComponent } from './features/dashboard/settings/settings.component';
@@ -86,6 +87,11 @@ export const routes: Routes = [
         component: TradeDeskComponent,
       },
       {
+        path: 'index-desk',
+        canActivate: [moduleGuard('trade')],
+        component: IndexDeskComponent,
+      },
+      {
         path: 'order-test',
         canActivate: [moduleGuard('test')],
         component: OrderTestComponent,
@@ -118,11 +124,11 @@ export const routes: Routes = [
         path: 'settings',
         component: SettingsComponent,
       },
-      { path: 'historical-tester', redirectTo: 'trade-desk', pathMatch: 'full' },
-      { path: 'strategy', redirectTo: 'trade-desk', pathMatch: 'full' },
-      { path: 'strategies', redirectTo: 'trade-desk', pathMatch: 'full' },
-      { path: 'results', redirectTo: 'trade-desk', pathMatch: 'full' },
-      { path: 'results/:id', redirectTo: 'trade-desk' },
+      { path: 'historical-tester', redirectTo: 'index-desk', pathMatch: 'full' },
+      { path: 'strategy', redirectTo: 'index-desk', pathMatch: 'full' },
+      { path: 'strategies', redirectTo: 'index-desk', pathMatch: 'full' },
+      { path: 'results', redirectTo: 'index-desk', pathMatch: 'full' },
+      { path: 'results/:id', redirectTo: 'index-desk' },
     ],
   },
   {

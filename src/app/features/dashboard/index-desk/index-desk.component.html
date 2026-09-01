@@ -1,0 +1,457 @@
+<section class="desk pg-page">
+  <header class="hero pg-page-hero">
+    <div class="hero-copy">
+      <p class="pg-eyebrow">Index Desk</p>
+      <h1>Trading Agent</h1>
+      <p class="pg-lede">
+        <strong>Get Token</strong> → set capital if needed → <strong>Start</strong> → leave tab open →
+        <strong>Stop after 3:15</strong>.
+      </p>
+    </div>
+    <div class="hero-meta">
+      <span class="pg-badge pg-badge-neutral mono" title="Deployed app build">{{
+        appBuildLabel
+      }}</span>
+      <span class="pg-badge" [class.pg-badge-bull]="mode() === 'live'" [class.pg-badge-neutral]="mode() !== 'live'">
+        {{ mode() === 'live' ? 'Live' : 'Paper' }}
+      </span>
+    </div>
+  </header>
+
+  <div class="active-strategy-bar" role="status" aria-live="polite">
+    <div class="active-strategy-label">
+      <span class="as-kicker">Running</span>
+      <strong class="as-name">Trap · option ₹</strong>
+      <span class="as-meta"
+        >{{ allocationSummary() }} · pierce20/B40 · max3 · trail ₹{{
+          capitalPlan.optionTrailArmRs | number: '1.0-0'
+        }}
+        · option stop −₹{{ optionDayLossMoneyRs() | number: '1.0-0' }}</span
+      >
+    </div>
+  </div>
+
+  <div class="mode-switch" role="tablist" aria-label="Desk mode">
+    <button
+      type="button"
+      role="tab"
+      class="mode-btn"
+      [class.active]="mode() === 'testing'"
+      (click)="setMode('testing')"
+    >
+      <span class="mode-title">Paper</span>
+      <span class="mode-sub">Check dates · same strategy as Live</span>
+    </button>
+    <button
+      type="button"
+      role="tab"
+      class="mode-btn"
+      [class.active]="mode() === 'live'"
+      (click)="setMode('live')"
+    >
+      <span class="mode-title">Live</span>
+      <span class="mode-sub">Today · real MIS · Stop after 3:15</span>
+    </button>
+  </div>
+
+  <div class="control-bar">
+    @if (mode() === 'testing') {
+      <label class="field">
+        <span>From</span>
+        <input type="date" [(ngModel)]="fromDate" [disabled]="busy() || snapshot().running" />
+      </label>
+      <label class="field">
+        <span>To</span>
+        <input type="date" [(ngModel)]="toDate" [disabled]="busy() || snapshot().running" />
+      </label>
+      <button
+        type="button"
+        class="preset-btn"
+        [disabled]="busy() || snapshot().running"
+        (click)="setTestingToday()"
+      >
+        Today
+      </button>
+    }
+
+    <label class="field capital-field agent-capital">
+      <span>Capital (₹)</span>
+      <input
+        type="text"
+        inputmode="numeric"
+        autocomplete="off"
+        [ngModel]="capitalDraft"
+        (ngModelChange)="onCapitalDraftChange($event)"
+        (blur)="commitCapital()"
+        (keydown.enter)="$event.preventDefault(); commitCapital()"
+        [disabled]="busy() || snapshot().running"
+        placeholder="40000"
+      />
+    </label>
+
+    <div class="agent-locked compact">
+      <span
+        >{{ allocationSummary() }} · lock ~₹{{ capitalPlan.dayProfitLockRs | number: '1.0-0' }}/day ·
+        trail ₹{{ capitalPlan.optionTrailArmRs | number: '1.0-0' }} · option stop −₹{{
+          optionDayLossMoneyRs() | number: '1.0-0'
+        }}
+        · target ~₹{{ capitalPlan.dailyTargetRs | number: '1.0-0' }}/day</span
+      >
+    </div>
+
+    @if (mode() === 'live') {
+      <aside class="agent-ops" aria-label="Daily steps">
+        <ol class="agent-ops-list">
+          <li [class.done]="hasKiteSession()">
+            <a routerLink="/dashboard/get-token">Get Token</a>
+          </li>
+          <li>Start (any morning)</li>
+          <li>Stop after <strong>3:15</strong></li>
+        </ol>
+      </aside>
+    }
+
+    <div class="actions">
+      @if (busy() || (mode() === 'live' && snapshot().running)) {
+        <button mat-stroked-button type="button" class="stop-btn" (click)="onStop()">
+          {{ busy() ? 'Cancel' : 'Stop' }}
+        </button>
+      }
+      <button
+        mat-flat-button
+        type="button"
+        class="start-btn"
+        [disabled]="busy() || (mode() === 'live' && snapshot().running)"
+        (click)="onStart()"
+      >
+        @if (busy()) {
+          <span class="start-btn-inner">
+            <mat-spinner diameter="16" />
+            <span>Running…</span>
+          </span>
+        } @else if (mode() === 'live' && snapshot().running) {
+          <span class="start-btn-inner">Live running</span>
+        } @else {
+          <span class="start-btn-inner">Start</span>
+        }
+      </button>
+    </div>
+  </div>
+
+  @if (mode() === 'live' && snapshot().running) {
+    <div class="alive-bar" role="status">
+      <span class="pulse" aria-hidden="true"></span>
+      <strong>I'm alive</strong>
+      <span>Last tick {{ fmtTime(snapshot().lastTickAt) }} IST</span>
+    </div>
+  }
+
+  @if (liveAssistant(); as assist) {
+    <aside class="live-assistant" role="status" aria-live="polite" [attr.data-tone]="assist.tone">
+      <div class="la-head">
+        <span class="la-kicker">Status</span>
+        <span class="phase-pill" [attr.data-phase]="assist.tone">{{ assist.headline }}</span>
+      </div>
+      <p class="la-detail">{{ assist.detail }}</p>
+      @if (assist.lines.length) {
+        <ul class="la-lines">
+          @for (line of assist.lines; track line.name) {
+            <li>
+              <div class="la-line-head">
+                <strong>{{ line.name }}</strong>
+                @if (line.meta) {
+                  <em>{{ line.meta }}</em>
+                }
+              </div>
+              <span>{{ line.text }}</span>
+            </li>
+          }
+        </ul>
+      }
+      @if (assist.nextAction) {
+        <p class="la-next"><span>Next</span> {{ assist.nextAction }}</p>
+      }
+    </aside>
+  }
+
+  @if (mode() === 'live' && snapshot().running && hasOpenTrade()) {
+    <div class="market-live-bar" role="status" [class.money]="snapshot().realOrders">
+      <span class="market-pulse" aria-hidden="true"></span>
+      <div class="market-live-copy">
+        <strong>{{
+          snapshot().realOrders
+            ? hasKiteOpenTrade()
+              ? 'ON KITE'
+              : 'Waiting for Kite order'
+            : 'In trade'
+        }}</strong>
+        <span>{{ marketLiveSummary() }}</span>
+      </div>
+    </div>
+  }
+
+  @if (error()) {
+    <p class="banner err" role="alert">{{ error() }}</p>
+  }
+  @if (!error() && snapshot().message) {
+    <p class="banner info" [class.warn]="!snapshot().marketOpen && mode() === 'live'">
+      {{ snapshot().message }}
+    </p>
+  }
+
+  @if (resultView().totals.trades || snapshot().statuses.length) {
+    <div class="totals totals-simple">
+      <div
+        class="stat primary profit-hero"
+        [class.up]="primaryProfitRs() > 0"
+        [class.down]="primaryProfitRs() < 0"
+      >
+        <span>Profit ₹</span>
+        <strong
+          >{{ primaryProfitRs() > 0 ? '+' : '' }}{{ primaryProfitRs() | number: '1.0-0' }}</strong
+        >
+      </div>
+      @if (mode() === 'testing' && lockedResearchRs() != null) {
+        <div class="stat">
+          <span>Locked ₹</span>
+          <strong
+            >{{ lockedResearchRs()! > 0 ? '+' : ''
+            }}{{ lockedResearchRs()! | number: '1.0-0' }}</strong
+          >
+        </div>
+      }
+      <div class="stat">
+        <span>Trades</span>
+        <strong>{{ resultView().totals.trades }}</strong>
+      </div>
+      <div class="stat">
+        <span>W / L</span>
+        <strong>{{ resultView().totals.wins }} / {{ resultView().totals.losses }}</strong>
+      </div>
+    </div>
+
+    @if (mode() === 'testing' && resultView().dayStats.tradingDays > 1) {
+      <div class="day-stats">
+        <div class="day-stats-head">
+          <div>
+            <h3>Day breakdown</h3>
+            <p>{{ resultView().dayStats.tradingDays }} trading day(s)</p>
+          </div>
+          <button
+            mat-stroked-button
+            type="button"
+            class="pdf-btn"
+            [disabled]="!resultView().trades.length || busy() || snapshot().running"
+            (click)="downloadPdf()"
+          >
+            Download PDF
+          </button>
+        </div>
+        <div class="day-tables">
+          <div class="day-table-block">
+            <h4>By day</h4>
+            <div class="table-scroll">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Day</th>
+                    <th>Trades</th>
+                    <th>Profit ₹</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (d of resultView().dayStats.topProfitDays; track d.date) {
+                    <tr>
+                      <td>{{ d.displayDate }}</td>
+                      <td>{{ d.weekday }}</td>
+                      <td>{{ d.trades }}</td>
+                      <td class="num up">{{ d.optionNetRs > 0 ? '+' : '' }}{{ d.optionNetRs | number: '1.0-0' }}</td>
+                    </tr>
+                  }
+                  @for (d of resultView().dayStats.topLossDays; track d.date) {
+                    <tr>
+                      <td>{{ d.displayDate }}</td>
+                      <td>{{ d.weekday }}</td>
+                      <td>{{ d.trades }}</td>
+                      <td class="num down">{{ d.optionNetRs | number: '1.0-0' }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    }
+
+    <div class="status-grid">
+      @for (s of snapshot().statuses; track s.instrumentId) {
+        <article
+          class="status-card"
+          [class.has-open]="!!s.openTrade"
+          [class.phase-waiting]="s.livePhase === 'waiting'"
+          [class.phase-trade]="s.livePhase === 'in_trade'"
+          [class.phase-target]="s.livePhase === 'target_hit'"
+          [class.phase-sl]="s.livePhase === 'sl_hit'"
+        >
+          <header>
+            <h2>{{ s.instrumentName }}</h2>
+            <p>{{ s.lastSignal }}</p>
+          </header>
+
+          <div class="phase-pill" [attr.data-phase]="s.livePhase">
+            {{ s.livePhaseLabel }}
+          </div>
+
+          @if (s.openTrade; as o) {
+            <div
+              class="trade-live-panel"
+              role="status"
+              [class.blocked]="snapshot().realOrders && !s.brokerEntryOrderId"
+            >
+              <div class="tlp-head">
+                <strong>{{ optionLegLabel(o) }}</strong>
+                <span>{{ o.option?.tradingSymbol || 'ATM' }}</span>
+              </div>
+              @if (snapshot().realOrders) {
+                <p class="tlp-kite">
+                  @if (s.brokerEntryOrderId) {
+                    On Kite · entry {{ s.brokerEntryOrderId }}
+                  } @else {
+                    Waiting for Kite entry…
+                  }
+                </p>
+              }
+            </div>
+          }
+
+          <dl class="status-stats">
+            <div>
+              <dt>Day ₹</dt>
+              <dd
+                class="num"
+                [class.up]="s.dayNetOptionRs > 0"
+                [class.down]="s.dayNetOptionRs < 0"
+              >
+                {{ s.dayNetOptionRs > 0 ? '+' : '' }}{{ s.dayNetOptionRs | number: '1.0-0' }}
+              </dd>
+            </div>
+            <div>
+              <dt>Trades</dt>
+              <dd>{{ s.tradesToday }}</dd>
+            </div>
+          </dl>
+        </article>
+      }
+    </div>
+  }
+
+  @if (mode() === 'live' && snapshot().realOrders && (snapshot().orderSummary.length || snapshot().orderEvents.length)) {
+    <div class="orders-block">
+      <h3>Kite orders</h3>
+      @if (snapshot().orderSummary.length) {
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Book</th>
+                <th>Symbol</th>
+                <th>Leg</th>
+                <th>Status</th>
+                <th>Avg</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (r of snapshot().orderSummary; track r.orderId) {
+                <tr [attr.data-leg]="r.leg" [attr.data-status]="r.status">
+                  <td>{{ fmtTime(r.at) }}</td>
+                  <td>{{ r.instrumentName }}</td>
+                  <td class="mono">{{ r.tradingSymbol }}</td>
+                  <td><span class="leg-pill">{{ r.leg }}</span></td>
+                  <td>
+                    <span class="status-pill" [attr.data-status]="r.status">{{ r.status }}</span>
+                  </td>
+                  <td>{{ r.averagePrice != null ? (r.averagePrice | number: '1.2-2') : '—' }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+      @if (snapshot().orderEvents.length) {
+        <details class="order-log-details" [open]="hasKiteBlockEvents()">
+          <summary>Events ({{ snapshot().orderEvents.length }})</summary>
+          <ul class="order-log">
+            @for (e of snapshot().orderEvents; track e.at + e.detail) {
+              <li [attr.data-action]="e.action">
+                <strong>{{ e.action }}</strong>
+                <span>{{ e.instrumentName || e.instrumentId }} · {{ e.detail }}</span>
+              </li>
+            }
+          </ul>
+        </details>
+      }
+    </div>
+  }
+
+  @if (resultView().trades.length) {
+    <div class="trades-block">
+      <div class="trades-head">
+        <h3>{{ snapshot().realOrders ? 'Kite fills' : 'Trades' }}</h3>
+        <button
+          mat-stroked-button
+          type="button"
+          class="pdf-btn"
+          [disabled]="busy() || snapshot().running"
+          (click)="downloadPdf()"
+        >
+          Download PDF
+        </button>
+      </div>
+
+      <div class="trade-cards" aria-label="Closed trades">
+        @for (t of resultView().trades; track t.id) {
+          <article
+            class="trade-card"
+            [class.win]="hasTradeProfitRs(t) && tradeProfitRs(t) > 0"
+            [class.loss]="hasTradeProfitRs(t) && tradeProfitRs(t) < 0"
+          >
+            <div class="trade-card-top">
+              <div class="stack">
+                <strong>{{ t.option?.tradingSymbol || t.instrumentName }}</strong>
+                <small
+                  >{{ fmtWeekday(t.entryTime) }} · {{ fmtClock(t.entryTime) }} →
+                  {{ fmtClock(t.exitTime) }}
+                  ·
+                  <span class="dir" [attr.data-dir]="t.direction">{{ optionLegLabel(t) }}</span></small
+                >
+              </div>
+              <div
+                class="trade-card-pnl num"
+                [class.up]="hasTradeProfitRs(t) && tradeProfitRs(t) > 0"
+                [class.down]="hasTradeProfitRs(t) && tradeProfitRs(t) < 0"
+              >
+                @if (hasTradeProfitRs(t)) {
+                  {{ tradeProfitRs(t) > 0 ? '+' : '' }}{{ tradeProfitRs(t) | number: '1.0-0' }}
+                } @else {
+                  —
+                }
+              </div>
+            </div>
+            <div class="trade-card-meta">
+              @if (t.optionEntryPremium != null && t.optionExitPremium != null) {
+                <span
+                  >{{ t.optionEntryPremium | number: '1.2-2' }} →
+                  {{ t.optionExitPremium | number: '1.2-2' }}</span
+                >
+              }
+            </div>
+            <p class="trade-card-exit">{{ t.exitReason }}</p>
+          </article>
+        }
+      </div>
+    </div>
+  }
+</section>

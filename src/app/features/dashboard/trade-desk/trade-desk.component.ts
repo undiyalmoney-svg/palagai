@@ -1,44 +1,66 @@
-import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { PaperTradeDeskService, TradeDeskRunOptions } from '../../../core/paper-desk/paper-trade-desk.service';
-import { PaperDeskExportService } from '../../../core/paper-desk/paper-desk-export.service';
-import { PaperDeskMode } from '../../../core/paper-desk/paper-desk.models';
-import { buildLiveAssistant } from '../../../core/paper-desk/live-assistant.util';
+import { SwingScannerService, SwingScanResult } from '../../../core/services/swing-scanner.service';
+import { SwingPositionsService } from '../../../core/services/swing-positions.service';
 import {
-  PAPER_WEEKDAY_OPTIONS,
-  PaperWeekdayKey,
-  PaperWeekdaySelection,
-  buildWeekdayFilteredView,
-  defaultPaperWeekdaySelection,
-} from '../../../core/paper-desk/paper-desk-weekday-filter';
+  SwingBacktestService,
+  BACKTEST_DEFAULT_START_MONTH,
+  BACKTEST_DEFAULT_END_MONTH,
+} from '../../../core/services/swing-backtest.service';
+import { SwingWeeklyBacktestService } from '../../../core/services/swing-weekly-backtest.service';
 import {
-  PDHL_RUPEES_PER_POINT,
-  deskDayProfitLockMoneyRs,
-  deskStrictDayLossMoneyRs,
-} from '../../../core/strategy-engine/strategies/pdhl-opening-range/pdhl-opening-range.evaluator';
-import { KiteSessionService } from '../../../core/kite/kite-session.service';
-import { LotsPreferenceService } from '../../../core/services/lots-preference.service';
-import { formatUnknownError } from '../../../core/utils/kite-error.util';
-import { extractTradeDate, formatDayOfWeek, formatDisplayDate } from '../../../core/utils/trade-date.util';
-import { StrategyAssignmentService } from '../../../core/strategy-manager/config/strategy-assignment.service';
-import { StrategyRegistryService } from '../../../core/strategy-manager/registry/strategy-registry.service';
-import { dnaCapsForStrategy } from '../../../core/strategy-manager/config/strategy-dna-caps';
-import { DeskChannel } from '../../../core/strategy-manager/models/desk-channel.model';
-import { UiDialogService } from '../../../shared/ui/dialog/ui-dialog.service';
+  IntradayBacktestService,
+  IntradayStrategyId,
+  INTRADAY_STRATEGY_OPTIONS,
+} from '../../../core/services/intraday-backtest.service';
+import {
+  StrategyFinderService,
+  FinderCandidate,
+} from '../../../core/services/strategy-finder.service';
+import {
+  FinderUniverse,
+  SearchSpace,
+  buildRecipes,
+  defaultSearchSpace,
+  emaPullbackSpace,
+  smartPullbackSpace,
+} from '../../../core/strategy-engine/strategies/finder/strategy-search-space';
+import { StopKind } from '../../../core/strategy-engine/strategies/finder/strategy-recipe';
+import { NIFTY_500_UNIVERSE } from '../../../core/services/nifty500-universe';
+import { NIFTY_50_UNIVERSE } from '../../../core/services/nifty50-universe';
+import { Timeframe } from '../../../core/models/candle.model';
+import {
+  SWING_CAPITAL_PER_STOCK_RS,
+  SWING_MAX_HOLD_TRADING_DAYS,
+  SWING_MAX_RISK_PCT,
+  qtyForFlatCapital,
+} from '../../../core/strategy-engine/strategies/swing-breakout/swing-breakout.evaluator';
 import { APP_BUILD_LABEL } from '../../../core/config/app-build';
-import { DAILY_3K_DESK_PRESET } from '../../../core/paper-desk/daily-3k-desk-preset';
-import {
-  CapitalLotPlan,
-  DEFAULT_TRADING_CAPITAL_RS,
-  planLotsForCapital,
-} from '../../../core/paper-desk/capital-plan.util';
-import { deskOptionDayLossMoneyRs } from '../../../core/paper-desk/option-day-loss.util';
-import { CapitalPreferenceService } from '../../../core/services/capital-preference.service';
-import { computeOptionTargetPremium } from '../../../core/live-desk/option-sl-premium.util';
+import { currentMonth, shiftMonth } from '../../../core/utils/month-range.util';
+
+type DeskTab = 'scan' | 'positions' | 'backtest' | 'intraday' | 'finder';
+type BacktestView = 'weekly' | 'signals';
+const WEEKLY_TOP_N = 3;
+const DEFAULT_WEEKLY_CAPITAL_RS = SWING_CAPITAL_PER_STOCK_RS * WEEKLY_TOP_N;
+
+const MONTH_OPTIONS = [
+  { value: 1, label: 'Jan' },
+  { value: 2, label: 'Feb' },
+  { value: 3, label: 'Mar' },
+  { value: 4, label: 'Apr' },
+  { value: 5, label: 'May' },
+  { value: 6, label: 'Jun' },
+  { value: 7, label: 'Jul' },
+  { value: 8, label: 'Aug' },
+  { value: 9, label: 'Sep' },
+  { value: 10, label: 'Oct' },
+  { value: 11, label: 'Nov' },
+  { value: 12, label: 'Dec' },
+];
 
 @Component({
   selector: 'app-trade-desk',
@@ -47,608 +69,523 @@ import { computeOptionTargetPremium } from '../../../core/live-desk/option-sl-pr
   templateUrl: './trade-desk.component.html',
   styleUrl: './trade-desk.component.css',
 })
-export class TradeDeskComponent implements OnInit, OnDestroy {
-  private readonly desk = inject(PaperTradeDeskService);
-  private readonly deskExport = inject(PaperDeskExportService);
-  private readonly kiteSession = inject(KiteSessionService);
-  private readonly lotsPreference = inject(LotsPreferenceService);
-  private readonly capitalPreference = inject(CapitalPreferenceService);
-  private readonly uiDialog = inject(UiDialogService);
-  private readonly assignments = inject(StrategyAssignmentService);
-  private readonly registry = inject(StrategyRegistryService);
+export class TradeDeskComponent implements OnInit {
+  private readonly scanner = inject(SwingScannerService);
+  private readonly positionsSvc = inject(SwingPositionsService);
+  private readonly backtestSvc = inject(SwingBacktestService);
+  private readonly weeklyBacktestSvc = inject(SwingWeeklyBacktestService);
+  private readonly intradaySvc = inject(IntradayBacktestService);
+  private readonly finderSvc = inject(StrategyFinderService);
 
-  /** Visible build stamp so you can confirm deploy (e.g. v1.3.41 · …). */
   protected readonly appBuildLabel = APP_BUILD_LABEL;
+  protected readonly universeCount = NIFTY_500_UNIVERSE.length;
+  protected readonly capitalPerStockRs = SWING_CAPITAL_PER_STOCK_RS;
+  protected readonly maxHoldDays = SWING_MAX_HOLD_TRADING_DAYS;
+  protected readonly maxRiskPct = Math.round(SWING_MAX_RISK_PCT * 1000) / 10;
 
-  /** Hands-off agent defaults to Live — client only presses Start / Stop. */
-  protected readonly mode = signal<PaperDeskMode>('live');
-  /** When true, Live hides knobs; Start applies the full agent plan. */
-  protected readonly handsOffAgent = true;
-  /**
-   * Default Testing window = today (IST).
-   * Yesterday-only hid “today’s DNA ₹” that research / agent reports show.
-   */
-  protected fromDate = todayIso();
-  protected toDate = todayIso();
-  /** When Live + checked, places real Kite MIS orders. */
-  protected realOrders = false;
-  protected realOrdersAck = false;
-  /**
-   * Total trading capital (₹). Desk auto-allocates lots from this.
-   * Client sets capital once; daily job is Get Token + Start + keep tab open.
-   */
-  protected capitalRs = DEFAULT_TRADING_CAPITAL_RS;
-  /**
-   * Draft string while the capital field is being edited.
-   * Do NOT clamp on every keystroke — that made the input uneditable.
-   */
-  protected capitalDraft = String(DEFAULT_TRADING_CAPITAL_RS);
-  /** When true (default), lot inputs are driven by capital — not hand-edited. */
-  protected autoLotsFromCapital = true;
-  protected capitalPlan: CapitalLotPlan = planLotsForCapital(DEFAULT_TRADING_CAPITAL_RS);
-  /** Per-book lots (exchange lot × this). Defaults from capital plan. */
-  protected niftyLots = 1;
-  protected bankLots = 1;
+  protected readonly tab = signal<DeskTab>('scan');
 
-  /** Index books only — Crude/Nat Gas are not on Trade Desk. */
-  protected enableNifty = true;
-  protected enableBank = true;
-  /** Combined strict day loss ≈ −₹2,950 × lots — on for hands-off agent. */
-  protected strictDayStop = true;
-  /** Combined day profit lock ≈ +₹3,000 × lots (1→₹3k, 3→₹9k). */
-  protected dayProfitLock = true;
-  /** Kutty off — not part of the agent desk. */
-  protected enableKutty = false;
-  protected kuttyAlone = false;
+  protected readonly scanResults = this.scanner.results;
+  protected readonly scanBusy = this.scanner.busy;
+  protected readonly scanError = this.scanner.error;
+  protected readonly scanProgress = this.scanner.progress;
+  protected readonly lastScanAt = this.scanner.lastScanAt;
+  protected readonly skippedUnresolved = this.scanner.skippedUnresolved;
+  protected readonly lastScanWasCustom = this.scanner.lastScanWasCustom;
 
-  /** Testing result filter: Mon–Fri (fetch all, show selected weekdays). */
-  protected readonly weekdayOptions = PAPER_WEEKDAY_OPTIONS;
-  protected readonly weekdayOn = signal<PaperWeekdaySelection>(defaultPaperWeekdaySelection());
+  protected readonly lookupResult = this.scanner.lookupResult;
+  protected readonly lookupError = this.scanner.lookupError;
+  protected readonly lookupBusy = this.scanner.lookupBusy;
 
-  protected readonly snapshot = this.desk.snapshot;
-  protected readonly busy = this.desk.busy;
-  protected readonly error = signal('');
+  protected readonly positions = this.positionsSvc.positions;
+  protected readonly positionSignals = this.positionsSvc.signals;
+  protected readonly checkingPositions = this.positionsSvc.checking;
+  protected readonly checkError = this.positionsSvc.checkError;
 
-  /** Active Strat assignments for the desk mode (Paper in Testing, Live in Live). */
-  protected readonly activeStrategies = computed(() => {
-    const assignMode = this.mode() === 'live' ? 'live' : 'paper';
-    const map = this.assignments.assignments();
-    const row = (channel: DeskChannel) => {
-      const id = assignMode === 'live' ? map[channel].live : map[channel].paper;
-      const mod = this.registry.getById(id);
-      const caps = dnaCapsForStrategy(id, channel);
-      const mt = caps.maxTradesPerDay > 0 ? `${caps.maxTradesPerDay}t/day` : '∞ t/day';
-      return {
-        channel,
-        id,
-        name: mod?.name ?? id,
-        maxTradesLabel: mt,
-      };
-    };
-    return {
-      modeLabel: assignMode === 'live' ? 'Live' : 'Paper',
-      nifty: row('nifty'),
-      bank: row('bank'),
-      same: map.nifty[assignMode] === map.bank[assignMode],
-    };
+  protected readonly openPositions = computed(() => this.positions().filter((p) => !p.closedAt));
+  protected readonly closedPositions = computed(() => this.positions().filter((p) => !!p.closedAt));
+
+  protected readonly progressPct = computed(() => {
+    const p = this.scanProgress();
+    if (!p.total) return 0;
+    return Math.round((p.done / p.total) * 100);
   });
 
-  /** Filtered Testing view; Live uses full snapshot. */
-  protected readonly resultView = computed(() => {
-    const snap = this.snapshot();
-    if (this.mode() !== 'testing' || !snap.trades.length) {
-      return {
-        trades: snap.trades,
-        totals: snap.totals,
-        dayStats: snap.dayStats,
-        weekdayLabel: 'all',
-        filtered: false,
-      };
+  protected readonly backtestResult = this.backtestSvc.result;
+  protected readonly backtestBusy = this.backtestSvc.busy;
+  protected readonly backtestError = this.backtestSvc.error;
+  protected readonly backtestProgress = this.backtestSvc.progress;
+
+  // Shared by both backtest views — Start month / End month, stored as "YYYY-MM".
+  protected btStartMonth = BACKTEST_DEFAULT_START_MONTH;
+  protected btEndMonth = BACKTEST_DEFAULT_END_MONTH;
+  protected readonly monthOptions = MONTH_OPTIONS;
+
+  // Plain month-dropdown + year-number editors (sidesteps native <input type="month"> quirks
+  // where the year segment can be finicky/uneditable depending on browser/OS).
+  protected get startMonthNum(): number {
+    return Number(this.btStartMonth.split('-')[1]);
+  }
+  protected set startMonthNum(v: number) {
+    this.btStartMonth = `${this.startYearNum}-${String(v).padStart(2, '0')}`;
+  }
+  protected get startYearNum(): number {
+    return Number(this.btStartMonth.split('-')[0]);
+  }
+  protected set startYearNum(v: number) {
+    const year = Math.max(2000, Math.floor(Number(v)) || this.startYearNum);
+    this.btStartMonth = `${year}-${String(this.startMonthNum).padStart(2, '0')}`;
+  }
+
+  protected get endMonthNum(): number {
+    return Number(this.btEndMonth.split('-')[1]);
+  }
+  protected set endMonthNum(v: number) {
+    this.btEndMonth = `${this.endYearNum}-${String(v).padStart(2, '0')}`;
+  }
+  protected get endYearNum(): number {
+    return Number(this.btEndMonth.split('-')[0]);
+  }
+  protected set endYearNum(v: number) {
+    const year = Math.max(2000, Math.floor(Number(v)) || this.endYearNum);
+    this.btEndMonth = `${year}-${String(this.endMonthNum).padStart(2, '0')}`;
+  }
+
+  protected readonly backtestProgressPct = computed(() => {
+    const p = this.backtestProgress();
+    if (!p.total) return 0;
+    return Math.round((p.done / p.total) * 100);
+  });
+
+  protected readonly backtestView = signal<BacktestView>('weekly');
+  protected readonly weeklyTopN = WEEKLY_TOP_N;
+  protected weeklyCapitalInput = DEFAULT_WEEKLY_CAPITAL_RS;
+
+  protected readonly weeklyResult = this.weeklyBacktestSvc.result;
+  protected readonly weeklyBusy = this.weeklyBacktestSvc.busy;
+  protected readonly weeklyError = this.weeklyBacktestSvc.error;
+  protected readonly weeklyProgress = this.weeklyBacktestSvc.progress;
+
+  protected readonly weeklyProgressPct = computed(() => {
+    const p = this.weeklyProgress();
+    if (!p.total) return 0;
+    return Math.round((p.done / p.total) * 100);
+  });
+
+  protected weeklyPerPickCapital(): number {
+    return Math.round((Number(this.weeklyCapitalInput) || 0) / this.weeklyTopN);
+  }
+
+  /** Only take long breakouts while Nifty 50 is above its own 50-day average. */
+  protected regimeFilterOn = false;
+
+  // --- Intraday ---
+  protected readonly intradayResult = this.intradaySvc.result;
+  protected readonly intradayBusy = this.intradaySvc.busy;
+  protected readonly intradayError = this.intradaySvc.error;
+  protected readonly intradayProgress = this.intradaySvc.progress;
+  protected readonly intradayStrategies = INTRADAY_STRATEGY_OPTIONS;
+  protected readonly intradayUniverseCount = NIFTY_50_UNIVERSE.length;
+  protected readonly intervalOptions: Timeframe[] = ['5minute', '15minute', '30minute', '60minute'];
+
+  protected intradayStrategyId: IntradayStrategyId = 'orb';
+  protected intradayCapital = 30_000;
+  protected intradayInterval: Timeframe = '5minute';
+  protected intradayMaxPositions = 10;
+
+  /**
+   * Intraday keeps its own window, defaulting to 3 months rather than the swing tab's 24.
+   * Fifty stocks of 5-minute candles is roughly 75 bars per stock per day — a two-year
+   * pull is hundreds of API calls and millions of candles.
+   */
+  protected intradayStartMonth = shiftMonth(currentMonth(), -3);
+  protected intradayEndMonth = currentMonth();
+
+  protected get intraStartMonthNum(): number {
+    return Number(this.intradayStartMonth.split('-')[1]);
+  }
+  protected set intraStartMonthNum(v: number) {
+    this.intradayStartMonth = `${this.intraStartYearNum}-${String(v).padStart(2, '0')}`;
+  }
+  protected get intraStartYearNum(): number {
+    return Number(this.intradayStartMonth.split('-')[0]);
+  }
+  protected set intraStartYearNum(v: number) {
+    const year = Math.max(2000, Math.floor(Number(v)) || this.intraStartYearNum);
+    this.intradayStartMonth = `${year}-${String(this.intraStartMonthNum).padStart(2, '0')}`;
+  }
+
+  protected get intraEndMonthNum(): number {
+    return Number(this.intradayEndMonth.split('-')[1]);
+  }
+  protected set intraEndMonthNum(v: number) {
+    this.intradayEndMonth = `${this.intraEndYearNum}-${String(v).padStart(2, '0')}`;
+  }
+  protected get intraEndYearNum(): number {
+    return Number(this.intradayEndMonth.split('-')[0]);
+  }
+  protected set intraEndYearNum(v: number) {
+    const year = Math.max(2000, Math.floor(Number(v)) || this.intraEndYearNum);
+    this.intradayEndMonth = `${year}-${String(this.intraEndMonthNum).padStart(2, '0')}`;
+  }
+
+  // --- Strategy finder ---
+  protected readonly finderResult = this.finderSvc.result;
+  protected readonly finderBusy = this.finderSvc.busy;
+  protected readonly finderError = this.finderSvc.error;
+  protected readonly finderProgress = this.finderSvc.progress;
+
+  protected finderSpace: SearchSpace = defaultSearchSpace();
+  protected finderUniverse: FinderUniverse = 'nifty50';
+  protected finderPositionRs = 10_000;
+  protected finderStartMonth = shiftMonth(currentMonth(), -36);
+  protected finderEndMonth = currentMonth();
+
+  /** Text mirrors of the numeric list fields, so they can be typed as "10, 20, 50". */
+  protected finderText = {
+    emaFast: '20',
+    emaSlow: '50',
+    breakoutLookback: '10, 20',
+    rsiValue: '30, 40',
+    volumeMinRatio: '1.2',
+    pullbackMinPct: '3',
+    priceEmaPeriod: '50',
+    engulfTolerancePct: '0.3, 0.5, 1',
+    strongBodyRatio: '0.6',
+    emaTouchPeriod: '20, 50',
+    notSidewaysRatio: '0.7',
+    nearPivotMaxDistPct: '1',
+    stopValue: '2',
+    maxRiskPct: '5, 7',
+    rewardMultiple: '1.5, 2, 3',
+    maxHoldBars: '5, 10, 20',
+  };
+
+  /** Ready-made spaces, including the ported Pine indicator. */
+  protected applyPreset(name: 'default' | 'smartPullback' | 'emaPullback'): void {
+    const space =
+      name === 'smartPullback' ? smartPullbackSpace()
+      : name === 'emaPullback' ? emaPullbackSpace()
+      : defaultSearchSpace();
+    this.finderSpace = space;
+    this.finderStopKind = space.stopKind[0] ?? 'atr';
+    const list = (xs: number[]) => xs.join(', ');
+    const pct = (xs: number[]) => xs.map((v) => +(v * 100).toFixed(3)).join(', ');
+    this.finderText = {
+      emaFast: list(space.emaFast),
+      emaSlow: list(space.emaSlow),
+      breakoutLookback: list(space.breakoutLookback),
+      rsiValue: list(space.rsiValue),
+      volumeMinRatio: list(space.volumeMinRatio),
+      pullbackMinPct: pct(space.pullbackMinPct),
+      priceEmaPeriod: list(space.priceEmaPeriod),
+      engulfTolerancePct: pct(space.engulfTolerancePct),
+      strongBodyRatio: list(space.strongBodyRatio),
+      emaTouchPeriod: list(space.emaTouchPeriod),
+      notSidewaysRatio: list(space.notSidewaysRatio),
+      nearPivotMaxDistPct: pct(space.nearPivotMaxDistPct),
+      stopValue: list(space.stopValue),
+      maxRiskPct: pct(space.maxRiskPct),
+      rewardMultiple: list(space.rewardMultiple),
+      maxHoldBars: list(space.maxHoldBars),
+    };
+  }
+
+  protected readonly stopKindOptions: StopKind[] = ['atr', 'pct', 'swingLow'];
+  protected finderStopKind: StopKind = 'atr';
+
+  protected readonly finderProgressPct = computed(() => {
+    const p = this.finderProgress();
+    if (!p.total) return 0;
+    return Math.round((p.done / p.total) * 100);
+  });
+
+  /** Applies the typed text fields back onto the search space. */
+  private syncFinderSpace(): void {
+    const nums = (s: string) =>
+      s.split(/[,\s]+/).map((v) => Number(v)).filter((v) => Number.isFinite(v) && v > 0);
+    const t = this.finderText;
+    this.finderSpace.emaFast = nums(t.emaFast);
+    this.finderSpace.emaSlow = nums(t.emaSlow);
+    this.finderSpace.breakoutLookback = nums(t.breakoutLookback);
+    this.finderSpace.rsiValue = nums(t.rsiValue);
+    this.finderSpace.volumeMinRatio = nums(t.volumeMinRatio);
+    this.finderSpace.pullbackMinPct = nums(t.pullbackMinPct).map((v) => v / 100);
+    this.finderSpace.stopValue = nums(t.stopValue);
+    this.finderSpace.maxRiskPct = nums(t.maxRiskPct).map((v) => v / 100);
+    this.finderSpace.rewardMultiple = nums(t.rewardMultiple);
+    this.finderSpace.maxHoldBars = nums(t.maxHoldBars);
+    this.finderSpace.stopKind = [this.finderStopKind];
+    this.finderSpace.priceEmaPeriod = nums(t.priceEmaPeriod);
+    this.finderSpace.engulfTolerancePct = nums(t.engulfTolerancePct).map((v) => v / 100);
+    this.finderSpace.strongBodyRatio = nums(t.strongBodyRatio);
+    this.finderSpace.emaTouchPeriod = nums(t.emaTouchPeriod);
+    this.finderSpace.notSidewaysRatio = nums(t.notSidewaysRatio);
+    this.finderSpace.nearPivotMaxDistPct = nums(t.nearPivotMaxDistPct).map((v) => v / 100);
+  }
+
+  /** Live count so you can see the search exploding before you launch it. */
+  protected finderComboCount(): number {
+    this.syncFinderSpace();
+    try {
+      return buildRecipes(this.finderSpace).length;
+    } catch {
+      return 0;
     }
-    const view = buildWeekdayFilteredView(
-      snap.trades,
-      this.weekdayOn(),
-      (id) => this.lotsForInstrumentId(id),
-      PDHL_RUPEES_PER_POINT,
+  }
+
+  protected async runFinder(): Promise<void> {
+    this.syncFinderSpace();
+    await this.finderSvc.run({
+      space: this.finderSpace,
+      startMonth: this.finderStartMonth,
+      endMonth: this.finderEndMonth,
+      universe: this.finderUniverse,
+      positionSizeRs: Number(this.finderPositionRs) || 10_000,
+    });
+  }
+
+  protected verdictLabel(v: FinderCandidate['verdict']): string {
+    switch (v) {
+      case 'promising': return 'Held up out-of-sample';
+      case 'likely-overfit': return 'Fell apart out-of-sample';
+      case 'no-edge': return 'No edge in-sample';
+      default: return 'Too few trades';
+    }
+  }
+
+  /** Copies just the recipe — the portable formula, ready to paste back for coding up. */
+  protected async copyFormula(c: FinderCandidate, key: string): Promise<void> {
+    await this.copyJson(
+      {
+        recipe: c.recipe,
+        measured: { inSample: c.inSample, outOfSample: c.outOfSample },
+        verdict: c.verdict,
+        costHurdleR: c.costHurdleR,
+      },
+      key,
     );
-    return { ...view, filtered: true };
+  }
+
+  /** Rough call-count warning so a huge window is an informed choice, not a surprise. */
+  protected intradayMonthSpan(): number {
+    const [sy, sm] = this.intradayStartMonth.split('-').map(Number);
+    const [ey, em] = this.intradayEndMonth.split('-').map(Number);
+    return Math.max(0, (ey! - sy!) * 12 + (em! - sm!) + 1);
+  }
+
+  protected readonly intradayProgressPct = computed(() => {
+    const p = this.intradayProgress();
+    if (!p.total) return 0;
+    return Math.round((p.done / p.total) * 100);
   });
+
+  protected async runIntraday(): Promise<void> {
+    await this.intradaySvc.run({
+      strategyId: this.intradayStrategyId,
+      capitalRs: Number(this.intradayCapital) || 0,
+      startMonth: this.intradayStartMonth,
+      endMonth: this.intradayEndMonth,
+      interval: this.intradayInterval,
+      maxPositions: Math.max(1, Math.min(10, Math.floor(Number(this.intradayMaxPositions)) || 10)),
+    });
+  }
+
+  // Add-position form
+  protected addSymbol = '';
+  protected addEntryDate = todayIso();
+  protected addEntryPrice: number | null = null;
+  protected addQty: number | null = null;
+  protected addStop: number | null = null;
+  protected addTarget: number | null = null;
+  protected addQtyManual = false;
+  protected addFormError = signal('');
+
+  // Custom-list scan
+  protected customSymbolsInput = '';
+
+  // Instrument token lookup
+  protected lookupSymbolInput = '';
 
   ngOnInit(): void {
-    // Default trading capital is ₹40k (saved preference overrides only after user edits).
-    this.capitalRs = this.capitalPreference.get() || DEFAULT_TRADING_CAPITAL_RS;
-    if (this.capitalRs < 10_000) {
-      this.capitalRs = DEFAULT_TRADING_CAPITAL_RS;
-    }
-    this.capitalDraft = String(this.capitalRs);
-    // Live continues in the root desk service across tab switches — restore UI mode.
-    if (this.snapshot().running) {
-      this.mode.set('live');
-      this.realOrders = this.snapshot().realOrders;
-      this.realOrdersAck = true;
-      this.capitalPlan = planLotsForCapital(this.capitalRs);
-    } else {
-      // Hands-off: Live · capital → lots · all-green DNA · capital guards on.
-      this.mode.set('live');
-      this.applyCapitalAgentPreset();
-      // Preset must not wipe a saved capital the user typed earlier.
-      this.capitalDraft = String(this.capitalRs || DEFAULT_TRADING_CAPITAL_RS);
-    }
-    this.enableKutty = false;
-    this.kuttyAlone = false;
-  }
-
-  ngOnDestroy(): void {
-    // Do not stopLive — desk keeps polling when you switch tabs.
-  }
-
-  /**
-   * Commit capital on blur / Enter only — never while typing.
-   * Clamping on ngModelChange was resetting the field every keystroke.
-   */
-  protected commitCapital(): void {
-    const parsed = Math.floor(Number(String(this.capitalDraft).replace(/[,_\s]/g, '')));
-    const next = Math.max(
-      10_000,
-      Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_TRADING_CAPITAL_RS,
-    );
-    this.capitalRs = next;
-    this.capitalDraft = String(next);
-    this.capitalPreference.set(next);
-    if (this.busy() || this.snapshot().running) {
-      return;
-    }
-    this.applyCapitalAllocation();
-  }
-
-  /** Keep draft in sync while typing; do not normalize yet. */
-  protected onCapitalDraftChange(raw: string): void {
-    this.capitalDraft = raw;
-  }
-
-  protected onAutoLotsToggle(): void {
-    if (this.autoLotsFromCapital && !(this.busy() || this.snapshot().running)) {
-      this.applyCapitalAllocation();
+    if (this.openPositions().length) {
+      void this.positionsSvc.refreshSignals();
     }
   }
 
-  protected onLotsChange(book: 'nifty' | 'bank'): void {
-    if (this.autoLotsFromCapital) {
-      return;
-    }
-    if (book === 'nifty') {
-      this.niftyLots = Math.max(1, Math.floor(Number(this.niftyLots)) || 1);
-      this.lotsPreference.set(this.niftyLots);
-    } else {
-      this.bankLots = Math.max(1, Math.floor(Number(this.bankLots)) || 1);
-    }
-  }
-
-  /**
-   * Hands-off agent preset — client only presses Start / Stop after 15:15.
-   * Capital, lots, books, DNA, Live money, day lock + strict stop all auto.
-   */
-  private applyCapitalAgentPreset(): void {
-    if (this.busy() || this.snapshot().running) {
-      return;
-    }
-    const p = DAILY_3K_DESK_PRESET;
-    this.assignments.forceTrapDefaultsForDaily3k();
-    this.strictDayStop = true; // capital must not drain
-    this.dayProfitLock = true;
-    this.autoLotsFromCapital = true;
-    this.enableKutty = false;
-    this.kuttyAlone = false;
-    // Live money only on Live tab — Paper never places Kite orders.
-    if (this.mode() === 'live') {
-      this.realOrders = true;
-      this.realOrdersAck = true;
-    } else {
-      this.realOrders = false;
-      this.realOrdersAck = false;
-    }
-    this.applyCapitalAllocation();
-    this.error.set('');
-  }
-
-  /** Size Nifty+Bank from total capital — more capital → more lots. */
-  private applyCapitalAllocation(): void {
-    const plan = planLotsForCapital(this.capitalRs);
-    this.capitalPlan = plan;
-    this.enableNifty = plan.enableNifty;
-    this.enableBank = plan.enableBank;
-    this.niftyLots = plan.enableNifty ? Math.max(1, plan.niftyLots) : 0;
-    this.bankLots = plan.enableBank ? Math.max(1, plan.bankLots) : 0;
-    // Preference store keeps a single "primary" lot hint (Nifty when on).
-    this.lotsPreference.set(Math.max(this.niftyLots, this.bankLots, 1));
-  }
-
-  protected allocationSummary(): string {
-    const bits = [
-      this.enableNifty ? `Nifty ×${this.niftyLots}` : null,
-      this.enableBank ? `Bank ×${this.bankLots}` : null,
-    ].filter(Boolean);
-    return bits.join(' · ') || 'no books';
+  protected setTab(tab: DeskTab): void {
+    this.tab.set(tab);
   }
 
   protected hasKiteSession(): boolean {
-    return !!this.kiteSession.getAuthorizationHeader();
+    return this.scanner.hasKiteSession();
   }
 
-  private lotsForInstrumentId(instrumentId: string): number {
-    const id = instrumentId.toLowerCase();
-    if (id.includes('bank')) {
-      return this.bankLots;
-    }
-    return this.niftyLots;
+  protected async runScan(): Promise<void> {
+    await this.scanner.scan(NIFTY_500_UNIVERSE);
   }
 
-  protected toggleWeekday(key: PaperWeekdayKey): void {
-    this.weekdayOn.update((cur) => ({ ...cur, [key]: !cur[key] }));
+  protected async runCustomScan(): Promise<void> {
+    await this.scanner.scanCustom(this.customSymbolsInput);
   }
 
-  protected isWeekdayOn(key: PaperWeekdayKey): boolean {
-    return this.weekdayOn()[key];
+  protected async lookupToken(): Promise<void> {
+    await this.scanner.lookupToken(this.lookupSymbolInput);
   }
 
-  protected setMode(mode: PaperDeskMode): void {
-    if (this.busy()) {
-      this.desk.cancelRun();
-    } else if (this.snapshot().running) {
-      this.desk.stopLive();
-    }
-    this.mode.set(mode);
-    this.error.set('');
-    if (mode === 'testing') {
-      this.realOrders = false;
-      this.realOrdersAck = false;
-    }
-    // Hands-off: always the same books/DNA/guards — no leftover toggles.
-    if (this.handsOffAgent && !this.snapshot().running) {
-      this.applyCapitalAgentPreset();
-      if (mode === 'testing') {
-        this.realOrders = false;
-        this.realOrdersAck = false;
-      }
-    }
+  protected async runBacktest(): Promise<void> {
+    await this.backtestSvc.run(this.btStartMonth, this.btEndMonth, NIFTY_500_UNIVERSE);
   }
 
-  private buildRunOptions(): TradeDeskRunOptions {
-    return {
-      lots: this.niftyLots,
-      niftyLots: this.niftyLots,
-      bankLots: this.bankLots,
-      enableNifty: this.enableNifty,
-      enableBank: this.enableBank,
-      enableCrude: false,
-      enableNatGas: false,
-      strictDayStop: this.strictDayStop,
-      dayProfitLock: this.dayProfitLock,
-      enableKutty: false,
-      kuttyAlone: false,
-    };
-  }
-
-  /**
-   * Lots used for ₹ lock/stop labels. Daily keeps Nifty/Bank equal — money ≈ ₹3k × lots.
-   */
-  protected deskRiskLots(): number {
-    if (this.enableBank && !this.enableNifty) {
-      return Math.max(1, Math.floor(Number(this.bankLots)) || 1);
-    }
-    return Math.max(1, Math.floor(Number(this.niftyLots)) || 1);
-  }
-
-  /** Day profit lock money band — capital plan when auto lots, else ₹3k × lots. */
-  protected profitLockMoneyRs(): number {
-    if (this.autoLotsFromCapital && this.capitalPlan.dayProfitLockRs > 0) {
-      return this.capitalPlan.dayProfitLockRs;
-    }
-    return deskDayProfitLockMoneyRs(this.deskRiskLots());
-  }
-
-  /** Strict day-stop money band at current lots (1→₹2,950, 3→₹8,850). */
-  protected strictStopMoneyRs(): number {
-    return deskStrictDayLossMoneyRs(this.deskRiskLots());
-  }
-
-  /** Option-₹ stand-down (doc 51) — real brake for MIS premium scrap. */
-  protected optionDayLossMoneyRs(): number {
-    return deskOptionDayLossMoneyRs(this.deskRiskLots());
-  }
-
-  private selectedBooksLabel(): string {
-    const parts = [
-      this.enableNifty ? `Nifty 50 ×${this.niftyLots}` : null,
-      this.enableBank ? `Bank Nifty ×${this.bankLots}` : null,
-    ].filter(Boolean);
-    return parts.join(' + ') || 'none';
-  }
-
-  protected async onStart(): Promise<void> {
-    this.error.set('');
-    if (!this.kiteSession.getAuthorizationHeader()) {
-      this.error.set('No Kite session. Open Get Token once, then press Start.');
-      return;
-    }
-    // Commit any in-progress capital typing before sizing / start.
-    this.commitCapital();
-    // Hands-off: same plan for Paper and Live — only Kite I/O differs on Live.
-    if (this.handsOffAgent) {
-      this.applyCapitalAgentPreset();
-    } else if (this.autoLotsFromCapital) {
-      this.applyCapitalAllocation();
-    }
-    if (!this.enableNifty && !this.enableBank) {
-      this.error.set('Agent plan has no books — check capital preference (min ₹10,000).');
-      return;
-    }
-
-    this.niftyLots = Math.max(1, Math.floor(Number(this.niftyLots)) || 1);
-    this.bankLots = Math.max(1, Math.floor(Number(this.bankLots)) || 1);
-    this.lotsPreference.set(this.niftyLots);
-    const runOpts = this.buildRunOptions();
-
-    try {
-      if (this.mode() === 'testing') {
-        if (!this.fromDate || !this.toDate || this.fromDate > this.toDate) {
-          this.error.set('Pick a valid From → To date range.');
-          return;
-        }
-        await this.desk.runTesting(this.fromDate, this.toDate, runOpts);
-      } else {
-        // Hands-off Live money: no checkboxes, no confirm dialog — Start is the only action.
-        if (this.handsOffAgent) {
-          this.realOrders = true;
-          this.realOrdersAck = true;
-        } else if (this.realOrders && !this.realOrdersAck) {
-          this.error.set('Tick the confirmation box before starting Live money.');
-          return;
-        } else if (this.realOrders) {
-          const riskBits = [
-            this.strictDayStop
-              ? `strict day stop −₹${this.strictStopMoneyRs().toLocaleString('en-IN')}`
-              : null,
-            this.dayProfitLock
-              ? `day profit lock +₹${this.profitLockMoneyRs().toLocaleString('en-IN')}`
-              : null,
-            `option stand-down −₹${this.optionDayLossMoneyRs().toLocaleString('en-IN')}`,
-          ]
-            .filter(Boolean)
-            .join(', ');
-          const ok = await this.uiDialog.confirm({
-            title: 'Start live money?',
-            message: `Real Kite MIS MARKET orders on ATM options for: ${this.selectedBooksLabel()}.\n${riskBits ? `Risk: ${riskBits}.\n` : ''}\nOrders go via DigitalOcean fixed IP.`,
-            confirmLabel: 'Start live',
-            cancelLabel: 'Cancel',
-            tone: 'danger',
-          });
-          if (!ok) {
-            return;
-          }
-        }
-        await this.desk.startLive({
-          ...runOpts,
-          realOrders: this.realOrders,
-        });
-      }
-    } catch (err) {
-      this.error.set(formatUnknownError(err, 'Trade desk'));
-    }
-  }
-
-  protected async onStop(): Promise<void> {
-    if (this.busy()) {
-      this.desk.cancelRun();
-      return;
-    }
-    // After 15:15 (or anytime): cancel SL-M + MARKET flatten open MIS, then stop.
-    await this.desk.stopLive({
-      flatten: true,
-      reason: 'Stop — flatten open MIS',
-    });
-  }
-
-  protected hasOpenTrade(): boolean {
-    return this.snapshot().statuses.some((s) => !!s.openTrade);
-  }
-
-  protected hasKiteOpenTrade(): boolean {
-    return this.snapshot().statuses.some((s) => !!s.openTrade && !!s.brokerEntryOrderId);
-  }
-
-  protected hasKiteBlockEvents(): boolean {
-    return this.snapshot().orderEvents.some((e) => e.action === 'SKIP' || e.action === 'ERROR');
-  }
-
-  /**
-   * Plain-language “what’s happening now” for Live — scanning, flat/no setup,
-   * waiting for entry, in trade, or Kite blocked.
-   */
-  protected readonly liveAssistant = computed(() => {
-    const snap = this.snapshot();
-    if (this.mode() !== 'live') {
-      return null;
-    }
-    const nowHhMm = new Date().toLocaleTimeString('en-IN', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
-      timeZone: 'Asia/Kolkata',
-    });
-    return buildLiveAssistant({
-      running: snap.running,
-      marketOpen: snap.marketOpen,
-      realOrders: snap.realOrders,
-      message: snap.message,
-      statuses: snap.statuses,
-      nowHhMm,
-      lotsByBook: {
-        nifty: this.niftyLots,
-        bank: this.bankLots,
-      },
-    });
-  });
-
-  protected marketLiveSummary(): string {
-    const open = this.snapshot().statuses.filter((s) => s.openTrade);
-    if (!open.length) {
-      return '';
-    }
-    return open
-      .map((s) => {
-        const o = s.openTrade!;
-        const optTgt = this.optionTargetPremium(o);
-        const optBits =
-          o.optionEntryPremium != null
-            ? ` · Opt ${o.optionEntryPremium.toFixed(2)}${optTgt != null ? `→${optTgt.toFixed(2)}` : ''}`
-            : '';
-        if (this.snapshot().realOrders && s.brokerEntryOrderId) {
-          return `${s.instrumentName}: ${o.direction} · E ${o.indexEntry.toFixed(1)} → Tgt ${o.indexTarget.toFixed(1)}${optBits} · Kite ${s.brokerEntryOrderId}`;
-        }
-        if (this.snapshot().realOrders) {
-          return `${s.instrumentName}: ${o.direction} · desk only · NOT on Kite${s.kiteBlockReason ? ` (${s.kiteBlockReason})` : ''}`;
-        }
-        return `${s.instrumentName}: ${o.direction} · E ${o.indexEntry.toFixed(1)} → Tgt ${o.indexTarget.toFixed(1)}${optBits} · paper`;
-      })
-      .join('  |  ');
-  }
-
-  /** Option target premium proxy — NFO ATM delta. */
-  protected optionTargetPremium(open: {
-    indexEntry: number;
-    indexTarget: number;
-    optionEntryPremium: number | null;
-    option?: { exchange?: string; tradingSymbol?: string } | null;
-  }): number | null {
-    if (open.optionEntryPremium == null || open.optionEntryPremium <= 0) {
-      return null;
-    }
-    return computeOptionTargetPremium({
-      fillPremium: open.optionEntryPremium,
-      indexRewardPts: Math.abs(open.indexTarget - open.indexEntry),
-      exchange: open.option?.exchange,
-      tradingSymbol: open.option?.tradingSymbol,
-    });
-  }
-
-  protected fmtTime(ts: string | null | undefined): string {
-    if (!ts) {
-      return '—';
-    }
-    return ts.replace('T', ' ').slice(0, 16);
-  }
-
-  /** HH:MM only — Day column already has the date (stops mobile When wrap). */
-  protected fmtClock(ts: string | null | undefined): string {
-    if (!ts) {
-      return '—';
-    }
-    const norm = ts.replace('T', ' ');
-    const m = norm.match(/\b(\d{2}:\d{2})\b/);
-    if (m?.[1]) {
-      return m[1];
-    }
-    const slice = norm.slice(11, 16);
-    return slice.length === 5 ? slice : '—';
-  }
-
-  protected fmtWeekday(ts: string | null | undefined): string {
-    if (!ts) {
-      return '—';
-    }
-    return formatDayOfWeek(extractTradeDate(ts));
-  }
-
-  protected fmtDisplayDate(ts: string | null | undefined): string {
-    if (!ts) {
-      return '—';
-    }
-    return formatDisplayDate(extractTradeDate(ts));
-  }
-
-  protected downloadPdf(): void {
-    const snap = this.snapshot();
-    const view = this.resultView();
-    if (!view.trades.length) {
-      return;
-    }
-    this.deskExport.exportPdf(
-      {
-        ...snap,
-        trades: view.trades,
-        totals: view.totals,
-        dayStats: view.dayStats,
-      },
-      {
-        title: 'Trade Desk Results',
-        subtitle: `Nifty / Bank · days ${view.weekdayLabel}`,
-      },
+  protected async runWeeklyBacktest(): Promise<void> {
+    await this.weeklyBacktestSvc.run(
+      Number(this.weeklyCapitalInput) || 0,
+      this.btStartMonth,
+      this.btEndMonth,
+      this.weeklyTopN,
+      this.regimeFilterOn,
     );
   }
 
-  /** Quick Testing ranges — short windows (e.g. Jul-only) can look “broken” vs research. */
-  protected setTestingRange(daysBack: number): void {
-    this.fromDate = shiftDays(-Math.abs(daysBack));
-    this.toDate = todayIso();
+  protected setBacktestView(view: BacktestView): void {
+    this.backtestView.set(view);
   }
 
-  /** Single-session Testing = today IST. */
-  protected setTestingToday(): void {
-    this.fromDate = todayIso();
-    this.toDate = todayIso();
+  protected trackTrade(s: SwingScanResult): void {
+    this.addSymbol = s.symbol;
+    this.addEntryDate = todayIso();
+    this.addEntryPrice = round2(s.entry);
+    this.addQty = s.qty;
+    this.addStop = round2(s.stop);
+    this.addTarget = round2(s.target);
+    this.addQtyManual = false;
+    this.addFormError.set('');
+    this.tab.set('positions');
   }
 
-  /**
-   * One Profit ₹ — option money for Testing and Live (Kite fills overlay on Live money).
-   * Research Locked ₹ is a side meter only.
-   */
-  protected primaryProfitRs(): number {
-    const t = this.resultView().totals;
-    if (t.optionNetAfterChargesRs != null) {
-      return t.optionNetAfterChargesRs;
+  protected onEntryPriceChange(): void {
+    if (this.addQtyManual) return;
+    const price = Number(this.addEntryPrice);
+    if (price > 0) {
+      this.addQty = qtyForFlatCapital(price, SWING_CAPITAL_PER_STOCK_RS);
     }
-    return t.optionNetRs ?? 0;
   }
 
-  /** Published Locked index table (Jul ₹65,041) — research side meter. */
-  protected lockedResearchRs(): number | null {
-    const v = this.resultView().totals.researchLockedNetRs;
-    return v == null ? null : v;
+  protected onQtyEdited(): void {
+    this.addQtyManual = true;
   }
 
-  /** Per-trade profit — same basis as primary (net if present). */
-  protected tradeProfitRs(t: {
-    netOptionPnlRs?: number | null;
-    optionPnlRs?: number | null;
-  }): number {
-    if (t.netOptionPnlRs != null) {
-      return t.netOptionPnlRs;
+  protected addPosition(): void {
+    this.addFormError.set('');
+    const symbol = this.addSymbol.trim().toUpperCase();
+    const entryPrice = Number(this.addEntryPrice);
+    const qty = Number(this.addQty);
+    const stop = Number(this.addStop);
+    const target = Number(this.addTarget);
+    if (!symbol) {
+      this.addFormError.set('Enter a symbol.');
+      return;
     }
-    return t.optionPnlRs ?? 0;
-  }
-
-  /** False when option bars missing — do not paint Index SL as a ₹ loss. */
-  protected hasTradeProfitRs(t: {
-    netOptionPnlRs?: number | null;
-    optionPnlRs?: number | null;
-  }): boolean {
-    return t.netOptionPnlRs != null || t.optionPnlRs != null;
-  }
-
-  /**
-   * Closed-leg side label — desk always buys the option (long CE/PE).
-   * Bare "SELL" next to a PE looked like a short; premium drop then looked "should be green".
-   */
-  protected optionLegLabel(t: {
-    direction: 'BUY' | 'SELL';
-    option?: { optionType?: 'CE' | 'PE' | string } | null;
-  }): string {
-    const ot = (t.option?.optionType ?? '').toUpperCase();
-    if (ot === 'CE' || ot === 'PE') {
-      return `Long ${ot} · fut ${t.direction}`;
+    if (!(entryPrice > 0)) {
+      this.addFormError.set('Enter a valid entry price.');
+      return;
     }
-    return t.direction === 'BUY' ? 'Long CE · fut BUY' : 'Long PE · fut SELL';
+    if (!(qty > 0)) {
+      this.addFormError.set('Enter a valid quantity.');
+      return;
+    }
+    if (!(stop > 0) || stop >= entryPrice) {
+      this.addFormError.set('Stop must be a positive price below entry.');
+      return;
+    }
+    if (!(target > entryPrice)) {
+      this.addFormError.set('Target must be above entry.');
+      return;
+    }
+    this.positionsSvc.add({
+      symbol,
+      entryDate: this.addEntryDate,
+      entryPrice,
+      qty,
+      stop,
+      target,
+    });
+    this.addSymbol = '';
+    this.addEntryPrice = null;
+    this.addQty = null;
+    this.addStop = null;
+    this.addTarget = null;
+    this.addQtyManual = false;
+    this.addEntryDate = todayIso();
+  }
+
+  protected async refreshPositions(): Promise<void> {
+    await this.positionsSvc.refreshSignals();
+  }
+
+  protected removePosition(id: string): void {
+    this.positionsSvc.remove(id);
+  }
+
+  protected markSold(id: string, reason: 'TARGET' | 'STOP' | 'TIME' | 'HOLD', price: number | null): void {
+    if (price == null) return;
+    this.positionsSvc.markClosed(id, reason, price);
+  }
+
+  protected exitCopy(reason: string): string {
+    switch (reason) {
+      case 'TARGET':
+        return 'Target hit — book the profit.';
+      case 'STOP':
+        return 'Stop hit — cut the loss.';
+      case 'TIME':
+        return `Held ${SWING_MAX_HOLD_TRADING_DAYS} trading days without hitting target — close it out.`;
+      case 'ERROR':
+        return 'Could not fetch fresh candles — try again.';
+      default:
+        return 'No exit trigger yet — keep holding.';
+    }
+  }
+
+  protected fmtDate(d: string | null | undefined): string {
+    if (!d) return '—';
+    return d.slice(0, 10);
+  }
+
+  protected fmtR(n: number): string {
+    return `${n > 0 ? '+' : ''}${n.toFixed(2)}R`;
+  }
+
+  protected signed(n: number): string {
+    return n > 0 ? '+' : '';
+  }
+
+  protected signalFor(positionId: string) {
+    return this.positionSignals().find((s) => s.position.id === positionId) ?? null;
+  }
+
+  // Copy-JSON — lets you hand raw result data to anyone/anything (e.g. paste to an AI) without retyping it.
+  protected readonly copyFeedbackKey = signal<string | null>(null);
+  private copyFeedbackTimer: ReturnType<typeof setTimeout> | null = null;
+
+  protected copyLabel(key: string, defaultLabel = 'Copy JSON'): string {
+    const state = this.copyFeedbackKey();
+    if (state === key) return 'Copied!';
+    if (state === `${key}-error`) return 'Copy failed';
+    return defaultLabel;
+  }
+
+  protected async copyJson(data: unknown, key: string): Promise<void> {
+    if (this.copyFeedbackTimer) {
+      clearTimeout(this.copyFeedbackTimer);
+    }
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(data, null, 2));
+      this.copyFeedbackKey.set(key);
+    } catch {
+      this.copyFeedbackKey.set(`${key}-error`);
+    }
+    this.copyFeedbackTimer = setTimeout(() => this.copyFeedbackKey.set(null), 1800);
   }
 }
 
@@ -656,8 +593,6 @@ function todayIso(): string {
   return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
 }
 
-function shiftDays(days: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() + days);
-  return d.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
 }

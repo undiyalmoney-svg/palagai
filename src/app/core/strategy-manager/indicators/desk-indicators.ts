@@ -257,6 +257,20 @@ export function openingRange(
   return { high: hi, low: lo, mid: (hi + lo) / 2, firstOpen, lastClose };
 }
 
+/** Average volume over the last `period` candles, excluding the current (last) one. */
+export function avgVolume(candles: Candle[], period: number, excludeLast = true): number | null {
+  const end = excludeLast ? candles.length - 1 : candles.length;
+  const start = end - period;
+  if (start < 0 || end <= start) {
+    return null;
+  }
+  let sum = 0;
+  for (let i = start; i < end; i += 1) {
+    sum += candles[i]!.volume;
+  }
+  return sum / period;
+}
+
 export function barsOnDay(series: Candle[], day: string): Candle[] {
   return series.filter((c) => extractTradeDate(c.date) === day);
 }

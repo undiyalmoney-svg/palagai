@@ -2,456 +2,1452 @@
   <header class="hero pg-page-hero">
     <div class="hero-copy">
       <p class="pg-eyebrow">Trade Desk</p>
-      <h1>Trading Agent</h1>
+      <h1>Swing Scanner</h1>
       <p class="pg-lede">
-        <strong>Get Token</strong> → set capital if needed → <strong>Start</strong> → leave tab open →
-        <strong>Stop after 3:15</strong>.
+        <strong>Get Token</strong> → <strong>Scan</strong> for breakout setups → buy in Kite yourself →
+        log it under <strong>My Positions</strong> so this tool tells you when to sell.
       </p>
     </div>
     <div class="hero-meta">
-      <span class="pg-badge pg-badge-neutral mono" title="Deployed app build">{{
-        appBuildLabel
-      }}</span>
-      <span class="pg-badge" [class.pg-badge-bull]="mode() === 'live'" [class.pg-badge-neutral]="mode() !== 'live'">
-        {{ mode() === 'live' ? 'Live' : 'Paper' }}
-      </span>
+      <span class="pg-badge pg-badge-neutral mono" title="Deployed app build">{{ appBuildLabel }}</span>
+      <span class="pg-badge pg-badge-neutral">{{ universeCount }} stocks scanned</span>
     </div>
   </header>
 
-  <div class="active-strategy-bar" role="status" aria-live="polite">
-    <div class="active-strategy-label">
-      <span class="as-kicker">Running</span>
-      <strong class="as-name">Trap · option ₹</strong>
-      <span class="as-meta"
-        >{{ allocationSummary() }} · pierce20/B40 · max3 · trail ₹{{
-          capitalPlan.optionTrailArmRs | number: '1.0-0'
-        }}
-        · option stop −₹{{ optionDayLossMoneyRs() | number: '1.0-0' }}</span
-      >
-    </div>
+  <div class="rules">
+    <h4>How signals are picked</h4>
+    <ul>
+      <li>
+        <strong>Buy</strong> — uptrend (20-EMA above 50-EMA) and price breaks above the prior 20-day
+        high on volume ≥ 1.2× its 20-day average.
+      </li>
+      <li>
+        <strong>Stop / Target</strong> — stop is the wider of 2×ATR(14) or the last swing low, capped at
+        {{ maxRiskPct }}% below entry so the target stays reachable in a week; target is 2× that risk (2R).
+      </li>
+      <li>
+        <strong>Sell</strong> — target hit, stop hit, or {{ maxHoldDays }} trading days pass with neither
+        (profit is meant to happen within about a week).
+      </li>
+      <li>
+        <strong>Sizing</strong> — flat ₹{{ capitalPerStockRs | number: '1.0-0' }} per stock, independent
+        of other positions. This tool only shows signals — it never places orders.
+      </li>
+    </ul>
   </div>
 
-  <div class="mode-switch" role="tablist" aria-label="Desk mode">
+  <div class="mode-switch" role="tablist" aria-label="Desk tab">
     <button
       type="button"
       role="tab"
       class="mode-btn"
-      [class.active]="mode() === 'testing'"
-      (click)="setMode('testing')"
+      [class.active]="tab() === 'scan'"
+      (click)="setTab('scan')"
     >
-      <span class="mode-title">Paper</span>
-      <span class="mode-sub">Check dates · same strategy as Live</span>
+      <span class="mode-title">Scan</span>
+      <span class="mode-sub">Find fresh breakout candidates</span>
     </button>
     <button
       type="button"
       role="tab"
       class="mode-btn"
-      [class.active]="mode() === 'live'"
-      (click)="setMode('live')"
+      [class.active]="tab() === 'positions'"
+      (click)="setTab('positions')"
     >
-      <span class="mode-title">Live</span>
-      <span class="mode-sub">Today · real MIS · Stop after 3:15</span>
+      <span class="mode-title">My Positions</span>
+      <span class="mode-sub">{{ openPositions().length }} open · exit signals</span>
+    </button>
+    <button
+      type="button"
+      role="tab"
+      class="mode-btn"
+      [class.active]="tab() === 'backtest'"
+      (click)="setTab('backtest')"
+    >
+      <span class="mode-title">Backtest</span>
+      <span class="mode-sub">Historical win rate for this rule-set</span>
+    </button>
+    <button
+      type="button"
+      role="tab"
+      class="mode-btn"
+      [class.active]="tab() === 'intraday'"
+      (click)="setTab('intraday')"
+    >
+      <span class="mode-title">Intraday</span>
+      <span class="mode-sub">Opening range &amp; S/R, daily P&amp;L</span>
+    </button>
+    <button
+      type="button"
+      role="tab"
+      class="mode-btn"
+      [class.active]="tab() === 'finder'"
+      (click)="setTab('finder')"
+    >
+      <span class="mode-title">Finder</span>
+      <span class="mode-sub">Search element combos for real edge</span>
     </button>
   </div>
 
-  <div class="control-bar">
-    @if (mode() === 'testing') {
-      <label class="field">
-        <span>From</span>
-        <input type="date" [(ngModel)]="fromDate" [disabled]="busy() || snapshot().running" />
-      </label>
-      <label class="field">
-        <span>To</span>
-        <input type="date" [(ngModel)]="toDate" [disabled]="busy() || snapshot().running" />
-      </label>
-      <button
-        type="button"
-        class="preset-btn"
-        [disabled]="busy() || snapshot().running"
-        (click)="setTestingToday()"
-      >
-        Today
-      </button>
-    }
-
-    <label class="field capital-field agent-capital">
-      <span>Capital (₹)</span>
-      <input
-        type="text"
-        inputmode="numeric"
-        autocomplete="off"
-        [ngModel]="capitalDraft"
-        (ngModelChange)="onCapitalDraftChange($event)"
-        (blur)="commitCapital()"
-        (keydown.enter)="$event.preventDefault(); commitCapital()"
-        [disabled]="busy() || snapshot().running"
-        placeholder="40000"
-      />
-    </label>
-
-    <div class="agent-locked compact">
-      <span
-        >{{ allocationSummary() }} · lock ~₹{{ capitalPlan.dayProfitLockRs | number: '1.0-0' }}/day ·
-        trail ₹{{ capitalPlan.optionTrailArmRs | number: '1.0-0' }} · option stop −₹{{
-          optionDayLossMoneyRs() | number: '1.0-0'
-        }}
-        · target ~₹{{ capitalPlan.dailyTargetRs | number: '1.0-0' }}/day</span
-      >
-    </div>
-
-    @if (mode() === 'live') {
-      <aside class="agent-ops" aria-label="Daily steps">
-        <ol class="agent-ops-list">
-          <li [class.done]="hasKiteSession()">
-            <a routerLink="/dashboard/get-token">Get Token</a>
-          </li>
-          <li>Start (any morning)</li>
-          <li>Stop after <strong>3:15</strong></li>
-        </ol>
-      </aside>
-    }
-
-    <div class="actions">
-      @if (busy() || (mode() === 'live' && snapshot().running)) {
-        <button mat-stroked-button type="button" class="stop-btn" (click)="onStop()">
-          {{ busy() ? 'Cancel' : 'Stop' }}
-        </button>
-      }
-      <button
-        mat-flat-button
-        type="button"
-        class="start-btn"
-        [disabled]="busy() || (mode() === 'live' && snapshot().running)"
-        (click)="onStart()"
-      >
-        @if (busy()) {
-          <span class="start-btn-inner">
-            <mat-spinner diameter="16" />
-            <span>Running…</span>
-          </span>
-        } @else if (mode() === 'live' && snapshot().running) {
-          <span class="start-btn-inner">Live running</span>
-        } @else {
-          <span class="start-btn-inner">Start</span>
-        }
-      </button>
-    </div>
-  </div>
-
-  @if (mode() === 'live' && snapshot().running) {
-    <div class="alive-bar" role="status">
-      <span class="pulse" aria-hidden="true"></span>
-      <strong>I'm alive</strong>
-      <span>Last tick {{ fmtTime(snapshot().lastTickAt) }} IST</span>
-    </div>
-  }
-
-  @if (liveAssistant(); as assist) {
-    <aside class="live-assistant" role="status" aria-live="polite" [attr.data-tone]="assist.tone">
-      <div class="la-head">
-        <span class="la-kicker">Status</span>
-        <span class="phase-pill" [attr.data-phase]="assist.tone">{{ assist.headline }}</span>
-      </div>
-      <p class="la-detail">{{ assist.detail }}</p>
-      @if (assist.lines.length) {
-        <ul class="la-lines">
-          @for (line of assist.lines; track line.name) {
-            <li>
-              <div class="la-line-head">
-                <strong>{{ line.name }}</strong>
-                @if (line.meta) {
-                  <em>{{ line.meta }}</em>
-                }
-              </div>
-              <span>{{ line.text }}</span>
-            </li>
-          }
-        </ul>
-      }
-      @if (assist.nextAction) {
-        <p class="la-next"><span>Next</span> {{ assist.nextAction }}</p>
-      }
-    </aside>
-  }
-
-  @if (mode() === 'live' && snapshot().running && hasOpenTrade()) {
-    <div class="market-live-bar" role="status" [class.money]="snapshot().realOrders">
-      <span class="market-pulse" aria-hidden="true"></span>
-      <div class="market-live-copy">
-        <strong>{{
-          snapshot().realOrders
-            ? hasKiteOpenTrade()
-              ? 'ON KITE'
-              : 'Waiting for Kite order'
-            : 'In trade'
-        }}</strong>
-        <span>{{ marketLiveSummary() }}</span>
-      </div>
-    </div>
-  }
-
-  @if (error()) {
-    <p class="banner err" role="alert">{{ error() }}</p>
-  }
-  @if (!error() && snapshot().message) {
-    <p class="banner info" [class.warn]="!snapshot().marketOpen && mode() === 'live'">
-      {{ snapshot().message }}
-    </p>
-  }
-
-  @if (resultView().totals.trades || snapshot().statuses.length) {
-    <div class="totals totals-simple">
-      <div
-        class="stat primary profit-hero"
-        [class.up]="primaryProfitRs() > 0"
-        [class.down]="primaryProfitRs() < 0"
-      >
-        <span>Profit ₹</span>
-        <strong
-          >{{ primaryProfitRs() > 0 ? '+' : '' }}{{ primaryProfitRs() | number: '1.0-0' }}</strong
-        >
-      </div>
-      @if (mode() === 'testing' && lockedResearchRs() != null) {
-        <div class="stat">
-          <span>Locked ₹</span>
-          <strong
-            >{{ lockedResearchRs()! > 0 ? '+' : ''
-            }}{{ lockedResearchRs()! | number: '1.0-0' }}</strong
-          >
+  @if (tab() === 'scan') {
+    @if (backtestResult(); as bt) {
+      <div class="winrate-banner">
+        <div class="winrate-stat">
+          <strong>{{ bt.summary.winRatePct | number: '1.0-0' }}%</strong>
+          <span>historical win rate</span>
         </div>
-      }
-      <div class="stat">
-        <span>Trades</span>
-        <strong>{{ resultView().totals.trades }}</strong>
+        <p>
+          Across {{ bt.summary.trades }} signals this exact rule-set fired between
+          {{ fmtDate(bt.fromDate) }} and {{ fmtDate(bt.toDate) }} (avg {{ fmtR(bt.summary.avgRMultiple) }}/trade).
+          Past results on this rule-set, not a prediction for any one trade —
+          <button type="button" class="link-btn" (click)="setTab('backtest')">see the full backtest</button>.
+        </p>
       </div>
-      <div class="stat">
-        <span>W / L</span>
-        <strong>{{ resultView().totals.wins }} / {{ resultView().totals.losses }}</strong>
+    } @else {
+      <p class="banner info">
+        No historical win rate yet — run the
+        <button type="button" class="link-btn" (click)="setTab('backtest')">Backtest tab</button>
+        once to see this strategy's actual track record instead of guessing.
+      </p>
+    }
+
+    <div class="control-bar">
+      <div class="scan-info">
+        @if (!hasKiteSession()) {
+          <span class="scan-hint warn">No Kite session — <a routerLink="/dashboard/get-token">Get Token</a> first.</span>
+        } @else if (lastScanAt()) {
+          <span class="scan-hint">Last scan ({{ lastScanWasCustom() ? 'custom list' : 'Nifty 500' }}) {{ fmtDate(lastScanAt()) }} · {{ scanResults().length }} setup(s) found</span>
+        } @else {
+          <span class="scan-hint">Not scanned yet.</span>
+        }
+      </div>
+      <div class="actions">
+        <button
+          mat-flat-button
+          type="button"
+          class="start-btn"
+          [disabled]="scanBusy() || !hasKiteSession()"
+          (click)="runScan()"
+        >
+          @if (scanBusy()) {
+            <span class="start-btn-inner">
+              <mat-spinner diameter="16" />
+              <span>Scanning… {{ scanProgress().done }}/{{ scanProgress().total }}</span>
+            </span>
+          } @else {
+            <span class="start-btn-inner">Scan {{ universeCount }} stocks</span>
+          }
+        </button>
       </div>
     </div>
 
-    @if (mode() === 'testing' && resultView().dayStats.tradingDays > 1) {
-      <div class="day-stats">
-        <div class="day-stats-head">
-          <div>
-            <h3>Day breakdown</h3>
-            <p>{{ resultView().dayStats.tradingDays }} trading day(s)</p>
-          </div>
+    <div class="tools-row">
+      <div class="tool-box">
+        <span class="tool-label">Check custom stocks</span>
+        <div class="tool-inline">
+          <input
+            type="text"
+            [(ngModel)]="customSymbolsInput"
+            placeholder="RELIANCE, TCS, INFY…"
+            autocomplete="off"
+            [disabled]="scanBusy()"
+          />
           <button
             mat-stroked-button
             type="button"
-            class="pdf-btn"
-            [disabled]="!resultView().trades.length || busy() || snapshot().running"
-            (click)="downloadPdf()"
+            [disabled]="scanBusy() || !hasKiteSession() || !customSymbolsInput.trim()"
+            (click)="runCustomScan()"
           >
-            Download PDF
+            Scan these
           </button>
         </div>
-        <div class="day-tables">
-          <div class="day-table-block">
-            <h4>By day</h4>
-            <div class="table-scroll">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Date</th>
-                    <th>Day</th>
-                    <th>Trades</th>
-                    <th>Profit ₹</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  @for (d of resultView().dayStats.topProfitDays; track d.date) {
-                    <tr>
-                      <td>{{ d.displayDate }}</td>
-                      <td>{{ d.weekday }}</td>
-                      <td>{{ d.trades }}</td>
-                      <td class="num up">{{ d.optionNetRs > 0 ? '+' : '' }}{{ d.optionNetRs | number: '1.0-0' }}</td>
-                    </tr>
-                  }
-                  @for (d of resultView().dayStats.topLossDays; track d.date) {
-                    <tr>
-                      <td>{{ d.displayDate }}</td>
-                      <td>{{ d.weekday }}</td>
-                      <td>{{ d.trades }}</td>
-                      <td class="num down">{{ d.optionNetRs | number: '1.0-0' }}</td>
-                    </tr>
-                  }
-                </tbody>
-              </table>
-            </div>
-          </div>
+        <small>Comma or space separated. Resolved via live quote, so it also works for symbols not yet cached.</small>
+      </div>
+
+      <div class="tool-box">
+        <span class="tool-label">Look up instrument token</span>
+        <div class="tool-inline">
+          <input
+            type="text"
+            [(ngModel)]="lookupSymbolInput"
+            placeholder="e.g. CANBK"
+            autocomplete="off"
+            [disabled]="lookupBusy()"
+            (keydown.enter)="lookupToken()"
+          />
+          <button
+            mat-stroked-button
+            type="button"
+            [disabled]="lookupBusy() || !hasKiteSession() || !lookupSymbolInput.trim()"
+            (click)="lookupToken()"
+          >
+            @if (lookupBusy()) {
+              <span class="start-btn-inner"><mat-spinner diameter="14" /></span>
+            } @else {
+              Look up
+            }
+          </button>
         </div>
+        @if (lookupError()) {
+          <small class="tool-error">{{ lookupError() }}</small>
+        }
+        @if (lookupResult(); as r) {
+          <small class="tool-result">
+            <strong>{{ r.tradingSymbol }}</strong> · token <span class="mono">{{ r.instrumentToken }}</span> ·
+            {{ r.name }} · via {{ r.source }}
+          </small>
+        }
+      </div>
+    </div>
+
+    @if (scanBusy()) {
+      <div class="progress-bar" role="progressbar" [attr.aria-valuenow]="progressPct()">
+        <div class="progress-fill" [style.width.%]="progressPct()"></div>
       </div>
     }
 
-    <div class="status-grid">
-      @for (s of snapshot().statuses; track s.instrumentId) {
-        <article
-          class="status-card"
-          [class.has-open]="!!s.openTrade"
-          [class.phase-waiting]="s.livePhase === 'waiting'"
-          [class.phase-trade]="s.livePhase === 'in_trade'"
-          [class.phase-target]="s.livePhase === 'target_hit'"
-          [class.phase-sl]="s.livePhase === 'sl_hit'"
-        >
-          <header>
-            <h2>{{ s.instrumentName }}</h2>
-            <p>{{ s.lastSignal }}</p>
-          </header>
+    @if (scanError()) {
+      <p class="banner err" role="alert">{{ scanError() }}</p>
+    }
 
-          <div class="phase-pill" [attr.data-phase]="s.livePhase">
-            {{ s.livePhaseLabel }}
-          </div>
+    @if (!scanBusy() && skippedUnresolved().length) {
+      <p class="banner warn">
+        Skipped {{ skippedUnresolved().length }} symbol(s) — instrument not found in the current cache.
+      </p>
+    }
 
-          @if (s.openTrade; as o) {
-            <div
-              class="trade-live-panel"
-              role="status"
-              [class.blocked]="snapshot().realOrders && !s.brokerEntryOrderId"
-            >
-              <div class="tlp-head">
-                <strong>{{ optionLegLabel(o) }}</strong>
-                <span>{{ o.option?.tradingSymbol || 'ATM' }}</span>
+    @if (!scanBusy() && lastScanAt() && !scanResults().length) {
+      <p class="banner info">No breakout setups found in this scan. Try again after the next candle close.</p>
+    }
+
+    @if (scanResults().length) {
+      <div class="copy-json-row">
+        <button type="button" class="copy-json-btn" (click)="copyJson(scanResults(), 'scan')">
+          {{ copyLabel('scan') }}
+        </button>
+      </div>
+      <div class="signal-grid">
+        @for (s of scanResults(); track s.instrumentToken) {
+          <article class="signal-card">
+            <header>
+              <h2>{{ s.symbol }}</h2>
+              <span class="ratio-pill">{{ s.volumeRatio | number: '1.1-1' }}× vol</span>
+            </header>
+            <p class="signal-name">{{ s.name }}</p>
+            <dl class="signal-levels">
+              <div>
+                <dt>Entry</dt>
+                <dd>{{ s.entry | number: '1.2-2' }}</dd>
               </div>
-              @if (snapshot().realOrders) {
-                <p class="tlp-kite">
-                  @if (s.brokerEntryOrderId) {
-                    On Kite · entry {{ s.brokerEntryOrderId }}
-                  } @else {
-                    Waiting for Kite entry…
-                  }
-                </p>
-              }
-            </div>
-          }
-
-          <dl class="status-stats">
-            <div>
-              <dt>Day ₹</dt>
-              <dd
-                class="num"
-                [class.up]="s.dayNetOptionRs > 0"
-                [class.down]="s.dayNetOptionRs < 0"
-              >
-                {{ s.dayNetOptionRs > 0 ? '+' : '' }}{{ s.dayNetOptionRs | number: '1.0-0' }}
-              </dd>
-            </div>
-            <div>
-              <dt>Trades</dt>
-              <dd>{{ s.tradesToday }}</dd>
-            </div>
-          </dl>
-        </article>
-      }
-    </div>
+              <div>
+                <dt>Stop</dt>
+                <dd class="down">{{ s.stop | number: '1.2-2' }}</dd>
+              </div>
+              <div>
+                <dt>Target</dt>
+                <dd class="up">{{ s.target | number: '1.2-2' }}</dd>
+              </div>
+            </dl>
+            <p class="signal-meta">
+              Qty {{ s.qty }} · ₹{{ s.notionalRs | number: '1.0-0' }} · risk ₹{{ s.riskPerShareRs | number: '1.2-2' }}/share ·
+              {{ s.rewardRiskRatio }}R
+            </p>
+            <button mat-stroked-button type="button" class="track-btn" (click)="trackTrade(s)">
+              Track this trade
+            </button>
+          </article>
+        }
+      </div>
+    }
   }
 
-  @if (mode() === 'live' && snapshot().realOrders && (snapshot().orderSummary.length || snapshot().orderEvents.length)) {
-    <div class="orders-block">
-      <h3>Kite orders</h3>
-      @if (snapshot().orderSummary.length) {
+  @if (tab() === 'positions') {
+    <div class="add-position">
+      <h3>Log a position</h3>
+      <p class="add-position-note">
+        Only add a trade after you've actually bought it in Kite — this logs what you hold so the
+        scanner can tell you when to sell it.
+      </p>
+      <div class="add-grid">
+        <label class="field">
+          <span>Symbol</span>
+          <input type="text" [(ngModel)]="addSymbol" placeholder="e.g. RELIANCE" autocomplete="off" />
+        </label>
+        <label class="field">
+          <span>Entry date</span>
+          <input type="date" [(ngModel)]="addEntryDate" />
+        </label>
+        <label class="field">
+          <span>Entry price (₹)</span>
+          <input
+            type="number"
+            step="0.05"
+            [(ngModel)]="addEntryPrice"
+            (ngModelChange)="onEntryPriceChange()"
+          />
+        </label>
+        <label class="field">
+          <span>Qty</span>
+          <input type="number" step="1" [(ngModel)]="addQty" (ngModelChange)="onQtyEdited()" />
+        </label>
+        <label class="field">
+          <span>Stop (₹)</span>
+          <input type="number" step="0.05" [(ngModel)]="addStop" />
+        </label>
+        <label class="field">
+          <span>Target (₹)</span>
+          <input type="number" step="0.05" [(ngModel)]="addTarget" />
+        </label>
+      </div>
+      @if (addFormError()) {
+        <p class="banner err">{{ addFormError() }}</p>
+      }
+      <button mat-flat-button type="button" class="start-btn" (click)="addPosition()">Add position</button>
+    </div>
+
+    <div class="positions-head">
+      <h3>Open positions ({{ openPositions().length }})</h3>
+      <div class="positions-head-actions">
+        <button
+          type="button"
+          class="copy-json-btn"
+          [disabled]="!positions().length"
+          (click)="copyJson({ open: openPositions(), closed: closedPositions(), signals: positionSignals() }, 'positions')"
+        >
+          {{ copyLabel('positions') }}
+        </button>
+        <button
+          mat-stroked-button
+          type="button"
+          [disabled]="checkingPositions() || !openPositions().length"
+          (click)="refreshPositions()"
+        >
+          @if (checkingPositions()) {
+            <span class="start-btn-inner"><mat-spinner diameter="16" /><span>Checking…</span></span>
+          } @else {
+            Refresh signals
+          }
+        </button>
+      </div>
+    </div>
+
+    @if (checkError()) {
+      <p class="banner err">{{ checkError() }}</p>
+    }
+
+    @if (!openPositions().length) {
+      <p class="banner info">No open positions logged yet — track a signal from the Scan tab, or add one above.</p>
+    }
+
+    @if (openPositions().length) {
+      <div class="position-cards">
+        @for (p of openPositions(); track p.id) {
+          @let sig = signalFor(p.id);
+          <article class="position-card" [attr.data-action]="sig?.action || 'PENDING'">
+            <header>
+              <h2>{{ p.symbol }}</h2>
+              @if (sig) {
+                <span class="action-pill" [attr.data-action]="sig.action">{{ sig.action === 'SELL' ? 'SELL' : sig.action === 'HOLD' ? 'HOLD' : '—' }}</span>
+              }
+            </header>
+            <p class="position-meta">
+              Entry {{ p.entryPrice | number: '1.2-2' }} on {{ fmtDate(p.entryDate) }} · qty {{ p.qty }}
+            </p>
+            <dl class="signal-levels">
+              <div>
+                <dt>Stop</dt>
+                <dd class="down">{{ p.stop | number: '1.2-2' }}</dd>
+              </div>
+              <div>
+                <dt>Target</dt>
+                <dd class="up">{{ p.target | number: '1.2-2' }}</dd>
+              </div>
+              <div>
+                <dt>Now</dt>
+                <dd>{{ sig?.currentPrice != null ? (sig!.currentPrice! | number: '1.2-2') : '—' }}</dd>
+              </div>
+            </dl>
+            @if (sig && sig.pnlRs != null) {
+              <p class="position-pnl num" [class.up]="sig.pnlRs > 0" [class.down]="sig.pnlRs < 0">
+                {{ sig.pnlRs > 0 ? '+' : '' }}{{ sig.pnlRs | number: '1.0-0' }} ({{ sig.pnlPct! > 0 ? '+' : '' }}{{ sig.pnlPct! | number: '1.1-1' }}%) · {{ sig.daysHeld }} day(s) held
+              </p>
+            }
+            <p class="exit-copy">{{ exitCopy(sig?.reason || 'HOLD') }}</p>
+            @if (sig?.message) {
+              <p class="exit-copy warn">{{ sig!.message }}</p>
+            }
+            <div class="position-actions">
+              @if (sig?.action === 'SELL') {
+                <button
+                  mat-flat-button
+                  type="button"
+                  class="start-btn small"
+                  (click)="markSold(p.id, sig!.reason === 'ERROR' ? 'HOLD' : sig!.reason, sig!.currentPrice)"
+                >
+                  Mark sold
+                </button>
+              }
+              <button mat-stroked-button type="button" class="stop-btn small" (click)="removePosition(p.id)">
+                Remove
+              </button>
+            </div>
+          </article>
+        }
+      </div>
+    }
+
+    @if (closedPositions().length) {
+      <details class="closed-positions">
+        <summary>Closed ({{ closedPositions().length }})</summary>
         <div class="table-scroll">
           <table>
             <thead>
               <tr>
-                <th>Time</th>
-                <th>Book</th>
                 <th>Symbol</th>
-                <th>Leg</th>
-                <th>Status</th>
-                <th>Avg</th>
+                <th>Entry</th>
+                <th>Exit</th>
+                <th>Reason</th>
+                <th>P&amp;L ₹</th>
               </tr>
             </thead>
             <tbody>
-              @for (r of snapshot().orderSummary; track r.orderId) {
-                <tr [attr.data-leg]="r.leg" [attr.data-status]="r.status">
-                  <td>{{ fmtTime(r.at) }}</td>
-                  <td>{{ r.instrumentName }}</td>
-                  <td class="mono">{{ r.tradingSymbol }}</td>
-                  <td><span class="leg-pill">{{ r.leg }}</span></td>
-                  <td>
-                    <span class="status-pill" [attr.data-status]="r.status">{{ r.status }}</span>
+              @for (p of closedPositions(); track p.id) {
+                <tr>
+                  <td>{{ p.symbol }}</td>
+                  <td>{{ p.entryPrice | number: '1.2-2' }} · {{ fmtDate(p.entryDate) }}</td>
+                  <td>{{ p.closedPrice != null ? (p.closedPrice | number: '1.2-2') : '—' }} · {{ fmtDate(p.closedAt) }}</td>
+                  <td>{{ p.closedReason }}</td>
+                  <td class="num" [class.up]="p.closedPrice != null && p.closedPrice > p.entryPrice" [class.down]="p.closedPrice != null && p.closedPrice < p.entryPrice">
+                    @if (p.closedPrice != null) {
+                      {{ ((p.closedPrice - p.entryPrice) * p.qty) | number: '1.0-0' }}
+                    } @else {
+                      —
+                    }
                   </td>
-                  <td>{{ r.averagePrice != null ? (r.averagePrice | number: '1.2-2') : '—' }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </details>
+    }
+  }
+
+  @if (tab() === 'backtest') {
+    <div class="bt-view-switch" role="tablist" aria-label="Backtest view">
+      <button
+        type="button"
+        role="tab"
+        class="bt-view-btn"
+        [class.active]="backtestView() === 'weekly'"
+        (click)="setBacktestView('weekly')"
+      >
+        Weekly Top {{ weeklyTopN }} (your rule)
+      </button>
+      <button
+        type="button"
+        role="tab"
+        class="bt-view-btn"
+        [class.active]="backtestView() === 'signals'"
+        (click)="setBacktestView('signals')"
+      >
+        All signals
+      </button>
+    </div>
+
+    @if (backtestView() === 'weekly') {
+      <div class="rules">
+        <h4>How the weekly rule works — and its limits</h4>
+        <ul>
+          <li>
+            Scan every Friday close (or the last trading day of the week on a short holiday week) across
+            the whole universe, rank qualifying breakouts by volume surge, take the top {{ weeklyTopN }}.
+          </li>
+          <li>
+            <strong>Pre-order fill</strong> — each pick is filled at the following Monday's open, not
+            Friday's signal price (that's what actually happens with a pre-order).
+          </li>
+          <li>
+            <strong>Exit</strong> — stop or target touch during the week, else force-closed on the week's
+            last trading day. That forced exit is approximated by that day's <strong>close</strong> — daily
+            candles don't have a real 2:30 PM price, so this is a stand-in, not an exact fill.
+          </li>
+          <li>
+            <strong>Capital</strong> — your weekly capital is split evenly across all {{ weeklyTopN }} slots
+            every week, whether or not all {{ weeklyTopN }} find a qualifying pick (an empty slot just sits
+            idle that week — capital is not compounded week over week).
+          </li>
+          <li>
+            <strong>Charges</strong> — STT, stamp duty, exchange fees, GST and the flat ₹16 DP charge
+            are deducted per round trip, so "Net profit" is what would actually reach your account.
+            Slippage is still <em>not</em> modeled, so real fills remain slightly worse.
+          </li>
+          <li>
+            <strong>Survivorship bias</strong> — the scan universe is <em>today's</em> Nifty 500, so
+            delisted and demoted companies are invisible. This tilts historical results optimistically.
+          </li>
+          <li><strong>Past results are not a guarantee of future ones.</strong></li>
+        </ul>
+      </div>
+
+      <div class="control-bar">
+        <label class="field month-field">
+          <span>Start month</span>
+          <div class="month-year-pair">
+            <select [(ngModel)]="startMonthNum" [disabled]="weeklyBusy()">
+              @for (m of monthOptions; track m.value) {
+                <option [value]="m.value">{{ m.label }}</option>
+              }
+            </select>
+            <input type="number" [(ngModel)]="startYearNum" [disabled]="weeklyBusy()" min="2000" max="2100" />
+          </div>
+        </label>
+        <label class="field month-field">
+          <span>End month</span>
+          <div class="month-year-pair">
+            <select [(ngModel)]="endMonthNum" [disabled]="weeklyBusy()">
+              @for (m of monthOptions; track m.value) {
+                <option [value]="m.value">{{ m.label }}</option>
+              }
+            </select>
+            <input type="number" [(ngModel)]="endYearNum" [disabled]="weeklyBusy()" min="2000" max="2100" />
+          </div>
+        </label>
+        <label class="field capital-field">
+          <span>Weekly capital (₹)</span>
+          <input
+            type="number"
+            step="1000"
+            [(ngModel)]="weeklyCapitalInput"
+            [disabled]="weeklyBusy()"
+          />
+        </label>
+        <label class="regime-toggle">
+          <input type="checkbox" [(ngModel)]="regimeFilterOn" [disabled]="weeklyBusy()" />
+          <span>Only trade when Nifty 50 &gt; its 50-day average</span>
+        </label>
+        <div class="scan-info">
+          @if (!hasKiteSession()) {
+            <span class="scan-hint warn">No Kite session — <a routerLink="/dashboard/get-token">Get Token</a> first.</span>
+          } @else if (weeklyResult(); as wr) {
+            <span class="scan-hint">
+              Last run {{ fmtDate(wr.fromDate) }} → {{ fmtDate(wr.toDate) }} · ₹{{ weeklyPerPickCapital() | number: '1.0-0' }}/pick ·
+              {{ wr.symbolsScanned }}/{{ wr.symbolsScanned + wr.symbolsSkipped }} stocks
+            </span>
+          } @else {
+            <span class="scan-hint">₹{{ weeklyPerPickCapital() | number: '1.0-0' }}/pick · scans all {{ universeCount }} stocks, expect a few minutes.</span>
+          }
+        </div>
+        <div class="actions">
+          <button
+            mat-flat-button
+            type="button"
+            class="start-btn"
+            [disabled]="weeklyBusy() || !hasKiteSession()"
+            (click)="runWeeklyBacktest()"
+          >
+            @if (weeklyBusy()) {
+              <span class="start-btn-inner">
+                <mat-spinner diameter="16" />
+                <span>Running… {{ weeklyProgress().done }}/{{ weeklyProgress().total }}</span>
+              </span>
+            } @else {
+              <span class="start-btn-inner">Run weekly backtest</span>
+            }
+          </button>
+        </div>
+      </div>
+
+      @if (weeklyBusy()) {
+        <div class="progress-bar" role="progressbar" [attr.aria-valuenow]="weeklyProgressPct()">
+          <div class="progress-fill" [style.width.%]="weeklyProgressPct()"></div>
+        </div>
+      }
+
+      @if (weeklyError()) {
+        <p class="banner err" role="alert">{{ weeklyError() }}</p>
+      }
+
+      @if (weeklyResult(); as wr) {
+        @if (!wr.summary.weeksWithPicks) {
+          <p class="banner info">No weeks found a qualifying pick in this lookback window.</p>
+        } @else {
+          <div class="copy-json-row">
+            <button type="button" class="copy-json-btn" (click)="copyJson(wr, 'weekly')">
+              {{ copyLabel('weekly') }}
+            </button>
+          </div>
+          <div class="bt-stats">
+            <div class="bt-stat primary">
+              <span>Net profit (after charges)</span>
+              <strong [class.up]="wr.summary.totalPnlRs > 0" [class.down]="wr.summary.totalPnlRs < 0">
+                {{ signed(wr.summary.totalPnlRs) }}{{ wr.summary.totalPnlRs | number: '1.0-0' }}
+              </strong>
+              <small>over {{ wr.summary.weeksWithPicks }} active week(s) of {{ wr.summary.weeks }}</small>
+            </div>
+            <div class="bt-stat">
+              <span>Gross → charges</span>
+              <strong class="small-strong">
+                {{ signed(wr.summary.grossPnlRs) }}{{ wr.summary.grossPnlRs | number: '1.0-0' }}
+                − {{ wr.summary.totalCostRs | number: '1.0-0' }}
+              </strong>
+              <small>STT, stamp, exchange, GST, DP</small>
+            </div>
+            <div class="bt-stat">
+              <span>Winning weeks</span>
+              <strong>{{ wr.summary.weekWinRatePct | number: '1.0-0' }}%</strong>
+              <small>{{ wr.summary.winningWeeks }} of {{ wr.summary.weeksWithPicks }}</small>
+            </div>
+            <div class="bt-stat">
+              <span>Pick win rate</span>
+              <strong>{{ wr.summary.pickWinRatePct | number: '1.0-0' }}%</strong>
+              <small>{{ wr.summary.wins }}W / {{ wr.summary.losses }}L of {{ wr.summary.totalPicks }}</small>
+            </div>
+            <div class="bt-stat">
+              <span>Avg weekly profit</span>
+              <strong [class.up]="wr.summary.avgWeeklyPnlRs > 0" [class.down]="wr.summary.avgWeeklyPnlRs < 0">
+                {{ signed(wr.summary.avgWeeklyPnlRs) }}{{ wr.summary.avgWeeklyPnlRs | number: '1.0-0' }}
+              </strong>
+            </div>
+            <div class="bt-stat">
+              <span>Best week</span>
+              <strong class="up">+{{ wr.summary.bestWeekPnlRs | number: '1.0-0' }}</strong>
+            </div>
+            <div class="bt-stat">
+              <span>Worst week</span>
+              <strong class="down">{{ wr.summary.worstWeekPnlRs | number: '1.0-0' }}</strong>
+            </div>
+          </div>
+
+          @if (wr.regimeFilterNote) {
+            <p class="banner warn">{{ wr.regimeFilterNote }}</p>
+          }
+          @if (wr.regimeFilterOn) {
+            <p class="banner info">
+              Regime filter ON — {{ wr.summary.weeksStoodDown }} of {{ wr.summary.weeks }} week(s) stood
+              down with Nifty 50 below its 50-day average (no capital deployed those weeks).
+            </p>
+          }
+          @if (wr.symbolsSkipped) {
+            <p class="banner warn">Skipped {{ wr.symbolsSkipped }} stock(s) — candle fetch failed or symbol unresolved.</p>
+          }
+          @if (wr.totalWeeksFound > wr.weeks.length) {
+            <p class="banner info">
+              Showing the {{ wr.weeks.length }} most recent of {{ wr.totalWeeksFound }} weeks — the stats above use all of them.
+            </p>
+          }
+
+          <div class="week-list">
+            @for (w of wr.weeks; track w.weekStart) {
+              <article class="week-card">
+                <header>
+                  <h3>{{ fmtDate(w.weekStart) }} → {{ fmtDate(w.weekEnd) }}</h3>
+                  <span
+                    class="week-pnl num"
+                    [class.up]="w.weekPnlRs > 0"
+                    [class.down]="w.weekPnlRs < 0"
+                  >
+                    {{ signed(w.weekPnlRs) }}{{ w.weekPnlRs | number: '1.0-0' }}
+                  </span>
+                </header>
+                <p class="week-meta">
+                  Scanned {{ fmtDate(w.scanDate) }} · {{ w.candidatesFound }} candidate(s) found · cumulative
+                  {{ signed(w.cumulativePnlRs) }}{{ w.cumulativePnlRs | number: '1.0-0' }}
+                </p>
+                @if (!w.regimeOk) {
+                  <p class="week-empty">Stood down — Nifty 50 below its 50-day average.</p>
+                } @else if (!w.picks.length) {
+                  <p class="week-empty">No qualifying pick this week.</p>
+                } @else {
+                  <div class="table-scroll">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Symbol</th>
+                          <th>Entry</th>
+                          <th>Exit</th>
+                          <th>Reason</th>
+                          <th>Qty</th>
+                          <th>P&amp;L ₹</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        @for (p of w.picks; track p.symbol) {
+                          <tr [class.win]="p.win" [class.loss]="!p.win">
+                            <td>{{ p.symbol }}</td>
+                            <td>{{ p.entryPrice | number: '1.2-2' }} · {{ fmtDate(p.entryDate) }}</td>
+                            <td>{{ p.exitPrice | number: '1.2-2' }} · {{ fmtDate(p.exitDate) }}</td>
+                            <td>{{ p.exitReason }}</td>
+                            <td>{{ p.qty }}</td>
+                            <td class="num" [class.up]="p.pnlRs > 0" [class.down]="p.pnlRs < 0">
+                              {{ signed(p.pnlRs) }}{{ p.pnlRs | number: '1.0-0' }}
+                            </td>
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
+                  </div>
+                }
+              </article>
+            }
+          </div>
+        }
+      }
+    }
+
+    @if (backtestView() === 'signals') {
+    <div class="rules">
+      <h4>How this backtest works — and its limits</h4>
+      <ul>
+        <li>Replays the exact same rules as the live scanner over each stock's own price history.</li>
+        <li>
+          Entry fills at the breakout day's close; a later day's low touching the stop wins over its high
+          touching the target (conservative, avoids inflating the win rate).
+        </li>
+        <li>
+          Entry fills at the signal day's <strong>close</strong>, which you cannot actually trade —
+          in reality you buy the next open. This view is a <em>signal-quality</em> measure (R multiples),
+          so it is optimistic on fills and excludes charges. Use the Weekly view for real rupee results.
+        </li>
+        <li>
+          <strong>Survivorship bias</strong> — the universe is <em>today's</em> Nifty 500, so companies
+          that failed out of the index are invisible. This tilts results optimistically.
+        </li>
+        <li><strong>Past performance on this rule-set is not a guarantee of future results.</strong></li>
+      </ul>
+    </div>
+
+    <div class="control-bar">
+      <label class="field month-field">
+        <span>Start month</span>
+        <div class="month-year-pair">
+          <select [(ngModel)]="startMonthNum" [disabled]="backtestBusy()">
+            @for (m of monthOptions; track m.value) {
+              <option [value]="m.value">{{ m.label }}</option>
+            }
+          </select>
+          <input type="number" [(ngModel)]="startYearNum" [disabled]="backtestBusy()" min="2000" max="2100" />
+        </div>
+      </label>
+      <label class="field month-field">
+        <span>End month</span>
+        <div class="month-year-pair">
+          <select [(ngModel)]="endMonthNum" [disabled]="backtestBusy()">
+            @for (m of monthOptions; track m.value) {
+              <option [value]="m.value">{{ m.label }}</option>
+            }
+          </select>
+          <input type="number" [(ngModel)]="endYearNum" [disabled]="backtestBusy()" min="2000" max="2100" />
+        </div>
+      </label>
+      <div class="scan-info">
+        @if (!hasKiteSession()) {
+          <span class="scan-hint warn">No Kite session — <a routerLink="/dashboard/get-token">Get Token</a> first.</span>
+        } @else if (backtestResult(); as bt) {
+          <span class="scan-hint">
+            Last run {{ fmtDate(bt.fromDate) }} → {{ fmtDate(bt.toDate) }} · {{ bt.symbolsScanned }}/{{ bt.symbolsScanned + bt.symbolsSkipped }} stocks
+          </span>
+        } @else {
+          <span class="scan-hint">Not run yet — this scans all {{ universeCount }} stocks over the selected range, expect a few minutes.</span>
+        }
+      </div>
+      <div class="actions">
+        <button
+          mat-flat-button
+          type="button"
+          class="start-btn"
+          [disabled]="backtestBusy() || !hasKiteSession()"
+          (click)="runBacktest()"
+        >
+          @if (backtestBusy()) {
+            <span class="start-btn-inner">
+              <mat-spinner diameter="16" />
+              <span>Running… {{ backtestProgress().done }}/{{ backtestProgress().total }}</span>
+            </span>
+          } @else {
+            <span class="start-btn-inner">Run backtest</span>
+          }
+        </button>
+      </div>
+    </div>
+
+    @if (backtestBusy()) {
+      <div class="progress-bar" role="progressbar" [attr.aria-valuenow]="backtestProgressPct()">
+        <div class="progress-fill" [style.width.%]="backtestProgressPct()"></div>
+      </div>
+    }
+
+    @if (backtestError()) {
+      <p class="banner err" role="alert">{{ backtestError() }}</p>
+    }
+
+    @if (backtestResult(); as bt) {
+      @if (!bt.summary.trades) {
+        <p class="banner info">No historical breakout signals found for this rule-set in the lookback window.</p>
+      } @else {
+        <div class="copy-json-row">
+          <button type="button" class="copy-json-btn" (click)="copyJson(bt, 'signals')">
+            {{ copyLabel('signals') }}
+          </button>
+        </div>
+        <div class="bt-stats">
+          <div class="bt-stat primary">
+            <span>Win rate</span>
+            <strong>{{ bt.summary.winRatePct | number: '1.0-0' }}%</strong>
+            <small>{{ bt.summary.wins }}W / {{ bt.summary.losses }}L of {{ bt.summary.trades }}</small>
+          </div>
+          <div class="bt-stat">
+            <span>Avg R / trade</span>
+            <strong [class.up]="bt.summary.avgRMultiple > 0" [class.down]="bt.summary.avgRMultiple < 0">{{ fmtR(bt.summary.avgRMultiple) }}</strong>
+          </div>
+          <div class="bt-stat">
+            <span>Profit factor</span>
+            <strong>{{ bt.summary.profitFactor != null ? (bt.summary.profitFactor | number: '1.2-2') : '∞' }}</strong>
+          </div>
+          <div class="bt-stat">
+            <span>Avg days held</span>
+            <strong>{{ bt.summary.avgDaysHeld | number: '1.1-1' }}</strong>
+          </div>
+          <div class="bt-stat">
+            <span>Avg win / loss</span>
+            <strong>{{ fmtR(bt.summary.avgWinRMultiple) }} / {{ fmtR(bt.summary.avgLossRMultiple) }}</strong>
+          </div>
+          <div class="bt-stat">
+            <span>Exit mix</span>
+            <strong class="small-strong">
+              {{ bt.summary.byExitReason.TARGET }} tgt · {{ bt.summary.byExitReason.STOP }} stop ·
+              {{ bt.summary.byExitReason.TIME }} time
+            </strong>
+          </div>
+        </div>
+
+        @if (bt.symbolsSkipped) {
+          <p class="banner warn">Skipped {{ bt.symbolsSkipped }} stock(s) — candle fetch failed or symbol unresolved.</p>
+        }
+        @if (bt.totalTradesFound > bt.trades.length) {
+          <p class="banner info">
+            Showing the {{ bt.trades.length }} most recent of {{ bt.totalTradesFound }} trades found — the stats above use all of them.
+          </p>
+        }
+
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Symbol</th>
+                <th>Entry</th>
+                <th>Exit</th>
+                <th>Reason</th>
+                <th>R</th>
+                <th>Days</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (t of bt.trades; track t.symbol + t.entryDate) {
+                <tr [class.win]="t.win" [class.loss]="!t.win">
+                  <td>{{ t.symbol }}</td>
+                  <td>{{ t.entryPrice | number: '1.2-2' }} · {{ fmtDate(t.entryDate) }}</td>
+                  <td>{{ t.exitPrice | number: '1.2-2' }} · {{ fmtDate(t.exitDate) }}</td>
+                  <td>{{ t.exitReason }}</td>
+                  <td class="num" [class.up]="t.rMultiple > 0" [class.down]="t.rMultiple < 0">{{ fmtR(t.rMultiple) }}</td>
+                  <td>{{ t.daysHeld }}</td>
                 </tr>
               }
             </tbody>
           </table>
         </div>
       }
-      @if (snapshot().orderEvents.length) {
-        <details class="order-log-details" [open]="hasKiteBlockEvents()">
-          <summary>Events ({{ snapshot().orderEvents.length }})</summary>
-          <ul class="order-log">
-            @for (e of snapshot().orderEvents; track e.at + e.detail) {
-              <li [attr.data-action]="e.action">
-                <strong>{{ e.action }}</strong>
-                <span>{{ e.instrumentName || e.instrumentId }} · {{ e.detail }}</span>
-              </li>
-            }
-          </ul>
-        </details>
-      }
-    </div>
+    }
+    }
   }
 
-  @if (resultView().trades.length) {
-    <div class="trades-block">
-      <div class="trades-head">
-        <h3>{{ snapshot().realOrders ? 'Kite fills' : 'Trades' }}</h3>
+  @if (tab() === 'intraday') {
+    <div class="rules">
+      <h4>How the intraday books work — and their limits</h4>
+      <ul>
+        <li>
+          <strong>Opening range breakout</strong> — let the first hour (09:15–10:15) trade out and mark
+          its high and low. After that, the first candle to <em>close</em> beyond the range takes the
+          trade: above the high goes long, below the low goes short.
+        </li>
+        <li>
+          <strong>Support / resistance</strong> — the opposite bet. Previous-day pivots give S1/R1; a
+          bar that dips to S1 but closes back above it buys the bounce, a bar that pokes R1 but closes
+          below it sells the rejection. Target is the central pivot.
+        </li>
+        <li>
+          <strong>Slots</strong> — positions fill strictly in the order signals fire, first come first
+          served. Ranking the day's signals by which turned out best would be look-ahead bias: at 10:20
+          you cannot know which stock breaks out at 14:00.
+        </li>
+        <li>
+          <strong>Capital</strong> — split evenly across slots, but each position is kept above ₹2,500,
+          so smaller capital concentrates into fewer names rather than positions too small to outrun
+          their own charges. No MIS leverage is modeled (1× only).
+        </li>
+        <li>
+          <strong>Exits</strong> — stop, target, or forced square-off at 15:15. If a bar touches both
+          stop and target, the stop is taken (conservative). Intraday charges are deducted per trade.
+        </li>
+        <li>
+          Slippage is not modeled and the universe is <em>today's</em> Nifty 50, so results still lean
+          optimistic. <strong>Past results are not a guarantee of future ones.</strong>
+        </li>
+      </ul>
+    </div>
+
+    <div class="control-bar">
+      <label class="field month-field">
+        <span>Start month</span>
+        <div class="month-year-pair">
+          <select [(ngModel)]="intraStartMonthNum" [disabled]="intradayBusy()">
+            @for (m of monthOptions; track m.value) {
+              <option [value]="m.value">{{ m.label }}</option>
+            }
+          </select>
+          <input type="number" [(ngModel)]="intraStartYearNum" [disabled]="intradayBusy()" min="2000" max="2100" />
+        </div>
+      </label>
+      <label class="field month-field">
+        <span>End month</span>
+        <div class="month-year-pair">
+          <select [(ngModel)]="intraEndMonthNum" [disabled]="intradayBusy()">
+            @for (m of monthOptions; track m.value) {
+              <option [value]="m.value">{{ m.label }}</option>
+            }
+          </select>
+          <input type="number" [(ngModel)]="intraEndYearNum" [disabled]="intradayBusy()" min="2000" max="2100" />
+        </div>
+      </label>
+      <label class="field month-field">
+        <span>Strategy</span>
+        <select [(ngModel)]="intradayStrategyId" [disabled]="intradayBusy()">
+          @for (s of intradayStrategies; track s.id) {
+            <option [value]="s.id">{{ s.label }}</option>
+          }
+        </select>
+      </label>
+      <label class="field">
+        <span>Candle</span>
+        <select [(ngModel)]="intradayInterval" [disabled]="intradayBusy()">
+          @for (iv of intervalOptions; track iv) {
+            <option [value]="iv">{{ iv }}</option>
+          }
+        </select>
+      </label>
+      <label class="field capital-field">
+        <span>Capital (₹)</span>
+        <input type="number" step="1000" [(ngModel)]="intradayCapital" [disabled]="intradayBusy()" />
+      </label>
+      <label class="field">
+        <span>Max stocks</span>
+        <input type="number" step="1" min="1" max="10" [(ngModel)]="intradayMaxPositions" [disabled]="intradayBusy()" />
+      </label>
+      <div class="actions">
         <button
-          mat-stroked-button
+          mat-flat-button
           type="button"
-          class="pdf-btn"
-          [disabled]="busy() || snapshot().running"
-          (click)="downloadPdf()"
+          class="start-btn"
+          [disabled]="intradayBusy() || !hasKiteSession()"
+          (click)="runIntraday()"
         >
-          Download PDF
+          @if (intradayBusy()) {
+            <span class="start-btn-inner">
+              <mat-spinner diameter="16" />
+              <span>Running… {{ intradayProgress().done }}/{{ intradayProgress().total }}</span>
+            </span>
+          } @else {
+            <span class="start-btn-inner">Run intraday test</span>
+          }
         </button>
       </div>
+    </div>
 
-      <div class="trade-cards" aria-label="Closed trades">
-        @for (t of resultView().trades; track t.id) {
-          <article
-            class="trade-card"
-            [class.win]="hasTradeProfitRs(t) && tradeProfitRs(t) > 0"
-            [class.loss]="hasTradeProfitRs(t) && tradeProfitRs(t) < 0"
-          >
-            <div class="trade-card-top">
-              <div class="stack">
-                <strong>{{ t.option?.tradingSymbol || t.instrumentName }}</strong>
-                <small
-                  >{{ fmtWeekday(t.entryTime) }} · {{ fmtClock(t.entryTime) }} →
-                  {{ fmtClock(t.exitTime) }}
-                  ·
-                  <span class="dir" [attr.data-dir]="t.direction">{{ optionLegLabel(t) }}</span></small
-                >
-              </div>
-              <div
-                class="trade-card-pnl num"
-                [class.up]="hasTradeProfitRs(t) && tradeProfitRs(t) > 0"
-                [class.down]="hasTradeProfitRs(t) && tradeProfitRs(t) < 0"
-              >
-                @if (hasTradeProfitRs(t)) {
-                  {{ tradeProfitRs(t) > 0 ? '+' : '' }}{{ tradeProfitRs(t) | number: '1.0-0' }}
-                } @else {
-                  —
-                }
-              </div>
-            </div>
-            <div class="trade-card-meta">
-              @if (t.optionEntryPremium != null && t.optionExitPremium != null) {
-                <span
-                  >{{ t.optionEntryPremium | number: '1.2-2' }} →
-                  {{ t.optionExitPremium | number: '1.2-2' }}</span
-                >
-              }
-            </div>
-            <p class="trade-card-exit">{{ t.exitReason }}</p>
-          </article>
+    <div class="scan-info" style="margin-bottom: 0.75rem;">
+      @if (!hasKiteSession()) {
+        <span class="scan-hint warn">No Kite session — <a routerLink="/dashboard/get-token">Get Token</a> first.</span>
+      } @else if (intradayResult(); as ir) {
+        <span class="scan-hint">
+          Last run {{ fmtDate(ir.fromDate) }} → {{ fmtDate(ir.toDate) }} · {{ ir.strategyLabel }} ·
+          {{ ir.interval }} · {{ ir.positions }} slot(s) × ₹{{ ir.perPositionRs | number: '1.0-0' }}
+        </span>
+      } @else {
+        <span class="scan-hint">
+          Scans {{ intradayUniverseCount }} Nifty 50 stocks on {{ intradayInterval }} candles over
+          {{ intradayMonthSpan() }} month(s) — expect several minutes.
+        </span>
+      }
+      @if (intradayMonthSpan() > 6) {
+        <span class="scan-hint warn">
+          {{ intradayMonthSpan() }} months of intraday candles is a very large pull. Try 2–3 months first.
+        </span>
+      }
+    </div>
+
+    @if (intradayBusy()) {
+      <div class="progress-bar" role="progressbar" [attr.aria-valuenow]="intradayProgressPct()">
+        <div class="progress-fill" [style.width.%]="intradayProgressPct()"></div>
+      </div>
+    }
+
+    @if (intradayError()) {
+      <p class="banner err" role="alert">{{ intradayError() }}</p>
+    }
+
+    @if (intradayResult(); as ir) {
+      @if (!ir.summary.totalTrades) {
+        <p class="banner info">No trades triggered for this strategy in the selected window.</p>
+      } @else {
+        <div class="copy-json-row">
+          <button type="button" class="copy-json-btn" (click)="copyJson(ir, 'intraday')">
+            {{ copyLabel('intraday') }}
+          </button>
+        </div>
+
+        <div class="bt-stats">
+          <div class="bt-stat primary">
+            <span>Net profit (after charges)</span>
+            <strong [class.up]="ir.summary.totalPnlRs > 0" [class.down]="ir.summary.totalPnlRs < 0">
+              {{ signed(ir.summary.totalPnlRs) }}{{ ir.summary.totalPnlRs | number: '1.0-0' }}
+            </strong>
+            <small>over {{ ir.summary.tradingDays }} trading day(s)</small>
+          </div>
+          <div class="bt-stat">
+            <span>Avg per day</span>
+            <strong [class.up]="ir.summary.avgDailyPnlRs > 0" [class.down]="ir.summary.avgDailyPnlRs < 0">
+              {{ signed(ir.summary.avgDailyPnlRs) }}{{ ir.summary.avgDailyPnlRs | number: '1.0-0' }}
+            </strong>
+          </div>
+          <div class="bt-stat">
+            <span>Green days</span>
+            <strong>{{ ir.summary.dayWinRatePct | number: '1.0-0' }}%</strong>
+            <small>{{ ir.summary.greenDays }} up / {{ ir.summary.redDays }} down</small>
+          </div>
+          <div class="bt-stat">
+            <span>Trade win rate</span>
+            <strong>{{ ir.summary.winRatePct | number: '1.0-0' }}%</strong>
+            <small>{{ ir.summary.wins }}W / {{ ir.summary.losses }}L of {{ ir.summary.totalTrades }}</small>
+          </div>
+          <div class="bt-stat">
+            <span>Gross → charges</span>
+            <strong class="small-strong">
+              {{ signed(ir.summary.grossPnlRs) }}{{ ir.summary.grossPnlRs | number: '1.0-0' }}
+              − {{ ir.summary.totalCostRs | number: '1.0-0' }}
+            </strong>
+          </div>
+          <div class="bt-stat">
+            <span>Max drawdown</span>
+            <strong class="down">−{{ ir.summary.maxDrawdownRs | number: '1.0-0' }}</strong>
+            <small>worst day {{ ir.summary.worstDayRs | number: '1.0-0' }}</small>
+          </div>
+          <div class="bt-stat">
+            <span>Best day</span>
+            <strong class="up">+{{ ir.summary.bestDayRs | number: '1.0-0' }}</strong>
+          </div>
+          <div class="bt-stat">
+            <span>Exit mix</span>
+            <strong class="small-strong">
+              {{ ir.summary.byExitReason.TARGET }} tgt · {{ ir.summary.byExitReason.STOP }} stop ·
+              {{ ir.summary.byExitReason.SQUARE_OFF }} sq-off
+            </strong>
+          </div>
+        </div>
+
+        @if (ir.symbolsSkipped) {
+          <p class="banner warn">Skipped {{ ir.symbolsSkipped }} stock(s) — intraday candle fetch failed.</p>
         }
+        @if (ir.totalDaysFound > ir.days.length) {
+          <p class="banner info">
+            Showing the {{ ir.days.length }} most recent of {{ ir.totalDaysFound }} days — the stats above use all of them.
+          </p>
+        }
+
+        <div class="week-list">
+          @for (d of ir.days; track d.date) {
+            <article class="week-card">
+              <header>
+                <h3>{{ fmtDate(d.date) }}</h3>
+                <span class="week-pnl num" [class.up]="d.dayPnlRs > 0" [class.down]="d.dayPnlRs < 0">
+                  {{ signed(d.dayPnlRs) }}{{ d.dayPnlRs | number: '1.0-0' }}
+                </span>
+              </header>
+              <p class="week-meta">
+                {{ d.signalsFound }} signal(s) · {{ d.trades.length }} taken · cumulative
+                {{ signed(d.cumulativePnlRs) }}{{ d.cumulativePnlRs | number: '1.0-0' }}
+              </p>
+              @if (!d.trades.length) {
+                <p class="week-empty">No trade triggered.</p>
+              } @else {
+                <div class="table-scroll">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Symbol</th>
+                        <th>Side</th>
+                        <th>Entry</th>
+                        <th>Exit</th>
+                        <th>Why</th>
+                        <th>Qty</th>
+                        <th>P&amp;L ₹</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (t of d.trades; track t.symbol + t.entryTime) {
+                        <tr [class.win]="t.win" [class.loss]="!t.win">
+                          <td>{{ t.symbol }}</td>
+                          <td><span class="dir" [attr.data-dir]="t.direction === 'LONG' ? 'BUY' : 'SELL'">{{ t.direction }}</span></td>
+                          <td>{{ t.entryPrice | number: '1.2-2' }} · {{ t.entryTime }}</td>
+                          <td>{{ t.exitPrice | number: '1.2-2' }} · {{ t.exitTime }}</td>
+                          <td>{{ t.exitReason }}</td>
+                          <td>{{ t.qty }}</td>
+                          <td class="num" [class.up]="t.pnlRs > 0" [class.down]="t.pnlRs < 0">
+                            {{ signed(t.pnlRs) }}{{ t.pnlRs | number: '1.0-0' }}
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              }
+            </article>
+          }
+        </div>
+      }
+    }
+  }
+
+  @if (tab() === 'finder') {
+    <div class="rules">
+      <h4>How the search protects you from itself</h4>
+      <ul>
+        <li>
+          Pick which <strong>elements</strong> to include and what values to try. Every combination
+          becomes a complete strategy, and all of them get tested.
+        </li>
+        <li>
+          <strong>The window is split.</strong> The earlier 60% is where combinations are searched;
+          the later 40% is held back and never used for choosing. A strategy only counts as promising
+          if it also works on data it was never fitted to.
+        </li>
+        <li>
+          <strong>Why that split matters:</strong> test 300 combinations on one dataset and a few will
+          look excellent by pure chance. That is not edge, it is the lottery having a winner. The
+          held-back period is what separates the two.
+        </li>
+        <li>
+          <strong>Cost hurdle</strong> — each result shows the avgR it must clear just to pay its own
+          charges. Anything below that line loses money however good the win rate looks.
+        </li>
+        <li>
+          Entries fill at the <strong>next bar's open</strong>, never the signal close. Stop beats
+          target when one bar spans both.
+        </li>
+      </ul>
+    </div>
+
+    <div class="control-bar">
+      <label class="field month-field">
+        <span>Start month</span>
+        <input type="month" [(ngModel)]="finderStartMonth" [disabled]="finderBusy()" />
+      </label>
+      <label class="field month-field">
+        <span>End month</span>
+        <input type="month" [(ngModel)]="finderEndMonth" [disabled]="finderBusy()" />
+      </label>
+      <label class="field">
+        <span>Universe</span>
+        <select [(ngModel)]="finderUniverse" [disabled]="finderBusy()">
+          <option value="nifty50">Nifty 50 (fast)</option>
+          <option value="nifty500">Nifty 500 (slow)</option>
+        </select>
+      </label>
+      <label class="field">
+        <span>Direction</span>
+        <select [(ngModel)]="finderSpace.direction" [disabled]="finderBusy()">
+          <option value="LONG">Long</option>
+          <option value="SHORT">Short</option>
+        </select>
+      </label>
+      <label class="field capital-field">
+        <span>Position size (₹)</span>
+        <input type="number" step="1000" [(ngModel)]="finderPositionRs" [disabled]="finderBusy()" />
+      </label>
+      <div class="actions">
+        <button
+          mat-flat-button
+          type="button"
+          class="start-btn"
+          [disabled]="finderBusy() || !hasKiteSession()"
+          (click)="runFinder()"
+        >
+          @if (finderBusy()) {
+            <span class="start-btn-inner">
+              <mat-spinner diameter="16" />
+              <span>
+                {{ finderProgress().phase === 'fetching' ? 'Fetching' : 'Searching' }}
+                {{ finderProgress().done }}/{{ finderProgress().total }}
+              </span>
+            </span>
+          } @else {
+            <span class="start-btn-inner">Search {{ finderComboCount() }} combos</span>
+          }
+        </button>
       </div>
     </div>
+
+    <div class="preset-row">
+      <span class="preset-label">Presets</span>
+      <button type="button" class="copy-json-btn" [disabled]="finderBusy()" (click)="applyPreset('smartPullback')">
+        Smart Pullback PRO
+      </button>
+      <button type="button" class="copy-json-btn" [disabled]="finderBusy()" (click)="applyPreset('emaPullback')">
+        EMA pullback
+      </button>
+      <button type="button" class="copy-json-btn" [disabled]="finderBusy()" (click)="applyPreset('default')">
+        Reset
+      </button>
+    </div>
+
+    <div class="element-grid">
+      <div class="element-box">
+        <label class="element-head">
+          <input type="checkbox" [(ngModel)]="finderSpace.usePriceVsEma" [disabled]="finderBusy()" />
+          <span>Price vs EMA</span>
+        </label>
+        <p class="element-note">Close on the trend side of a single EMA (the script's <code>close &gt; ema50</code>).</p>
+        <div class="element-inputs">
+          <label><span>EMA period</span><input type="text" [(ngModel)]="finderText.priceEmaPeriod" [disabled]="finderBusy()" /></label>
+        </div>
+      </div>
+
+      <div class="element-box">
+        <label class="element-head">
+          <input type="checkbox" [(ngModel)]="finderSpace.useEngulf" [disabled]="finderBusy()" />
+          <span>Engulfing breakout</span>
+        </label>
+        <p class="element-note">
+          Closes past yesterday's high while its low stays near yesterday's low. Your script's
+          breakout + retest pair, with the raw <code>+10</code> converted to a %.
+        </p>
+        <div class="element-inputs">
+          <label><span>Tolerance %</span><input type="text" [(ngModel)]="finderText.engulfTolerancePct" [disabled]="finderBusy()" /></label>
+        </div>
+      </div>
+
+      <div class="element-box">
+        <label class="element-head">
+          <input type="checkbox" [(ngModel)]="finderSpace.useStrongBody" [disabled]="finderBusy()" />
+          <span>Strong candle body</span>
+        </label>
+        <p class="element-note">Body bigger than N× its own 10-bar average (strongBull / strongBear).</p>
+        <div class="element-inputs">
+          <label><span>Min ratio</span><input type="text" [(ngModel)]="finderText.strongBodyRatio" [disabled]="finderBusy()" /></label>
+        </div>
+      </div>
+
+      <div class="element-box">
+        <label class="element-head">
+          <input type="checkbox" [(ngModel)]="finderSpace.useEmaTouch" [disabled]="finderBusy()" />
+          <span>EMA touch (pullback)</span>
+        </label>
+        <p class="element-note">Green bar that tags the EMA from above — the PULLBACK BUY label.</p>
+        <div class="element-inputs">
+          <label><span>EMA period</span><input type="text" [(ngModel)]="finderText.emaTouchPeriod" [disabled]="finderBusy()" /></label>
+        </div>
+      </div>
+
+      <div class="element-box">
+        <label class="element-head">
+          <input type="checkbox" [(ngModel)]="finderSpace.useNotSideways" [disabled]="finderBusy()" />
+          <span>Skip sideways tape</span>
+        </label>
+        <p class="element-note">Requires ATR to be at least N× its own 20-bar average.</p>
+        <div class="element-inputs">
+          <label><span>Min ATR ratio</span><input type="text" [(ngModel)]="finderText.notSidewaysRatio" [disabled]="finderBusy()" /></label>
+        </div>
+      </div>
+
+      <div class="element-box">
+        <label class="element-head">
+          <input type="checkbox" [(ngModel)]="finderSpace.useNearPivot" [disabled]="finderBusy()" />
+          <span>Near support / resistance</span>
+        </label>
+        <p class="element-note">Price within N% of the last confirmed pivot — your S/R zones as a filter.</p>
+        <div class="element-inputs">
+          <label><span>Max distance %</span><input type="text" [(ngModel)]="finderText.nearPivotMaxDistPct" [disabled]="finderBusy()" /></label>
+        </div>
+      </div>
+
+      <div class="element-box">
+        <label class="element-head">
+          <input type="checkbox" [(ngModel)]="finderSpace.useEmaTrend" [disabled]="finderBusy()" />
+          <span>Trend filter (EMA)</span>
+        </label>
+        <p class="element-note">Only trade when the fast EMA is above the slow one.</p>
+        <div class="element-inputs">
+          <label><span>Fast</span><input type="text" [(ngModel)]="finderText.emaFast" [disabled]="finderBusy()" /></label>
+          <label><span>Slow</span><input type="text" [(ngModel)]="finderText.emaSlow" [disabled]="finderBusy()" /></label>
+        </div>
+      </div>
+
+      <div class="element-box">
+        <label class="element-head">
+          <input type="checkbox" [(ngModel)]="finderSpace.useBreakout" [disabled]="finderBusy()" />
+          <span>Breakout</span>
+        </label>
+        <p class="element-note">Close beyond the prior N-day extreme.</p>
+        <div class="element-inputs">
+          <label><span>Lookback days</span><input type="text" [(ngModel)]="finderText.breakoutLookback" [disabled]="finderBusy()" /></label>
+        </div>
+      </div>
+
+      <div class="element-box">
+        <label class="element-head">
+          <input type="checkbox" [(ngModel)]="finderSpace.useRsi" [disabled]="finderBusy()" />
+          <span>RSI</span>
+        </label>
+        <p class="element-note">Oversold (&lt;) for reversals, overbought (&gt;) for momentum.</p>
+        <div class="element-inputs">
+          <label>
+            <span>Side</span>
+            <select [(ngModel)]="finderSpace.rsiOp" [disabled]="finderBusy()">
+              <option value="lt">below</option>
+              <option value="gt">above</option>
+            </select>
+          </label>
+          <label><span>Levels</span><input type="text" [(ngModel)]="finderText.rsiValue" [disabled]="finderBusy()" /></label>
+        </div>
+      </div>
+
+      <div class="element-box">
+        <label class="element-head">
+          <input type="checkbox" [(ngModel)]="finderSpace.useVolume" [disabled]="finderBusy()" />
+          <span>Volume surge</span>
+        </label>
+        <p class="element-note">Volume vs its own 20-day average.</p>
+        <div class="element-inputs">
+          <label><span>Min ratio</span><input type="text" [(ngModel)]="finderText.volumeMinRatio" [disabled]="finderBusy()" /></label>
+        </div>
+      </div>
+
+      <div class="element-box">
+        <label class="element-head">
+          <input type="checkbox" [(ngModel)]="finderSpace.usePullback" [disabled]="finderBusy()" />
+          <span>Pullback</span>
+        </label>
+        <p class="element-note">Price stretched away from its EMA — mean-reversion entry.</p>
+        <div class="element-inputs">
+          <label><span>Min % away</span><input type="text" [(ngModel)]="finderText.pullbackMinPct" [disabled]="finderBusy()" /></label>
+        </div>
+      </div>
+
+      <div class="element-box">
+        <span class="element-head plain">Exit rules</span>
+        <p class="element-note">Applied to every combination above.</p>
+        <div class="element-inputs">
+          <label>
+            <span>Stop type</span>
+            <select [(ngModel)]="finderStopKind" [disabled]="finderBusy()">
+              <option value="atr">ATR multiple</option>
+              <option value="pct">Fixed %</option>
+              <option value="swingLow">Swing level</option>
+            </select>
+          </label>
+          <label><span>Stop value</span><input type="text" [(ngModel)]="finderText.stopValue" [disabled]="finderBusy()" /></label>
+          <label><span>Max risk %</span><input type="text" [(ngModel)]="finderText.maxRiskPct" [disabled]="finderBusy()" /></label>
+          <label><span>Reward (R)</span><input type="text" [(ngModel)]="finderText.rewardMultiple" [disabled]="finderBusy()" /></label>
+          <label><span>Max hold bars</span><input type="text" [(ngModel)]="finderText.maxHoldBars" [disabled]="finderBusy()" /></label>
+          <label><span>Cooldown bars</span><input type="number" min="0" [(ngModel)]="finderSpace.cooldownBars" [disabled]="finderBusy()" /></label>
+        </div>
+      </div>
+    </div>
+
+    @if (finderComboCount() === 0) {
+      <p class="banner warn">This search space produces no valid strategies — enable at least one entry element.</p>
+    }
+
+    @if (finderBusy()) {
+      <div class="progress-bar" role="progressbar" [attr.aria-valuenow]="finderProgressPct()">
+        <div class="progress-fill" [style.width.%]="finderProgressPct()"></div>
+      </div>
+    }
+
+    @if (finderError()) {
+      <p class="banner err" role="alert">{{ finderError() }}</p>
+    }
+
+    @if (finderResult(); as fr) {
+      <p class="banner info">
+        Tested {{ fr.combinationsTested }} combination(s) across {{ fr.symbolsScanned }} stocks.
+        Searched on {{ fmtDate(fr.inSampleFrom) }} → {{ fmtDate(fr.inSampleTo) }}, validated on
+        held-back data {{ fmtDate(fr.outOfSampleFrom) }} → {{ fmtDate(fr.outOfSampleTo) }}.
+      </p>
+
+      @if (!fr.candidates.length) {
+        <p class="banner info">No candidates produced any trades. Loosen the filters and try again.</p>
+      } @else {
+        <div class="copy-json-row">
+          <button type="button" class="copy-json-btn" (click)="copyJson(fr, 'finder-all')">
+            {{ copyLabel('finder-all') }}
+          </button>
+        </div>
+
+        <div class="week-list">
+          @for (c of fr.candidates; track c.recipe.label) {
+            <article class="week-card" [attr.data-verdict]="c.verdict">
+              <header>
+                <h3>{{ c.recipe.label }}</h3>
+                <span class="verdict-pill" [attr.data-verdict]="c.verdict">{{ verdictLabel(c.verdict) }}</span>
+              </header>
+              <div class="table-scroll">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Period</th>
+                      <th>Trades</th>
+                      <th>Win %</th>
+                      <th>Avg R</th>
+                      <th>Profit factor</th>
+                      <th>Exits (T/S/Time)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>Searched on</td>
+                      <td>{{ c.inSample.trades }}</td>
+                      <td>{{ c.inSample.winRatePct | number: '1.0-0' }}%</td>
+                      <td class="num" [class.up]="c.inSample.avgRMultiple > c.costHurdleR" [class.down]="c.inSample.avgRMultiple <= c.costHurdleR">
+                        {{ fmtR(c.inSample.avgRMultiple) }}
+                      </td>
+                      <td>{{ c.inSample.profitFactor != null ? (c.inSample.profitFactor | number: '1.2-2') : '—' }}</td>
+                      <td>{{ c.inSample.targetExits }} / {{ c.inSample.stopExits }} / {{ c.inSample.timeExits }}</td>
+                    </tr>
+                    <tr [class.win]="c.verdict === 'promising'" [class.loss]="c.verdict === 'likely-overfit'">
+                      <td><strong>Held back</strong></td>
+                      <td>{{ c.outOfSample.trades }}</td>
+                      <td>{{ c.outOfSample.winRatePct | number: '1.0-0' }}%</td>
+                      <td class="num" [class.up]="c.outOfSample.avgRMultiple > c.costHurdleR" [class.down]="c.outOfSample.avgRMultiple <= c.costHurdleR">
+                        {{ fmtR(c.outOfSample.avgRMultiple) }}
+                      </td>
+                      <td>{{ c.outOfSample.profitFactor != null ? (c.outOfSample.profitFactor | number: '1.2-2') : '—' }}</td>
+                      <td>{{ c.outOfSample.targetExits }} / {{ c.outOfSample.stopExits }} / {{ c.outOfSample.timeExits }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <p class="week-meta">
+                Must beat <strong>{{ fmtR(c.costHurdleR) }}</strong> per trade just to cover charges at
+                ₹{{ fr.positionSizeRs | number: '1.0-0' }} per position.
+              </p>
+              <div class="position-actions">
+                <button type="button" class="copy-json-btn" (click)="copyFormula(c, 'formula-' + c.recipe.label)">
+                  {{ copyLabel('formula-' + c.recipe.label, 'Copy formula') }}
+                </button>
+              </div>
+            </article>
+          }
+        </div>
+      }
+    }
   }
 </section>

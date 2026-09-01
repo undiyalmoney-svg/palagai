@@ -48,6 +48,13 @@ export class DashboardComponent implements OnInit, OnDestroy {
       label: 'Trade',
       shortLabel: 'Trade',
       route: '/dashboard/trade-desk',
+      icon: 'trending-up',
+      module: 'trade',
+    },
+    {
+      label: 'Index',
+      shortLabel: 'Index',
+      route: '/dashboard/index-desk',
       icon: 'layout-dashboard',
       module: 'trade',
     },
@@ -91,6 +98,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
   private readonly titles: Record<string, { title: string; subtitle: string }> = {
     '/dashboard/trade-desk': {
       title: 'Trade Desk',
+      subtitle: 'Scan NSE stocks for swing setups and track entry / exit signals.',
+    },
+    '/dashboard/index-desk': {
+      title: 'Index Desk',
       subtitle: 'Manage live trading, testing and paper trading from one place.',
     },
     '/dashboard/strategy-manager': {
