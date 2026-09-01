@@ -80,13 +80,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
       module: 'test',
     },
     {
-      label: 'Fade Test',
-      shortLabel: 'Fade',
-      route: '/dashboard/fade-test',
-      icon: 'activity',
-      module: null,
-    },
-    {
       label: 'Token',
       shortLabel: 'Token',
       route: '/dashboard/get-token',
