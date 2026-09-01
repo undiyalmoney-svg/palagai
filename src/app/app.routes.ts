@@ -13,6 +13,7 @@ import { DashboardComponent } from './features/dashboard/dashboard.component';
 import { DashboardHomeComponent } from './features/dashboard/dashboard-home.component';
 import { TradeDeskComponent } from './features/dashboard/trade-desk/trade-desk.component';
 import { OrderTestComponent } from './features/dashboard/order-test/order-test.component';
+import { FadeTestComponent } from './features/dashboard/fade-test/fade-test.component';
 import { GetTokenComponent } from './features/dashboard/get-token/get-token.component';
 import { SettingsComponent } from './features/dashboard/settings/settings.component';
 import { ExperimentsPageComponent } from './features/dashboard/experiments/experiments-page.component';
@@ -89,6 +90,10 @@ export const routes: Routes = [
         path: 'order-test',
         canActivate: [moduleGuard('test')],
         component: OrderTestComponent,
+      },
+      {
+        path: 'fade-test',
+        component: FadeTestComponent,
       },
       { path: 'orders', redirectTo: '/admin/pnl', pathMatch: 'full' },
       { path: 'pnl-records', redirectTo: '/admin/pnl', pathMatch: 'full' },

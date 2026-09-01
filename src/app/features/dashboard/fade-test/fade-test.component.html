@@ -1,0 +1,125 @@
+<section class="ft">
+  <header class="ft-head">
+    <div class="ft-title">
+      <span class="ft-eyebrow">Strategy Test</span>
+      <h1>Exhaustion Fade</h1>
+      <p class="ft-sub">
+        Fade a volume-climax blow-off — when the crowd is done, take the other side.
+        Run ≥{{ d.params.RUN_PCT }}% · volume ≥{{ d.params.VOL_MULT }}× · blow-off
+        ≥{{ d.params.BLOWOFF_ATR }}×ATR · {{ d.params.STOP_ATR }}×ATR stop · exit {{ d.params.EXIT_TIME }}.
+      </p>
+    </div>
+    <div class="ft-modes" role="tablist" aria-label="Mode">
+      <button role="tab" [attr.aria-selected]="mode() === 'paper'"
+        [class.active]="mode() === 'paper'" (click)="setMode('paper')">Paper</button>
+      <button role="tab" [attr.aria-selected]="mode() === 'live'"
+        [class.active]="mode() === 'live'" (click)="setMode('live')">Live</button>
+    </div>
+  </header>
+
+  <!-- LIVE GATE -->
+  <div class="ft-gate" *ngIf="mode() === 'live'">
+    <div class="ft-gate-badge">LIVE — LOCKED</div>
+    <p>Real-money trading is not enabled for this strategy. It clears the gate only when:</p>
+    <ul>
+      <li><span class="chk">1</span> 2–3 months of forward paper results match the backtest below</li>
+      <li><span class="chk">2</span> Real mid-cap spreads are measured (currently assumed 0.05%/side)</li>
+      <li><span class="chk">3</span> The live execution layer's stop/profit-lock defects are fixed</li>
+    </ul>
+    <p class="ft-gate-note">Until then, use Paper. The numbers below are a backtest, not a promise.</p>
+  </div>
+
+  <ng-container *ngIf="mode() === 'paper'">
+    <!-- KPI STRIP -->
+    <div class="ft-kpis">
+      <div class="kpi">
+        <span class="kpi-label">Net P&amp;L</span>
+        <span class="kpi-val" [class.pos]="d.stats.totalNet >= 0" [class.neg]="d.stats.totalNet < 0">{{ fmt(d.stats.totalNet) }}</span>
+        <span class="kpi-foot">{{ d.stats.firstDate }} → {{ d.stats.lastDate }}</span>
+      </div>
+      <div class="kpi">
+        <span class="kpi-label">Win rate</span>
+        <span class="kpi-val">{{ d.stats.winRate }}%</span>
+        <span class="kpi-foot">{{ d.stats.trades }} trades</span>
+      </div>
+      <div class="kpi">
+        <span class="kpi-label">Avg win / loss</span>
+        <span class="kpi-val">{{ rr() | number: '1.2-2' }}×</span>
+        <span class="kpi-foot pos">{{ fmt(d.stats.avgWin) }}</span> <span class="kpi-foot neg">{{ fmt(d.stats.avgLoss) }}</span>
+      </div>
+      <div class="kpi">
+        <span class="kpi-label">Worst day</span>
+        <span class="kpi-val neg">{{ fmt(d.stats.worstDay) }}</span>
+        <span class="kpi-foot">max DD {{ fmt(d.stats.maxDrawdown) }}</span>
+      </div>
+      <div class="kpi">
+        <span class="kpi-label">Frequency</span>
+        <span class="kpi-val">1 / {{ d.stats.tradeFreq }}d</span>
+        <span class="kpi-foot">selective — mostly no trade</span>
+      </div>
+    </div>
+
+    <!-- EQUITY CURVE -->
+    <div class="ft-panel">
+      <div class="ft-panel-head">
+        <h2>Equity curve</h2>
+        <span class="ft-panel-note">₹{{ d.stats.startCapital | number }} start · compounding · {{ d.stats.sessions | number }} sessions scanned</span>
+      </div>
+      <svg class="ft-chart" viewBox="0 0 1000 300" preserveAspectRatio="none" aria-label="Equity curve">
+        <line x1="0" [attr.y1]="baselineY()" x2="1000" [attr.y2]="baselineY()" class="ft-baseline" />
+        <path [attr.d]="curveArea()" class="ft-area" />
+        <path [attr.d]="curvePath()" class="ft-line" />
+      </svg>
+    </div>
+
+    <!-- YEAR BARS -->
+    <div class="ft-panel">
+      <div class="ft-panel-head"><h2>Year by year</h2></div>
+      <div class="ft-years">
+        <div class="yr" *ngFor="let y of years()">
+          <span class="yr-net" [class.pos]="y.net >= 0" [class.neg]="y.net < 0">{{ fmt(y.net) }}</span>
+          <div class="yr-track">
+            <div class="yr-bar" [class.pos]="y.net >= 0" [class.neg]="y.net < 0"
+              [style.height.%]="(y.net >= 0 ? y.net : -y.net) / maxYearMag() * 100"></div>
+          </div>
+          <span class="yr-label">{{ y.year }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- SIGNALS TABLE -->
+    <div class="ft-panel">
+      <div class="ft-panel-head">
+        <h2>Signals</h2>
+        <button class="ft-link" (click)="showAllTrades.set(!showAllTrades())">
+          {{ showAllTrades() ? 'Show recent' : 'Show all ' + d.stats.trades }}
+        </button>
+      </div>
+      <div class="ft-table-wrap">
+        <table class="ft-table">
+          <thead>
+            <tr><th>Date</th><th>Stock</th><th>Side</th><th class="num">Qty</th><th class="num">Entry</th><th class="num">Exit</th><th>Exit</th><th class="num">Net</th></tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let t of recentTrades()">
+              <td class="mono">{{ t.date }}</td>
+              <td>{{ t.symbol }}</td>
+              <td><span class="side" [class.buy]="t.side === 'BUY'" [class.sell]="t.side === 'SELL'">{{ t.side }}</span></td>
+              <td class="num mono">{{ t.qty }}</td>
+              <td class="num mono">{{ t.entry | number: '1.2-2' }}</td>
+              <td class="num mono">{{ t.exit | number: '1.2-2' }}</td>
+              <td><span class="why" [class.stop]="t.why === 'STOP'">{{ t.why }}</span></td>
+              <td class="num mono" [class.pos]="t.net >= 0" [class.neg]="t.net < 0">{{ fmt(t.net) }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <p class="ft-disclaimer">
+      Backtest on 55 mid-cap stocks, 2018–2026, honest 1× sizing, 0.05%/side slippage, real Zerodha charges.
+      Pooled t ≈ 2.89; out-of-sample (2023–26) positive. The edge is real but modest and was found by search —
+      <strong>prove it forward in Paper before any real capital.</strong>
+    </p>
+  </ng-container>
+</section>
