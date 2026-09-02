@@ -45,7 +45,7 @@ export class SrBreakoutComponent {
   today = new Date().toISOString().slice(0, 10);
   fromDate = this.today;
   toDate = this.today;
-  sel: Record<string, boolean> = { nifty: true, banknifty: true, crude: false };
+  sel: Record<string, boolean> = { nifty: true, banknifty: true, crude: true };
   lots = 1;
   entryPts: number | null = null;   // blank = use per-instrument default
   bigPts: number | null = null;
