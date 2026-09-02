@@ -105,8 +105,6 @@ export class SrBreakoutComponent {
     const chosen = INSTRUMENTS.filter((i) => this.sel[i.key]).map((i) => i.key);
     if (!chosen.length) { this.error.set('Select at least one instrument.'); return; }
     if (!this.fromDate || !this.toDate || this.fromDate > this.toDate) { this.error.set('Pick a valid From → To range.'); return; }
-    const kite = this.kiteSession.getAuthorizationHeader();
-    if (!kite) { this.error.set('Kite token required — open Get Token, then retry.'); return; }
 
     const body: Record<string, unknown> = {
       instruments: chosen, fromDate: this.fromDate, toDate: this.toDate, lots: Number(this.lots) || 1,
@@ -115,15 +113,20 @@ export class SrBreakoutComponent {
     if (this.bigPts != null && this.bigPts !== ('' as unknown)) body['bigPts'] = this.bigPts;
     if (this.targetPts != null && this.targetPts !== ('' as unknown)) body['targetPts'] = this.targetPts;
 
+    // Send the browser's Kite header when present; otherwise rely on the token
+    // pushed to the server. Do NOT block here — let the server decide.
+    const kite = this.kiteSession.getAuthorizationHeader();
+    const headers: Record<string, string> = kite ? { 'X-Kite-Authorization': kite } : {};
+
     this.busy.set(true);
     try {
       const res = await firstValueFrom(
-        this.http.post<SrResponse>(`${this.liveApiBase}/sr-breakout`, body, { headers: { 'X-Kite-Authorization': kite } }),
+        this.http.post<SrResponse>(`${this.liveApiBase}/sr-breakout`, body, { headers }),
       );
       this.result.set(res);
     } catch (err) {
       const msg = (err as { error?: { message?: string } })?.error?.message;
-      this.error.set(msg || 'Run failed. Check the token and try again.');
+      this.error.set(msg || 'Run failed — open Get Token (fresh daily token), Push Token, then retry.');
     } finally {
       this.busy.set(false);
     }
