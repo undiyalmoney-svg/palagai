@@ -52,10 +52,12 @@
         <input type="number" [(ngModel)]="targetPts" placeholder="hold" />
       </div>
       <div class="fld actions">
+        <button class="push" (click)="pushToken()" [disabled]="pushing()">{{ pushing() ? 'Pushing…' : 'Push Token' }}</button>
         <button class="run" (click)="run()" [disabled]="busy()">{{ busy() ? 'Running…' : 'Run Paper' }}</button>
         <button class="dl" (click)="downloadCsv()" [disabled]="!allTrades().length">Download CSV</button>
       </div>
     </div>
+    <p class="sr-token-note" *ngIf="tokenNote()" [class.ok]="tokenNote().startsWith('✓')">{{ tokenNote() }}</p>
 
     <p class="sr-error" *ngIf="error()">{{ error() }}</p>
 

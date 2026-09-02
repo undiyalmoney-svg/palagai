@@ -54,6 +54,8 @@ export class SrBreakoutComponent {
   readonly busy = signal(false);
   readonly error = signal('');
   readonly result = signal<SrResponse | null>(null);
+  readonly pushing = signal(false);
+  readonly tokenNote = signal('');
 
   readonly totals = computed(() => {
     const r = this.result();
@@ -77,6 +79,26 @@ export class SrBreakoutComponent {
 
   setTab(t: 'paper' | 'live'): void { this.tab.set(t); }
   toggle(key: string): void { this.sel[key] = !this.sel[key]; }
+
+  /** Push the browser's Kite token to the server so Paper works even without
+   *  the browser resending it (and for future Live). Encrypted server-side. */
+  async pushToken(): Promise<void> {
+    this.tokenNote.set('');
+    const s = this.kiteSession.storedSession();
+    const apiKey = s?.data?.api_key;
+    const accessToken = s?.data?.access_token;
+    if (!apiKey || !accessToken) { this.tokenNote.set('No Kite session in this browser. Open Get Token first.'); return; }
+    this.pushing.set(true);
+    try {
+      await firstValueFrom(this.http.put(`${this.liveApiBase}/auth`, { apiKey, accessToken }));
+      this.tokenNote.set('✓ Kite token pushed to server.');
+    } catch (err) {
+      const msg = (err as { error?: { message?: string } })?.error?.message;
+      this.tokenNote.set(`Push failed: ${msg || 'try again'}`);
+    } finally {
+      this.pushing.set(false);
+    }
+  }
 
   async run(): Promise<void> {
     this.error.set('');
