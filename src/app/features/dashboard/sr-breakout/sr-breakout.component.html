@@ -1,0 +1,120 @@
+<section class="sr">
+  <header class="sr-head">
+    <div>
+      <span class="sr-eyebrow">Intraday</span>
+      <h1>S/R Breakout</h1>
+      <p class="sr-sub">Big candle breaks support/resistance → CE on a bullish break, PE on a bearish break. Runs on real candles via the backend.</p>
+    </div>
+    <div class="sr-modes" role="tablist">
+      <button role="tab" [class.active]="tab() === 'paper'" (click)="setTab('paper')">Paper</button>
+      <button role="tab" [class.active]="tab() === 'live'" (click)="setTab('live')">Live</button>
+    </div>
+  </header>
+
+  <!-- LIVE: empty for now -->
+  <div class="sr-empty" *ngIf="tab() === 'live'">
+    <p><strong>Live</strong> is not enabled yet. Prove the strategy in Paper first — Live goes here once you're ready.</p>
+  </div>
+
+  <ng-container *ngIf="tab() === 'paper'">
+    <!-- FORM -->
+    <div class="sr-form">
+      <div class="fld">
+        <label>From date</label>
+        <input type="date" [(ngModel)]="fromDate" [max]="today" />
+      </div>
+      <div class="fld">
+        <label>To date <span class="hint" *ngIf="toDate === today">(today = live so far)</span></label>
+        <input type="date" [(ngModel)]="toDate" [max]="today" />
+      </div>
+      <div class="fld instruments">
+        <label>Instruments</label>
+        <div class="chips">
+          <button type="button" class="chip" *ngFor="let i of instruments" [class.on]="sel[i.key]" (click)="toggle(i.key)">
+            <span class="dot"></span>{{ i.label }}
+          </button>
+        </div>
+      </div>
+      <div class="fld small">
+        <label>Lots</label>
+        <input type="number" min="1" [(ngModel)]="lots" />
+      </div>
+      <div class="fld small">
+        <label>Entry pts <span class="hint">(blank = default)</span></label>
+        <input type="number" [(ngModel)]="entryPts" placeholder="auto" />
+      </div>
+      <div class="fld small">
+        <label>Big candle pts</label>
+        <input type="number" [(ngModel)]="bigPts" placeholder="auto" />
+      </div>
+      <div class="fld small">
+        <label>Target pts <span class="hint">(blank = hold to close)</span></label>
+        <input type="number" [(ngModel)]="targetPts" placeholder="hold" />
+      </div>
+      <div class="fld actions">
+        <button class="run" (click)="run()" [disabled]="busy()">{{ busy() ? 'Running…' : 'Run Paper' }}</button>
+        <button class="dl" (click)="downloadCsv()" [disabled]="!allTrades().length">Download CSV</button>
+      </div>
+    </div>
+
+    <p class="sr-error" *ngIf="error()">{{ error() }}</p>
+
+    <!-- RESULTS -->
+    <ng-container *ngIf="result() as r">
+      <div class="sr-totals" *ngIf="totals() as t">
+        <div class="tot"><span class="tot-label">Total profit</span><span class="tot-val pos">{{ fmt(t.profit) }}</span></div>
+        <div class="tot"><span class="tot-label">Total loss</span><span class="tot-val neg">{{ fmt(t.loss) }}</span></div>
+        <div class="tot big"><span class="tot-label">Net P&amp;L</span><span class="tot-val" [class.pos]="t.net >= 0" [class.neg]="t.net < 0">{{ fmt(t.net) }}</span></div>
+        <div class="tot"><span class="tot-label">Trades (W / L)</span><span class="tot-val">{{ t.wins }} / {{ t.losses }}</span></div>
+        <div class="tot"><span class="tot-label">Window</span><span class="tot-val sm">{{ r.fromDate }} → {{ r.toDate }}<span *ngIf="r.isToday" class="live-badge">TODAY</span></span></div>
+      </div>
+
+      <!-- per-instrument cards -->
+      <div class="sr-cards">
+        <div class="card" *ngFor="let ins of r.results" [class.err]="ins.error">
+          <div class="card-head">
+            <span class="card-name">{{ ins.name }}<span class="card-contract" *ngIf="ins.contract && ins.contract !== ins.name">{{ ins.contract }}</span></span>
+            <span class="card-net" *ngIf="!ins.error" [class.pos]="ins.summary.netRupees >= 0" [class.neg]="ins.summary.netRupees < 0">{{ fmt(ins.summary.netRupees) }}</span>
+          </div>
+          <div class="card-body" *ngIf="!ins.error; else errTpl">
+            <span class="pos">profit {{ fmt(ins.summary.totalProfitRupees) }}</span>
+            <span class="neg">loss {{ fmt(ins.summary.totalLossRupees) }}</span>
+            <span>{{ ins.summary.wins }}W / {{ ins.summary.losses }}L</span>
+            <span *ngIf="ins.summary.tgtHitPct">{{ ins.summary.tgtHitPct }}% hit target</span>
+          </div>
+          <ng-template #errTpl><div class="card-body err-msg">{{ ins.error }}</div></ng-template>
+        </div>
+      </div>
+
+      <!-- trades table -->
+      <div class="sr-table-wrap" *ngIf="allTrades().length; else noTrades">
+        <table class="sr-table">
+          <thead>
+            <tr><th>Date</th><th>Instrument</th><th>Opt</th><th>Entry</th><th class="num">Price</th><th>Exit</th><th class="num">Price</th><th>Why</th><th class="num">Pts</th><th class="num">₹</th></tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let t of allTrades()">
+              <td class="mono">{{ t.date }}</td>
+              <td>{{ t.instrument }}</td>
+              <td><span class="opt" [class.ce]="t.option === 'CE'" [class.pe]="t.option === 'PE'">{{ t.option }}</span></td>
+              <td class="mono">{{ t.entryTime }}</td>
+              <td class="num mono">{{ t.entryPrice }}</td>
+              <td class="mono">{{ t.exitTime }}</td>
+              <td class="num mono">{{ t.exitPrice }}</td>
+              <td><span class="why" [class.tgt]="t.exitReason === 'TARGET'">{{ t.exitReason }}</span></td>
+              <td class="num mono" [class.pos]="t.points >= 0" [class.neg]="t.points < 0">{{ t.points }}</td>
+              <td class="num mono" [class.pos]="t.rupees >= 0" [class.neg]="t.rupees < 0">{{ fmt(t.rupees) }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <ng-template #noTrades><p class="sr-note">No breakout signals in this window — the setup is selective, so quiet days are normal.</p></ng-template>
+    </ng-container>
+
+    <p class="sr-disclaimer">
+      Paper results are computed from real 5-min candles server-side. ₹ is a futures-equivalent (points × lot × lots);
+      your actual CE/PE option P&L differs (premium, theta, IV). Max loss per trade with options = the premium paid.
+      Prove it forward here before any real money.
+    </p>
+  </ng-container>
+</section>

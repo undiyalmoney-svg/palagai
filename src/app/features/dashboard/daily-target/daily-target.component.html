@@ -1,0 +1,69 @@
+<section class="dt">
+  <header class="dt-head">
+    <span class="dt-eyebrow">Target Check</span>
+    <h1>Can this capital hit your target?</h1>
+    <p class="dt-sub">
+      Enter a capital and a rupee target. This scales the Exhaustion Fade strategy's real
+      per-trade record (55 mid-caps, 2018–2026, 5× MIS, real charges) to your numbers —
+      no promises, just what the record shows.
+    </p>
+  </header>
+
+  <div class="dt-inputs">
+    <label class="dt-field">
+      <span>Capital (₹)</span>
+      <input type="number" min="1000" step="1000" [value]="capital()"
+        (input)="setCapital($any($event.target).value)" />
+    </label>
+    <label class="dt-field">
+      <span>Target profit (₹)</span>
+      <input type="number" min="50" step="50" [value]="target()"
+        (input)="setTarget($any($event.target).value)" />
+    </label>
+  </div>
+
+  <div class="dt-verdict" [class]="'tone-' + verdict().tone">
+    <span class="dt-verdict-badge">{{ verdict().tone === 'ok' ? 'ACHIEVABLE ON AVERAGE' : verdict().tone === 'warn' ? 'BELOW TARGET' : 'LOSES MONEY' }}</span>
+    <p>{{ verdict().text }}</p>
+  </div>
+
+  <div class="dt-kpis">
+    <div class="kpi">
+      <span class="kpi-label">Hits ≥ {{ fmt(target()) }}</span>
+      <span class="kpi-val">{{ stats().hitPct }}%</span>
+      <span class="kpi-foot">of {{ stats().trades }} trades</span>
+    </div>
+    <div class="kpi">
+      <span class="kpi-label">Avg / trade</span>
+      <span class="kpi-val" [class.pos]="stats().perTrade >= 0" [class.neg]="stats().perTrade < 0">{{ fmt(stats().perTrade) }}</span>
+      <span class="kpi-foot">win {{ stats().winPct }}%</span>
+    </div>
+    <div class="kpi">
+      <span class="kpi-label">Avg / month</span>
+      <span class="kpi-val" [class.pos]="stats().perMonth >= 0" [class.neg]="stats().perMonth < 0">{{ fmt(stats().perMonth) }}</span>
+      <span class="kpi-foot">~{{ stats().tradesPerMonth }} trades/mo</span>
+    </div>
+    <div class="kpi">
+      <span class="kpi-label">Typical win</span>
+      <span class="kpi-val pos">{{ fmt(stats().avgWin) }}</span>
+      <span class="kpi-foot">best {{ fmt(stats().best) }}</span>
+    </div>
+    <div class="kpi">
+      <span class="kpi-label">Typical loss</span>
+      <span class="kpi-val neg">{{ fmt(stats().avgLoss) }}</span>
+      <span class="kpi-foot">worst {{ fmt(stats().worst) }}</span>
+    </div>
+  </div>
+
+  <div class="dt-truth">
+    <h2>The part that matters</h2>
+    <p>
+      A winning trade averages <strong class="pos">{{ fmt(stats().avgWin) }}</strong> — it clears
+      {{ fmt(target()) }} easily. But {{ 100 - stats().winPct }}% of trades lose, averaging
+      <strong class="neg">{{ fmt(stats().avgLoss) }}</strong>. You cannot keep the upside and
+      remove the downside — they are the same trade. The target is reached by the
+      <em>average holding up over many trades</em>, not by every trade paying out
+      {{ fmt(target()) }}. Change the capital above and every number rescales.
+    </p>
+  </div>
+</section>

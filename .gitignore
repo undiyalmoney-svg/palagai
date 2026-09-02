@@ -55,3 +55,6 @@ Thumbs.db
 /Palagai-YouTube-Promo.mp4
 scripts/__pycache__/
 .kite-app-credentials
+
+# local Claude Code config
+.claude/

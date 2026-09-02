@@ -13,6 +13,8 @@ import { DashboardComponent } from './features/dashboard/dashboard.component';
 import { DashboardHomeComponent } from './features/dashboard/dashboard-home.component';
 import { TradeDeskComponent } from './features/dashboard/trade-desk/trade-desk.component';
 import { IndexDeskComponent } from './features/dashboard/index-desk/index-desk.component';
+import { SrBreakoutComponent } from './features/dashboard/sr-breakout/sr-breakout.component';
+import { DailyTargetComponent } from './features/dashboard/daily-target/daily-target.component';
 import { OrderTestComponent } from './features/dashboard/order-test/order-test.component';
 import { GetTokenComponent } from './features/dashboard/get-token/get-token.component';
 import { SettingsComponent } from './features/dashboard/settings/settings.component';
@@ -95,6 +97,14 @@ export const routes: Routes = [
         path: 'order-test',
         canActivate: [moduleGuard('test')],
         component: OrderTestComponent,
+      },
+      {
+        path: 'sr-breakout',
+        component: SrBreakoutComponent,
+      },
+      {
+        path: 'daily-target',
+        component: DailyTargetComponent,
       },
       { path: 'orders', redirectTo: '/admin/pnl', pathMatch: 'full' },
       { path: 'pnl-records', redirectTo: '/admin/pnl', pathMatch: 'full' },

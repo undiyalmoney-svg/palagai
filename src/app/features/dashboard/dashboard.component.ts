@@ -87,6 +87,20 @@ export class DashboardComponent implements OnInit, OnDestroy {
       module: 'test',
     },
     {
+      label: 'S/R Breakout',
+      shortLabel: 'S/R',
+      route: '/dashboard/sr-breakout',
+      icon: 'trending-up',
+      module: null,
+    },
+    {
+      label: 'Target',
+      shortLabel: 'Target',
+      route: '/dashboard/daily-target',
+      icon: 'activity',
+      module: null,
+    },
+    {
       label: 'Token',
       shortLabel: 'Token',
       route: '/dashboard/get-token',
