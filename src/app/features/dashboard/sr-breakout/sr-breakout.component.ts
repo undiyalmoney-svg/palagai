@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, inject, OnDestroy, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
@@ -32,7 +32,7 @@ const INSTRUMENTS = [
   templateUrl: './sr-breakout.component.html',
   styleUrl: './sr-breakout.component.css',
 })
-export class SrBreakoutComponent {
+export class SrBreakoutComponent implements OnDestroy {
   private readonly http = inject(HttpClient);
   private readonly kiteSession = inject(KiteSessionService);
   private readonly liveApiBase =
@@ -62,6 +62,29 @@ export class SrBreakoutComponent {
   readonly announce = signal<{ icon: string; text: string; tone: string }[]>([]);
   readonly announcing = signal(false);
   private annTimers: ReturnType<typeof setTimeout>[] = [];
+
+  // ── Live watch state (shadow only — never places an order) ──────────────────
+  readonly liveOn = signal(false);
+  readonly liveResult = signal<SrResponse | null>(null);
+  readonly liveTick = signal(0);            // poll counter
+  readonly liveAt = signal('');             // last poll clock time
+  readonly liveErr = signal('');
+  private liveTimer: ReturnType<typeof setInterval> | null = null;
+  private seenLive = new Set<string>();     // signal keys already narrated
+  private readonly LIVE_MS = 60_000;
+
+  // Strike step + Kite symbol root per instrument, for the manual order ticket.
+  private readonly TICKET: Record<string, { step: number; root: string }> = {
+    nifty: { step: 50, root: 'NIFTY' },
+    banknifty: { step: 100, root: 'BANKNIFTY' },
+    crude: { step: 50, root: 'CRUDEOILM' },
+  };
+  readonly liveSignals = computed(() => {
+    const r = this.liveResult();
+    if (!r) return [] as (SrTrade & { key: string })[];
+    return r.results.flatMap((x) => (x.trades || []).map((t) => ({ ...t, key: x.key })))
+      .sort((a, b) => (a.entryTime < b.entryTime ? 1 : -1));
+  });
 
   readonly totals = computed(() => {
     const r = this.result();
@@ -153,6 +176,80 @@ export class SrBreakoutComponent {
     a.download = `sr-breakout_${this.fromDate}_${this.toDate}.csv`;
     a.click();
     URL.revokeObjectURL(url);
+  }
+
+  ngOnDestroy(): void { this.stopLive(); this.clearAnnouncer(); }
+
+  // ── Live watch (shadow) ─────────────────────────────────────────────────────
+  // Polls TODAY's candles on a timer and narrates new signals as they appear.
+  // It NEVER places an order — it shows a ticket you submit yourself in Kite.
+  toggleLive(): void { this.liveOn() ? this.stopLive() : this.startLive(); }
+  startLive(): void {
+    const chosen = INSTRUMENTS.filter((i) => this.sel[i.key]).map((i) => i.key);
+    if (!chosen.length) { this.liveErr.set('Select at least one instrument first.'); return; }
+    this.liveErr.set('');
+    this.seenLive.clear();
+    this.announce.set([]);
+    this.liveOn.set(true);
+    this.say([{ icon: '🟢', text: 'Live watch on. I will call every breakout as it forms — you place the orders.', tone: 'accent' }]);
+    void this.pollLive();
+    this.liveTimer = setInterval(() => void this.pollLive(), this.LIVE_MS);
+  }
+  stopLive(): void {
+    if (this.liveTimer) { clearInterval(this.liveTimer); this.liveTimer = null; }
+    if (this.liveOn()) this.pushAnn({ icon: '⏸️', text: 'Live watch paused.', tone: 'muted' });
+    this.liveOn.set(false);
+  }
+  private async pollLive(): Promise<void> {
+    const chosen = INSTRUMENTS.filter((i) => this.sel[i.key]).map((i) => i.key);
+    const body: Record<string, unknown> = {
+      instruments: chosen, fromDate: this.today, toDate: this.today,
+      lots: Number(this.lots) || 1, maxTradesPerDay: Number(this.maxTradesPerDay) || 3,
+    };
+    if (this.entryPts != null && this.entryPts !== ('' as unknown)) body['entryPts'] = this.entryPts;
+    const kite = this.kiteSession.getAuthorizationHeader();
+    const headers: Record<string, string> = kite ? { 'X-Kite-Authorization': kite } : {};
+    try {
+      const res = await firstValueFrom(this.http.post<SrResponse>(`${this.liveApiBase}/sr-breakout`, body, { headers }));
+      this.liveResult.set(res);
+      this.liveTick.update((n) => n + 1);
+      this.liveAt.set(new Date().toLocaleTimeString('en-IN', { hour12: false }));
+      this.liveErr.set('');
+      this.narrateNew(res);
+    } catch (err) {
+      const msg = (err as { error?: { message?: string } })?.error?.message;
+      this.liveErr.set(msg || 'Live poll failed — Get Token (fresh daily), Push Token, then Start again.');
+    }
+  }
+  private narrateNew(res: SrResponse): void {
+    const ok = res.results.filter((r) => !r.error);
+    let fresh = 0;
+    for (const r of ok) {
+      for (const t of r.trades || []) {
+        const key = `${r.key}|${t.date}|${t.entryTime}`;
+        if (this.seenLive.has(key)) continue;
+        this.seenLive.add(key); fresh += 1;
+        const opt = t.option === 'CE' ? 'call (CE)' : 'put (PE)';
+        this.pushAnn({ icon: t.option === 'CE' ? '📈' : '📉', text: `${t.entryTime} ${r.name}: ${Math.abs(t.bodyPts)}pt candle broke ${t.side === 'BUY' ? 'resistance' : 'support'} — ${opt}, confidence ${this.stars(t.confidence)}, aim ${t.target} pts.`, tone: 'accent' });
+        this.pushAnn({ icon: '🎫', text: `Ticket ready: ${this.ticketText(t as SrTrade & { key: string })} — place it in Kite when you're happy.`, tone: 'muted' });
+      }
+    }
+    if (!fresh && this.liveTick() > 1) this.pushAnn({ icon: '🫧', text: `${this.liveAt()} — scanned, no new break. Holding.`, tone: 'muted' });
+  }
+  private pushAnn(a: { icon: string; text: string; tone: string }): void {
+    this.announcing.set(true);
+    this.announce.update((cur) => [...cur, a]);
+    // keep the feed from growing unbounded across a long session
+    this.announce.update((cur) => (cur.length > 80 ? cur.slice(cur.length - 80) : cur));
+  }
+
+  atmStrike(t: SrTrade & { key: string }): number {
+    const step = this.TICKET[t.key]?.step || 50;
+    return Math.round(t.entryPrice / step) * step;
+  }
+  ticketText(t: SrTrade & { key: string }): string {
+    const root = this.TICKET[t.key]?.root || t.instrument;
+    return `BUY ${this.lots} lot ${root} ${this.atmStrike(t)} ${t.option} (nearest expiry)`;
   }
 
   fmt(n: number): string { const s = n < 0 ? '-' : ''; return `${s}₹${Math.abs(Math.round(n)).toLocaleString('en-IN')}`; }

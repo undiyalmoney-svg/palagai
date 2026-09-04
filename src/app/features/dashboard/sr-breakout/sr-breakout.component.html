@@ -11,10 +11,94 @@
     </div>
   </header>
 
-  <!-- LIVE: empty for now -->
-  <div class="sr-empty" *ngIf="tab() === 'live'">
-    <p><strong>Live</strong> is not enabled yet. Prove the strategy in Paper first — Live goes here once you're ready.</p>
-  </div>
+  <!-- LIVE: shadow watch — calls signals in real time, you place the orders -->
+  <ng-container *ngIf="tab() === 'live'">
+    <div class="sr-live-banner">
+      <span class="lv-shield">🛡️</span>
+      <span>This watches today's candles live and calls each breakout. <strong>It never places an order</strong> — it hands you a ready ticket to submit yourself in Kite.</span>
+    </div>
+
+    <div class="sr-form">
+      <div class="fld instruments">
+        <label>Instruments</label>
+        <div class="chips">
+          <button type="button" class="chip" *ngFor="let i of instruments" [class.on]="sel[i.key]" (click)="toggle(i.key)">
+            <span class="dot"></span>{{ i.label }}
+          </button>
+        </div>
+      </div>
+      <div class="fld small">
+        <label>Lots</label>
+        <input type="number" min="1" [(ngModel)]="lots" />
+      </div>
+      <div class="fld small">
+        <label>Entry pts <span class="hint">(blank = default)</span></label>
+        <input type="number" [(ngModel)]="entryPts" placeholder="auto" />
+      </div>
+      <div class="fld small">
+        <label>Max trades/day</label>
+        <input type="number" min="1" [(ngModel)]="maxTradesPerDay" />
+      </div>
+      <div class="fld actions">
+        <button class="push" (click)="pushToken()" [disabled]="pushing()">{{ pushing() ? 'Pushing…' : 'Push Token' }}</button>
+        <button class="run" [class.stop]="liveOn()" (click)="toggleLive()">{{ liveOn() ? '■ Stop Live' : '▶ Start Live' }}</button>
+      </div>
+    </div>
+    <p class="sr-token-note" *ngIf="tokenNote()" [class.ok]="tokenNote().startsWith('✓')">{{ tokenNote() }}</p>
+    <p class="sr-error" *ngIf="liveErr()">{{ liveErr() }}</p>
+
+    <div class="sr-live-status" *ngIf="liveOn() || liveTick()">
+      <span class="lv-orb" [class.live]="liveOn()"></span>
+      <span *ngIf="liveOn()">Watching · scan #{{ liveTick() }}</span>
+      <span *ngIf="!liveOn()">Paused</span>
+      <span class="lv-at" *ngIf="liveAt()">last {{ liveAt() }}</span>
+      <span class="lv-count">{{ liveSignals().length }} signal(s) today</span>
+    </div>
+
+    <!-- Brain feed (shared markup) -->
+    <div class="sr-announcer" *ngIf="announce().length">
+      <div class="ann-head">
+        <span class="ann-orb" [class.live]="liveOn()"></span>
+        <span class="ann-title">Brain</span>
+        <span class="ann-status">{{ liveOn() ? 'watching…' : 'idle' }}</span>
+      </div>
+      <ul class="ann-feed">
+        <li *ngFor="let a of announce()" [attr.data-tone]="a.tone">
+          <span class="ann-icon">{{ a.icon }}</span><span class="ann-text">{{ a.text }}</span>
+        </li>
+      </ul>
+    </div>
+
+    <!-- Today's live signals as order tickets -->
+    <div class="sr-tickets" *ngIf="liveSignals().length; else noLive">
+      <div class="ticket" *ngFor="let t of liveSignals()">
+        <div class="tk-top">
+          <span class="opt" [class.ce]="t.option === 'CE'" [class.pe]="t.option === 'PE'">{{ t.option }}</span>
+          <span class="tk-instr">{{ t.instrument }}</span>
+          <span class="conf" [attr.data-score]="t.confidence" [title]="'Confidence ' + t.confidence + '/3'">{{ stars(t.confidence) }}</span>
+          <span class="tk-time mono">{{ t.entryTime }}</span>
+        </div>
+        <div class="tk-order">{{ ticketText(t) }}</div>
+        <div class="tk-meta">
+          <span>break {{ t.side === 'BUY' ? 'above' : 'below' }} <span class="mono">{{ t.level }}</span></span>
+          <span>underlying <span class="mono">{{ t.entryPrice }}</span></span>
+          <span>target <span class="mono">{{ t.target }}</span> pts</span>
+          <span class="tk-exit" *ngIf="t.exitReason === 'TARGET'">✓ hit target on candles</span>
+        </div>
+        <p class="tk-note">You place this in Kite. Max loss = premium you pay.</p>
+      </div>
+    </div>
+    <ng-template #noLive>
+      <p class="sr-note" *ngIf="liveOn()">No breakout yet today — the setup is selective. The Brain will call it the moment one forms.</p>
+      <p class="sr-note" *ngIf="!liveOn() && !liveTick()">Press <strong>Start Live</strong> after pushing a fresh Kite token. Signals and tickets appear here as they form.</p>
+    </ng-template>
+
+    <p class="sr-disclaimer">
+      Live watch is read-only: it fetches today's 5-min candles and computes signals. It cannot and will not place,
+      modify, or cancel any order. Every ticket is a suggestion you review and submit yourself. Max loss per option
+      trade = the premium you pay.
+    </p>
+  </ng-container>
 
   <ng-container *ngIf="tab() === 'paper'">
     <!-- FORM -->

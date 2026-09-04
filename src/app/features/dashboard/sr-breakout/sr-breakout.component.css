@@ -108,3 +108,23 @@
 .conf[data-score='1'] { color: var(--s-muted); }
 .conf[data-score='2'] { color: var(--s-amber); }
 .conf[data-score='3'] { color: var(--s-pos); }
+
+/* ── Live tab ───────────────────────────────────────────────────────────────*/
+.sr-live-banner { display: flex; gap: 10px; align-items: flex-start; background: color-mix(in srgb, var(--s-pos) 9%, var(--s-surface)); border: 1px solid color-mix(in srgb, var(--s-pos) 30%, var(--s-line)); border-radius: 12px; padding: 12px 16px; font-size: 13px; line-height: 1.5; color: var(--s-ink); }
+.lv-shield { font-size: 16px; line-height: 1.4; }
+.run.stop { background: var(--s-neg); }
+.sr-live-status { display: flex; align-items: center; gap: 12px; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--s-muted); padding: 2px 2px; }
+.lv-orb { width: 9px; height: 9px; border-radius: 50%; background: var(--s-muted); flex: 0 0 auto; }
+.lv-orb.live { background: var(--s-pos); animation: annpulse 1.4s ease-out infinite; }
+.lv-at { margin-left: auto; }
+.lv-count { color: var(--s-accent); font-weight: 600; }
+
+.sr-tickets { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+.ticket { background: var(--s-surface); border: 1px solid var(--s-line); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 8px; }
+.tk-top { display: flex; align-items: center; gap: 8px; }
+.tk-instr { font-weight: 600; font-size: 14px; }
+.tk-time { margin-left: auto; color: var(--s-muted); font-size: 12px; }
+.tk-order { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--s-ink); background: var(--s-bg); border: 1px dashed var(--s-line); border-radius: 8px; padding: 8px 10px; }
+.tk-meta { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; color: var(--s-muted); }
+.tk-exit { color: var(--s-pos); font-weight: 600; }
+.tk-note { margin: 2px 0 0; font-size: 11px; color: var(--s-amber); }
