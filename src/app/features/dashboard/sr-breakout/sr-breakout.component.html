@@ -197,6 +197,11 @@
           </span>
           <span class="au-meta mono">detector {{ r.summary?.detectorRan ? 'RAN' : 'IDLE' }} · {{ r.summary?.completedCandles }} candles · {{ r.summary?.candidatesReachedThreshold }} hit threshold</span>
         </div>
+        <div class="au-read" *ngIf="r.topRead as tr" [class.sig]="tr.signal">
+          <span class="au-read-k">Best read</span>
+          <span class="au-read-prob">{{ tr.probability }}%</span>
+          <span class="au-read-txt">{{ tr.headline }}</span>
+        </div>
         <ng-template #auErr><div class="au-sum"><span class="au-name">{{ r.name }}</span><span class="au-meta neg">{{ r.error }}</span></div></ng-template>
 
         <div class="au-reasons" *ngIf="!r.error && (r.summary?.signals || 0) === 0">

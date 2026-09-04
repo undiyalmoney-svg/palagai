@@ -187,3 +187,11 @@
 .au-table .strong { font-weight: 700; color: var(--s-ink); }
 .au-yes { color: var(--s-pos); font-weight: 600; }
 .au-no { color: var(--s-muted); }
+
+/* best-read line in the audit */
+.au-read { display: flex; align-items: center; gap: 10px; background: var(--s-bg); border: 1px solid var(--s-line); border-left: 3px solid var(--s-muted); border-radius: 8px; padding: 8px 12px; }
+.au-read.sig { border-left-color: var(--s-pos); }
+.au-read-k { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: .06em; text-transform: uppercase; color: var(--s-muted); }
+.au-read-prob { font-family: 'JetBrains Mono', monospace; font-size: 15px; font-weight: 700; color: var(--s-accent); }
+.au-read.sig .au-read-prob { color: var(--s-pos); }
+.au-read-txt { font-size: 13px; color: var(--s-ink); }

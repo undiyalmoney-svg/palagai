@@ -39,8 +39,9 @@ interface AuditCandle {
   signal: boolean; option: string | null; rejection: string | null;
   developing: { finalState: string; developingAt: string | null; thresholdCrossedAt: string | null };
 }
+interface TopRead { headline: string; probability: number; signal: boolean; time: string; option: string | null; }
 interface AuditResult {
-  key: string; name: string; error?: string;
+  key: string; name: string; error?: string; topRead?: TopRead | null;
   summary?: { completedCandles: number; candidatesReachedThreshold: number; signals: number; rejected: number; rejectionReasons: Record<string, number>; detectorRan: boolean };
   candles?: AuditCandle[];
 }
