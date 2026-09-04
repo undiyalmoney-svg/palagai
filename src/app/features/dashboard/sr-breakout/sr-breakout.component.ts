@@ -33,6 +33,18 @@ interface ObserverStatus {
   };
 }
 interface SrResponse { status: string; mode: string; fromDate: string; toDate: string; isToday: boolean; ranAt: string; results: SrInstrumentResult[]; }
+interface AuditCandle {
+  time: string; body: number; nearestWall: number | null; wallType: string; distToWall: number | null;
+  trend: number | null; threshold: number; reachedThreshold: boolean; brokeWall: boolean; withTrend: boolean;
+  signal: boolean; option: string | null; rejection: string | null;
+  developing: { finalState: string; developingAt: string | null; thresholdCrossedAt: string | null };
+}
+interface AuditResult {
+  key: string; name: string; error?: string;
+  summary?: { completedCandles: number; candidatesReachedThreshold: number; signals: number; rejected: number; rejectionReasons: Record<string, number>; detectorRan: boolean };
+  candles?: AuditCandle[];
+}
+interface AuditResponse { status: string; date: string; results: AuditResult[]; }
 
 const INSTRUMENTS = [
   { key: 'nifty', label: 'Nifty 50' },
@@ -70,6 +82,8 @@ export class SrBreakoutComponent implements OnDestroy {
   readonly busy = signal(false);
   readonly error = signal('');
   readonly result = signal<SrResponse | null>(null);
+  readonly audit = signal<AuditResponse | null>(null);
+  readonly auditing = signal(false);
   readonly pushing = signal(false);
   readonly tokenNote = signal('');
 
@@ -205,6 +219,32 @@ export class SrBreakoutComponent implements OnDestroy {
     } finally {
       this.busy.set(false);
     }
+  }
+
+  /** "Why no trade?" — audit every candle for the chosen date and show why each
+   *  was accepted or rejected. Distinguishes NO OPPORTUNITY from a broken detector. */
+  async whyNoTrade(): Promise<void> {
+    const chosen = INSTRUMENTS.filter((i) => this.sel[i.key]).map((i) => i.key);
+    if (!chosen.length) { this.error.set('Select at least one instrument.'); return; }
+    this.error.set('');
+    this.auditing.set(true);
+    const kite = this.kiteSession.getAuthorizationHeader();
+    const headers: Record<string, string> = kite ? { 'X-Kite-Authorization': kite } : {};
+    try {
+      const res = await firstValueFrom(this.http.post<AuditResponse>(
+        `${this.liveApiBase}/sr-breakout/debug`, { instruments: chosen, date: this.toDate }, { headers },
+      ));
+      this.audit.set(res);
+    } catch (err) {
+      const msg = (err as { error?: { message?: string } })?.error?.message;
+      this.error.set(msg || 'Audit failed — push a fresh Kite token and retry.');
+    } finally {
+      this.auditing.set(false);
+    }
+  }
+  rejectionList(r: AuditResult): { reason: string; n: number }[] {
+    const rr = r.summary?.rejectionReasons || {};
+    return Object.entries(rr).map(([reason, n]) => ({ reason, n })).sort((a, b) => b.n - a.n);
   }
 
   downloadCsv(): void {

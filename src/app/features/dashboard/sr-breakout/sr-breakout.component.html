@@ -178,12 +178,50 @@
       <div class="fld actions">
         <button class="push" (click)="pushToken()" [disabled]="pushing()">{{ pushing() ? 'Pushing…' : 'Push Token' }}</button>
         <button class="run" (click)="run()" [disabled]="busy()">{{ busy() ? 'Running…' : 'Run Paper' }}</button>
+        <button class="why" (click)="whyNoTrade()" [disabled]="auditing()">{{ auditing() ? 'Auditing…' : 'Why no trade?' }}</button>
         <button class="dl" (click)="downloadCsv()" [disabled]="!allTrades().length">Download CSV</button>
       </div>
     </div>
     <p class="sr-token-note" *ngIf="tokenNote()" [class.ok]="tokenNote().startsWith('✓')">{{ tokenNote() }}</p>
 
     <p class="sr-error" *ngIf="error()">{{ error() }}</p>
+
+    <!-- WHY NO TRADE? — candle-by-candle audit -->
+    <div class="sr-audit" *ngIf="audit() as a">
+      <div class="au-head"><span class="au-title">Candle audit — {{ a.date }}</span></div>
+      <div class="au-inst" *ngFor="let r of a.results">
+        <div class="au-sum" *ngIf="!r.error; else auErr">
+          <span class="au-name">{{ r.name }}</span>
+          <span class="au-verdict" [class.sig]="(r.summary?.signals || 0) > 0">
+            {{ (r.summary?.signals || 0) > 0 ? (r.summary?.signals + ' SIGNAL(S)') : 'NO SIGNAL' }}
+          </span>
+          <span class="au-meta mono">detector {{ r.summary?.detectorRan ? 'RAN' : 'IDLE' }} · {{ r.summary?.completedCandles }} candles · {{ r.summary?.candidatesReachedThreshold }} hit threshold</span>
+        </div>
+        <ng-template #auErr><div class="au-sum"><span class="au-name">{{ r.name }}</span><span class="au-meta neg">{{ r.error }}</span></div></ng-template>
+
+        <div class="au-reasons" *ngIf="!r.error && (r.summary?.signals || 0) === 0">
+          <span class="au-rchip" *ngFor="let x of rejectionList(r)">{{ x.reason }} <b>×{{ x.n }}</b></span>
+        </div>
+
+        <div class="au-scroll" *ngIf="!r.error && r.candles?.length">
+          <table class="au-table">
+            <thead><tr><th>Time</th><th class="num">Body</th><th class="num">Req</th><th>Wall</th><th class="num">Dist</th><th class="num">Trend</th><th>Broke?</th><th>Result</th></tr></thead>
+            <tbody>
+              <tr *ngFor="let c of r.candles" [class.hit]="c.signal">
+                <td class="mono">{{ c.time }}</td>
+                <td class="num mono" [class.strong]="c.reachedThreshold">{{ c.body }}</td>
+                <td class="num mono">{{ c.threshold }}</td>
+                <td class="mono">{{ c.wallType === 'resistance' ? 'R' : 'S' }} {{ c.nearestWall }}</td>
+                <td class="num mono">{{ c.distToWall }}</td>
+                <td class="num mono" [class.pos]="(c.trend || 0) > 0" [class.neg]="(c.trend || 0) < 0">{{ c.trend }}</td>
+                <td>{{ c.brokeWall ? '✓' : '·' }}</td>
+                <td><span *ngIf="c.signal" class="au-yes">SIGNAL {{ c.option }}</span><span *ngIf="!c.signal" class="au-no">{{ c.rejection }}</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
 
     <!-- LIVE ANNOUNCER — the "brain" narrating what the system is doing (not saved) -->
     <div class="sr-announcer" *ngIf="announce().length">
