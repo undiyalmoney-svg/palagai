@@ -22,6 +22,7 @@
     <div class="sr-observer" *ngIf="observer() as ob">
       <div class="obs-head">
         <span class="obs-title">Buildia Live Observer</span>
+        <span class="obs-firewall" title="Real broker orders are disabled server-side">🔒 {{ ob.liveBrokerOrders || 'DISABLED' }}</span>
         <span class="obs-run" [class.on]="ob.running && ob.lastPollStatus !== 'error'">
           <span class="obs-dot"></span>{{ ob.running ? (ob.lastPollStatus === 'ok' ? 'RUNNING' : (ob.lastPollStatus | uppercase)) : 'STANDBY' }}
         </span>
@@ -40,6 +41,15 @@
         </div>
         <div class="obs-bar"><div class="obs-fill" [style.width.%]="obsPct()"></div></div>
         <div class="obs-cnums mono">{{ d.collection.optionTradesRecorded }} / {{ d.collection.minSampleForFirstValidation }} min · {{ d.collection.recommended }}+ recommended</div>
+      </div>
+      <div class="obs-brake" *ngIf="ob.dashboard?.today?.brake as brake">
+        ⛔ Paper stopped for the day — {{ brake === 'PROFIT_LIMIT' ? '+₹3,500 profit limit' : brake === 'LOSS_LIMIT' ? '−₹3,500 loss limit' : 'max 3 trades' }} reached. Collection continues.
+      </div>
+      <div class="obs-pnl" *ngIf="ob.dashboard?.cumulative as c">
+        <div class="op-cell"><span class="obs-k">Closed paper trades</span><span class="obs-v">{{ c.closed }}</span></div>
+        <div class="op-cell"><span class="obs-k">Win rate</span><span class="obs-v">{{ c.winRate != null ? c.winRate + '%' : '—' }}</span></div>
+        <div class="op-cell"><span class="obs-k">Net P&amp;L</span><span class="obs-v" [class.pos]="(c.netPnL || 0) >= 0" [class.neg]="(c.netPnL || 0) < 0">{{ c.netPnL != null ? fmt(c.netPnL) : '—' }}</span></div>
+        <div class="op-cell"><span class="obs-k">Profit factor</span><span class="obs-v">{{ c.profitFactor != null ? c.profitFactor : '—' }}</span></div>
       </div>
       <p class="obs-note" *ngIf="ob.idleReason">Idle — {{ ob.idleReason }}. The collector keeps running server-side; data collects on signal days.</p>
     </div>

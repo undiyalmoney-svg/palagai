@@ -21,9 +21,14 @@ interface ObserverStatus {
   running: boolean; lastPoll: string | null; lastPollStatus: string; idleReason: string | null;
   polls: number; lastSignalId: string | null;
   config?: { MARKET_OPEN: string; MARKET_CLOSE: string; INSTRUMENTS: string[] };
+  executionMode?: string;
+  liveBrokerOrders?: string;
   dashboard?: {
-    today: { signals: number; paperEntries: number; armed: number; open: number };
-    cumulative: { totalSignals: number; optionTradesRecorded: number; closed: number; wins: number; losses: number; winRate: number | null };
+    today: { signals: number; paperEntries: number; armed: number; open: number; closed?: number; dayPnl?: number; brake?: string | null };
+    cumulative: {
+      totalSignals: number; optionTradesRecorded: number; closed: number; wins: number; losses: number; winRate: number | null;
+      netPnL?: number; avgWin?: number | null; avgLoss?: number | null; profitFactor?: number | null; expectedValue?: number | null; maxDrawdown?: number;
+    };
     collection: { signalsRecorded: number; optionTradesRecorded: number; minSampleForFirstValidation: number; recommended: number; optionEdgeStatus: string };
   };
 }
