@@ -7,8 +7,8 @@ import { environment } from '../../../../environments/environment';
 import { KiteSessionService } from '../../../core/kite/kite-session.service';
 
 interface SrTrade {
-  date: string; instrument: string; side: string; option: string;
-  entryTime: string; entryPrice: number; level: number; bodyPts: number;
+  date: string; instrument: string; side: string; option: string; confidence: number;
+  entryTime: string; entryPrice: number; level: number; bodyPts: number; target: number;
   exitTime: string; exitPrice: number; exitReason: string; points: number; rupees: number;
 }
 interface SrSummary {
@@ -48,14 +48,20 @@ export class SrBreakoutComponent {
   sel: Record<string, boolean> = { nifty: true, banknifty: true, crude: true };
   lots = 1;
   entryPts: number | null = null;   // blank = use per-instrument default
-  bigPts: number | null = null;
-  targetPts: number | null = null;  // blank/0 = hold to close
+  dayLossStopRs: number | null = 3500;    // stop the day once loss reaches this
+  dayProfitTargetRs: number | null = 3500; // stop the day once profit reaches this
+  maxTradesPerDay = 3;
 
   readonly busy = signal(false);
   readonly error = signal('');
   readonly result = signal<SrResponse | null>(null);
   readonly pushing = signal(false);
   readonly tokenNote = signal('');
+
+  // Live announcer — the "brain" narrating what the system is doing. Ephemeral.
+  readonly announce = signal<{ icon: string; text: string; tone: string }[]>([]);
+  readonly announcing = signal(false);
+  private annTimers: ReturnType<typeof setTimeout>[] = [];
 
   readonly totals = computed(() => {
     const r = this.result();
@@ -108,10 +114,11 @@ export class SrBreakoutComponent {
 
     const body: Record<string, unknown> = {
       instruments: chosen, fromDate: this.fromDate, toDate: this.toDate, lots: Number(this.lots) || 1,
+      maxTradesPerDay: Number(this.maxTradesPerDay) || 3,
     };
     if (this.entryPts != null && this.entryPts !== ('' as unknown)) body['entryPts'] = this.entryPts;
-    if (this.bigPts != null && this.bigPts !== ('' as unknown)) body['bigPts'] = this.bigPts;
-    if (this.targetPts != null && this.targetPts !== ('' as unknown)) body['targetPts'] = this.targetPts;
+    if (this.dayLossStopRs != null && this.dayLossStopRs !== ('' as unknown)) body['dayLossStopRs'] = this.dayLossStopRs;
+    if (this.dayProfitTargetRs != null && this.dayProfitTargetRs !== ('' as unknown)) body['dayProfitTargetRs'] = this.dayProfitTargetRs;
 
     // Send the browser's Kite header when present; otherwise rely on the token
     // pushed to the server. Do NOT block here — let the server decide.
@@ -124,6 +131,7 @@ export class SrBreakoutComponent {
         this.http.post<SrResponse>(`${this.liveApiBase}/sr-breakout`, body, { headers }),
       );
       this.result.set(res);
+      this.playAnnouncer(res);
     } catch (err) {
       const msg = (err as { error?: { message?: string } })?.error?.message;
       this.error.set(msg || 'Run failed — open Get Token (fresh daily token), Push Token, then retry.');
@@ -135,7 +143,7 @@ export class SrBreakoutComponent {
   downloadCsv(): void {
     const trades = this.allTrades();
     if (!trades.length) return;
-    const cols = ['date', 'instrument', 'option', 'side', 'entryTime', 'entryPrice', 'level', 'bodyPts', 'exitTime', 'exitPrice', 'exitReason', 'points', 'rupees'];
+    const cols = ['date', 'instrument', 'option', 'side', 'confidence', 'entryTime', 'entryPrice', 'level', 'bodyPts', 'target', 'exitTime', 'exitPrice', 'exitReason', 'points', 'rupees'];
     const lines = [cols.join(',')];
     for (const t of trades) lines.push(cols.map((c) => (t as unknown as Record<string, unknown>)[c]).join(','));
     const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
@@ -148,4 +156,63 @@ export class SrBreakoutComponent {
   }
 
   fmt(n: number): string { const s = n < 0 ? '-' : ''; return `${s}₹${Math.abs(Math.round(n)).toLocaleString('en-IN')}`; }
+
+  stars(score: number): string { return '★'.repeat(Math.max(0, Math.min(3, score))) + '☆'.repeat(3 - Math.max(0, Math.min(3, score))); }
+
+  // ── Live announcer ────────────────────────────────────────────────────────
+  // Replays the run as a plain-English feed so you can *see* what the brain did:
+  // scanning → spotting a break → picking the option → entering → how it exited.
+  // Purely visual; nothing is stored. Cadence is faster than real time.
+  private clearAnnouncer(): void {
+    for (const t of this.annTimers) clearTimeout(t);
+    this.annTimers = [];
+  }
+  private say(lines: { icon: string; text: string; tone: string }[]): void {
+    this.clearAnnouncer();
+    this.announce.set([]);
+    this.announcing.set(true);
+    let i = 0;
+    const step = () => {
+      if (i >= lines.length) { this.announcing.set(false); return; }
+      this.announce.update((cur) => [...cur, lines[i]]);
+      i += 1;
+      this.annTimers.push(setTimeout(step, i < 2 ? 650 : 480));
+    };
+    step();
+  }
+  private playAnnouncer(res: SrResponse): void {
+    const ok = res.results.filter((r) => !r.error);
+    const lines: { icon: string; text: string; tone: string }[] = [];
+    const range = res.isToday ? 'today' : `${res.fromDate} → ${res.toDate}`;
+    lines.push({ icon: '☀️', text: `A calm ${res.mode} session. Waking up the brain for ${range}…`, tone: 'muted' });
+    if (!ok.length) {
+      lines.push({ icon: '🌙', text: 'No instruments came back with candles. Push a fresh Kite token and try again.', tone: 'warn' });
+      this.say(lines); return;
+    }
+    for (const r of ok) {
+      const label = r.contract && r.contract !== r.name ? `${r.name} (${r.contract})` : r.name;
+      lines.push({ icon: '🔍', text: `Scanning ${label} — ${r.candles.toLocaleString('en-IN')} candles for support/resistance breaks…`, tone: 'muted' });
+      const shown = r.trades.slice(0, 6);
+      for (const t of shown) {
+        const opt = t.option === 'CE' ? 'call (CE)' : 'put (PE)';
+        lines.push({ icon: t.option === 'CE' ? '📈' : '📉', text: `${t.date} ${t.entryTime} — a ${Math.abs(t.bodyPts)}pt candle broke ${t.side === 'BUY' ? 'resistance' : 'support'}. Looks like a ${opt}.`, tone: 'muted' });
+        lines.push({ icon: '🧠', text: `Confidence ${this.stars(t.confidence)} — picking the ${opt}, aiming for ${t.target} pts.`, tone: 'accent' });
+        lines.push({ icon: '🟢', text: `Entering at ${t.entryPrice}…`, tone: 'muted' });
+        const win = t.points > 0;
+        lines.push({
+          icon: win ? '✅' : '🔴',
+          text: win
+            ? `${t.exitReason === 'TARGET' ? 'Target hit' : 'Closed green'} at ${t.exitPrice} — +${t.points} pts (${this.fmt(t.rupees)}).`
+            : `Exited at ${t.exitPrice} — ${t.points} pts (${this.fmt(t.rupees)}). Sat through it.`,
+          tone: win ? 'good' : 'bad',
+        });
+      }
+      if (r.trades.length > shown.length) lines.push({ icon: '⏩', text: `…and ${r.trades.length - shown.length} more ${label} trades in the table below.`, tone: 'muted' });
+      const s = r.summary;
+      lines.push({ icon: s.netRupees >= 0 ? '🟩' : '🟥', text: `${r.name} wrapped: ${s.trades} trades, ${s.winPct}% hit, net ${this.fmt(s.netRupees)}.`, tone: s.netRupees >= 0 ? 'good' : 'bad' });
+    }
+    const tot = this.totals();
+    if (tot) lines.push({ icon: '😌', text: `Session done. ${tot.trades} trades across all books — net ${this.fmt(tot.net)}. That's the honest number, after nothing hidden.`, tone: tot.net >= 0 ? 'good' : 'bad' });
+    this.say(lines);
+  }
 }

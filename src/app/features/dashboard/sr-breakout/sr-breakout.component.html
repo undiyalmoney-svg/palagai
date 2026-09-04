@@ -3,7 +3,7 @@
     <div>
       <span class="sr-eyebrow">Intraday</span>
       <h1>S/R Breakout</h1>
-      <p class="sr-sub">Big candle breaks support/resistance → CE on a bullish break, PE on a bearish break. Runs on real candles via the backend.</p>
+      <p class="sr-sub">Big candle breaks support/resistance <em>with the trend</em> → CE on a bullish break, PE on a bearish break. A confidence meter (★1–3) sizes the target; daily stops cap the damage. Runs on real candles via the backend.</p>
     </div>
     <div class="sr-modes" role="tablist">
       <button role="tab" [class.active]="tab() === 'paper'" (click)="setTab('paper')">Paper</button>
@@ -44,12 +44,16 @@
         <input type="number" [(ngModel)]="entryPts" placeholder="auto" />
       </div>
       <div class="fld small">
-        <label>Big candle pts</label>
-        <input type="number" [(ngModel)]="bigPts" placeholder="auto" />
+        <label>Max trades/day</label>
+        <input type="number" min="1" [(ngModel)]="maxTradesPerDay" />
       </div>
       <div class="fld small">
-        <label>Target pts <span class="hint">(blank = hold to close)</span></label>
-        <input type="number" [(ngModel)]="targetPts" placeholder="hold" />
+        <label>Daily loss stop ₹ <span class="hint">(0 = off)</span></label>
+        <input type="number" min="0" [(ngModel)]="dayLossStopRs" placeholder="off" />
+      </div>
+      <div class="fld small">
+        <label>Daily profit stop ₹ <span class="hint">(0 = off)</span></label>
+        <input type="number" min="0" [(ngModel)]="dayProfitTargetRs" placeholder="off" />
       </div>
       <div class="fld actions">
         <button class="push" (click)="pushToken()" [disabled]="pushing()">{{ pushing() ? 'Pushing…' : 'Push Token' }}</button>
@@ -60,6 +64,20 @@
     <p class="sr-token-note" *ngIf="tokenNote()" [class.ok]="tokenNote().startsWith('✓')">{{ tokenNote() }}</p>
 
     <p class="sr-error" *ngIf="error()">{{ error() }}</p>
+
+    <!-- LIVE ANNOUNCER — the "brain" narrating what the system is doing (not saved) -->
+    <div class="sr-announcer" *ngIf="announce().length">
+      <div class="ann-head">
+        <span class="ann-orb" [class.live]="announcing()"></span>
+        <span class="ann-title">Brain</span>
+        <span class="ann-status">{{ announcing() ? 'thinking…' : 'idle' }}</span>
+      </div>
+      <ul class="ann-feed">
+        <li *ngFor="let a of announce()" [attr.data-tone]="a.tone">
+          <span class="ann-icon">{{ a.icon }}</span><span class="ann-text">{{ a.text }}</span>
+        </li>
+      </ul>
+    </div>
 
     <!-- RESULTS -->
     <ng-container *ngIf="result() as r">
@@ -92,15 +110,17 @@
       <div class="sr-table-wrap" *ngIf="allTrades().length; else noTrades">
         <table class="sr-table">
           <thead>
-            <tr><th>Date</th><th>Instrument</th><th>Opt</th><th>Entry</th><th class="num">Price</th><th>Exit</th><th class="num">Price</th><th>Why</th><th class="num">Pts</th><th class="num">₹</th></tr>
+            <tr><th>Date</th><th>Instrument</th><th>Opt</th><th title="Confidence 1–3">Conf</th><th>Entry</th><th class="num">Price</th><th class="num">Tgt</th><th>Exit</th><th class="num">Price</th><th>Why</th><th class="num">Pts</th><th class="num">₹</th></tr>
           </thead>
           <tbody>
             <tr *ngFor="let t of allTrades()">
               <td class="mono">{{ t.date }}</td>
               <td>{{ t.instrument }}</td>
               <td><span class="opt" [class.ce]="t.option === 'CE'" [class.pe]="t.option === 'PE'">{{ t.option }}</span></td>
+              <td><span class="conf" [attr.data-score]="t.confidence" [title]="'Confidence ' + t.confidence + '/3'">{{ stars(t.confidence) }}</span></td>
               <td class="mono">{{ t.entryTime }}</td>
               <td class="num mono">{{ t.entryPrice }}</td>
+              <td class="num mono">{{ t.target }}</td>
               <td class="mono">{{ t.exitTime }}</td>
               <td class="num mono">{{ t.exitPrice }}</td>
               <td><span class="why" [class.tgt]="t.exitReason === 'TARGET'">{{ t.exitReason }}</span></td>
