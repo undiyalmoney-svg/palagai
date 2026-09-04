@@ -17,6 +17,16 @@ interface SrSummary {
   totalProfitRupees: number; totalLossRupees: number; netRupees: number;
 }
 interface SrInstrumentResult { key: string; name: string; contract?: string; token: string; candles: number; summary: SrSummary; trades: SrTrade[]; error?: string; }
+interface ObserverStatus {
+  running: boolean; lastPoll: string | null; lastPollStatus: string; idleReason: string | null;
+  polls: number; lastSignalId: string | null;
+  config?: { MARKET_OPEN: string; MARKET_CLOSE: string; INSTRUMENTS: string[] };
+  dashboard?: {
+    today: { signals: number; paperEntries: number; armed: number; open: number };
+    cumulative: { totalSignals: number; optionTradesRecorded: number; closed: number; wins: number; losses: number; winRate: number | null };
+    collection: { signalsRecorded: number; optionTradesRecorded: number; minSampleForFirstValidation: number; recommended: number; optionEdgeStatus: string };
+  };
+}
 interface SrResponse { status: string; mode: string; fromDate: string; toDate: string; isToday: boolean; ranAt: string; results: SrInstrumentResult[]; }
 
 const INSTRUMENTS = [
@@ -86,6 +96,11 @@ export class SrBreakoutComponent implements OnDestroy {
       .sort((a, b) => (a.entryTime < b.entryTime ? 1 : -1));
   });
 
+  // Backend collector status (Buildia Live Observer) — polled from the server,
+  // which is the source of truth. Runs whether or not this tab is open.
+  readonly observer = signal<ObserverStatus | null>(null);
+  private obsTimer: ReturnType<typeof setInterval> | null = null;
+
   readonly totals = computed(() => {
     const r = this.result();
     if (!r) return null;
@@ -106,8 +121,32 @@ export class SrBreakoutComponent implements OnDestroy {
     return r.results.flatMap((x) => x.trades || []).sort((a, b) => (a.date + a.entryTime < b.date + b.entryTime ? -1 : 1));
   });
 
-  setTab(t: 'paper' | 'live'): void { this.tab.set(t); }
+  setTab(t: 'paper' | 'live'): void {
+    this.tab.set(t);
+    if (t === 'live') this.startObserverPoll(); else this.stopObserverPoll();
+  }
   toggle(key: string): void { this.sel[key] = !this.sel[key]; }
+
+  // Poll the backend collector status (source of truth; runs server-side).
+  private startObserverPoll(): void {
+    if (this.obsTimer) return;
+    void this.pollObserver();
+    this.obsTimer = setInterval(() => void this.pollObserver(), 15_000);
+  }
+  private stopObserverPoll(): void {
+    if (this.obsTimer) { clearInterval(this.obsTimer); this.obsTimer = null; }
+  }
+  private async pollObserver(): Promise<void> {
+    try {
+      const s = await firstValueFrom(this.http.get<ObserverStatus>(`${this.liveApiBase}/sr-observe/status`));
+      this.observer.set(s);
+    } catch { /* leave last status; endpoint may be pre-deploy */ }
+  }
+  obsPct(): number {
+    const d = this.observer()?.dashboard?.collection;
+    if (!d) return 0;
+    return Math.min(100, Math.round((100 * d.optionTradesRecorded) / d.minSampleForFirstValidation));
+  }
 
   /** Push the browser's Kite token to the server so Paper works even without
    *  the browser resending it (and for future Live). Encrypted server-side. */
@@ -178,7 +217,7 @@ export class SrBreakoutComponent implements OnDestroy {
     URL.revokeObjectURL(url);
   }
 
-  ngOnDestroy(): void { this.stopLive(); this.clearAnnouncer(); }
+  ngOnDestroy(): void { this.stopLive(); this.clearAnnouncer(); this.stopObserverPoll(); }
 
   // ── Live watch (shadow) ─────────────────────────────────────────────────────
   // Polls TODAY's candles on a timer and narrates new signals as they appear.

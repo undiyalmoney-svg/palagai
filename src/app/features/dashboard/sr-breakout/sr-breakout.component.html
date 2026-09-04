@@ -18,6 +18,32 @@
       <span>This watches today's candles live and calls each breakout. <strong>It never places an order</strong> — it hands you a ready ticket to submit yourself in Kite.</span>
     </div>
 
+    <!-- BUILDIA LIVE OBSERVER — backend collector status (source of truth) -->
+    <div class="sr-observer" *ngIf="observer() as ob">
+      <div class="obs-head">
+        <span class="obs-title">Buildia Live Observer</span>
+        <span class="obs-run" [class.on]="ob.running && ob.lastPollStatus !== 'error'">
+          <span class="obs-dot"></span>{{ ob.running ? (ob.lastPollStatus === 'ok' ? 'RUNNING' : (ob.lastPollStatus | uppercase)) : 'STANDBY' }}
+        </span>
+      </div>
+      <div class="obs-grid" *ngIf="ob.dashboard as d">
+        <div class="obs-cell"><span class="obs-k">Last poll</span><span class="obs-v mono">{{ ob.lastPoll ? (ob.lastPoll | date:'HH:mm:ss') : '—' }}</span></div>
+        <div class="obs-cell"><span class="obs-k">Signals today</span><span class="obs-v">{{ d.today.signals }}</span></div>
+        <div class="obs-cell"><span class="obs-k">Paper trades</span><span class="obs-v">{{ d.today.paperEntries }} / 3</span></div>
+        <div class="obs-cell"><span class="obs-k">Armed</span><span class="obs-v">{{ d.today.armed }}</span></div>
+        <div class="obs-cell"><span class="obs-k">Market</span><span class="obs-v mono">{{ ob.config?.MARKET_OPEN }}–{{ ob.config?.MARKET_CLOSE }}</span></div>
+      </div>
+      <div class="obs-collect" *ngIf="ob.dashboard as d">
+        <div class="obs-clabel">
+          <span>Real option observations collected</span>
+          <span class="obs-status" [attr.data-s]="d.collection.optionEdgeStatus">{{ d.collection.optionEdgeStatus }}</span>
+        </div>
+        <div class="obs-bar"><div class="obs-fill" [style.width.%]="obsPct()"></div></div>
+        <div class="obs-cnums mono">{{ d.collection.optionTradesRecorded }} / {{ d.collection.minSampleForFirstValidation }} min · {{ d.collection.recommended }}+ recommended</div>
+      </div>
+      <p class="obs-note" *ngIf="ob.idleReason">Idle — {{ ob.idleReason }}. The collector keeps running server-side; data collects on signal days.</p>
+    </div>
+
     <div class="sr-form">
       <div class="fld instruments">
         <label>Instruments</label>
