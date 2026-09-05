@@ -67,6 +67,12 @@
         <label>Lots</label>
         <input type="number" min="1" [(ngModel)]="lots" />
       </div>
+      <div class="fld">
+        <label>Strategy <span class="hint">(only Eligible/Production)</span></label>
+        <select [(ngModel)]="strategy">
+          <option *ngFor="let s of strategyOptions" [value]="s.id" [disabled]="!s.selectable">{{ s.label }} — {{ s.status }}</option>
+        </select>
+      </div>
       <div class="fld small">
         <label>Entry pts <span class="hint">(blank = default)</span></label>
         <input type="number" [(ngModel)]="entryPts" placeholder="auto" />

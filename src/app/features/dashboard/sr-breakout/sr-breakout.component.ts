@@ -299,6 +299,7 @@ export class SrBreakoutComponent implements OnDestroy {
     const body: Record<string, unknown> = {
       instruments: chosen, fromDate: this.today, toDate: this.today,
       lots: Number(this.lots) || 1, maxTradesPerDay: Number(this.maxTradesPerDay) || 3,
+      strategy: this.strategy,
     };
     if (this.entryPts != null && this.entryPts !== ('' as unknown)) body['entryPts'] = this.entryPts;
     const kite = this.kiteSession.getAuthorizationHeader();
