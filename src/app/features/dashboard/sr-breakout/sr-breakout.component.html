@@ -67,12 +67,6 @@
         <label>Lots</label>
         <input type="number" min="1" [(ngModel)]="lots" />
       </div>
-      <div class="fld">
-        <label>Strategy <span class="hint">(only Eligible/Production)</span></label>
-        <select [(ngModel)]="strategy">
-          <option *ngFor="let s of strategyOptions" [value]="s.id" [disabled]="!s.selectable">{{ s.label }} — {{ s.status }}</option>
-        </select>
-      </div>
       <div class="fld small">
         <label>Entry pts <span class="hint">(blank = default)</span></label>
         <input type="number" [(ngModel)]="entryPts" placeholder="auto" />
@@ -152,12 +146,6 @@
       <div class="fld">
         <label>To date <span class="hint" *ngIf="toDate === today">(today = live so far)</span></label>
         <input type="date" [(ngModel)]="toDate" [max]="today" />
-      </div>
-      <div class="fld">
-        <label>Strategy <span class="hint">(only Eligible/Production run)</span></label>
-        <select [(ngModel)]="strategy">
-          <option *ngFor="let s of strategyOptions" [value]="s.id" [disabled]="!s.selectable">{{ s.label }} — {{ s.status }}</option>
-        </select>
       </div>
       <div class="fld instruments">
         <label>Instruments</label>

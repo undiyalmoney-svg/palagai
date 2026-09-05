@@ -75,15 +75,9 @@ export class SrBreakoutComponent implements OnDestroy {
   toDate = this.today;
   sel: Record<string, boolean> = { nifty: true, banknifty: true, crude: true };
   lots = 1;
-  strategy = 'baseline';
-  // Only production/eligible are selectable (the profitability gate). Non-eligible
-  // strategies would appear disabled with their status. Sourced from the backend
-  // registry (mirrored here for the initial render; the run response confirms it).
-  readonly strategyOptions = [
-    { id: 'baseline', label: 'Baseline', status: 'Production', selectable: true },
-    { id: 'nifty_retest_v1', label: 'Nifty Retest V1', status: 'Eligible · candidate', selectable: true },
-    { id: 'bank_intraday_v1', label: 'Bank Intraday V1', status: 'Eligible · candidate', selectable: true },
-  ];
+  // Strategy is AUTO-routed per instrument by the backend (Nifty → Retest V1,
+  // Bank → Intraday V1, Crude → Baseline). No selector — the backend picks the
+  // validated eligible strategy for each instrument.
   entryPts: number | null = null;   // blank = use per-instrument default
   dayLossStopRs: number | null = 3500;    // stop the day once loss reaches this
   dayProfitTargetRs: number | null = 3500; // stop the day once profit reaches this
@@ -205,7 +199,7 @@ export class SrBreakoutComponent implements OnDestroy {
 
     const body: Record<string, unknown> = {
       instruments: chosen, fromDate: this.fromDate, toDate: this.toDate, lots: Number(this.lots) || 1,
-      maxTradesPerDay: Number(this.maxTradesPerDay) || 3, strategy: this.strategy,
+      maxTradesPerDay: Number(this.maxTradesPerDay) || 3,
     };
     if (this.entryPts != null && this.entryPts !== ('' as unknown)) body['entryPts'] = this.entryPts;
     if (this.dayLossStopRs != null && this.dayLossStopRs !== ('' as unknown)) body['dayLossStopRs'] = this.dayLossStopRs;
@@ -299,7 +293,6 @@ export class SrBreakoutComponent implements OnDestroy {
     const body: Record<string, unknown> = {
       instruments: chosen, fromDate: this.today, toDate: this.today,
       lots: Number(this.lots) || 1, maxTradesPerDay: Number(this.maxTradesPerDay) || 3,
-      strategy: this.strategy,
     };
     if (this.entryPts != null && this.entryPts !== ('' as unknown)) body['entryPts'] = this.entryPts;
     const kite = this.kiteSession.getAuthorizationHeader();
