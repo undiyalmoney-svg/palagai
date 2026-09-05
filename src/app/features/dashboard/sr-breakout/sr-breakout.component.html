@@ -148,9 +148,9 @@
         <input type="date" [(ngModel)]="toDate" [max]="today" />
       </div>
       <div class="fld">
-        <label>Strategy</label>
+        <label>Strategy <span class="hint">(only Eligible/Production run)</span></label>
         <select [(ngModel)]="strategy">
-          <option *ngFor="let s of strategyOptions" [value]="s.id">{{ s.label }}</option>
+          <option *ngFor="let s of strategyOptions" [value]="s.id" [disabled]="!s.selectable">{{ s.label }} — {{ s.status }}</option>
         </select>
       </div>
       <div class="fld instruments">

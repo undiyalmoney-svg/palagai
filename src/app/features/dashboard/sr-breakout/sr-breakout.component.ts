@@ -75,10 +75,14 @@ export class SrBreakoutComponent implements OnDestroy {
   toDate = this.today;
   sel: Record<string, boolean> = { nifty: true, banknifty: true, crude: true };
   lots = 1;
-  strategy = 'baseline';            // 'baseline' | 'nifty_retest_v1' (candidate)
+  strategy = 'baseline';
+  // Only production/eligible are selectable (the profitability gate). Non-eligible
+  // strategies would appear disabled with their status. Sourced from the backend
+  // registry (mirrored here for the initial render; the run response confirms it).
   readonly strategyOptions = [
-    { id: 'baseline', label: 'Baseline (production)' },
-    { id: 'nifty_retest_v1', label: 'Nifty Retest V1 (candidate)' },
+    { id: 'baseline', label: 'Baseline', status: 'Production', selectable: true },
+    { id: 'nifty_retest_v1', label: 'Nifty Retest V1', status: 'Eligible · candidate', selectable: true },
+    { id: 'bank_intraday_v1', label: 'Bank Intraday V1', status: 'Eligible · candidate', selectable: true },
   ];
   entryPts: number | null = null;   // blank = use per-instrument default
   dayLossStopRs: number | null = 3500;    // stop the day once loss reaches this
