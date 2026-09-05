@@ -142,7 +142,7 @@
 .sr-observer { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 16px; display: flex; flex-direction: column; gap: 14px; box-shadow: var(--shadow); }
 .obs-head { display: flex; align-items: center; gap: 10px; }
 .obs-title { font-weight: 650; font-size: 14px; }
-.obs-firewall { margin-left: auto; font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 700; letter-spacing: .07em; color: var(--neg); border: 1px solid color-mix(in srgb, var(--neg) 35%, var(--line)); border-radius: 999px; padding: 3px 10px; background: var(--neg-soft); }
+.obs-firewall.on { color: var(--pos); border-color: color-mix(in srgb, var(--pos) 35%, var(--line)); background: var(--pos-soft); }
 .obs-run { display: inline-flex; align-items: center; gap: 7px; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700; letter-spacing: .05em; color: var(--muted); }
 .obs-run.on { color: var(--pos); }
 .obs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(92px, 1fr)); gap: 12px; }

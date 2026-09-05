@@ -11,18 +11,18 @@
     </div>
   </header>
 
-  <!-- LIVE: shadow watch — calls signals in real time, you place the orders -->
+  <!-- LIVE: server places MIS when a signal fires -->
   <ng-container *ngIf="tab() === 'live'">
     <div class="sr-live-banner">
-      <span class="lv-shield">🛡️</span>
-      <span>This watches today's candles live and calls each breakout. <strong>It never places an order</strong> — it hands you a ready ticket to submit yourself in Kite.</span>
+      <span class="lv-shield">⚡</span>
+      <span>Start Live and the server watches today's candles. <strong>When a breakout signal fires, it buys the option (MIS)</strong> — CE on a bullish break, PE on a bearish break — then rests an SL. Stop Auto Bot Live first so the two desks do not double-trade.</span>
     </div>
 
     <!-- BUILDIA LIVE OBSERVER — backend collector status (source of truth) -->
     <div class="sr-observer" *ngIf="observer() as ob">
       <div class="obs-head">
         <span class="obs-title">Buildia Live Observer</span>
-        <span class="obs-firewall" title="Safety firewall: the system never places a real broker order — Live is shadow only. This is intended.">🔒 ORDERS OFF</span>
+        <span class="obs-firewall" [class.on]="liveBrokerOn()" [title]="liveBrokerOn() ? 'S/R Live worker is placing real MIS orders on signals.' : 'Observer stays read-only. Press Start Live to enable orders.'">{{ liveBrokerOn() ? '⚡ ORDERS ON' : '🔒 OBSERVE ONLY' }}</span>
         <span class="obs-run" [class.on]="ob.running && ob.lastPollStatus !== 'error'">
           <span class="obs-dot"></span>{{ ob.running ? (ob.lastPollStatus === 'ok' ? 'RUNNING' : (ob.lastPollStatus | uppercase)) : 'STANDBY' }}
         </span>
@@ -85,18 +85,19 @@
 
     <div class="sr-live-status" *ngIf="liveOn() || liveTick()">
       <span class="lv-orb" [class.live]="liveOn()"></span>
-      <span *ngIf="liveOn()">Watching · scan #{{ liveTick() }}</span>
+      <span *ngIf="liveOn()">Live trading · scan #{{ liveTick() }}</span>
       <span *ngIf="!liveOn()">Paused</span>
       <span class="lv-at" *ngIf="liveAt()">last {{ liveAt() }}</span>
       <span class="lv-count">{{ liveSignals().length }} signal(s) today</span>
     </div>
+    <p class="obs-note" *ngIf="liveBrokerMsg()">{{ liveBrokerMsg() }}</p>
 
     <!-- Brain feed (shared markup) -->
     <div class="sr-announcer" *ngIf="announce().length">
       <div class="ann-head">
         <span class="ann-orb" [class.live]="liveOn()"></span>
         <span class="ann-title">Brain</span>
-        <span class="ann-status">{{ liveOn() ? 'watching…' : 'idle' }}</span>
+        <span class="ann-status">{{ liveOn() ? 'live orders…' : 'idle' }}</span>
       </div>
       <ul class="ann-feed">
         <li *ngFor="let a of announce()" [attr.data-tone]="a.tone">
@@ -121,18 +122,19 @@
           <span>target <span class="mono">{{ t.target }}</span> pts</span>
           <span class="tk-exit" *ngIf="t.exitReason === 'TARGET'">✓ hit target on candles</span>
         </div>
-        <p class="tk-note">You place this in Kite. Max loss = premium you pay.</p>
+        <p class="tk-note" *ngIf="placedFor(t)">Live order sent for this signal (BUY MIS + SL).</p>
+        <p class="tk-note" *ngIf="!placedFor(t)">Waiting for a fresh signal window — Live buys automatically, you do not ticket this in Kite.</p>
       </div>
     </div>
     <ng-template #noLive>
-      <p class="sr-note" *ngIf="liveOn()">No breakout yet today — the setup is selective. The Brain will call it the moment one forms.</p>
-      <p class="sr-note" *ngIf="!liveOn() && !liveTick()">Press <strong>Start Live</strong> after pushing a fresh Kite token. Signals and tickets appear here as they form.</p>
+      <p class="sr-note" *ngIf="liveOn()">No breakout yet today — Live stays armed. A BUY goes out the moment a fresh signal forms.</p>
+      <p class="sr-note" *ngIf="!liveOn() && !liveTick()">Push Token, then <strong>Start Live</strong>. Nifty / Bank Nifty options are bought automatically on signal (Crude stays observe-only).</p>
     </ng-template>
 
     <p class="sr-disclaimer">
-      Live watch is read-only: it fetches today's 5-min candles and computes signals. It cannot and will not place,
-      modify, or cancel any order. Every ticket is a suggestion you review and submit yourself. Max loss per option
-      trade = the premium you pay.
+      S/R Live places real Kite MIS orders when a signal is still fresh (about 20 minutes after the entry bar).
+      Protective stop is an SL limit (not SL-M). Max loss per option is bounded by that stop and the premium.
+      Do not run Auto Bot Live on the same account at the same time. Crude is not live-traded here.
     </p>
   </ng-container>
 

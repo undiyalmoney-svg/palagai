@@ -96,15 +96,20 @@ export class SrBreakoutComponent implements OnDestroy {
   readonly announcing = signal(false);
   private annTimers: ReturnType<typeof setTimeout>[] = [];
 
-  // ── Live watch state (shadow only — never places an order) ──────────────────
+  // ── Live worker state ───────────────────────────────────────────────────────
   readonly liveOn = signal(false);
   readonly liveResult = signal<SrResponse | null>(null);
   readonly liveTick = signal(0);            // poll counter
   readonly liveAt = signal('');             // last poll clock time
   readonly liveErr = signal('');
+  readonly liveBrokerOn = signal(false);
+  readonly liveBrokerMsg = signal('');
+  readonly liveEvents = signal<{ at: string; action: string; detail: string }[]>([]);
+  readonly liveEntered = signal<string[]>([]);
   private liveTimer: ReturnType<typeof setInterval> | null = null;
   private seenLive = new Set<string>();     // signal keys already narrated
-  private readonly LIVE_MS = 60_000;
+  private seenEvents = 0;
+  private readonly LIVE_MS = 15_000;
 
   // Strike step + Kite symbol root per instrument, for the manual order ticket.
   private readonly TICKET: Record<string, { step: number; root: string }> = {
@@ -146,11 +151,34 @@ export class SrBreakoutComponent implements OnDestroy {
 
   setTab(t: 'paper' | 'live'): void {
     this.tab.set(t);
-    if (t === 'live') this.startObserverPoll(); else this.stopObserverPoll();
+    if (t === 'live') {
+      this.startObserverPoll();
+      void this.hydrateLive();
+    } else {
+      this.stopObserverPoll();
+    }
   }
   toggle(key: string): void { this.sel[key] = !this.sel[key]; }
 
   // Poll the backend collector status (source of truth; runs server-side).
+  private async hydrateLive(): Promise<void> {
+    try {
+      const live = await firstValueFrom(this.http.get<{
+        running?: boolean; message?: string; entered?: string[];
+        events?: { at: string; action: string; detail: string }[];
+      }>(`${this.liveApiBase}/sr-breakout/live/status`));
+      this.liveBrokerOn.set(!!live.running);
+      this.liveBrokerMsg.set(live.message || '');
+      this.liveEntered.set(live.entered || []);
+      this.liveEvents.set(live.events || []);
+      if (live.running && !this.liveOn()) {
+        this.liveOn.set(true);
+        this.say([{ icon: '🟢', text: 'S/R Live already running on the server — attaching.', tone: 'accent' }]);
+        void this.pollLive();
+        if (!this.liveTimer) this.liveTimer = setInterval(() => void this.pollLive(), this.LIVE_MS);
+      }
+    } catch { /* status endpoint may be pre-deploy */ }
+  }
   private startObserverPoll(): void {
     if (this.obsTimer) return;
     void this.pollObserver();
@@ -268,31 +296,56 @@ export class SrBreakoutComponent implements OnDestroy {
 
   ngOnDestroy(): void { this.stopLive(); this.clearAnnouncer(); this.stopObserverPoll(); }
 
-  // ── Live watch (shadow) ─────────────────────────────────────────────────────
-  // Polls TODAY's candles on a timer and narrates new signals as they appear.
-  // It NEVER places an order — it shows a ticket you submit yourself in Kite.
-  toggleLive(): void { this.liveOn() ? this.stopLive() : this.startLive(); }
-  startLive(): void {
+  // ── Live: server worker places MIS when a signal fires ──────────────────────
+  toggleLive(): void { this.liveOn() ? this.stopLive() : void this.startLive(); }
+  private liveStartBody(): Record<string, unknown> {
+    const chosen = INSTRUMENTS.filter((i) => this.sel[i.key] && (i.key === 'nifty' || i.key === 'banknifty')).map((i) => i.key);
+    const body: Record<string, unknown> = {
+      instruments: chosen.length ? chosen : ['nifty'],
+      lots: Number(this.lots) || 1,
+      maxTradesPerDay: Number(this.maxTradesPerDay) || 3,
+    };
+    if (this.entryPts != null && this.entryPts !== ('' as unknown)) body['entryPts'] = this.entryPts;
+    if (this.dayLossStopRs != null && this.dayLossStopRs !== ('' as unknown)) body['dayLossStopRs'] = this.dayLossStopRs;
+    if (this.dayProfitTargetRs != null && this.dayProfitTargetRs !== ('' as unknown)) body['dayProfitTargetRs'] = this.dayProfitTargetRs;
+    return body;
+  }
+  async startLive(): Promise<void> {
     const chosen = INSTRUMENTS.filter((i) => this.sel[i.key]).map((i) => i.key);
     if (!chosen.length) { this.liveErr.set('Select at least one instrument first.'); return; }
     this.liveErr.set('');
     this.seenLive.clear();
+    this.seenEvents = 0;
     this.announce.set([]);
-    this.liveOn.set(true);
-    this.say([{ icon: '🟢', text: 'Live watch on. I will call every breakout as it forms — you place the orders.', tone: 'accent' }]);
-    void this.pollLive();
-    this.liveTimer = setInterval(() => void this.pollLive(), this.LIVE_MS);
+    try {
+      const res = await firstValueFrom(this.http.post<{
+        running?: boolean; message?: string; events?: { at: string; action: string; detail: string }[];
+      }>(`${this.liveApiBase}/sr-breakout/live/start`, this.liveStartBody()));
+      this.liveOn.set(!!res.running);
+      this.liveBrokerOn.set(!!res.running);
+      this.liveBrokerMsg.set(res.message || '');
+      this.seenEvents = (res.events || []).length;
+      this.say([{ icon: '🟢', text: 'S/R Live on. When a breakout prints, the server buys the option (MIS). Stop Auto Bot Live first if it is running.', tone: 'accent' }]);
+      void this.pollLive();
+      this.liveTimer = setInterval(() => void this.pollLive(), this.LIVE_MS);
+    } catch (err) {
+      const msg = (err as { error?: { message?: string } })?.error?.message;
+      this.liveErr.set(msg || 'Could not start S/R Live. Push Token, then retry. Stop Auto Bot Live first if it is running.');
+      this.liveOn.set(false);
+      this.liveBrokerOn.set(false);
+    }
   }
   stopLive(): void {
     if (this.liveTimer) { clearInterval(this.liveTimer); this.liveTimer = null; }
-    if (this.liveOn()) this.pushAnn({ icon: '⏸️', text: 'Live watch paused.', tone: 'muted' });
+    if (this.liveOn()) {
+      void firstValueFrom(this.http.post(`${this.liveApiBase}/sr-breakout/live/stop`, {})).catch(() => undefined);
+      this.pushAnn({ icon: '⏸️', text: 'S/R Live stopped — no new orders.', tone: 'muted' });
+    }
     this.liveOn.set(false);
+    this.liveBrokerOn.set(false);
   }
   private async pollLive(): Promise<void> {
     const chosen = INSTRUMENTS.filter((i) => this.sel[i.key]).map((i) => i.key);
-    // Identical risk params to Paper so Live and Paper apply the SAME rules
-    // (max trades/day + daily ±₹ brakes). The only intended difference is that
-    // Live runs on today's partial candles while Paper runs a complete day.
     const body: Record<string, unknown> = {
       instruments: chosen, fromDate: this.today, toDate: this.today,
       lots: Number(this.lots) || 1, maxTradesPerDay: Number(this.maxTradesPerDay) || 3,
@@ -303,16 +356,40 @@ export class SrBreakoutComponent implements OnDestroy {
     const kite = this.kiteSession.getAuthorizationHeader();
     const headers: Record<string, string> = kite ? { 'X-Kite-Authorization': kite } : {};
     try {
-      const res = await firstValueFrom(this.http.post<SrResponse>(`${this.liveApiBase}/sr-breakout`, body, { headers }));
+      const [res, live] = await Promise.all([
+        firstValueFrom(this.http.post<SrResponse>(`${this.liveApiBase}/sr-breakout`, body, { headers })),
+        firstValueFrom(this.http.get<{
+          running?: boolean; message?: string;
+          events?: { at: string; action: string; detail: string }[];
+          entered?: string[];
+        }>(`${this.liveApiBase}/sr-breakout/live/status`)),
+      ]);
       this.liveResult.set(res);
       this.liveTick.update((n) => n + 1);
       this.liveAt.set(new Date().toLocaleTimeString('en-IN', { hour12: false }));
       this.liveErr.set('');
+      this.liveBrokerOn.set(!!live.running);
+      this.liveBrokerMsg.set(live.message || '');
+      this.liveEvents.set(live.events || []);
+      this.liveEntered.set(live.entered || []);
       this.narrateNew(res);
+      this.narrateBroker(live.events || []);
     } catch (err) {
       const msg = (err as { error?: { message?: string } })?.error?.message;
       this.liveErr.set(msg || 'Live poll failed — Get Token (fresh daily), Push Token, then Start again.');
     }
+  }
+  private narrateBroker(events: { at: string; action: string; detail: string }[]): void {
+    if (events.length < this.seenEvents) this.seenEvents = 0;
+    for (const e of events.slice(this.seenEvents)) {
+      const tone = e.action === 'ERROR' || e.action === 'SKIP' ? 'warn' : e.action === 'ENTRY' ? 'accent' : 'muted';
+      const icon = e.action === 'ENTRY' ? '🟢' : e.action === 'SIGNAL' ? '📡' : e.action === 'SL' ? '🛡️' : e.action === 'ERROR' ? '⚠️' : '•';
+      this.pushAnn({ icon, text: `${e.action}: ${e.detail}`, tone });
+    }
+    this.seenEvents = events.length;
+  }
+  placedFor(t: SrTrade & { key: string }): boolean {
+    return this.liveEntered().includes(`${t.key}|${t.date}|${t.entryTime}`);
   }
   private narrateNew(res: SrResponse): void {
     const ok = res.results.filter((r) => !r.error);
@@ -324,7 +401,7 @@ export class SrBreakoutComponent implements OnDestroy {
         this.seenLive.add(key); fresh += 1;
         const opt = t.option === 'CE' ? 'call (CE)' : 'put (PE)';
         this.pushAnn({ icon: t.option === 'CE' ? '📈' : '📉', text: `${t.entryTime} ${r.name}: ${Math.abs(t.bodyPts)}pt candle broke ${t.side === 'BUY' ? 'resistance' : 'support'} — ${opt}, confidence ${this.stars(t.confidence)}, aim ${t.target} pts.`, tone: 'accent' });
-        this.pushAnn({ icon: '🎫', text: `Ticket ready: ${this.ticketText(t as SrTrade & { key: string })} — place it in Kite when you're happy.`, tone: 'muted' });
+        this.pushAnn({ icon: '🎯', text: `Live will BUY ${this.ticketText(t as SrTrade & { key: string })} if the signal is still fresh.`, tone: 'muted' });
       }
     }
     if (!fresh && this.liveTick() > 1) this.pushAnn({ icon: '🫧', text: `${this.liveAt()} — scanned, no new break. Holding.`, tone: 'muted' });
