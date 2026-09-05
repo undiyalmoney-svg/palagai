@@ -1,38 +1,40 @@
 /* ============================================================================
-   S/R Breakout — clean pro trading-terminal dashboard. Dark-first, theme-aware.
+   S/R Breakout — clean pro trading dashboard. LIGHT-first (matches the app
+   shell), theme-aware: dark only when the OS/app is actually in dark mode.
    Paper and Live share one visual language: header, cards, chips, tables, P&L.
    ============================================================================ */
 :host {
-  /* dark-first trading palette (the default look) */
+  /* light palette — the default, matching the light Palagai app shell */
+  --bg: #f4f6fa; --panel: #ffffff; --card: #ffffff; --card-2: #f6f8fc;
+  --line: #e2e7f0; --line-soft: #edf1f7;
+  --ink: #131924; --muted: #5b6678; --faint: #8b97aa;
+  --accent: #2f6bf0; --accent-soft: #e8effe;
+  --pos: #128a5f; --pos-soft: #e4f5ee; --neg: #d23b48; --neg-soft: #fdeaec; --amber: #b7791f;
+  --r: 12px; --r-sm: 8px; --r-xs: 6px;
+  --shadow: 0 1px 2px rgba(19,25,36,.04), 0 8px 24px -16px rgba(19,25,36,.14);
+  display: block; color: var(--ink);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background: var(--bg);
+}
+/* dark tokens: only when the OS prefers dark AND no explicit light override */
+@media (prefers-color-scheme: dark) {
+  :host:not([data-theme='light']) {
+    --bg: #0a0e15; --panel: #121824; --card: #171f2e; --card-2: #1c2637;
+    --line: #253044; --line-soft: #1c2536;
+    --ink: #e8edf6; --muted: #8a97ad; --faint: #5c6a82;
+    --accent: #4d8dff; --accent-soft: #16264a;
+    --pos: #2bd07c; --pos-soft: #0f2b22; --neg: #ff5d6c; --neg-soft: #2e1620; --amber: #ffb43a;
+    --shadow: 0 1px 0 rgba(255,255,255,.03) inset, 0 6px 20px -12px rgba(0,0,0,.6);
+  }
+}
+/* explicit dark toggle wins regardless of OS */
+:host[data-theme='dark'] {
   --bg: #0a0e15; --panel: #121824; --card: #171f2e; --card-2: #1c2637;
   --line: #253044; --line-soft: #1c2536;
   --ink: #e8edf6; --muted: #8a97ad; --faint: #5c6a82;
   --accent: #4d8dff; --accent-soft: #16264a;
   --pos: #2bd07c; --pos-soft: #0f2b22; --neg: #ff5d6c; --neg-soft: #2e1620; --amber: #ffb43a;
-  --r: 12px; --r-sm: 8px; --r-xs: 6px;
   --shadow: 0 1px 0 rgba(255,255,255,.03) inset, 0 6px 20px -12px rgba(0,0,0,.6);
-  display: block; color: var(--ink);
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  background: var(--bg);
-}
-:host(:not([data-theme='dark'])) { }
-@media (prefers-color-scheme: light) {
-  :host:not([data-theme='dark']) {
-    --bg: #eef1f6; --panel: #ffffff; --card: #ffffff; --card-2: #f5f7fb;
-    --line: #dde3ec; --line-soft: #e8ecf3;
-    --ink: #10151f; --muted: #5a6678; --faint: #8b97aa;
-    --accent: #2f6bf0; --accent-soft: #e6eefe;
-    --pos: #10996a; --pos-soft: #e2f5ee; --neg: #d23b48; --neg-soft: #fdeaec; --amber: #b7791f;
-    --shadow: 0 1px 2px rgba(16,21,31,.04), 0 8px 24px -16px rgba(16,21,31,.18);
-  }
-}
-:host[data-theme='light'] {
-  --bg: #eef1f6; --panel: #ffffff; --card: #ffffff; --card-2: #f5f7fb;
-  --line: #dde3ec; --line-soft: #e8ecf3;
-  --ink: #10151f; --muted: #5a6678; --faint: #8b97aa;
-  --accent: #2f6bf0; --accent-soft: #e6eefe;
-  --pos: #10996a; --pos-soft: #e2f5ee; --neg: #d23b48; --neg-soft: #fdeaec; --amber: #b7791f;
-  --shadow: 0 1px 2px rgba(16,21,31,.04), 0 8px 24px -16px rgba(16,21,31,.18);
 }
 
 .sr { max-width: 1180px; margin: 0 auto; padding: 22px 18px 56px; display: flex; flex-direction: column; gap: 18px; }

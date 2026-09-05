@@ -22,7 +22,7 @@
     <div class="sr-observer" *ngIf="observer() as ob">
       <div class="obs-head">
         <span class="obs-title">Buildia Live Observer</span>
-        <span class="obs-firewall" title="Real broker orders are disabled server-side">🔒 {{ ob.liveBrokerOrders || 'DISABLED' }}</span>
+        <span class="obs-firewall" title="Safety firewall: the system never places a real broker order — Live is shadow only. This is intended.">🔒 ORDERS OFF</span>
         <span class="obs-run" [class.on]="ob.running && ob.lastPollStatus !== 'error'">
           <span class="obs-dot"></span>{{ ob.running ? (ob.lastPollStatus === 'ok' ? 'RUNNING' : (ob.lastPollStatus | uppercase)) : 'STANDBY' }}
         </span>
