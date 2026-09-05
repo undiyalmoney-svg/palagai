@@ -75,6 +75,11 @@ export class SrBreakoutComponent implements OnDestroy {
   toDate = this.today;
   sel: Record<string, boolean> = { nifty: true, banknifty: true, crude: true };
   lots = 1;
+  strategy = 'baseline';            // 'baseline' | 'nifty_retest_v1' (candidate)
+  readonly strategyOptions = [
+    { id: 'baseline', label: 'Baseline (production)' },
+    { id: 'nifty_retest_v1', label: 'Nifty Retest V1 (candidate)' },
+  ];
   entryPts: number | null = null;   // blank = use per-instrument default
   dayLossStopRs: number | null = 3500;    // stop the day once loss reaches this
   dayProfitTargetRs: number | null = 3500; // stop the day once profit reaches this
@@ -196,7 +201,7 @@ export class SrBreakoutComponent implements OnDestroy {
 
     const body: Record<string, unknown> = {
       instruments: chosen, fromDate: this.fromDate, toDate: this.toDate, lots: Number(this.lots) || 1,
-      maxTradesPerDay: Number(this.maxTradesPerDay) || 3,
+      maxTradesPerDay: Number(this.maxTradesPerDay) || 3, strategy: this.strategy,
     };
     if (this.entryPts != null && this.entryPts !== ('' as unknown)) body['entryPts'] = this.entryPts;
     if (this.dayLossStopRs != null && this.dayLossStopRs !== ('' as unknown)) body['dayLossStopRs'] = this.dayLossStopRs;

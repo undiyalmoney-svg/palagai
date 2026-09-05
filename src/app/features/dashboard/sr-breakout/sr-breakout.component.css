@@ -195,3 +195,7 @@
 .au-read-prob { font-family: 'JetBrains Mono', monospace; font-size: 15px; font-weight: 700; color: var(--s-accent); }
 .au-read.sig .au-read-prob { color: var(--s-pos); }
 .au-read-txt { font-size: 13px; color: var(--s-ink); }
+
+/* strategy selector matches the form inputs */
+.fld select { background: var(--s-bg); border: 1px solid var(--s-line); border-radius: 7px; padding: 8px 10px; color: var(--s-ink); font: inherit; font-size: 13px; }
+.fld select:focus-visible { outline: 2px solid var(--s-accent); outline-offset: 1px; }
