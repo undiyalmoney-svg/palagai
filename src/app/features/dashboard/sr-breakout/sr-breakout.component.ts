@@ -290,11 +290,16 @@ export class SrBreakoutComponent implements OnDestroy {
   }
   private async pollLive(): Promise<void> {
     const chosen = INSTRUMENTS.filter((i) => this.sel[i.key]).map((i) => i.key);
+    // Identical risk params to Paper so Live and Paper apply the SAME rules
+    // (max trades/day + daily ±₹ brakes). The only intended difference is that
+    // Live runs on today's partial candles while Paper runs a complete day.
     const body: Record<string, unknown> = {
       instruments: chosen, fromDate: this.today, toDate: this.today,
       lots: Number(this.lots) || 1, maxTradesPerDay: Number(this.maxTradesPerDay) || 3,
     };
     if (this.entryPts != null && this.entryPts !== ('' as unknown)) body['entryPts'] = this.entryPts;
+    if (this.dayLossStopRs != null && this.dayLossStopRs !== ('' as unknown)) body['dayLossStopRs'] = this.dayLossStopRs;
+    if (this.dayProfitTargetRs != null && this.dayProfitTargetRs !== ('' as unknown)) body['dayProfitTargetRs'] = this.dayProfitTargetRs;
     const kite = this.kiteSession.getAuthorizationHeader();
     const headers: Record<string, string> = kite ? { 'X-Kite-Authorization': kite } : {};
     try {
