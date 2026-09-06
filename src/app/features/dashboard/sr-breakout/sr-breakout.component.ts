@@ -74,7 +74,10 @@ export class SrBreakoutComponent implements OnDestroy {
   fromDate = this.today;
   toDate = this.today;
   sel: Record<string, boolean> = { nifty: true, banknifty: true, crude: true };
-  lots = 1;
+  // Lots are PER INSTRUMENT — the books have very different tick values
+  // (Rs75 / Rs35 / Rs10 per point), so one shared size is rarely right.
+  // Defaults mirror the backend's `defaultLots`.
+  lotsBy: Record<string, number> = { nifty: 1, banknifty: 1, crude: 5 };
   // Strategy is AUTO-routed per instrument by the backend (Nifty → Retest V1,
   // Bank → Intraday V1, Crude → Baseline). No selector — the backend picks the
   // validated eligible strategy for each instrument.
@@ -226,7 +229,8 @@ export class SrBreakoutComponent implements OnDestroy {
     if (!this.fromDate || !this.toDate || this.fromDate > this.toDate) { this.error.set('Pick a valid From → To range.'); return; }
 
     const body: Record<string, unknown> = {
-      instruments: chosen, fromDate: this.fromDate, toDate: this.toDate, lots: Number(this.lots) || 1,
+      instruments: chosen, fromDate: this.fromDate, toDate: this.toDate,
+      lotsByInstrument: this.lotsPayload(chosen),
       maxTradesPerDay: Number(this.maxTradesPerDay) || 3,
     };
     if (this.entryPts != null && this.entryPts !== ('' as unknown)) body['entryPts'] = this.entryPts;
@@ -302,7 +306,7 @@ export class SrBreakoutComponent implements OnDestroy {
     const chosen = INSTRUMENTS.filter((i) => this.sel[i.key]).map((i) => i.key);
     const body: Record<string, unknown> = {
       instruments: chosen.length ? chosen : ['nifty'],
-      lots: Number(this.lots) || 1,
+      lotsByInstrument: this.lotsPayload(chosen.length ? chosen : ['nifty']),
       maxTradesPerDay: Number(this.maxTradesPerDay) || 3,
     };
     if (this.entryPts != null && this.entryPts !== ('' as unknown)) body['entryPts'] = this.entryPts;
@@ -348,7 +352,8 @@ export class SrBreakoutComponent implements OnDestroy {
     const chosen = INSTRUMENTS.filter((i) => this.sel[i.key]).map((i) => i.key);
     const body: Record<string, unknown> = {
       instruments: chosen, fromDate: this.today, toDate: this.today,
-      lots: Number(this.lots) || 1, maxTradesPerDay: Number(this.maxTradesPerDay) || 3,
+      lotsByInstrument: this.lotsPayload(chosen),
+      maxTradesPerDay: Number(this.maxTradesPerDay) || 3,
     };
     if (this.entryPts != null && this.entryPts !== ('' as unknown)) body['entryPts'] = this.entryPts;
     if (this.dayLossStopRs != null && this.dayLossStopRs !== ('' as unknown)) body['dayLossStopRs'] = this.dayLossStopRs;
@@ -417,9 +422,27 @@ export class SrBreakoutComponent implements OnDestroy {
     const step = this.TICKET[t.key]?.step || 50;
     return Math.round(t.entryPrice / step) * step;
   }
+  /** Lots for one instrument key, falling back to 1. */
+  lotsFor(key: string): number {
+    return Math.max(1, Number(this.lotsBy[key]) || 1);
+  }
+
+  /** Map a display name back to its instrument key (tickets carry the name). */
+  keyForName(name: string): string {
+    return INSTRUMENTS.find((i) => i.label === name)?.key || 'nifty';
+  }
+
+  /** { nifty: 1, ... } for the chosen instruments — the backend reads this. */
+  private lotsPayload(chosen: string[]): Record<string, number> {
+    const out: Record<string, number> = {};
+    for (const k of chosen) out[k] = this.lotsFor(k);
+    return out;
+  }
+
   ticketText(t: SrTrade & { key: string }): string {
     const root = this.TICKET[t.key]?.root || t.instrument;
-    return `BUY ${this.lots} lot ${root} ${this.atmStrike(t)} ${t.option} (nearest expiry)`;
+    const n = this.lotsFor(this.keyForName(t.instrument));
+    return `BUY ${n} lot${n > 1 ? 's' : ''} ${root} ${this.atmStrike(t)} ${t.option} (nearest expiry)`;
   }
 
   fmt(n: number): string { const s = n < 0 ? '-' : ''; return `${s}₹${Math.abs(Math.round(n)).toLocaleString('en-IN')}`; }

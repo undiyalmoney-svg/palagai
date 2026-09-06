@@ -93,6 +93,16 @@
 .chip.on .dot { background: var(--accent); border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent); }
 .fld.actions { flex-direction: row; gap: 10px; margin-left: auto; }
 
+/* Per-instrument lots — one box per book, wraps to a single column on phones */
+.fld.lotsfld { flex: 0 1 auto; min-width: 0; }
+.lotgrid { display: flex; gap: 10px; flex-wrap: wrap; }
+.lotcell { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.lotname { font-size: 10.5px; font-weight: 600; color: var(--faint); white-space: nowrap; }
+.lotcell input { width: 84px; }
+.lotcell.off { opacity: .45; }
+.lotcell.off .lotname { text-decoration: line-through; }
+
+
 /* buttons */
 .run, .push, .dl, .why { border-radius: var(--r-sm); padding: 11px 22px; font: inherit; font-size: 13.5px; font-weight: 650; cursor: pointer; border: 1px solid transparent; transition: all var(--ease); }
 .run { background: var(--accent); color: #fff; box-shadow: 0 4px 14px -6px color-mix(in srgb, var(--accent) 70%, transparent); }
@@ -242,6 +252,9 @@
   .sr-head { align-items: flex-start; } .sr-modes { width: 100%; } .sr-modes button { flex: 1; padding: 10px 0; }
   .fld.actions { margin-left: 0; width: 100%; flex-wrap: wrap; } .fld.actions button { flex: 1; }
   .fld.small input { width: 100%; }
+  .fld.lotsfld { width: 100%; }
+  .lotgrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .lotcell input { width: 100%; }
   .tot-val { font-size: 24px; }
 }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }

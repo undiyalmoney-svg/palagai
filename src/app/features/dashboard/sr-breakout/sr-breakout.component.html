@@ -63,9 +63,14 @@
           </button>
         </div>
       </div>
-      <div class="fld small">
-        <label>Lots</label>
-        <input type="number" min="1" [(ngModel)]="lots" />
+      <div class="fld lotsfld">
+        <label>Lots <span class="hint">(per instrument)</span></label>
+        <div class="lotgrid">
+          <label class="lotcell" *ngFor="let i of instruments" [class.off]="!sel[i.key]">
+            <span class="lotname">{{ i.label }}</span>
+            <input type="number" min="1" [(ngModel)]="lotsBy[i.key]" [name]="'lots-' + i.key" />
+          </label>
+        </div>
       </div>
       <div class="fld small">
         <label>Entry pts <span class="hint">(blank = default)</span></label>
@@ -157,9 +162,14 @@
           </button>
         </div>
       </div>
-      <div class="fld small">
-        <label>Lots</label>
-        <input type="number" min="1" [(ngModel)]="lots" />
+      <div class="fld lotsfld">
+        <label>Lots <span class="hint">(per instrument)</span></label>
+        <div class="lotgrid">
+          <label class="lotcell" *ngFor="let i of instruments" [class.off]="!sel[i.key]">
+            <span class="lotname">{{ i.label }}</span>
+            <input type="number" min="1" [(ngModel)]="lotsBy[i.key]" [name]="'lots-' + i.key" />
+          </label>
+        </div>
       </div>
       <div class="fld small">
         <label>Entry pts <span class="hint">(blank = default)</span></label>
