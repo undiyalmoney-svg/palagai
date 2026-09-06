@@ -11,15 +11,12 @@ import { KiteCallbackComponent } from './features/kite-callback/kite-callback.co
 import { LoginComponent } from './features/login/login.component';
 import { DashboardComponent } from './features/dashboard/dashboard.component';
 import { DashboardHomeComponent } from './features/dashboard/dashboard-home.component';
-import { TradeDeskComponent } from './features/dashboard/trade-desk/trade-desk.component';
-import { IndexDeskComponent } from './features/dashboard/index-desk/index-desk.component';
 import { SrBreakoutComponent } from './features/dashboard/sr-breakout/sr-breakout.component';
 import { OrderTestComponent } from './features/dashboard/order-test/order-test.component';
 import { GetTokenComponent } from './features/dashboard/get-token/get-token.component';
 import { SettingsComponent } from './features/dashboard/settings/settings.component';
 import { AutoTraderComponent } from './features/dashboard/auto-trader/auto-trader.component';
 import { PnlRecordsComponent } from './features/dashboard/pnl-records/pnl-records.component';
-import { StrategyManagerPageComponent } from './features/dashboard/strategy-manager/strategy-manager-page.component';
 import { VaultPageComponent } from './features/dashboard/vault/vault-page.component';
 import { AdminLoginComponent } from './features/admin/admin-login.component';
 import { AdminShellComponent } from './features/admin/admin-shell.component';
@@ -82,16 +79,6 @@ export const routes: Routes = [
         component: DashboardHomeComponent,
       },
       {
-        path: 'trade-desk',
-        canActivate: [moduleGuard('trade')],
-        component: TradeDeskComponent,
-      },
-      {
-        path: 'index-desk',
-        canActivate: [moduleGuard('trade')],
-        component: IndexDeskComponent,
-      },
-      {
         path: 'order-test',
         canActivate: [moduleGuard('test')],
         component: OrderTestComponent,
@@ -108,11 +95,6 @@ export const routes: Routes = [
         component: AutoTraderComponent,
       },
       {
-        path: 'strategy-manager',
-        canActivate: [moduleGuard('strat')],
-        component: StrategyManagerPageComponent,
-      },
-      {
         path: 'get-token',
         canActivate: [moduleGuard('token')],
         component: GetTokenComponent,
@@ -122,11 +104,6 @@ export const routes: Routes = [
         path: 'settings',
         component: SettingsComponent,
       },
-      { path: 'historical-tester', redirectTo: 'index-desk', pathMatch: 'full' },
-      { path: 'strategy', redirectTo: 'index-desk', pathMatch: 'full' },
-      { path: 'strategies', redirectTo: 'index-desk', pathMatch: 'full' },
-      { path: 'results', redirectTo: 'index-desk', pathMatch: 'full' },
-      { path: 'results/:id', redirectTo: 'index-desk' },
     ],
   },
   {

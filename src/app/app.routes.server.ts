@@ -11,10 +11,6 @@ export const serverRoutes: ServerRoute[] = [
   { path: 'dashboard/get-token', renderMode: RenderMode.Client },
   { path: 'admin/login', renderMode: RenderMode.Client },
   {
-    path: 'dashboard/results/:id',
-    renderMode: RenderMode.Server,
-  },
-  {
     path: '**',
     renderMode: RenderMode.Server,
   },

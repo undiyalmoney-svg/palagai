@@ -98,12 +98,13 @@ export class LoginComponent {
     if (result.ok) {
       await this.authService.refreshMe();
       const u = this.authService.currentUser();
-      let next = ['/dashboard/trade-desk'];
+      // S/R Breakout has no module guard, so it is the one page every signed-in
+      // user can reach — the default landing page now that Trade Desk is gone.
+      let next = ['/dashboard/sr-breakout'];
       if (peekKiteRequestToken()) {
         next = ['/dashboard/get-token'];
-      } else if (u && !this.authService.hasModule('trade')) {
-        if (this.authService.hasModule('auto')) next = ['/dashboard/auto-trader'];
-        else if (this.authService.hasModule('test')) next = ['/dashboard/order-test'];
+      } else if (u && !this.authService.hasModule('auto')) {
+        if (this.authService.hasModule('test')) next = ['/dashboard/order-test'];
         else if (this.authService.hasModule('token')) next = ['/dashboard/get-token'];
       }
       await this.router.navigate(next);

@@ -37,34 +37,13 @@ export class DashboardComponent implements OnInit, OnDestroy {
   private navSub: Subscription | null = null;
 
   protected readonly clockLabel = signal('');
-  protected readonly pageTitle = signal('Trade Desk');
-  protected readonly pageSubtitle = signal('Manage live trading, testing and paper trading.');
+  protected readonly pageTitle = signal('S/R Breakout');
+  protected readonly pageSubtitle = signal('Support/resistance breakout desk — paper and live.');
   /** Desktop starts open; mobile starts closed (set in ngOnInit). */
   protected readonly sidebarOpen = signal(true);
   protected readonly profileOpen = signal(false);
 
   private readonly allNav: NavItem[] = [
-    {
-      label: 'Trade',
-      shortLabel: 'Trade',
-      route: '/dashboard/trade-desk',
-      icon: 'trending-up',
-      module: 'trade',
-    },
-    {
-      label: 'Index',
-      shortLabel: 'Index',
-      route: '/dashboard/index-desk',
-      icon: 'layout-dashboard',
-      module: 'trade',
-    },
-    {
-      label: 'Strategy',
-      shortLabel: 'Strat',
-      route: '/dashboard/strategy-manager',
-      icon: 'sliders',
-      module: 'strat',
-    },
     {
       label: 'Auto',
       shortLabel: 'Auto',
@@ -96,18 +75,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
   ];
 
   private readonly titles: Record<string, { title: string; subtitle: string }> = {
-    '/dashboard/trade-desk': {
-      title: 'Trade Desk',
-      subtitle: 'Scan NSE stocks for swing setups and track entry / exit signals.',
-    },
-    '/dashboard/index-desk': {
-      title: 'Index Desk',
-      subtitle: 'Manage live trading, testing and paper trading from one place.',
-    },
-    '/dashboard/strategy-manager': {
-      title: 'Strategy Data',
-      subtitle: 'Fetch Kite historical candles and download as JSON / CSV.',
-    },
     '/dashboard/auto-trader': {
       title: 'Auto Trader',
       subtitle: 'Automated session runner with live order checks.',
