@@ -66,13 +66,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
       module: 'strat',
     },
     {
-      label: 'Experiments',
-      shortLabel: 'Expt',
-      route: '/dashboard/crude-oil',
-      icon: 'droplet',
-      module: 'crude',
-    },
-    {
       label: 'Auto',
       shortLabel: 'Auto',
       route: '/dashboard/auto-trader',
@@ -91,13 +84,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
       shortLabel: 'S/R',
       route: '/dashboard/sr-breakout',
       icon: 'trending-up',
-      module: null,
-    },
-    {
-      label: 'Target',
-      shortLabel: 'Target',
-      route: '/dashboard/daily-target',
-      icon: 'activity',
       module: null,
     },
     {
@@ -121,10 +107,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
     '/dashboard/strategy-manager': {
       title: 'Strategy Data',
       subtitle: 'Fetch Kite historical candles and download as JSON / CSV.',
-    },
-    '/dashboard/crude-oil': {
-      title: 'Experiments',
-      subtitle: 'Paper lab — Crude / Nat Gas Mini / Top 50 stocks for new DNAs.',
     },
     '/dashboard/auto-trader': {
       title: 'Auto Trader',

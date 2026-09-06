@@ -12,7 +12,6 @@ import {
 const MODULE_HOME: Array<{ module: SiteModule; path: string }> = [
   { module: 'trade', path: '/dashboard/trade-desk' },
   { module: 'strat', path: '/dashboard/strategy-manager' },
-  { module: 'crude', path: '/dashboard/crude-oil' },
   { module: 'auto', path: '/dashboard/auto-trader' },
   { module: 'test', path: '/dashboard/order-test' },
   { module: 'token', path: '/dashboard/get-token' },

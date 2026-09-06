@@ -102,8 +102,7 @@ export class LoginComponent {
       if (peekKiteRequestToken()) {
         next = ['/dashboard/get-token'];
       } else if (u && !this.authService.hasModule('trade')) {
-        if (this.authService.hasModule('crude')) next = ['/dashboard/crude-oil'];
-        else if (this.authService.hasModule('auto')) next = ['/dashboard/auto-trader'];
+        if (this.authService.hasModule('auto')) next = ['/dashboard/auto-trader'];
         else if (this.authService.hasModule('test')) next = ['/dashboard/order-test'];
         else if (this.authService.hasModule('token')) next = ['/dashboard/get-token'];
       }

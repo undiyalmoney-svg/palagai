@@ -14,11 +14,9 @@ import { DashboardHomeComponent } from './features/dashboard/dashboard-home.comp
 import { TradeDeskComponent } from './features/dashboard/trade-desk/trade-desk.component';
 import { IndexDeskComponent } from './features/dashboard/index-desk/index-desk.component';
 import { SrBreakoutComponent } from './features/dashboard/sr-breakout/sr-breakout.component';
-import { DailyTargetComponent } from './features/dashboard/daily-target/daily-target.component';
 import { OrderTestComponent } from './features/dashboard/order-test/order-test.component';
 import { GetTokenComponent } from './features/dashboard/get-token/get-token.component';
 import { SettingsComponent } from './features/dashboard/settings/settings.component';
-import { ExperimentsPageComponent } from './features/dashboard/experiments/experiments-page.component';
 import { AutoTraderComponent } from './features/dashboard/auto-trader/auto-trader.component';
 import { PnlRecordsComponent } from './features/dashboard/pnl-records/pnl-records.component';
 import { StrategyManagerPageComponent } from './features/dashboard/strategy-manager/strategy-manager-page.component';
@@ -102,18 +100,8 @@ export const routes: Routes = [
         path: 'sr-breakout',
         component: SrBreakoutComponent,
       },
-      {
-        path: 'daily-target',
-        component: DailyTargetComponent,
-      },
       { path: 'orders', redirectTo: '/admin/pnl', pathMatch: 'full' },
       { path: 'pnl-records', redirectTo: '/admin/pnl', pathMatch: 'full' },
-      {
-        path: 'crude-oil',
-        canActivate: [moduleGuard('crude')],
-        component: ExperimentsPageComponent,
-      },
-      { path: 'stocks', redirectTo: 'crude-oil', pathMatch: 'full' },
       {
         path: 'auto-trader',
         canActivate: [moduleGuard('auto')],
