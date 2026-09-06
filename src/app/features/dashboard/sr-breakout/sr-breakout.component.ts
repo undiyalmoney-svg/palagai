@@ -299,7 +299,7 @@ export class SrBreakoutComponent implements OnDestroy {
   // ── Live: server worker places MIS when a signal fires ──────────────────────
   toggleLive(): void { this.liveOn() ? this.stopLive() : void this.startLive(); }
   private liveStartBody(): Record<string, unknown> {
-    const chosen = INSTRUMENTS.filter((i) => this.sel[i.key] && (i.key === 'nifty' || i.key === 'banknifty')).map((i) => i.key);
+    const chosen = INSTRUMENTS.filter((i) => this.sel[i.key]).map((i) => i.key);
     const body: Record<string, unknown> = {
       instruments: chosen.length ? chosen : ['nifty'],
       lots: Number(this.lots) || 1,

@@ -128,13 +128,13 @@
     </div>
     <ng-template #noLive>
       <p class="sr-note" *ngIf="liveOn()">No breakout yet today — Live stays armed. A BUY goes out the moment a fresh signal forms.</p>
-      <p class="sr-note" *ngIf="!liveOn() && !liveTick()">Push Token, then <strong>Start Live</strong>. Nifty / Bank Nifty options are bought automatically on signal (Crude stays observe-only).</p>
+      <p class="sr-note" *ngIf="!liveOn() && !liveTick()">Push Token, then <strong>Start Live</strong>. Nifty / Bank Nifty / Crude Mini options are bought automatically on a fresh signal.</p>
     </ng-template>
 
     <p class="sr-disclaimer">
       S/R Live places real Kite MIS orders when a signal is still fresh (about 20 minutes after the entry bar).
       Protective stop is an SL limit (not SL-M). Max loss per option is bounded by that stop and the premium.
-      Do not run Auto Bot Live on the same account at the same time. Crude is not live-traded here.
+      Do not run Auto Bot Live on the same account at the same time. Crude Mini is live on this tab (MCX CE/PE, entry until 20:00, square-off 23:20 IST).
     </p>
   </ng-container>
 
