@@ -92,6 +92,7 @@ export class SrBreakoutComponent implements OnDestroy {
   readonly audit = signal<AuditResponse | null>(null);
   readonly auditing = signal(false);
   readonly pushing = signal(false);
+  readonly applyingLimits = signal(false);
   readonly tokenNote = signal('');
 
   // Live announcer — the "brain" narrating what the system is doing. Ephemeral.
@@ -339,6 +340,26 @@ export class SrBreakoutComponent implements OnDestroy {
       this.liveBrokerOn.set(false);
     }
   }
+
+  /** Push max-trades / day SL / day profit to the running worker without flattening. */
+  async applyLiveLimits(): Promise<void> {
+    this.liveErr.set('');
+    this.applyingLimits.set(true);
+    try {
+      const res = await firstValueFrom(this.http.post<{
+        running?: boolean; message?: string; events?: { at: string; action: string; detail: string }[];
+      }>(`${this.liveApiBase}/sr-breakout/live/start`, this.liveStartBody()));
+      this.liveBrokerOn.set(!!res.running);
+      this.liveBrokerMsg.set(res.message || '');
+      this.pushAnn({ icon: '🛠️', text: res.message || 'Live limits updated.', tone: 'accent' });
+    } catch (err) {
+      const msg = (err as { error?: { message?: string } })?.error?.message;
+      this.liveErr.set(msg || 'Could not apply limits. Start Live first.');
+    } finally {
+      this.applyingLimits.set(false);
+    }
+  }
+
   stopLive(): void {
     if (this.liveTimer) { clearInterval(this.liveTimer); this.liveTimer = null; }
     if (this.liveOn()) {

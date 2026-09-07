@@ -80,10 +80,20 @@
         <label>Max trades/day</label>
         <input type="number" min="1" [(ngModel)]="maxTradesPerDay" />
       </div>
+      <div class="fld small">
+        <label>Daily loss stop ₹ <span class="hint">(0 = off)</span></label>
+        <input type="number" min="0" [(ngModel)]="dayLossStopRs" placeholder="off" name="liveDayLoss" />
+      </div>
+      <div class="fld small">
+        <label>Daily profit stop ₹ <span class="hint">(0 = off)</span></label>
+        <input type="number" min="0" [(ngModel)]="dayProfitTargetRs" placeholder="off" name="liveDayProfit" />
+      </div>
       <div class="fld actions">
         <button class="push" (click)="pushToken()" [disabled]="pushing()">{{ pushing() ? 'Pushing…' : 'Push Token' }}</button>
         <button class="run" [class.stop]="liveOn()" (click)="toggleLive()">{{ liveOn() ? '■ Stop Live' : '▶ Start Live' }}</button>
+        <button class="why" type="button" *ngIf="liveOn()" (click)="applyLiveLimits()" [disabled]="applyingLimits()">{{ applyingLimits() ? 'Applying…' : 'Apply limits' }}</button>
       </div>
+      <p class="sr-token-note" *ngIf="liveOn()">Limits (max trades, day SL / day profit) apply on <strong>Start Live</strong> or <strong>Apply limits</strong> — changing the box alone does not move the worker.</p>
     </div>
     <p class="sr-token-note" *ngIf="tokenNote()" [class.ok]="tokenNote().startsWith('✓')">{{ tokenNote() }}</p>
     <p class="sr-error" *ngIf="liveErr()">{{ liveErr() }}</p>
