@@ -33,6 +33,10 @@ import {
   mergeSettings,
 } from '../../src/app/core/strategy-manager/engines/index-rule.engine';
 import {
+  evaluateOptionPeakTrail,
+  optionPeakTrailSettingsFromExtras,
+} from '../../src/app/core/paper-desk/option-peak-trail.util';
+import {
   createSmartPbDayState,
   channelProfileExtras,
   DEFAULT_SMART_PB_EXTRAS,
@@ -396,6 +400,8 @@ export {
   effectiveProtectiveStop,
   armPeakTrailFloor,
   applySlConfirmCutoff,
+  evaluateOptionPeakTrail,
+  optionPeakTrailSettingsFromExtras,
 };
 
 export type {
