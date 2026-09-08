@@ -162,7 +162,7 @@
 
   <ng-container *ngIf="tab() === 'paper'">
     <div class="sr-split-warn" role="status" *ngIf="niftyVehicle === 'fut'">
-      <strong>Nifty is nearest futures</strong> (not CE/PE). CE = BUY fut, PE = SELL fut. ₹ = pts × 65 — same greens as the index. Needs futures margin. Bank/Crude stay options. Switch to Options CE/PE below to check the option book.
+      <strong>Nifty is nearest futures</strong> (not CE/PE). CE = BUY fut, PE = SELL fut. ₹ = pts × 65. Run Paper also collects option 5-min bars and shows Opt ₹. Bank/Crude stay options.
     </div>
     <div class="sr-split-warn" role="status" *ngIf="niftyVehicle === 'option'">
       <strong>Nifty Paper ₹ is CE/PE</strong> (ATM weekly, ask/bid, charges, SL). Same signals as futures, different money. Live still trades Nifty futures. Expired weeklies can print —. Bank/Crude stay options.
@@ -290,6 +290,8 @@
         <div class="tot"><span class="tot-label">{{ paperRupeeNoun() }} profit</span><span class="tot-val pos">{{ fmt(t.profit) }}</span></div>
         <div class="tot"><span class="tot-label">{{ paperRupeeNoun() }} loss</span><span class="tot-val neg">{{ fmt(t.loss) }}</span></div>
         <div class="tot big"><span class="tot-label">{{ paperRupeeNoun() }} net</span><span class="tot-val" [class.pos]="t.net >= 0" [class.neg]="t.net < 0">{{ fmt(t.net) }}</span></div>
+        <div class="tot" *ngIf="t.optionPriced"><span class="tot-label">Collected option net</span><span class="tot-val" [class.pos]="t.optionNet >= 0" [class.neg]="t.optionNet < 0">{{ fmt(t.optionNet) }}</span></div>
+        <div class="tot" *ngIf="t.optionPriced"><span class="tot-label">Option W / L</span><span class="tot-val">{{ t.optionWins }} / {{ t.optionLosses }}</span></div>
         <div class="tot"><span class="tot-label">Trades (W / L)</span><span class="tot-val">{{ t.wins }} / {{ t.losses }}</span></div>
         <div class="tot"><span class="tot-label">Window</span><span class="tot-val sm">{{ r.fromDate }} → {{ r.toDate }}<span *ngIf="r.isToday" class="live-badge">TODAY</span></span></div>
       </div>
@@ -315,14 +317,14 @@
       <div class="sr-table-wrap" *ngIf="allTrades().length; else noTrades">
         <table class="sr-table">
           <thead>
-            <tr><th>Date</th><th>Instrument</th><th>Opt</th><th>Contract</th><th title="Confidence 1–3">Conf</th><th>Entry</th><th class="num">Price</th><th class="num">Tgt</th><th>Exit</th><th class="num">Price</th><th>Why</th><th class="num">Pts</th><th class="num">₹</th></tr>
+            <tr><th>Date</th><th>Instrument</th><th>Opt</th><th>Contract</th><th title="Confidence 1–3">Conf</th><th>Entry</th><th class="num">Price</th><th class="num">Tgt</th><th>Exit</th><th class="num">Price</th><th>Why</th><th class="num">Pts</th><th class="num">₹</th><th class="num">Opt ₹</th></tr>
           </thead>
           <tbody>
             <tr *ngFor="let t of allTrades()">
               <td class="mono">{{ t.date }}</td>
               <td>{{ t.instrument }}</td>
               <td><span class="opt" [class.ce]="t.option === 'CE'" [class.pe]="t.option === 'PE'">{{ t.option }}</span></td>
-              <td class="mono">{{ t.optionSymbol || '—' }}</td>
+              <td class="mono">{{ t.optionSymbol || '—' }}<span class="card-contract" *ngIf="t.optionContract && t.optionContract !== t.optionSymbol"> {{ t.optionContract }}</span></td>
               <td><span class="conf" [attr.data-score]="t.confidence" [title]="'Confidence ' + t.confidence + '/3'">{{ stars(t.confidence) }}</span></td>
               <td class="mono">{{ t.entryTime }}</td>
               <td class="num mono">{{ t.entryPrice }}</td>
@@ -332,6 +334,7 @@
               <td><span class="why" [class.tgt]="t.exitReason === 'TARGET'">{{ t.exitReason }}</span></td>
               <td class="num mono" [class.pos]="t.points >= 0" [class.neg]="t.points < 0">{{ t.points }}</td>
               <td class="num mono" [class.pos]="t.rupees > 0" [class.neg]="t.rupees < 0">{{ t.rupees == null ? '—' : fmt(t.rupees) }}</td>
+              <td class="num mono" [class.pos]="(t.optionRupees || 0) > 0" [class.neg]="(t.optionRupees || 0) < 0">{{ t.optionRupees == null ? '—' : fmt(t.optionRupees) }}</td>
             </tr>
           </tbody>
         </table>
@@ -340,7 +343,7 @@
     </ng-container>
 
     <p class="sr-disclaimer">
-      <ng-container *ngIf="niftyVehicle === 'fut'">Nifty Paper/Live is the index future (1 pt = ₹65). You cannot buy cash Nifty 50. PE days sell the future. Use Options CE/PE to check the option book — that does not change Live.</ng-container>
+      <ng-container *ngIf="niftyVehicle === 'fut'">Nifty Paper ₹ is the index future (1 pt = ₹65). Each Run Paper also collects ATM weekly CE/PE 5-min bars and fills Opt ₹. Later runs reuse that cache if Kite no longer lists the weekly. Live still trades futures.</ng-container>
       <ng-container *ngIf="niftyVehicle === 'option'">Nifty Paper ₹ is CE/PE premium (not pts × 65). Live still buys/sells nearest Nifty futures. Bank/Crude stay options either way.</ng-container>
     </p>
   </ng-container>

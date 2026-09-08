@@ -11,6 +11,8 @@ interface SrTrade {
   entryTime: string; entryPrice: number; level: number; bodyPts: number; target: number;
   exitTime: string; exitPrice: number; exitReason: string; points: number; rupees: number;
   optionSymbol?: string | null; rupeesSource?: string | null;
+  optionContract?: string | null; optionRupees?: number | null;
+  optionRupeesSource?: string | null; optionBarsSource?: string | null;
   optionEntryPremium?: number | null; optionExitPremium?: number | null;
 }
 interface SrSummary {
@@ -18,10 +20,14 @@ interface SrSummary {
   grossPoints: number; grossRupees: number; tgtHitPct: number;
   totalProfitRupees: number; totalLossRupees: number; netRupees: number;
 }
+interface SrOptionBook {
+  priced: number; wins: number; losses: number; profit: number; loss: number; net: number;
+}
 interface SrInstrumentResult {
   key: string; name: string; contract?: string; token: string; candles: number;
   summary: SrSummary; trades: SrTrade[]; error?: string;
   params?: { rupeesMode?: string; vehicle?: string };
+  optionBook?: SrOptionBook;
 }
 interface ObserverStatus {
   running: boolean; lastPoll: string | null; lastPollStatus: string; idleReason: string | null;
@@ -153,6 +159,12 @@ export class SrBreakoutComponent implements OnDestroy {
       profit: ok.reduce((a, x) => a + x.summary.totalProfitRupees, 0),
       loss: ok.reduce((a, x) => a + x.summary.totalLossRupees, 0),
       net: ok.reduce((a, x) => a + x.summary.netRupees, 0),
+      optionPriced: ok.reduce((a, x) => a + (x.optionBook?.priced || 0), 0),
+      optionProfit: ok.reduce((a, x) => a + (x.optionBook?.profit || 0), 0),
+      optionLoss: ok.reduce((a, x) => a + (x.optionBook?.loss || 0), 0),
+      optionNet: ok.reduce((a, x) => a + (x.optionBook?.net || 0), 0),
+      optionWins: ok.reduce((a, x) => a + (x.optionBook?.wins || 0), 0),
+      optionLosses: ok.reduce((a, x) => a + (x.optionBook?.losses || 0), 0),
     };
   });
 
@@ -299,7 +311,7 @@ export class SrBreakoutComponent implements OnDestroy {
   downloadCsv(): void {
     const trades = this.allTrades();
     if (!trades.length) return;
-    const cols = ['date', 'instrument', 'option', 'optionSymbol', 'side', 'confidence', 'entryTime', 'entryPrice', 'level', 'bodyPts', 'target', 'exitTime', 'exitPrice', 'exitReason', 'points', 'rupees', 'rupeesSource'];
+    const cols = ['date', 'instrument', 'option', 'optionSymbol', 'optionContract', 'side', 'confidence', 'entryTime', 'entryPrice', 'level', 'bodyPts', 'target', 'exitTime', 'exitPrice', 'exitReason', 'points', 'rupees', 'rupeesSource', 'optionRupees', 'optionRupeesSource', 'optionBarsSource'];
     const lines = [cols.join(',')];
     for (const t of trades) lines.push(cols.map((c) => (t as unknown as Record<string, unknown>)[c]).join(','));
     const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
