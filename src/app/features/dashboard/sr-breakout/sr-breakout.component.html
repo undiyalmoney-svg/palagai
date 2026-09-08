@@ -107,6 +107,15 @@
     </div>
     <p class="obs-note" *ngIf="liveBrokerMsg()">{{ liveBrokerMsg() }}</p>
 
+    <div class="sr-kite-pnl" *ngIf="liveOn() && kitePnl() as k">
+      <div class="tot big">
+        <span class="tot-label">Kite option P&amp;L</span>
+        <span class="tot-val" [class.pos]="k.netRs >= 0" [class.neg]="k.netRs < 0">{{ fmt(k.netRs) }}</span>
+      </div>
+      <div class="tot"><span class="tot-label">Closed fills</span><span class="tot-val">{{ fmt(k.closedRs) }}</span></div>
+      <div class="tot"><span class="tot-label">Open MTM</span><span class="tot-val">{{ fmt(k.openRs) }}</span></div>
+    </div>
+
     <!-- Brain feed (shared markup) -->
     <div class="sr-announcer" *ngIf="announce().length">
       <div class="ann-head">
@@ -155,6 +164,13 @@
   </ng-container>
 
   <ng-container *ngIf="tab() === 'paper'">
+    <div class="sr-split-warn" role="status">
+      <strong>Paper ₹ is not Kite money.</strong>
+      These cards are index points × lot (Nifty 65 / Bank 30). Today that is why you see
+      Bank ₹600 (20 pts × 30) — your BANKNIFTY PE on Kite was option premium (about −₹3).
+      Open the <button type="button" class="sr-inline" (click)="setTab('live')">Live</button> tab
+      for Kite option P&amp;L, or check Positions.
+    </div>
     <!-- FORM -->
     <div class="sr-form">
       <div class="fld">

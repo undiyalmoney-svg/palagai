@@ -110,6 +110,7 @@ export class SrBreakoutComponent implements OnDestroy {
   readonly liveBrokerMsg = signal('');
   readonly liveEvents = signal<{ at: string; action: string; detail: string }[]>([]);
   readonly liveEntered = signal<string[]>([]);
+  readonly kitePnl = signal<{ closedRs: number; openRs: number; netRs: number } | null>(null);
   private liveTimer: ReturnType<typeof setInterval> | null = null;
   private seenLive = new Set<string>();     // signal keys already narrated
   private seenEvents = 0;
@@ -170,11 +171,13 @@ export class SrBreakoutComponent implements OnDestroy {
       const live = await firstValueFrom(this.http.get<{
         running?: boolean; message?: string; entered?: string[];
         events?: { at: string; action: string; detail: string }[];
+        kitePnl?: { closedRs: number; openRs: number; netRs: number };
       }>(`${this.liveApiBase}/sr-breakout/live/status`));
       this.liveBrokerOn.set(!!live.running);
       this.liveBrokerMsg.set(live.message || '');
       this.liveEntered.set(live.entered || []);
       this.liveEvents.set(live.events || []);
+      if (live.kitePnl) this.kitePnl.set(live.kitePnl);
       if (live.running && !this.liveOn()) {
         this.liveOn.set(true);
         this.say([{ icon: '🟢', text: 'S/R Live already running on the server — attaching.', tone: 'accent' }]);
@@ -388,6 +391,7 @@ export class SrBreakoutComponent implements OnDestroy {
           running?: boolean; message?: string;
           events?: { at: string; action: string; detail: string }[];
           entered?: string[];
+          kitePnl?: { closedRs: number; openRs: number; netRs: number };
         }>(`${this.liveApiBase}/sr-breakout/live/status`)),
       ]);
       this.liveResult.set(res);
@@ -398,6 +402,7 @@ export class SrBreakoutComponent implements OnDestroy {
       this.liveBrokerMsg.set(live.message || '');
       this.liveEvents.set(live.events || []);
       this.liveEntered.set(live.entered || []);
+      if (live.kitePnl) this.kitePnl.set(live.kitePnl);
       this.narrateNew(res);
       this.narrateBroker(live.events || []);
     } catch (err) {
