@@ -487,7 +487,7 @@ export class SrBreakoutComponent implements OnDestroy {
     const nifty = this.result()?.results.find((x) => x.key === 'nifty' && !x.error);
     const mode = nifty?.params?.rupeesMode || (this.niftyVehicle === 'option' ? 'option-live' : 'index-fut');
     if (mode === 'option-live') return 'Option';
-    if (mode === 'index-fut' && this.sel.nifty && !this.sel.banknifty && !this.sel.crude) return 'Futures';
+    if (mode === 'index-fut' && this.sel['nifty'] && !this.sel['banknifty'] && !this.sel['crude']) return 'Futures';
     return 'Paper';
   }
 

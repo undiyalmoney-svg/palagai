@@ -185,7 +185,7 @@
           </button>
         </div>
       </div>
-      <div class="fld instruments" *ngIf="sel.nifty">
+      <div class="fld instruments" *ngIf="sel['nifty']">
         <label>Nifty ₹ <span class="hint">(Paper only — Live stays futures)</span></label>
         <div class="chips">
           <button type="button" class="chip" [class.on]="niftyVehicle === 'fut'" (click)="niftyVehicle = 'fut'">Futures (Live)</button>
