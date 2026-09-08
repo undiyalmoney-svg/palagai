@@ -10,13 +10,19 @@ interface SrTrade {
   date: string; instrument: string; side: string; option: string; confidence: number;
   entryTime: string; entryPrice: number; level: number; bodyPts: number; target: number;
   exitTime: string; exitPrice: number; exitReason: string; points: number; rupees: number;
+  optionSymbol?: string | null; rupeesSource?: string | null;
+  optionEntryPremium?: number | null; optionExitPremium?: number | null;
 }
 interface SrSummary {
   trades: number; wins: number; losses: number; winPct: number;
   grossPoints: number; grossRupees: number; tgtHitPct: number;
   totalProfitRupees: number; totalLossRupees: number; netRupees: number;
 }
-interface SrInstrumentResult { key: string; name: string; contract?: string; token: string; candles: number; summary: SrSummary; trades: SrTrade[]; error?: string; }
+interface SrInstrumentResult {
+  key: string; name: string; contract?: string; token: string; candles: number;
+  summary: SrSummary; trades: SrTrade[]; error?: string;
+  params?: { rupeesMode?: string; vehicle?: string };
+}
 interface ObserverStatus {
   running: boolean; lastPoll: string | null; lastPollStatus: string; idleReason: string | null;
   polls: number; lastSignalId: string | null;
@@ -78,6 +84,8 @@ export class SrBreakoutComponent implements OnDestroy {
   // (Rs65 / Rs30 / Rs10 per point), so one shared size is rarely right.
   // Defaults mirror the backend's `defaultLots`.
   lotsBy: Record<string, number> = { nifty: 1, banknifty: 1, crude: 5 };
+  /** Paper only. Live Nifty stays futures. 'option' re-prices Nifty as CE/PE. */
+  niftyVehicle: 'fut' | 'option' = 'fut';
   // Strategy is AUTO-routed per instrument by the backend (Nifty → Retest V1,
   // Bank → Intraday V1, Crude → Baseline). No selector — the backend picks the
   // validated eligible strategy for each instrument.
@@ -236,6 +244,7 @@ export class SrBreakoutComponent implements OnDestroy {
       instruments: chosen, fromDate: this.fromDate, toDate: this.toDate,
       lotsByInstrument: this.lotsPayload(chosen),
       maxTradesPerDay: Number(this.maxTradesPerDay) || 3,
+      niftyVehicle: this.niftyVehicle,
     };
     if (this.entryPts != null && this.entryPts !== ('' as unknown)) body['entryPts'] = this.entryPts;
     if (this.dayLossStopRs != null && this.dayLossStopRs !== ('' as unknown)) body['dayLossStopRs'] = this.dayLossStopRs;
@@ -290,7 +299,7 @@ export class SrBreakoutComponent implements OnDestroy {
   downloadCsv(): void {
     const trades = this.allTrades();
     if (!trades.length) return;
-    const cols = ['date', 'instrument', 'option', 'side', 'confidence', 'entryTime', 'entryPrice', 'level', 'bodyPts', 'target', 'exitTime', 'exitPrice', 'exitReason', 'points', 'rupees'];
+    const cols = ['date', 'instrument', 'option', 'optionSymbol', 'side', 'confidence', 'entryTime', 'entryPrice', 'level', 'bodyPts', 'target', 'exitTime', 'exitPrice', 'exitReason', 'points', 'rupees', 'rupeesSource'];
     const lines = [cols.join(',')];
     for (const t of trades) lines.push(cols.map((c) => (t as unknown as Record<string, unknown>)[c]).join(','));
     const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
@@ -473,6 +482,15 @@ export class SrBreakoutComponent implements OnDestroy {
 
   fmt(n: number): string { const s = n < 0 ? '-' : ''; return `${s}₹${Math.abs(Math.round(n)).toLocaleString('en-IN')}`; }
 
+  /** Label for Paper totals: futures pts×65 vs CE/PE premium. */
+  paperRupeeNoun(): string {
+    const nifty = this.result()?.results.find((x) => x.key === 'nifty' && !x.error);
+    const mode = nifty?.params?.rupeesMode || (this.niftyVehicle === 'option' ? 'option-live' : 'index-fut');
+    if (mode === 'option-live') return 'Option';
+    if (mode === 'index-fut' && this.sel.nifty && !this.sel.banknifty && !this.sel.crude) return 'Futures';
+    return 'Paper';
+  }
+
   stars(score: number): string { return '★'.repeat(Math.max(0, Math.min(3, score))) + '☆'.repeat(3 - Math.max(0, Math.min(3, score))); }
 
   // ── Live announcer ────────────────────────────────────────────────────────
@@ -518,7 +536,7 @@ export class SrBreakoutComponent implements OnDestroy {
         lines.push({
           icon: win ? '✅' : '🔴',
           text: win
-            ? `${t.exitReason === 'TARGET' ? 'Index target' : 'Closed'} — ${t.rupees != null ? 'option ' + this.fmt(t.rupees) : 'option ₹ unavailable'} (premium, not index × lot).`
+            ? `${t.exitReason === 'TARGET' ? 'Index target' : 'Closed'} — ${t.rupees != null ? this.fmt(t.rupees) : '₹ unavailable'} (${t.rupeesSource === 'index-fut' ? 'futures pts × lot' : 'CE/PE premium'}).`
             : `Exited at ${t.exitPrice} — ${t.points} pts (${this.fmt(t.rupees)}). Sat through it.`,
           tone: win ? 'good' : 'bad',
         });
@@ -528,7 +546,7 @@ export class SrBreakoutComponent implements OnDestroy {
       lines.push({ icon: s.netRupees >= 0 ? '🟩' : '🟥', text: `${r.name} wrapped: ${s.trades} trades, ${s.winPct}% hit, net ${this.fmt(s.netRupees)}.`, tone: s.netRupees >= 0 ? 'good' : 'bad' });
     }
     const tot = this.totals();
-    if (tot) lines.push({ icon: '😌', text: `Session done. ${tot.trades} trades — option net ${this.fmt(tot.net)} (CE/PE premium, same as Live).`, tone: tot.net >= 0 ? 'good' : 'bad' });
+    if (tot) lines.push({ icon: '😌', text: `Session done. ${tot.trades} trades — ${this.paperRupeeNoun().toLowerCase()} net ${this.fmt(tot.net)}. Live Nifty is still futures.`, tone: tot.net >= 0 ? 'good' : 'bad' });
     this.say(lines);
   }
 }
