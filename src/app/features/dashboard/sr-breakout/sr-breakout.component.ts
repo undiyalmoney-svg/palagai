@@ -21,7 +21,7 @@ interface SrSummary {
   totalProfitRupees: number; totalLossRupees: number; netRupees: number;
 }
 interface SrOptionBook {
-  priced: number; wins: number; losses: number; profit: number; loss: number; net: number;
+  attempted?: number; priced: number; wins: number; losses: number; profit: number; loss: number; net: number;
 }
 interface SrInstrumentResult {
   key: string; name: string; contract?: string; token: string; candles: number;
