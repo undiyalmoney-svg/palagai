@@ -75,7 +75,7 @@ export class SrBreakoutComponent implements OnDestroy {
   toDate = this.today;
   sel: Record<string, boolean> = { nifty: true, banknifty: true, crude: true };
   // Lots are PER INSTRUMENT — the books have very different tick values
-  // (Rs75 / Rs35 / Rs10 per point), so one shared size is rarely right.
+  // (Rs65 / Rs30 / Rs10 per point), so one shared size is rarely right.
   // Defaults mirror the backend's `defaultLots`.
   lotsBy: Record<string, number> = { nifty: 1, banknifty: 1, crude: 5 };
   // Strategy is AUTO-routed per instrument by the backend (Nifty → Retest V1,
@@ -427,7 +427,7 @@ export class SrBreakoutComponent implements OnDestroy {
         this.seenLive.add(key); fresh += 1;
         const opt = t.option === 'CE' ? 'call (CE)' : 'put (PE)';
         this.pushAnn({ icon: t.option === 'CE' ? '📈' : '📉', text: `${t.entryTime} ${r.name}: ${Math.abs(t.bodyPts)}pt candle broke ${t.side === 'BUY' ? 'resistance' : 'support'} — ${opt}, confidence ${this.stars(t.confidence)}, aim ${t.target} pts.`, tone: 'accent' });
-        this.pushAnn({ icon: '🎯', text: `Live will BUY ${this.ticketText(t as SrTrade & { key: string })} if the signal is still fresh.`, tone: 'muted' });
+        this.pushAnn({ icon: '🎯', text: `Live will BUY ${this.ticketText(t as SrTrade & { key: string })} if the signal is still fresh. Index ₹ on Paper is not the option P&L.`, tone: 'muted' });
       }
     }
     if (!fresh && this.liveTick() > 1) this.pushAnn({ icon: '🫧', text: `${this.liveAt()} — scanned, no new break. Holding.`, tone: 'muted' });
@@ -513,7 +513,7 @@ export class SrBreakoutComponent implements OnDestroy {
         lines.push({
           icon: win ? '✅' : '🔴',
           text: win
-            ? `${t.exitReason === 'TARGET' ? 'Target hit' : 'Closed green'} at ${t.exitPrice} — +${t.points} pts (${this.fmt(t.rupees)}).`
+            ? `${t.exitReason === 'TARGET' ? 'Target hit on the INDEX' : 'Closed green on the INDEX'} at ${t.exitPrice} — +${t.points} index pts (${this.fmt(t.rupees)} futures-equivalent, not Kite option P&L).`
             : `Exited at ${t.exitPrice} — ${t.points} pts (${this.fmt(t.rupees)}). Sat through it.`,
           tone: win ? 'good' : 'bad',
         });
@@ -523,7 +523,7 @@ export class SrBreakoutComponent implements OnDestroy {
       lines.push({ icon: s.netRupees >= 0 ? '🟩' : '🟥', text: `${r.name} wrapped: ${s.trades} trades, ${s.winPct}% hit, net ${this.fmt(s.netRupees)}.`, tone: s.netRupees >= 0 ? 'good' : 'bad' });
     }
     const tot = this.totals();
-    if (tot) lines.push({ icon: '😌', text: `Session done. ${tot.trades} trades across all books — net ${this.fmt(tot.net)}. That's the honest number, after nothing hidden.`, tone: tot.net >= 0 ? 'good' : 'bad' });
+    if (tot) lines.push({ icon: '😌', text: `Session done. ${tot.trades} trades — index net ${this.fmt(tot.net)}. This is NOT Kite option P&L (premium, delta, and lot 65/30).`, tone: tot.net >= 0 ? 'good' : 'bad' });
     this.say(lines);
   }
 }
