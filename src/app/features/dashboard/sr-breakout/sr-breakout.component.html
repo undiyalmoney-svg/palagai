@@ -165,8 +165,8 @@
 
   <ng-container *ngIf="tab() === 'paper'">
     <div class="sr-split-warn" role="status">
-      <strong>Paper ₹ is option premium</strong> (same CE/PE Live buys), from Kite option candles at entry/exit — not index points × lot.
-      Wins/losses follow that option P&amp;L. Live still needs <em>Start Live</em> to place Kite orders.
+      <strong>Paper ₹ is Live-like option P&amp;L</strong> — same CE/PE, buy/sell friction, F&amp;O charges, and the SL trigger+limit if premium tags the stop.
+      Not index points × lot. Kite fills can still differ by a few rupees. Live still needs <em>Start Live</em>.
     </div>
     <!-- FORM -->
     <div class="sr-form">
@@ -333,8 +333,8 @@
     </ng-container>
 
     <p class="sr-disclaimer">
-      Paper ₹ is the CE/PE premium change on Kite 5-min candles (lot 65 Nifty / 30 Bank), same contracts Live buys.
-      Index points stay in the Pts column. Live P&amp;L is the fill; Paper is the option candle mark — they should be close, not index × lot.
+      Paper ₹ uses the same Live marks: worse than the 5-min close (ask in, bid out), minus charges, and the SL-LIMIT if it would have fired.
+      Index points stay in Pts. That is the best Paper can do without a Kite fill — not a photocopy of tomorrow’s P&amp;L.
     </p>
   </ng-container>
 </section>
