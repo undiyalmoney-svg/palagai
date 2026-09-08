@@ -157,16 +157,15 @@
 
     <p class="sr-disclaimer">
       S/R Live places real Kite MIS orders when a signal is still fresh (about 20 minutes after the entry bar).
-      Paper/Brain ₹ is index points × lot (65 Nifty / 30 Bank), not option premium. Check Kite Positions for Live P&amp;L.
-      Protective stop is an SL limit (not SL-M). Max loss per option is bounded by that stop and the premium.
-      Do not run Auto Bot Live on the same account at the same time. Crude Mini is live on this tab (MCX CE/PE, entry until 20:00, square-off 23:20 IST).
+      Paper ₹ is the option CE/PE, not index points × lot. Check Kite for the live fill.
+      Protective stop is an SL limit (not SL-M). Do not run Auto Bot Live on the same account at the same time.
     </p>
   </ng-container>
 
   <ng-container *ngIf="tab() === 'paper'">
     <div class="sr-split-warn" role="status">
-      <strong>Paper ₹ is Live-like option P&amp;L</strong> — same CE/PE, buy/sell friction, F&amp;O charges, and the SL trigger+limit if premium tags the stop.
-      Not index points × lot. Kite fills can still differ by a few rupees. Live still needs <em>Start Live</em>.
+      <strong>Paper ₹ is option CE/PE</strong> (ask/bid friction + charges). LOCK/TARGET are market exits — they are not dumped on the Auto Bot ₹300 stop.
+      Index TARGET +20 pts can still lose rupees if that option did not pay. Not index × lot.
     </div>
     <!-- FORM -->
     <div class="sr-form">
@@ -333,8 +332,8 @@
     </ng-container>
 
     <p class="sr-disclaimer">
-      Paper ₹ uses the same Live marks: worse than the 5-min close (ask in, bid out), minus charges, and the SL-LIMIT if it would have fired.
-      Index points stay in Pts. That is the best Paper can do without a Kite fill — not a photocopy of tomorrow’s P&amp;L.
+      Paper ₹ is the CE/PE path (friction + charges). Pts is the index. TARGET in pts is not TARGET in rupees.
+      The Auto Bot ₹300 wick-stop is not applied to LOCK/TARGET paper rows.
     </p>
   </ng-container>
 </section>
