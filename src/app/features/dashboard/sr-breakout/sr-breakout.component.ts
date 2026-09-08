@@ -518,7 +518,7 @@ export class SrBreakoutComponent implements OnDestroy {
         lines.push({
           icon: win ? '✅' : '🔴',
           text: win
-            ? `${t.exitReason === 'TARGET' ? 'Target hit on the INDEX' : 'Closed green on the INDEX'} at ${t.exitPrice} — +${t.points} index pts (${this.fmt(t.rupees)} futures-equivalent, not Kite option P&L).`
+            ? `${t.exitReason === 'TARGET' ? 'Index target' : 'Closed'} — ${t.rupees != null ? 'option ' + this.fmt(t.rupees) : 'option ₹ unavailable'} (premium, not index × lot).`
             : `Exited at ${t.exitPrice} — ${t.points} pts (${this.fmt(t.rupees)}). Sat through it.`,
           tone: win ? 'good' : 'bad',
         });
@@ -528,7 +528,7 @@ export class SrBreakoutComponent implements OnDestroy {
       lines.push({ icon: s.netRupees >= 0 ? '🟩' : '🟥', text: `${r.name} wrapped: ${s.trades} trades, ${s.winPct}% hit, net ${this.fmt(s.netRupees)}.`, tone: s.netRupees >= 0 ? 'good' : 'bad' });
     }
     const tot = this.totals();
-    if (tot) lines.push({ icon: '😌', text: `Session done. ${tot.trades} trades — index net ${this.fmt(tot.net)}. This is NOT Kite option P&L (premium, delta, and lot 65/30).`, tone: tot.net >= 0 ? 'good' : 'bad' });
+    if (tot) lines.push({ icon: '😌', text: `Session done. ${tot.trades} trades — option net ${this.fmt(tot.net)} (CE/PE premium, same as Live).`, tone: tot.net >= 0 ? 'good' : 'bad' });
     this.say(lines);
   }
 }

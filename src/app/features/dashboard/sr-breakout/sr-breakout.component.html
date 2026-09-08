@@ -165,11 +165,8 @@
 
   <ng-container *ngIf="tab() === 'paper'">
     <div class="sr-split-warn" role="status">
-      <strong>Paper ₹ is not Kite money.</strong>
-      These cards are index points × lot (Nifty 65 / Bank 30). Today that is why you see
-      Bank ₹600 (20 pts × 30) — your BANKNIFTY PE on Kite was option premium (about −₹3).
-      Open the <button type="button" class="sr-inline" (click)="setTab('live')">Live</button> tab
-      for Kite option P&amp;L, or check Positions.
+      <strong>Paper ₹ is option premium</strong> (same CE/PE Live buys), from Kite option candles at entry/exit — not index points × lot.
+      Wins/losses follow that option P&amp;L. Live still needs <em>Start Live</em> to place Kite orders.
     </div>
     <!-- FORM -->
     <div class="sr-form">
@@ -284,9 +281,9 @@
     <!-- RESULTS -->
     <ng-container *ngIf="result() as r">
       <div class="sr-totals" *ngIf="totals() as t">
-        <div class="tot"><span class="tot-label">Index profit</span><span class="tot-val pos">{{ fmt(t.profit) }}</span></div>
-        <div class="tot"><span class="tot-label">Index loss</span><span class="tot-val neg">{{ fmt(t.loss) }}</span></div>
-        <div class="tot big"><span class="tot-label">Index net (not Kite)</span><span class="tot-val" [class.pos]="t.net >= 0" [class.neg]="t.net < 0">{{ fmt(t.net) }}</span></div>
+        <div class="tot"><span class="tot-label">Option profit</span><span class="tot-val pos">{{ fmt(t.profit) }}</span></div>
+        <div class="tot"><span class="tot-label">Option loss</span><span class="tot-val neg">{{ fmt(t.loss) }}</span></div>
+        <div class="tot big"><span class="tot-label">Option net (CE/PE)</span><span class="tot-val" [class.pos]="t.net >= 0" [class.neg]="t.net < 0">{{ fmt(t.net) }}</span></div>
         <div class="tot"><span class="tot-label">Trades (W / L)</span><span class="tot-val">{{ t.wins }} / {{ t.losses }}</span></div>
         <div class="tot"><span class="tot-label">Window</span><span class="tot-val sm">{{ r.fromDate }} → {{ r.toDate }}<span *ngIf="r.isToday" class="live-badge">TODAY</span></span></div>
       </div>
@@ -327,7 +324,7 @@
               <td class="num mono">{{ t.exitPrice }}</td>
               <td><span class="why" [class.tgt]="t.exitReason === 'TARGET'">{{ t.exitReason }}</span></td>
               <td class="num mono" [class.pos]="t.points >= 0" [class.neg]="t.points < 0">{{ t.points }}</td>
-              <td class="num mono" [class.pos]="t.rupees >= 0" [class.neg]="t.rupees < 0">{{ fmt(t.rupees) }}</td>
+              <td class="num mono" [class.pos]="t.rupees > 0" [class.neg]="t.rupees < 0">{{ t.rupees == null ? '—' : fmt(t.rupees) }}</td>
             </tr>
           </tbody>
         </table>
@@ -336,9 +333,8 @@
     </ng-container>
 
     <p class="sr-disclaimer">
-      Paper ₹ is index points × lot (Nifty 65, Bank 30, Crude 10) — a futures-equivalent.
-      Kite CE/PE P&amp;L is option premium and will not equal this number. Max loss on an option is the premium paid.
-      Prove it forward here before treating Paper ₹ as Live money.
+      Paper ₹ is the CE/PE premium change on Kite 5-min candles (lot 65 Nifty / 30 Bank), same contracts Live buys.
+      Index points stay in the Pts column. Live P&amp;L is the fill; Paper is the option candle mark — they should be close, not index × lot.
     </p>
   </ng-container>
 </section>
