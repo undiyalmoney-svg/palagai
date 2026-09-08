@@ -162,7 +162,7 @@
 
   <ng-container *ngIf="tab() === 'paper'">
     <div class="sr-split-warn" role="status" *ngIf="niftyVehicle === 'fut'">
-      <strong>Nifty is nearest futures</strong> (not CE/PE). CE = BUY fut, PE = SELL fut. ₹ = pts × 65. Run Paper also collects option 5-min bars and shows Opt ₹. Bank/Crude stay options.
+      <strong>Nifty is nearest futures</strong> (not CE/PE). CE = BUY fut, PE = SELL fut. ₹ = pts × 65. Run Paper also collects that day’s ATM weekly option bars through the whole date range and shows Opt ₹. Bank/Crude stay options.
     </div>
     <div class="sr-split-warn" role="status" *ngIf="niftyVehicle === 'option'">
       <strong>Nifty Paper ₹ is CE/PE</strong> (ATM weekly, ask/bid, charges, SL). Same signals as futures, different money. Live still trades Nifty futures. Expired weeklies can print —. Bank/Crude stay options.
@@ -291,7 +291,7 @@
         <div class="tot"><span class="tot-label">{{ paperRupeeNoun() }} loss</span><span class="tot-val neg">{{ fmt(t.loss) }}</span></div>
         <div class="tot big"><span class="tot-label">{{ paperRupeeNoun() }} net</span><span class="tot-val" [class.pos]="t.net >= 0" [class.neg]="t.net < 0">{{ fmt(t.net) }}</span></div>
         <div class="tot" *ngIf="t.optionPriced"><span class="tot-label">Collected option net</span><span class="tot-val" [class.pos]="t.optionNet >= 0" [class.neg]="t.optionNet < 0">{{ fmt(t.optionNet) }}</span></div>
-        <div class="tot" *ngIf="t.optionPriced"><span class="tot-label">Option W / L</span><span class="tot-val">{{ t.optionWins }} / {{ t.optionLosses }}</span></div>
+        <div class="tot" *ngIf="t.optionAttempted"><span class="tot-label">Option data</span><span class="tot-val sm">{{ t.optionPriced }} / {{ t.optionAttempted }} trades</span></div>
         <div class="tot"><span class="tot-label">Trades (W / L)</span><span class="tot-val">{{ t.wins }} / {{ t.losses }}</span></div>
         <div class="tot"><span class="tot-label">Window</span><span class="tot-val sm">{{ r.fromDate }} → {{ r.toDate }}<span *ngIf="r.isToday" class="live-badge">TODAY</span></span></div>
       </div>
@@ -343,7 +343,7 @@
     </ng-container>
 
     <p class="sr-disclaimer">
-      <ng-container *ngIf="niftyVehicle === 'fut'">Nifty Paper ₹ is the index future (1 pt = ₹65). Each Run Paper also collects ATM weekly CE/PE 5-min bars and fills Opt ₹. Later runs reuse that cache if Kite no longer lists the weekly. Live still trades futures.</ng-container>
+      <ng-container *ngIf="niftyVehicle === 'fut'">Nifty Paper ₹ is the index future (1 pt = ₹65). Run Paper collects ATM weekly CE/PE 5-min bars for every trade in the From–To range (the weekly that was listed on that day, not today’s). Opt ₹ fills when Kite still has those bars or they were archived while listed; older gaps show —. Live still trades futures.</ng-container>
       <ng-container *ngIf="niftyVehicle === 'option'">Nifty Paper ₹ is CE/PE premium (not pts × 65). Live still buys/sells nearest Nifty futures. Bank/Crude stay options either way.</ng-container>
     </p>
   </ng-container>

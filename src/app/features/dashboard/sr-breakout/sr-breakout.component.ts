@@ -160,6 +160,7 @@ export class SrBreakoutComponent implements OnDestroy {
       loss: ok.reduce((a, x) => a + x.summary.totalLossRupees, 0),
       net: ok.reduce((a, x) => a + x.summary.netRupees, 0),
       optionPriced: ok.reduce((a, x) => a + (x.optionBook?.priced || 0), 0),
+      optionAttempted: ok.reduce((a, x) => a + (x.optionBook?.attempted || 0), 0),
       optionProfit: ok.reduce((a, x) => a + (x.optionBook?.profit || 0), 0),
       optionLoss: ok.reduce((a, x) => a + (x.optionBook?.loss || 0), 0),
       optionNet: ok.reduce((a, x) => a + (x.optionBook?.net || 0), 0),
