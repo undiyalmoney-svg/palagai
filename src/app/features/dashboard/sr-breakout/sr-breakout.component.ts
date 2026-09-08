@@ -14,6 +14,7 @@ interface SrTrade {
   optionContract?: string | null; optionRupees?: number | null;
   optionRupeesSource?: string | null; optionBarsSource?: string | null;
   optionEntryPremium?: number | null; optionExitPremium?: number | null;
+  optionInstrumentToken?: number | null;
 }
 interface SrSummary {
   trades: number; wins: number; losses: number; winPct: number;
@@ -312,7 +313,7 @@ export class SrBreakoutComponent implements OnDestroy {
   downloadCsv(): void {
     const trades = this.allTrades();
     if (!trades.length) return;
-    const cols = ['date', 'instrument', 'option', 'optionSymbol', 'optionContract', 'side', 'confidence', 'entryTime', 'entryPrice', 'level', 'bodyPts', 'target', 'exitTime', 'exitPrice', 'exitReason', 'points', 'rupees', 'rupeesSource', 'optionRupees', 'optionRupeesSource', 'optionBarsSource'];
+    const cols = ['date', 'instrument', 'option', 'optionSymbol', 'optionContract', 'optionInstrumentToken', 'optionEntryPremium', 'optionExitPremium', 'side', 'confidence', 'entryTime', 'entryPrice', 'level', 'bodyPts', 'target', 'exitTime', 'exitPrice', 'exitReason', 'points', 'rupees', 'rupeesSource', 'optionRupees', 'optionRupeesSource', 'optionBarsSource'];
     const lines = [cols.join(',')];
     for (const t of trades) lines.push(cols.map((c) => (t as unknown as Record<string, unknown>)[c]).join(','));
     const blob = new Blob([lines.join('\n')], { type: 'text/csv' });

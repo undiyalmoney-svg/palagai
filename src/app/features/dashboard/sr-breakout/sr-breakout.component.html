@@ -317,7 +317,7 @@
       <div class="sr-table-wrap" *ngIf="allTrades().length; else noTrades">
         <table class="sr-table">
           <thead>
-            <tr><th>Date</th><th>Instrument</th><th>Opt</th><th>Contract</th><th title="Confidence 1–3">Conf</th><th>Entry</th><th class="num">Price</th><th class="num">Tgt</th><th>Exit</th><th class="num">Price</th><th>Why</th><th class="num">Pts</th><th class="num">₹</th><th class="num">Opt ₹</th></tr>
+            <tr><th>Date</th><th>Instrument</th><th>Opt</th><th>Contract</th><th>Token</th><th class="num">Inst in</th><th class="num">Inst out</th><th title="Confidence 1–3">Conf</th><th>Entry</th><th class="num">Index</th><th class="num">Tgt</th><th>Exit</th><th class="num">Index</th><th>Why</th><th class="num">Pts</th><th class="num">₹</th><th class="num">Opt ₹</th></tr>
           </thead>
           <tbody>
             <tr *ngFor="let t of allTrades()">
@@ -325,6 +325,9 @@
               <td>{{ t.instrument }}</td>
               <td><span class="opt" [class.ce]="t.option === 'CE'" [class.pe]="t.option === 'PE'">{{ t.option }}</span></td>
               <td class="mono">{{ t.optionSymbol || '—' }}<span class="card-contract" *ngIf="t.optionContract && t.optionContract !== t.optionSymbol"> {{ t.optionContract }}</span></td>
+              <td class="mono">{{ t.optionInstrumentToken || '—' }}</td>
+              <td class="num mono">{{ t.optionEntryPremium != null ? t.optionEntryPremium : '—' }}</td>
+              <td class="num mono">{{ t.optionExitPremium != null ? t.optionExitPremium : '—' }}</td>
               <td><span class="conf" [attr.data-score]="t.confidence" [title]="'Confidence ' + t.confidence + '/3'">{{ stars(t.confidence) }}</span></td>
               <td class="mono">{{ t.entryTime }}</td>
               <td class="num mono">{{ t.entryPrice }}</td>
