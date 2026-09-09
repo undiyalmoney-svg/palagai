@@ -455,7 +455,7 @@ export class SrBreakoutComponent implements OnDestroy {
         this.seenLive.add(key); fresh += 1;
         const opt = t.option === 'CE' ? 'call (CE)' : 'put (PE)';
         this.pushAnn({ icon: t.option === 'CE' ? '📈' : '📉', text: `${t.entryTime} ${r.name}: ${Math.abs(t.bodyPts)}pt candle broke ${t.side === 'BUY' ? 'resistance' : 'support'} — ${opt}, confidence ${this.stars(t.confidence)}, aim ${t.target} pts.`, tone: 'accent' });
-        this.pushAnn({ icon: '🎯', text: `Live will BUY ${this.ticketText(t as SrTrade & { key: string })} if the signal is still fresh. Index ₹ on Paper is not the option P&L.`, tone: 'muted' });
+        this.pushAnn({ icon: '🎯', text: `Live will ${this.ticketText(t as SrTrade & { key: string })} if the signal is still fresh. Paper TARGET on the next candle is not a reason to skip Kite.`, tone: 'muted' });
       }
     }
     if (!fresh && this.liveTick() > 1) this.pushAnn({ icon: '🫧', text: `${this.liveAt()} — scanned, no new break. Holding.`, tone: 'muted' });
@@ -491,7 +491,12 @@ export class SrBreakoutComponent implements OnDestroy {
   ticketText(t: SrTrade & { key: string }): string {
     const root = this.TICKET[t.key]?.root || t.instrument;
     const n = this.lotsFor(this.keyForName(t.instrument));
-    return `BUY ${n} lot${n > 1 ? 's' : ''} ${root} ${this.atmStrike(t)} ${t.option} (nearest expiry)`;
+    const lots = `${n} lot${n > 1 ? 's' : ''}`;
+    if (t.key === 'nifty') {
+      const side = t.side === 'SELL' ? 'SELL' : 'BUY';
+      return `${side} ${lots} nearest Nifty fut (PE→SELL, CE→BUY) — not ${t.option}`;
+    }
+    return `BUY ${lots} ${root} ${this.atmStrike(t)} ${t.option} (nearest expiry)`;
   }
 
   fmt(n: number): string { const s = n < 0 ? '-' : ''; return `${s}₹${Math.abs(Math.round(n)).toLocaleString('en-IN')}`; }
