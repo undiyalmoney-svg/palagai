@@ -15,7 +15,7 @@
   <ng-container *ngIf="tab() === 'live'">
     <div class="sr-live-banner">
       <span class="lv-shield">⚡</span>
-      <span>Start Live and the server watches today's candles. <strong>Nifty / Bank / Crude Live BUY ATM CE or PE</strong> (MIS) — not Nifty futures. Stop Auto Bot Live first so the two desks do not double-trade.</span>
+      <span>Flow: confirm CE/PE → pick ATM contract (next weekly on expiry day) → Kite BUY + SL. When the engine says leave, cancel SL then exit. Stop Auto Bot Live first so the two desks do not double-trade.</span>
     </div>
 
     <!-- BUILDIA LIVE OBSERVER — backend collector status (source of truth) -->
@@ -156,7 +156,7 @@
     </ng-template>
 
     <p class="sr-disclaimer">
-      S/R Live <strong>buys</strong> the ATM weekly option (CE on a bullish break, PE on a bearish break). Cash Nifty 50 is not tradable. No futures, no option selling.
+      S/R Live <strong>buys</strong> the ATM weekly option (CE on a bullish break, PE on a bearish break). On expiry day it uses the <strong>next</strong> weekly. Leave = cancel the SL, then square off. No futures, no option selling.
     </p>
   </ng-container>
 
