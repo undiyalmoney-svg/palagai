@@ -15,7 +15,7 @@
   <ng-container *ngIf="tab() === 'live'">
     <div class="sr-live-banner">
       <span class="lv-shield">⚡</span>
-      <span>Start Live and the server watches today's candles. <strong>Nifty Live sends nearest futures MIS</strong> (CE signal = BUY fut, PE = SELL fut). Bank/Crude buy CE/PE. Stop Auto Bot Live first so the two desks do not double-trade.</span>
+      <span>Start Live and the server watches today's candles. <strong>Nifty / Bank / Crude Live BUY ATM CE or PE</strong> (MIS) — not Nifty futures. Stop Auto Bot Live first so the two desks do not double-trade.</span>
     </div>
 
     <!-- BUILDIA LIVE OBSERVER — backend collector status (source of truth) -->
@@ -156,16 +156,16 @@
     </ng-template>
 
     <p class="sr-disclaimer">
-      S/R Live on Nifty places nearest <strong>Nifty futures</strong> (BUY on CE, SELL on PE). Cash Nifty 50 is not tradable. Bank/Crude stay CE/PE.
+      S/R Live <strong>buys</strong> the ATM weekly option (CE on a bullish break, PE on a bearish break). Cash Nifty 50 is not tradable. No futures, no option selling.
     </p>
   </ng-container>
 
   <ng-container *ngIf="tab() === 'paper'">
     <div class="sr-split-warn" role="status" *ngIf="niftyVehicle === 'fut'">
-      <strong>Nifty is nearest futures</strong> (not CE/PE). CE = BUY fut, PE = SELL fut. ₹ = pts × 65. Run Paper also collects that day’s ATM weekly option bars through the whole date range and shows Opt ₹. Bank/Crude stay options.
+      <strong>Nifty Paper ₹ is the index future</strong> (pts × 65). Live still buys ATM CE/PE. Run Paper also collects that day’s weekly option bars. Bank/Crude stay options.
     </div>
     <div class="sr-split-warn" role="status" *ngIf="niftyVehicle === 'option'">
-      <strong>Nifty Paper ₹ is CE/PE</strong> (ATM weekly, ask/bid, charges, SL). Same signals as futures, different money. Live still trades Nifty futures. Expired weeklies can print —. Bank/Crude stay options.
+      <strong>Nifty Paper ₹ is CE/PE</strong> (ATM weekly, ask/bid, charges, SL) — same vehicle as Live. Expired weeklies can print —. Bank/Crude stay options.
     </div>
     <!-- FORM -->
     <div class="sr-form">
@@ -186,10 +186,10 @@
         </div>
       </div>
       <div class="fld instruments" *ngIf="sel['nifty']">
-        <label>Nifty ₹ <span class="hint">(Paper only — Live stays futures)</span></label>
+        <label>Nifty ₹ <span class="hint">(Paper only — Live always buys CE/PE)</span></label>
         <div class="chips">
-          <button type="button" class="chip" [class.on]="niftyVehicle === 'fut'" (click)="niftyVehicle = 'fut'">Futures (Live)</button>
-          <button type="button" class="chip" [class.on]="niftyVehicle === 'option'" (click)="niftyVehicle = 'option'">Options CE/PE</button>
+          <button type="button" class="chip" [class.on]="niftyVehicle === 'fut'" (click)="niftyVehicle = 'fut'">Futures pts</button>
+          <button type="button" class="chip" [class.on]="niftyVehicle === 'option'" (click)="niftyVehicle = 'option'">Options CE/PE (Live)</button>
         </div>
       </div>
       <div class="fld lotsfld">
@@ -346,8 +346,8 @@
     </ng-container>
 
     <p class="sr-disclaimer">
-      <ng-container *ngIf="niftyVehicle === 'fut'">Nifty Paper ₹ is the index future (1 pt = ₹65). Run Paper collects ATM weekly CE/PE 5-min bars for every trade in the From–To range (the weekly that was listed on that day, not today’s). Opt ₹ fills when Kite still has those bars or they were archived while listed; older gaps show —. Live still trades futures.</ng-container>
-      <ng-container *ngIf="niftyVehicle === 'option'">Nifty Paper ₹ is CE/PE premium (not pts × 65). Live still buys/sells nearest Nifty futures. Bank/Crude stay options either way.</ng-container>
+      <ng-container *ngIf="niftyVehicle === 'fut'">Nifty Paper ₹ is the index future (1 pt = ₹65). Live still buys ATM CE/PE. Opt ₹ fills when Kite still has those bars or they were archived while listed; older gaps show —.</ng-container>
+      <ng-container *ngIf="niftyVehicle === 'option'">Nifty Paper ₹ is CE/PE premium (same as Live). Bank/Crude stay options either way.</ng-container>
     </p>
   </ng-container>
 </section>

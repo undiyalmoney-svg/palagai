@@ -91,8 +91,8 @@ export class SrBreakoutComponent implements OnDestroy {
   // (Rs65 / Rs30 / Rs10 per point), so one shared size is rarely right.
   // Defaults mirror the backend's `defaultLots`.
   lotsBy: Record<string, number> = { nifty: 1, banknifty: 1, crude: 5 };
-  /** Paper only. Live Nifty stays futures. 'option' re-prices Nifty as CE/PE. */
-  niftyVehicle: 'fut' | 'option' = 'fut';
+  /** Paper ₹ toggle. Live always buys ATM CE/PE. */
+  niftyVehicle: 'fut' | 'option' = 'option';
   // Strategy is AUTO-routed per instrument by the backend (Nifty → Retest V1,
   // Bank → Intraday V1, Crude → Baseline). No selector — the backend picks the
   // validated eligible strategy for each instrument.
@@ -492,10 +492,6 @@ export class SrBreakoutComponent implements OnDestroy {
     const root = this.TICKET[t.key]?.root || t.instrument;
     const n = this.lotsFor(this.keyForName(t.instrument));
     const lots = `${n} lot${n > 1 ? 's' : ''}`;
-    if (t.key === 'nifty') {
-      const side = t.side === 'SELL' ? 'SELL' : 'BUY';
-      return `${side} ${lots} nearest Nifty fut (PE→SELL, CE→BUY) — not ${t.option}`;
-    }
     return `BUY ${lots} ${root} ${this.atmStrike(t)} ${t.option} (nearest expiry)`;
   }
 
@@ -565,7 +561,7 @@ export class SrBreakoutComponent implements OnDestroy {
       lines.push({ icon: s.netRupees >= 0 ? '🟩' : '🟥', text: `${r.name} wrapped: ${s.trades} trades, ${s.winPct}% hit, net ${this.fmt(s.netRupees)}.`, tone: s.netRupees >= 0 ? 'good' : 'bad' });
     }
     const tot = this.totals();
-    if (tot) lines.push({ icon: '😌', text: `Session done. ${tot.trades} trades — ${this.paperRupeeNoun().toLowerCase()} net ${this.fmt(tot.net)}. Live Nifty is still futures.`, tone: tot.net >= 0 ? 'good' : 'bad' });
+    if (tot) lines.push({ icon: '😌', text: `Session done. ${tot.trades} trades — ${this.paperRupeeNoun().toLowerCase()} net ${this.fmt(tot.net)}. Live buys the ATM option.`, tone: tot.net >= 0 ? 'good' : 'bad' });
     this.say(lines);
   }
 }
