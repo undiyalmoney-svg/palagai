@@ -318,8 +318,8 @@ export class AutoTraderComponent implements OnInit, OnDestroy {
   protected crudeAfterIndexClose = true;
   protected paperLivePath = true;
   protected crudeWindow = '16:00–21:00 IST (hard gate 15:15)';
-  protected deskLabel = 'All3 · Nifty→Bank→Crude';
-  protected deskSupportLine = 'Nifty → Bank (after Nifty) → Crude after NSE';
+  protected deskLabel = 'Genie · Nifty';
+  protected deskSupportLine = 'Genie: CE/PE buy, SL, cancel SL then leave';
   protected bankStrategy: BankStrategy = 'trap';
   protected crudeStrategy: CrudeStrategy = 'live-crude-green';
   protected dayProfitLock = true;

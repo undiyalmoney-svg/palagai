@@ -11,11 +11,10 @@ import { KiteCallbackComponent } from './features/kite-callback/kite-callback.co
 import { LoginComponent } from './features/login/login.component';
 import { DashboardComponent } from './features/dashboard/dashboard.component';
 import { DashboardHomeComponent } from './features/dashboard/dashboard-home.component';
-import { SrBreakoutComponent } from './features/dashboard/sr-breakout/sr-breakout.component';
 import { OrderTestComponent } from './features/dashboard/order-test/order-test.component';
+import { AutoTraderComponent } from './features/dashboard/auto-trader/auto-trader.component';
 import { GetTokenComponent } from './features/dashboard/get-token/get-token.component';
 import { SettingsComponent } from './features/dashboard/settings/settings.component';
-import { AutoTraderComponent } from './features/dashboard/auto-trader/auto-trader.component';
 import { PnlRecordsComponent } from './features/dashboard/pnl-records/pnl-records.component';
 import { VaultPageComponent } from './features/dashboard/vault/vault-page.component';
 import { AdminLoginComponent } from './features/admin/admin-login.component';
@@ -85,7 +84,8 @@ export const routes: Routes = [
       },
       {
         path: 'sr-breakout',
-        component: SrBreakoutComponent,
+        redirectTo: 'auto-trader',
+        pathMatch: 'full',
       },
       { path: 'orders', redirectTo: '/admin/pnl', pathMatch: 'full' },
       { path: 'pnl-records', redirectTo: '/admin/pnl', pathMatch: 'full' },

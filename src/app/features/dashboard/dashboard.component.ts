@@ -37,8 +37,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
   private navSub: Subscription | null = null;
 
   protected readonly clockLabel = signal('');
-  protected readonly pageTitle = signal('S/R Breakout');
-  protected readonly pageSubtitle = signal('Support/resistance breakout desk — paper and live.');
+  protected readonly pageTitle = signal('Auto Trader');
+  protected readonly pageSubtitle = signal('Genie Nifty ATM CE/PE desk — paper and live.');
   /** Desktop starts open; mobile starts closed (set in ngOnInit). */
   protected readonly sidebarOpen = signal(true);
   protected readonly profileOpen = signal(false);
@@ -59,13 +59,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
       module: 'test',
     },
     {
-      label: 'S/R Breakout',
-      shortLabel: 'S/R',
-      route: '/dashboard/sr-breakout',
-      icon: 'trending-up',
-      module: null,
-    },
-    {
       label: 'Token',
       shortLabel: 'Token',
       route: '/dashboard/get-token',
@@ -77,7 +70,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   private readonly titles: Record<string, { title: string; subtitle: string }> = {
     '/dashboard/auto-trader': {
       title: 'Auto Trader',
-      subtitle: 'Automated session runner with live order checks.',
+      subtitle: 'Genie — confirm CE/PE, buy ATM, SL, cancel SL then leave.',
     },
     '/dashboard/order-test': {
       title: 'Order Test',
