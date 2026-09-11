@@ -92,8 +92,9 @@
     <p class="hint">
       Walk-forward scan on NSE Nifty 50 daily bars (not Genie / S/R).
       It searches confirmation wait, hold, stop, and target.
+      <strong>Kill failures:</strong> first close against the trade exits — losers are not held to time.
+      Specs that lose out-of-sample are discarded.
       Paper uses that spec without a Kite token. Live money still needs Get Token and buys ATM CE or PE in the signal direction.
-      This does not guarantee a profitable day.
     </p>
     <div class="actions">
       <button

@@ -94,6 +94,7 @@ interface EeWaitSpec {
   hold?: number;
   stopPct?: number;
   targetPct?: number;
+  killFailures?: boolean;
 }
 
 interface EeWaitFound {
