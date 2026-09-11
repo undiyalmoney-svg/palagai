@@ -87,6 +87,132 @@
     }
   </div>
 
+  <div class="panel option-panel">
+    <h3>Option OHLC &amp; price</h3>
+    <p class="hint">Historical candles and live last price for the ATM weekly (or a symbol you type).</p>
+    <div class="row">
+      <label class="field grow">
+        <span>Option symbol</span>
+        <input
+          type="text"
+          [(ngModel)]="optionSymbol"
+          placeholder="NFO ATM weekly, or e.g. NIFTY25SEP24500CE"
+          [disabled]="optionAtm || optionBusy() || busy()"
+        />
+      </label>
+      <label class="field">
+        <span>Interval</span>
+        <select [(ngModel)]="optionInterval" [disabled]="optionBusy() || busy()">
+          <option value="minute">1 minute</option>
+          <option value="5minute">5 minute</option>
+          <option value="day">Day</option>
+        </select>
+      </label>
+    </div>
+    <div class="checks">
+      <label class="check">
+        <input type="checkbox" [(ngModel)]="optionAtm" [disabled]="optionBusy() || busy()" />
+        <span>
+          <strong>ATM Nifty</strong>
+          <small>Resolve this week’s CE and PE from spot</small>
+        </span>
+      </label>
+      <label class="check">
+        <input type="checkbox" [(ngModel)]="optionHistorical" [disabled]="optionBusy() || busy()" />
+        <span>
+          <strong>Historical</strong>
+          <small>Candle OHLC for From → To</small>
+        </span>
+      </label>
+      <label class="check">
+        <input type="checkbox" [(ngModel)]="optionLive" [disabled]="optionBusy() || busy()" />
+        <span>
+          <strong>Live price</strong>
+          <small>Last traded price and today’s OHLC</small>
+        </span>
+      </label>
+    </div>
+    <div class="actions">
+      <button
+        mat-stroked-button
+        type="button"
+        [disabled]="optionBusy() || busy() || (!optionHistorical && !optionLive)"
+        (click)="fetchOptionOhlc()"
+      >
+        @if (optionBusy()) {
+          <mat-spinner diameter="18" />
+        }
+        Get option OHLC
+      </button>
+    </div>
+    @if (optionError()) {
+      <p class="err">{{ optionError() }}</p>
+    }
+  </div>
+
+  @if (optionResult(); as o) {
+    <div class="paper-card">
+      <h3>Option market</h3>
+      <p>
+        @if (o.spot) {
+          Spot {{ o.spot }} ·
+        }
+        {{ o.fromDate || 'live' }} → {{ o.toDate || 'live' }}
+        · {{ o.interval || 'quote' }}
+      </p>
+      @for (c of o.contracts || []; track c.key || c.tradingSymbol || $index) {
+        <div class="opt-block">
+          <h4>{{ c.tradingSymbol }} @if (c.instrumentType) { ({{ c.instrumentType }}) }</h4>
+          <p>
+            Price ₹{{ c.price }}
+            @if (c.live?.ohlc; as d) {
+              · day O {{ d.open }} H {{ d.high }} L {{ d.low }} C {{ d.close }}
+            }
+            @if (c.live?.bid != null) {
+              · bid {{ c.live?.bid }} / ask {{ c.live?.ask }}
+            }
+          </p>
+          @if (c.historicalError) {
+            <p class="err">{{ c.historicalError }}</p>
+          }
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>O</th>
+                  <th>H</th>
+                  <th>L</th>
+                  <th>C</th>
+                  <th>Vol</th>
+                  <th>OI</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (b of (c.historical || []).slice(-12); track $index) {
+                  <tr>
+                    <td>{{ b.date }}</td>
+                    <td>{{ b.open }}</td>
+                    <td>{{ b.high }}</td>
+                    <td>{{ b.low }}</td>
+                    <td>{{ b.close }}</td>
+                    <td>{{ b.volume }}</td>
+                    <td>{{ b.oi }}</td>
+                  </tr>
+                }
+                @if (!(c.historical || []).length) {
+                  <tr>
+                    <td colspan="7">No historical bars (live quote only, or Kite had no candles).</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+      }
+    </div>
+  }
+
   @if (live(); as s) {
     <div class="status-card" [attr.data-running]="s.status === 'running'">
       <h3>Live status</h3>

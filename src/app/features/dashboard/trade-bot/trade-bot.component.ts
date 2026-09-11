@@ -41,6 +41,49 @@ interface PaperResult {
   message?: string;
 }
 
+interface OptionBar {
+  date?: string;
+  open?: number;
+  high?: number;
+  low?: number;
+  close?: number;
+  volume?: number;
+  oi?: number;
+}
+
+interface OptionLive {
+  price?: number | null;
+  ohlc?: { open?: number | null; high?: number | null; low?: number | null; close?: number | null };
+  bid?: number | null;
+  ask?: number | null;
+  volume?: number | null;
+  oi?: number | null;
+}
+
+interface OptionContract {
+  tradingSymbol?: string;
+  instrumentToken?: number;
+  instrumentType?: string;
+  strike?: number | null;
+  expiry?: string;
+  key?: string;
+  price?: number | null;
+  live?: OptionLive | null;
+  historical?: OptionBar[];
+  lastBar?: OptionBar | null;
+  historicalError?: string;
+}
+
+interface OptionOhlcResult {
+  fromDate?: string | null;
+  toDate?: string | null;
+  interval?: string | null;
+  atm?: boolean;
+  spot?: number | null;
+  contracts?: OptionContract[];
+  message?: string;
+}
+
 interface LiveStatus {
   status?: string;
   message?: string;
@@ -75,11 +118,19 @@ export class TradeBotComponent implements OnInit, OnDestroy {
   protected today = true;
   protected liveMoney = false;
   protected lots = 1;
+  protected optionSymbol = '';
+  protected optionAtm = true;
+  protected optionHistorical = true;
+  protected optionLive = true;
+  protected optionInterval = '5minute';
 
   protected readonly busy = signal(false);
   protected readonly error = signal('');
   protected readonly paper = signal<PaperResult | null>(null);
   protected readonly live = signal<LiveStatus | null>(null);
+  protected readonly optionBusy = signal(false);
+  protected readonly optionError = signal('');
+  protected readonly optionResult = signal<OptionOhlcResult | null>(null);
 
   private pollTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -190,6 +241,57 @@ export class TradeBotComponent implements OnInit, OnDestroy {
       this.error.set(this.fmtErr(err));
     } finally {
       this.busy.set(false);
+    }
+  }
+
+  protected async fetchOptionOhlc(): Promise<void> {
+    this.optionError.set('');
+    this.applyToday();
+    if (this.optionHistorical && (!this.fromDate || !this.toDate || this.fromDate > this.toDate)) {
+      this.optionError.set('Pick a valid From date and To date for historical OHLC.');
+      return;
+    }
+    const body: {
+      fromDate: string;
+      toDate: string;
+      today: boolean;
+      historical: boolean;
+      live: boolean;
+      interval: string;
+      atm: boolean;
+      oi: boolean;
+      tradingSymbol?: string;
+    } = {
+      fromDate: this.fromDate,
+      toDate: this.toDate,
+      today: this.today,
+      historical: this.optionHistorical,
+      live: this.optionLive,
+      interval: this.optionInterval,
+      atm: this.optionAtm,
+      oi: true,
+    };
+    if (!this.optionAtm) {
+      const sym = this.optionSymbol.trim();
+      if (!sym) {
+        this.optionError.set('Enter an NFO option symbol, or check ATM.');
+        return;
+      }
+      body.tradingSymbol = sym;
+      body.atm = false;
+    }
+    const kite = this.kiteSession.getAuthorizationHeader();
+    const headers: Record<string, string> = kite ? { 'X-Kite-Authorization': kite } : {};
+    this.optionBusy.set(true);
+    try {
+      const res = await firstValueFrom(
+        this.http.post<OptionOhlcResult>(`${this.liveApiBase}/options/ohlc`, body, { headers }),
+      );
+      this.optionResult.set(res);
+    } catch (err) {
+      this.optionError.set(this.fmtErr(err));
+    } finally {
+      this.optionBusy.set(false);
     }
   }
 

@@ -35,8 +35,23 @@
   min-width: 10rem;
 }
 
-.trade-bot .field.lots {
-  min-width: 6rem;
+.trade-bot .field.grow {
+  flex: 1;
+  min-width: 14rem;
+}
+
+.trade-bot .option-panel h3 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.trade-bot .opt-block {
+  margin-top: 0.85rem;
+}
+
+.trade-bot .opt-block h4 {
+  margin: 0 0 0.25rem;
+  font-size: 0.95rem;
 }
 
 .trade-bot .field span {
@@ -47,7 +62,8 @@
   color: var(--pg-muted);
 }
 
-.trade-bot .field input {
+.trade-bot .field input,
+.trade-bot .field select {
   padding: 0.45rem 0.55rem;
   border: 1px solid var(--pg-line);
   border-radius: var(--pg-radius-sm);
