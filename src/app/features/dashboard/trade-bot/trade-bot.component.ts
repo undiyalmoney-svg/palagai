@@ -261,7 +261,17 @@ export class TradeBotComponent implements OnInit, OnDestroy {
     }
 
     const found = this.research()?.best?.spec;
-    const body: Record<string, unknown> = {
+    const body: {
+      fromDate: string;
+      toDate: string;
+      today: boolean;
+      liveMoney: boolean;
+      realOrders: boolean;
+      lots: number;
+      niftyLots: number;
+      engine?: string;
+      eeWait?: EeWaitSpec;
+    } = {
       fromDate: this.fromDate,
       toDate: this.toDate,
       today: this.today,
