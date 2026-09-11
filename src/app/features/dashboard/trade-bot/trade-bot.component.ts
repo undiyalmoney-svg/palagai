@@ -102,6 +102,20 @@ interface EeWaitFound {
   toDate?: string;
   bars?: number;
   note?: string;
+  universe?: string;
+  symbol?: string;
+  scanned?: number;
+  ranked?: number;
+  stocks?: Array<{
+    symbol?: string;
+    spec?: EeWaitSpec;
+    oos?: {
+      trades?: number;
+      points?: number;
+      rupees?: number;
+      profitFactor?: number;
+    };
+  }>;
   best?: {
     spec?: EeWaitSpec;
     oos?: { trades?: number; points?: number; rupees?: number; wins?: number; losses?: number };
@@ -167,6 +181,7 @@ export class TradeBotComponent implements OnInit, OnDestroy {
   protected optionLive = true;
   protected optionInterval = '5minute';
   protected optionExpiry = '';
+  protected researchUniverse = 'nifty-50';
 
   protected readonly busy = signal(false);
   protected readonly error = signal('');
@@ -227,6 +242,7 @@ export class TradeBotComponent implements OnInit, OnDestroy {
           fromDate: this.today ? '' : this.fromDate,
           toDate: this.today ? '' : this.toDate,
           lots: this.lots,
+          universe: this.researchUniverse,
         }),
       );
       this.research.set(res);
@@ -272,6 +288,8 @@ export class TradeBotComponent implements OnInit, OnDestroy {
       niftyLots: number;
       engine?: string;
       eeWait?: EeWaitSpec;
+      universe?: string;
+      symbol?: string;
     } = {
       fromDate: this.fromDate,
       toDate: this.toDate,
@@ -284,6 +302,9 @@ export class TradeBotComponent implements OnInit, OnDestroy {
     if (found) {
       body.engine = 'ee-wait';
       body.eeWait = found;
+      body.universe = this.researchUniverse;
+      const sym = this.research()?.symbol;
+      if (sym) body.symbol = sym;
     }
     const kite = this.kiteSession.getAuthorizationHeader();
     const headers: Record<string, string> = kite ? { 'X-Kite-Authorization': kite } : {};

@@ -90,12 +90,20 @@
   <div class="panel option-panel">
     <h3>Find entry / wait / exit</h3>
     <p class="hint">
-      Walk-forward scan on NSE Nifty 50 daily bars (not Genie / S/R).
-      It searches confirmation wait, hold, stop, and target.
-      <strong>Kill failures:</strong> first close against the trade exits — losers are not held to time.
-      Specs that lose out-of-sample are discarded.
-      Paper uses that spec without a Kite token. Live money still needs Get Token and buys ATM CE or PE in the signal direction.
+      Walk-forward on NSE daily bars. Choose Nifty 50, Nifty 100 index, or all
+      <strong>Nifty 100 stocks</strong>. Kill failures on first adverse close.
+      Stock rupees = share move × lots. Live money is Nifty 50 ATM options only.
     </p>
+    <div class="row">
+      <label class="field">
+        <span>Universe</span>
+        <select [(ngModel)]="researchUniverse" [disabled]="researchBusy() || busy()">
+          <option value="nifty-50">Nifty 50 index</option>
+          <option value="nifty-100">Nifty 100 index</option>
+          <option value="nifty-100-stocks">Nifty 100 stocks</option>
+        </select>
+      </label>
+    </div>
     <div class="actions">
       <button
         mat-stroked-button
@@ -114,7 +122,16 @@
     }
     @if (research(); as r) {
       <p>
-        {{ r.bars }} daily bars · {{ r.fromDate }} → {{ r.toDate }}
+        {{ r.fromDate }} → {{ r.toDate }}
+        @if (r.bars) {
+          · {{ r.bars }} bars
+        }
+        @if (r.symbol) {
+          · {{ r.symbol }}
+        }
+        @if (r.universe === 'nifty-100-stocks') {
+          · scanned {{ r.scanned }} · ranked {{ r.ranked }}
+        }
         · OOS {{ r.best?.oos?.trades }} trades
         · {{ r.best?.oos?.points }} pts
         · ₹{{ r.best?.oos?.rupees }}
@@ -130,6 +147,34 @@
         </p>
       }
       <p class="hint">{{ r.note }}</p>
+      @if (r.stocks?.length) {
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Stock</th>
+                <th>OOS pts</th>
+                <th>₹</th>
+                <th>Trades</th>
+                <th>PF</th>
+                <th>Spec</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (s of r.stocks; track s.symbol) {
+                <tr>
+                  <td>{{ s.symbol }}</td>
+                  <td>{{ s.oos?.points }}</td>
+                  <td>{{ s.oos?.rupees }}</td>
+                  <td>{{ s.oos?.trades }}</td>
+                  <td>{{ s.oos?.profitFactor }}</td>
+                  <td>{{ s.spec?.entry }} w{{ s.spec?.wait }} h{{ s.spec?.hold }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
     }
   </div>
 
