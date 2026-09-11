@@ -72,6 +72,9 @@ interface OptionContract {
   historical?: OptionBar[];
   lastBar?: OptionBar | null;
   historicalError?: string;
+  dataSource?: string | null;
+  intervalUsed?: string | null;
+  note?: string | null;
 }
 
 interface OptionOhlcResult {
@@ -123,6 +126,7 @@ export class TradeBotComponent implements OnInit, OnDestroy {
   protected optionHistorical = true;
   protected optionLive = true;
   protected optionInterval = '5minute';
+  protected optionExpiry = '';
 
   protected readonly busy = signal(false);
   protected readonly error = signal('');
@@ -260,6 +264,15 @@ export class TradeBotComponent implements OnInit, OnDestroy {
       this.optionError.set('Pick a valid From date and To date for historical OHLC.');
       return;
     }
+    const kite = this.kiteSession.getAuthorizationHeader();
+    if (this.optionLive && !kite && !this.optionHistorical) {
+      this.optionError.set('Live option price needs Get Token. Historical expired candles use NSE and do not.');
+      return;
+    }
+    if (this.optionAtm && !kite) {
+      this.optionError.set('ATM Nifty needs a Kite token for live spot.');
+      return;
+    }
     const body: {
       fromDate: string;
       toDate: string;
@@ -270,16 +283,19 @@ export class TradeBotComponent implements OnInit, OnDestroy {
       atm: boolean;
       oi: boolean;
       tradingSymbol?: string;
+      expiryDate?: string;
     } = {
       fromDate: this.fromDate,
       toDate: this.toDate,
       today: this.today,
       historical: this.optionHistorical,
-      live: this.optionLive,
+      live: this.optionLive && !!kite,
       interval: this.optionInterval,
       atm: this.optionAtm,
       oi: true,
     };
+    const expiry = this.optionExpiry.trim();
+    if (expiry) body.expiryDate = expiry;
     const symbol = this.optionSymbol.trim();
     if (symbol) {
       body.tradingSymbol = symbol;
@@ -288,7 +304,6 @@ export class TradeBotComponent implements OnInit, OnDestroy {
       this.optionError.set('Type any listed option tradingsymbol, or check ATM Nifty.');
       return;
     }
-    const kite = this.kiteSession.getAuthorizationHeader();
     const headers: Record<string, string> = kite ? { 'X-Kite-Authorization': kite } : {};
     this.optionBusy.set(true);
     try {

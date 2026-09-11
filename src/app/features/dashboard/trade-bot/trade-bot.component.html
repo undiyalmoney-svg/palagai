@@ -90,8 +90,9 @@
   <div class="panel option-panel">
     <h3>Option OHLC &amp; price</h3>
     <p class="hint">
-      Historical candles for <strong>any listed option</strong> — Nifty, Bank, stocks, MCX.
-      Paste a Kite tradingsymbol (comma-separated for several). ATM Nifty is only a shortcut when the box is empty.
+      Listed contracts use Kite (intraday when the series is still on the chain).
+      <strong>Expired options</strong> use NSE’s contract-wise FO history — daily OHLC only, including 2020–2021.
+      Uncheck Today and set From/To to the life of that expiry. ATM Nifty still needs a Kite token.
     </p>
     <div class="row">
       <label class="field grow">
@@ -100,17 +101,26 @@
           type="text"
           [(ngModel)]="optionSymbol"
           (ngModelChange)="onOptionSymbolChange()"
-          placeholder="e.g. BANKNIFTY2591655000CE, RELIANCE259181400CE"
+          placeholder="e.g. NIFTY21JUN15600CE or RELIANCE26SEP1400CE"
           [disabled]="optionBusy() || busy()"
         />
       </label>
       <label class="field">
         <span>Interval</span>
         <select [(ngModel)]="optionInterval" [disabled]="optionBusy() || busy()">
-          <option value="minute">1 minute</option>
-          <option value="5minute">5 minute</option>
-          <option value="day">Day</option>
+          <option value="minute">1 minute (listed / Kite)</option>
+          <option value="5minute">5 minute (listed / Kite)</option>
+          <option value="day">Day (Kite or NSE expired)</option>
         </select>
+      </label>
+      <label class="field">
+        <span>NSE expiry (optional)</span>
+        <input
+          type="text"
+          [(ngModel)]="optionExpiry"
+          placeholder="24-Jun-2021"
+          [disabled]="optionBusy() || busy()"
+        />
       </label>
     </div>
     <div class="checks">
@@ -166,7 +176,12 @@
       </p>
       @for (c of o.contracts || []; track c.key || c.tradingSymbol || $index) {
         <div class="opt-block">
-          <h4>{{ c.tradingSymbol }} @if (c.instrumentType) { ({{ c.instrumentType }}) }</h4>
+          <h4>
+            {{ c.tradingSymbol }} @if (c.instrumentType) { ({{ c.instrumentType }}) }
+            @if (c.dataSource) {
+              · {{ c.dataSource }}{{ c.intervalUsed ? ' ' + c.intervalUsed : '' }}
+            }
+          </h4>
           <p>
             Price ₹{{ c.price }}
             · {{ (c.historical || []).length }} bars
@@ -180,6 +195,9 @@
               · bid {{ c.live?.bid }} / ask {{ c.live?.ask }}
             }
           </p>
+          @if (c.note) {
+            <p class="hint">{{ c.note }}</p>
+          }
           @if (c.historicalError) {
             <p class="err">{{ c.historicalError }}</p>
           }
@@ -210,7 +228,7 @@
                 }
                 @if (!(c.historical || []).length) {
                   <tr>
-                    <td colspan="7">No historical bars (live quote only, or Kite had no candles).</td>
+                    <td colspan="7">No historical bars (live quote only, Kite empty, or NSE foCPV had no rows for this expiry).</td>
                   </tr>
                 }
               </tbody>
