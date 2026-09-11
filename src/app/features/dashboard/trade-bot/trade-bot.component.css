@@ -1,0 +1,190 @@
+.trade-bot {
+  max-width: 1120px;
+}
+
+.trade-bot .hero-copy h1 {
+  margin: 0;
+}
+
+.trade-bot .hero-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  justify-content: flex-end;
+}
+
+.trade-bot .panel {
+  display: grid;
+  gap: 1rem;
+  padding: 1.25rem;
+  border-radius: var(--pg-radius);
+  border: 1px solid var(--pg-line);
+  background: var(--pg-bg-elevated);
+  box-shadow: 0 10px 35px rgba(12, 31, 23, 0.08);
+}
+
+.trade-bot .row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.trade-bot .field {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 10rem;
+}
+
+.trade-bot .field.grow {
+  flex: 1;
+  min-width: 14rem;
+}
+
+.trade-bot .option-panel h3 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.trade-bot .opt-block {
+  margin-top: 0.85rem;
+}
+
+.trade-bot .opt-block h4 {
+  margin: 0 0 0.25rem;
+  font-size: 0.95rem;
+}
+
+.trade-bot .field span {
+  font-size: 0.72rem;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--pg-muted);
+}
+
+.trade-bot .field input,
+.trade-bot .field select {
+  padding: 0.45rem 0.55rem;
+  border: 1px solid var(--pg-line);
+  border-radius: var(--pg-radius-sm);
+  font: inherit;
+}
+
+.trade-bot .checks {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.trade-bot .check {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--pg-line);
+  border-radius: var(--pg-radius-sm);
+  background: #fff;
+}
+
+.trade-bot .check input {
+  margin-top: 0.2rem;
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+.trade-bot .check span {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.trade-bot .check strong {
+  font-size: 0.95rem;
+}
+
+.trade-bot .check small {
+  color: var(--pg-muted);
+  font-size: 0.8rem;
+}
+
+.trade-bot .check.off {
+  opacity: 0.55;
+}
+
+.trade-bot .actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.trade-bot .err {
+  margin: 0;
+  color: #b91c1c;
+  font-size: 0.9rem;
+}
+
+.trade-bot .status-card,
+.trade-bot .paper-card {
+  margin-top: 1rem;
+  padding: 1.1rem 1.2rem;
+  border: 1px solid var(--pg-line);
+  border-radius: var(--pg-radius);
+  background: #fff;
+}
+
+.trade-bot .status-card[data-running='true'] {
+  border-color: #86efac;
+  background: var(--pg-bull-soft);
+}
+
+.trade-bot .status-card h3,
+.trade-bot .paper-card h3 {
+  margin: 0 0 0.35rem;
+  font-size: 1.05rem;
+}
+
+.trade-bot .hint,
+.trade-bot .status-card p,
+.trade-bot .paper-card p {
+  margin: 0;
+  color: var(--pg-muted);
+  font-size: 0.88rem;
+}
+
+.trade-bot .events {
+  list-style: none;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.trade-bot .events li {
+  display: grid;
+  gap: 0.1rem;
+  font-size: 0.82rem;
+}
+
+.trade-bot .events code {
+  font-family: var(--pg-font-mono);
+  font-size: 0.75rem;
+}
+
+.trade-bot .table-wrap {
+  margin-top: 0.75rem;
+  overflow: auto;
+  max-height: 28rem;
+}
+
+.trade-bot table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.trade-bot th,
+.trade-bot td {
+  text-align: left;
+  padding: 0.4rem 0.5rem;
+  border-bottom: 1px solid var(--pg-line);
+  white-space: nowrap;
+}

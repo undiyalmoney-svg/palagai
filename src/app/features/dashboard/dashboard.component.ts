@@ -37,17 +37,16 @@ export class DashboardComponent implements OnInit, OnDestroy {
   private navSub: Subscription | null = null;
 
   protected readonly clockLabel = signal('');
-  protected readonly pageTitle = signal('S/R Breakout');
-  protected readonly pageSubtitle = signal('Support/resistance breakout desk — paper and live.');
-  /** Desktop starts open; mobile starts closed (set in ngOnInit). */
+  protected readonly pageTitle = signal('Palagai');
+  protected readonly pageSubtitle = signal('Trade Bot, Token, and Test.');
   protected readonly sidebarOpen = signal(true);
   protected readonly profileOpen = signal(false);
 
   private readonly allNav: NavItem[] = [
     {
-      label: 'Auto',
-      shortLabel: 'Auto',
-      route: '/dashboard/auto-trader',
+      label: 'Trade Bot',
+      shortLabel: 'Bot',
+      route: '/dashboard/trade-bot',
       icon: 'bot',
       module: 'auto',
     },
@@ -59,13 +58,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
       module: 'test',
     },
     {
-      label: 'S/R Breakout',
-      shortLabel: 'S/R',
-      route: '/dashboard/sr-breakout',
-      icon: 'trending-up',
-      module: null,
-    },
-    {
       label: 'Token',
       shortLabel: 'Token',
       route: '/dashboard/get-token',
@@ -75,9 +67,9 @@ export class DashboardComponent implements OnInit, OnDestroy {
   ];
 
   private readonly titles: Record<string, { title: string; subtitle: string }> = {
-    '/dashboard/auto-trader': {
-      title: 'Auto Trader',
-      subtitle: 'Automated session runner with live order checks.',
+    '/dashboard/trade-bot': {
+      title: 'Trade Bot',
+      subtitle: 'From / To dates, Today autofill, Live money for real Kite orders.',
     },
     '/dashboard/order-test': {
       title: 'Order Test',
