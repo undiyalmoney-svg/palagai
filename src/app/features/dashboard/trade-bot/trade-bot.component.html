@@ -5,7 +5,9 @@
       <h1>Trade Bot</h1>
       <p class="lede pg-lede">
         Paper and live are the same run. Dates set the window.
-        <strong>Today</strong> fills both dates.
+        <strong>Today</strong> fills both dates for live orders.
+        Paper P&amp;L always uses the Find window (years of daily bars) — a single
+        session cannot produce trades.
         <strong>Live money</strong> is the only switch that places Kite orders.
       </p>
     </div>
@@ -46,7 +48,7 @@
         <input type="checkbox" [(ngModel)]="today" (ngModelChange)="onTodayChange()" [disabled]="busy()" />
         <span>
           <strong>Today</strong>
-          <small>Auto-fill From and To with today’s IST date</small>
+          <small>Auto-fill From and To with today’s IST date (live). Paper still reports the Find window P&amp;L.</small>
         </span>
       </label>
       <label class="check" [class.off]="!allowLiveMoney">
@@ -88,11 +90,14 @@
   </div>
 
   <div class="panel option-panel">
-    <h3>Find entry / wait / exit</h3>
+    <h3>Find entry / wait / exit + order flow</h3>
     <p class="hint">
-      Walk-forward on NSE daily bars. Choose Nifty 50, Nifty 100 index, or all
-      <strong>Nifty 100 stocks</strong>. Kill failures on first adverse close.
-      Stock rupees = share move × lots. Live money is Nifty 50 ATM options only.
+      Walk-forward on NSE daily bars. Compares the old entry/wait/exit grid with
+      Stockkraft-style confluence: <strong>level</strong> (POC / value area) +
+      <strong>wall</strong> (high-volume node) + <strong>delta flip</strong>
+      (signed volume from the candle body — not a live bid/ask tape or heatmap).
+      Kill failures on first adverse close. Index ₹ = points × 65 × lots.
+      Stock ₹ = share move × lots. Live money is Nifty 50 ATM options only.
     </p>
     <div class="row">
       <label class="field">
@@ -114,7 +119,7 @@
         @if (researchBusy()) {
           <mat-spinner diameter="18" />
         }
-        Find best entry / wait / exit
+        Find best (includes order flow)
       </button>
     </div>
     @if (researchError()) {
@@ -123,6 +128,9 @@
     @if (research(); as r) {
       <p>
         {{ r.fromDate }} → {{ r.toDate }}
+        @if (r.engine) {
+          · engine {{ r.engine }}
+        }
         @if (r.bars) {
           · {{ r.bars }} bars
         }
@@ -132,14 +140,31 @@
         @if (r.universe === 'nifty-100-stocks') {
           · scanned {{ r.scanned }} · ranked {{ r.ranked }}
         }
-        · OOS {{ r.best?.oos?.trades }} trades
-        · {{ r.best?.oos?.points }} pts
-        · ₹{{ r.best?.oos?.rupees }}
+        · OOS {{ r.best?.oos?.trades || 0 }} trades
+        · {{ r.best?.oos?.wins || 0 }}W / {{ r.best?.oos?.losses || 0 }}L
+        · {{ r.best?.oos?.points || 0 }} pts
+        · ₹{{ r.best?.oos?.rupees || 0 }}
+        @if (r.best?.oos?.profitFactor != null) {
+          · PF {{ r.best?.oos?.profitFactor }}
+        }
         @if (r.best?.spec; as s) {
-          · {{ s.entry }} lookback {{ s.lookback }} wait {{ s.wait }} hold {{ s.hold }}
+          · {{ s.entry }} lookback {{ s.lookback }}
+          @if (s.wait) {
+            wait {{ s.wait }}
+          }
+          hold {{ s.hold }}
           stop {{ s.stopPct }}% target {{ s.targetPct }}%
         }
       </p>
+      @if (r.engines) {
+        <p class="hint">
+          Compared —
+          ee-wait: ₹{{ r.engines['ee-wait']?.oos?.rupees ?? 'none' }}
+          ({{ r.engines['ee-wait']?.oos?.trades ?? 0 }} trades)
+          · order-flow: ₹{{ r.engines['order-flow']?.oos?.rupees ?? 'none' }}
+          ({{ r.engines['order-flow']?.oos?.trades ?? 0 }} trades)
+        </p>
+      }
       @if (r.checks?.btstOvernight?.full; as b) {
         <p>
           BTST check (reject prior high, buy PE, exit next day):
@@ -168,7 +193,7 @@
                   <td>{{ s.oos?.rupees }}</td>
                   <td>{{ s.oos?.trades }}</td>
                   <td>{{ s.oos?.profitFactor }}</td>
-                  <td>{{ s.spec?.entry }} w{{ s.spec?.wait }} h{{ s.spec?.hold }}</td>
+                  <td>{{ s.engine }} {{ s.spec?.entry }} w{{ s.spec?.wait || '-' }} h{{ s.spec?.hold }}</td>
                 </tr>
               }
             </tbody>
@@ -354,10 +379,27 @@
     <div class="paper-card">
       <h3>Paper result</h3>
       <p>
-        {{ p.fromDate }} → {{ p.toDate }}
+        {{ p.engine || 'paper' }}
+        · {{ p.fromDate }} → {{ p.toDate }}
         · trades {{ p.totals?.trades || 0 }}
+        · {{ p.totals?.wins || 0 }}W / {{ p.totals?.losses || 0 }}L
+        @if (p.totals?.underlyingPoints != null) {
+          · {{ p.totals?.underlyingPoints }} pts
+        }
+        @if (p.totals?.profitFactor != null) {
+          · PF {{ p.totals?.profitFactor }}
+        }
         · net ₹{{ (p.totals?.optionNetAfterChargesRs ?? p.totals?.optionNetRs ?? 0) | number: '1.0-0' }}
       </p>
+      @if (p.usedFindWindow) {
+        <p class="hint">Today was checked — paper P&amp;L used the Find window above, not a single session.</p>
+      }
+      @if (p.note) {
+        <p class="hint">{{ p.note }}</p>
+      }
+      @if (p.message) {
+        <p class="err">{{ p.message }}</p>
+      }
       <div class="table-wrap">
         <table>
           <thead>
