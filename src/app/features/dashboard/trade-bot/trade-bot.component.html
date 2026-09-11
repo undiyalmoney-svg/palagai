@@ -89,15 +89,19 @@
 
   <div class="panel option-panel">
     <h3>Option OHLC &amp; price</h3>
-    <p class="hint">Historical candles and live last price for the ATM weekly (or a symbol you type).</p>
+    <p class="hint">
+      Historical candles for <strong>any listed option</strong> — Nifty, Bank, stocks, MCX.
+      Paste a Kite tradingsymbol (comma-separated for several). ATM Nifty is only a shortcut when the box is empty.
+    </p>
     <div class="row">
       <label class="field grow">
         <span>Option symbol</span>
         <input
           type="text"
           [(ngModel)]="optionSymbol"
-          placeholder="NFO ATM weekly, or e.g. NIFTY25SEP24500CE"
-          [disabled]="optionAtm || optionBusy() || busy()"
+          (ngModelChange)="onOptionSymbolChange()"
+          placeholder="e.g. BANKNIFTY2591655000CE, RELIANCE259181400CE"
+          [disabled]="optionBusy() || busy()"
         />
       </label>
       <label class="field">
@@ -114,7 +118,7 @@
         <input type="checkbox" [(ngModel)]="optionAtm" [disabled]="optionBusy() || busy()" />
         <span>
           <strong>ATM Nifty</strong>
-          <small>Resolve this week’s CE and PE from spot</small>
+          <small>Used only when the symbol box is empty</small>
         </span>
       </label>
       <label class="check">
@@ -165,6 +169,10 @@
           <h4>{{ c.tradingSymbol }} @if (c.instrumentType) { ({{ c.instrumentType }}) }</h4>
           <p>
             Price ₹{{ c.price }}
+            · {{ (c.historical || []).length }} bars
+            @if ((c.historical || []).length > 250) {
+              (last 250 shown)
+            }
             @if (c.live?.ohlc; as d) {
               · day O {{ d.open }} H {{ d.high }} L {{ d.low }} C {{ d.close }}
             }
@@ -189,7 +197,7 @@
                 </tr>
               </thead>
               <tbody>
-                @for (b of (c.historical || []).slice(-12); track $index) {
+                @for (b of optionBars(c); track $index) {
                   <tr>
                     <td>{{ b.date }}</td>
                     <td>{{ b.open }}</td>

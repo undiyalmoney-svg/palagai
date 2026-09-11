@@ -172,6 +172,7 @@
 .trade-bot .table-wrap {
   margin-top: 0.75rem;
   overflow: auto;
+  max-height: 28rem;
 }
 
 .trade-bot table {

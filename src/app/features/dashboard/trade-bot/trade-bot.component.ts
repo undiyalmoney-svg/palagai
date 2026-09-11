@@ -119,7 +119,7 @@ export class TradeBotComponent implements OnInit, OnDestroy {
   protected liveMoney = false;
   protected lots = 1;
   protected optionSymbol = '';
-  protected optionAtm = true;
+  protected optionAtm = false;
   protected optionHistorical = true;
   protected optionLive = true;
   protected optionInterval = '5minute';
@@ -244,6 +244,15 @@ export class TradeBotComponent implements OnInit, OnDestroy {
     }
   }
 
+  protected onOptionSymbolChange(): void {
+    if (this.optionSymbol.trim()) this.optionAtm = false;
+  }
+
+  protected optionBars(c: OptionContract): OptionBar[] {
+    const rows = c.historical || [];
+    return rows.length > 250 ? rows.slice(-250) : rows;
+  }
+
   protected async fetchOptionOhlc(): Promise<void> {
     this.optionError.set('');
     this.applyToday();
@@ -271,14 +280,13 @@ export class TradeBotComponent implements OnInit, OnDestroy {
       atm: this.optionAtm,
       oi: true,
     };
-    if (!this.optionAtm) {
-      const sym = this.optionSymbol.trim();
-      if (!sym) {
-        this.optionError.set('Enter an NFO option symbol, or check ATM.');
-        return;
-      }
-      body.tradingSymbol = sym;
+    const symbol = this.optionSymbol.trim();
+    if (symbol) {
+      body.tradingSymbol = symbol;
       body.atm = false;
+    } else if (!this.optionAtm) {
+      this.optionError.set('Type any listed option tradingsymbol, or check ATM Nifty.');
+      return;
     }
     const kite = this.kiteSession.getAuthorizationHeader();
     const headers: Record<string, string> = kite ? { 'X-Kite-Authorization': kite } : {};
