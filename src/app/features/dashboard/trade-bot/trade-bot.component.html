@@ -4,11 +4,9 @@
       <p class="pg-eyebrow">One engine</p>
       <h1>Trade Bot</h1>
       <p class="lede pg-lede">
-        Paper and live are the same run. Dates set the window.
-        <strong>Today</strong> fills both dates for live orders.
-        Paper P&amp;L always uses the Find window (years of daily bars) — a single
-        session cannot produce trades.
-        <strong>Live money</strong> is the only switch that places Kite orders.
+        Pick a date range, keep Live money off, and click <strong>Run paper</strong>.
+        The net ₹ below is the paper P&amp;L for that window (index points × 65 × lots —
+        not live option premium).
       </p>
     </div>
     <div class="hero-meta">
@@ -43,12 +41,18 @@
       </label>
     </div>
 
+    <div class="actions range-presets">
+      <button mat-stroked-button type="button" [disabled]="busy() || today" (click)="setRangeDays(30)">Last 30 days</button>
+      <button mat-stroked-button type="button" [disabled]="busy() || today" (click)="setRangeDays(90)">Last 90 days</button>
+      <button mat-stroked-button type="button" [disabled]="busy() || today" (click)="setRangeDays(365)">Last 1 year</button>
+    </div>
+
     <div class="checks">
       <label class="check">
         <input type="checkbox" [(ngModel)]="today" (ngModelChange)="onTodayChange()" [disabled]="busy()" />
         <span>
           <strong>Today</strong>
-          <small>Auto-fill From and To with today’s IST date (live). Paper still reports the Find window P&amp;L.</small>
+          <small>Locks From/To to today for live. Paper then uses the last 1 year so you still see profit.</small>
         </span>
       </label>
       <label class="check" [class.off]="!allowLiveMoney">
@@ -88,6 +92,64 @@
       <p class="err">{{ error() }}</p>
     }
   </div>
+
+  @if (paper(); as p) {
+    <div class="paper-card paper-hero" [attr.data-up]="paperNet(p) >= 0">
+      <h3>Paper profit</h3>
+      <p class="pnl-figure" [class.up]="paperNet(p) >= 0" [class.down]="paperNet(p) < 0">
+        ₹{{ paperNet(p) | number: '1.0-0' }}
+      </p>
+      <p>
+        {{ p.fromDate }} → {{ p.toDate }}
+        · {{ p.engine || 'paper' }}
+        · {{ p.totals?.trades || 0 }} trades
+        · {{ p.totals?.wins || 0 }} won / {{ p.totals?.losses || 0 }} lost
+        @if (p.totals?.profitFactor != null) {
+          · PF {{ p.totals?.profitFactor }}
+        }
+        @if (p.totals?.underlyingPoints != null) {
+          · {{ p.totals?.underlyingPoints }} pts
+        }
+      </p>
+      @if (p.note) {
+        <p class="hint">{{ p.note }}</p>
+      }
+      @if (p.message) {
+        <p class="err">{{ p.message }}</p>
+      }
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>When</th>
+              <th>Book</th>
+              <th>Side</th>
+              <th>CE/PE</th>
+              <th>Net ₹</th>
+              <th>Exit</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (t of p.trades || []; track $index) {
+              <tr>
+                <td>{{ t.entryTime }}</td>
+                <td>{{ t.instrumentName }}</td>
+                <td>{{ t.side }}</td>
+                <td>{{ t.optionSymbol }}</td>
+                <td>{{ t.netOptionPnlRs ?? t.optionPnlRs }}</td>
+                <td>{{ t.exitReason }}</td>
+              </tr>
+            }
+            @if (!(p.trades || []).length) {
+              <tr>
+                <td colspan="6">No trades in this date range. Widen From/To (Last 1 year) and Run paper again.</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+  }
 
   <div class="panel option-panel">
     <h3>Find entry / wait / exit + order flow</h3>
@@ -372,65 +434,6 @@
           }
         </ul>
       }
-    </div>
-  }
-
-  @if (paper(); as p) {
-    <div class="paper-card">
-      <h3>Paper result</h3>
-      <p>
-        {{ p.engine || 'paper' }}
-        · {{ p.fromDate }} → {{ p.toDate }}
-        · trades {{ p.totals?.trades || 0 }}
-        · {{ p.totals?.wins || 0 }}W / {{ p.totals?.losses || 0 }}L
-        @if (p.totals?.underlyingPoints != null) {
-          · {{ p.totals?.underlyingPoints }} pts
-        }
-        @if (p.totals?.profitFactor != null) {
-          · PF {{ p.totals?.profitFactor }}
-        }
-        · net ₹{{ (p.totals?.optionNetAfterChargesRs ?? p.totals?.optionNetRs ?? 0) | number: '1.0-0' }}
-      </p>
-      @if (p.usedFindWindow) {
-        <p class="hint">Today was checked — paper P&amp;L used the Find window above, not a single session.</p>
-      }
-      @if (p.note) {
-        <p class="hint">{{ p.note }}</p>
-      }
-      @if (p.message) {
-        <p class="err">{{ p.message }}</p>
-      }
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>When</th>
-              <th>Book</th>
-              <th>Side</th>
-              <th>Option</th>
-              <th>Net ₹</th>
-              <th>Exit</th>
-            </tr>
-          </thead>
-          <tbody>
-            @for (t of p.trades || []; track $index) {
-              <tr>
-                <td>{{ t.entryTime }}</td>
-                <td>{{ t.instrumentName }}</td>
-                <td>{{ t.side }}</td>
-                <td>{{ t.optionSymbol }}</td>
-                <td>{{ t.netOptionPnlRs ?? t.optionPnlRs }}</td>
-                <td>{{ t.exitReason }}</td>
-              </tr>
-            }
-            @if (!(p.trades || []).length) {
-              <tr>
-                <td colspan="6">No executable option trades in this window.</td>
-              </tr>
-            }
-          </tbody>
-        </table>
-      </div>
     </div>
   }
 </section>
