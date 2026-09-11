@@ -28,17 +28,23 @@ interface PaperTotals {
   losses?: number;
   optionNetAfterChargesRs?: number;
   optionNetRs?: number;
+  underlyingPoints?: number;
+  profitFactor?: number;
 }
 
 interface PaperResult {
   mode?: string;
+  engine?: string;
   fromDate?: string;
   toDate?: string;
   liveMoney?: boolean;
   realOrders?: boolean;
+  usedFindWindow?: boolean;
   totals?: PaperTotals;
   trades?: PaperTrade[];
   message?: string;
+  note?: string;
+  spec?: EeWaitSpec;
 }
 
 interface OptionBar {
@@ -88,12 +94,15 @@ interface OptionOhlcResult {
 }
 
 interface EeWaitSpec {
+  engine?: string;
   entry?: string;
   lookback?: number;
   wait?: number;
   hold?: number;
   stopPct?: number;
   targetPct?: number;
+  levelPct?: number;
+  wallMult?: number;
   killFailures?: boolean;
 }
 
@@ -102,12 +111,18 @@ interface EeWaitFound {
   toDate?: string;
   bars?: number;
   note?: string;
+  engine?: string;
   universe?: string;
   symbol?: string;
   scanned?: number;
   ranked?: number;
+  engines?: {
+    'ee-wait'?: { spec?: EeWaitSpec; oos?: { trades?: number; points?: number; rupees?: number } } | null;
+    'order-flow'?: { spec?: EeWaitSpec; oos?: { trades?: number; points?: number; rupees?: number } } | null;
+  };
   stocks?: Array<{
     symbol?: string;
+    engine?: string;
     spec?: EeWaitSpec;
     oos?: {
       trades?: number;
@@ -118,7 +133,14 @@ interface EeWaitFound {
   }>;
   best?: {
     spec?: EeWaitSpec;
-    oos?: { trades?: number; points?: number; rupees?: number; wins?: number; losses?: number };
+    oos?: {
+      trades?: number;
+      points?: number;
+      rupees?: number;
+      wins?: number;
+      losses?: number;
+      profitFactor?: number;
+    };
   };
   checks?: {
     btstOvernight?: {
@@ -298,11 +320,11 @@ export class TradeBotComponent implements OnInit, OnDestroy {
       realOrders: this.liveMoney,
       lots: this.lots,
       niftyLots: this.lots,
+      universe: this.researchUniverse,
     };
     if (found) {
-      body.engine = 'ee-wait';
+      body.engine = this.research()?.engine || found.engine || 'ee-wait';
       body.eeWait = found;
-      body.universe = this.researchUniverse;
       const sym = this.research()?.symbol;
       if (sym) body.symbol = sym;
     }
