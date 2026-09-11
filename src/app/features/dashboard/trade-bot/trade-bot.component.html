@@ -122,6 +122,12 @@
           stop {{ s.stopPct }}% target {{ s.targetPct }}%
         }
       </p>
+      @if (r.checks?.btstOvernight?.full; as b) {
+        <p>
+          BTST check (reject prior high, buy PE, exit next day):
+          {{ b.trades }} trades · {{ b.wins }}/{{ b.losses }} · {{ b.points }} pts · ₹{{ b.rupees }} · PF {{ b.profitFactor }}
+        </p>
+      }
       <p class="hint">{{ r.note }}</p>
     }
   </div>

@@ -105,7 +105,28 @@ interface EeWaitFound {
     spec?: EeWaitSpec;
     oos?: { trades?: number; points?: number; rupees?: number; wins?: number; losses?: number };
   };
+  checks?: {
+    btstOvernight?: {
+      spec?: EeWaitSpec;
+      oos?: {
+        trades?: number;
+        points?: number;
+        rupees?: number;
+        profitFactor?: number;
+      };
+      full?: {
+        trades?: number;
+        points?: number;
+        rupees?: number;
+        profitFactor?: number;
+        wins?: number;
+        losses?: number;
+      };
+    };
+  };
 }
+
+interface LiveStatus {
   status?: string;
   message?: string;
   liveMoney?: boolean;
