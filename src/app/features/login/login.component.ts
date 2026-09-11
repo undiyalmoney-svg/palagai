@@ -97,13 +97,9 @@ export class LoginComponent {
 
     if (result.ok) {
       await this.authService.refreshMe();
-      const u = this.authService.currentUser();
       let next = [firstDashboardPath(this.authService)];
       if (peekKiteRequestToken()) {
         next = ['/dashboard/get-token'];
-      } else if (u && !this.authService.hasModule('auto')) {
-        if (this.authService.hasModule('test')) next = ['/dashboard/order-test'];
-        else if (this.authService.hasModule('token')) next = ['/dashboard/get-token'];
       }
       await this.router.navigate(next);
     } else {

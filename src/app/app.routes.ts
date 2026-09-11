@@ -12,7 +12,6 @@ import { LoginComponent } from './features/login/login.component';
 import { DashboardComponent } from './features/dashboard/dashboard.component';
 import { DashboardHomeComponent } from './features/dashboard/dashboard-home.component';
 import { OrderTestComponent } from './features/dashboard/order-test/order-test.component';
-import { AutoTraderComponent } from './features/dashboard/auto-trader/auto-trader.component';
 import { GetTokenComponent } from './features/dashboard/get-token/get-token.component';
 import { SettingsComponent } from './features/dashboard/settings/settings.component';
 import { PnlRecordsComponent } from './features/dashboard/pnl-records/pnl-records.component';
@@ -84,15 +83,15 @@ export const routes: Routes = [
       },
       {
         path: 'sr-breakout',
-        redirectTo: 'auto-trader',
+        redirectTo: 'get-token',
         pathMatch: 'full',
       },
       { path: 'orders', redirectTo: '/admin/pnl', pathMatch: 'full' },
       { path: 'pnl-records', redirectTo: '/admin/pnl', pathMatch: 'full' },
       {
         path: 'auto-trader',
-        canActivate: [moduleGuard('auto')],
-        component: AutoTraderComponent,
+        redirectTo: 'get-token',
+        pathMatch: 'full',
       },
       {
         path: 'get-token',

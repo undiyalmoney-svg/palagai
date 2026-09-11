@@ -12,7 +12,7 @@ import { MatButtonModule } from '@angular/material/button';
       <h1>No desk available</h1>
       <p>
         Your account has no modules enabled, or the session needs a fresh login. Ask admin
-        (<code>Admin</code>) to enable Trade / Crude / Auto / Token — or sign in again.
+        to enable Token / Test — or sign in again.
       </p>
       <a mat-flat-button color="primary" routerLink="/login">Go to login</a>
     </section>

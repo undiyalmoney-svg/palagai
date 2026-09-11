@@ -37,20 +37,12 @@ export class DashboardComponent implements OnInit, OnDestroy {
   private navSub: Subscription | null = null;
 
   protected readonly clockLabel = signal('');
-  protected readonly pageTitle = signal('Auto Trader');
-  protected readonly pageSubtitle = signal('Genie Nifty ATM CE/PE desk — paper and live.');
-  /** Desktop starts open; mobile starts closed (set in ngOnInit). */
+  protected readonly pageTitle = signal('Palagai');
+  protected readonly pageSubtitle = signal('Get Token, then build a new desk.');
   protected readonly sidebarOpen = signal(true);
   protected readonly profileOpen = signal(false);
 
   private readonly allNav: NavItem[] = [
-    {
-      label: 'Auto',
-      shortLabel: 'Auto',
-      route: '/dashboard/auto-trader',
-      icon: 'bot',
-      module: 'auto',
-    },
     {
       label: 'Test',
       shortLabel: 'Test',
@@ -68,10 +60,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
   ];
 
   private readonly titles: Record<string, { title: string; subtitle: string }> = {
-    '/dashboard/auto-trader': {
-      title: 'Auto Trader',
-      subtitle: 'Genie — confirm CE/PE, buy ATM, SL, cancel SL then leave.',
-    },
     '/dashboard/order-test': {
       title: 'Order Test',
       subtitle: 'Safe order probes against your connected Kite session.',
