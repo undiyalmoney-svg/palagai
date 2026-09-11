@@ -5,8 +5,8 @@
       <h1>Trade Bot</h1>
       <p class="lede pg-lede">
         Pick a date range, keep Live money off, and click <strong>Run paper</strong>.
-        The net ₹ below is the paper P&amp;L for that window (index points × 65 × lots —
-        not live option premium).
+        <strong>Today</strong> means this IST session only. Historical P&amp;L needs
+        From/To (Last 1 year). Net ₹ is index points × 65 × lots — not live option premium.
       </p>
     </div>
     <div class="hero-meta">
@@ -52,7 +52,7 @@
         <input type="checkbox" [(ngModel)]="today" (ngModelChange)="onTodayChange()" [disabled]="busy()" />
         <span>
           <strong>Today</strong>
-          <small>Locks From/To to today for live. Paper then uses the last 1 year so you still see profit.</small>
+          <small>Locks From and To to today’s IST date. Paper then shows only today’s trades — not last year.</small>
         </span>
       </label>
       <label class="check" [class.off]="!allowLiveMoney">
@@ -142,7 +142,7 @@
             }
             @if (!(p.trades || []).length) {
               <tr>
-                <td colspan="6">No trades in this date range. Widen From/To (Last 1 year) and Run paper again.</td>
+                <td colspan="6">No trades in this date range. If Today is on, that is only today’s session — uncheck it and use Last 1 year for history.</td>
               </tr>
             }
           </tbody>

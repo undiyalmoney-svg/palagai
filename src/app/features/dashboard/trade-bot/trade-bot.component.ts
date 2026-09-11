@@ -358,11 +358,6 @@ export class TradeBotComponent implements OnInit, OnDestroy {
         this.paper.set(res);
         this.live.set(null);
         this.clearPoll();
-        if (res.fromDate && res.toDate) {
-          this.today = false;
-          this.fromDate = res.fromDate;
-          this.toDate = res.toDate;
-        }
       }
     } catch (err) {
       this.error.set(this.fmtErr(err));
