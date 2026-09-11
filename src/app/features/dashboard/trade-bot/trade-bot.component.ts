@@ -172,8 +172,10 @@ interface LiveStatus {
   totals?: { netRs?: number; trades?: number };
 }
 
-function istToday(): string {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+function oneYearAgo(): string {
+  const t = istToday();
+  const [y, m, d] = t.split('-').map(Number);
+  return `${y - 1}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 }
 
 @Component({
@@ -192,9 +194,9 @@ export class TradeBotComponent implements OnInit, OnDestroy {
   private readonly liveApiBase =
     (environment as { liveApiBaseUrl?: string }).liveApiBaseUrl || '/api/live';
 
-  protected fromDate = istToday();
+  protected fromDate = oneYearAgo();
   protected toDate = istToday();
-  protected today = true;
+  protected today = false;
   protected liveMoney = false;
   protected lots = 1;
   protected optionSymbol = '';
@@ -225,7 +227,7 @@ export class TradeBotComponent implements OnInit, OnDestroy {
     const uid = this.auth.currentUser()?.id;
     if (uid) this.kiteSession.bindSiteUser(uid);
     this.lots = this.lotsPreference.get();
-    this.applyToday();
+    if (this.today) this.applyToday();
     void this.refreshLiveStatus();
   }
 
@@ -253,6 +255,18 @@ export class TradeBotComponent implements OnInit, OnDestroy {
     const n = Math.max(1, Math.floor(Number(this.lots)) || 1);
     this.lots = n;
     this.lotsPreference.set(n);
+  }
+
+  protected setRangeDays(days: number): void {
+    this.today = false;
+    this.toDate = istToday();
+    const t = new Date(`${this.toDate}T00:00:00+05:30`);
+    t.setDate(t.getDate() - Math.max(1, days));
+    this.fromDate = t.toISOString().slice(0, 10);
+  }
+
+  protected paperNet(p: PaperResult): number {
+    return Number(p.totals?.optionNetAfterChargesRs ?? p.totals?.optionNetRs ?? 0) || 0;
   }
 
   protected async findEeWait(): Promise<void> {
@@ -344,6 +358,11 @@ export class TradeBotComponent implements OnInit, OnDestroy {
         this.paper.set(res);
         this.live.set(null);
         this.clearPoll();
+        if (res.fromDate && res.toDate) {
+          this.today = false;
+          this.fromDate = res.fromDate;
+          this.toDate = res.toDate;
+        }
       }
     } catch (err) {
       this.error.set(this.fmtErr(err));
