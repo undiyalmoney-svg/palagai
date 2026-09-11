@@ -1,0 +1,151 @@
+<section class="trade-bot pg-page">
+  <header class="hero pg-page-hero">
+    <div class="hero-copy">
+      <p class="pg-eyebrow">One engine</p>
+      <h1>Trade Bot</h1>
+      <p class="lede pg-lede">
+        Paper and live are the same run. Dates set the window.
+        <strong>Today</strong> fills both dates.
+        <strong>Live money</strong> is the only switch that places Kite orders.
+      </p>
+    </div>
+    <div class="hero-meta">
+      @if (liveMoney) {
+        <span class="pg-badge pg-badge-bear">LIVE MONEY</span>
+      } @else {
+        <span class="pg-badge pg-badge-neutral">PAPER</span>
+      }
+    </div>
+  </header>
+
+  <div class="panel">
+    <div class="row">
+      <label class="field">
+        <span>From date</span>
+        <input type="date" [(ngModel)]="fromDate" [disabled]="today || busy()" />
+      </label>
+      <label class="field">
+        <span>To date</span>
+        <input type="date" [(ngModel)]="toDate" [disabled]="today || busy()" />
+      </label>
+      <label class="field lots">
+        <span>Lots</span>
+        <input
+          type="number"
+          min="1"
+          step="1"
+          [(ngModel)]="lots"
+          (ngModelChange)="onLotsChange()"
+          [disabled]="busy()"
+        />
+      </label>
+    </div>
+
+    <div class="checks">
+      <label class="check">
+        <input type="checkbox" [(ngModel)]="today" (ngModelChange)="onTodayChange()" [disabled]="busy()" />
+        <span>
+          <strong>Today</strong>
+          <small>Auto-fill From and To with today’s IST date</small>
+        </span>
+      </label>
+      <label class="check" [class.off]="!allowLiveMoney">
+        <input
+          type="checkbox"
+          [(ngModel)]="liveMoney"
+          [disabled]="busy() || !allowLiveMoney"
+        />
+        <span>
+          <strong>Live money</strong>
+          <small>Same engine — when on, place live Kite orders</small>
+        </span>
+      </label>
+    </div>
+
+    <div class="actions">
+      <button mat-flat-button color="primary" type="button" [disabled]="busy()" (click)="run()">
+        @if (busy()) {
+          <mat-spinner diameter="18" />
+        }
+        {{ liveMoney ? 'Start live' : 'Run paper' }}
+      </button>
+      <button
+        mat-stroked-button
+        type="button"
+        [disabled]="busy() || live()?.status !== 'running'"
+        (click)="stopLive()"
+      >
+        Stop live
+      </button>
+    </div>
+
+    @if (liveMoney && !datesIncludeToday()) {
+      <p class="err">Live money only places orders when the date range includes today. Check Today, or uncheck Live money for a past window.</p>
+    }
+    @if (error()) {
+      <p class="err">{{ error() }}</p>
+    }
+  </div>
+
+  @if (live(); as s) {
+    <div class="status-card" [attr.data-running]="s.status === 'running'">
+      <h3>Live status</h3>
+      <p>{{ s.status || 'idle' }}{{ s.message ? ' · ' + s.message : '' }}</p>
+      <p class="hint">
+        Orders: {{ s.realOrders || s.liveMoney ? 'live Kite' : 'paper marks only' }}
+      </p>
+      @if (s.events?.length) {
+        <ul class="events">
+          @for (ev of (s.events || []).slice(0, 12); track $index) {
+            <li>
+              <code>{{ ev.action }}</code>
+              <span>{{ ev.detail }}</span>
+            </li>
+          }
+        </ul>
+      }
+    </div>
+  }
+
+  @if (paper(); as p) {
+    <div class="paper-card">
+      <h3>Paper result</h3>
+      <p>
+        {{ p.fromDate }} → {{ p.toDate }}
+        · trades {{ p.totals?.trades || 0 }}
+        · net ₹{{ (p.totals?.optionNetAfterChargesRs ?? p.totals?.optionNetRs ?? 0) | number: '1.0-0' }}
+      </p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>When</th>
+              <th>Book</th>
+              <th>Side</th>
+              <th>Option</th>
+              <th>Net ₹</th>
+              <th>Exit</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (t of p.trades || []; track $index) {
+              <tr>
+                <td>{{ t.entryTime }}</td>
+                <td>{{ t.instrumentName }}</td>
+                <td>{{ t.side }}</td>
+                <td>{{ t.optionSymbol }}</td>
+                <td>{{ t.netOptionPnlRs ?? t.optionPnlRs }}</td>
+                <td>{{ t.exitReason }}</td>
+              </tr>
+            }
+            @if (!(p.trades || []).length) {
+              <tr>
+                <td colspan="6">No executable option trades in this window.</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+  }
+</section>

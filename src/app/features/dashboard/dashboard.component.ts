@@ -38,11 +38,18 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   protected readonly clockLabel = signal('');
   protected readonly pageTitle = signal('Palagai');
-  protected readonly pageSubtitle = signal('Get Token, then build a new desk.');
+  protected readonly pageSubtitle = signal('Trade Bot, Token, and Test.');
   protected readonly sidebarOpen = signal(true);
   protected readonly profileOpen = signal(false);
 
   private readonly allNav: NavItem[] = [
+    {
+      label: 'Trade Bot',
+      shortLabel: 'Bot',
+      route: '/dashboard/trade-bot',
+      icon: 'bot',
+      module: 'auto',
+    },
     {
       label: 'Test',
       shortLabel: 'Test',
@@ -60,6 +67,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
   ];
 
   private readonly titles: Record<string, { title: string; subtitle: string }> = {
+    '/dashboard/trade-bot': {
+      title: 'Trade Bot',
+      subtitle: 'From / To dates, Today autofill, Live money for real Kite orders.',
+    },
     '/dashboard/order-test': {
       title: 'Order Test',
       subtitle: 'Safe order probes against your connected Kite session.',
