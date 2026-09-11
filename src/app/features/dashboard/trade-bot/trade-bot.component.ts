@@ -87,7 +87,25 @@ interface OptionOhlcResult {
   message?: string;
 }
 
-interface LiveStatus {
+interface EeWaitSpec {
+  entry?: string;
+  lookback?: number;
+  wait?: number;
+  hold?: number;
+  stopPct?: number;
+  targetPct?: number;
+}
+
+interface EeWaitFound {
+  fromDate?: string;
+  toDate?: string;
+  bars?: number;
+  note?: string;
+  best?: {
+    spec?: EeWaitSpec;
+    oos?: { trades?: number; points?: number; rupees?: number; wins?: number; losses?: number };
+  };
+}
   status?: string;
   message?: string;
   liveMoney?: boolean;
@@ -135,6 +153,9 @@ export class TradeBotComponent implements OnInit, OnDestroy {
   protected readonly optionBusy = signal(false);
   protected readonly optionError = signal('');
   protected readonly optionResult = signal<OptionOhlcResult | null>(null);
+  protected readonly researchBusy = signal(false);
+  protected readonly researchError = signal('');
+  protected readonly research = signal<EeWaitFound | null>(null);
 
   private pollTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -175,6 +196,25 @@ export class TradeBotComponent implements OnInit, OnDestroy {
     this.lotsPreference.set(n);
   }
 
+  protected async findEeWait(): Promise<void> {
+    this.researchError.set('');
+    this.researchBusy.set(true);
+    try {
+      const res = await firstValueFrom(
+        this.http.post<EeWaitFound>(`${this.liveApiBase}/research/ee-wait`, {
+          fromDate: this.today ? '' : this.fromDate,
+          toDate: this.today ? '' : this.toDate,
+          lots: this.lots,
+        }),
+      );
+      this.research.set(res);
+    } catch (err) {
+      this.researchError.set(this.fmtErr(err));
+    } finally {
+      this.researchBusy.set(false);
+    }
+  }
+
   protected async run(): Promise<void> {
     this.error.set('');
     this.applyToday();
@@ -199,7 +239,8 @@ export class TradeBotComponent implements OnInit, OnDestroy {
       await this.pushToken();
     }
 
-    const body = {
+    const found = this.research()?.best?.spec;
+    const body: Record<string, unknown> = {
       fromDate: this.fromDate,
       toDate: this.toDate,
       today: this.today,
@@ -208,6 +249,10 @@ export class TradeBotComponent implements OnInit, OnDestroy {
       lots: this.lots,
       niftyLots: this.lots,
     };
+    if (found) {
+      body.engine = 'ee-wait';
+      body.eeWait = found;
+    }
     const kite = this.kiteSession.getAuthorizationHeader();
     const headers: Record<string, string> = kite ? { 'X-Kite-Authorization': kite } : {};
 

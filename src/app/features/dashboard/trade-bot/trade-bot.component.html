@@ -88,6 +88,45 @@
   </div>
 
   <div class="panel option-panel">
+    <h3>Find entry / wait / exit</h3>
+    <p class="hint">
+      Walk-forward scan on NSE Nifty 50 daily bars (not Genie / S/R).
+      It searches confirmation wait, hold, stop, and target.
+      Paper uses that spec without a Kite token. Live money still needs Get Token and buys ATM CE or PE in the signal direction.
+      This does not guarantee a profitable day.
+    </p>
+    <div class="actions">
+      <button
+        mat-stroked-button
+        type="button"
+        [disabled]="researchBusy() || busy()"
+        (click)="findEeWait()"
+      >
+        @if (researchBusy()) {
+          <mat-spinner diameter="18" />
+        }
+        Find best entry / wait / exit
+      </button>
+    </div>
+    @if (researchError()) {
+      <p class="err">{{ researchError() }}</p>
+    }
+    @if (research(); as r) {
+      <p>
+        {{ r.bars }} daily bars · {{ r.fromDate }} → {{ r.toDate }}
+        · OOS {{ r.best?.oos?.trades }} trades
+        · {{ r.best?.oos?.points }} pts
+        · ₹{{ r.best?.oos?.rupees }}
+        @if (r.best?.spec; as s) {
+          · {{ s.entry }} lookback {{ s.lookback }} wait {{ s.wait }} hold {{ s.hold }}
+          stop {{ s.stopPct }}% target {{ s.targetPct }}%
+        }
+      </p>
+      <p class="hint">{{ r.note }}</p>
+    }
+  </div>
+
+  <div class="panel option-panel">
     <h3>Option OHLC &amp; price</h3>
     <p class="hint">
       Listed contracts use Kite (intraday when the series is still on the chain).
