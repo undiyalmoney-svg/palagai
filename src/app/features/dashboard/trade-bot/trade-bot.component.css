@@ -170,9 +170,8 @@
   font-size: 0.88rem;
 }
 
-.trade-bot .paper-card p.pnl-figure {
-  color: inherit;
-  font-size: 2.1rem;
+.trade-bot .paper-card tr.up td {
+  background: var(--pg-bull-soft);
 }
 
 .trade-bot .pnl-figure.up {
@@ -241,6 +240,25 @@
   color: #b91c1c;
 }
 
+.trade-bot td.up {
+  color: #15803d;
+}
+
+.trade-bot td.down {
+  color: #b91c1c;
+}
+
+.trade-bot .protect-block {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--pg-line);
+}
+
+.trade-bot .protect-block h4 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
 .trade-bot tfoot td {
   font-weight: 650;
 }
@@ -286,4 +304,9 @@
   padding: 0.4rem 0.5rem;
   border-bottom: 1px solid var(--pg-line);
   white-space: nowrap;
+}
+
+.trade-bot tr.open-row td {
+  background: #ecfdf3;
+  font-weight: 650;
 }
