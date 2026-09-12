@@ -4,7 +4,7 @@
       <p class="pg-eyebrow">One engine</p>
       <h1>Trade Bot</h1>
       <p class="lede pg-lede">
-        The desk takes the ATM straddle both ways: sell CE+PE if price is still inside the 15-minute range at 10:00, buy CE+PE if it already broke. Month-lock walls do not drop Nifty or Bank. Run 2 months to total profit and loss (Kite 60-day chunks, 3s gap).
+        The desk does not buy both option sides. Quiet 15-minute range at 10:00 → sell ATM CE+PE. Confirmed break → buy one CE or PE with a stop. That is how a 7-month long-straddle debit is avoided. Run 2 months to total profit and loss.
       </p>
     </div>
     <div class="hero-meta">
@@ -88,7 +88,7 @@
 
     <div class="actions range-presets">
       <button mat-flat-button color="primary" type="button" [disabled]="busy()" (click)="runTwoMonthBatch()">
-        2 months · take both sides
+        2 months · profit desk
       </button>
       <button mat-stroked-button type="button" [disabled]="busy() || today" (click)="setRangeDays(30)">Last 30 days</button>
       <button mat-stroked-button type="button" [disabled]="busy() || today" (click)="setRangeDays(60)">Last 60 days</button>

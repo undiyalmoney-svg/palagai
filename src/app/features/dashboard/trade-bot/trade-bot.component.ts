@@ -491,7 +491,7 @@ export class TradeBotComponent implements OnInit, OnDestroy {
       const ok = await this.uiDialog.confirm({
         title: 'Place live Kite orders?',
         message:
-          'Live uses the same paper desk. Inside the 15-minute range at 10:00 → sell ATM CE+PE. Breakout → buy ATM CE+PE. Late start will not chase. Stocks stay paper.',
+          'Live uses the same paper desk. Quiet range at 10:00 → sell ATM CE+PE. Confirmed break → buy one CE or PE. It will not buy both sides. Late start will not chase. Stocks stay paper.',
         confirmLabel: 'Start live',
         cancelLabel: 'Cancel',
         tone: 'danger',
