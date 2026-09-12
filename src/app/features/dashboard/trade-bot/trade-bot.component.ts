@@ -74,6 +74,7 @@ interface PaperResult {
   message?: string;
   note?: string;
   capitalRs?: number;
+  capitalSource?: 'actual' | 'mine';
   maxLots?: number;
   month?: {
     key?: string;
@@ -242,6 +243,7 @@ export class TradeBotComponent implements OnInit, OnDestroy {
   protected toDate = istToday();
   protected today = false;
   protected liveMoney = false;
+  protected fundSource: 'actual' | 'mine' = 'actual';
   protected lots = 1;
   protected capitalRs = DEFAULT_TRADING_CAPITAL_RS;
 
@@ -284,6 +286,18 @@ export class TradeBotComponent implements OnInit, OnDestroy {
   protected datesIncludeToday(): boolean {
     const t = istToday();
     return !!this.fromDate && !!this.toDate && this.fromDate <= t && this.toDate >= t;
+  }
+
+  protected onLiveMoneyChange(): void {
+    if (this.liveMoney) this.fundSource = 'actual';
+  }
+
+  protected fundMode(): 'actual' | 'mine' {
+    return this.liveMoney ? 'actual' : this.fundSource;
+  }
+
+  protected actualFundRs(): number {
+    return this.availableFundsRs() || 0;
   }
 
   protected onLotsChange(): void {
@@ -340,6 +354,9 @@ export class TradeBotComponent implements OnInit, OnDestroy {
   }
 
   protected sizingCapitalRs(): number {
+    if (this.fundMode() === 'mine') {
+      return Math.max(0, Math.floor(Number(this.capitalRs) || 0));
+    }
     return this.availableFundsRs() || Math.max(0, Math.floor(Number(this.capitalRs) || 0));
   }
 
@@ -650,6 +667,7 @@ export class TradeBotComponent implements OnInit, OnDestroy {
       lots: number;
       niftyLots: number;
       capitalRs: number;
+      capitalSource: 'actual' | 'mine';
       engine: string;
     } = {
       fromDate: this.fromDate,
@@ -660,6 +678,7 @@ export class TradeBotComponent implements OnInit, OnDestroy {
       lots: this.lots,
       niftyLots: this.lots,
       capitalRs: this.capitalRs,
+      capitalSource: this.fundMode(),
       engine: 'sr-desk',
     };
     const kite = this.kiteSession.getAuthorizationHeader();
@@ -682,7 +701,6 @@ export class TradeBotComponent implements OnInit, OnDestroy {
         this.clearPoll();
         if (res.kiteFunds && (res.kiteFunds.capitalRs || res.kiteFunds.equityCash != null)) {
           this.kiteFundsSvc.apply(res.kiteFunds);
-          this.syncCapitalFromFunds();
         }
       }
     } catch (err) {
@@ -710,12 +728,6 @@ export class TradeBotComponent implements OnInit, OnDestroy {
 
   private async refreshKiteFunds(): Promise<void> {
     await this.kiteFundsSvc.refresh();
-    this.syncCapitalFromFunds();
-  }
-
-  private syncCapitalFromFunds(): void {
-    const n = this.kiteFundsSvc.equityAvailable();
-    if (n != null && n > 0) this.capitalRs = n;
   }
 
   private async refreshLiveStatus(): Promise<void> {

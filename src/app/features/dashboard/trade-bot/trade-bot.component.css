@@ -180,7 +180,63 @@
   font: inherit;
 }
 
-.trade-bot .checks {
+.trade-bot .fund-picks {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: 0.75rem;
+  margin: 0.85rem 0 0;
+}
+
+.trade-bot .fund-pick {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--pg-line);
+  border-radius: var(--pg-radius-sm);
+  background: #fff;
+}
+
+.trade-bot .fund-pick.on {
+  border-color: #86efac;
+  background: #f0fdf4;
+}
+
+.trade-bot .fund-pick.off {
+  opacity: 0.55;
+}
+
+.trade-bot .fund-pick input[type='radio'] {
+  margin-top: 0.25rem;
+  width: 1.1rem;
+  height: 1.1rem;
+  flex: none;
+}
+
+.trade-bot .fund-pick span {
+  display: grid;
+  gap: 0.2rem;
+  flex: 1;
+}
+
+.trade-bot .fund-pick strong {
+  font-size: 0.95rem;
+}
+
+.trade-bot .fund-pick small {
+  color: var(--pg-muted);
+  font-size: 0.8rem;
+}
+
+.trade-bot .fund-pick input[type='number'] {
+  margin-top: 0.2rem;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid var(--pg-line);
+  border-radius: var(--pg-radius-sm);
+  font: inherit;
+  width: 100%;
+  font-variant-numeric: tabular-nums;
+}
   display: grid;
   gap: 0.65rem;
 }

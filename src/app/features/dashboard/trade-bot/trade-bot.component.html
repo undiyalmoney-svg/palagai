@@ -20,7 +20,7 @@
     <div class="money-cell">
       <span>Funds</span>
       <strong>₹{{ sizingCapitalRs() | number: '1.0-0' }}</strong>
-      <em>Kite available</em>
+      <em>{{ fundMode() === 'actual' ? 'Kite available' : 'Your amount' }}</em>
     </div>
     <div class="money-cell">
       <span>Protected</span>
@@ -48,7 +48,7 @@
     @if (kiteFundsError) {
       <p class="err">{{ kiteFundsError }}</p>
     } @else if (!kiteFunds && !fundsBusy) {
-      <p class="hint">Get Token, then Refresh. Fallback ₹ is used only if Kite is missing.</p>
+      <p class="hint">Get Token, then Refresh. Actual fund is Kite. Mine is your number for paper.</p>
     }
   </div>
 
@@ -63,17 +63,6 @@
         <input type="date" [(ngModel)]="toDate" [disabled]="today || busy()" />
       </label>
       <label class="field lots">
-        <span>Fallback ₹</span>
-        <input
-          type="number"
-          min="1000"
-          step="1000"
-          [(ngModel)]="capitalRs"
-          (ngModelChange)="onCapitalChange()"
-          [disabled]="busy()"
-        />
-      </label>
-      <label class="field lots">
         <span>Max lots</span>
         <input
           type="number"
@@ -83,6 +72,53 @@
           (ngModelChange)="onLotsChange()"
           [disabled]="busy()"
         />
+      </label>
+    </div>
+
+    <div class="fund-picks">
+      <label class="fund-pick" [class.on]="fundMode() === 'actual'">
+        <input
+          type="radio"
+          name="fundSource"
+          value="actual"
+          [(ngModel)]="fundSource"
+          [disabled]="busy()"
+        />
+        <span>
+          <strong>Actual fund</strong>
+          <small>Kite available. Live always uses this.</small>
+          <input
+            type="number"
+            min="0"
+            step="1"
+            [ngModel]="actualFundRs()"
+            [ngModelOptions]="{ standalone: true }"
+            readonly
+            tabindex="-1"
+          />
+        </span>
+      </label>
+      <label class="fund-pick" [class.on]="fundMode() === 'mine'" [class.off]="liveMoney">
+        <input
+          type="radio"
+          name="fundSource"
+          value="mine"
+          [(ngModel)]="fundSource"
+          [disabled]="busy() || liveMoney"
+        />
+        <span>
+          <strong>Mine</strong>
+          <small>Your amount. Paper only.</small>
+          <input
+            type="number"
+            min="1000"
+            step="1000"
+            [(ngModel)]="capitalRs"
+            (ngModelChange)="onCapitalChange()"
+            [ngModelOptions]="{ standalone: true }"
+            [disabled]="busy() || liveMoney"
+          />
+        </span>
       </label>
     </div>
 
@@ -106,6 +142,7 @@
         <input
           type="checkbox"
           [(ngModel)]="liveMoney"
+          (ngModelChange)="onLiveMoneyChange()"
           [disabled]="busy() || !allowLiveMoney"
         />
         <span>
