@@ -35,6 +35,8 @@ interface PaperTrade {
   optionPnlRs?: number | null;
   netOptionPnlRs?: number | null;
   optionStrike?: number | null;
+  optionEntryPremium?: number | null;
+  optionExitPremium?: number | null;
   optionSymbol?: string | null;
   option?: { tradingSymbol?: string; symbol?: string; strike?: number };
   liveWouldTake?: boolean;
@@ -502,11 +504,22 @@ export class TradeBotComponent implements OnInit, OnDestroy {
     if (t.option?.strike != null && Number.isFinite(Number(t.option.strike))) {
       return Math.round(Number(t.option.strike));
     }
-    const px = Number(t.entryPrice ?? t.indexEntry);
-    if (!Number.isFinite(px) || px <= 0) return null;
+    const px = Number(t.indexEntry);
+    if (!Number.isFinite(px) || px < 10000) return null;
     const name = `${t.instrumentName || ''} ${t.selectedInstrument || ''}`.toLowerCase();
     const step = name.includes('bank') ? 100 : 50;
     return Math.round(px / step) * step;
+  }
+
+  protected optionFillPrice(t: PaperTrade, which: 'entry' | 'exit'): number | null {
+    const prem = which === 'entry' ? t.optionEntryPremium : t.optionExitPremium;
+    if (prem != null && Number(prem) > 0 && Number(prem) < 10000) return Number(prem);
+    const px = which === 'entry' ? t.entryPrice : t.exitPrice;
+    const idx = which === 'entry' ? t.indexEntry : t.indexExit;
+    const n = Number(px);
+    if (Number.isFinite(n) && n > 0 && n < 10000) return n;
+    if (Number.isFinite(Number(idx)) && Number(idx) >= 10000) return null;
+    return Number.isFinite(n) && n > 0 && n < 10000 ? n : null;
   }
 
   protected optionLabel(t: PaperTrade): string {

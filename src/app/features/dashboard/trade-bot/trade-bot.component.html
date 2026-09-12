@@ -244,8 +244,8 @@
                 <td>{{ t.instrumentName || '—' }}</td>
                 <td>{{ optionLabel(t) }}</td>
                 <td>{{ tradeSide(t) }}</td>
-                <td>{{ formatPrice(t.entryPrice ?? t.indexEntry) }}</td>
-                <td>{{ isOpenTrade(t) ? '—' : formatPrice(t.exitPrice ?? t.indexExit) }}</td>
+                <td>{{ formatPrice(optionFillPrice(t, 'entry')) }}</td>
+                <td>{{ isOpenTrade(t) ? '—' : formatPrice(optionFillPrice(t, 'exit')) }}</td>
                 <td>{{ t.lots || 1 }}</td>
                 <td [class.up]="(t.netOptionPnlRs ?? t.optionPnlRs ?? 0) >= 0" [class.down]="(t.netOptionPnlRs ?? t.optionPnlRs ?? 0) < 0">
                   ₹{{ (t.netOptionPnlRs ?? t.optionPnlRs ?? 0) | number: '1.0-0' }}
