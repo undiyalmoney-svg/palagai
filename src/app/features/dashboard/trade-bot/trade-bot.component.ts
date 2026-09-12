@@ -247,6 +247,7 @@ export class TradeBotComponent implements OnInit, OnDestroy {
   protected liveMoney = false;
   protected fundSource: 'actual' | 'mine' = 'actual';
   protected capitalRs = DEFAULT_TRADING_CAPITAL_RS;
+  protected mineFundText = String(DEFAULT_TRADING_CAPITAL_RS);
 
   protected readonly busy = signal(false);
   protected readonly error = signal('');
@@ -263,6 +264,7 @@ export class TradeBotComponent implements OnInit, OnDestroy {
     const uid = this.auth.currentUser()?.id;
     if (uid) this.kiteSession.bindSiteUser(uid);
     this.capitalRs = this.capitalPreference.get();
+    this.mineFundText = String(this.capitalRs);
     void this.refreshLiveStatus();
     void this.refreshKiteFunds();
   }
@@ -323,9 +325,16 @@ export class TradeBotComponent implements OnInit, OnDestroy {
     return this.availableFundsRs() || 0;
   }
 
+  protected onMineTyped(raw: string): void {
+    this.mineFundText = raw;
+    const n = Math.floor(Number(String(raw).replace(/,/g, '').replace(/[^\d]/g, '')));
+    if (Number.isFinite(n) && n > 0) this.capitalRs = n;
+  }
+
   protected onCapitalChange(): void {
-    const n = Math.max(10_000, Math.floor(Number(this.capitalRs)) || DEFAULT_TRADING_CAPITAL_RS);
+    const n = Math.max(10_000, Math.floor(Number(this.capitalRs) || DEFAULT_TRADING_CAPITAL_RS));
     this.capitalRs = n;
+    this.mineFundText = String(n);
     this.capitalPreference.set(n);
   }
 
@@ -671,6 +680,7 @@ export class TradeBotComponent implements OnInit, OnDestroy {
       });
       if (!ok) return;
     }
+    await this.kiteFundsSvc.pushToken();
     await this.refreshKiteFunds();
 
     const body: {

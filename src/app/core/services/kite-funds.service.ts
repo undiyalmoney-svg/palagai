@@ -65,7 +65,7 @@ export class KiteFundsService {
     }
   }
 
-  private async pushToken(): Promise<void> {
+  async pushToken(): Promise<void> {
     const data = this.kiteSession.getSession()?.data;
     if (!data?.api_key || !data.access_token) return;
     try {

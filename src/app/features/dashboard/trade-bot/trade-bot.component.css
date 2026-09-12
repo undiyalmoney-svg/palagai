@@ -219,6 +219,14 @@
   flex: 1;
 }
 
+.trade-bot .fund-readout {
+  font-style: normal;
+  font-size: 1.35rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
+}
+
 .trade-bot .fund-pick strong {
   font-size: 0.95rem;
 }
@@ -228,6 +236,7 @@
   font-size: 0.8rem;
 }
 
+.trade-bot .fund-pick input[type='text'],
 .trade-bot .fund-pick input[type='number'] {
   margin-top: 0.2rem;
   padding: 0.45rem 0.55rem;
