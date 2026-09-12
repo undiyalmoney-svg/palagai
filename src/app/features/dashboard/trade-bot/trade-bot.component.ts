@@ -337,13 +337,6 @@ export class TradeBotComponent implements OnInit, OnDestroy {
     this.fromDate = t.toISOString().slice(0, 10);
   }
 
-  protected async runTwoMonthBatch(): Promise<void> {
-    this.today = false;
-    this.liveMoney = false;
-    this.setRangeDays(60);
-    await this.run();
-  }
-
   protected paperNet(p: PaperResult): number {
     return Number(p.totals?.netRs ?? p.totals?.optionNetAfterChargesRs ?? p.totals?.optionNetRs ?? 0) || 0;
   }
