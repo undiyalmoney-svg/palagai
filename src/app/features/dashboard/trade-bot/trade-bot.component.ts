@@ -1,5 +1,5 @@
 import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
-import { DatePipe, DecimalPipe } from '@angular/common';
+import { DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { MatButtonModule } from '@angular/material/button';
@@ -213,7 +213,7 @@ function istToday(): string {
 @Component({
   selector: 'app-trade-bot',
   standalone: true,
-  imports: [FormsModule, DecimalPipe, DatePipe, MatButtonModule, MatProgressSpinnerModule],
+  imports: [FormsModule, DecimalPipe, MatButtonModule, MatProgressSpinnerModule],
   templateUrl: './trade-bot.component.html',
   styleUrl: './trade-bot.component.css',
 })
