@@ -538,11 +538,11 @@ export class TradeBotComponent implements OnInit, OnDestroy {
       date = `${Number(iso[3])} ${months[Number(iso[2]) - 1]} ${iso[1]}`;
       hour = Number(iso[4]);
       min = iso[5];
-      sec = iso[6] || '00';
+      sec = (iso[6] || '00').padStart(2, '0');
     } else if (hm) {
       hour = Number(hm[1]);
       min = hm[2];
-      sec = hm[3] || '00';
+      sec = (hm[3] || '00').padStart(2, '0');
     } else {
       return null;
     }
@@ -557,8 +557,10 @@ export class TradeBotComponent implements OnInit, OnDestroy {
   }
 
   protected formatIstClock(value?: string | null, fallback?: string | null): string {
-    if (fallback) return fallback;
-    return this.formatIstParts(value)?.clock || '—';
+    if (fallback && /\d:\d{2}:\d{2}/.test(fallback)) return fallback;
+    const parts = this.formatIstParts(value);
+    if (parts?.clock) return parts.clock;
+    return '—';
   }
 
   protected formatIst(value?: string | null): string {
