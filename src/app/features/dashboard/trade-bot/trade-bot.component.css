@@ -25,6 +25,104 @@
   font-size: 0.88rem;
 }
 
+.trade-bot .money-board {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11.5rem, 1fr));
+  gap: 0.75rem;
+  margin: 0 0 1rem;
+}
+
+.trade-bot .money-board.tight {
+  margin: 0.85rem 0 0;
+}
+
+.trade-bot .money-cell {
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--pg-line);
+  border-radius: var(--pg-radius);
+  background: #fff;
+  display: grid;
+  gap: 0.2rem;
+}
+
+.trade-bot .money-cell-hero {
+  background: #ecfdf3;
+  border-color: #86efac;
+}
+
+.trade-bot .money-cell span {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--pg-muted);
+}
+
+.trade-bot .money-cell strong {
+  font-size: 1.85rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.trade-bot .money-cell strong.up {
+  color: #15803d;
+}
+
+.trade-bot .money-cell strong.down {
+  color: #b91c1c;
+}
+
+.trade-bot .money-cell em {
+  font-style: normal;
+  font-size: 0.78rem;
+  color: var(--pg-muted);
+}
+
+.trade-bot .funds-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+  margin: -0.4rem 0 1rem;
+}
+
+.trade-bot .inst-money {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0.5rem 0 1rem;
+}
+
+.trade-bot .inst-card {
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--pg-line);
+  border-radius: var(--pg-radius);
+  background: #fff;
+}
+
+.trade-bot .inst-card[data-taken='true'] {
+  border-color: #86efac;
+}
+
+.trade-bot .inst-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: baseline;
+}
+
+.trade-bot .inst-head strong {
+  font-size: 1.05rem;
+}
+
+.trade-bot .inst-head span {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--pg-muted);
+}
+
 .trade-bot .panel {
   display: grid;
   gap: 1rem;

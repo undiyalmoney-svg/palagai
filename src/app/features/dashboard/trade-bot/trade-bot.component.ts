@@ -441,6 +441,12 @@ export class TradeBotComponent implements OnInit, OnDestroy {
     return Math.round((this.availableFundsRs() || Number(p.capitalRs) || 0) + this.paperNet(p));
   }
 
+  protected moneyAfterRs(p: PaperResult): number {
+    const prot = this.protectionOf(p);
+    const funds = Number(prot.fundsRs || prot.capitalRs) || this.sizingCapitalRs();
+    return Math.round(funds + this.paperNet(p));
+  }
+
   protected indexBooks(p: PaperResult): NonNullable<PaperResult['coreBooks']> {
     if (p.coreBooks?.length) return p.coreBooks;
     return (p.books || []).filter((b) => b.id === 'nifty' || b.id === 'bank' || b.id === 'crude');
