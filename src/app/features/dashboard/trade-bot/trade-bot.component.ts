@@ -30,8 +30,9 @@ interface PaperTrade {
   open?: boolean;
   optionPnlRs?: number | null;
   netOptionPnlRs?: number | null;
+  optionStrike?: number | null;
   optionSymbol?: string | null;
-  option?: { tradingSymbol?: string; symbol?: string };
+  option?: { tradingSymbol?: string; symbol?: string; strike?: number };
   liveWouldTake?: boolean;
   skipReason?: string;
   lots?: number;
@@ -490,18 +491,32 @@ export class TradeBotComponent implements OnInit, OnDestroy {
     return t.optionSymbol || t.option?.tradingSymbol || t.option?.symbol || '';
   }
 
+  protected optionStrike(t: PaperTrade): number | null {
+    if (t.optionStrike != null && Number.isFinite(Number(t.optionStrike))) {
+      return Math.round(Number(t.optionStrike));
+    }
+    if (t.option?.strike != null && Number.isFinite(Number(t.option.strike))) {
+      return Math.round(Number(t.option.strike));
+    }
+    const px = Number(t.entryPrice ?? t.indexEntry);
+    if (!Number.isFinite(px) || px <= 0) return null;
+    const name = `${t.instrumentName || ''} ${t.selectedInstrument || ''}`.toLowerCase();
+    const step = name.includes('bank') ? 100 : 50;
+    return Math.round(px / step) * step;
+  }
+
   protected selectedInstrument(t: PaperTrade): string {
-    const raw =
-      t.selectedInstrument ||
-      t.option?.tradingSymbol ||
-      t.option?.symbol ||
-      t.optionSymbol ||
-      '';
-    const cleaned = String(raw)
+    const kite = t.option?.tradingSymbol || t.option?.symbol || '';
+    if (kite && /\d{4,}(CE|PE)$/i.test(kite)) return kite;
+    const kind = this.optionKind(t);
+    const strike = this.optionStrike(t);
+    if (t.instrumentName && strike != null && kind) {
+      return `${t.instrumentName} ${strike} ${kind}`;
+    }
+    const raw = String(t.selectedInstrument || t.optionSymbol || '')
       .replace(/\s*\(index×lot\)\s*$/i, '')
       .trim();
-    if (cleaned) return cleaned;
-    const kind = this.optionKind(t);
+    if (raw) return raw;
     if (t.instrumentName && kind) return `${t.instrumentName} ATM ${kind}`;
     return t.instrumentName || '—';
   }
