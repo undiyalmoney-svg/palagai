@@ -4,7 +4,7 @@
       <p class="pg-eyebrow">One engine</p>
       <h1>Trade Bot</h1>
       <p class="lede pg-lede">
-        The desk is the short ATM straddle: 1 lot Nifty + 1 lot Bank after 09:30. Run 2 months to total that profit and loss. Trend days can still lose.
+        The desk sells the ATM straddle (1 lot Nifty + 1 lot Bank) only when price is still inside the 15-minute opening range at 10:00. Breakout days sit out — that is how a trend day stops eating the premium. Run 2 months to total profit and loss (Kite history in 60-day chunks, 3s gap).
       </p>
     </div>
     <div class="hero-meta">
@@ -215,8 +215,9 @@
         }
       </div>
 
-      @if (p.message) {
-        <p class="err">{{ p.message }}</p>
+      @if (p.note) {
+        <p class="hint">{{ p.note }}</p>
+      }
       }
 
       <h3>Trades</h3>

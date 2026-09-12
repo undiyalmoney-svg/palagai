@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { MatButtonModule } from '@angular/material/button';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, timeout } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 import { KiteSessionService } from '../../../core/kite/kite-session.service';
 import { LotsPreferenceService } from '../../../core/services/lots-preference.service';
@@ -491,7 +491,7 @@ export class TradeBotComponent implements OnInit, OnDestroy {
       const ok = await this.uiDialog.confirm({
         title: 'Place live Kite orders?',
         message:
-          'Live uses the same paper desk. The only extra step is Kite ATM MIS orders. Start at the session open so fills match paper. Late start will not chase a signal that already printed. Stocks stay paper.',
+          'Live uses the same paper desk. Short ATM CE+PE only if price is still inside the 15-minute range at 10:00. Breakout days sit out. Late start will not chase. Stocks stay paper.',
         confirmLabel: 'Start live',
         cancelLabel: 'Cancel',
         tone: 'danger',
@@ -527,7 +527,9 @@ export class TradeBotComponent implements OnInit, OnDestroy {
     this.busy.set(true);
     try {
       const res = await firstValueFrom(
-        this.http.post<PaperResult & LiveStatus>(`${this.liveApiBase}/start`, body, { headers }),
+        this.http.post<PaperResult & LiveStatus>(`${this.liveApiBase}/start`, body, { headers }).pipe(
+          timeout(180_000),
+        ),
       );
       if (this.liveMoney) {
         this.paper.set(null);
