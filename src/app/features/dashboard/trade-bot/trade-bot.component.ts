@@ -98,7 +98,7 @@ interface PaperResult {
       riskRs1?: number;
     }>;
   };
-  spec?: EeWaitSpec | Record<string, unknown>;
+  spec?: Record<string, unknown>;
   specText?: string;
   train?: { fromDate?: string; toDate?: string; totals?: PaperTotals };
   books?: Array<{
@@ -137,121 +137,26 @@ interface PaperResult {
     }>;
     error?: string;
   };
-}
-
-interface OptionBar {
-  date?: string;
-  open?: number;
-  high?: number;
-  low?: number;
-  close?: number;
-  volume?: number;
-  oi?: number;
-}
-
-interface OptionLive {
-  price?: number | null;
-  ohlc?: { open?: number | null; high?: number | null; low?: number | null; close?: number | null };
-  bid?: number | null;
-  ask?: number | null;
-  volume?: number | null;
-  oi?: number | null;
-}
-
-interface OptionContract {
-  tradingSymbol?: string;
-  instrumentToken?: number;
-  instrumentType?: string;
-  strike?: number | null;
-  expiry?: string;
-  key?: string;
-  price?: number | null;
-  live?: OptionLive | null;
-  historical?: OptionBar[];
-  lastBar?: OptionBar | null;
-  historicalError?: string;
-  dataSource?: string | null;
-  intervalUsed?: string | null;
-  note?: string | null;
-}
-
-interface OptionOhlcResult {
-  fromDate?: string | null;
-  toDate?: string | null;
-  interval?: string | null;
-  atm?: boolean;
-  spot?: number | null;
-  contracts?: OptionContract[];
-  message?: string;
-}
-
-interface EeWaitSpec {
-  engine?: string;
-  entry?: string;
-  lookback?: number;
-  wait?: number;
-  hold?: number;
-  stopPct?: number;
-  targetPct?: number;
-  levelPct?: number;
-  wallMult?: number;
-  killFailures?: boolean;
-}
-
-interface EeWaitFound {
-  fromDate?: string;
-  toDate?: string;
-  bars?: number;
-  note?: string;
-  engine?: string;
-  universe?: string;
-  symbol?: string;
-  scanned?: number;
-  ranked?: number;
-  engines?: {
-    'ee-wait'?: { spec?: EeWaitSpec; oos?: { trades?: number; points?: number; rupees?: number } } | null;
-    'order-flow'?: { spec?: EeWaitSpec; oos?: { trades?: number; points?: number; rupees?: number } } | null;
-  };
-  stocks?: Array<{
-    symbol?: string;
-    engine?: string;
-    spec?: EeWaitSpec;
-    oos?: {
-      trades?: number;
-      points?: number;
-      rupees?: number;
-      profitFactor?: number;
+  compare?: {
+    rule?: string;
+    overall?: {
+      book?: string;
+      bookId?: string;
+      strategy?: string;
+      strategyId?: string;
+      totals?: PaperTotals;
     };
-  }>;
-  best?: {
-    spec?: EeWaitSpec;
-    oos?: {
-      trades?: number;
-      points?: number;
-      rupees?: number;
-      wins?: number;
-      losses?: number;
-      profitFactor?: number;
-    };
-  };
-  checks?: {
-    btstOvernight?: {
-      spec?: EeWaitSpec;
-      oos?: {
-        trades?: number;
-        points?: number;
-        rupees?: number;
-        profitFactor?: number;
-      };
-      full?: {
-        trades?: number;
-        points?: number;
-        rupees?: number;
-        profitFactor?: number;
-        wins?: number;
-        losses?: number;
-      };
-    };
+    books?: Array<{
+      bookId?: string;
+      label?: string;
+      winnerId?: string;
+      winnerLabel?: string;
+      rows?: Array<{
+        id?: string;
+        label?: string;
+        totals?: PaperTotals;
+      }>;
+    }>;
   };
 }
 
@@ -292,24 +197,11 @@ export class TradeBotComponent implements OnInit, OnDestroy {
   protected liveMoney = false;
   protected lots = 1;
   protected capitalRs = DEFAULT_TRADING_CAPITAL_RS;
-  protected optionSymbol = '';
-  protected optionAtm = false;
-  protected optionHistorical = true;
-  protected optionLive = true;
-  protected optionInterval = '5minute';
-  protected optionExpiry = '';
-  protected researchUniverse = 'nifty-50';
 
   protected readonly busy = signal(false);
   protected readonly error = signal('');
   protected readonly paper = signal<PaperResult | null>(null);
   protected readonly live = signal<LiveStatus | null>(null);
-  protected readonly optionBusy = signal(false);
-  protected readonly optionError = signal('');
-  protected readonly optionResult = signal<OptionOhlcResult | null>(null);
-  protected readonly researchBusy = signal(false);
-  protected readonly researchError = signal('');
-  protected readonly research = signal<EeWaitFound | null>(null);
 
   private pollTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -430,26 +322,6 @@ export class TradeBotComponent implements OnInit, OnDestroy {
     return t.optionSymbol || t.option?.tradingSymbol || t.option?.symbol || '';
   }
 
-  protected async findEeWait(): Promise<void> {
-    this.researchError.set('');
-    this.researchBusy.set(true);
-    try {
-      const res = await firstValueFrom(
-        this.http.post<EeWaitFound>(`${this.liveApiBase}/research/ee-wait`, {
-          fromDate: this.today ? '' : this.fromDate,
-          toDate: this.today ? '' : this.toDate,
-          lots: this.lots,
-          universe: this.researchUniverse,
-        }),
-      );
-      this.research.set(res);
-    } catch (err) {
-      this.researchError.set(this.fmtErr(err));
-    } finally {
-      this.researchBusy.set(false);
-    }
-  }
-
   protected async run(): Promise<void> {
     this.error.set('');
     this.applyToday();
@@ -484,7 +356,6 @@ export class TradeBotComponent implements OnInit, OnDestroy {
       niftyLots: number;
       capitalRs: number;
       engine: string;
-      universe?: string;
     } = {
       fromDate: this.fromDate,
       toDate: this.toDate,
@@ -495,7 +366,6 @@ export class TradeBotComponent implements OnInit, OnDestroy {
       niftyLots: this.lots,
       capitalRs: this.capitalRs,
       engine: 'paper-desk',
-      universe: this.researchUniverse,
     };
     const kite = this.kiteSession.getAuthorizationHeader();
     const headers: Record<string, string> = kite ? { 'X-Kite-Authorization': kite } : {};
@@ -538,76 +408,6 @@ export class TradeBotComponent implements OnInit, OnDestroy {
       this.error.set(this.fmtErr(err));
     } finally {
       this.busy.set(false);
-    }
-  }
-
-  protected onOptionSymbolChange(): void {
-    if (this.optionSymbol.trim()) this.optionAtm = false;
-  }
-
-  protected optionBars(c: OptionContract): OptionBar[] {
-    const rows = c.historical || [];
-    return rows.length > 250 ? rows.slice(-250) : rows;
-  }
-
-  protected async fetchOptionOhlc(): Promise<void> {
-    this.optionError.set('');
-    this.applyToday();
-    if (this.optionHistorical && (!this.fromDate || !this.toDate || this.fromDate > this.toDate)) {
-      this.optionError.set('Pick a valid From date and To date for historical OHLC.');
-      return;
-    }
-    const kite = this.kiteSession.getAuthorizationHeader();
-    if (this.optionLive && !kite && !this.optionHistorical) {
-      this.optionError.set('Live option price needs Get Token. Historical expired candles use NSE and do not.');
-      return;
-    }
-    if (this.optionAtm && !kite) {
-      this.optionError.set('ATM Nifty needs a Kite token for live spot.');
-      return;
-    }
-    const body: {
-      fromDate: string;
-      toDate: string;
-      today: boolean;
-      historical: boolean;
-      live: boolean;
-      interval: string;
-      atm: boolean;
-      oi: boolean;
-      tradingSymbol?: string;
-      expiryDate?: string;
-    } = {
-      fromDate: this.fromDate,
-      toDate: this.toDate,
-      today: this.today,
-      historical: this.optionHistorical,
-      live: this.optionLive && !!kite,
-      interval: this.optionInterval,
-      atm: this.optionAtm,
-      oi: true,
-    };
-    const expiry = this.optionExpiry.trim();
-    if (expiry) body.expiryDate = expiry;
-    const symbol = this.optionSymbol.trim();
-    if (symbol) {
-      body.tradingSymbol = symbol;
-      body.atm = false;
-    } else if (!this.optionAtm) {
-      this.optionError.set('Type any listed option tradingsymbol, or check ATM Nifty.');
-      return;
-    }
-    const headers: Record<string, string> = kite ? { 'X-Kite-Authorization': kite } : {};
-    this.optionBusy.set(true);
-    try {
-      const res = await firstValueFrom(
-        this.http.post<OptionOhlcResult>(`${this.liveApiBase}/options/ohlc`, body, { headers }),
-      );
-      this.optionResult.set(res);
-    } catch (err) {
-      this.optionError.set(this.fmtErr(err));
-    } finally {
-      this.optionBusy.set(false);
     }
   }
 

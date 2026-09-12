@@ -4,7 +4,7 @@
       <p class="pg-eyebrow">One engine</p>
       <h1>Trade Bot</h1>
       <p class="lede pg-lede">
-        Pick a date, Get Token, then Run paper. <strong>Red days are allowed. A red month is not.</strong> After the month is green, today’s stop cannot exceed month P&amp;L. If the month is red, only a small recovery trade. Flat after green locks. One OR play (VWAP ORB / fade / pullback). Live is the same path with Kite orders.
+        Pick dates, then Run paper. Compares <strong>ORB</strong> vs <strong>long/short ATM straddle</strong> on Nifty 50, Bank Nifty, and stocks. The winner is whichever has more victories (wins minus losses), then higher net ₹.
       </p>
     </div>
     <div class="hero-meta">
@@ -172,6 +172,48 @@
           <strong>{{ p.totals?.trades || 0 }}</strong>
         </div>
       </div>
+      @if (p.compare; as cmp) {
+        <div class="funds-card">
+          <h3>ORB vs straddle</h3>
+          @if (cmp.overall; as o) {
+            <p class="pnl-figure up">{{ o.book }} · {{ o.strategy }}</p>
+            <p class="hint">
+              Most victories: {{ o.totals?.wins || 0 }}W / {{ o.totals?.losses || 0 }}L
+              · net ₹{{ (o.totals?.optionNetAfterChargesRs || 0) | number: '1.0-0' }}
+              · win rate {{ ((o.totals?.winRate || 0) * 100) | number: '1.0-0' }}%
+            </p>
+          }
+          <p class="hint">{{ cmp.rule }}</p>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Book</th>
+                  <th>Strategy</th>
+                  <th>Wins</th>
+                  <th>Losses</th>
+                  <th>Net ₹</th>
+                  <th>Winner</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (b of cmp.books || []; track b.bookId) {
+                  @for (r of b.rows || []; track r.id) {
+                    <tr [class.up]="b.winnerId === r.id">
+                      <td>{{ $first ? b.label : '' }}</td>
+                      <td>{{ r.label }}</td>
+                      <td>{{ r.totals?.wins || 0 }}</td>
+                      <td>{{ r.totals?.losses || 0 }}</td>
+                      <td>{{ r.totals?.optionNetAfterChargesRs || 0 }}</td>
+                      <td>{{ b.winnerId === r.id ? 'yes' : '' }}</td>
+                    </tr>
+                  }
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+      }
       @if (p.month; as m) {
         <div class="funds-card">
           <h3>Month {{ m.key }}</h3>
@@ -201,10 +243,9 @@
         · {{ p.totals?.wins || 0 }} won / {{ p.totals?.losses || 0 }} lost
       </p>
       @if (indexBooks(p).length) {
-        <h4>Nifty · Bank Nifty · Crude Mini</h4>
+        <h4>Nifty · Bank Nifty</h4>
         <p class="hint">
-          These three are always scanned. Sit-out / skipped / no-signal is a reason, not a missing book.
-          Crude does not print in the 09:15 cash session.
+          Nifty and Bank are always scanned on 5m. Stocks use NSE daily. Sit-out / skipped is a reason, not a missing book.
         </p>
         <div class="table-wrap">
           <table>
@@ -375,271 +416,6 @@
     </div>
   }
 
-  <div class="panel option-panel">
-    <h3>Find entry / wait / exit + order flow</h3>
-    <p class="hint">
-      Walk-forward on NSE daily bars. Compares the old entry/wait/exit grid with
-      Stockkraft-style confluence: <strong>level</strong> (POC / value area) +
-      <strong>wall</strong> (high-volume node) + <strong>delta flip</strong>
-      (signed volume from the candle body — not a live bid/ask tape or heatmap).
-      Kill failures on first adverse close. Index ₹ = points × 65 × lots.
-      Stock ₹ = share move × lots. Live money is Nifty 50 ATM options only.
-    </p>
-    <div class="row">
-      <label class="field">
-        <span>Universe</span>
-        <select [(ngModel)]="researchUniverse" [disabled]="researchBusy() || busy()">
-          <option value="nifty-50">Nifty 50 index</option>
-          <option value="nifty-100">Nifty 100 index</option>
-          <option value="nifty-100-stocks">Nifty 100 stocks</option>
-        </select>
-      </label>
-    </div>
-    <div class="actions">
-      <button
-        mat-stroked-button
-        type="button"
-        [disabled]="researchBusy() || busy()"
-        (click)="findEeWait()"
-      >
-        @if (researchBusy()) {
-          <mat-spinner diameter="18" />
-        }
-        Find best (includes order flow)
-      </button>
-    </div>
-    @if (researchError()) {
-      <p class="err">{{ researchError() }}</p>
-    }
-    @if (research(); as r) {
-      <p>
-        {{ r.fromDate }} → {{ r.toDate }}
-        @if (r.engine) {
-          · engine {{ r.engine }}
-        }
-        @if (r.bars) {
-          · {{ r.bars }} bars
-        }
-        @if (r.symbol) {
-          · {{ r.symbol }}
-        }
-        @if (r.universe === 'nifty-100-stocks') {
-          · scanned {{ r.scanned }} · ranked {{ r.ranked }}
-        }
-        · OOS {{ r.best?.oos?.trades || 0 }} trades
-        · {{ r.best?.oos?.wins || 0 }}W / {{ r.best?.oos?.losses || 0 }}L
-        · {{ r.best?.oos?.points || 0 }} pts
-        · ₹{{ r.best?.oos?.rupees || 0 }}
-        @if (r.best?.oos?.profitFactor != null) {
-          · PF {{ r.best?.oos?.profitFactor }}
-        }
-        @if (r.best?.spec; as s) {
-          · {{ s.entry }} lookback {{ s.lookback }}
-          @if (s.wait) {
-            wait {{ s.wait }}
-          }
-          hold {{ s.hold }}
-          stop {{ s.stopPct }}% target {{ s.targetPct }}%
-        }
-      </p>
-      @if (r.engines) {
-        <p class="hint">
-          Compared —
-          ee-wait: ₹{{ r.engines['ee-wait']?.oos?.rupees ?? 'none' }}
-          ({{ r.engines['ee-wait']?.oos?.trades ?? 0 }} trades)
-          · order-flow: ₹{{ r.engines['order-flow']?.oos?.rupees ?? 'none' }}
-          ({{ r.engines['order-flow']?.oos?.trades ?? 0 }} trades)
-        </p>
-      }
-      @if (r.checks?.btstOvernight?.full; as b) {
-        <p>
-          BTST check (reject prior high, buy PE, exit next day):
-          {{ b.trades }} trades · {{ b.wins }}/{{ b.losses }} · {{ b.points }} pts · ₹{{ b.rupees }} · PF {{ b.profitFactor }}
-        </p>
-      }
-      <p class="hint">{{ r.note }}</p>
-      @if (r.stocks?.length) {
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Stock</th>
-                <th>OOS pts</th>
-                <th>₹</th>
-                <th>Trades</th>
-                <th>PF</th>
-                <th>Spec</th>
-              </tr>
-            </thead>
-            <tbody>
-              @for (s of r.stocks; track s.symbol) {
-                <tr>
-                  <td>{{ s.symbol }}</td>
-                  <td>{{ s.oos?.points }}</td>
-                  <td>{{ s.oos?.rupees }}</td>
-                  <td>{{ s.oos?.trades }}</td>
-                  <td>{{ s.oos?.profitFactor }}</td>
-                  <td>{{ s.engine }} {{ s.spec?.entry }} w{{ s.spec?.wait || '-' }} h{{ s.spec?.hold }}</td>
-                </tr>
-              }
-            </tbody>
-          </table>
-        </div>
-      }
-    }
-  </div>
-
-  <div class="panel option-panel">
-    <h3>Option OHLC &amp; price</h3>
-    <p class="hint">
-      Listed contracts use Kite (intraday when the series is still on the chain).
-      <strong>Expired options</strong> use NSE’s contract-wise FO history — daily OHLC only, including 2020–2021.
-      Uncheck Today and set From/To to the life of that expiry. ATM Nifty still needs a Kite token.
-    </p>
-    <div class="row">
-      <label class="field grow">
-        <span>Option symbol</span>
-        <input
-          type="text"
-          [(ngModel)]="optionSymbol"
-          (ngModelChange)="onOptionSymbolChange()"
-          placeholder="e.g. NIFTY21JUN15600CE or RELIANCE26SEP1400CE"
-          [disabled]="optionBusy() || busy()"
-        />
-      </label>
-      <label class="field">
-        <span>Interval</span>
-        <select [(ngModel)]="optionInterval" [disabled]="optionBusy() || busy()">
-          <option value="minute">1 minute (listed / Kite)</option>
-          <option value="5minute">5 minute (listed / Kite)</option>
-          <option value="day">Day (Kite or NSE expired)</option>
-        </select>
-      </label>
-      <label class="field">
-        <span>NSE expiry (optional)</span>
-        <input
-          type="text"
-          [(ngModel)]="optionExpiry"
-          placeholder="24-Jun-2021"
-          [disabled]="optionBusy() || busy()"
-        />
-      </label>
-    </div>
-    <div class="checks">
-      <label class="check">
-        <input type="checkbox" [(ngModel)]="optionAtm" [disabled]="optionBusy() || busy()" />
-        <span>
-          <strong>ATM Nifty</strong>
-          <small>Used only when the symbol box is empty</small>
-        </span>
-      </label>
-      <label class="check">
-        <input type="checkbox" [(ngModel)]="optionHistorical" [disabled]="optionBusy() || busy()" />
-        <span>
-          <strong>Historical</strong>
-          <small>Candle OHLC for From → To</small>
-        </span>
-      </label>
-      <label class="check">
-        <input type="checkbox" [(ngModel)]="optionLive" [disabled]="optionBusy() || busy()" />
-        <span>
-          <strong>Live price</strong>
-          <small>Last traded price and today’s OHLC</small>
-        </span>
-      </label>
-    </div>
-    <div class="actions">
-      <button
-        mat-stroked-button
-        type="button"
-        [disabled]="optionBusy() || busy() || (!optionHistorical && !optionLive)"
-        (click)="fetchOptionOhlc()"
-      >
-        @if (optionBusy()) {
-          <mat-spinner diameter="18" />
-        }
-        Get option OHLC
-      </button>
-    </div>
-    @if (optionError()) {
-      <p class="err">{{ optionError() }}</p>
-    }
-  </div>
-
-  @if (optionResult(); as o) {
-    <div class="paper-card">
-      <h3>Option market</h3>
-      <p>
-        @if (o.spot) {
-          Spot {{ o.spot }} ·
-        }
-        {{ o.fromDate || 'live' }} → {{ o.toDate || 'live' }}
-        · {{ o.interval || 'quote' }}
-      </p>
-      @for (c of o.contracts || []; track c.key || c.tradingSymbol || $index) {
-        <div class="opt-block">
-          <h4>
-            {{ c.tradingSymbol }} @if (c.instrumentType) { ({{ c.instrumentType }}) }
-            @if (c.dataSource) {
-              · {{ c.dataSource }}{{ c.intervalUsed ? ' ' + c.intervalUsed : '' }}
-            }
-          </h4>
-          <p>
-            Price ₹{{ c.price }}
-            · {{ (c.historical || []).length }} bars
-            @if ((c.historical || []).length > 250) {
-              (last 250 shown)
-            }
-            @if (c.live?.ohlc; as d) {
-              · day O {{ d.open }} H {{ d.high }} L {{ d.low }} C {{ d.close }}
-            }
-            @if (c.live?.bid != null) {
-              · bid {{ c.live?.bid }} / ask {{ c.live?.ask }}
-            }
-          </p>
-          @if (c.note) {
-            <p class="hint">{{ c.note }}</p>
-          }
-          @if (c.historicalError) {
-            <p class="err">{{ c.historicalError }}</p>
-          }
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Time</th>
-                  <th>O</th>
-                  <th>H</th>
-                  <th>L</th>
-                  <th>C</th>
-                  <th>Vol</th>
-                  <th>OI</th>
-                </tr>
-              </thead>
-              <tbody>
-                @for (b of optionBars(c); track $index) {
-                  <tr>
-                    <td>{{ b.date }}</td>
-                    <td>{{ b.open }}</td>
-                    <td>{{ b.high }}</td>
-                    <td>{{ b.low }}</td>
-                    <td>{{ b.close }}</td>
-                    <td>{{ b.volume }}</td>
-                    <td>{{ b.oi }}</td>
-                  </tr>
-                }
-                @if (!(c.historical || []).length) {
-                  <tr>
-                    <td colspan="7">No historical bars (live quote only, Kite empty, or NSE foCPV had no rows for this expiry).</td>
-                  </tr>
-                }
-              </tbody>
-            </table>
-          </div>
-        </div>
-      }
-    </div>
-  }
 
   @if (live(); as s) {
     <div class="status-card" [attr.data-running]="s.status === 'running'">
