@@ -176,11 +176,9 @@
         <div class="funds-card">
           <h3>ORB vs straddle</h3>
           @if (cmp.overall; as o) {
-            <p class="pnl-figure up">{{ o.book }} · {{ o.strategy }}</p>
+            <p class="pnl-figure up">{{ o.strategy }}</p>
             <p class="hint">
-              Most victories: {{ o.totals?.wins || 0 }}W / {{ o.totals?.losses || 0 }}L
-              · net ₹{{ (o.totals?.optionNetAfterChargesRs || 0) | number: '1.0-0' }}
-              · win rate {{ ((o.totals?.winRate || 0) * 100) | number: '1.0-0' }}%
+              Won {{ o.booksWon || 0 }} of {{ (cmp.books || []).length }} books (Nifty, Bank, stocks).
             </p>
           }
           <p class="hint">{{ cmp.rule }}</p>
