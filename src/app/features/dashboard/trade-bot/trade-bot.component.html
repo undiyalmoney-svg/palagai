@@ -4,7 +4,7 @@
       <p class="pg-eyebrow">One engine</p>
       <h1>Trade Bot</h1>
       <p class="lede pg-lede">
-        Pick dates, then Run paper. Compares <strong>ORB</strong> vs <strong>long/short ATM straddle</strong> on Nifty 50, Bank Nifty, and stocks. The winner is whichever has more victories (wins minus losses), then higher net ₹.
+        Paper today finds the short ATM straddle as soon as the 15-minute opening range ends (~09:30) and keeps it OPEN until square-off — it does not wait for the day to finish. Live uses that same 5m path and sells ATM CE+PE then, so later fills match paper. Late start does not chase. Stocks stay paper on finished days only.
       </p>
     </div>
     <div class="hero-meta">
@@ -107,7 +107,7 @@
         <input type="checkbox" [(ngModel)]="today" (ngModelChange)="onTodayChange()" [disabled]="busy()" />
         <span>
           <strong>Today</strong>
-          <small>Locks From and To to today’s IST date. Paper then shows only today’s trades — not last year.</small>
+          <small>Locks From and To to today’s IST date. After 09:30 the short straddle shows as OPEN (mark-to-market). It is not an end-of-day backtest.</small>
         </span>
       </label>
       <label class="check" [class.off]="!allowLiveMoney">
@@ -337,7 +337,7 @@
           </thead>
           <tbody>
             @for (t of p.trades || []; track $index) {
-              <tr>
+              <tr [class.open-row]="isOpenTrade(t)">
                 <td>{{ t.entryTime }}</td>
                 <td>{{ t.instrumentName }}</td>
                 <td>{{ tradeSide(t) }}</td>
@@ -345,7 +345,7 @@
                 <td>{{ t.lots || 1 }}</td>
                 <td>{{ t.netOptionPnlRs ?? t.optionPnlRs }}</td>
                 <td>{{ t.liveWouldTake === false ? (t.skipReason || 'no') : 'yes' }}</td>
-                <td>{{ t.exitReason }}</td>
+                <td>{{ isOpenTrade(t) ? 'OPEN (live same)' : t.exitReason }}</td>
               </tr>
             }
             @if (!(p.trades || []).length) {

@@ -21,6 +21,7 @@ interface PaperTrade {
   entryTime?: string;
   exitTime?: string;
   exitReason?: string;
+  open?: boolean;
   optionPnlRs?: number | null;
   netOptionPnlRs?: number | null;
   optionSymbol?: string | null;
@@ -320,6 +321,10 @@ export class TradeBotComponent implements OnInit, OnDestroy {
 
   protected tradeSymbol(t: PaperTrade): string {
     return t.optionSymbol || t.option?.tradingSymbol || t.option?.symbol || '';
+  }
+
+  protected isOpenTrade(t: PaperTrade): boolean {
+    return !!(t.open || t.exitReason === 'open');
   }
 
   protected async run(): Promise<void> {

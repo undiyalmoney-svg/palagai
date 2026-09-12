@@ -286,3 +286,8 @@
   border-bottom: 1px solid var(--pg-line);
   white-space: nowrap;
 }
+
+.trade-bot tr.open-row td {
+  background: #ecfdf3;
+  font-weight: 650;
+}
