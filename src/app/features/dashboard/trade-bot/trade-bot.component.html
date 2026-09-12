@@ -4,9 +4,8 @@
       <p class="pg-eyebrow">One engine</p>
       <h1>Trade Bot</h1>
       <p class="lede pg-lede">
-        Pick a date (or Today), keep Live money off, Get Token, then <strong>Run paper</strong>.
-        Paper replays Align Combo <strong>Genie</strong> on that session — the same strategy live uses.
-        The rupee figure is the strategy result. Find is a separate research scan and does not change paper.
+        Pick a date, keep Live money off, Get Token, then <strong>Run paper</strong>.
+        Paper <strong>searches a new spec</strong> on the days before From (session VWAP impulse — not Genie, Trap, S/R, or Find), then shows how that winner would have traded on the dates you picked.
       </p>
     </div>
     <div class="hero-meta">
@@ -63,7 +62,7 @@
         />
         <span>
           <strong>Live money</strong>
-          <small>Same Genie strategy as paper — when on, place live Kite orders</small>
+          <small>Not enabled for a newly found paper spec yet — keep this off</small>
         </span>
       </label>
     </div>
@@ -95,7 +94,7 @@
 
   @if (paper(); as p) {
     <div class="paper-card paper-hero" [attr.data-up]="paperNet(p) >= 0">
-      <h3>Paper — Genie that day</h3>
+      <h3>Paper — found spec that day</h3>
       <p class="pnl-figure" [class.up]="paperNet(p) >= 0" [class.down]="paperNet(p) < 0">
         ₹{{ paperNet(p) | number: '1.0-0' }}
       </p>
@@ -105,10 +104,14 @@
         · {{ p.totals?.trades || 0 }} trades
         · {{ p.totals?.wins || 0 }} won / {{ p.totals?.losses || 0 }} lost
       </p>
-      @if (p.liveTotals) {
+      @if (p.specText) {
+        <p class="hint">Winner: {{ p.specText }}</p>
+      }
+      @if (p.train?.totals) {
         <p class="hint">
-          Live would place {{ p.liveTotals.trades || 0 }} of those
-          (net ₹{{ (p.liveTotals.optionNetAfterChargesRs ?? p.liveTotals.optionNetRs ?? 0) | number: '1.0-0' }}).
+          Search window {{ p.train.fromDate }} → {{ p.train.toDate }}
+          · {{ p.train.totals.trades || 0 }} train trades
+          · ₹{{ (p.train.totals.optionNetAfterChargesRs || 0) | number: '1.0-0' }}
         </p>
       }
       @if (p.note) {
@@ -144,7 +147,7 @@
             }
             @if (!(p.trades || []).length) {
               <tr>
-                <td colspan="7">Genie had no trade on this date. Pick a session day (not a weekend) and Get Token first.</td>
+                <td colspan="7">The found spec had no trade on this date. Pick a session day (not a weekend) and Get Token first.</td>
               </tr>
             }
           </tbody>

@@ -50,7 +50,9 @@ interface PaperResult {
   trades?: PaperTrade[];
   message?: string;
   note?: string;
-  spec?: EeWaitSpec;
+  spec?: EeWaitSpec | Record<string, unknown>;
+  specText?: string;
+  train?: { fromDate?: string; toDate?: string; totals?: PaperTotals };
 }
 
 interface OptionBar {
@@ -316,7 +318,7 @@ export class TradeBotComponent implements OnInit, OnDestroy {
       const ok = await this.uiDialog.confirm({
         title: 'Place live Kite orders?',
         message:
-          'Paper and live use the same Genie strategy. Live money is on, so this run will send real orders when the strategy fires.',
+          'Live money is not attached to a newly found paper spec yet. Cancel and Run paper instead.',
         confirmLabel: 'Start live',
         cancelLabel: 'Cancel',
         tone: 'danger',
@@ -343,7 +345,7 @@ export class TradeBotComponent implements OnInit, OnDestroy {
       realOrders: this.liveMoney,
       lots: this.lots,
       niftyLots: this.lots,
-      engine: 'genie',
+      engine: 'vwap-impulse',
       universe: this.researchUniverse,
     };
     const kite = this.kiteSession.getAuthorizationHeader();
