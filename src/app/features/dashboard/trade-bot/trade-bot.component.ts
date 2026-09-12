@@ -38,6 +38,7 @@ interface PaperTrade {
   optionEntryPremium?: number | null;
   optionExitPremium?: number | null;
   optionSymbol?: string | null;
+  option?: { tradingSymbol?: string; symbol?: string; strike?: number } | null;
   entryOhlc?: { open: number; high: number; low: number; close: number } | null;
   exitOhlc?: { open: number; high: number; low: number; close: number } | null;
   premiumSource?: string | null;
