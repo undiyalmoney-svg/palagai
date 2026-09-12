@@ -310,3 +310,11 @@
   background: #ecfdf3;
   font-weight: 650;
 }
+
+.trade-bot tr.why-row td {
+  white-space: normal;
+  color: var(--pg-muted);
+  font-size: 0.8rem;
+  padding-top: 0;
+  border-bottom: 1px solid var(--pg-line);
+}

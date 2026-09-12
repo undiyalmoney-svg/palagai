@@ -172,6 +172,7 @@ interface PaperResult {
     netRs?: number;
     source?: string;
     riskRs?: number;
+    why?: string;
   }>;
   protection?: {
     fundsRs?: number;
@@ -357,45 +358,19 @@ export class TradeBotComponent implements OnInit, OnDestroy {
   }
 
   protected instrumentRows(p: PaperResult) {
-    if (p.instruments?.length) return p.instruments;
-    const rows = new Map<
-      string,
-      {
-        id: string;
-        instrumentName: string;
-        sitOut?: boolean;
-        status?: string;
-        trades: number;
-        wins: number;
-        losses: number;
-        grossProfitRs: number;
-        grossLossRs: number;
-        netRs: number;
-        riskRs: number;
-      }
-    >();
-    for (const b of p.books || []) {
-      const tot = b.totals;
-      rows.set(b.id || b.label || '', {
-        id: b.id || b.label || '',
-        instrumentName: b.label || b.id || '',
-        sitOut: b.sitOut,
-        status: b.status,
-        trades: tot?.trades || 0,
-        wins: tot?.wins || 0,
-        losses: tot?.losses || 0,
-        grossProfitRs: tot?.grossProfitRs || 0,
-        grossLossRs: tot?.grossLossRs || 0,
-        netRs: tot?.netRs ?? tot?.optionNetAfterChargesRs ?? 0,
-        riskRs: 0,
-      });
+    if (p.instruments?.length) {
+      return p.instruments.filter((r) => r.id !== 'crude' && r.id !== 'stocks');
     }
+    const rows: NonNullable<PaperResult['instruments']> = [];
+    const fundedKeys = new Set<string>();
+    const byName = new Map<string, NonNullable<PaperResult['instruments']>[number]>();
     for (const t of p.trades || []) {
       const key = t.instrumentName || 'book';
       const n = Number(t.netOptionPnlRs ?? t.optionPnlRs) || 0;
-      const cur = rows.get(key) || {
+      const cur = byName.get(key) || {
         id: key,
         instrumentName: key,
+        status: 'taken',
         trades: 0,
         wins: 0,
         losses: 0,
@@ -403,21 +378,46 @@ export class TradeBotComponent implements OnInit, OnDestroy {
         grossLossRs: 0,
         netRs: 0,
         riskRs: 0,
-        status: 'funded',
+        why: 'Taken',
       };
-      cur.trades += 1;
-      cur.netRs += n;
+      cur.trades = (cur.trades || 0) + 1;
+      cur.netRs = (cur.netRs || 0) + n;
       if (n > 0) {
-        cur.wins += 1;
-        cur.grossProfitRs += n;
+        cur.wins = (cur.wins || 0) + 1;
+        cur.grossProfitRs = (cur.grossProfitRs || 0) + n;
       } else if (n < 0) {
-        cur.losses += 1;
-        cur.grossLossRs += Math.abs(n);
+        cur.losses = (cur.losses || 0) + 1;
+        cur.grossLossRs = (cur.grossLossRs || 0) + Math.abs(n);
       }
-      cur.status = 'funded';
-      rows.set(key, cur);
+      byName.set(key, cur);
+      fundedKeys.add(key);
     }
-    return [...rows.values()];
+    for (const id of ['nifty', 'bank']) {
+      const b = (p.books || []).find((row) => row.id === id);
+      const funded = [...byName.values()].find((r) => r.id === id || r.instrumentName === b?.label);
+      if (funded) {
+        rows.push({ ...funded, why: b?.why || funded.why });
+        continue;
+      }
+      rows.push({
+        id,
+        instrumentName: b?.label || id,
+        status: 'not-taken',
+        trades: 0,
+        wins: 0,
+        losses: 0,
+        grossProfitRs: 0,
+        grossLossRs: 0,
+        netRs: 0,
+        riskRs: 0,
+        why: b?.why || 'Not taken',
+      });
+    }
+    for (const row of byName.values()) {
+      if (rows.some((r) => r.instrumentName === row.instrumentName)) continue;
+      rows.push(row);
+    }
+    return rows;
   }
 
   protected get kiteFunds() {

@@ -4,7 +4,7 @@
       <p class="pg-eyebrow">One engine</p>
       <h1>Trade Bot</h1>
       <p class="lede pg-lede">
-        Paper today finds the short ATM straddle as soon as the 15-minute opening range ends (~09:30) and keeps it OPEN until square-off — it does not wait for the day to finish. Live uses that same 5m path and sells ATM CE+PE then, so later fills match paper. Late start does not chase. Stocks stay paper on finished days only.
+        After 09:30, paper and live sell the same Nifty and Bank ATM straddle. The numbers below are only trades capital actually took — not a 1-lot scan.
       </p>
     </div>
     <div class="hero-meta">
@@ -56,7 +56,7 @@
     </div>
     <div class="funds-card" data-testid="kite-funds">
       <div class="funds-head">
-        <h3>Available funds</h3>
+        <h3>Funds</h3>
         <button mat-stroked-button type="button" [disabled]="busy() || fundsBusy" (click)="onRefreshFunds()">
           @if (fundsBusy) {
             <mat-spinner diameter="16" />
@@ -70,54 +70,28 @@
       @if (kiteFunds; as f) {
         <p class="pnl-figure">₹{{ (f.equityCash || f.capitalRs || 0) | number: '1.0-0' }}</p>
         <p class="hint">
-          Equity available from Kite (live balance / cash). Paper sizes from this number.
+          Kite equity available. Paper sizes from this.
           @if (f.fetchedAt) {
             · {{ f.fetchedAt | date: 'h:mm a' }}
           }
         </p>
-        <div class="funds-grid">
-          <div>
-            <span>Equity net</span>
-            <strong>₹{{ (f.equityNet || 0) | number: '1.0-0' }}</strong>
-          </div>
-          <div>
-            <span>Commodity available</span>
-            <strong>₹{{ (f.commodityCash || 0) | number: '1.0-0' }}</strong>
-          </div>
-          <div>
-            <span>Commodity net</span>
-            <strong>₹{{ (f.commodityNet || 0) | number: '1.0-0' }}</strong>
-          </div>
-        </div>
       } @else if (fundsBusy) {
         <p class="hint">Fetching Kite available funds…</p>
       } @else if (!kiteFundsError) {
-        <p class="hint">Get Token, then Refresh — paper sizes from Kite available funds. Fallback ₹ is used only if Kite is missing.</p>
+        <p class="hint">Get Token, then Refresh. Fallback ₹ is used only if Kite is missing.</p>
       }
       <div class="protect-block">
-        <h4>Capital protected</h4>
-        <p class="pnl-figure">₹{{ protectedFloorRs() | number: '1.0-0' }}</p>
-        <p class="hint">
-          Floor = funds minus the 6% day stop. That remainder stays protected even if every funded trade hits its stop.
-        </p>
         <div class="funds-grid">
           <div>
-            <span>Funds</span>
-            <strong>₹{{ sizingCapitalRs() | number: '1.0-0' }}</strong>
-          </div>
-          <div>
-            <span>2% / trade</span>
-            <strong>₹{{ tradeRiskBudgetRs() | number: '1.0-0' }}</strong>
-          </div>
-          <div>
-            <span>6% / day (max loss)</span>
+            <span>Can lose today (6%)</span>
             <strong class="down">₹{{ dayRiskBudgetRs() | number: '1.0-0' }}</strong>
           </div>
           <div>
-            <span>Protected floor</span>
+            <span>Protected</span>
             <strong class="up">₹{{ protectedFloorRs() | number: '1.0-0' }}</strong>
           </div>
         </div>
+        <p class="hint">Protected = funds minus the 6% day stop. That cash is not at risk.</p>
       </div>
     </div>
 
@@ -132,7 +106,7 @@
         <input type="checkbox" [(ngModel)]="today" (ngModelChange)="onTodayChange()" [disabled]="busy()" />
         <span>
           <strong>Today</strong>
-          <small>Locks From and To to today’s IST date. After 09:30 the short straddle shows as OPEN (mark-to-market). It is not an end-of-day backtest.</small>
+          <small>This IST session only. After 09:30 the straddle shows OPEN until square-off.</small>
         </span>
       </label>
       <label class="check" [class.off]="!allowLiveMoney">
@@ -143,7 +117,7 @@
         />
         <span>
           <strong>Live money</strong>
-          <small>Same desk as paper. Places Kite ATM MIS orders. Start at the session open — late start does not chase.</small>
+          <small>Places the same ATM CE+PE on Kite. Start at the open — late start does not chase.</small>
         </span>
       </label>
     </div>
@@ -175,7 +149,7 @@
 
   @if (paper(); as p) {
     <div class="paper-card paper-hero" [attr.data-up]="paperNet(p) >= 0">
-      <h3>Paper — capital-picked desk</h3>
+      <h3>What capital took · {{ p.fromDate }} → {{ p.toDate }}</h3>
       <p class="pnl-figure" [class.up]="paperNet(p) >= 0" [class.down]="paperNet(p) < 0">
         Net ₹{{ paperNet(p) | number: '1.0-0' }}
       </p>
@@ -189,273 +163,87 @@
           <strong class="down">₹{{ paperLoss(p) | number: '1.0-0' }}</strong>
         </div>
         <div>
-          <span>Wins / losses</span>
-          <strong>{{ p.totals?.wins || 0 }} / {{ p.totals?.losses || 0 }}</strong>
-        </div>
-        <div>
-          <span>Funded trades</span>
-          <strong>{{ p.totals?.trades || 0 }}</strong>
+          <span>Trades</span>
+          <strong>{{ p.totals?.wins || 0 }} won / {{ p.totals?.losses || 0 }} lost</strong>
         </div>
       </div>
+
       @if (protectionOf(p); as prot) {
         <div class="funds-card">
-          <h3>Funds and capital protected</h3>
-          <p class="pnl-figure up">₹{{ (prot.stillProtectedRs || prot.protectedFloorRs || 0) | number: '1.0-0' }}</p>
-          <p class="hint">
-            Still protected after funded risk. Worst-case floor (full 6% day stop) ₹{{ (prot.protectedFloorRs || 0) | number: '1.0-0' }}.
-            @if (prot.monthMode) {
-              Month {{ prot.monthMode }}{{ prot.monthLocked ? ' · locked' : '' }}.
-            }
-          </p>
+          <h3>Funds</h3>
           <div class="funds-grid">
             <div>
-              <span>Funds</span>
+              <span>In Kite</span>
               <strong>₹{{ (prot.fundsRs || prot.capitalRs || 0) | number: '1.0-0' }}</strong>
             </div>
             <div>
-              <span>Sizing capital</span>
-              <strong>₹{{ (prot.capitalRs || 0) | number: '1.0-0' }}</strong>
+              <span>At risk on taken trades</span>
+              <strong class="down">₹{{ (prot.dayRiskUsedRs || 0) | number: '1.0-0' }}</strong>
             </div>
             <div>
-              <span>2% / trade</span>
-              <strong>₹{{ (prot.riskPerTradeRs || 0) | number: '1.0-0' }}</strong>
-            </div>
-            <div>
-              <span>6% / day</span>
-              <strong class="down">₹{{ (prot.dayRiskRs || 0) | number: '1.0-0' }}</strong>
-            </div>
-            <div>
-              <span>Risk used</span>
-              <strong>₹{{ (prot.dayRiskUsedRs || 0) | number: '1.0-0' }}</strong>
-            </div>
-            <div>
-              <span>Day budget left</span>
-              <strong>₹{{ (prot.dayRiskLeftRs || 0) | number: '1.0-0' }}</strong>
-            </div>
-            <div>
-              <span>Protected now</span>
+              <span>Still protected</span>
               <strong class="up">₹{{ (prot.stillProtectedRs || 0) | number: '1.0-0' }}</strong>
             </div>
-            <div>
-              <span>Protected floor</span>
-              <strong class="up">₹{{ (prot.protectedFloorRs || 0) | number: '1.0-0' }}</strong>
-            </div>
-            <div>
-              <span>Month MTD</span>
-              <strong [class.up]="(prot.monthMtdRs || 0) >= 0" [class.down]="(prot.monthMtdRs || 0) < 0">
-                ₹{{ (prot.monthMtdRs || 0) | number: '1.0-0' }}
-              </strong>
-            </div>
           </div>
-          @if (prot.monthRule) {
-            <p class="hint">{{ prot.monthRule }}</p>
-          }
+          <p class="hint">
+            Still protected = funds minus risk on the trades below. A 1-lot Nifty/Bank stop is larger than month profit
+            ₹{{ (prot.monthMtdRs || 0) | number: '1.0-0' }}, so those index books are left sitting.
+          </p>
         </div>
       }
+
       <div class="funds-card">
         <h3>By instrument</h3>
-        <p class="hint">Total profit and total loss per book on this window (funded rows replace the 1-lot scan).</p>
+        <p class="hint">Profit and loss only for trades that were taken. Not-taken books show ₹0 — that is not a missed ₹50k scan.</p>
         <div class="table-wrap">
           <table>
             <thead>
               <tr>
                 <th>Instrument</th>
-                <th>Status</th>
+                <th>Taken?</th>
                 <th>Trades</th>
                 <th>Total profit</th>
                 <th>Total loss</th>
-                <th>Net ₹</th>
-                <th>At risk ₹</th>
+                <th>Net</th>
               </tr>
             </thead>
             <tbody>
               @for (r of instrumentRows(p); track r.id || r.instrumentName) {
                 <tr>
                   <td>{{ r.instrumentName }}</td>
-                  <td>{{ r.status || (r.sitOut ? 'sit-out' : 'scan') }}</td>
+                  <td>{{ r.status === 'taken' ? 'yes' : 'no' }}</td>
                   <td>{{ r.trades || 0 }}</td>
                   <td class="up">₹{{ (r.grossProfitRs || 0) | number: '1.0-0' }}</td>
                   <td class="down">₹{{ (r.grossLossRs || 0) | number: '1.0-0' }}</td>
                   <td [class.up]="(r.netRs || 0) >= 0" [class.down]="(r.netRs || 0) < 0">
                     ₹{{ (r.netRs || 0) | number: '1.0-0' }}
                   </td>
-                  <td>₹{{ (r.riskRs || 0) | number: '1.0-0' }}</td>
                 </tr>
-              }
-              @if (!instrumentRows(p).length) {
-                <tr>
-                  <td colspan="7">No instrument P&amp;L yet. Run paper.</td>
-                </tr>
+                @if (r.why && r.status !== 'taken') {
+                  <tr class="why-row">
+                    <td colspan="6">{{ r.why }}</td>
+                  </tr>
+                }
               }
             </tbody>
           </table>
         </div>
       </div>
-      @if (p.compare; as cmp) {
-        <div class="funds-card">
-          <h3>ORB vs straddle</h3>
-          @if (cmp.overall; as o) {
-            <p class="pnl-figure up">{{ o.strategy }}</p>
-            <p class="hint">
-              Won {{ o.booksWon || 0 }} of {{ (cmp.books || []).length }} books (Nifty, Bank, stocks).
-            </p>
-          }
-          <p class="hint">{{ cmp.rule }}</p>
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Book</th>
-                  <th>Strategy</th>
-                  <th>Wins</th>
-                  <th>Losses</th>
-                  <th>Net ₹</th>
-                  <th>Winner</th>
-                </tr>
-              </thead>
-              <tbody>
-                @for (b of cmp.books || []; track b.bookId) {
-                  @for (r of b.rows || []; track r.id) {
-                    <tr [class.up]="b.winnerId === r.id">
-                      <td>{{ $first ? b.label : '' }}</td>
-                      <td>{{ r.label }}</td>
-                      <td>{{ r.totals?.wins || 0 }}</td>
-                      <td>{{ r.totals?.losses || 0 }}</td>
-                      <td>{{ r.totals?.optionNetAfterChargesRs || 0 }}</td>
-                      <td>{{ b.winnerId === r.id ? 'yes' : '' }}</td>
-                    </tr>
-                  }
-                }
-              </tbody>
-            </table>
-          </div>
-        </div>
-      }
-      @if (p.month; as m) {
-        <div class="funds-card">
-          <h3>Month {{ m.key }}</h3>
-          <p class="pnl-figure" [class.up]="(m.mtdRs || 0) >= 0" [class.down]="(m.mtdRs || 0) < 0">
-            MTD ₹{{ (m.mtdRs || 0) | number: '1.0-0' }}
-          </p>
-          <p class="hint">
-            {{ m.mode }} · red days allowed · red month not accepted
-            @if (m.locked) {
-              · locked at flat
-            }
-          </p>
-        </div>
-      }
-      @if (availableFundsRs(); as cash) {
-        <p class="hint">
-          Available funds ₹{{ cash | number: '1.0-0' }}
-          · paper mark after this window ₹{{ paperMark(p) | number: '1.0-0' }}
-          (available + net; not a live Kite withdrawal)
-        </p>
-      }
-      <p>
-        {{ p.fromDate }} → {{ p.toDate }}
-        · capital ₹{{ (p.capitalRs || p.allocation?.capitalRs || 0) | number: '1.0-0' }}{{ p.kiteFunds?.capitalRs ? ' (Kite)' : '' }}
-        · {{ p.strategy || p.engine || 'paper' }}
-        · {{ p.totals?.trades || 0 }} funded trades
-        · {{ p.totals?.wins || 0 }} won / {{ p.totals?.losses || 0 }} lost
-      </p>
-      @if (indexBooks(p).length) {
-        <h4>Nifty · Bank Nifty</h4>
-        <p class="hint">
-          Nifty and Bank are always scanned on 5m. Stocks use NSE daily. Sit-out / skipped is a reason, not a missing book.
-        </p>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Book</th>
-                <th>Vehicle</th>
-                <th>Status</th>
-                <th>Why</th>
-                <th>Trades</th>
-                <th>Total profit</th>
-                <th>Total loss</th>
-                <th>Net ₹</th>
-              </tr>
-            </thead>
-            <tbody>
-              @for (b of indexBooks(p); track b.id || b.label) {
-                <tr>
-                  <td>{{ b.label }}</td>
-                  <td>{{ b.vehicle || '—' }}</td>
-                  <td>{{ b.status || (b.sitOut ? 'sit-out' : 'scanned') }}</td>
-                  <td>{{ b.why || b.error || b.specText || '—' }}</td>
-                  <td>{{ b.totals?.trades || 0 }}</td>
-                  <td class="up">₹{{ (b.totals?.grossProfitRs || 0) | number: '1.0-0' }}</td>
-                  <td class="down">₹{{ (b.totals?.grossLossRs || 0) | number: '1.0-0' }}</td>
-                  <td>{{ b.totals?.optionNetAfterChargesRs || 0 }}</td>
-                </tr>
-              }
-            </tbody>
-          </table>
-        </div>
-      }
-      @if (p.allocation; as a) {
-        <p class="hint">
-          2% / trade ₹{{ a.riskPerTradeRs | number: '1.0-0' }}
-          · 6% / day ₹{{ a.dayRiskRs | number: '1.0-0' }}
-          · used ₹{{ a.dayRiskUsedRs | number: '1.0-0' }}
-          · protected now ₹{{ ((a.capitalRs || 0) - (a.dayRiskUsedRs || 0)) | number: '1.0-0' }}
-        </p>
-        @if (a.taken?.length) {
-          <p class="hint">
-            Funded:
-            @for (t of a.taken; track $index) {
-              {{ t.instrumentName }} ×{{ t.lots }}
-              @if (!$last) { · }
-            }
-          </p>
-        }
-        @if (a.skipped?.length) {
-          <p class="hint">
-            Skipped for capital:
-            @for (s of a.skipped; track $index) {
-              {{ s.instrumentName }} ({{ s.reason }})
-              @if (!$last) { · }
-            }
-          </p>
-        }
-      }
-      @if (p.books?.length) {
-        <p class="hint">
-          Scan (1 lot):
-          @for (b of p.books; track b.id || b.label) {
-            {{ b.label }}: {{ b.sitOut ? 'sit-out' : ((b.totals?.trades || 0) + ' t ₹' + (b.totals?.optionNetAfterChargesRs || 0)) }}
-            @if (!$last) { · }
-          }
-        </p>
-      }
-      @if (p.train; as tr) {
-        @if (tr.totals; as tt) {
-          <p class="hint">
-            Search window {{ tr.fromDate }} → {{ tr.toDate }}
-            · {{ tt.trades || 0 }} train trades
-            · ₹{{ (tt.optionNetAfterChargesRs || 0) | number: '1.0-0' }}
-          </p>
-        }
-      }
-      @if (p.note) {
-        <p class="hint">{{ p.note }}</p>
-      }
+
       @if (p.message) {
         <p class="err">{{ p.message }}</p>
       }
+
+      <h3>Trades taken</h3>
       <div class="table-wrap">
         <table>
           <thead>
             <tr>
               <th>When</th>
-              <th>Book</th>
+              <th>Instrument</th>
               <th>Side</th>
-              <th>CE/PE</th>
               <th>Size</th>
               <th>Net ₹</th>
-              <th>Live?</th>
               <th>Exit</th>
             </tr>
           </thead>
@@ -465,108 +253,30 @@
                 <td>{{ t.entryTime }}</td>
                 <td>{{ t.instrumentName }}</td>
                 <td>{{ tradeSide(t) }}</td>
-                <td>{{ tradeSymbol(t) }}</td>
                 <td>{{ t.lots || 1 }}</td>
                 <td>{{ t.netOptionPnlRs ?? t.optionPnlRs }}</td>
-                <td>{{ t.liveWouldTake === false ? (t.skipReason || 'no') : 'yes' }}</td>
-                <td>{{ isOpenTrade(t) ? 'OPEN (live same)' : t.exitReason }}</td>
+                <td>{{ isOpenTrade(t) ? 'OPEN' : t.exitReason }}</td>
               </tr>
             }
             @if (!(p.trades || []).length) {
               <tr>
-                <td colspan="8">Scan found nothing capital could fund on this date. Pick a session day, Get Token, or raise Capital ₹.</td>
+                <td colspan="6">Nothing taken in this window. Check Today after 09:30, or widen the dates.</td>
               </tr>
             }
           </tbody>
-          @if ((p.trades || []).length) {
-            <tfoot>
-              <tr>
-                <td colspan="5">Totals</td>
-                <td>
-                  P ₹{{ paperProfit(p) | number: '1.0-0' }}
-                  · L ₹{{ paperLoss(p) | number: '1.0-0' }}
-                  · Net ₹{{ paperNet(p) | number: '1.0-0' }}
-                </td>
-                <td colspan="2"></td>
-              </tr>
-            </tfoot>
-          }
         </table>
       </div>
-      @if (p.stocks; as st) {
-        <h4>Stocks (NSE daily, Nifty 100)</h4>
-        <p class="hint">
-          Scanned {{ st.scanned || 0 }} names on free NSE history. Inside-day breakout, walk-forward.
-          @if (st.taken; as taken) {
-            @if (taken.length) {
-              Traded today: {{ taken.join(', ') }}.
-            }
-          }
-        </p>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Symbol</th>
-                <th>Train t</th>
-                <th>Train ₹</th>
-                <th>PF</th>
-                <th>Today t</th>
-                <th>Today ₹</th>
-              </tr>
-            </thead>
-            <tbody>
-              @for (s of st.rows || []; track s.symbol) {
-                <tr>
-                  <td>{{ s.symbol }}</td>
-                  <td>{{ s.train?.trades || 0 }}</td>
-                  <td>{{ s.train?.optionNetAfterChargesRs || 0 }}</td>
-                  <td>{{ s.train?.profitFactor || 0 }}</td>
-                  <td>{{ s.day?.trades || 0 }}</td>
-                  <td>{{ s.day?.optionNetAfterChargesRs || 0 }}</td>
-                </tr>
-              }
-              @if (!(st.rows || []).length) {
-                <tr>
-                  <td colspan="6">{{ st.error || 'No stock with a walk-forward edge in this window.' }}</td>
-                </tr>
-              }
-            </tbody>
-          </table>
-        </div>
-      }
     </div>
   }
 
-
   @if (live(); as s) {
     <div class="status-card" [attr.data-running]="s.status === 'running'">
-      <h3>Live status</h3>
+      <h3>Live</h3>
       <p>{{ s.status || 'idle' }}{{ s.message ? ' · ' + s.message : '' }}</p>
-      <p class="hint">
-        Orders: {{ s.realOrders || s.liveMoney ? 'live Kite' : 'paper marks only' }}
-      </p>
       @if (availableFundsRs(); as cash) {
         <p class="hint">
-          Available funds ₹{{ cash | number: '1.0-0' }}
-          · protected floor ₹{{ protectedFloorRs() | number: '1.0-0' }}
-          · 2% / trade ₹{{ tradeRiskBudgetRs() | number: '1.0-0' }}
-          · 6% / day ₹{{ dayRiskBudgetRs() | number: '1.0-0' }}
+          Funds ₹{{ cash | number: '1.0-0' }} · protected ₹{{ protectedFloorRs() | number: '1.0-0' }}
         </p>
-      }
-      @if (s.totals) {
-        <div class="pnl-split">
-          <div>
-            <span>Live net</span>
-            <strong [class.up]="(s.totals.netRs || 0) >= 0" [class.down]="(s.totals.netRs || 0) < 0">
-              ₹{{ (s.totals.netRs || 0) | number: '1.0-0' }}
-            </strong>
-          </div>
-          <div>
-            <span>Live trades</span>
-            <strong>{{ s.totals.trades || 0 }}</strong>
-          </div>
-        </div>
       }
       @if (s.events?.length) {
         <ul class="events">
