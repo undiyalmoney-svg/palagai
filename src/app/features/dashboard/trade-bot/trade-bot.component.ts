@@ -10,6 +10,7 @@ import { KiteSessionService } from '../../../core/kite/kite-session.service';
 import { CapitalPreferenceService } from '../../../core/services/capital-preference.service';
 import { KiteFundsService } from '../../../core/services/kite-funds.service';
 import { DEFAULT_TRADING_CAPITAL_RS } from '../../../core/paper-desk/capital-plan.util';
+import { lotsFromAvailableFunds } from '../../../core/paper-desk/lots-from-funds';
 import { UiDialogService } from '../../../shared/ui/dialog/ui-dialog.service';
 import { AuthService } from '../../../core/auth/auth.service';
 
@@ -314,9 +315,7 @@ export class TradeBotComponent implements OnInit, OnDestroy {
   }
 
   protected systemLots(): number {
-    const c = this.sizingCapitalRs();
-    if (!(c > 0)) return 1;
-    return Math.min(10, Math.max(1, Math.floor(c / 40_000)));
+    return lotsFromAvailableFunds(this.sizingCapitalRs());
   }
 
   protected actualFundRs(): number {
