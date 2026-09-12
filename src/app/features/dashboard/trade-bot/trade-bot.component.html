@@ -135,8 +135,8 @@
               <tr>
                 <td>{{ t.entryTime }}</td>
                 <td>{{ t.instrumentName }}</td>
-                <td>{{ t.side }}</td>
-                <td>{{ t.optionSymbol }}</td>
+                <td>{{ tradeSide(t) }}</td>
+                <td>{{ tradeSymbol(t) }}</td>
                 <td>{{ t.netOptionPnlRs ?? t.optionPnlRs }}</td>
                 <td>{{ t.liveWouldTake === false ? (t.skipReason || 'no') : 'yes' }}</td>
                 <td>{{ t.exitReason }}</td>

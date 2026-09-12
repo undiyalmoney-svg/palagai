@@ -14,12 +14,14 @@ import { AuthService } from '../../../core/auth/auth.service';
 interface PaperTrade {
   instrumentName?: string;
   side?: string;
+  direction?: string;
   entryTime?: string;
   exitTime?: string;
   exitReason?: string;
   optionPnlRs?: number | null;
   netOptionPnlRs?: number | null;
   optionSymbol?: string | null;
+  option?: { tradingSymbol?: string; symbol?: string };
   liveWouldTake?: boolean;
   skipReason?: string;
 }
@@ -269,6 +271,14 @@ export class TradeBotComponent implements OnInit, OnDestroy {
 
   protected paperNet(p: PaperResult): number {
     return Number(p.totals?.optionNetAfterChargesRs ?? p.totals?.optionNetRs ?? 0) || 0;
+  }
+
+  protected tradeSide(t: PaperTrade): string {
+    return t.side || t.direction || '';
+  }
+
+  protected tradeSymbol(t: PaperTrade): string {
+    return t.optionSymbol || t.option?.tradingSymbol || t.option?.symbol || '';
   }
 
   protected async findEeWait(): Promise<void> {
