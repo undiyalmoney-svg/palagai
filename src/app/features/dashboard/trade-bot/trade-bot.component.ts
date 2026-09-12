@@ -61,6 +61,20 @@ interface PaperResult {
     totals?: PaperTotals;
     error?: string;
   }>;
+  stocks?: {
+    source?: string;
+    universe?: string;
+    scanned?: number;
+    taken?: string[];
+    rows?: Array<{
+      symbol?: string;
+      sitOut?: boolean;
+      train?: PaperTotals;
+      day?: PaperTotals;
+      trades?: number;
+    }>;
+    error?: string;
+  };
 }
 
 interface OptionBar {

@@ -158,6 +158,46 @@
           </tbody>
         </table>
       </div>
+      @if (p.stocks; as st) {
+        <h4>Stocks (NSE daily, Nifty 100)</h4>
+        <p class="hint">
+          Scanned {{ st.scanned || 0 }} names on free NSE history. Inside-day breakout, walk-forward.
+          @if (st.taken?.length) {
+            Traded today: {{ st.taken.join(', ') }}.
+          }
+        </p>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Symbol</th>
+                <th>Train t</th>
+                <th>Train ₹</th>
+                <th>PF</th>
+                <th>Today t</th>
+                <th>Today ₹</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (s of st.rows || []; track s.symbol) {
+                <tr>
+                  <td>{{ s.symbol }}</td>
+                  <td>{{ s.train?.trades || 0 }}</td>
+                  <td>{{ s.train?.optionNetAfterChargesRs || 0 }}</td>
+                  <td>{{ s.train?.profitFactor || 0 }}</td>
+                  <td>{{ s.day?.trades || 0 }}</td>
+                  <td>{{ s.day?.optionNetAfterChargesRs || 0 }}</td>
+                </tr>
+              }
+              @if (!(st.rows || []).length) {
+                <tr>
+                  <td colspan="6">{{ st.error || 'No stock with a walk-forward edge in this window.' }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
     </div>
   }
 
