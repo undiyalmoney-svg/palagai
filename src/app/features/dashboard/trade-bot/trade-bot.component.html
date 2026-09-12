@@ -39,7 +39,7 @@
     </div>
   </div>
   <div class="funds-actions">
-    <button mat-stroked-button type="button" [disabled]="busy() || fundsBusy" (click)="onRefreshFunds()">
+    <button mat-stroked-button type="button" [disabled]="controlsLocked() || fundsBusy" (click)="onRefreshFunds()">
       @if (fundsBusy) {
         <mat-spinner diameter="16" />
       }
@@ -56,22 +56,24 @@
     <div class="row">
       <label class="field">
         <span>From date</span>
-        <input type="date" [(ngModel)]="fromDate" [disabled]="today || busy()" />
+        <input type="date" [(ngModel)]="fromDate" [disabled]="controlsLocked()" />
       </label>
       <label class="field">
         <span>To date</span>
-        <input type="date" [(ngModel)]="toDate" [disabled]="today || busy()" />
+        <input type="date" [(ngModel)]="toDate" [disabled]="controlsLocked()" />
       </label>
       <label class="field lots">
-        <span>Max lots</span>
+        <span>Lots</span>
         <input
           type="number"
           min="1"
           step="1"
-          [(ngModel)]="lots"
-          (ngModelChange)="onLotsChange()"
-          [disabled]="busy()"
+          [ngModel]="systemLots()"
+          [ngModelOptions]="{ standalone: true }"
+          readonly
+          tabindex="-1"
         />
+        <small>From funds · ₹40,000 per lot</small>
       </label>
     </div>
 
@@ -82,7 +84,7 @@
           name="fundSource"
           value="actual"
           [(ngModel)]="fundSource"
-          [disabled]="busy()"
+          [disabled]="controlsLocked()"
         />
         <span>
           <strong>Actual fund</strong>
@@ -98,13 +100,13 @@
           />
         </span>
       </label>
-      <label class="fund-pick" [class.on]="fundMode() === 'mine'" [class.off]="liveMoney">
+      <label class="fund-pick" [class.on]="fundMode() === 'mine'">
         <input
           type="radio"
           name="fundSource"
           value="mine"
           [(ngModel)]="fundSource"
-          [disabled]="busy() || liveMoney"
+          [disabled]="controlsLocked()"
         />
         <span>
           <strong>Mine</strong>
@@ -116,23 +118,23 @@
             [(ngModel)]="capitalRs"
             (ngModelChange)="onCapitalChange()"
             [ngModelOptions]="{ standalone: true }"
-            [disabled]="busy() || liveMoney"
+            [disabled]="controlsLocked()"
           />
         </span>
       </label>
     </div>
 
     <div class="actions range-presets">
-      <button mat-flat-button color="primary" type="button" [disabled]="busy()" (click)="runTwoMonthBatch()">
+      <button mat-flat-button color="primary" type="button" [disabled]="controlsLocked()" (click)="runTwoMonthBatch()">
         2 months · S/R Nifty
       </button>
-      <button mat-stroked-button type="button" [disabled]="busy() || today" (click)="setRangeDays(30)">Last 30 days</button>
-      <button mat-stroked-button type="button" [disabled]="busy() || today" (click)="setRangeDays(60)">Last 60 days</button>
+      <button mat-stroked-button type="button" [disabled]="controlsLocked()" (click)="setRangeDays(30)">Last 30 days</button>
+      <button mat-stroked-button type="button" [disabled]="controlsLocked()" (click)="setRangeDays(60)">Last 60 days</button>
     </div>
 
     <div class="checks">
       <label class="check">
-        <input type="checkbox" [(ngModel)]="today" (ngModelChange)="onTodayChange()" [disabled]="busy()" />
+        <input type="checkbox" [(ngModel)]="today" (ngModelChange)="onTodayChange()" [disabled]="controlsLocked()" />
         <span>
           <strong>Today</strong>
           <small>This IST session only.</small>
@@ -169,11 +171,19 @@
       </button>
     </div>
 
-    @if (liveMoney && !datesIncludeToday()) {
-      <p class="err">Live money only places orders when the date range includes today.</p>
-    }
     @if (error()) {
       <p class="err">{{ error() }}</p>
+    }
+    @if (liveMoney || liveHelp().length) {
+      <aside class="live-assistant" data-testid="live-assistant">
+        <h3>Live assistant</h3>
+        @if (!liveHelp().length) {
+          <p class="hint">Get Token, then Start live. This box reports Kite errors so a restart cannot hide them.</p>
+        }
+        @for (row of liveHelp(); track $index) {
+          <p [class.ok]="row.ok" [class.err]="!row.ok">{{ row.detail }}</p>
+        }
+      </aside>
     }
   </div>
 

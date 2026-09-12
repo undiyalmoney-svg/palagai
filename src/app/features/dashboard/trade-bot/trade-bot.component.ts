@@ -213,6 +213,8 @@ interface LiveStatus {
   message?: string;
   liveMoney?: boolean;
   realOrders?: boolean;
+  lastError?: string | null;
+  liveAssistant?: { ok?: boolean; checks?: Array<{ id?: string; ok: boolean; detail: string }> };
   events?: Array<{ at?: string; action?: string; detail?: string }>;
   totals?: { netRs?: number; trades?: number };
 }
@@ -239,8 +241,8 @@ export class TradeBotComponent implements OnInit, OnDestroy {
   private readonly liveApiBase =
     (environment as { liveApiBaseUrl?: string }).liveApiBaseUrl || '/api/live';
 
-  protected fromDate = istToday();
-  protected toDate = istToday();
+  protected fromDate = '';
+  protected toDate = '';
   protected today = false;
   protected liveMoney = false;
   protected fundSource: 'actual' | 'mine' = 'actual';
@@ -251,6 +253,7 @@ export class TradeBotComponent implements OnInit, OnDestroy {
   protected readonly error = signal('');
   protected readonly paper = signal<PaperResult | null>(null);
   protected readonly live = signal<LiveStatus | null>(null);
+  protected readonly liveAssistant = signal<Array<{ id?: string; ok: boolean; detail: string }>>([]);
 
   private pollTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -262,8 +265,6 @@ export class TradeBotComponent implements OnInit, OnDestroy {
     if (uid) this.kiteSession.bindSiteUser(uid);
     this.lots = this.lotsPreference.get();
     this.capitalRs = this.capitalPreference.get();
-    this.setRangeDays(60);
-    if (this.today) this.applyToday();
     void this.refreshLiveStatus();
     void this.refreshKiteFunds();
   }
@@ -288,12 +289,38 @@ export class TradeBotComponent implements OnInit, OnDestroy {
     return !!this.fromDate && !!this.toDate && this.fromDate <= t && this.toDate >= t;
   }
 
+  protected controlsLocked(): boolean {
+    return this.liveMoney || this.busy();
+  }
+
+  protected liveHelp(): Array<{ ok: boolean; detail: string }> {
+    const rows: Array<{ ok: boolean; detail: string }> = [...this.liveAssistant()];
+    const s = this.live();
+    if (s?.lastError && !rows.some((r) => r.detail === s.lastError)) {
+      rows.push({ ok: false, detail: String(s.lastError) });
+    }
+    for (const ev of s?.events || []) {
+      if (String(ev.action || '').toUpperCase() !== 'ERROR') continue;
+      const detail = String(ev.detail || '');
+      if (detail && !rows.some((r) => r.detail === detail)) {
+        rows.push({ ok: false, detail });
+      }
+    }
+    return rows;
+  }
+
   protected onLiveMoneyChange(): void {
     if (this.liveMoney) this.fundSource = 'actual';
   }
 
   protected fundMode(): 'actual' | 'mine' {
     return this.liveMoney ? 'actual' : this.fundSource;
+  }
+
+  protected systemLots(): number {
+    const c = this.sizingCapitalRs();
+    if (!(c > 0)) return 1;
+    return Math.min(10, Math.max(1, Math.floor(c / 40_000)));
   }
 
   protected actualFundRs(): number {
@@ -636,10 +663,15 @@ export class TradeBotComponent implements OnInit, OnDestroy {
 
   protected async run(): Promise<void> {
     this.error.set('');
-    this.applyToday();
-    if (!this.fromDate || !this.toDate || this.fromDate > this.toDate) {
-      this.error.set('Pick a valid From date and To date.');
-      return;
+    this.liveAssistant.set([]);
+    if (this.liveMoney) {
+      this.fundSource = 'actual';
+    } else {
+      this.applyToday();
+      if (!this.fromDate || !this.toDate || this.fromDate > this.toDate) {
+        this.error.set('Pick a From date and To date, or check Today.');
+        return;
+      }
     }
     if (this.liveMoney && !this.allowLiveMoney) {
       this.error.set('Live money is disabled in this build.');
@@ -672,11 +704,11 @@ export class TradeBotComponent implements OnInit, OnDestroy {
     } = {
       fromDate: this.fromDate,
       toDate: this.toDate,
-      today: this.today,
+      today: this.liveMoney ? true : this.today,
       liveMoney: this.liveMoney,
       realOrders: this.liveMoney,
-      lots: this.lots,
-      niftyLots: this.lots,
+      lots: this.systemLots(),
+      niftyLots: this.systemLots(),
       capitalRs: this.capitalRs,
       capitalSource: this.fundMode(),
       engine: 'sr-desk',
@@ -694,6 +726,7 @@ export class TradeBotComponent implements OnInit, OnDestroy {
       if (this.liveMoney) {
         this.paper.set(null);
         this.live.set(res);
+        this.liveAssistant.set(res.liveAssistant?.checks || []);
         this.startPoll();
       } else {
         this.paper.set(res);
@@ -705,6 +738,7 @@ export class TradeBotComponent implements OnInit, OnDestroy {
       }
     } catch (err) {
       this.error.set(this.fmtErr(err));
+      this.applyAssistantFromErr(err);
     } finally {
       this.busy.set(false);
     }
@@ -734,6 +768,8 @@ export class TradeBotComponent implements OnInit, OnDestroy {
     try {
       const s = await firstValueFrom(this.http.get<LiveStatus>(`${this.liveApiBase}/status`));
       this.live.set(s);
+      const checks = s?.liveAssistant?.checks;
+      if (checks?.length) this.liveAssistant.set(checks);
       if (s?.status === 'running') {
         this.startPoll();
       }
@@ -754,6 +790,13 @@ export class TradeBotComponent implements OnInit, OnDestroy {
       clearInterval(this.pollTimer);
       this.pollTimer = null;
     }
+  }
+
+  private applyAssistantFromErr(err: unknown): void {
+    if (!(err instanceof HttpErrorResponse)) return;
+    const body = err.error as LiveStatus | { liveAssistant?: LiveStatus['liveAssistant'] };
+    const checks = body && typeof body === 'object' ? body.liveAssistant?.checks : null;
+    if (checks?.length) this.liveAssistant.set(checks);
   }
 
   private fmtErr(err: unknown): string {

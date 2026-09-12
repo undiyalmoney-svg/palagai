@@ -288,6 +288,31 @@
   font-size: 0.9rem;
 }
 
+.trade-bot .ok {
+  margin: 0;
+  color: #15803d;
+  font-size: 0.9rem;
+}
+
+.trade-bot .live-assistant {
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--pg-line);
+  border-radius: var(--pg-radius);
+  background: #fff;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.trade-bot .live-assistant h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.trade-bot .field small {
+  color: var(--pg-muted);
+  font-size: 0.75rem;
+}
+
 .trade-bot .status-card,
 .trade-bot .paper-card {
   margin-top: 1rem;
