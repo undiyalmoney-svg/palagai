@@ -404,21 +404,9 @@
   white-space: nowrap;
 }
 
-.trade-bot .trade-when {
-  display: flex;
-  flex-direction: column;
-  gap: 0.08rem;
-  line-height: 1.2;
-}
-
-.trade-bot .trade-when span {
-  color: var(--pg-muted);
-  font-size: 0.72rem;
-}
-
-.trade-bot .trade-when strong {
+.trade-bot .trade-hms {
   font-variant-numeric: tabular-nums;
-  font-weight: 700;
+  font-weight: 650;
 }
 
 .trade-bot tr.open-row td {

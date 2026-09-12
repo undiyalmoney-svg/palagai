@@ -224,8 +224,9 @@
         <table>
           <thead>
             <tr>
-              <th>Entry hh:mm:ss</th>
-              <th>Exit hh:mm:ss</th>
+              <th>Entry time</th>
+              <th>Exit time</th>
+              <th>Instrument</th>
               <th>Option</th>
               <th>Side</th>
               <th>Entry price</th>
@@ -238,23 +239,10 @@
           <tbody>
             @for (t of p.trades || []; track $index) {
               <tr [class.open-row]="isOpenTrade(t)">
-                <td>
-                  <div class="trade-when">
-                    <span>{{ formatIstDate(t.entryTime) }}</span>
-                    <strong>{{ formatIstClock(t.entryTime, t.entryClock) }}</strong>
-                  </div>
-                </td>
-                <td>
-                  @if (isOpenTrade(t)) {
-                    <strong>OPEN</strong>
-                  } @else {
-                    <div class="trade-when">
-                      <span>{{ formatIstDate(t.exitTime) }}</span>
-                      <strong>{{ formatIstClock(t.exitTime, t.exitClock) }}</strong>
-                    </div>
-                  }
-                </td>
-                <td>{{ selectedInstrument(t) }}</td>
+                <td class="trade-hms">{{ formatTradeWhen(t.entryTime, t.entryClock) }}</td>
+                <td class="trade-hms">{{ isOpenTrade(t) ? 'OPEN' : formatTradeWhen(t.exitTime, t.exitClock) }}</td>
+                <td>{{ t.instrumentName || '—' }}</td>
+                <td>{{ optionLabel(t) }}</td>
                 <td>{{ tradeSide(t) }}</td>
                 <td>{{ formatPrice(t.entryPrice ?? t.indexEntry) }}</td>
                 <td>{{ isOpenTrade(t) ? '—' : formatPrice(t.exitPrice ?? t.indexExit) }}</td>
@@ -267,7 +255,7 @@
             }
             @if (!(p.trades || []).length) {
               <tr>
-                <td colspan="9">No money booked in this window.</td>
+                <td colspan="10">No money booked in this window.</td>
               </tr>
             }
           </tbody>

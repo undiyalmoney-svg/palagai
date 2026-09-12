@@ -509,6 +509,20 @@ export class TradeBotComponent implements OnInit, OnDestroy {
     return Math.round(px / step) * step;
   }
 
+  protected optionLabel(t: PaperTrade): string {
+    const kind = this.optionKind(t);
+    const strike = this.optionStrike(t);
+    if (strike != null && kind) return `${strike} ${kind}`;
+    return this.selectedInstrument(t);
+  }
+
+  protected formatTradeWhen(iso?: string | null, clock?: string | null): string {
+    const parts = this.formatIstParts(iso);
+    const hms = clock && /\d:\d{2}:\d{2}/.test(clock) ? clock : parts?.clock;
+    if (parts?.date && hms) return `${parts.date}, ${hms}`;
+    return hms || parts?.date || '—';
+  }
+
   protected selectedInstrument(t: PaperTrade): string {
     const kite = t.option?.tradingSymbol || t.option?.symbol || '';
     if (kite && /\d{4,}(CE|PE)$/i.test(kite)) return kite;
