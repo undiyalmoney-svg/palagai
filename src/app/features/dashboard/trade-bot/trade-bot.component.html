@@ -238,8 +238,22 @@
           <tbody>
             @for (t of p.trades || []; track $index) {
               <tr [class.open-row]="isOpenTrade(t)">
-                <td>{{ formatIst(t.entryTime) }}</td>
-                <td>{{ isOpenTrade(t) ? 'OPEN' : formatIst(t.exitTime) }}</td>
+                <td>
+                  <div class="trade-when">
+                    <span>{{ formatIstDate(t.entryTime) }}</span>
+                    <strong>{{ formatIstClock(t.entryTime, t.entryClock) }}</strong>
+                  </div>
+                </td>
+                <td>
+                  @if (isOpenTrade(t)) {
+                    <strong>OPEN</strong>
+                  } @else {
+                    <div class="trade-when">
+                      <span>{{ formatIstDate(t.exitTime) }}</span>
+                      <strong>{{ formatIstClock(t.exitTime, t.exitClock) }}</strong>
+                    </div>
+                  }
+                </td>
                 <td>{{ selectedInstrument(t) }}</td>
                 <td>{{ tradeSide(t) }}</td>
                 <td>{{ formatPrice(t.entryPrice ?? t.indexEntry) }}</td>

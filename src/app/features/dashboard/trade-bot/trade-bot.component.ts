@@ -22,6 +22,10 @@ interface PaperTrade {
   direction?: string;
   entryTime?: string;
   exitTime?: string;
+  entryHm?: string | null;
+  exitHm?: string | null;
+  entryClock?: string | null;
+  exitClock?: string | null;
   entryPrice?: number | null;
   exitPrice?: number | null;
   indexEntry?: number | null;
@@ -521,16 +525,46 @@ export class TradeBotComponent implements OnInit, OnDestroy {
     return t.instrumentName || '—';
   }
 
-  protected formatIst(value?: string | null): string {
-    if (!value) return '—';
-    const m = String(value).match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
-    if (!m) return String(value);
+  protected formatIstParts(value?: string | null): { date: string; clock: string } | null {
+    if (!value) return null;
+    const iso = String(value).match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?/);
+    const hm = String(value).match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    let hour = Number(m[4]);
+    let hour: number;
+    let min: string;
+    let sec: string;
+    let date = '';
+    if (iso) {
+      date = `${Number(iso[3])} ${months[Number(iso[2]) - 1]} ${iso[1]}`;
+      hour = Number(iso[4]);
+      min = iso[5];
+      sec = iso[6] || '00';
+    } else if (hm) {
+      hour = Number(hm[1]);
+      min = hm[2];
+      sec = hm[3] || '00';
+    } else {
+      return null;
+    }
     const ampm = hour >= 12 ? 'PM' : 'AM';
-    hour = hour % 12;
+    hour %= 12;
     if (hour === 0) hour = 12;
-    return `${Number(m[3])} ${months[Number(m[2]) - 1]} ${m[1]}, ${hour}:${m[5]} ${ampm}`;
+    return { date, clock: `${hour}:${min}:${sec} ${ampm}` };
+  }
+
+  protected formatIstDate(value?: string | null): string {
+    return this.formatIstParts(value)?.date || '—';
+  }
+
+  protected formatIstClock(value?: string | null, fallback?: string | null): string {
+    if (fallback) return fallback;
+    return this.formatIstParts(value)?.clock || '—';
+  }
+
+  protected formatIst(value?: string | null): string {
+    const parts = this.formatIstParts(value);
+    if (!parts) return value ? String(value) : '—';
+    return parts.date ? `${parts.date}, ${parts.clock}` : parts.clock;
   }
 
   protected formatPrice(value?: number | null): string {
