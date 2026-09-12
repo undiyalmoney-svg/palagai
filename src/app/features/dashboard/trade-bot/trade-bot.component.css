@@ -409,6 +409,19 @@
   font-weight: 650;
 }
 
+.trade-bot td.px {
+  white-space: normal;
+  font-variant-numeric: tabular-nums;
+}
+
+.trade-bot td.px .ohlc {
+  display: block;
+  margin-top: 0.15rem;
+  color: var(--pg-muted);
+  font-size: 0.72rem;
+  font-weight: 500;
+}
+
 .trade-bot tr.open-row td {
   background: #ecfdf3;
   font-weight: 650;

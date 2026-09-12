@@ -38,7 +38,9 @@ interface PaperTrade {
   optionEntryPremium?: number | null;
   optionExitPremium?: number | null;
   optionSymbol?: string | null;
-  option?: { tradingSymbol?: string; symbol?: string; strike?: number };
+  entryOhlc?: { open: number; high: number; low: number; close: number } | null;
+  exitOhlc?: { open: number; high: number; low: number; close: number } | null;
+  premiumSource?: string | null;
   liveWouldTake?: boolean;
   skipReason?: string;
   lots?: number;
@@ -512,6 +514,8 @@ export class TradeBotComponent implements OnInit, OnDestroy {
   }
 
   protected optionFillPrice(t: PaperTrade, which: 'entry' | 'exit'): number | null {
+    const ohlc = which === 'entry' ? t.entryOhlc : t.exitOhlc;
+    if (ohlc && Number(ohlc.close) > 0 && Number(ohlc.close) < 10000) return Number(ohlc.close);
     const prem = which === 'entry' ? t.optionEntryPremium : t.optionExitPremium;
     if (prem != null && Number(prem) > 0 && Number(prem) < 10000) return Number(prem);
     const px = which === 'entry' ? t.entryPrice : t.exitPrice;
@@ -520,6 +524,14 @@ export class TradeBotComponent implements OnInit, OnDestroy {
     if (Number.isFinite(n) && n > 0 && n < 10000) return n;
     if (Number.isFinite(Number(idx)) && Number(idx) >= 10000) return null;
     return Number.isFinite(n) && n > 0 && n < 10000 ? n : null;
+  }
+
+  protected ohlcLine(t: PaperTrade, which: 'entry' | 'exit'): string | null {
+    const ohlc = which === 'entry' ? t.entryOhlc : t.exitOhlc;
+    if (!ohlc) return null;
+    const parts = [ohlc.open, ohlc.high, ohlc.low, ohlc.close].map((n) => Number(n));
+    if (parts.some((n) => !Number.isFinite(n) || n <= 0)) return null;
+    return parts.map((n) => n.toFixed(2)).join(' / ');
   }
 
   protected optionLabel(t: PaperTrade): string {

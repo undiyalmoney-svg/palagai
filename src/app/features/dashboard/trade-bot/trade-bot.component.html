@@ -244,8 +244,22 @@
                 <td>{{ t.instrumentName || '—' }}</td>
                 <td>{{ optionLabel(t) }}</td>
                 <td>{{ tradeSide(t) }}</td>
-                <td>{{ formatPrice(optionFillPrice(t, 'entry')) }}</td>
-                <td>{{ isOpenTrade(t) ? '—' : formatPrice(optionFillPrice(t, 'exit')) }}</td>
+                <td class="px">
+                  <div>{{ formatPrice(optionFillPrice(t, 'entry')) }}</div>
+                  @if (ohlcLine(t, 'entry'); as o) {
+                    <small class="ohlc">{{ o }}</small>
+                  }
+                </td>
+                <td class="px">
+                  @if (isOpenTrade(t)) {
+                    —
+                  } @else {
+                    <div>{{ formatPrice(optionFillPrice(t, 'exit')) }}</div>
+                    @if (ohlcLine(t, 'exit'); as o) {
+                      <small class="ohlc">{{ o }}</small>
+                    }
+                  }
+                </td>
                 <td>{{ t.lots || 1 }}</td>
                 <td [class.up]="(t.netOptionPnlRs ?? t.optionPnlRs ?? 0) >= 0" [class.down]="(t.netOptionPnlRs ?? t.optionPnlRs ?? 0) < 0">
                   ₹{{ (t.netOptionPnlRs ?? t.optionPnlRs ?? 0) | number: '1.0-0' }}
