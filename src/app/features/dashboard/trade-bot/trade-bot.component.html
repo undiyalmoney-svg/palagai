@@ -4,7 +4,7 @@
       <p class="pg-eyebrow">One engine</p>
       <h1>Trade Bot</h1>
       <p class="lede pg-lede">
-        The old straddle desk is off. This bot is Nifty + Bank S/R: with-trend wall break, profit lock, day ±₹3,500. Paper ₹ is index × lot (the measured walk-forward book). Live buys one ATM CE or PE — it does not sell both sides.
+        Only Nifty 50 and Bank Nifty. Crude and stocks stay off. This is S/R wall-break: with-trend, profit lock, day ±₹3,500. Paper ₹ is index × lot. Live buys one ATM CE or PE — it does not sell both sides.
       </p>
     </div>
     <div class="hero-meta">
@@ -218,26 +218,31 @@
       @if (p.note) {
         <p class="hint">{{ p.note }}</p>
       }
-      }
 
       <h3>Trades</h3>
       <div class="table-wrap">
         <table>
           <thead>
             <tr>
-              <th>When</th>
+              <th>Entry time</th>
+              <th>Exit time</th>
               <th>Instrument</th>
-              <th>Side</th>
-              <th>Size</th>
-              <th>Money</th>
+              <th>Entry</th>
               <th>Exit</th>
+              <th>Side</th>
+              <th>Lots</th>
+              <th>₹</th>
+              <th>Why</th>
             </tr>
           </thead>
           <tbody>
             @for (t of p.trades || []; track $index) {
               <tr [class.open-row]="isOpenTrade(t)">
-                <td>{{ t.entryTime }}</td>
-                <td>{{ t.instrumentName }}</td>
+                <td>{{ formatIst(t.entryTime) }}</td>
+                <td>{{ isOpenTrade(t) ? 'OPEN' : formatIst(t.exitTime) }}</td>
+                <td>{{ selectedInstrument(t) }}</td>
+                <td>{{ formatPrice(t.entryPrice ?? t.indexEntry) }}</td>
+                <td>{{ isOpenTrade(t) ? '—' : formatPrice(t.exitPrice ?? t.indexExit) }}</td>
                 <td>{{ tradeSide(t) }}</td>
                 <td>{{ t.lots || 1 }}</td>
                 <td [class.up]="(t.netOptionPnlRs ?? t.optionPnlRs ?? 0) >= 0" [class.down]="(t.netOptionPnlRs ?? t.optionPnlRs ?? 0) < 0">
@@ -248,7 +253,7 @@
             }
             @if (!(p.trades || []).length) {
               <tr>
-                <td colspan="6">No money booked in this window.</td>
+                <td colspan="9">No money booked in this window.</td>
               </tr>
             }
           </tbody>

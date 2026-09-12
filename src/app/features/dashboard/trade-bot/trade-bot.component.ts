@@ -16,10 +16,15 @@ import { AuthService } from '../../../core/auth/auth.service';
 
 interface PaperTrade {
   instrumentName?: string;
+  selectedInstrument?: string;
   side?: string;
   direction?: string;
   entryTime?: string;
   exitTime?: string;
+  entryPrice?: number | null;
+  exitPrice?: number | null;
+  indexEntry?: number | null;
+  indexExit?: number | null;
   exitReason?: string;
   open?: boolean;
   optionPnlRs?: number | null;
@@ -465,11 +470,37 @@ export class TradeBotComponent implements OnInit, OnDestroy {
   }
 
   protected tradeSide(t: PaperTrade): string {
+    const dir = String(t.direction || '').toUpperCase();
+    if (dir === 'CE' || dir === 'PE') return `Buy ${dir}`;
     return t.side || t.direction || '';
   }
 
   protected tradeSymbol(t: PaperTrade): string {
     return t.optionSymbol || t.option?.tradingSymbol || t.option?.symbol || '';
+  }
+
+  protected selectedInstrument(t: PaperTrade): string {
+    return (
+      t.selectedInstrument ||
+      t.option?.tradingSymbol ||
+      t.option?.symbol ||
+      t.optionSymbol ||
+      t.instrumentName ||
+      '—'
+    );
+  }
+
+  protected formatIst(value?: string | null): string {
+    if (!value) return '—';
+    const m = String(value).match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}:\d{2})/);
+    if (!m) return String(value);
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return `${Number(m[3])} ${months[Number(m[2]) - 1]} ${m[1]} ${m[4]} IST`;
+  }
+
+  protected formatPrice(value?: number | null): string {
+    if (value == null || !Number.isFinite(Number(value))) return '—';
+    return Number(value).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
 
   protected isOpenTrade(t: PaperTrade): boolean {
