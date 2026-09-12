@@ -345,7 +345,7 @@ export class TradeBotComponent implements OnInit, OnDestroy {
       realOrders: this.liveMoney,
       lots: this.lots,
       niftyLots: this.lots,
-      engine: 'vwap-impulse',
+      engine: 'or-failure',
       universe: this.researchUniverse,
     };
     const kite = this.kiteSession.getAuthorizationHeader();
