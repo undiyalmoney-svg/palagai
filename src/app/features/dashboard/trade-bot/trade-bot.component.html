@@ -4,9 +4,9 @@
       <p class="pg-eyebrow">One engine</p>
       <h1>Trade Bot</h1>
       <p class="lede pg-lede">
-        Pick From and To, keep Live money off, Get Token, then <strong>Run paper</strong>.
-        Paper replays the live <strong>Genie</strong> strategy on those dates (same as live would).
-        <strong>Today</strong> is only that IST session. Find is a separate research scan.
+        Pick a date (or Today), keep Live money off, Get Token, then <strong>Run paper</strong>.
+        Paper replays Align Combo <strong>Genie</strong> on that session — the same strategy live uses.
+        The rupee figure is the strategy result. Find is a separate research scan and does not change paper.
       </p>
     </div>
     <div class="hero-meta">
@@ -95,22 +95,22 @@
 
   @if (paper(); as p) {
     <div class="paper-card paper-hero" [attr.data-up]="paperNet(p) >= 0">
-      <h3>Paper profit</h3>
+      <h3>Paper — Genie that day</h3>
       <p class="pnl-figure" [class.up]="paperNet(p) >= 0" [class.down]="paperNet(p) < 0">
         ₹{{ paperNet(p) | number: '1.0-0' }}
       </p>
       <p>
         {{ p.fromDate }} → {{ p.toDate }}
-        · {{ p.engine || 'paper' }}
+        · {{ p.strategy || p.engine || 'paper' }}
         · {{ p.totals?.trades || 0 }} trades
         · {{ p.totals?.wins || 0 }} won / {{ p.totals?.losses || 0 }} lost
-        @if (p.totals?.profitFactor != null) {
-          · PF {{ p.totals?.profitFactor }}
-        }
-        @if (p.totals?.underlyingPoints != null) {
-          · {{ p.totals?.underlyingPoints }} pts
-        }
       </p>
+      @if (p.liveTotals) {
+        <p class="hint">
+          Live would place {{ p.liveTotals.trades || 0 }} of those
+          (net ₹{{ (p.liveTotals.optionNetAfterChargesRs ?? p.liveTotals.optionNetRs ?? 0) | number: '1.0-0' }}).
+        </p>
+      }
       @if (p.note) {
         <p class="hint">{{ p.note }}</p>
       }
@@ -126,6 +126,7 @@
               <th>Side</th>
               <th>CE/PE</th>
               <th>Net ₹</th>
+              <th>Live?</th>
               <th>Exit</th>
             </tr>
           </thead>
@@ -137,12 +138,13 @@
                 <td>{{ t.side }}</td>
                 <td>{{ t.optionSymbol }}</td>
                 <td>{{ t.netOptionPnlRs ?? t.optionPnlRs }}</td>
+                <td>{{ t.liveWouldTake === false ? (t.skipReason || 'no') : 'yes' }}</td>
                 <td>{{ t.exitReason }}</td>
               </tr>
             }
             @if (!(p.trades || []).length) {
               <tr>
-                <td colspan="6">No trades in this date range. If Today is on, that is only today’s session — uncheck it and use Last 1 year for history.</td>
+                <td colspan="7">Genie had no trade on this date. Pick a session day (not a weekend) and Get Token first.</td>
               </tr>
             }
           </tbody>

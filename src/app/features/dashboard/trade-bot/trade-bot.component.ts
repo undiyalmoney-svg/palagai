@@ -20,6 +20,8 @@ interface PaperTrade {
   optionPnlRs?: number | null;
   netOptionPnlRs?: number | null;
   optionSymbol?: string | null;
+  liveWouldTake?: boolean;
+  skipReason?: string;
 }
 
 interface PaperTotals {
@@ -35,12 +37,14 @@ interface PaperTotals {
 interface PaperResult {
   mode?: string;
   engine?: string;
+  strategy?: string;
   fromDate?: string;
   toDate?: string;
   liveMoney?: boolean;
   realOrders?: boolean;
   usedFindWindow?: boolean;
   totals?: PaperTotals;
+  liveTotals?: PaperTotals;
   trades?: PaperTrade[];
   message?: string;
   note?: string;
@@ -172,10 +176,8 @@ interface LiveStatus {
   totals?: { netRs?: number; trades?: number };
 }
 
-function oneYearAgo(): string {
-  const t = istToday();
-  const [y, m, d] = t.split('-').map(Number);
-  return `${y - 1}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+function istToday(): string {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
 }
 
 @Component({
@@ -194,9 +196,9 @@ export class TradeBotComponent implements OnInit, OnDestroy {
   private readonly liveApiBase =
     (environment as { liveApiBaseUrl?: string }).liveApiBaseUrl || '/api/live';
 
-  protected fromDate = oneYearAgo();
+  protected fromDate = istToday();
   protected toDate = istToday();
-  protected today = false;
+  protected today = true;
   protected liveMoney = false;
   protected lots = 1;
   protected optionSymbol = '';
@@ -313,7 +315,6 @@ export class TradeBotComponent implements OnInit, OnDestroy {
     }
     await this.pushToken();
 
-    const found = this.research()?.best?.spec;
     const body: {
       fromDate: string;
       toDate: string;
@@ -322,10 +323,8 @@ export class TradeBotComponent implements OnInit, OnDestroy {
       realOrders: boolean;
       lots: number;
       niftyLots: number;
-      engine?: string;
-      eeWait?: EeWaitSpec;
+      engine: string;
       universe?: string;
-      symbol?: string;
     } = {
       fromDate: this.fromDate,
       toDate: this.toDate,
@@ -334,14 +333,9 @@ export class TradeBotComponent implements OnInit, OnDestroy {
       realOrders: this.liveMoney,
       lots: this.lots,
       niftyLots: this.lots,
+      engine: 'genie',
       universe: this.researchUniverse,
     };
-    if (found) {
-      body.engine = this.research()?.engine || found.engine || 'ee-wait';
-      body.eeWait = found;
-      const sym = this.research()?.symbol;
-      if (sym) body.symbol = sym;
-    }
     const kite = this.kiteSession.getAuthorizationHeader();
     const headers: Record<string, string> = kite ? { 'X-Kite-Authorization': kite } : {};
 
