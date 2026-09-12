@@ -11,6 +11,18 @@
   flex-wrap: wrap;
   gap: 0.45rem;
   justify-content: flex-end;
+  align-items: center;
+}
+
+.trade-bot .funds-hero {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.28rem 0.7rem;
+  border-radius: 999px;
+  background: #ecfdf3;
+  color: #166534;
+  font-weight: 700;
+  font-size: 0.88rem;
 }
 
 .trade-bot .panel {
@@ -173,6 +185,64 @@
 
 .trade-bot .paper-hero[data-up='true'] {
   border-color: #86efac;
+}
+
+.trade-bot .funds-card {
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--pg-line);
+  border-radius: var(--pg-radius-sm);
+  background: #fff;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.trade-bot .funds-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.trade-bot .funds-head h3,
+.trade-bot .funds-card h3 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.trade-bot .funds-grid,
+.trade-bot .pnl-split {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+  gap: 0.65rem;
+  margin: 0.35rem 0 0.15rem;
+}
+
+.trade-bot .funds-grid span,
+.trade-bot .pnl-split span {
+  display: block;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--pg-muted);
+}
+
+.trade-bot .funds-grid strong,
+.trade-bot .pnl-split strong {
+  font-size: 1.05rem;
+}
+
+.trade-bot .pnl-split .up,
+.trade-bot .funds-grid .up {
+  color: #15803d;
+}
+
+.trade-bot .pnl-split .down,
+.trade-bot .funds-grid .down {
+  color: #b91c1c;
+}
+
+.trade-bot tfoot td {
+  font-weight: 650;
 }
 
 .trade-bot .range-presets {

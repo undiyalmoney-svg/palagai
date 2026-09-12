@@ -1,5 +1,5 @@
 import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
-import { DecimalPipe } from '@angular/common';
+import { DatePipe, DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { MatButtonModule } from '@angular/material/button';
@@ -8,24 +8,35 @@ import { firstValueFrom } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 import { KiteSessionService } from '../../../core/kite/kite-session.service';
 import { LotsPreferenceService } from '../../../core/services/lots-preference.service';
+import { CapitalPreferenceService } from '../../../core/services/capital-preference.service';
+import { KiteFundsService } from '../../../core/services/kite-funds.service';
+import { DEFAULT_TRADING_CAPITAL_RS } from '../../../core/paper-desk/capital-plan.util';
 import { UiDialogService } from '../../../shared/ui/dialog/ui-dialog.service';
 import { AuthService } from '../../../core/auth/auth.service';
 
 interface PaperTrade {
   instrumentName?: string;
   side?: string;
+  direction?: string;
   entryTime?: string;
   exitTime?: string;
   exitReason?: string;
   optionPnlRs?: number | null;
   netOptionPnlRs?: number | null;
   optionSymbol?: string | null;
+  option?: { tradingSymbol?: string; symbol?: string };
+  liveWouldTake?: boolean;
+  skipReason?: string;
+  lots?: number;
 }
 
 interface PaperTotals {
   trades?: number;
   wins?: number;
   losses?: number;
+  grossProfitRs?: number;
+  grossLossRs?: number;
+  netRs?: number;
   optionNetAfterChargesRs?: number;
   optionNetRs?: number;
   underlyingPoints?: number;
@@ -35,16 +46,97 @@ interface PaperTotals {
 interface PaperResult {
   mode?: string;
   engine?: string;
+  strategy?: string;
   fromDate?: string;
   toDate?: string;
   liveMoney?: boolean;
   realOrders?: boolean;
   usedFindWindow?: boolean;
   totals?: PaperTotals;
+  liveTotals?: PaperTotals;
   trades?: PaperTrade[];
   message?: string;
   note?: string;
-  spec?: EeWaitSpec;
+  capitalRs?: number;
+  maxLots?: number;
+  month?: {
+    key?: string;
+    fromDate?: string;
+    mtdRs?: number;
+    hadTrade?: boolean;
+    locked?: boolean;
+    mode?: string;
+    rule?: string;
+  };
+  kiteFunds?: {
+    source?: string;
+    equityCash?: number;
+    equityNet?: number;
+    commodityCash?: number;
+    commodityNet?: number;
+    capitalRs?: number;
+    error?: string;
+  };
+  scanTotals?: PaperTotals;
+  allocation?: {
+    capitalRs?: number;
+    riskPerTradeRs?: number;
+    dayRiskRs?: number;
+    dayRiskUsedRs?: number;
+    taken?: Array<{
+      instrumentName?: string;
+      bookId?: string;
+      direction?: string;
+      lots?: number;
+      riskRs?: number;
+    }>;
+    skipped?: Array<{
+      instrumentName?: string;
+      bookId?: string;
+      reason?: string;
+      detail?: string;
+      riskRs1?: number;
+    }>;
+  };
+  spec?: EeWaitSpec | Record<string, unknown>;
+  specText?: string;
+  train?: { fromDate?: string; toDate?: string; totals?: PaperTotals };
+  books?: Array<{
+    id?: string;
+    label?: string;
+    vehicle?: string;
+    sitOut?: boolean;
+    status?: string;
+    why?: string;
+    specText?: string;
+    totals?: PaperTotals;
+    error?: string;
+  }>;
+  coreBooks?: Array<{
+    id?: string;
+    label?: string;
+    vehicle?: string;
+    sitOut?: boolean;
+    status?: string;
+    why?: string;
+    specText?: string;
+    totals?: PaperTotals;
+    error?: string;
+  }>;
+  stocks?: {
+    source?: string;
+    universe?: string;
+    scanned?: number;
+    taken?: string[];
+    rows?: Array<{
+      symbol?: string;
+      sitOut?: boolean;
+      train?: PaperTotals;
+      day?: PaperTotals;
+      trades?: number;
+    }>;
+    error?: string;
+  };
 }
 
 interface OptionBar {
@@ -172,16 +264,14 @@ interface LiveStatus {
   totals?: { netRs?: number; trades?: number };
 }
 
-function oneYearAgo(): string {
-  const t = istToday();
-  const [y, m, d] = t.split('-').map(Number);
-  return `${y - 1}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+function istToday(): string {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
 }
 
 @Component({
   selector: 'app-trade-bot',
   standalone: true,
-  imports: [FormsModule, DecimalPipe, MatButtonModule, MatProgressSpinnerModule],
+  imports: [FormsModule, DecimalPipe, DatePipe, MatButtonModule, MatProgressSpinnerModule],
   templateUrl: './trade-bot.component.html',
   styleUrl: './trade-bot.component.css',
 })
@@ -189,16 +279,19 @@ export class TradeBotComponent implements OnInit, OnDestroy {
   private readonly http = inject(HttpClient);
   private readonly kiteSession = inject(KiteSessionService);
   private readonly lotsPreference = inject(LotsPreferenceService);
+  private readonly capitalPreference = inject(CapitalPreferenceService);
+  protected readonly kiteFundsSvc = inject(KiteFundsService);
   private readonly uiDialog = inject(UiDialogService);
   private readonly auth = inject(AuthService);
   private readonly liveApiBase =
     (environment as { liveApiBaseUrl?: string }).liveApiBaseUrl || '/api/live';
 
-  protected fromDate = oneYearAgo();
+  protected fromDate = istToday();
   protected toDate = istToday();
-  protected today = false;
+  protected today = true;
   protected liveMoney = false;
   protected lots = 1;
+  protected capitalRs = DEFAULT_TRADING_CAPITAL_RS;
   protected optionSymbol = '';
   protected optionAtm = false;
   protected optionHistorical = true;
@@ -227,8 +320,10 @@ export class TradeBotComponent implements OnInit, OnDestroy {
     const uid = this.auth.currentUser()?.id;
     if (uid) this.kiteSession.bindSiteUser(uid);
     this.lots = this.lotsPreference.get();
+    this.capitalRs = this.capitalPreference.get();
     if (this.today) this.applyToday();
     void this.refreshLiveStatus();
+    void this.refreshKiteFunds();
   }
 
   ngOnDestroy(): void {
@@ -257,6 +352,12 @@ export class TradeBotComponent implements OnInit, OnDestroy {
     this.lotsPreference.set(n);
   }
 
+  protected onCapitalChange(): void {
+    const n = Math.max(10_000, Math.floor(Number(this.capitalRs)) || DEFAULT_TRADING_CAPITAL_RS);
+    this.capitalRs = n;
+    this.capitalPreference.set(n);
+  }
+
   protected setRangeDays(days: number): void {
     this.today = false;
     this.toDate = istToday();
@@ -266,7 +367,67 @@ export class TradeBotComponent implements OnInit, OnDestroy {
   }
 
   protected paperNet(p: PaperResult): number {
-    return Number(p.totals?.optionNetAfterChargesRs ?? p.totals?.optionNetRs ?? 0) || 0;
+    return Number(p.totals?.netRs ?? p.totals?.optionNetAfterChargesRs ?? p.totals?.optionNetRs ?? 0) || 0;
+  }
+
+  protected paperProfit(p: PaperResult): number {
+    const fromTotals = Number(p.totals?.grossProfitRs);
+    if (Number.isFinite(fromTotals) && fromTotals > 0) return fromTotals;
+    let sum = 0;
+    for (const t of p.trades || []) {
+      const n = Number(t.netOptionPnlRs ?? t.optionPnlRs) || 0;
+      if (n > 0) sum += n;
+    }
+    return Math.round(sum);
+  }
+
+  protected paperLoss(p: PaperResult): number {
+    const fromTotals = Number(p.totals?.grossLossRs);
+    if (Number.isFinite(fromTotals) && fromTotals > 0) return fromTotals;
+    let sum = 0;
+    for (const t of p.trades || []) {
+      const n = Number(t.netOptionPnlRs ?? t.optionPnlRs) || 0;
+      if (n < 0) sum += Math.abs(n);
+    }
+    return Math.round(sum);
+  }
+
+  protected get kiteFunds() {
+    return this.kiteFundsSvc.funds();
+  }
+
+  protected get kiteFundsError() {
+    return this.kiteFundsSvc.error();
+  }
+
+  protected get fundsBusy() {
+    return this.kiteFundsSvc.busy();
+  }
+
+  protected availableFundsRs(): number | null {
+    const n = this.kiteFundsSvc.equityAvailable();
+    return n != null && n > 0 ? n : null;
+  }
+
+  protected paperMark(p: PaperResult): number {
+    return Math.round((this.availableFundsRs() || Number(p.capitalRs) || 0) + this.paperNet(p));
+  }
+
+  protected indexBooks(p: PaperResult): NonNullable<PaperResult['coreBooks']> {
+    if (p.coreBooks?.length) return p.coreBooks;
+    return (p.books || []).filter((b) => b.id === 'nifty' || b.id === 'bank' || b.id === 'crude');
+  }
+
+  protected onRefreshFunds(): void {
+    void this.refreshKiteFunds();
+  }
+
+  protected tradeSide(t: PaperTrade): string {
+    return t.side || t.direction || '';
+  }
+
+  protected tradeSymbol(t: PaperTrade): string {
+    return t.optionSymbol || t.option?.tradingSymbol || t.option?.symbol || '';
   }
 
   protected async findEeWait(): Promise<void> {
@@ -304,16 +465,15 @@ export class TradeBotComponent implements OnInit, OnDestroy {
       const ok = await this.uiDialog.confirm({
         title: 'Place live Kite orders?',
         message:
-          'Paper and live use the same Genie strategy. Live money is on, so this run will send real orders when the strategy fires.',
+          'Live uses the same paper desk. The only extra step is Kite ATM MIS orders. Start at the session open so fills match paper. Late start will not chase a signal that already printed. Stocks stay paper.',
         confirmLabel: 'Start live',
         cancelLabel: 'Cancel',
         tone: 'danger',
       });
       if (!ok) return;
     }
-    await this.pushToken();
+    await this.refreshKiteFunds();
 
-    const found = this.research()?.best?.spec;
     const body: {
       fromDate: string;
       toDate: string;
@@ -322,10 +482,9 @@ export class TradeBotComponent implements OnInit, OnDestroy {
       realOrders: boolean;
       lots: number;
       niftyLots: number;
-      engine?: string;
-      eeWait?: EeWaitSpec;
+      capitalRs: number;
+      engine: string;
       universe?: string;
-      symbol?: string;
     } = {
       fromDate: this.fromDate,
       toDate: this.toDate,
@@ -334,14 +493,10 @@ export class TradeBotComponent implements OnInit, OnDestroy {
       realOrders: this.liveMoney,
       lots: this.lots,
       niftyLots: this.lots,
+      capitalRs: this.capitalRs,
+      engine: 'paper-desk',
       universe: this.researchUniverse,
     };
-    if (found) {
-      body.engine = this.research()?.engine || found.engine || 'ee-wait';
-      body.eeWait = found;
-      const sym = this.research()?.symbol;
-      if (sym) body.symbol = sym;
-    }
     const kite = this.kiteSession.getAuthorizationHeader();
     const headers: Record<string, string> = kite ? { 'X-Kite-Authorization': kite } : {};
 
@@ -358,6 +513,10 @@ export class TradeBotComponent implements OnInit, OnDestroy {
         this.paper.set(res);
         this.live.set(null);
         this.clearPoll();
+        if (res.kiteFunds && (res.kiteFunds.capitalRs || res.kiteFunds.equityCash != null)) {
+          this.kiteFundsSvc.apply(res.kiteFunds);
+          this.syncCapitalFromFunds();
+        }
       }
     } catch (err) {
       this.error.set(this.fmtErr(err));
@@ -452,19 +611,14 @@ export class TradeBotComponent implements OnInit, OnDestroy {
     }
   }
 
-  private async pushToken(): Promise<void> {
-    const data = this.kiteSession.getSession()?.data;
-    if (!data?.api_key || !data.access_token) return;
-    try {
-      await firstValueFrom(
-        this.http.put(`${this.liveApiBase}/auth`, {
-          apiKey: data.api_key,
-          accessToken: data.access_token,
-        }),
-      );
-    } catch {
-      /* server may already have a pushed token */
-    }
+  private async refreshKiteFunds(): Promise<void> {
+    await this.kiteFundsSvc.refresh();
+    this.syncCapitalFromFunds();
+  }
+
+  private syncCapitalFromFunds(): void {
+    const n = this.kiteFundsSvc.equityAvailable();
+    if (n != null && n > 0) this.capitalRs = n;
   }
 
   private async refreshLiveStatus(): Promise<void> {

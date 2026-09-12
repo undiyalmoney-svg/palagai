@@ -9,10 +9,12 @@ import {
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { filter } from 'rxjs/operators';
 import { Subscription } from 'rxjs';
+import { DecimalPipe } from '@angular/common';
 import { AuthService } from '../../core/auth/auth.service';
 import { SiteModule } from '../../core/auth/auth.constants';
 import { PgIconComponent } from '../../shared/ui/icon/pg-icon.component';
 import { UiDialogService } from '../../shared/ui/dialog/ui-dialog.service';
+import { KiteFundsService } from '../../core/services/kite-funds.service';
 
 interface NavItem {
   label: string;
@@ -25,7 +27,7 @@ interface NavItem {
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, PgIconComponent],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, PgIconComponent, DecimalPipe],
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.css',
 })
@@ -33,6 +35,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   private readonly authService = inject(AuthService);
   private readonly router = inject(Router);
   private readonly uiDialog = inject(UiDialogService);
+  protected readonly kiteFunds = inject(KiteFundsService);
   private clockTimer: ReturnType<typeof setInterval> | null = null;
   private navSub: Subscription | null = null;
 
@@ -69,7 +72,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   private readonly titles: Record<string, { title: string; subtitle: string }> = {
     '/dashboard/trade-bot': {
       title: 'Trade Bot',
-      subtitle: 'From / To dates, Today autofill, Live money for real Kite orders.',
+      subtitle: 'Kite funds on this bar. Pick dates, then Run paper.',
     },
     '/dashboard/order-test': {
       title: 'Order Test',
@@ -144,6 +147,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     // Get Token / mid-OAuth: never bounce to login (consume race used to trip this).
     if (onGetToken || pendingKite) {
       await this.authService.refreshMe();
+      void this.kiteFunds.refresh();
       if (pendingKite && !onGetToken) {
         void this.router.navigateByUrl('/dashboard/get-token');
       }
@@ -155,6 +159,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
       void this.router.navigateByUrl('/login');
       return;
     }
+    void this.kiteFunds.refresh();
     const url = this.router.url.replace(/\?.*$/, '');
     if (url === '/dashboard' || url === '/dashboard/') {
       const { firstDashboardPath } = await import('../../core/auth/auth.guard');

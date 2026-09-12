@@ -429,6 +429,13 @@ async function proxyOrderBackendJson(
   if (typeof req.headers['x-vault-password'] === 'string') {
     headers['X-Vault-Password'] = req.headers['x-vault-password'];
   }
+  // Browser Kite session — Angular sends this; without it GET /live/funds 400s.
+  if (typeof req.headers['x-kite-authorization'] === 'string') {
+    headers['X-Kite-Authorization'] = req.headers['x-kite-authorization'];
+  }
+  if (typeof req.headers['x-kite-authorisation'] === 'string') {
+    headers['X-Kite-Authorisation'] = req.headers['x-kite-authorisation'];
+  }
 
   const init: RequestInit = {
     method: req.method,
