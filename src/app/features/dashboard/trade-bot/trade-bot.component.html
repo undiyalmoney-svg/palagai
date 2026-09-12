@@ -4,7 +4,7 @@
       <p class="pg-eyebrow">One engine</p>
       <h1>Trade Bot</h1>
       <p class="lede pg-lede">
-        Pick a date, Get Token, then Run paper. Available funds come from <strong>Kite</strong>. A name whose last walk-forward trade was red sits out. 2% per trade / 6% day stop. Live is the same path with Kite orders.
+        Pick a date, Get Token, then Run paper. The desk always scans <strong>Nifty 50</strong>, <strong>Bank Nifty</strong>, and <strong>Crude Oil Mini</strong>. Bank’s 1-lot stop is often wider than 2% of ~₹30k so it shows as skipped, not missing. Crude is evening-only (16:00–21:30 IST). Live is the same path with Kite orders.
       </p>
     </div>
     <div class="hero-meta">
@@ -171,6 +171,39 @@
         · {{ p.totals?.trades || 0 }} funded trades
         · {{ p.totals?.wins || 0 }} won / {{ p.totals?.losses || 0 }} lost
       </p>
+      @if (indexBooks(p).length) {
+        <h4>Nifty · Bank Nifty · Crude Mini</h4>
+        <p class="hint">
+          These three are always scanned. Sit-out / skipped / no-signal is a reason, not a missing book.
+          Crude does not print in the 09:15 cash session.
+        </p>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Book</th>
+                <th>Vehicle</th>
+                <th>Status</th>
+                <th>Why</th>
+                <th>Today t</th>
+                <th>Today ₹</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (b of indexBooks(p); track b.id || b.label) {
+                <tr>
+                  <td>{{ b.label }}</td>
+                  <td>{{ b.vehicle || '—' }}</td>
+                  <td>{{ b.status || (b.sitOut ? 'sit-out' : 'scanned') }}</td>
+                  <td>{{ b.why || b.error || b.specText || '—' }}</td>
+                  <td>{{ b.totals?.trades || 0 }}</td>
+                  <td>{{ b.totals?.optionNetAfterChargesRs || 0 }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
       @if (p.allocation; as a) {
         <p class="hint">
           2% / trade ₹{{ a.riskPerTradeRs | number: '1.0-0' }}

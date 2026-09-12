@@ -94,7 +94,21 @@ interface PaperResult {
   books?: Array<{
     id?: string;
     label?: string;
+    vehicle?: string;
     sitOut?: boolean;
+    status?: string;
+    why?: string;
+    specText?: string;
+    totals?: PaperTotals;
+    error?: string;
+  }>;
+  coreBooks?: Array<{
+    id?: string;
+    label?: string;
+    vehicle?: string;
+    sitOut?: boolean;
+    status?: string;
+    why?: string;
     specText?: string;
     totals?: PaperTotals;
     error?: string;
@@ -377,6 +391,11 @@ export class TradeBotComponent implements OnInit, OnDestroy {
 
   protected paperMark(p: PaperResult): number {
     return Math.round((this.availableFundsRs() || Number(p.capitalRs) || 0) + this.paperNet(p));
+  }
+
+  protected indexBooks(p: PaperResult): NonNullable<PaperResult['coreBooks']> {
+    if (p.coreBooks?.length) return p.coreBooks;
+    return (p.books || []).filter((b) => b.id === 'nifty' || b.id === 'bank' || b.id === 'crude');
   }
 
   protected onRefreshFunds(): void {
