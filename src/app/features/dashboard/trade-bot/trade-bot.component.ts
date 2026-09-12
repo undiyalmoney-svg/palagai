@@ -491,7 +491,7 @@ export class TradeBotComponent implements OnInit, OnDestroy {
       const ok = await this.uiDialog.confirm({
         title: 'Place live Kite orders?',
         message:
-          'Live uses the same paper desk. Quiet range at 10:00 → sell ATM CE+PE. Confirmed break → buy one CE or PE. It will not buy both sides. Late start will not chase. Stocks stay paper.',
+          'Live places real MIS buys on Nifty + Bank S/R signals (one ATM CE or PE). It does not sell a straddle. Day ±₹3,500. Crude stays off.',
         confirmLabel: 'Start live',
         cancelLabel: 'Cancel',
         tone: 'danger',
@@ -519,7 +519,7 @@ export class TradeBotComponent implements OnInit, OnDestroy {
       lots: this.lots,
       niftyLots: this.lots,
       capitalRs: this.capitalRs,
-      engine: 'paper-desk',
+      engine: 'sr-desk',
     };
     const kite = this.kiteSession.getAuthorizationHeader();
     const headers: Record<string, string> = kite ? { 'X-Kite-Authorization': kite } : {};

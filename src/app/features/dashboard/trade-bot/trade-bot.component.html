@@ -4,7 +4,7 @@
       <p class="pg-eyebrow">One engine</p>
       <h1>Trade Bot</h1>
       <p class="lede pg-lede">
-        The desk does not buy both option sides. Quiet 15-minute range at 10:00 → sell ATM CE+PE. Confirmed break → buy one CE or PE with a stop. That is how a 7-month long-straddle debit is avoided. Run 2 months to total profit and loss.
+        The old straddle desk is off. This bot is Nifty + Bank S/R: with-trend wall break, profit lock, day ±₹3,500. Paper ₹ is index × lot (the measured walk-forward book). Live buys one ATM CE or PE — it does not sell both sides.
       </p>
     </div>
     <div class="hero-meta">
@@ -88,7 +88,7 @@
 
     <div class="actions range-presets">
       <button mat-flat-button color="primary" type="button" [disabled]="busy()" (click)="runTwoMonthBatch()">
-        2 months · profit desk
+        2 months · S/R Nifty
       </button>
       <button mat-stroked-button type="button" [disabled]="busy() || today" (click)="setRangeDays(30)">Last 30 days</button>
       <button mat-stroked-button type="button" [disabled]="busy() || today" (click)="setRangeDays(60)">Last 60 days</button>
