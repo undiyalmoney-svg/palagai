@@ -33,6 +33,9 @@ interface PaperTotals {
   trades?: number;
   wins?: number;
   losses?: number;
+  grossProfitRs?: number;
+  grossLossRs?: number;
+  netRs?: number;
   optionNetAfterChargesRs?: number;
   optionNetRs?: number;
   underlyingPoints?: number;
@@ -60,6 +63,7 @@ interface PaperResult {
     equityCash?: number;
     equityNet?: number;
     commodityCash?: number;
+    commodityNet?: number;
     capitalRs?: number;
     error?: string;
   };
@@ -264,6 +268,8 @@ export class TradeBotComponent implements OnInit, OnDestroy {
   protected lots = 1;
   protected capitalRs = DEFAULT_TRADING_CAPITAL_RS;
   protected kiteCash: number | null = null;
+  protected kiteFunds: PaperResult['kiteFunds'] | null = null;
+  protected kiteFundsError = '';
   protected optionSymbol = '';
   protected optionAtm = false;
   protected optionHistorical = true;
@@ -339,7 +345,42 @@ export class TradeBotComponent implements OnInit, OnDestroy {
   }
 
   protected paperNet(p: PaperResult): number {
-    return Number(p.totals?.optionNetAfterChargesRs ?? p.totals?.optionNetRs ?? 0) || 0;
+    return Number(p.totals?.netRs ?? p.totals?.optionNetAfterChargesRs ?? p.totals?.optionNetRs ?? 0) || 0;
+  }
+
+  protected paperProfit(p: PaperResult): number {
+    const fromTotals = Number(p.totals?.grossProfitRs);
+    if (Number.isFinite(fromTotals) && fromTotals > 0) return fromTotals;
+    let sum = 0;
+    for (const t of p.trades || []) {
+      const n = Number(t.netOptionPnlRs ?? t.optionPnlRs) || 0;
+      if (n > 0) sum += n;
+    }
+    return Math.round(sum);
+  }
+
+  protected paperLoss(p: PaperResult): number {
+    const fromTotals = Number(p.totals?.grossLossRs);
+    if (Number.isFinite(fromTotals) && fromTotals > 0) return fromTotals;
+    let sum = 0;
+    for (const t of p.trades || []) {
+      const n = Number(t.netOptionPnlRs ?? t.optionPnlRs) || 0;
+      if (n < 0) sum += Math.abs(n);
+    }
+    return Math.round(sum);
+  }
+
+  protected availableFundsRs(): number | null {
+    const n = Math.floor(Number(this.kiteFunds?.equityCash || this.kiteFunds?.capitalRs || this.kiteCash) || 0);
+    return n > 0 ? n : null;
+  }
+
+  protected paperMark(p: PaperResult): number {
+    return Math.round((this.availableFundsRs() || Number(p.capitalRs) || 0) + this.paperNet(p));
+  }
+
+  protected onRefreshFunds(): void {
+    void this.refreshKiteFunds();
   }
 
   protected tradeSide(t: PaperTrade): string {
@@ -434,6 +475,11 @@ export class TradeBotComponent implements OnInit, OnDestroy {
         this.paper.set(res);
         this.live.set(null);
         this.clearPoll();
+        if (res.kiteFunds && (res.kiteFunds.capitalRs || res.kiteFunds.equityCash)) {
+          this.kiteFunds = res.kiteFunds;
+          const n = Math.floor(Number(res.kiteFunds.capitalRs || res.kiteFunds.equityCash) || 0);
+          this.kiteCash = n > 0 ? n : this.kiteCash;
+        }
       }
     } catch (err) {
       this.error.set(this.fmtErr(err));
@@ -531,21 +577,32 @@ export class TradeBotComponent implements OnInit, OnDestroy {
   private async refreshKiteFunds(): Promise<void> {
     const kite = this.kiteSession.getAuthorizationHeader();
     const headers: Record<string, string> = kite ? { 'X-Kite-Authorization': kite } : {};
+    this.kiteFundsError = '';
     try {
       const res = await firstValueFrom(
-        this.http.get<{ capitalRs?: number; equityCash?: number; error?: string }>(
-          `${this.liveApiBase}/funds`,
-          { headers },
-        ),
+        this.http.get<{
+          capitalRs?: number;
+          equityCash?: number;
+          equityNet?: number;
+          commodityCash?: number;
+          commodityNet?: number;
+          source?: string;
+          error?: string;
+          message?: string;
+        }>(`${this.liveApiBase}/funds`, { headers }),
       );
       const n = Math.floor(Number(res.capitalRs || res.equityCash) || 0);
       this.kiteCash = n > 0 ? n : null;
+      this.kiteFunds = n > 0 || res.equityNet != null ? res : null;
       if (n > 0) {
         this.capitalRs = n;
         this.capitalPreference.set(n);
       }
-    } catch {
+      if (!n && res.message) this.kiteFundsError = res.message;
+    } catch (err) {
       this.kiteCash = null;
+      this.kiteFunds = null;
+      this.kiteFundsError = this.fmtErr(err);
     }
   }
 

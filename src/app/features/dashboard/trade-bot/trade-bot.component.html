@@ -4,7 +4,7 @@
       <p class="pg-eyebrow">One engine</p>
       <h1>Trade Bot</h1>
       <p class="lede pg-lede">
-        Pick a date, Get Token, then Run paper. Capital comes from <strong>Kite funds</strong>. The desk can take several books in one session (index, crude, several stocks) inside a 2% per-trade / 8% day stop budget — not a single share lot. One scratch does not empty the day. Live is the same path with Kite orders.
+        Pick a date, Get Token, then Run paper. Available funds come from <strong>Kite</strong>. A name whose last walk-forward trade was red sits out. 2% per trade / 6% day stop. Live is the same path with Kite orders.
       </p>
     </div>
     <div class="hero-meta">
@@ -49,9 +49,37 @@
         />
       </label>
     </div>
-    @if (kiteCash) {
-      <p class="hint">Kite funds ₹{{ kiteCash | number: '1.0-0' }} — paper sizes from this. Fallback ₹ is used only if Kite funds are missing.</p>
-    }
+    <div class="funds-card">
+      <div class="funds-head">
+        <h3>Available funds</h3>
+        <button mat-stroked-button type="button" [disabled]="busy()" (click)="onRefreshFunds()">
+          Refresh
+        </button>
+      </div>
+      @if (kiteFundsError) {
+        <p class="err">{{ kiteFundsError }}</p>
+      }
+      @if (kiteFunds; as f) {
+        <p class="pnl-figure">₹{{ (f.equityCash || f.capitalRs || 0) | number: '1.0-0' }}</p>
+        <p class="hint">Equity available (Kite live balance / cash)</p>
+        <div class="funds-grid">
+          <div>
+            <span>Equity net</span>
+            <strong>₹{{ (f.equityNet || 0) | number: '1.0-0' }}</strong>
+          </div>
+          <div>
+            <span>Commodity available</span>
+            <strong>₹{{ (f.commodityCash || 0) | number: '1.0-0' }}</strong>
+          </div>
+          <div>
+            <span>Commodity net</span>
+            <strong>₹{{ (f.commodityNet || 0) | number: '1.0-0' }}</strong>
+          </div>
+        </div>
+      } @else if (!kiteFundsError) {
+        <p class="hint">Get Token, then Refresh — paper sizes from Kite available funds. Fallback ₹ is used only if Kite is missing.</p>
+      }
+    </div>
 
     <div class="actions range-presets">
       <button mat-stroked-button type="button" [disabled]="busy() || today" (click)="setRangeDays(30)">Last 30 days</button>
@@ -109,8 +137,33 @@
     <div class="paper-card paper-hero" [attr.data-up]="paperNet(p) >= 0">
       <h3>Paper — capital-picked desk</h3>
       <p class="pnl-figure" [class.up]="paperNet(p) >= 0" [class.down]="paperNet(p) < 0">
-        ₹{{ paperNet(p) | number: '1.0-0' }}
+        Net ₹{{ paperNet(p) | number: '1.0-0' }}
       </p>
+      <div class="pnl-split">
+        <div>
+          <span>Total profit</span>
+          <strong class="up">₹{{ paperProfit(p) | number: '1.0-0' }}</strong>
+        </div>
+        <div>
+          <span>Total loss</span>
+          <strong class="down">₹{{ paperLoss(p) | number: '1.0-0' }}</strong>
+        </div>
+        <div>
+          <span>Wins / losses</span>
+          <strong>{{ p.totals?.wins || 0 }} / {{ p.totals?.losses || 0 }}</strong>
+        </div>
+        <div>
+          <span>Funded trades</span>
+          <strong>{{ p.totals?.trades || 0 }}</strong>
+        </div>
+      </div>
+      @if (availableFundsRs(); as cash) {
+        <p class="hint">
+          Available funds ₹{{ cash | number: '1.0-0' }}
+          · paper mark after this window ₹{{ paperMark(p) | number: '1.0-0' }}
+          (available + net; not a live Kite withdrawal)
+        </p>
+      }
       <p>
         {{ p.fromDate }} → {{ p.toDate }}
         · capital ₹{{ (p.capitalRs || p.allocation?.capitalRs || 0) | number: '1.0-0' }}{{ p.kiteFunds?.capitalRs ? ' (Kite)' : '' }}
@@ -121,7 +174,7 @@
       @if (p.allocation; as a) {
         <p class="hint">
           2% / trade ₹{{ a.riskPerTradeRs | number: '1.0-0' }}
-          · 8% / day ₹{{ a.dayRiskRs | number: '1.0-0' }}
+          · 6% / day ₹{{ a.dayRiskRs | number: '1.0-0' }}
           · used ₹{{ a.dayRiskUsedRs | number: '1.0-0' }}
         </p>
         @if (a.taken?.length) {
@@ -198,6 +251,19 @@
               </tr>
             }
           </tbody>
+          @if ((p.trades || []).length) {
+            <tfoot>
+              <tr>
+                <td colspan="5">Totals</td>
+                <td>
+                  P ₹{{ paperProfit(p) | number: '1.0-0' }}
+                  · L ₹{{ paperLoss(p) | number: '1.0-0' }}
+                  · Net ₹{{ paperNet(p) | number: '1.0-0' }}
+                </td>
+                <td colspan="2"></td>
+              </tr>
+            </tfoot>
+          }
         </table>
       </div>
       @if (p.stocks; as st) {
@@ -516,6 +582,23 @@
       <p class="hint">
         Orders: {{ s.realOrders || s.liveMoney ? 'live Kite' : 'paper marks only' }}
       </p>
+      @if (availableFundsRs(); as cash) {
+        <p class="hint">Available funds ₹{{ cash | number: '1.0-0' }}</p>
+      }
+      @if (s.totals) {
+        <div class="pnl-split">
+          <div>
+            <span>Live net</span>
+            <strong [class.up]="(s.totals.netRs || 0) >= 0" [class.down]="(s.totals.netRs || 0) < 0">
+              ₹{{ (s.totals.netRs || 0) | number: '1.0-0' }}
+            </strong>
+          </div>
+          <div>
+            <span>Live trades</span>
+            <strong>{{ s.totals.trades || 0 }}</strong>
+          </div>
+        </div>
+      }
       @if (s.events?.length) {
         <ul class="events">
           @for (ev of (s.events || []).slice(0, 12); track $index) {
