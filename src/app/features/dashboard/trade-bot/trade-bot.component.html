@@ -5,7 +5,7 @@
       <h1>Trade Bot</h1>
       <p class="lede pg-lede">
         Pick a date, keep Live money off, Get Token, then <strong>Run paper</strong>.
-        Paper searches a desk on the days before From: <strong>Nifty 50</strong>, <strong>Bank Nifty</strong>, <strong>Crude Oil Mini</strong> (Kite 5m) and liquid <strong>Nifty 100 stocks</strong> (free NSE daily). Each book only trades if walk-forward has an edge — otherwise it sits out.
+        Paper searches a desk on the days before From: <strong>Nifty 50</strong>, <strong>Bank Nifty</strong>, <strong>Crude Oil Mini</strong> (Kite 5m) and liquid <strong>Nifty 100 stocks</strong> (free NSE daily). Capital then picks which vehicle to fund — 2% stop per trade, 4% for the day. Wide index stops sit out on small capital.
       </p>
     </div>
     <div class="hero-meta">
@@ -28,7 +28,18 @@
         <input type="date" [(ngModel)]="toDate" [disabled]="today || busy()" />
       </label>
       <label class="field lots">
-        <span>Lots</span>
+        <span>Capital ₹</span>
+        <input
+          type="number"
+          min="10000"
+          step="10000"
+          [(ngModel)]="capitalRs"
+          (ngModelChange)="onCapitalChange()"
+          [disabled]="busy()"
+        />
+      </label>
+      <label class="field lots">
+        <span>Max lots</span>
         <input
           type="number"
           min="1"
@@ -94,18 +105,45 @@
 
   @if (paper(); as p) {
     <div class="paper-card paper-hero" [attr.data-up]="paperNet(p) >= 0">
-      <h3>Paper — found spec that day</h3>
+      <h3>Paper — capital-picked desk</h3>
       <p class="pnl-figure" [class.up]="paperNet(p) >= 0" [class.down]="paperNet(p) < 0">
         ₹{{ paperNet(p) | number: '1.0-0' }}
       </p>
       <p>
         {{ p.fromDate }} → {{ p.toDate }}
+        · capital ₹{{ (p.capitalRs || p.allocation?.capitalRs || 0) | number: '1.0-0' }}
         · {{ p.strategy || p.engine || 'paper' }}
-        · {{ p.totals?.trades || 0 }} trades
+        · {{ p.totals?.trades || 0 }} funded trades
         · {{ p.totals?.wins || 0 }} won / {{ p.totals?.losses || 0 }} lost
       </p>
+      @if (p.allocation; as a) {
+        <p class="hint">
+          2% / trade ₹{{ a.riskPerTradeRs | number: '1.0-0' }}
+          · 4% / day ₹{{ a.dayRiskRs | number: '1.0-0' }}
+          · used ₹{{ a.dayRiskUsedRs | number: '1.0-0' }}
+        </p>
+        @if (a.taken?.length) {
+          <p class="hint">
+            Funded:
+            @for (t of a.taken; track $index) {
+              {{ t.instrumentName }} ×{{ t.lots }}
+              @if (!$last) { · }
+            }
+          </p>
+        }
+        @if (a.skipped?.length) {
+          <p class="hint">
+            Skipped for capital:
+            @for (s of a.skipped; track $index) {
+              {{ s.instrumentName }} ({{ s.reason }})
+              @if (!$last) { · }
+            }
+          </p>
+        }
+      }
       @if (p.books?.length) {
         <p class="hint">
+          Scan (1 lot):
           @for (b of p.books; track b.id || b.label) {
             {{ b.label }}: {{ b.sitOut ? 'sit-out' : ((b.totals?.trades || 0) + ' t ₹' + (b.totals?.optionNetAfterChargesRs || 0)) }}
             @if (!$last) { · }
@@ -133,6 +171,7 @@
               <th>Book</th>
               <th>Side</th>
               <th>CE/PE</th>
+              <th>Size</th>
               <th>Net ₹</th>
               <th>Live?</th>
               <th>Exit</th>
@@ -145,6 +184,7 @@
                 <td>{{ t.instrumentName }}</td>
                 <td>{{ tradeSide(t) }}</td>
                 <td>{{ tradeSymbol(t) }}</td>
+                <td>{{ t.lots || 1 }}</td>
                 <td>{{ t.netOptionPnlRs ?? t.optionPnlRs }}</td>
                 <td>{{ t.liveWouldTake === false ? (t.skipReason || 'no') : 'yes' }}</td>
                 <td>{{ t.exitReason }}</td>
@@ -152,7 +192,7 @@
             }
             @if (!(p.trades || []).length) {
               <tr>
-                <td colspan="7">The found spec had no trade on this date. Pick a session day (not a weekend) and Get Token first.</td>
+                <td colspan="8">Scan found nothing capital could fund on this date. Pick a session day, Get Token, or raise Capital ₹.</td>
               </tr>
             }
           </tbody>

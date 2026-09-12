@@ -8,6 +8,8 @@ import { firstValueFrom } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 import { KiteSessionService } from '../../../core/kite/kite-session.service';
 import { LotsPreferenceService } from '../../../core/services/lots-preference.service';
+import { CapitalPreferenceService } from '../../../core/services/capital-preference.service';
+import { DEFAULT_TRADING_CAPITAL_RS } from '../../../core/paper-desk/capital-plan.util';
 import { UiDialogService } from '../../../shared/ui/dialog/ui-dialog.service';
 import { AuthService } from '../../../core/auth/auth.service';
 
@@ -24,6 +26,7 @@ interface PaperTrade {
   option?: { tradingSymbol?: string; symbol?: string };
   liveWouldTake?: boolean;
   skipReason?: string;
+  lots?: number;
 }
 
 interface PaperTotals {
@@ -50,6 +53,29 @@ interface PaperResult {
   trades?: PaperTrade[];
   message?: string;
   note?: string;
+  capitalRs?: number;
+  maxLots?: number;
+  scanTotals?: PaperTotals;
+  allocation?: {
+    capitalRs?: number;
+    riskPerTradeRs?: number;
+    dayRiskRs?: number;
+    dayRiskUsedRs?: number;
+    taken?: Array<{
+      instrumentName?: string;
+      bookId?: string;
+      direction?: string;
+      lots?: number;
+      riskRs?: number;
+    }>;
+    skipped?: Array<{
+      instrumentName?: string;
+      bookId?: string;
+      reason?: string;
+      detail?: string;
+      riskRs1?: number;
+    }>;
+  };
   spec?: EeWaitSpec | Record<string, unknown>;
   specText?: string;
   train?: { fromDate?: string; toDate?: string; totals?: PaperTotals };
@@ -217,6 +243,7 @@ export class TradeBotComponent implements OnInit, OnDestroy {
   private readonly http = inject(HttpClient);
   private readonly kiteSession = inject(KiteSessionService);
   private readonly lotsPreference = inject(LotsPreferenceService);
+  private readonly capitalPreference = inject(CapitalPreferenceService);
   private readonly uiDialog = inject(UiDialogService);
   private readonly auth = inject(AuthService);
   private readonly liveApiBase =
@@ -227,6 +254,7 @@ export class TradeBotComponent implements OnInit, OnDestroy {
   protected today = true;
   protected liveMoney = false;
   protected lots = 1;
+  protected capitalRs = DEFAULT_TRADING_CAPITAL_RS;
   protected optionSymbol = '';
   protected optionAtm = false;
   protected optionHistorical = true;
@@ -255,6 +283,7 @@ export class TradeBotComponent implements OnInit, OnDestroy {
     const uid = this.auth.currentUser()?.id;
     if (uid) this.kiteSession.bindSiteUser(uid);
     this.lots = this.lotsPreference.get();
+    this.capitalRs = this.capitalPreference.get();
     if (this.today) this.applyToday();
     void this.refreshLiveStatus();
   }
@@ -283,6 +312,12 @@ export class TradeBotComponent implements OnInit, OnDestroy {
     const n = Math.max(1, Math.floor(Number(this.lots)) || 1);
     this.lots = n;
     this.lotsPreference.set(n);
+  }
+
+  protected onCapitalChange(): void {
+    const n = Math.max(10_000, Math.floor(Number(this.capitalRs)) || DEFAULT_TRADING_CAPITAL_RS);
+    this.capitalRs = n;
+    this.capitalPreference.set(n);
   }
 
   protected setRangeDays(days: number): void {
@@ -357,6 +392,7 @@ export class TradeBotComponent implements OnInit, OnDestroy {
       realOrders: boolean;
       lots: number;
       niftyLots: number;
+      capitalRs: number;
       engine: string;
       universe?: string;
     } = {
@@ -367,6 +403,7 @@ export class TradeBotComponent implements OnInit, OnDestroy {
       realOrders: this.liveMoney,
       lots: this.lots,
       niftyLots: this.lots,
+      capitalRs: this.capitalRs,
       engine: 'paper-desk',
       universe: this.researchUniverse,
     };
