@@ -94,6 +94,31 @@
       } @else if (!kiteFundsError) {
         <p class="hint">Get Token, then Refresh — paper sizes from Kite available funds. Fallback ₹ is used only if Kite is missing.</p>
       }
+      <div class="protect-block">
+        <h4>Capital protected</h4>
+        <p class="pnl-figure">₹{{ protectedFloorRs() | number: '1.0-0' }}</p>
+        <p class="hint">
+          Floor = funds minus the 6% day stop. That remainder stays protected even if every funded trade hits its stop.
+        </p>
+        <div class="funds-grid">
+          <div>
+            <span>Funds</span>
+            <strong>₹{{ sizingCapitalRs() | number: '1.0-0' }}</strong>
+          </div>
+          <div>
+            <span>2% / trade</span>
+            <strong>₹{{ tradeRiskBudgetRs() | number: '1.0-0' }}</strong>
+          </div>
+          <div>
+            <span>6% / day (max loss)</span>
+            <strong class="down">₹{{ dayRiskBudgetRs() | number: '1.0-0' }}</strong>
+          </div>
+          <div>
+            <span>Protected floor</span>
+            <strong class="up">₹{{ protectedFloorRs() | number: '1.0-0' }}</strong>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div class="actions range-presets">
@@ -170,6 +195,100 @@
         <div>
           <span>Funded trades</span>
           <strong>{{ p.totals?.trades || 0 }}</strong>
+        </div>
+      </div>
+      @if (protectionOf(p); as prot) {
+        <div class="funds-card">
+          <h3>Funds and capital protected</h3>
+          <p class="pnl-figure up">₹{{ (prot.stillProtectedRs || prot.protectedFloorRs || 0) | number: '1.0-0' }}</p>
+          <p class="hint">
+            Still protected after funded risk. Worst-case floor (full 6% day stop) ₹{{ (prot.protectedFloorRs || 0) | number: '1.0-0' }}.
+            @if (prot.monthMode) {
+              Month {{ prot.monthMode }}{{ prot.monthLocked ? ' · locked' : '' }}.
+            }
+          </p>
+          <div class="funds-grid">
+            <div>
+              <span>Funds</span>
+              <strong>₹{{ (prot.fundsRs || prot.capitalRs || 0) | number: '1.0-0' }}</strong>
+            </div>
+            <div>
+              <span>Sizing capital</span>
+              <strong>₹{{ (prot.capitalRs || 0) | number: '1.0-0' }}</strong>
+            </div>
+            <div>
+              <span>2% / trade</span>
+              <strong>₹{{ (prot.riskPerTradeRs || 0) | number: '1.0-0' }}</strong>
+            </div>
+            <div>
+              <span>6% / day</span>
+              <strong class="down">₹{{ (prot.dayRiskRs || 0) | number: '1.0-0' }}</strong>
+            </div>
+            <div>
+              <span>Risk used</span>
+              <strong>₹{{ (prot.dayRiskUsedRs || 0) | number: '1.0-0' }}</strong>
+            </div>
+            <div>
+              <span>Day budget left</span>
+              <strong>₹{{ (prot.dayRiskLeftRs || 0) | number: '1.0-0' }}</strong>
+            </div>
+            <div>
+              <span>Protected now</span>
+              <strong class="up">₹{{ (prot.stillProtectedRs || 0) | number: '1.0-0' }}</strong>
+            </div>
+            <div>
+              <span>Protected floor</span>
+              <strong class="up">₹{{ (prot.protectedFloorRs || 0) | number: '1.0-0' }}</strong>
+            </div>
+            <div>
+              <span>Month MTD</span>
+              <strong [class.up]="(prot.monthMtdRs || 0) >= 0" [class.down]="(prot.monthMtdRs || 0) < 0">
+                ₹{{ (prot.monthMtdRs || 0) | number: '1.0-0' }}
+              </strong>
+            </div>
+          </div>
+          @if (prot.monthRule) {
+            <p class="hint">{{ prot.monthRule }}</p>
+          }
+        </div>
+      }
+      <div class="funds-card">
+        <h3>By instrument</h3>
+        <p class="hint">Total profit and total loss per book on this window (funded rows replace the 1-lot scan).</p>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Instrument</th>
+                <th>Status</th>
+                <th>Trades</th>
+                <th>Total profit</th>
+                <th>Total loss</th>
+                <th>Net ₹</th>
+                <th>At risk ₹</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (r of instrumentRows(p); track r.id || r.instrumentName) {
+                <tr>
+                  <td>{{ r.instrumentName }}</td>
+                  <td>{{ r.status || (r.sitOut ? 'sit-out' : 'scan') }}</td>
+                  <td>{{ r.trades || 0 }}</td>
+                  <td class="up">₹{{ (r.grossProfitRs || 0) | number: '1.0-0' }}</td>
+                  <td class="down">₹{{ (r.grossLossRs || 0) | number: '1.0-0' }}</td>
+                  <td [class.up]="(r.netRs || 0) >= 0" [class.down]="(r.netRs || 0) < 0">
+                    ₹{{ (r.netRs || 0) | number: '1.0-0' }}
+                  </td>
+                  <td>₹{{ (r.riskRs || 0) | number: '1.0-0' }}</td>
+                </tr>
+              }
+              @if (!instrumentRows(p).length) {
+                <tr>
+                  <td colspan="7">No instrument P&amp;L yet. Run paper.</td>
+                </tr>
+              }
+            </tbody>
+          </table>
         </div>
       </div>
       @if (p.compare; as cmp) {
@@ -253,8 +372,10 @@
                 <th>Vehicle</th>
                 <th>Status</th>
                 <th>Why</th>
-                <th>Today t</th>
-                <th>Today ₹</th>
+                <th>Trades</th>
+                <th>Total profit</th>
+                <th>Total loss</th>
+                <th>Net ₹</th>
               </tr>
             </thead>
             <tbody>
@@ -265,6 +386,8 @@
                   <td>{{ b.status || (b.sitOut ? 'sit-out' : 'scanned') }}</td>
                   <td>{{ b.why || b.error || b.specText || '—' }}</td>
                   <td>{{ b.totals?.trades || 0 }}</td>
+                  <td class="up">₹{{ (b.totals?.grossProfitRs || 0) | number: '1.0-0' }}</td>
+                  <td class="down">₹{{ (b.totals?.grossLossRs || 0) | number: '1.0-0' }}</td>
                   <td>{{ b.totals?.optionNetAfterChargesRs || 0 }}</td>
                 </tr>
               }
@@ -277,6 +400,7 @@
           2% / trade ₹{{ a.riskPerTradeRs | number: '1.0-0' }}
           · 6% / day ₹{{ a.dayRiskRs | number: '1.0-0' }}
           · used ₹{{ a.dayRiskUsedRs | number: '1.0-0' }}
+          · protected now ₹{{ ((a.capitalRs || 0) - (a.dayRiskUsedRs || 0)) | number: '1.0-0' }}
         </p>
         @if (a.taken?.length) {
           <p class="hint">
@@ -423,7 +547,12 @@
         Orders: {{ s.realOrders || s.liveMoney ? 'live Kite' : 'paper marks only' }}
       </p>
       @if (availableFundsRs(); as cash) {
-        <p class="hint">Available funds ₹{{ cash | number: '1.0-0' }}</p>
+        <p class="hint">
+          Available funds ₹{{ cash | number: '1.0-0' }}
+          · protected floor ₹{{ protectedFloorRs() | number: '1.0-0' }}
+          · 2% / trade ₹{{ tradeRiskBudgetRs() | number: '1.0-0' }}
+          · 6% / day ₹{{ dayRiskBudgetRs() | number: '1.0-0' }}
+        </p>
       }
       @if (s.totals) {
         <div class="pnl-split">

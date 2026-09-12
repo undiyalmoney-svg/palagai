@@ -159,6 +159,36 @@ interface PaperResult {
       }>;
     }>;
   };
+  instruments?: Array<{
+    id?: string;
+    instrumentName?: string;
+    sitOut?: boolean;
+    status?: string;
+    trades?: number;
+    wins?: number;
+    losses?: number;
+    grossProfitRs?: number;
+    grossLossRs?: number;
+    netRs?: number;
+    source?: string;
+    riskRs?: number;
+  }>;
+  protection?: {
+    fundsRs?: number;
+    capitalRs?: number;
+    riskPerTradePct?: number;
+    dayRiskPct?: number;
+    riskPerTradeRs?: number;
+    dayRiskRs?: number;
+    dayRiskUsedRs?: number;
+    dayRiskLeftRs?: number;
+    protectedFloorRs?: number;
+    stillProtectedRs?: number;
+    monthMtdRs?: number;
+    monthLocked?: boolean;
+    monthMode?: string | null;
+    monthRule?: string | null;
+  };
 }
 
 interface LiveStatus {
@@ -283,6 +313,111 @@ export class TradeBotComponent implements OnInit, OnDestroy {
       if (n < 0) sum += Math.abs(n);
     }
     return Math.round(sum);
+  }
+
+  protected sizingCapitalRs(): number {
+    return this.availableFundsRs() || Math.max(0, Math.floor(Number(this.capitalRs) || 0));
+  }
+
+  protected tradeRiskBudgetRs(): number {
+    return Math.round(this.sizingCapitalRs() * 0.02);
+  }
+
+  protected dayRiskBudgetRs(): number {
+    return Math.round(this.sizingCapitalRs() * 0.06);
+  }
+
+  protected protectedFloorRs(): number {
+    return Math.max(0, this.sizingCapitalRs() - this.dayRiskBudgetRs());
+  }
+
+  protected protectionOf(p?: PaperResult | null) {
+    if (p?.protection) return p.protection;
+    const capital = Number(p?.capitalRs || p?.allocation?.capitalRs) || this.sizingCapitalRs();
+    const dayRisk = Number(p?.allocation?.dayRiskRs) || Math.round(capital * 0.06);
+    const used = Number(p?.allocation?.dayRiskUsedRs) || 0;
+    const trade = Number(p?.allocation?.riskPerTradeRs) || Math.round(capital * 0.02);
+    const funds = this.availableFundsRs() || Number(p?.kiteFunds?.equityCash || p?.kiteFunds?.capitalRs) || 0;
+    return {
+      fundsRs: funds,
+      capitalRs: capital,
+      riskPerTradePct: 0.02,
+      dayRiskPct: 0.06,
+      riskPerTradeRs: trade,
+      dayRiskRs: dayRisk,
+      dayRiskUsedRs: used,
+      dayRiskLeftRs: Math.max(0, dayRisk - used),
+      protectedFloorRs: Math.max(0, capital - dayRisk),
+      stillProtectedRs: Math.max(0, capital - used),
+      monthMtdRs: p?.month?.mtdRs || 0,
+      monthLocked: !!p?.month?.locked,
+      monthMode: p?.month?.mode || null,
+      monthRule: p?.month?.rule || null,
+    };
+  }
+
+  protected instrumentRows(p: PaperResult) {
+    if (p.instruments?.length) return p.instruments;
+    const rows = new Map<
+      string,
+      {
+        id: string;
+        instrumentName: string;
+        sitOut?: boolean;
+        status?: string;
+        trades: number;
+        wins: number;
+        losses: number;
+        grossProfitRs: number;
+        grossLossRs: number;
+        netRs: number;
+        riskRs: number;
+      }
+    >();
+    for (const b of p.books || []) {
+      const tot = b.totals;
+      rows.set(b.id || b.label || '', {
+        id: b.id || b.label || '',
+        instrumentName: b.label || b.id || '',
+        sitOut: b.sitOut,
+        status: b.status,
+        trades: tot?.trades || 0,
+        wins: tot?.wins || 0,
+        losses: tot?.losses || 0,
+        grossProfitRs: tot?.grossProfitRs || 0,
+        grossLossRs: tot?.grossLossRs || 0,
+        netRs: tot?.netRs ?? tot?.optionNetAfterChargesRs ?? 0,
+        riskRs: 0,
+      });
+    }
+    for (const t of p.trades || []) {
+      const key = t.instrumentName || 'book';
+      const n = Number(t.netOptionPnlRs ?? t.optionPnlRs) || 0;
+      const cur = rows.get(key) || {
+        id: key,
+        instrumentName: key,
+        trades: 0,
+        wins: 0,
+        losses: 0,
+        grossProfitRs: 0,
+        grossLossRs: 0,
+        netRs: 0,
+        riskRs: 0,
+        status: 'funded',
+      };
+      cur.trades += 1;
+      cur.netRs += n;
+      if (n > 0) {
+        cur.wins += 1;
+        cur.grossProfitRs += n;
+      } else if (n < 0) {
+        cur.losses += 1;
+        cur.grossLossRs += Math.abs(n);
+      }
+      cur.status = 'funded';
+      rows.set(key, cur);
+    }
+    return [...rows.values()];
   }
 
   protected get kiteFunds() {
