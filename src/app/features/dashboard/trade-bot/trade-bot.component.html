@@ -33,9 +33,9 @@
       <em>6% of funds</em>
     </div>
     <div class="money-cell">
-      <span>2% / trade</span>
-      <strong>₹{{ tradeRiskBudgetRs() | number: '1.0-0' }}</strong>
-      <em>Max one setup can lose</em>
+      <span>Lots</span>
+      <strong>{{ systemLots() }}</strong>
+      <em>From funds · ₹40,000 each</em>
     </div>
   </div>
   <div class="funds-actions">
@@ -62,19 +62,6 @@
         <span>To date</span>
         <input type="date" [(ngModel)]="toDate" [disabled]="controlsLocked()" />
       </label>
-      <label class="field lots">
-        <span>Lots</span>
-        <input
-          type="number"
-          min="1"
-          step="1"
-          [ngModel]="systemLots()"
-          [ngModelOptions]="{ standalone: true }"
-          readonly
-          tabindex="-1"
-        />
-        <small>From funds · ₹40,000 per lot</small>
-      </label>
     </div>
 
     <div class="fund-picks">
@@ -88,7 +75,7 @@
         />
         <span>
           <strong>Actual fund</strong>
-          <small>Kite available. Live always uses this.</small>
+          <small>Kite available. Live always uses this. Lots follow this.</small>
           <input
             type="number"
             min="0"
@@ -110,7 +97,7 @@
         />
         <span>
           <strong>Mine</strong>
-          <small>Your amount. Paper only.</small>
+          <small>Your amount. Paper only. Lots follow this.</small>
           <input
             type="number"
             min="1000"

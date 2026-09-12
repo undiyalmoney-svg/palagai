@@ -7,7 +7,6 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { firstValueFrom, timeout } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 import { KiteSessionService } from '../../../core/kite/kite-session.service';
-import { LotsPreferenceService } from '../../../core/services/lots-preference.service';
 import { CapitalPreferenceService } from '../../../core/services/capital-preference.service';
 import { KiteFundsService } from '../../../core/services/kite-funds.service';
 import { DEFAULT_TRADING_CAPITAL_RS } from '../../../core/paper-desk/capital-plan.util';
@@ -233,7 +232,6 @@ function istToday(): string {
 export class TradeBotComponent implements OnInit, OnDestroy {
   private readonly http = inject(HttpClient);
   private readonly kiteSession = inject(KiteSessionService);
-  private readonly lotsPreference = inject(LotsPreferenceService);
   private readonly capitalPreference = inject(CapitalPreferenceService);
   protected readonly kiteFundsSvc = inject(KiteFundsService);
   private readonly uiDialog = inject(UiDialogService);
@@ -246,7 +244,6 @@ export class TradeBotComponent implements OnInit, OnDestroy {
   protected today = false;
   protected liveMoney = false;
   protected fundSource: 'actual' | 'mine' = 'actual';
-  protected lots = 1;
   protected capitalRs = DEFAULT_TRADING_CAPITAL_RS;
 
   protected readonly busy = signal(false);
@@ -263,7 +260,6 @@ export class TradeBotComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     const uid = this.auth.currentUser()?.id;
     if (uid) this.kiteSession.bindSiteUser(uid);
-    this.lots = this.lotsPreference.get();
     this.capitalRs = this.capitalPreference.get();
     void this.refreshLiveStatus();
     void this.refreshKiteFunds();
@@ -325,12 +321,6 @@ export class TradeBotComponent implements OnInit, OnDestroy {
 
   protected actualFundRs(): number {
     return this.availableFundsRs() || 0;
-  }
-
-  protected onLotsChange(): void {
-    const n = Math.max(1, Math.floor(Number(this.lots)) || 1);
-    this.lots = n;
-    this.lotsPreference.set(n);
   }
 
   protected onCapitalChange(): void {
