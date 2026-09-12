@@ -13,6 +13,11 @@
       } @else {
         <span class="pg-badge pg-badge-neutral">PAPER</span>
       }
+      @if (kiteFunds; as f) {
+        <span class="funds-hero" title="Kite equity available">
+          Funds ₹{{ (f.equityCash || f.capitalRs || 0) | number: '1.0-0' }}
+        </span>
+      }
     </div>
   </header>
 
@@ -49,10 +54,13 @@
         />
       </label>
     </div>
-    <div class="funds-card">
+    <div class="funds-card" data-testid="kite-funds">
       <div class="funds-head">
         <h3>Available funds</h3>
-        <button mat-stroked-button type="button" [disabled]="busy()" (click)="onRefreshFunds()">
+        <button mat-stroked-button type="button" [disabled]="busy() || fundsBusy" (click)="onRefreshFunds()">
+          @if (fundsBusy) {
+            <mat-spinner diameter="16" />
+          }
           Refresh
         </button>
       </div>
@@ -61,7 +69,12 @@
       }
       @if (kiteFunds; as f) {
         <p class="pnl-figure">₹{{ (f.equityCash || f.capitalRs || 0) | number: '1.0-0' }}</p>
-        <p class="hint">Equity available (Kite live balance / cash)</p>
+        <p class="hint">
+          Equity available from Kite (live balance / cash). Paper sizes from this number.
+          @if (f.fetchedAt) {
+            · {{ f.fetchedAt | date: 'h:mm a' }}
+          }
+        </p>
         <div class="funds-grid">
           <div>
             <span>Equity net</span>
@@ -76,6 +89,8 @@
             <strong>₹{{ (f.commodityNet || 0) | number: '1.0-0' }}</strong>
           </div>
         </div>
+      } @else if (fundsBusy) {
+        <p class="hint">Fetching Kite available funds…</p>
       } @else if (!kiteFundsError) {
         <p class="hint">Get Token, then Refresh — paper sizes from Kite available funds. Fallback ₹ is used only if Kite is missing.</p>
       }

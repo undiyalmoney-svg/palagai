@@ -283,6 +283,27 @@
   white-space: nowrap;
 }
 
+.funds-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.4rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  border: 1px solid #b7ebd0;
+  background: var(--pg-bull-soft);
+  color: var(--pg-bull-deep);
+  white-space: nowrap;
+}
+
+.funds-chip.muted {
+  border-color: var(--pg-line);
+  background: #fff;
+  color: var(--pg-muted);
+  font-weight: 600;
+}
+
 .live-badge {
   display: inline-flex;
   align-items: center;

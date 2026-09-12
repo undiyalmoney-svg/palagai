@@ -61,6 +61,15 @@
           <app-pg-icon name="calendar" [size]="15" />
           <span>{{ clockLabel() }}</span>
         </div>
+        @if (kiteFunds.funds(); as f) {
+          <span class="funds-chip" title="Kite equity available">
+            Funds ₹{{ (f.equityCash || f.capitalRs || 0) | number: '1.0-0' }}
+          </span>
+        } @else if (kiteFunds.busy()) {
+          <span class="funds-chip muted">Funds…</span>
+        } @else if (kiteFunds.error()) {
+          <span class="funds-chip muted" [title]="kiteFunds.error()">Funds —</span>
+        }
         <span class="live-badge" [attr.data-tone]="liveBadge().tone">
           <span class="dot" aria-hidden="true"></span>
           {{ liveBadge().label }}

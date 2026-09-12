@@ -1,5 +1,5 @@
 import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
-import { DecimalPipe } from '@angular/common';
+import { DatePipe, DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { MatButtonModule } from '@angular/material/button';
@@ -9,6 +9,7 @@ import { environment } from '../../../../environments/environment';
 import { KiteSessionService } from '../../../core/kite/kite-session.service';
 import { LotsPreferenceService } from '../../../core/services/lots-preference.service';
 import { CapitalPreferenceService } from '../../../core/services/capital-preference.service';
+import { KiteFundsService } from '../../../core/services/kite-funds.service';
 import { DEFAULT_TRADING_CAPITAL_RS } from '../../../core/paper-desk/capital-plan.util';
 import { UiDialogService } from '../../../shared/ui/dialog/ui-dialog.service';
 import { AuthService } from '../../../core/auth/auth.service';
@@ -270,7 +271,7 @@ function istToday(): string {
 @Component({
   selector: 'app-trade-bot',
   standalone: true,
-  imports: [FormsModule, DecimalPipe, MatButtonModule, MatProgressSpinnerModule],
+  imports: [FormsModule, DecimalPipe, DatePipe, MatButtonModule, MatProgressSpinnerModule],
   templateUrl: './trade-bot.component.html',
   styleUrl: './trade-bot.component.css',
 })
@@ -279,6 +280,7 @@ export class TradeBotComponent implements OnInit, OnDestroy {
   private readonly kiteSession = inject(KiteSessionService);
   private readonly lotsPreference = inject(LotsPreferenceService);
   private readonly capitalPreference = inject(CapitalPreferenceService);
+  protected readonly kiteFundsSvc = inject(KiteFundsService);
   private readonly uiDialog = inject(UiDialogService);
   private readonly auth = inject(AuthService);
   private readonly liveApiBase =
@@ -290,9 +292,6 @@ export class TradeBotComponent implements OnInit, OnDestroy {
   protected liveMoney = false;
   protected lots = 1;
   protected capitalRs = DEFAULT_TRADING_CAPITAL_RS;
-  protected kiteCash: number | null = null;
-  protected kiteFunds: PaperResult['kiteFunds'] | null = null;
-  protected kiteFundsError = '';
   protected optionSymbol = '';
   protected optionAtm = false;
   protected optionHistorical = true;
@@ -393,9 +392,21 @@ export class TradeBotComponent implements OnInit, OnDestroy {
     return Math.round(sum);
   }
 
+  protected get kiteFunds() {
+    return this.kiteFundsSvc.funds();
+  }
+
+  protected get kiteFundsError() {
+    return this.kiteFundsSvc.error();
+  }
+
+  protected get fundsBusy() {
+    return this.kiteFundsSvc.busy();
+  }
+
   protected availableFundsRs(): number | null {
-    const n = Math.floor(Number(this.kiteFunds?.equityCash || this.kiteFunds?.capitalRs || this.kiteCash) || 0);
-    return n > 0 ? n : null;
+    const n = this.kiteFundsSvc.equityAvailable();
+    return n != null && n > 0 ? n : null;
   }
 
   protected paperMark(p: PaperResult): number {
@@ -461,7 +472,6 @@ export class TradeBotComponent implements OnInit, OnDestroy {
       });
       if (!ok) return;
     }
-    await this.pushToken();
     await this.refreshKiteFunds();
 
     const body: {
@@ -503,10 +513,9 @@ export class TradeBotComponent implements OnInit, OnDestroy {
         this.paper.set(res);
         this.live.set(null);
         this.clearPoll();
-        if (res.kiteFunds && (res.kiteFunds.capitalRs || res.kiteFunds.equityCash)) {
-          this.kiteFunds = res.kiteFunds;
-          const n = Math.floor(Number(res.kiteFunds.capitalRs || res.kiteFunds.equityCash) || 0);
-          this.kiteCash = n > 0 ? n : this.kiteCash;
+        if (res.kiteFunds && (res.kiteFunds.capitalRs || res.kiteFunds.equityCash != null)) {
+          this.kiteFundsSvc.apply(res.kiteFunds);
+          this.syncCapitalFromFunds();
         }
       }
     } catch (err) {
@@ -603,50 +612,13 @@ export class TradeBotComponent implements OnInit, OnDestroy {
   }
 
   private async refreshKiteFunds(): Promise<void> {
-    const kite = this.kiteSession.getAuthorizationHeader();
-    const headers: Record<string, string> = kite ? { 'X-Kite-Authorization': kite } : {};
-    this.kiteFundsError = '';
-    try {
-      const res = await firstValueFrom(
-        this.http.get<{
-          capitalRs?: number;
-          equityCash?: number;
-          equityNet?: number;
-          commodityCash?: number;
-          commodityNet?: number;
-          source?: string;
-          error?: string;
-          message?: string;
-        }>(`${this.liveApiBase}/funds`, { headers }),
-      );
-      const n = Math.floor(Number(res.capitalRs || res.equityCash) || 0);
-      this.kiteCash = n > 0 ? n : null;
-      this.kiteFunds = n > 0 || res.equityNet != null ? res : null;
-      if (n > 0) {
-        this.capitalRs = n;
-        this.capitalPreference.set(n);
-      }
-      if (!n && res.message) this.kiteFundsError = res.message;
-    } catch (err) {
-      this.kiteCash = null;
-      this.kiteFunds = null;
-      this.kiteFundsError = this.fmtErr(err);
-    }
+    await this.kiteFundsSvc.refresh();
+    this.syncCapitalFromFunds();
   }
 
-  private async pushToken(): Promise<void> {
-    const data = this.kiteSession.getSession()?.data;
-    if (!data?.api_key || !data.access_token) return;
-    try {
-      await firstValueFrom(
-        this.http.put(`${this.liveApiBase}/auth`, {
-          apiKey: data.api_key,
-          accessToken: data.access_token,
-        }),
-      );
-    } catch {
-      /* server may already have a pushed token */
-    }
+  private syncCapitalFromFunds(): void {
+    const n = this.kiteFundsSvc.equityAvailable();
+    if (n != null && n > 0) this.capitalRs = n;
   }
 
   private async refreshLiveStatus(): Promise<void> {

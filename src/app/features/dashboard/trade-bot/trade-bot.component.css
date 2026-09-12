@@ -11,6 +11,18 @@
   flex-wrap: wrap;
   gap: 0.45rem;
   justify-content: flex-end;
+  align-items: center;
+}
+
+.trade-bot .funds-hero {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.28rem 0.7rem;
+  border-radius: 999px;
+  background: #ecfdf3;
+  color: #166534;
+  font-weight: 700;
+  font-size: 0.88rem;
 }
 
 .trade-bot .panel {
