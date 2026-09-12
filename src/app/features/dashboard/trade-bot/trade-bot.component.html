@@ -4,7 +4,7 @@
       <p class="pg-eyebrow">One engine</p>
       <h1>Trade Bot</h1>
       <p class="lede pg-lede">
-        Pick a date, Get Token, then Run paper. After the opening range the desk takes <strong>one play</strong> (how desks actually bank daily P&amp;L — not check-all): VWAP-aligned ORB, fade a failed break, or VWAP pullback. Skip tiny ranges, skip &gt;1% gaps, skip Tuesday. Always scans Nifty, Bank, Crude Mini. Live is the same path with Kite orders.
+        Pick a date, Get Token, then Run paper. <strong>Red days are allowed. A red month is not.</strong> After the month is green, today’s stop cannot exceed month P&amp;L. If the month is red, only a small recovery trade. Flat after green locks. One OR play (VWAP ORB / fade / pullback). Live is the same path with Kite orders.
       </p>
     </div>
     <div class="hero-meta">
@@ -157,6 +157,20 @@
           <strong>{{ p.totals?.trades || 0 }}</strong>
         </div>
       </div>
+      @if (p.month; as m) {
+        <div class="funds-card">
+          <h3>Month {{ m.key }}</h3>
+          <p class="pnl-figure" [class.up]="(m.mtdRs || 0) >= 0" [class.down]="(m.mtdRs || 0) < 0">
+            MTD ₹{{ (m.mtdRs || 0) | number: '1.0-0' }}
+          </p>
+          <p class="hint">
+            {{ m.mode }} · red days allowed · red month not accepted
+            @if (m.locked) {
+              · locked at flat
+            }
+          </p>
+        </div>
+      }
       @if (availableFundsRs(); as cash) {
         <p class="hint">
           Available funds ₹{{ cash | number: '1.0-0' }}

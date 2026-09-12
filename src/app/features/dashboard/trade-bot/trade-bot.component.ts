@@ -58,6 +58,15 @@ interface PaperResult {
   note?: string;
   capitalRs?: number;
   maxLots?: number;
+  month?: {
+    key?: string;
+    fromDate?: string;
+    mtdRs?: number;
+    hadTrade?: boolean;
+    locked?: boolean;
+    mode?: string;
+    rule?: string;
+  };
   kiteFunds?: {
     source?: string;
     equityCash?: number;
