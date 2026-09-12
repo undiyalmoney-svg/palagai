@@ -4,8 +4,7 @@
       <p class="pg-eyebrow">One engine</p>
       <h1>Trade Bot</h1>
       <p class="lede pg-lede">
-        Pick a date, keep Live money off, Get Token, then <strong>Run paper</strong>.
-        Pick a date, Get Token, then Run paper. That print is the shadow of live: same spec, same 5m path. Live money is the same desk with Kite ATM orders. Start live at the open if you want fills to match — it will not chase a signal that already printed.
+        Pick a date, Get Token, then Run paper. Paper uses <strong>Kite funds</strong> as capital when the token is live. It sits out unless the last sessions of the chosen spec have no stop-outs — profit or no trade. Live is the same desk with Kite orders.
       </p>
     </div>
     <div class="hero-meta">
@@ -28,11 +27,11 @@
         <input type="date" [(ngModel)]="toDate" [disabled]="today || busy()" />
       </label>
       <label class="field lots">
-        <span>Capital ₹</span>
+        <span>Fallback ₹</span>
         <input
           type="number"
-          min="10000"
-          step="10000"
+          min="1000"
+          step="1000"
           [(ngModel)]="capitalRs"
           (ngModelChange)="onCapitalChange()"
           [disabled]="busy()"
@@ -50,6 +49,9 @@
         />
       </label>
     </div>
+    @if (kiteCash) {
+      <p class="hint">Kite funds ₹{{ kiteCash | number: '1.0-0' }} — paper sizes from this. Fallback ₹ is used only if Kite funds are missing.</p>
+    }
 
     <div class="actions range-presets">
       <button mat-stroked-button type="button" [disabled]="busy() || today" (click)="setRangeDays(30)">Last 30 days</button>
@@ -111,7 +113,7 @@
       </p>
       <p>
         {{ p.fromDate }} → {{ p.toDate }}
-        · capital ₹{{ (p.capitalRs || p.allocation?.capitalRs || 0) | number: '1.0-0' }}
+        · capital ₹{{ (p.capitalRs || p.allocation?.capitalRs || 0) | number: '1.0-0' }}{{ p.kiteFunds?.capitalRs ? ' (Kite)' : '' }}
         · {{ p.strategy || p.engine || 'paper' }}
         · {{ p.totals?.trades || 0 }} funded trades
         · {{ p.totals?.wins || 0 }} won / {{ p.totals?.losses || 0 }} lost

@@ -55,6 +55,14 @@ interface PaperResult {
   note?: string;
   capitalRs?: number;
   maxLots?: number;
+  kiteFunds?: {
+    source?: string;
+    equityCash?: number;
+    equityNet?: number;
+    commodityCash?: number;
+    capitalRs?: number;
+    error?: string;
+  };
   scanTotals?: PaperTotals;
   allocation?: {
     capitalRs?: number;
@@ -255,6 +263,7 @@ export class TradeBotComponent implements OnInit, OnDestroy {
   protected liveMoney = false;
   protected lots = 1;
   protected capitalRs = DEFAULT_TRADING_CAPITAL_RS;
+  protected kiteCash: number | null = null;
   protected optionSymbol = '';
   protected optionAtm = false;
   protected optionHistorical = true;
@@ -286,6 +295,7 @@ export class TradeBotComponent implements OnInit, OnDestroy {
     this.capitalRs = this.capitalPreference.get();
     if (this.today) this.applyToday();
     void this.refreshLiveStatus();
+    void this.refreshKiteFunds();
   }
 
   ngOnDestroy(): void {
@@ -383,6 +393,7 @@ export class TradeBotComponent implements OnInit, OnDestroy {
       if (!ok) return;
     }
     await this.pushToken();
+    await this.refreshKiteFunds();
 
     const body: {
       fromDate: string;
@@ -514,6 +525,27 @@ export class TradeBotComponent implements OnInit, OnDestroy {
       this.optionError.set(this.fmtErr(err));
     } finally {
       this.optionBusy.set(false);
+    }
+  }
+
+  private async refreshKiteFunds(): Promise<void> {
+    const kite = this.kiteSession.getAuthorizationHeader();
+    const headers: Record<string, string> = kite ? { 'X-Kite-Authorization': kite } : {};
+    try {
+      const res = await firstValueFrom(
+        this.http.get<{ capitalRs?: number; equityCash?: number; error?: string }>(
+          `${this.liveApiBase}/funds`,
+          { headers },
+        ),
+      );
+      const n = Math.floor(Number(res.capitalRs || res.equityCash) || 0);
+      this.kiteCash = n > 0 ? n : null;
+      if (n > 0) {
+        this.capitalRs = n;
+        this.capitalPreference.set(n);
+      }
+    } catch {
+      this.kiteCash = null;
     }
   }
 
