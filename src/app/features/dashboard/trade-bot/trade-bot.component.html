@@ -205,12 +205,14 @@
           }
         </p>
       }
-      @if (p.train?.totals) {
-        <p class="hint">
-          Search window {{ p.train.fromDate }} → {{ p.train.toDate }}
-          · {{ p.train.totals.trades || 0 }} train trades
-          · ₹{{ (p.train.totals.optionNetAfterChargesRs || 0) | number: '1.0-0' }}
-        </p>
+      @if (p.train; as tr) {
+        @if (tr.totals; as tt) {
+          <p class="hint">
+            Search window {{ tr.fromDate }} → {{ tr.toDate }}
+            · {{ tt.trades || 0 }} train trades
+            · ₹{{ (tt.optionNetAfterChargesRs || 0) | number: '1.0-0' }}
+          </p>
+        }
       }
       @if (p.note) {
         <p class="hint">{{ p.note }}</p>
@@ -270,8 +272,10 @@
         <h4>Stocks (NSE daily, Nifty 100)</h4>
         <p class="hint">
           Scanned {{ st.scanned || 0 }} names on free NSE history. Inside-day breakout, walk-forward.
-          @if (st.taken?.length) {
-            Traded today: {{ st.taken.join(', ') }}.
+          @if (st.taken; as taken) {
+            @if (taken.length) {
+              Traded today: {{ taken.join(', ') }}.
+            }
           }
         </p>
         <div class="table-wrap">
