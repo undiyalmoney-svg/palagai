@@ -33,9 +33,9 @@
       <em>6% of funds</em>
     </div>
     <div class="money-cell">
-      <span>Lots</span>
-      <strong>{{ systemLots() }}</strong>
-      <em>From funds · ₹40,000 each</em>
+      <span>2% / trade</span>
+      <strong>₹{{ tradeRiskBudgetRs() | number: '1.0-0' }}</strong>
+      <em>Max one setup can lose</em>
     </div>
   </div>
   <div class="funds-actions">
@@ -75,7 +75,7 @@
         />
         <span>
           <strong>Actual fund</strong>
-          <small>Kite available. Live always uses this. Lots follow this.</small>
+          <small>Kite available. Live always uses this.</small>
           <input
             type="number"
             min="0"
@@ -97,7 +97,7 @@
         />
         <span>
           <strong>Mine</strong>
-          <small>Your amount. Paper only. Lots follow this.</small>
+          <small>Your amount. Paper only.</small>
           <input
             type="number"
             min="1000"
