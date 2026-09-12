@@ -53,6 +53,14 @@ interface PaperResult {
   spec?: EeWaitSpec | Record<string, unknown>;
   specText?: string;
   train?: { fromDate?: string; toDate?: string; totals?: PaperTotals };
+  books?: Array<{
+    id?: string;
+    label?: string;
+    sitOut?: boolean;
+    specText?: string;
+    totals?: PaperTotals;
+    error?: string;
+  }>;
 }
 
 interface OptionBar {
@@ -345,7 +353,7 @@ export class TradeBotComponent implements OnInit, OnDestroy {
       realOrders: this.liveMoney,
       lots: this.lots,
       niftyLots: this.lots,
-      engine: 'or-failure',
+      engine: 'paper-desk',
       universe: this.researchUniverse,
     };
     const kite = this.kiteSession.getAuthorizationHeader();

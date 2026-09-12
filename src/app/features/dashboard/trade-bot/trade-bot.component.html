@@ -5,7 +5,7 @@
       <h1>Trade Bot</h1>
       <p class="lede pg-lede">
         Pick a date, keep Live money off, Get Token, then <strong>Run paper</strong>.
-        Paper <strong>searches a new spec</strong> on the days before From (opening-range failure fade — not VWAP impulse, Genie, Trap, S/R, or Find), then shows how that winner would have traded on the dates you picked.
+        Paper searches a desk on the days before From: <strong>Nifty 50</strong>, <strong>Bank Nifty</strong>, <strong>Crude Oil Mini</strong> (Kite 5m) and liquid <strong>Nifty 100 stocks</strong> (free NSE daily). Each book only trades if walk-forward has an edge — otherwise it sits out.
       </p>
     </div>
     <div class="hero-meta">
@@ -104,8 +104,13 @@
         · {{ p.totals?.trades || 0 }} trades
         · {{ p.totals?.wins || 0 }} won / {{ p.totals?.losses || 0 }} lost
       </p>
-      @if (p.specText) {
-        <p class="hint">Winner: {{ p.specText }}</p>
+      @if (p.books?.length) {
+        <p class="hint">
+          @for (b of p.books; track b.id || b.label) {
+            {{ b.label }}: {{ b.sitOut ? 'sit-out' : ((b.totals?.trades || 0) + ' t ₹' + (b.totals?.optionNetAfterChargesRs || 0)) }}
+            @if (!$last) { · }
+          }
+        </p>
       }
       @if (p.train?.totals) {
         <p class="hint">
