@@ -304,14 +304,14 @@ export class TradeBotComponent implements OnInit, OnDestroy {
       const ok = await this.uiDialog.confirm({
         title: 'Place live Kite orders?',
         message:
-          'Paper and live use the same engine. Live money is on, so this run will send real orders when the strategy fires.',
+          'Paper and live use the same Genie strategy. Live money is on, so this run will send real orders when the strategy fires.',
         confirmLabel: 'Start live',
         cancelLabel: 'Cancel',
         tone: 'danger',
       });
       if (!ok) return;
-      await this.pushToken();
     }
+    await this.pushToken();
 
     const found = this.research()?.best?.spec;
     const body: {
