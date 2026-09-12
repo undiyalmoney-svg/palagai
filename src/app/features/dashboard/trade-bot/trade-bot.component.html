@@ -226,10 +226,10 @@
             <tr>
               <th>Entry time</th>
               <th>Exit time</th>
-              <th>Instrument</th>
-              <th>Entry</th>
-              <th>Exit</th>
+              <th>Option</th>
               <th>Side</th>
+              <th>Entry price</th>
+              <th>Exit price</th>
               <th>Lots</th>
               <th>₹</th>
               <th>Why</th>
@@ -241,9 +241,9 @@
                 <td>{{ formatIst(t.entryTime) }}</td>
                 <td>{{ isOpenTrade(t) ? 'OPEN' : formatIst(t.exitTime) }}</td>
                 <td>{{ selectedInstrument(t) }}</td>
+                <td>{{ tradeSide(t) }}</td>
                 <td>{{ formatPrice(t.entryPrice ?? t.indexEntry) }}</td>
                 <td>{{ isOpenTrade(t) ? '—' : formatPrice(t.exitPrice ?? t.indexExit) }}</td>
-                <td>{{ tradeSide(t) }}</td>
                 <td>{{ t.lots || 1 }}</td>
                 <td [class.up]="(t.netOptionPnlRs ?? t.optionPnlRs ?? 0) >= 0" [class.down]="(t.netOptionPnlRs ?? t.optionPnlRs ?? 0) < 0">
                   ₹{{ (t.netOptionPnlRs ?? t.optionPnlRs ?? 0) | number: '1.0-0' }}

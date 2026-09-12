@@ -18,6 +18,7 @@ interface PaperTrade {
   instrumentName?: string;
   selectedInstrument?: string;
   side?: string;
+  sideLabel?: string;
   direction?: string;
   entryTime?: string;
   exitTime?: string;
@@ -469,9 +470,19 @@ export class TradeBotComponent implements OnInit, OnDestroy {
     void this.refreshKiteFunds();
   }
 
-  protected tradeSide(t: PaperTrade): string {
+  protected optionKind(t: PaperTrade): 'CE' | 'PE' | '' {
     const dir = String(t.direction || '').toUpperCase();
-    if (dir === 'CE' || dir === 'PE') return `Buy ${dir}`;
+    if (dir === 'CE' || dir === 'PE') return dir;
+    const blob = `${t.selectedInstrument || ''} ${t.optionSymbol || ''} ${t.option?.tradingSymbol || ''}`.toUpperCase();
+    if (/\bCE\b/.test(blob) || /CE$/.test(blob.trim())) return 'CE';
+    if (/\bPE\b/.test(blob) || /PE$/.test(blob.trim())) return 'PE';
+    return '';
+  }
+
+  protected tradeSide(t: PaperTrade): string {
+    if (t.sideLabel) return t.sideLabel;
+    const kind = this.optionKind(t);
+    if (kind) return `${kind} BUY`;
     return t.side || t.direction || '';
   }
 
@@ -480,22 +491,31 @@ export class TradeBotComponent implements OnInit, OnDestroy {
   }
 
   protected selectedInstrument(t: PaperTrade): string {
-    return (
+    const raw =
       t.selectedInstrument ||
       t.option?.tradingSymbol ||
       t.option?.symbol ||
       t.optionSymbol ||
-      t.instrumentName ||
-      '—'
-    );
+      '';
+    const cleaned = String(raw)
+      .replace(/\s*\(index×lot\)\s*$/i, '')
+      .trim();
+    if (cleaned) return cleaned;
+    const kind = this.optionKind(t);
+    if (t.instrumentName && kind) return `${t.instrumentName} ATM ${kind}`;
+    return t.instrumentName || '—';
   }
 
   protected formatIst(value?: string | null): string {
     if (!value) return '—';
-    const m = String(value).match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}:\d{2})/);
+    const m = String(value).match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
     if (!m) return String(value);
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    return `${Number(m[3])} ${months[Number(m[2]) - 1]} ${m[1]} ${m[4]} IST`;
+    let hour = Number(m[4]);
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    hour = hour % 12;
+    if (hour === 0) hour = 12;
+    return `${Number(m[3])} ${months[Number(m[2]) - 1]} ${m[1]}, ${hour}:${m[5]} ${ampm}`;
   }
 
   protected formatPrice(value?: number | null): string {
