@@ -225,7 +225,7 @@ export class TradeBotComponent implements OnInit, OnDestroy {
 
   protected fromDate = istToday();
   protected toDate = istToday();
-  protected today = true;
+  protected today = false;
   protected liveMoney = false;
   protected lots = 1;
   protected capitalRs = DEFAULT_TRADING_CAPITAL_RS;
@@ -245,6 +245,7 @@ export class TradeBotComponent implements OnInit, OnDestroy {
     if (uid) this.kiteSession.bindSiteUser(uid);
     this.lots = this.lotsPreference.get();
     this.capitalRs = this.capitalPreference.get();
+    this.setRangeDays(60);
     if (this.today) this.applyToday();
     void this.refreshLiveStatus();
     void this.refreshKiteFunds();
@@ -288,6 +289,13 @@ export class TradeBotComponent implements OnInit, OnDestroy {
     const t = new Date(`${this.toDate}T00:00:00+05:30`);
     t.setDate(t.getDate() - Math.max(1, days));
     this.fromDate = t.toISOString().slice(0, 10);
+  }
+
+  protected async runTwoMonthBatch(): Promise<void> {
+    this.today = false;
+    this.liveMoney = false;
+    this.setRangeDays(60);
+    await this.run();
   }
 
   protected paperNet(p: PaperResult): number {

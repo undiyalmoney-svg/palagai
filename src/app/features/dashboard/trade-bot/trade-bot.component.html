@@ -3,7 +3,9 @@
     <div class="hero-copy">
       <p class="pg-eyebrow">One engine</p>
       <h1>Trade Bot</h1>
-      <p class="lede pg-lede">After 09:30, paper and live sell the same ATM straddle. This page is the money.</p>
+      <p class="lede pg-lede">
+        The desk is the short ATM straddle: 1 lot Nifty + 1 lot Bank after 09:30. Run 2 months to total that profit and loss. Trend days can still lose.
+      </p>
     </div>
     <div class="hero-meta">
       @if (liveMoney) {
@@ -85,9 +87,11 @@
     </div>
 
     <div class="actions range-presets">
+      <button mat-flat-button color="primary" type="button" [disabled]="busy()" (click)="runTwoMonthBatch()">
+        2 months · short straddle
+      </button>
       <button mat-stroked-button type="button" [disabled]="busy() || today" (click)="setRangeDays(30)">Last 30 days</button>
-      <button mat-stroked-button type="button" [disabled]="busy() || today" (click)="setRangeDays(90)">Last 90 days</button>
-      <button mat-stroked-button type="button" [disabled]="busy() || today" (click)="setRangeDays(365)">Last 1 year</button>
+      <button mat-stroked-button type="button" [disabled]="busy() || today" (click)="setRangeDays(60)">Last 60 days</button>
     </div>
 
     <div class="checks">
