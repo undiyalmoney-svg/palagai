@@ -83,6 +83,12 @@ export const routes: Routes = [
         component: TradeBotComponent,
       },
       {
+        path: 'crude-bot',
+        canActivate: [moduleGuard('auto')],
+        data: { desk: 'crude' },
+        component: TradeBotComponent,
+      },
+      {
         path: 'order-test',
         canActivate: [moduleGuard('test')],
         component: OrderTestComponent,

@@ -1,9 +1,9 @@
 <section class="trade-bot pg-page">
   <header class="hero pg-page-hero">
     <div class="hero-copy">
-      <h1>Trade Bot</h1>
+      <h1>{{ deskTitle() }}</h1>
       <p class="lede pg-lede">
-        Only Nifty 50 and Bank Nifty. Crude and stocks stay off. This is S/R wall-break: with-trend, profit lock, day ±₹3,500. Paper ₹ is index × lot. Live buys one ATM CE or PE — it does not sell both sides.
+        {{ deskLede() }}
       </p>
     </div>
     <div class="hero-meta">
@@ -153,7 +153,7 @@
       <aside class="live-assistant" data-testid="live-assistant">
         <h3>Live assistant</h3>
         @if (!liveHelp().length) {
-          <p class="hint">Get Token pushes the Kite token to the server automatically. Start live and Refresh funds do the same. There is no Push Token button on this page.</p>
+          <p class="hint">{{ isCrudeDesk() ? 'Get Token pushes the Kite token automatically. Start live and Refresh funds do the same. Crude Bot live is MCX CRUDEOILM futures only.' : 'Get Token pushes the Kite token to the server automatically. Start live and Refresh funds do the same. There is no Push Token button on this page.' }}</p>
         }
         @for (row of liveHelp(); track $index) {
           <p [class.ok]="row.ok" [class.err]="!row.ok">{{ row.detail }}</p>
@@ -241,9 +241,7 @@
       }
 
       <h3>Trades</h3>
-      <p class="hint">
-        Yes — every fill has a protective SL. Paper uses the same option-premium trigger Live rests on Kite (SL ₹). Hide extra columns if the table is wide; scroll sideways for the rest.
-      </p>
+      <p class="hint">{{ tradesHint() }}</p>
       <div class="col-toggles" data-testid="trade-bot-col-toggles">
         @for (col of tradeCols; track col.id) {
           <label class="col-toggle">

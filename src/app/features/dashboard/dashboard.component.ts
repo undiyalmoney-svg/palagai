@@ -65,7 +65,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   protected readonly clockLabel = signal('');
   protected readonly pageTitle = signal('Palagai');
-  protected readonly pageSubtitle = signal('Trade Bot, Token, and Test.');
+  protected readonly pageSubtitle = signal('Trade Bot, Crude Bot, Token, and Test.');
   protected readonly sidebarOpen = signal(true);
   protected readonly profileOpen = signal(false);
 
@@ -75,6 +75,13 @@ export class DashboardComponent implements OnInit, OnDestroy {
       shortLabel: 'Bot',
       route: '/dashboard/trade-bot',
       icon: 'bot',
+      module: 'auto',
+    },
+    {
+      label: 'Crude Bot',
+      shortLabel: 'Crude',
+      route: '/dashboard/crude-bot',
+      icon: 'droplet',
       module: 'auto',
     },
     {
@@ -97,6 +104,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
     '/dashboard/trade-bot': {
       title: 'Trade Bot',
       subtitle: 'Only Nifty 50 and Bank Nifty. S/R wall-break. Not a straddle.',
+    },
+    '/dashboard/crude-bot': {
+      title: 'Crude Bot',
+      subtitle: 'Crude Oil Mini futures. Evening squeeze-break. Not the old crude desks.',
     },
     '/dashboard/order-test': {
       title: 'Order Test',

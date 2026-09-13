@@ -3,6 +3,7 @@ import { DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { MatButtonModule } from '@angular/material/button';
+import { ActivatedRoute } from '@angular/router';
 import { firstValueFrom, timeout } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 import { KiteSessionService } from '../../../core/kite/kite-session.service';
@@ -248,6 +249,7 @@ function istToday(): string {
 }
 
 const TRADE_COL_STORE = 'palagai_trade_bot_cols';
+const CRUDE_COL_STORE = 'palagai_crude_bot_cols';
 const TRADE_COLS = [
   { id: 'entryTime', label: 'Entry time' },
   { id: 'exitTime', label: 'Exit time' },
@@ -277,6 +279,9 @@ export class TradeBotComponent implements OnInit, OnDestroy {
   protected readonly kiteFundsSvc = inject(KiteFundsService);
   private readonly uiDialog = inject(UiDialogService);
   private readonly auth = inject(AuthService);
+  private readonly route = inject(ActivatedRoute);
+  protected readonly deskKind: 'trade' | 'crude' =
+    this.route.snapshot.data['desk'] === 'crude' ? 'crude' : 'trade';
   private readonly liveApiBase =
     (environment as { liveApiBaseUrl?: string }).liveApiBaseUrl || '/api/live';
 
@@ -458,8 +463,35 @@ export class TradeBotComponent implements OnInit, OnDestroy {
     };
   }
 
+  protected isCrudeDesk(): boolean {
+    return this.deskKind === 'crude';
+  }
+
+  protected deskTitle(): string {
+    return this.isCrudeDesk() ? 'Crude Bot' : 'Trade Bot';
+  }
+
+  protected deskLede(): string {
+    return this.isCrudeDesk()
+      ? 'Only Crude Oil Mini futures. Evening squeeze-break (17:00–17:45 coil, first close beyond it after 17:50). Not Nifty, not Bank, not the old crude desks. Paper ₹ is points × ₹10 × lot. Live buys or sells the mini future with a futures SL.'
+      : 'Only Nifty 50 and Bank Nifty. Crude and stocks stay off. This is S/R wall-break: with-trend, profit lock, day ±₹3,500. Paper ₹ is index × lot. Live buys one ATM CE or PE — it does not sell both sides.';
+  }
+
+  protected tradesHint(): string {
+    return this.isCrudeDesk()
+      ? 'Every fill has a protective futures SL (SL ₹). Hide extra columns if the table is wide; scroll sideways for the rest.'
+      : 'Yes — every fill has a protective SL. Paper uses the same option-premium trigger Live rests on Kite (SL ₹). Hide extra columns if the table is wide; scroll sideways for the rest.';
+  }
+
+  protected colStoreKey(): string {
+    return this.isCrudeDesk() ? CRUDE_COL_STORE : TRADE_COL_STORE;
+  }
+
   protected instrumentRows(p: PaperResult) {
     if (p.instruments?.length) {
+      if (this.isCrudeDesk()) {
+        return p.instruments.filter((r) => r.id === 'crude' || r.id === 'crude-oil-mini');
+      }
       return p.instruments.filter((r) => r.id !== 'crude' && r.id !== 'stocks');
     }
     const rows: NonNullable<PaperResult['instruments']> = [];
@@ -493,7 +525,7 @@ export class TradeBotComponent implements OnInit, OnDestroy {
       byName.set(key, cur);
       fundedKeys.add(key);
     }
-    for (const id of ['nifty', 'bank']) {
+    for (const id of this.isCrudeDesk() ? ['crude'] : ['nifty', 'bank']) {
       const b = (p.books || []).find((row) => row.id === id);
       const funded = [...byName.values()].find((r) => r.id === id || r.instrumentName === b?.label);
       if (funded) {
@@ -746,7 +778,7 @@ export class TradeBotComponent implements OnInit, OnDestroy {
 
   private loadHiddenCols(): void {
     try {
-      const raw = localStorage.getItem(TRADE_COL_STORE);
+      const raw = localStorage.getItem(this.colStoreKey());
       if (!raw) return;
       const ids = JSON.parse(raw) as string[];
       if (!Array.isArray(ids)) return;
@@ -759,7 +791,7 @@ export class TradeBotComponent implements OnInit, OnDestroy {
 
   private saveHiddenCols(): void {
     try {
-      localStorage.setItem(TRADE_COL_STORE, JSON.stringify([...this.hiddenCols()]));
+      localStorage.setItem(this.colStoreKey(), JSON.stringify([...this.hiddenCols()]));
     } catch {
       /* ignore */
     }
@@ -829,9 +861,10 @@ export class TradeBotComponent implements OnInit, OnDestroy {
     }
     if (this.liveMoney) {
       const ok = await this.uiDialog.confirm({
-        title: 'Place live Kite orders?',
-        message:
-          'Live places real MIS buys on Nifty + Bank S/R signals (one ATM CE or PE). It does not sell a straddle. Day ±₹3,500. Crude stays off.',
+        title: this.isCrudeDesk() ? 'Place live Crude Mini orders?' : 'Place live Kite orders?',
+        message: this.isCrudeDesk()
+          ? 'Live places real MIS buy or sell on Crude Oil Mini futures when the evening squeeze-break fires. Not Nifty or Bank. Protective futures SL. Day risk cap ₹2,500.'
+          : 'Live places real MIS buys on Nifty + Bank S/R signals (one ATM CE or PE). It does not sell a straddle. Day ±₹3,500. Crude stays off.',
         confirmLabel: 'Start live',
         cancelLabel: 'Cancel',
         tone: 'danger',
@@ -862,7 +895,7 @@ export class TradeBotComponent implements OnInit, OnDestroy {
       niftyLots: this.systemLots(),
       capitalRs: this.capitalRs,
       capitalSource: this.fundMode(),
-      engine: 'sr-desk',
+      engine: this.isCrudeDesk() ? 'crude-desk' : 'sr-desk',
     };
     const kite = this.kiteSession.getAuthorizationHeader();
     const headers: Record<string, string> = kite ? { 'X-Kite-Authorization': kite } : {};
@@ -900,7 +933,7 @@ export class TradeBotComponent implements OnInit, OnDestroy {
     this.error.set('');
     try {
       const res = await firstValueFrom(
-        this.http.post<LiveStatus>(`${this.liveApiBase}/stop`, {}),
+        this.http.post<LiveStatus>(`${this.liveApiBase}/stop`, this.isCrudeDesk() ? { engine: 'crude-desk' } : {}),
       );
       this.live.set(res);
       this.clearPoll();
@@ -917,7 +950,11 @@ export class TradeBotComponent implements OnInit, OnDestroy {
 
   private async refreshLiveStatus(): Promise<void> {
     try {
-      const s = await firstValueFrom(this.http.get<LiveStatus>(`${this.liveApiBase}/status`));
+      const s = await firstValueFrom(
+        this.http.get<LiveStatus>(
+          this.isCrudeDesk() ? `${this.liveApiBase}/status?desk=crude` : `${this.liveApiBase}/status`,
+        ),
+      );
       this.live.set(s);
       const checks = s?.liveAssistant?.checks;
       if (checks?.length) this.liveAssistant.set(checks);
