@@ -486,13 +486,13 @@ export class TradeBotComponent implements OnInit, OnDestroy {
 
   protected deskLede(): string {
     return this.isCrudeDesk()
-      ? 'Only Crude Oil Mini futures. Same playbook as Nifty/Bank: intraday wall, 2-bar retest, +20 pts, lock 20→12, day ±₹3,500. Not the old crude S/R or green-OR desks. Paper ₹ is points × ₹10 × lot. Live buys or sells the mini future with a futures SL.'
-      : 'Only Nifty 50 and Bank Nifty. Crude and stocks stay off. This is S/R wall-break: with-trend, profit lock, day ±₹3,500. Paper ₹ is index × lot. Live buys one ATM CE or PE — it does not sell both sides.';
+      ? 'Only Crude Oil Mini ATM CE/PE. Same playbook as Nifty/Bank: intraday wall, 2-bar retest, +20 pts, lock 20→12, day ±₹3,500. Paper In/Out/SL ₹ are the option 5m premium (Kite listed MCX options). Signals still come from the mini future. Live buys one ATM CE or PE from Kite — never the future print.'
+      : 'Only Nifty 50 and Bank Nifty. Crude and stocks stay off. This is S/R wall-break: with-trend, profit lock, day ±₹3,500. Paper In/Out are NSE 5-minute option OHLC. Paper ₹ is index × lot. Live buys one ATM CE or PE from Kite — it does not sell both sides.';
   }
 
   protected tradesHint(): string {
     return this.isCrudeDesk()
-      ? 'Every fill has a protective futures SL (SL ₹). Hide extra columns if the table is wide; scroll sideways for the rest.'
+      ? 'Every fill has a protective option SL (SL ₹). Hide extra columns if the table is wide; scroll sideways for the rest.'
       : 'Yes — every fill has a protective SL. Paper uses the same option-premium trigger Live rests on Kite (SL ₹). Hide extra columns if the table is wide; scroll sideways for the rest.';
   }
 
@@ -629,24 +629,31 @@ export class TradeBotComponent implements OnInit, OnDestroy {
     if (t.option?.strike != null && Number.isFinite(Number(t.option.strike))) {
       return Math.round(Number(t.option.strike));
     }
+    const fromSym = String(t.optionSymbol || t.option?.tradingSymbol || '').match(/(\d{4,})(CE|PE)$/i);
+    if (fromSym) return Number(fromSym[1]);
     const px = Number(t.indexEntry);
-    if (!Number.isFinite(px) || px < 10000) return null;
+    if (!Number.isFinite(px) || px <= 0) return null;
     const name = `${t.instrumentName || ''} ${t.selectedInstrument || ''}`.toLowerCase();
-    const step = name.includes('bank') ? 100 : 50;
+    const crude = this.isCrudeDesk() || name.includes('crude');
+    if (!crude && px < 10000) return null;
+    const step = name.includes('bank') ? 100 : crude ? 50 : 50;
     return Math.round(px / step) * step;
   }
 
   protected optionFillPrice(t: PaperTrade, which: 'entry' | 'exit'): number | null {
     const ohlc = which === 'entry' ? t.entryOhlc : t.exitOhlc;
-    if (ohlc && Number(ohlc.close) > 0 && Number(ohlc.close) < 10000) return Number(ohlc.close);
+    if (ohlc && Number(ohlc.close) > 0 && Number(ohlc.close) < 2500) return Number(ohlc.close);
     const prem = which === 'entry' ? t.optionEntryPremium : t.optionExitPremium;
-    if (prem != null && Number(prem) > 0 && Number(prem) < 10000) return Number(prem);
     const px = which === 'entry' ? t.entryPrice : t.exitPrice;
     const idx = which === 'entry' ? t.indexEntry : t.indexExit;
-    const n = Number(px);
-    if (Number.isFinite(n) && n > 0 && n < 10000) return n;
-    if (Number.isFinite(Number(idx)) && Number(idx) >= 10000) return null;
-    return Number.isFinite(n) && n > 0 && n < 10000 ? n : null;
+    const pick = (n: number | null | undefined) => {
+      const v = Number(n);
+      if (!Number.isFinite(v) || v <= 0 || v >= 2500) return null;
+      if (/FUT/i.test(this.tradeSymbol(t) + ' ' + (t.selectedInstrument || ''))) return null;
+      if (Number(idx) > 0 && v > Number(idx) * 0.35) return null;
+      return v;
+    };
+    return pick(ohlc?.close) ?? pick(prem) ?? pick(px);
   }
 
   protected ohlcLine(t: PaperTrade, which: 'entry' | 'exit'): string | null {
@@ -737,15 +744,20 @@ export class TradeBotComponent implements OnInit, OnDestroy {
   }
 
   protected tradeSl(t: PaperTrade): number | null {
+    const fill = this.optionFillPrice(t, 'entry');
     for (const v of [t.slTrigger, t.slPrice]) {
       const n = Number(v);
-      if (Number.isFinite(n) && n > 0) return n;
+      if (!Number.isFinite(n) || n <= 0) continue;
+      if (fill && n >= fill) continue;
+      if (n >= 2500) continue;
+      return n;
     }
-    const fill = this.optionFillPrice(t, 'entry');
     if (!(fill && fill > 0)) return null;
-    const bank = /bank/i.test(`${t.instrumentName || ''} ${t.selectedInstrument || ''}`);
+    const name = `${t.instrumentName || ''} ${t.selectedInstrument || ''}`.toLowerCase();
+    const bank = /bank/i.test(name);
+    const crude = this.isCrudeDesk() || name.includes('crude');
     const lots = Math.max(1, Number(t.lots) || 1);
-    const lotUnits = (bank ? 30 : 65) * lots;
+    const lotUnits = (bank ? 30 : crude ? 10 : 65) * lots;
     const indexRisk =
       t.indexStop != null && t.indexEntry != null
         ? Math.abs(Number(t.indexEntry) - Number(t.indexStop))
@@ -753,10 +765,10 @@ export class TradeBotComponent implements OnInit, OnDestroy {
     let trigger = computeProtectiveSlTrigger({
       fillPremium: fill,
       indexRiskPts: Math.max(0, indexRisk),
-      exchange: 'NFO',
+      exchange: crude ? 'MCX' : 'NFO',
       tradingSymbol: this.tradeSymbol(t),
       ltp: fill,
-      maxLossRs: bank ? 0 : 5000 * lots,
+      maxLossRs: (bank ? 0 : crude ? 2500 : 5000) * lots,
       lotUnits,
     });
     if (!(trigger > 0)) trigger = roundOptionPremiumTick(fill * 0.9);
@@ -876,7 +888,7 @@ export class TradeBotComponent implements OnInit, OnDestroy {
       const ok = await this.uiDialog.confirm({
         title: this.isCrudeDesk() ? 'Place live Crude Mini orders?' : 'Place live Kite orders?',
         message: this.isCrudeDesk()
-          ? 'Live places real MIS buy or sell on Crude Oil Mini futures when the Nifty/Bank-style retest fires. Not Nifty or Bank. Protective futures SL. Day ±₹3,500.'
+          ? 'Live places a real MIS buy on one Crude Oil Mini ATM CE or PE when the Nifty/Bank-style retest fires. Not the future print. Not Nifty or Bank. Protective option SL. Day ±₹3,500.'
           : 'Live places real MIS buys on Nifty + Bank S/R signals (one ATM CE or PE). It does not sell a straddle. Day ±₹3,500. Crude stays off.',
         confirmLabel: 'Start live',
         cancelLabel: 'Cancel',

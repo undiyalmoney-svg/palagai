@@ -107,7 +107,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     },
     '/dashboard/crude-bot': {
       title: 'Crude Bot',
-      subtitle: 'Crude Oil Mini futures. Same retest playbook as Nifty/Bank.',
+      subtitle: 'Crude Oil Mini ATM CE/PE. Same retest playbook as Nifty/Bank.',
     },
     '/dashboard/order-test': {
       title: 'Order Test',
