@@ -225,9 +225,9 @@
               <th>Instrument</th>
               <th>Option</th>
               <th>Side</th>
-              <th>Entry price</th>
-              <th>SL</th>
-              <th>Exit price</th>
+              <th>In</th>
+              <th>SL ₹</th>
+              <th>Out</th>
               <th>Lots</th>
               <th>₹</th>
               <th>Why</th>
@@ -247,8 +247,9 @@
                     <small class="ohlc">{{ o }}</small>
                   }
                 </td>
-                <td class="px" [class.down]="isOpenTrade(t) && t.slOn === false">
-                  {{ tradeSl(t) != null ? formatPrice(tradeSl(t)) : '—' }}
+                <td class="px sl-cell" [class.down]="isOpenTrade(t) && t.slOn === false">
+                  <span class="sl-kicker">SL</span>
+                  <strong>{{ slLabel(t) }}</strong>
                 </td>
                 <td class="px">
                   @if (isOpenTrade(t)) {

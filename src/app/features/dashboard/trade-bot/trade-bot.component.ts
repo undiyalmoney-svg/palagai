@@ -11,6 +11,10 @@ import { CapitalPreferenceService } from '../../../core/services/capital-prefere
 import { KiteFundsService } from '../../../core/services/kite-funds.service';
 import { DEFAULT_TRADING_CAPITAL_RS } from '../../../core/paper-desk/capital-plan.util';
 import { lotsFromAvailableFunds } from '../../../core/paper-desk/lots-from-funds';
+import {
+  computeProtectiveSlTrigger,
+  roundOptionPremiumTick,
+} from '../../../core/live-desk/option-sl-premium.util';
 import { UiDialogService } from '../../../shared/ui/dialog/ui-dialog.service';
 import { AuthService } from '../../../core/auth/auth.service';
 
@@ -40,6 +44,7 @@ interface PaperTrade {
   optionSymbol?: string | null;
   option?: { tradingSymbol?: string; symbol?: string; strike?: number } | null;
   slTrigger?: number | null;
+  slPrice?: number | null;
   slOn?: boolean;
   slOrderId?: string | null;
   indexStop?: number | null;
@@ -669,8 +674,36 @@ export class TradeBotComponent implements OnInit, OnDestroy {
   }
 
   protected tradeSl(t: PaperTrade): number | null {
-    const n = Number(t.slTrigger);
-    return Number.isFinite(n) && n > 0 ? n : null;
+    for (const v of [t.slTrigger, t.slPrice]) {
+      const n = Number(v);
+      if (Number.isFinite(n) && n > 0) return n;
+    }
+    const fill = this.optionFillPrice(t, 'entry');
+    if (!(fill && fill > 0)) return null;
+    const bank = /bank/i.test(`${t.instrumentName || ''} ${t.selectedInstrument || ''}`);
+    const lots = Math.max(1, Number(t.lots) || 1);
+    const lotUnits = (bank ? 30 : 65) * lots;
+    const indexRisk =
+      t.indexStop != null && t.indexEntry != null
+        ? Math.abs(Number(t.indexEntry) - Number(t.indexStop))
+        : Number(t.stopPts) || 0;
+    let trigger = computeProtectiveSlTrigger({
+      fillPremium: fill,
+      indexRiskPts: Math.max(0, indexRisk),
+      exchange: 'NFO',
+      tradingSymbol: this.tradeSymbol(t),
+      ltp: fill,
+      maxLossRs: bank ? 0 : 5000 * lots,
+      lotUnits,
+    });
+    if (!(trigger > 0)) trigger = roundOptionPremiumTick(fill * 0.9);
+    if (trigger >= fill) trigger = roundOptionPremiumTick(Math.max(0.05, fill * 0.9));
+    return trigger > 0 ? trigger : null;
+  }
+
+  protected slLabel(t: PaperTrade): string {
+    const sl = this.tradeSl(t);
+    return sl != null ? `₹${this.formatPrice(sl)}` : '—';
   }
 
   protected resultBoard(): PaperResult | null {

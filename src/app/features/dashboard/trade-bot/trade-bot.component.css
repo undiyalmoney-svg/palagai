@@ -539,6 +539,26 @@
   font-weight: 500;
 }
 
+.trade-bot td.sl-cell {
+  min-width: 7.5rem;
+  background: #fff7ed;
+}
+
+.trade-bot td.sl-cell .sl-kicker {
+  display: block;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: #9a3412;
+}
+
+.trade-bot td.sl-cell strong {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #9a3412;
+  font-variant-numeric: tabular-nums;
+}
+
 .trade-bot tr.open-row td {
   background: #ecfdf3;
   font-weight: 650;
