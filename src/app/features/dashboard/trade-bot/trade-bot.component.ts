@@ -40,6 +40,8 @@ interface PaperTrade {
   optionSymbol?: string | null;
   option?: { tradingSymbol?: string; symbol?: string; strike?: number } | null;
   slTrigger?: number | null;
+  slOn?: boolean;
+  slOrderId?: string | null;
   indexStop?: number | null;
   stopPts?: number | null;
   entryOhlc?: { open: number; high: number; low: number; close: number } | null;
@@ -214,6 +216,7 @@ interface PaperResult {
 
 interface LiveStatus {
   status?: string;
+  running?: boolean;
   message?: string;
   liveMoney?: boolean;
   realOrders?: boolean;
@@ -221,11 +224,15 @@ interface LiveStatus {
   liveAssistant?: { ok?: boolean; checks?: Array<{ id?: string; ok: boolean; detail: string }> };
   events?: Array<{ at?: string; action?: string; detail?: string }>;
   totals?: { netRs?: number; trades?: number };
+  trades?: PaperTrade[];
+  kitePnl?: { closedRs?: number; openRs?: number; netRs?: number };
   positions?: Array<{
     instrumentId?: string;
     symbol?: string;
     status?: string;
     quantity?: number;
+    entryTime?: string | null;
+    entryPremium?: number | null;
     slTrigger?: number | null;
     slOrderId?: string | null;
     slOn?: boolean;
@@ -666,8 +673,50 @@ export class TradeBotComponent implements OnInit, OnDestroy {
     return Number.isFinite(n) && n > 0 ? n : null;
   }
 
+  protected resultBoard(): PaperResult | null {
+    if (this.liveMoney) {
+      const live = this.live();
+      if (!live) return null;
+      const trades = live.trades?.length ? live.trades : this.tradesFromLive(live);
+      const running = live.status === 'running' || !!live.running;
+      if (!running && !trades.length) return null;
+      const net = Number(live.kitePnl?.netRs);
+      const profit = this.paperProfit({ trades });
+      const loss = this.paperLoss({ trades });
+      return {
+        fromDate: istToday(),
+        toDate: istToday(),
+        liveMoney: true,
+        trades,
+        totals: {
+          netRs: Number.isFinite(net) ? net : this.paperNet({ trades }),
+          grossProfitRs: profit,
+          grossLossRs: loss,
+        },
+        note: live.message || undefined,
+      };
+    }
+    return this.paper();
+  }
+
+  protected tradesFromLive(s: LiveStatus): PaperTrade[] {
+    return (s.positions || []).map((p) => ({
+      instrumentName: p.instrumentId === 'bank-nifty' ? 'Bank Nifty' : 'Nifty 50',
+      selectedInstrument: p.symbol || null,
+      optionSymbol: p.symbol || null,
+      entryTime: p.entryTime || undefined,
+      entryPrice: p.entryPremium ?? null,
+      optionEntryPremium: p.entryPremium ?? null,
+      slTrigger: p.slTrigger ?? null,
+      slOn: !!p.slOn,
+      lots: 1,
+      open: p.status === 'open',
+      exitReason: p.status === 'open' ? (p.slOn ? 'OPEN' : 'OPEN · SL missing') : p.status,
+    }));
+  }
+
   protected isOpenTrade(t: PaperTrade): boolean {
-    return !!(t.open || t.exitReason === 'open');
+    return !!(t.open || String(t.exitReason || '').toUpperCase().startsWith('OPEN'));
   }
 
   protected async run(): Promise<void> {
