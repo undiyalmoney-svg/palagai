@@ -153,7 +153,7 @@
       <aside class="live-assistant" data-testid="live-assistant">
         <h3>Live assistant</h3>
         @if (!liveHelp().length) {
-          <p class="hint">{{ isCrudeDesk() ? 'Get Token pushes the Kite token automatically. Crude Bot waits for NSE close, then trades the morning opening range (09:00–09:30, skip if wider than 60 pts) from 16:00–21:00 after a confirm bar. Max 2 trades a day, stop 30 Mini pts, target 80, trail ₹350→₹180. Quantity = Mini lots (3 per ₹40k). Paper ₹ is Mini points × ₹10 × lots.' : 'Get Token pushes the Kite token to the server automatically. Start live and Refresh funds do the same. There is no Push Token button on this page.' }}</p>
+          <p class="hint">{{ isCrudeDesk() ? 'Get Token pushes the Kite token automatically. Crude Bot waits for NSE close, then buys ATM PE only (short the Mini) on a 09:00–09:30 range, skip if wider than 60 pts, from 16:00–21:00 after a confirm bar. Max 2 trades a day. Afternoon CE is off. Paper ₹ is Mini points × ₹10 × lots.' : 'Get Token pushes the Kite token to the server automatically. Start live and Refresh funds do the same. There is no Push Token button on this page.' }}</p>
         }
         @for (row of liveHelp(); track $index) {
           <p [class.ok]="row.ok" [class.err]="!row.ok">{{ row.detail }}</p>
@@ -273,11 +273,14 @@
                 <td class="trade-hms" [class.off]="!colOn('entryTime')">{{ formatTradeWhen(t.entryTime, t.entryClock) }}</td>
                 <td class="trade-hms" [class.off]="!colOn('exitTime')">{{ isOpenTrade(t) ? 'OPEN' : formatTradeWhen(t.exitTime, t.exitClock) }}</td>
                 <td [class.off]="!colOn('instrument')">{{ t.instrumentName || '—' }}</td>
-                <td [class.off]="!colOn('option')">{{ optionLabel(t) }}</td>
+                <td [class.off]="!colOn('option')" class="opt-cell">{{ optionLabel(t) }}</td>
                 <td [class.off]="!colOn('side')">{{ tradeSide(t) }}</td>
                 <td class="px" [class.off]="!colOn('in')">
-                  <div>{{ formatPrice(optionFillPrice(t, 'entry')) }}</div>
+                  <div>{{ formatPrice(displayFillPrice(t, 'entry')) }}</div>
                   <div class="sl-inline">SL {{ slLabel(t) }}</div>
+                  @if (isCrudeDesk() && optionFillPrice(t, 'entry'); as prem) {
+                    <small class="ohlc">opt {{ formatPrice(prem) }}</small>
+                  }
                   @if (ohlcLine(t, 'entry'); as o) {
                     <small class="ohlc">{{ o }}</small>
                   }
@@ -290,7 +293,10 @@
                   @if (isOpenTrade(t)) {
                     —
                   } @else {
-                    <div>{{ formatPrice(optionFillPrice(t, 'exit')) }}</div>
+                    <div>{{ formatPrice(displayFillPrice(t, 'exit')) }}</div>
+                    @if (isCrudeDesk() && optionFillPrice(t, 'exit'); as prem) {
+                      <small class="ohlc">opt {{ formatPrice(prem) }}</small>
+                    }
                     @if (ohlcLine(t, 'exit'); as o) {
                       <small class="ohlc">{{ o }}</small>
                     }
@@ -311,6 +317,9 @@
           </tbody>
         </table>
       </div>
+      <p class="table-net" [class.up]="paperNet(p) >= 0" [class.down]="paperNet(p) < 0">
+        Table net ₹{{ paperNet(p) | number: '1.0-0' }}
+      </p>
     </div>
   }
 

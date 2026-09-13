@@ -562,6 +562,19 @@
   border-radius: var(--pg-radius);
 }
 
+.trade-bot td.opt-cell {
+  white-space: nowrap;
+  min-width: 7.5rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 650;
+}
+
+.trade-bot .table-net {
+  margin: 0.5rem 0 0;
+  font-weight: 800;
+  font-size: 1.05rem;
+}
+
 .trade-bot .table-wrap::-webkit-scrollbar {
   height: 10px;
   width: 10px;

@@ -486,13 +486,13 @@ export class TradeBotComponent implements OnInit, OnDestroy {
 
   protected deskLede(): string {
     return this.isCrudeDesk()
-      ? 'Only Crude Oil Mini ATM CE/PE. Same playbook as Nifty/Bank: intraday wall, 2-bar retest, +20 pts, lock 20→12, day ±₹3,500. Paper In/Out/SL ₹ are the option 5m premium (Kite listed MCX options). Signals still come from the mini future. Live buys one ATM CE or PE from Kite — never the future print.'
+      ? 'Only Crude Oil Mini ATM PE after NSE close. Session OR 09:00–09:30 (skip if wider than 60 pts), confirm, 16:00–21:00, max 2/day. Afternoon CE is off. Paper ₹ is Mini points × ₹10 × lots. In/Out are the Mini future prints for that ₹. Live buys one ATM PE from Kite — never the future print.'
       : 'Only Nifty 50 and Bank Nifty. Crude and stocks stay off. This is S/R wall-break: with-trend, profit lock, day ±₹3,500. Paper In/Out are NSE 5-minute option OHLC. Paper ₹ is index × lot. Live buys one ATM CE or PE from Kite — it does not sell both sides.';
   }
 
   protected tradesHint(): string {
     return this.isCrudeDesk()
-      ? 'Every fill has a protective option SL (SL ₹). Hide extra columns if the table is wide; scroll sideways for the rest.'
+      ? 'Paper ₹ is Mini points × ₹10 × lots (see Why for fut pts). In/Out are the future prints. Option premium is the small OHLC under In/Out. Hide extra columns if the table is wide; scroll sideways for the rest.'
       : 'Yes — every fill has a protective SL. Paper uses the same option-premium trigger Live rests on Kite (SL ₹). Hide extra columns if the table is wide; scroll sideways for the rest.';
   }
 
@@ -654,6 +654,16 @@ export class TradeBotComponent implements OnInit, OnDestroy {
       return v;
     };
     return pick(ohlc?.close) ?? pick(prem) ?? pick(px);
+  }
+
+  protected indexFillPrice(t: PaperTrade, which: 'entry' | 'exit'): number | null {
+    const v = Number(which === 'entry' ? t.indexEntry : t.indexExit);
+    return Number.isFinite(v) && v > 0 ? v : null;
+  }
+
+  protected displayFillPrice(t: PaperTrade, which: 'entry' | 'exit'): number | null {
+    if (this.isCrudeDesk()) return this.indexFillPrice(t, which);
+    return this.optionFillPrice(t, which);
   }
 
   protected ohlcLine(t: PaperTrade, which: 'entry' | 'exit'): string | null {
