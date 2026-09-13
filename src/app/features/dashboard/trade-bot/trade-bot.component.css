@@ -476,6 +476,31 @@
   font-size: 0.75rem;
 }
 
+.trade-bot .live-legs {
+  list-style: none;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.trade-bot .live-legs li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem 1rem;
+  font-size: 0.86rem;
+}
+
+.trade-bot .live-legs .ok {
+  color: #15803d;
+  font-weight: 700;
+}
+
+.trade-bot .live-legs .err {
+  color: #b91c1c;
+  font-weight: 700;
+}
+
 .trade-bot .table-wrap {
   margin-top: 0.75rem;
   overflow: auto;

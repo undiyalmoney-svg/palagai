@@ -128,7 +128,7 @@
       <aside class="live-assistant" data-testid="live-assistant">
         <h3>Live assistant</h3>
         @if (!liveHelp().length) {
-          <p class="hint">Get Token, then Start live. Start live pushes the Kite token to the server.</p>
+          <p class="hint">Get Token pushes the Kite token to the server automatically. Start live and Refresh funds do the same. There is no Push Token button on this page.</p>
         }
         @for (row of liveHelp(); track $index) {
           <p [class.ok]="row.ok" [class.err]="!row.ok">{{ row.detail }}</p>
@@ -226,6 +226,7 @@
               <th>Option</th>
               <th>Side</th>
               <th>Entry price</th>
+              <th>SL</th>
               <th>Exit price</th>
               <th>Lots</th>
               <th>₹</th>
@@ -246,6 +247,7 @@
                     <small class="ohlc">{{ o }}</small>
                   }
                 </td>
+                <td class="px">{{ tradeSl(t) != null ? formatPrice(tradeSl(t)) : '—' }}</td>
                 <td class="px">
                   @if (isOpenTrade(t)) {
                     —
@@ -265,7 +267,7 @@
             }
             @if (!(p.trades || []).length) {
               <tr>
-                <td colspan="10">No money booked in this window.</td>
+                <td colspan="11">No money booked in this window.</td>
               </tr>
             }
           </tbody>
@@ -278,6 +280,20 @@
     <div class="status-card" [attr.data-running]="s.status === 'running'">
       <h3>Live</h3>
       <p>{{ s.status || 'idle' }}{{ s.message ? ' · ' + s.message : '' }}</p>
+      @if (s.positions?.length) {
+        <ul class="live-legs">
+          @for (p of s.positions; track p.instrumentId || p.symbol || $index) {
+            <li>
+              <strong>{{ p.symbol || p.instrumentId }}</strong>
+              <span>{{ p.status || '—' }}</span>
+              <span>SL {{ p.slTrigger != null ? formatPrice(p.slTrigger) : '—' }}</span>
+              <span [class.ok]="p.slOn" [class.err]="!p.slOn && p.status === 'open'">
+                {{ p.slOn ? 'SL on' : 'SL missing' }}
+              </span>
+            </li>
+          }
+        </ul>
+      }
       @if (s.events?.length) {
         <ul class="events">
           @for (ev of (s.events || []).slice(0, 12); track $index) {

@@ -39,6 +39,9 @@ interface PaperTrade {
   optionExitPremium?: number | null;
   optionSymbol?: string | null;
   option?: { tradingSymbol?: string; symbol?: string; strike?: number } | null;
+  slTrigger?: number | null;
+  indexStop?: number | null;
+  stopPts?: number | null;
   entryOhlc?: { open: number; high: number; low: number; close: number } | null;
   exitOhlc?: { open: number; high: number; low: number; close: number } | null;
   premiumSource?: string | null;
@@ -218,6 +221,15 @@ interface LiveStatus {
   liveAssistant?: { ok?: boolean; checks?: Array<{ id?: string; ok: boolean; detail: string }> };
   events?: Array<{ at?: string; action?: string; detail?: string }>;
   totals?: { netRs?: number; trades?: number };
+  positions?: Array<{
+    instrumentId?: string;
+    symbol?: string;
+    status?: string;
+    quantity?: number;
+    slTrigger?: number | null;
+    slOrderId?: string | null;
+    slOn?: boolean;
+  }>;
 }
 
 function istToday(): string {
@@ -647,6 +659,11 @@ export class TradeBotComponent implements OnInit, OnDestroy {
   protected formatPrice(value?: number | null): string {
     if (value == null || !Number.isFinite(Number(value))) return '—';
     return Number(value).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  protected tradeSl(t: PaperTrade): number | null {
+    const n = Number(t.slTrigger);
+    return Number.isFinite(n) && n > 0 ? n : null;
   }
 
   protected isOpenTrade(t: PaperTrade): boolean {
