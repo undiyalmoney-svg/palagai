@@ -14,6 +14,7 @@ import { KiteCredentialsService } from '../../../core/kite/kite-credentials.serv
 import { KiteApiService } from '../../../core/kite/kite-api.service';
 import { KiteSessionService, KiteSession } from '../../../core/kite/kite-session.service';
 import { AuthService } from '../../../core/auth/auth.service';
+import { KiteFundsService } from '../../../core/services/kite-funds.service';
 import {
   captureKiteRequestTokenFromLocation,
   clearPendingKiteRequestToken,
@@ -58,6 +59,7 @@ export class GetTokenComponent {
   private readonly kiteCredentialsService = inject(KiteCredentialsService);
   private readonly kiteSessionService = inject(KiteSessionService);
   private readonly authService = inject(AuthService);
+  private readonly kiteFunds = inject(KiteFundsService);
 
   protected readonly isRedirecting = signal(false);
   protected readonly isGeneratingChecksum = signal(false);
@@ -585,6 +587,7 @@ export class GetTokenComponent {
               `Access token saved locally as palagai_kite_session:${siteUser.id}`,
             );
             this.autoExchangeNote.set('Kite login complete.');
+            void this.pushTokenToLiveServer();
           } else {
             this.tokenExchangeError.set(
               'Kite responded but access token was not saved to localStorage. Check the JSON below, then try again.',
@@ -641,5 +644,19 @@ export class GetTokenComponent {
       return true;
     }
     return sessionDate.toDateString() === new Date().toDateString();
+  }
+
+  private async pushTokenToLiveServer(): Promise<void> {
+    const ok = await this.kiteFunds.pushToken();
+    if (ok) {
+      this.sessionSavedMessage.update(
+        (m) => `${m} · Pushed to the live server (no extra Push Token step).`,
+      );
+      void this.kiteFunds.refresh();
+      return;
+    }
+    this.sessionSavedMessage.update(
+      (m) => `${m} · Live server push will retry on Refresh funds or Start live.`,
+    );
   }
 }

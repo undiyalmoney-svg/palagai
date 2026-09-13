@@ -65,9 +65,9 @@ export class KiteFundsService {
     }
   }
 
-  async pushToken(): Promise<void> {
+  async pushToken(): Promise<boolean> {
     const data = this.kiteSession.getSession()?.data;
-    if (!data?.api_key || !data.access_token) return;
+    if (!data?.api_key || !data.access_token) return false;
     try {
       await firstValueFrom(
         this.http.put(`${this.liveApiBase}/auth`, {
@@ -75,8 +75,9 @@ export class KiteFundsService {
           accessToken: data.access_token,
         }),
       );
+      return true;
     } catch {
-      /* server may already have a pushed token */
+      return false;
     }
   }
 
