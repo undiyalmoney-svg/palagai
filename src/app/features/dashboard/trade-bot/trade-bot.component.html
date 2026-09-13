@@ -16,11 +16,13 @@
   </header>
 
   <div class="funds-actions" data-testid="kite-funds">
-    <button mat-stroked-button type="button" [disabled]="controlsLocked() || fundsBusy" (click)="onRefreshFunds()">
+    <button mat-stroked-button type="button" class="busy-btn" [disabled]="controlsLocked() || fundsBusy" (click)="onRefreshFunds()">
       @if (fundsBusy) {
-        <mat-spinner diameter="16" />
+        <span class="btn-spin" aria-hidden="true"></span>
+        Refreshing
+      } @else {
+        Refresh funds
       }
-      Refresh funds
     </button>
     @if (kiteFundsError) {
       <p class="err">{{ kiteFundsError }}</p>
@@ -105,11 +107,13 @@
     </div>
 
     <div class="actions">
-      <button mat-flat-button color="primary" type="button" [disabled]="busy()" (click)="run()">
+      <button mat-flat-button color="primary" type="button" class="run-btn busy-btn" [disabled]="busy()" (click)="run()">
         @if (busy()) {
-          <mat-spinner diameter="18" />
+          <span class="btn-spin" aria-hidden="true"></span>
+          {{ liveMoney ? 'Starting…' : 'Running…' }}
+        } @else {
+          {{ liveMoney ? 'Start live' : 'Run paper' }}
         }
-        {{ liveMoney ? 'Start live' : 'Run paper' }}
       </button>
       <button
         mat-stroked-button

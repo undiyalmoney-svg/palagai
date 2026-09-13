@@ -3,7 +3,6 @@ import { DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { MatButtonModule } from '@angular/material/button';
-import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { firstValueFrom, timeout } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 import { KiteSessionService } from '../../../core/kite/kite-session.service';
@@ -267,7 +266,7 @@ type TradeColId = (typeof TRADE_COLS)[number]['id'];
 @Component({
   selector: 'app-trade-bot',
   standalone: true,
-  imports: [FormsModule, DecimalPipe, MatButtonModule, MatProgressSpinnerModule],
+  imports: [FormsModule, DecimalPipe, MatButtonModule],
   templateUrl: './trade-bot.component.html',
   styleUrl: './trade-bot.component.css',
 })
