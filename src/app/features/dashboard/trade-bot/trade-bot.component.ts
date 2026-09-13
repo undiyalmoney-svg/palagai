@@ -378,7 +378,7 @@ export class TradeBotComponent implements OnInit, OnDestroy {
   }
 
   protected systemLots(): number {
-    return lotsFromAvailableFunds(this.sizingCapitalRs());
+    return lotsFromAvailableFunds(this.sizingCapitalRs(), this.isCrudeDesk() ? 'crude' : 'index');
   }
 
   protected actualFundRs(): number {
