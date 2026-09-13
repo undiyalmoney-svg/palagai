@@ -795,8 +795,8 @@ export class TradeBotComponent implements OnInit, OnDestroy {
   protected tradesFromLive(s: LiveStatus): PaperTrade[] {
     return (s.positions || []).map((p) => ({
       instrumentName: p.instrumentId === 'bank-nifty' ? 'Bank Nifty' : 'Nifty 50',
-      selectedInstrument: p.symbol || null,
-      optionSymbol: p.symbol || null,
+      selectedInstrument: p.symbol || undefined,
+      optionSymbol: p.symbol || undefined,
       entryTime: p.entryTime || undefined,
       entryPrice: p.entryPremium ?? null,
       optionEntryPremium: p.entryPremium ?? null,
@@ -804,7 +804,7 @@ export class TradeBotComponent implements OnInit, OnDestroy {
       slOn: !!p.slOn,
       lots: 1,
       open: p.status === 'open',
-      exitReason: p.status === 'open' ? (p.slOn ? 'OPEN' : 'OPEN · SL missing') : p.status,
+      exitReason: p.status === 'open' ? (p.slOn ? 'OPEN' : 'OPEN · SL missing') : (p.status || undefined),
     }));
   }
 
