@@ -623,14 +623,12 @@ export class TradeBotComponent implements OnInit, OnDestroy {
   }
 
   protected optionStrike(t: PaperTrade): number | null {
-    if (t.optionStrike != null && Number.isFinite(Number(t.optionStrike))) {
-      return Math.round(Number(t.optionStrike));
-    }
-    if (t.option?.strike != null && Number.isFinite(Number(t.option.strike))) {
-      return Math.round(Number(t.option.strike));
-    }
-    const fromSym = String(t.optionSymbol || t.option?.tradingSymbol || '').match(/(\d{4,})(CE|PE)$/i);
-    if (fromSym) return Number(fromSym[1]);
+    const fromField = Number(t.optionStrike);
+    if (fromField > 0) return Math.round(fromField);
+    const nested = Number(t.option?.strike);
+    if (nested > 0) return Math.round(nested);
+    const fromSym = String(t.optionSymbol || t.option?.tradingSymbol || '').match(/(\d{3,5})(CE|PE)$/i);
+    if (fromSym && Number(fromSym[1]) > 0) return Number(fromSym[1]);
     const px = Number(t.indexEntry);
     if (!Number.isFinite(px) || px <= 0) return null;
     const name = `${t.instrumentName || ''} ${t.selectedInstrument || ''}`.toLowerCase();
@@ -671,6 +669,7 @@ export class TradeBotComponent implements OnInit, OnDestroy {
     if (!ohlc) return null;
     const parts = [ohlc.open, ohlc.high, ohlc.low, ohlc.close].map((n) => Number(n));
     if (parts.some((n) => !Number.isFinite(n) || n <= 0)) return null;
+    if (Math.max(...parts) - Math.min(...parts) < 0.001) return null;
     return parts.map((n) => n.toFixed(2)).join(' / ');
   }
 
