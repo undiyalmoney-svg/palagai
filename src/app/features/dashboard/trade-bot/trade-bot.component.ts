@@ -1,10 +1,12 @@
 import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { MatButtonModule } from '@angular/material/button';
 import { ActivatedRoute } from '@angular/router';
-import { firstValueFrom, timeout } from 'rxjs';
+import { map } from 'rxjs';
+import { firstValueFrom, timeout, Subscription } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 import { KiteSessionService } from '../../../core/kite/kite-session.service';
 import { CapitalPreferenceService } from '../../../core/services/capital-preference.service';
@@ -280,8 +282,10 @@ export class TradeBotComponent implements OnInit, OnDestroy {
   private readonly uiDialog = inject(UiDialogService);
   private readonly auth = inject(AuthService);
   private readonly route = inject(ActivatedRoute);
-  protected readonly deskKind: 'trade' | 'crude' =
-    this.route.snapshot.data['desk'] === 'crude' ? 'crude' : 'trade';
+  protected readonly deskKind = toSignal(
+    this.route.data.pipe(map((d) => (d['desk'] === 'crude' ? 'crude' : 'trade'))),
+    { initialValue: this.route.snapshot.data['desk'] === 'crude' ? 'crude' : 'trade' },
+  );
   private readonly liveApiBase =
     (environment as { liveApiBaseUrl?: string }).liveApiBaseUrl || '/api/live';
 
@@ -302,6 +306,7 @@ export class TradeBotComponent implements OnInit, OnDestroy {
   protected readonly hiddenCols = signal<Set<string>>(new Set());
 
   private pollTimer: ReturnType<typeof setInterval> | null = null;
+  private deskSub: Subscription | null = null;
 
   protected readonly allowLiveMoney =
     (environment as { allowLiveMoney?: boolean }).allowLiveMoney !== false;
@@ -312,12 +317,20 @@ export class TradeBotComponent implements OnInit, OnDestroy {
     this.capitalRs = this.capitalPreference.get();
     this.mineFundText = String(this.capitalRs);
     this.loadHiddenCols();
-    void this.refreshLiveStatus();
+    this.deskSub = this.route.data.subscribe(() => {
+      this.paper.set(null);
+      this.live.set(null);
+      this.error.set('');
+      this.liveAssistant.set([]);
+      this.loadHiddenCols();
+      void this.refreshLiveStatus();
+    });
     void this.refreshKiteFunds();
   }
 
   ngOnDestroy(): void {
     this.clearPoll();
+    this.deskSub?.unsubscribe();
   }
 
   protected onTodayChange(): void {
@@ -464,7 +477,7 @@ export class TradeBotComponent implements OnInit, OnDestroy {
   }
 
   protected isCrudeDesk(): boolean {
-    return this.deskKind === 'crude';
+    return this.deskKind() === 'crude';
   }
 
   protected deskTitle(): string {
