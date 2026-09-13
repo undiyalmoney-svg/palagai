@@ -469,7 +469,12 @@ export function replayPaperOnCrude(params: {
           orStart: tradeParams.sessionOrStart,
           orEnd: tradeParams.sessionOrEnd,
           maxOrWidth: tradeParams.maxOrWidth,
+          minOrWidth: tradeParams.minOrWidth,
           maxTradesDay: tradeParams.maxEveningTradesDay,
+          allowBuy: tradeParams.allowBuy,
+          allowSell: tradeParams.allowSell,
+          skipFadePriorDay: tradeParams.skipFadePriorDay,
+          fadeBufferPts: tradeParams.fadeBufferPts,
         });
         if (afternoon.action === 'BUY' || afternoon.action === 'SELL') {
           signal = afternoon;

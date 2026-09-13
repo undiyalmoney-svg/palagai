@@ -84,6 +84,11 @@ export interface CrudeTradeParams extends CrudeProtectParams {
   sessionOrEnd: string;
   /** Skip wide session OR (pts). */
   maxOrWidth: number;
+  minOrWidth?: number;
+  allowBuy?: boolean;
+  allowSell?: boolean;
+  skipFadePriorDay?: boolean;
+  fadeBufferPts?: number;
   /** Max evening/afternoon fills/day. */
   maxEveningTradesDay: number;
   /** Desk default: Morning ORB on/off when this profile is selected. */

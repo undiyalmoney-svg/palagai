@@ -51,6 +51,64 @@ function sessionOr(
   return { high, low };
 }
 
+function priorDayHighLow(
+  candles: Candle[],
+  tradingDate: string,
+): { high: number; low: number } | null {
+  const days: string[] = [];
+  for (const c of candles) {
+    const d = extractTradeDate(c.date);
+    if (d >= tradingDate) {
+      break;
+    }
+    if (days[days.length - 1] !== d) {
+      days.push(d);
+    }
+  }
+  const prev = days[days.length - 1];
+  if (!prev) {
+    return null;
+  }
+  let high = -Infinity;
+  let low = Infinity;
+  for (const c of candles) {
+    if (extractTradeDate(c.date) !== prev) {
+      continue;
+    }
+    high = Math.max(high, c.high);
+    low = Math.min(low, c.low);
+  }
+  if (!Number.isFinite(high) || !Number.isFinite(low)) {
+    return null;
+  }
+  return { high, low };
+}
+
+function isFadePriorDay(
+  action: 'BUY' | 'SELL',
+  price: number,
+  pd: { high: number; low: number } | null,
+  bufferPts: number,
+): boolean {
+  if (!pd || !Number.isFinite(price)) {
+    return false;
+  }
+  const buf = Math.max(0, Number(bufferPts) || 0);
+  if (action === 'SELL' && price > pd.high - buf) {
+    return true;
+  }
+  if (action === 'BUY' && price < pd.low + buf) {
+    return true;
+  }
+  return false;
+}
+
+function fadeSkipReason(action: 'BUY' | 'SELL'): string {
+  return action === 'SELL'
+    ? 'Skip fade — SELL into/above prior-day high'
+    : 'Skip fade — BUY into/below prior-day low';
+}
+
 function wait(candle: Candle, reason: string): CrudePdhlSignal {
   return {
     action: 'WAITING',
@@ -76,7 +134,12 @@ export function runCrudeSessionOr(params: {
   orStart?: string;
   orEnd?: string;
   maxOrWidth?: number;
+  minOrWidth?: number;
   maxTradesDay?: number;
+  allowBuy?: boolean;
+  allowSell?: boolean;
+  skipFadePriorDay?: boolean;
+  fadeBufferPts?: number;
 }): CrudePdhlSignal {
   const { candle, series, state } = params;
   const dayLossStopPts = params.dayLossStopPts ?? CRUDE_DAY_LOSS_STOP_PTS;
@@ -90,9 +153,15 @@ export function runCrudeSessionOr(params: {
   const orStart = params.orStart ?? CRUDE_SOR_OR_START;
   const orEnd = params.orEnd ?? CRUDE_SOR_OR_END;
   const maxOrWidth = params.maxOrWidth ?? CRUDE_SOR_MAX_OR_WIDTH;
+  const minOrWidth = params.minOrWidth ?? 0;
   const maxTradesDay = params.maxTradesDay ?? CRUDE_SOR_MAX_TRADES_DAY;
+  const allowBuy = params.allowBuy !== false;
+  const allowSell = params.allowSell !== false;
+  const skipFadePriorDay = params.skipFadePriorDay === true;
+  const fadeBufferPts = params.fadeBufferPts ?? 0;
 
   const tradingDate = extractTradeDate(candle.date);
+  const priorDay = skipFadePriorDay ? priorDayHighLow(series, tradingDate) : null;
   const month = tradingDate.slice(0, 7);
   const time = extractHhMm(candle.date);
 
@@ -143,13 +212,16 @@ export function runCrudeSessionOr(params: {
     if (time < entryStart || time > entryEnd) {
       return wait(candle, 'Confirm outside entry window');
     }
-    const bullOk = p.dir === 1 && candle.close > candle.open && candle.close > p.signalClose;
-    const bearOk = p.dir === -1 && candle.close < candle.open && candle.close < p.signalClose;
+    const bullOk = p.dir === 1 && allowBuy && candle.close > candle.open && candle.close > p.signalClose;
+    const bearOk = p.dir === -1 && allowSell && candle.close < candle.open && candle.close < p.signalClose;
     if (!bullOk && !bearOk) {
       return wait(candle, 'Session OR confirm failed');
     }
     const action: 'BUY' | 'SELL' = p.dir === 1 ? 'BUY' : 'SELL';
     const entry = candle.open;
+    if (skipFadePriorDay && isFadePriorDay(action, entry, priorDay, fadeBufferPts)) {
+      return wait(candle, fadeSkipReason(action));
+    }
     const stopLoss = action === 'BUY' ? entry - stopPts : entry + stopPts;
     const target = action === 'BUY' ? entry + targetPts : entry - targetPts;
     if (
@@ -186,6 +258,9 @@ export function runCrudeSessionOr(params: {
     return wait(candle, 'Session OR not ready');
   }
   const width = orb.high - orb.low;
+  if (minOrWidth > 0 && width < minOrWidth) {
+    return wait(candle, `OR too narrow (${width.toFixed(1)}<${minOrWidth})`);
+  }
   if (maxOrWidth > 0 && width > maxOrWidth) {
     return wait(candle, `OR too wide (${width.toFixed(1)}>${maxOrWidth})`);
   }
@@ -198,6 +273,15 @@ export function runCrudeSessionOr(params: {
   }
   if (!action) {
     return wait(candle, `Waiting OR break (${orb.low.toFixed(1)}–${orb.high.toFixed(1)})`);
+  }
+  if (action === 'BUY' && !allowBuy) {
+    return wait(candle, 'Longs off — PE only');
+  }
+  if (action === 'SELL' && !allowSell) {
+    return wait(candle, 'Shorts off — CE only');
+  }
+  if (skipFadePriorDay && isFadePriorDay(action, candle.close, priorDay, fadeBufferPts)) {
+    return wait(candle, fadeSkipReason(action));
   }
 
   if (requireConfirm) {
