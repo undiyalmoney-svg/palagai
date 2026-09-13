@@ -1,3 +1,12 @@
+<!-- Route progress bar — fixed at top of viewport -->
+<div
+  class="nav-progress"
+  [class.active]="navLoading()"
+  [style.width.%]="navProgress()"
+  role="progressbar"
+  aria-hidden="true"
+></div>
+
 <div class="shell" [class.sidebar-open]="sidebarOpen()" [class.sidebar-collapsed]="!sidebarOpen()">
   <aside class="sidebar" aria-label="Primary">
     <a class="brand" href="/dashboard" (click)="goHome($event)">
@@ -92,6 +101,20 @@
         </div>
       </div>
     </header>
+
+    <!-- Network status banners -->
+    @if (!online()) {
+      <div class="net-banner net-offline" role="alert">
+        <span class="net-icon" aria-hidden="true">📡</span>
+        <span class="net-msg"><strong>No internet connection</strong> — Some features may not work until you're back online.</span>
+      </div>
+    }
+    @if (online() && networkSlow()) {
+      <div class="net-banner net-slow" role="status">
+        <span class="net-icon" aria-hidden="true">⚡</span>
+        <span class="net-msg"><strong>Slow connection</strong> — Data may take longer to load than usual.</span>
+      </div>
+    }
 
     @if (adminNotice()) {
       <div class="admin-notice" role="status">

@@ -1,12 +1,22 @@
 import {
   Component,
+  NgZone,
   OnDestroy,
   OnInit,
   computed,
   inject,
   signal,
 } from '@angular/core';
-import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import {
+  NavigationCancel,
+  NavigationEnd,
+  NavigationError,
+  NavigationStart,
+  Router,
+  RouterLink,
+  RouterLinkActive,
+  RouterOutlet,
+} from '@angular/router';
 import { filter } from 'rxjs/operators';
 import { Subscription } from 'rxjs';
 import { DecimalPipe } from '@angular/common';
@@ -33,11 +43,25 @@ interface NavItem {
 })
 export class DashboardComponent implements OnInit, OnDestroy {
   private readonly authService = inject(AuthService);
-  private readonly router = inject(Router);
-  private readonly uiDialog = inject(UiDialogService);
+  private readonly router     = inject(Router);
+  private readonly uiDialog   = inject(UiDialogService);
+  private readonly ngZone     = inject(NgZone);
   protected readonly kiteFunds = inject(KiteFundsService);
-  private clockTimer: ReturnType<typeof setInterval> | null = null;
-  private navSub: Subscription | null = null;
+
+  private clockTimer:    ReturnType<typeof setInterval>  | null = null;
+  private navSub:        Subscription | null = null;
+  private progressSub:   Subscription | null = null;
+  private onlineHandler:  (() => void) | null = null;
+  private offlineHandler: (() => void) | null = null;
+  private progressTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /** Route progress bar (0–100) */
+  protected readonly navLoading  = signal(false);
+  protected readonly navProgress = signal(0);
+
+  /** Network status */
+  protected readonly online      = signal(true);
+  protected readonly networkSlow = signal(false);
 
   protected readonly clockLabel = signal('');
   protected readonly pageTitle = signal('Palagai');
@@ -128,12 +152,51 @@ export class DashboardComponent implements OnInit, OnDestroy {
       .pipe(filter((e): e is NavigationEnd => e instanceof NavigationEnd))
       .subscribe((e) => {
         this.syncTitle(e.urlAfterRedirects);
-        // Only auto-close the drawer on mobile; desktop collapse is user-controlled.
-        if (this.isMobileViewport()) {
-          this.sidebarOpen.set(false);
-        }
+        if (this.isMobileViewport()) this.sidebarOpen.set(false);
         this.profileOpen.set(false);
       });
+
+    // ── Route progress bar ────────────────────────────────────────────────
+    this.progressSub = this.router.events.subscribe((event) => {
+      if (event instanceof NavigationStart) {
+        if (this.progressTimer) clearTimeout(this.progressTimer);
+        this.navLoading.set(true);
+        this.navProgress.set(14);
+        this.progressTimer = setTimeout(() => {
+          if (this.navLoading()) this.navProgress.set(72);
+        }, 130);
+      } else if (
+        event instanceof NavigationEnd ||
+        event instanceof NavigationCancel ||
+        event instanceof NavigationError
+      ) {
+        this.navProgress.set(100);
+        this.progressTimer = setTimeout(() => {
+          this.navLoading.set(false);
+          this.navProgress.set(0);
+        }, 360);
+      }
+    });
+
+    // ── Network status ────────────────────────────────────────────────────
+    if (typeof window !== 'undefined') {
+      this.online.set(window.navigator.onLine);
+      this.onlineHandler  = () => this.ngZone.run(() => { this.online.set(true); this.networkSlow.set(false); });
+      this.offlineHandler = () => this.ngZone.run(() => this.online.set(false));
+      window.addEventListener('online',  this.onlineHandler);
+      window.addEventListener('offline', this.offlineHandler);
+
+      const conn = (navigator as any).connection as (EventTarget & { effectiveType?: string }) | undefined;
+      if (conn) {
+        const checkConn = () => this.ngZone.run(() => {
+          this.networkSlow.set(
+            ['slow-2g', '2g'].includes((conn as any).effectiveType ?? '') && navigator.onLine,
+          );
+        });
+        conn.addEventListener('change', checkConn);
+        checkConn();
+      }
+    }
     void this.bootAuth();
   }
 
@@ -168,11 +231,14 @@ export class DashboardComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
-    if (this.clockTimer) {
-      clearInterval(this.clockTimer);
-      this.clockTimer = null;
-    }
+    if (this.clockTimer)    clearInterval(this.clockTimer);
+    if (this.progressTimer) clearTimeout(this.progressTimer);
     this.navSub?.unsubscribe();
+    this.progressSub?.unsubscribe();
+    if (typeof window !== 'undefined') {
+      if (this.onlineHandler)  window.removeEventListener('online',  this.onlineHandler);
+      if (this.offlineHandler) window.removeEventListener('offline', this.offlineHandler);
+    }
   }
 
   protected go(route: string, event?: Event): void {

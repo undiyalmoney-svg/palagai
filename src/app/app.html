@@ -1,1 +1,42 @@
+@if (splashVisible()) {
+  <div class="pg-splash" [class.pg-splash--out]="splashFading()" role="status" aria-label="Loading Palagai">
+
+    <div class="splash-inner">
+
+      <!-- Animated candlestick chart -->
+      <div class="splash-chart" aria-hidden="true">
+        <div class="candle c1 up">
+          <span class="wick t"></span><span class="body"></span><span class="wick b"></span>
+        </div>
+        <div class="candle c2 up">
+          <span class="wick t"></span><span class="body"></span><span class="wick b"></span>
+        </div>
+        <div class="candle c3 down">
+          <span class="wick t"></span><span class="body"></span><span class="wick b"></span>
+        </div>
+        <div class="candle c4 up">
+          <span class="wick t"></span><span class="body"></span><span class="wick b"></span>
+        </div>
+        <div class="candle c5 up">
+          <span class="wick t"></span><span class="body"></span><span class="wick b"></span>
+        </div>
+      </div>
+
+      <!-- Brand -->
+      <div class="splash-brand" aria-hidden="true">
+        <span class="splash-mark">P</span>
+        <div class="splash-wordmark">
+          <strong>Palagai</strong>
+          <small>Trade Desk</small>
+        </div>
+      </div>
+
+      <!-- Loading dots -->
+      <div class="splash-dots" aria-hidden="true">
+        <span></span><span></span><span></span>
+      </div>
+
+    </div>
+  </div>
+}
 <router-outlet></router-outlet>

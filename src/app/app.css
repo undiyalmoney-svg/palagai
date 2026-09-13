@@ -1,3 +1,4 @@
+/* ── App root shell ─────────────────────────────────────────────────────── */
 :host {
   display: block;
   width: 100%;
@@ -10,4 +11,158 @@
   width: 100%;
   min-height: 100%;
   min-height: 100dvh;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   SPLASH LOADER — candlestick bull-run animation
+   Five candles (4 green, 1 red) rise from the baseline sequentially,
+   followed by the Palagai brand and three loading dots.
+   The whole overlay fades out after the first route resolves.
+═══════════════════════════════════════════════════════════════════════════ */
+.pg-splash {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity .52s cubic-bezier(.4, 0, .2, 1);
+}
+.pg-splash--out {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Center column */
+.splash-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 26px;
+  animation: splash-enter .45s cubic-bezier(.34, 1.5, .64, 1) both;
+}
+@keyframes splash-enter {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* ── Candlestick chart ─────────────────────────────────────────────────── */
+.splash-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  height: 104px;
+  padding-bottom: 2px;
+}
+
+/* Every candle: wick · body · wick, vertically stacked */
+.candle {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transform-origin: bottom center;
+  animation: candle-rise .55s cubic-bezier(.34, 1.38, .64, 1) both;
+}
+.c1 { animation-delay: .08s; }
+.c2 { animation-delay: .22s; }
+.c3 { animation-delay: .36s; }
+.c4 { animation-delay: .50s; }
+.c5 { animation-delay: .64s; }
+@keyframes candle-rise {
+  from { transform: scaleY(0); opacity: 0; }
+  to   { transform: scaleY(1); opacity: 1; }
+}
+
+/* Colors */
+.candle.up  .body, .candle.up  .wick { background: #0CA974; }
+.candle.down .body, .candle.down .wick { background: #E52B2B; }
+
+/* Shared wick / body shape */
+.candle .wick { width: 2px; border-radius: 1px; }
+.candle .body { width: 16px; border-radius: 3px; }
+
+/* Per-candle heights — ascending bull-run profile */
+.c1 .wick.t { height:  8px; } .c1 .body { height: 44px; } .c1 .wick.b { height:  7px; }
+.c2 .wick.t { height: 12px; } .c2 .body { height: 60px; } .c2 .wick.b { height:  8px; }
+.c3 .wick.t { height: 10px; } .c3 .body { height: 32px; } .c3 .wick.b { height: 14px; }
+.c4 .wick.t { height: 14px; } .c4 .body { height: 72px; } .c4 .wick.b { height:  5px; }
+.c5 .wick.t { height:  6px; } .c5 .body { height: 82px; } .c5 .wick.b { height: 10px; }
+
+/* ── Brand ─────────────────────────────────────────────────────────────── */
+.splash-brand {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  animation: fade-up .4s ease both;
+  animation-delay: .78s;
+}
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(7px); }
+  to   { opacity: 1; transform: none; }
+}
+.splash-mark {
+  width: 42px;
+  height: 42px;
+  border-radius: 13px;
+  display: grid;
+  place-items: center;
+  background: #0CA974;
+  color: #fff;
+  font-size: 1.15rem;
+  font-weight: 800;
+  font-family: system-ui, -apple-system, sans-serif;
+  letter-spacing: -.02em;
+  flex-shrink: 0;
+}
+.splash-wordmark {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+.splash-wordmark strong {
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: -.04em;
+  color: #0B1220;
+}
+.splash-wordmark small {
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: .72rem;
+  font-weight: 600;
+  color: #5C6E85;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+/* ── Loading dots ──────────────────────────────────────────────────────── */
+.splash-dots {
+  display: flex;
+  gap: 7px;
+  animation: fade-up .35s ease both;
+  animation-delay: .92s;
+}
+.splash-dots span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #0CA974;
+  animation: dot-pulse 1.3s ease-in-out infinite;
+}
+.splash-dots span:nth-child(2) { animation-delay: .18s; background: #64748b; }
+.splash-dots span:nth-child(3) { animation-delay: .36s; background: #E52B2B; }
+@keyframes dot-pulse {
+  0%, 80%, 100% { transform: scale(.7); opacity: .4; }
+  40%           { transform: scale(1);  opacity: 1;  }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .pg-splash { transition: none; }
+  .candle, .splash-inner, .splash-brand, .splash-dots, .splash-dots span {
+    animation: none !important;
+    opacity: 1;
+    transform: none;
+  }
 }
