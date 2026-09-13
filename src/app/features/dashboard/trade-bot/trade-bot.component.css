@@ -294,24 +294,48 @@
 }
 
 .trade-bot .run-btn {
-  min-width: 8.75rem;
+  min-width: 9.5rem;
 }
 
 .trade-bot :is(.busy-btn, .run-btn) ::ng-deep .mdc-button__label {
   display: inline-flex !important;
   align-items: center;
   justify-content: center;
+}
+
+.trade-bot .run-face {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   gap: 0.45rem;
+  white-space: nowrap;
+  line-height: 1;
 }
 
 .trade-bot .btn-spin {
-  width: 0.85rem;
-  height: 0.85rem;
-  border: 2px solid currentColor;
-  border-right-color: transparent;
+  display: block;
+  box-sizing: border-box;
+  width: 0.875rem;
+  height: 0.875rem;
+  flex: 0 0 0.875rem;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #fff;
   border-radius: 50%;
   animation: tb-spin 0.65s linear infinite;
-  flex: 0 0 auto;
+}
+
+.trade-bot .busy-btn.mat-mdc-outlined-button .btn-spin {
+  border-color: color-mix(in srgb, var(--pg-bull) 28%, transparent);
+  border-top-color: var(--pg-bull);
+}
+
+.trade-bot .run-btn.is-busy.mat-mdc-unelevated-button:disabled,
+.trade-bot .run-btn.is-busy.mat-mdc-unelevated-button[disabled] {
+  --mdc-filled-button-disabled-container-color: var(--pg-bull);
+  --mdc-filled-button-disabled-label-text-color: #fff;
+  background-color: var(--pg-bull) !important;
+  color: #fff !important;
+  opacity: 1;
 }
 
 @keyframes tb-spin {

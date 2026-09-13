@@ -16,13 +16,23 @@
   </header>
 
   <div class="funds-actions" data-testid="kite-funds">
-    <button mat-stroked-button type="button" class="busy-btn" [disabled]="controlsLocked() || fundsBusy" (click)="onRefreshFunds()">
-      @if (fundsBusy) {
-        <span class="btn-spin" aria-hidden="true"></span>
-        Refreshing
-      } @else {
-        Refresh funds
-      }
+    <button
+      mat-stroked-button
+      type="button"
+      class="busy-btn"
+      [class.is-busy]="fundsBusy"
+      [disabled]="controlsLocked() || fundsBusy"
+      [attr.aria-busy]="fundsBusy"
+      (click)="onRefreshFunds()"
+    >
+      <span class="run-face">
+        @if (fundsBusy) {
+          <span class="btn-spin" aria-hidden="true"></span>
+          <span>Refreshing</span>
+        } @else {
+          Refresh funds
+        }
+      </span>
     </button>
     @if (kiteFundsError) {
       <p class="err">{{ kiteFundsError }}</p>
@@ -107,13 +117,24 @@
     </div>
 
     <div class="actions">
-      <button mat-flat-button color="primary" type="button" class="run-btn busy-btn" [disabled]="busy()" (click)="run()">
-        @if (busy()) {
-          <span class="btn-spin" aria-hidden="true"></span>
-          {{ liveMoney ? 'Starting…' : 'Running…' }}
-        } @else {
-          {{ liveMoney ? 'Start live' : 'Run paper' }}
-        }
+      <button
+        mat-flat-button
+        color="primary"
+        type="button"
+        class="run-btn busy-btn"
+        [class.is-busy]="busy()"
+        [disabled]="busy()"
+        [attr.aria-busy]="busy()"
+        (click)="run()"
+      >
+        <span class="run-face">
+          @if (busy()) {
+            <span class="btn-spin" aria-hidden="true"></span>
+            <span>{{ liveMoney ? 'Starting…' : 'Running…' }}</span>
+          } @else {
+            {{ liveMoney ? 'Start live' : 'Run paper' }}
+          }
+        </span>
       </button>
       <button
         mat-stroked-button
