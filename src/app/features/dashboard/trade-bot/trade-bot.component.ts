@@ -486,7 +486,7 @@ export class TradeBotComponent implements OnInit, OnDestroy {
 
   protected deskLede(): string {
     return this.isCrudeDesk()
-      ? 'Only Crude Oil Mini futures. Evening squeeze-break (17:00–17:45 coil, first close beyond it after 17:50). Not Nifty, not Bank, not the old crude desks. Paper ₹ is points × ₹10 × lot. Live buys or sells the mini future with a futures SL.'
+      ? 'Only Crude Oil Mini futures. Same playbook as Nifty/Bank: intraday wall, 2-bar retest, +20 pts, lock 20→12, day ±₹3,500. Not the old crude S/R or green-OR desks. Paper ₹ is points × ₹10 × lot. Live buys or sells the mini future with a futures SL.'
       : 'Only Nifty 50 and Bank Nifty. Crude and stocks stay off. This is S/R wall-break: with-trend, profit lock, day ±₹3,500. Paper ₹ is index × lot. Live buys one ATM CE or PE — it does not sell both sides.';
   }
 
@@ -876,7 +876,7 @@ export class TradeBotComponent implements OnInit, OnDestroy {
       const ok = await this.uiDialog.confirm({
         title: this.isCrudeDesk() ? 'Place live Crude Mini orders?' : 'Place live Kite orders?',
         message: this.isCrudeDesk()
-          ? 'Live places real MIS buy or sell on Crude Oil Mini futures when the evening squeeze-break fires. Not Nifty or Bank. Protective futures SL. Day risk cap ₹2,500.'
+          ? 'Live places real MIS buy or sell on Crude Oil Mini futures when the Nifty/Bank-style retest fires. Not Nifty or Bank. Protective futures SL. Day ±₹3,500.'
           : 'Live places real MIS buys on Nifty + Bank S/R signals (one ATM CE or PE). It does not sell a straddle. Day ±₹3,500. Crude stays off.',
         confirmLabel: 'Start live',
         cancelLabel: 'Cancel',
