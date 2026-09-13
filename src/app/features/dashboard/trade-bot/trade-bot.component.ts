@@ -248,6 +248,22 @@ function istToday(): string {
   return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
 }
 
+const TRADE_COL_STORE = 'palagai_trade_bot_cols';
+const TRADE_COLS = [
+  { id: 'entryTime', label: 'Entry time' },
+  { id: 'exitTime', label: 'Exit time' },
+  { id: 'instrument', label: 'Instrument' },
+  { id: 'option', label: 'Option' },
+  { id: 'side', label: 'Side' },
+  { id: 'in', label: 'In' },
+  { id: 'sl', label: 'SL ₹' },
+  { id: 'out', label: 'Out' },
+  { id: 'lots', label: 'Lots' },
+  { id: 'pnl', label: '₹' },
+  { id: 'why', label: 'Why' },
+] as const;
+type TradeColId = (typeof TRADE_COLS)[number]['id'];
+
 @Component({
   selector: 'app-trade-bot',
   standalone: true,
@@ -278,6 +294,8 @@ export class TradeBotComponent implements OnInit, OnDestroy {
   protected readonly paper = signal<PaperResult | null>(null);
   protected readonly live = signal<LiveStatus | null>(null);
   protected readonly liveAssistant = signal<Array<{ id?: string; ok: boolean; detail: string }>>([]);
+  protected readonly tradeCols = TRADE_COLS;
+  protected readonly hiddenCols = signal<Set<string>>(new Set());
 
   private pollTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -289,6 +307,7 @@ export class TradeBotComponent implements OnInit, OnDestroy {
     if (uid) this.kiteSession.bindSiteUser(uid);
     this.capitalRs = this.capitalPreference.get();
     this.mineFundText = String(this.capitalRs);
+    this.loadHiddenCols();
     void this.refreshLiveStatus();
     void this.refreshKiteFunds();
   }
@@ -704,6 +723,47 @@ export class TradeBotComponent implements OnInit, OnDestroy {
   protected slLabel(t: PaperTrade): string {
     const sl = this.tradeSl(t);
     return sl != null ? `₹${this.formatPrice(sl)}` : '—';
+  }
+
+  protected colOn(id: string): boolean {
+    return !this.hiddenCols().has(id);
+  }
+
+  protected toggleCol(id: string): void {
+    const next = new Set(this.hiddenCols());
+    if (next.has(id)) next.delete(id);
+    else {
+      const visible = TRADE_COLS.filter((c) => !next.has(c.id)).length;
+      if (visible <= 1) return;
+      next.add(id);
+    }
+    this.hiddenCols.set(next);
+    this.saveHiddenCols();
+  }
+
+  protected visibleColCount(): number {
+    return TRADE_COLS.filter((c) => this.colOn(c.id)).length;
+  }
+
+  private loadHiddenCols(): void {
+    try {
+      const raw = localStorage.getItem(TRADE_COL_STORE);
+      if (!raw) return;
+      const ids = JSON.parse(raw) as string[];
+      if (!Array.isArray(ids)) return;
+      const allowed = new Set(TRADE_COLS.map((c) => c.id));
+      this.hiddenCols.set(new Set(ids.filter((id) => allowed.has(id as TradeColId))));
+    } catch {
+      /* ignore */
+    }
+  }
+
+  private saveHiddenCols(): void {
+    try {
+      localStorage.setItem(TRADE_COL_STORE, JSON.stringify([...this.hiddenCols()]));
+    } catch {
+      /* ignore */
+    }
   }
 
   protected resultBoard(): PaperResult | null {

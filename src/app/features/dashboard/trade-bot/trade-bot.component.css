@@ -503,14 +503,58 @@
 
 .trade-bot .table-wrap {
   margin-top: 0.75rem;
-  overflow: auto;
-  max-height: 28rem;
+  overflow-x: scroll;
+  overflow-y: auto;
+  max-height: 32rem;
+  scrollbar-gutter: stable;
+  border: 1px solid var(--pg-line);
+  border-radius: var(--pg-radius);
+}
+
+.trade-bot .table-wrap::-webkit-scrollbar {
+  height: 10px;
+  width: 10px;
+}
+
+.trade-bot .table-wrap::-webkit-scrollbar-thumb {
+  background: #94a3b8;
+  border-radius: 999px;
 }
 
 .trade-bot table {
-  width: 100%;
+  min-width: 76rem;
+  width: max-content;
   border-collapse: collapse;
   font-size: 0.82rem;
+}
+
+.trade-bot th.off,
+.trade-bot td.off {
+  display: none;
+}
+
+.trade-bot .col-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.75rem;
+  margin: 0.35rem 0 0.15rem;
+}
+
+.trade-bot .col-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  font-size: 0.78rem;
+  color: var(--pg-muted);
+  cursor: pointer;
+  user-select: none;
+}
+
+.trade-bot .sl-inline {
+  margin-top: 0.2rem;
+  font-weight: 800;
+  color: #9a3412;
+  font-variant-numeric: tabular-nums;
 }
 
 .trade-bot th,

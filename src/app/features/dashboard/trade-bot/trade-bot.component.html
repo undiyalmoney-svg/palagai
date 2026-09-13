@@ -216,42 +216,54 @@
       }
 
       <h3>Trades</h3>
+      <p class="hint">
+        Yes — every fill has a protective SL. Paper uses the same option-premium trigger Live rests on Kite (SL ₹). Hide extra columns if the table is wide; scroll sideways for the rest.
+      </p>
+      <div class="col-toggles" data-testid="trade-bot-col-toggles">
+        @for (col of tradeCols; track col.id) {
+          <label class="col-toggle">
+            <input type="checkbox" [checked]="colOn(col.id)" (change)="toggleCol(col.id)" />
+            <span>{{ col.label }}</span>
+          </label>
+        }
+      </div>
       <div class="table-wrap" data-testid="trade-bot-result-table">
         <table>
           <thead>
             <tr>
-              <th>Entry time</th>
-              <th>Exit time</th>
-              <th>Instrument</th>
-              <th>Option</th>
-              <th>Side</th>
-              <th>In</th>
-              <th>SL ₹</th>
-              <th>Out</th>
-              <th>Lots</th>
-              <th>₹</th>
-              <th>Why</th>
+              <th [class.off]="!colOn('entryTime')">Entry time</th>
+              <th [class.off]="!colOn('exitTime')">Exit time</th>
+              <th [class.off]="!colOn('instrument')">Instrument</th>
+              <th [class.off]="!colOn('option')">Option</th>
+              <th [class.off]="!colOn('side')">Side</th>
+              <th [class.off]="!colOn('in')">In</th>
+              <th [class.off]="!colOn('sl')">SL ₹</th>
+              <th [class.off]="!colOn('out')">Out</th>
+              <th [class.off]="!colOn('lots')">Lots</th>
+              <th [class.off]="!colOn('pnl')">₹</th>
+              <th [class.off]="!colOn('why')">Why</th>
             </tr>
           </thead>
           <tbody>
             @for (t of p.trades || []; track $index) {
               <tr [class.open-row]="isOpenTrade(t)">
-                <td class="trade-hms">{{ formatTradeWhen(t.entryTime, t.entryClock) }}</td>
-                <td class="trade-hms">{{ isOpenTrade(t) ? 'OPEN' : formatTradeWhen(t.exitTime, t.exitClock) }}</td>
-                <td>{{ t.instrumentName || '—' }}</td>
-                <td>{{ optionLabel(t) }}</td>
-                <td>{{ tradeSide(t) }}</td>
-                <td class="px">
+                <td class="trade-hms" [class.off]="!colOn('entryTime')">{{ formatTradeWhen(t.entryTime, t.entryClock) }}</td>
+                <td class="trade-hms" [class.off]="!colOn('exitTime')">{{ isOpenTrade(t) ? 'OPEN' : formatTradeWhen(t.exitTime, t.exitClock) }}</td>
+                <td [class.off]="!colOn('instrument')">{{ t.instrumentName || '—' }}</td>
+                <td [class.off]="!colOn('option')">{{ optionLabel(t) }}</td>
+                <td [class.off]="!colOn('side')">{{ tradeSide(t) }}</td>
+                <td class="px" [class.off]="!colOn('in')">
                   <div>{{ formatPrice(optionFillPrice(t, 'entry')) }}</div>
+                  <div class="sl-inline">SL {{ slLabel(t) }}</div>
                   @if (ohlcLine(t, 'entry'); as o) {
                     <small class="ohlc">{{ o }}</small>
                   }
                 </td>
-                <td class="px sl-cell" [class.down]="isOpenTrade(t) && t.slOn === false">
+                <td class="px sl-cell" [class.off]="!colOn('sl')" [class.down]="isOpenTrade(t) && t.slOn === false">
                   <span class="sl-kicker">SL</span>
                   <strong>{{ slLabel(t) }}</strong>
                 </td>
-                <td class="px">
+                <td class="px" [class.off]="!colOn('out')">
                   @if (isOpenTrade(t)) {
                     —
                   } @else {
@@ -261,16 +273,16 @@
                     }
                   }
                 </td>
-                <td>{{ t.lots || 1 }}</td>
-                <td [class.up]="(t.netOptionPnlRs ?? t.optionPnlRs ?? 0) >= 0" [class.down]="(t.netOptionPnlRs ?? t.optionPnlRs ?? 0) < 0">
+                <td [class.off]="!colOn('lots')">{{ t.lots || 1 }}</td>
+                <td [class.off]="!colOn('pnl')" [class.up]="(t.netOptionPnlRs ?? t.optionPnlRs ?? 0) >= 0" [class.down]="(t.netOptionPnlRs ?? t.optionPnlRs ?? 0) < 0">
                   ₹{{ (t.netOptionPnlRs ?? t.optionPnlRs ?? 0) | number: '1.0-0' }}
                 </td>
-                <td>{{ isOpenTrade(t) ? (t.slOn === false ? 'OPEN · SL missing' : 'OPEN') : t.exitReason }}</td>
+                <td [class.off]="!colOn('why')">{{ isOpenTrade(t) ? (t.slOn === false ? 'OPEN · SL missing' : 'OPEN') : t.exitReason }}</td>
               </tr>
             }
             @if (!(p.trades || []).length) {
               <tr>
-                <td colspan="11">No money booked in this window.</td>
+                <td [attr.colspan]="visibleColCount()">No money booked in this window.</td>
               </tr>
             }
           </tbody>
