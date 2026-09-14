@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
+import { ChangeDetectorRef, Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -276,6 +276,7 @@ type TradeColId = (typeof TRADE_COLS)[number]['id'];
 })
 export class TradeBotComponent implements OnInit, OnDestroy {
   private readonly http = inject(HttpClient);
+  private readonly cdr = inject(ChangeDetectorRef);
   private readonly kiteSession = inject(KiteSessionService);
   private readonly capitalPreference = inject(CapitalPreferenceService);
   protected readonly kiteFundsSvc = inject(KiteFundsService);
@@ -906,8 +907,11 @@ export class TradeBotComponent implements OnInit, OnDestroy {
       if (!ok) return;
     }
     this.busy.set(true);
+    this.cdr.detectChanges();
     try {
-      await this.kiteFundsSvc.refresh();
+      if (this.liveMoney) {
+        await this.kiteFundsSvc.refresh();
+      }
 
       const body: {
         fromDate: string;
@@ -963,6 +967,7 @@ export class TradeBotComponent implements OnInit, OnDestroy {
 
   protected async stopLive(): Promise<void> {
     this.busy.set(true);
+    this.cdr.detectChanges();
     this.error.set('');
     try {
       const res = await firstValueFrom(
