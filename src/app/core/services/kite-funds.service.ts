@@ -1,9 +1,10 @@
-import { HttpClient, HttpErrorResponse } from '@angular/common/http';
+import { HttpClient } from '@angular/common/http';
 import { Injectable, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { KiteSessionService } from '../kite/kite-session.service';
 import { CapitalPreferenceService } from './capital-preference.service';
+import { formatUnknownError } from '../utils/kite-error.util';
 
 export interface KiteFundsSnapshot {
   status?: string;
@@ -82,14 +83,6 @@ export class KiteFundsService {
   }
 
   private fmtErr(err: unknown): string {
-    if (err instanceof HttpErrorResponse) {
-      const body = err.error as { message?: string; error?: string } | string;
-      if (typeof body === 'string' && body.trim()) return body;
-      if (body && typeof body === 'object') {
-        return body.message || body.error || err.message || 'Request failed';
-      }
-      return err.message || 'Request failed';
-    }
-    return err instanceof Error ? err.message : 'Request failed';
+    return formatUnknownError(err, 'Funds');
   }
 }

@@ -18,7 +18,7 @@ import {
   roundOptionPremiumTick,
 } from '../../../core/live-desk/option-sl-premium.util';
 import { UiDialogService } from '../../../shared/ui/dialog/ui-dialog.service';
-import { AuthService } from '../../../core/auth/auth.service';
+import { toErrorText } from '../../../core/utils/kite-error.util';
 
 interface PaperTrade {
   instrumentName?: string;
@@ -905,37 +905,36 @@ export class TradeBotComponent implements OnInit, OnDestroy {
       });
       if (!ok) return;
     }
-    await this.kiteFundsSvc.pushToken();
-    await this.refreshKiteFunds();
-
-    const body: {
-      fromDate: string;
-      toDate: string;
-      today: boolean;
-      liveMoney: boolean;
-      realOrders: boolean;
-      lots: number;
-      niftyLots: number;
-      capitalRs: number;
-      capitalSource: 'actual' | 'mine';
-      engine: string;
-    } = {
-      fromDate: this.fromDate,
-      toDate: this.toDate,
-      today: this.liveMoney ? true : this.today,
-      liveMoney: this.liveMoney,
-      realOrders: this.liveMoney,
-      lots: this.systemLots(),
-      niftyLots: this.systemLots(),
-      capitalRs: this.capitalRs,
-      capitalSource: this.fundMode(),
-      engine: this.isCrudeDesk() ? 'crude-desk' : 'sr-desk',
-    };
-    const kite = this.kiteSession.getAuthorizationHeader();
-    const headers: Record<string, string> = kite ? { 'X-Kite-Authorization': kite } : {};
-
     this.busy.set(true);
     try {
+      await this.kiteFundsSvc.refresh();
+
+      const body: {
+        fromDate: string;
+        toDate: string;
+        today: boolean;
+        liveMoney: boolean;
+        realOrders: boolean;
+        lots: number;
+        niftyLots: number;
+        capitalRs: number;
+        capitalSource: 'actual' | 'mine';
+        engine: string;
+      } = {
+        fromDate: this.fromDate,
+        toDate: this.toDate,
+        today: this.liveMoney ? true : this.today,
+        liveMoney: this.liveMoney,
+        realOrders: this.liveMoney,
+        lots: this.systemLots(),
+        niftyLots: this.systemLots(),
+        capitalRs: this.capitalRs,
+        capitalSource: this.fundMode(),
+        engine: this.isCrudeDesk() ? 'crude-desk' : 'sr-desk',
+      };
+      const kite = this.kiteSession.getAuthorizationHeader();
+      const headers: Record<string, string> = kite ? { 'X-Kite-Authorization': kite } : {};
+
       const res = await firstValueFrom(
         this.http.post<PaperResult & LiveStatus>(`${this.liveApiBase}/start`, body, { headers }).pipe(
           timeout(180_000),
@@ -1023,13 +1022,23 @@ export class TradeBotComponent implements OnInit, OnDestroy {
 
   private fmtErr(err: unknown): string {
     if (err instanceof HttpErrorResponse) {
-      const body = err.error as { message?: string; error?: string } | string;
-      if (typeof body === 'string' && body.trim()) return body;
-      if (body && typeof body === 'object') {
-        return body.message || body.error || err.message || 'Request failed';
+      const body = err.error as { message?: unknown; error?: unknown } | string | null;
+      const fromBody = toErrorText(
+        body && typeof body === 'object'
+          ? body.message ?? body.error ?? body
+          : body,
+      );
+      if (fromBody) return fromBody;
+      if (err.status === 504 || err.status === 502) {
+        return 'Paper timed out reaching the trading server. Use Last 60 days, or retry.';
       }
-      return err.message || 'Request failed';
+      if (err.status === 0) return 'Paper: network error — Get Token and retry.';
+      return `Paper failed (HTTP ${err.status}).`;
     }
-    return err instanceof Error ? err.message : 'Request failed';
+    const text = toErrorText(err);
+    if (/Timeout/i.test(text)) {
+      return 'Paper timed out in the browser. Use Last 60 days, or retry.';
+    }
+    return text || 'Paper request failed.';
   }
 }
