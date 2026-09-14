@@ -489,13 +489,13 @@ export class TradeBotComponent implements OnInit, OnDestroy {
   protected deskLede(): string {
     return this.isCrudeDesk()
       ? 'Only Crude Oil Mini ATM PE after NSE close. Session OR 09:00–09:30 (skip if wider than 60 pts), confirm, 16:00–19:00, max 2/day. Afternoon CE is off. Paper ₹ is Mini points × ₹10 × lots. In/Out are the Mini future prints for that ₹. Live buys one ATM PE from Kite — never the future print.'
-      : 'Only Nifty 50 and Bank Nifty. Crude and stocks stay off. This is S/R wall-break: with-trend, profit lock, day ±₹3,500. Paper In/Out are NSE 5-minute option OHLC. Paper ₹ is index × lot. Live buys one ATM CE or PE from Kite — it does not sell both sides.';
+      : 'Only Nifty 50 and Bank Nifty. Crude and stocks stay off. This is S/R wall-break: with-trend, profit lock, day ±₹3,500. Paper In/Out are NSE 5-minute option OHLC. Paper ₹ is the same as Live: CE/PE premium × lot (65 / 30). Live buys one ATM CE or PE from Kite — it does not sell both sides.';
   }
 
   protected tradesHint(): string {
     return this.isCrudeDesk()
       ? 'Paper ₹ is Mini points × ₹10 × lots (see Why for fut pts). In/Out are the future prints. Option premium is the small OHLC under In/Out. Hide extra columns if the table is wide; scroll sideways for the rest.'
-      : 'Yes — every fill has a protective SL. Paper uses the same option-premium trigger Live rests on Kite (SL ₹). Hide extra columns if the table is wide; scroll sideways for the rest.';
+      : 'Yes — every fill has a protective SL. Paper ₹ is CE/PE premium × lot, same as Live. Paper uses the same option-premium trigger Live rests on Kite (SL ₹). Hide extra columns if the table is wide; scroll sideways for the rest.';
   }
 
   protected colStoreKey(): string {
