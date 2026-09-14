@@ -153,7 +153,7 @@
       <aside class="live-assistant" data-testid="live-assistant">
         <h3>Live assistant</h3>
         @if (!liveHelp().length) {
-          <p class="hint">{{ isCrudeDesk() ? 'Get Token pushes the Kite token automatically. Crude Bot waits for NSE close, then buys ATM PE only (short the Mini) on a 09:00–09:30 range, skip if wider than 60 pts, from 16:00–21:00 after a confirm bar. Max 2 trades a day. Afternoon CE is off. Paper ₹ is Mini points × ₹10 × lots.' : 'Get Token pushes the Kite token to the server automatically. Start live and Refresh funds do the same. There is no Push Token button on this page.' }}</p>
+          <p class="hint">{{ isCrudeDesk() ? 'Get Token pushes the Kite token automatically. Crude Bot waits for NSE close, then buys ATM PE only (short the Mini) on a 09:00–09:30 range, skip if wider than 60 pts, from 16:00–19:00 after a confirm bar. Max 1 trade a day. Afternoon CE is off. Paper ₹ is Mini points × ₹10 × lots.' : 'Get Token pushes the Kite token to the server automatically. Start live and Refresh funds do the same. There is no Push Token button on this page.' }}</p>
         }
         @for (row of liveHelp(); track $index) {
           <p [class.ok]="row.ok" [class.err]="!row.ok">{{ row.detail }}</p>
