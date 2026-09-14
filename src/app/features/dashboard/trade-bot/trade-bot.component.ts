@@ -8,6 +8,7 @@ import { ActivatedRoute } from '@angular/router';
 import { map } from 'rxjs';
 import { firstValueFrom, timeout, Subscription } from 'rxjs';
 import { environment } from '../../../../environments/environment';
+import { AuthService } from '../../../core/auth/auth.service';
 import { KiteSessionService } from '../../../core/kite/kite-session.service';
 import { CapitalPreferenceService } from '../../../core/services/capital-preference.service';
 import { KiteFundsService } from '../../../core/services/kite-funds.service';
