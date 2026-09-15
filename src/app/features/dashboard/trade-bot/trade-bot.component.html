@@ -7,7 +7,7 @@
       </p>
     </div>
     <div class="hero-meta">
-      @if (liveMoney) {
+      @if (liveSessionOn()) {
         <span class="pg-badge pg-badge-bear">LIVE MONEY</span>
       } @else {
         <span class="pg-badge pg-badge-neutral">PAPER</span>
@@ -140,7 +140,7 @@
       <button
         mat-stroked-button
         type="button"
-        [disabled]="busy() || live()?.status !== 'running'"
+        [disabled]="busy() || !liveIsRunning(live())"
         (click)="stopLive()"
       >
         Stop live
@@ -150,7 +150,7 @@
     @if (error()) {
       <p class="err">{{ error() }}</p>
     }
-    @if (liveMoney || liveHelp().length) {
+    @if (liveSessionOn() || liveHelp().length) {
       <aside class="live-assistant" data-testid="live-assistant">
         <h3>Live assistant</h3>
         @if (!liveHelp().length) {
@@ -304,8 +304,12 @@
                   }
                 </td>
                 <td [class.off]="!colOn('lots')">{{ t.lots || 1 }}</td>
-                <td [class.off]="!colOn('pnl')" [class.up]="(t.netOptionPnlRs ?? t.optionPnlRs ?? 0) >= 0" [class.down]="(t.netOptionPnlRs ?? t.optionPnlRs ?? 0) < 0">
-                  ₹{{ (t.netOptionPnlRs ?? t.optionPnlRs ?? 0) | number: '1.0-0' }}
+                <td [class.off]="!colOn('pnl')" [class.up]="(tradePnlRs(t) ?? 0) > 0" [class.down]="(tradePnlRs(t) ?? 0) < 0">
+                  @if (tradePnlRs(t) == null) {
+                    —
+                  } @else {
+                    ₹{{ tradePnlRs(t)! | number: '1.0-0' }}
+                  }
                 </td>
                 <td [class.off]="!colOn('why')">{{ isOpenTrade(t) ? (t.slOn === false ? 'OPEN · SL missing' : 'OPEN') : t.exitReason }}</td>
               </tr>
@@ -325,12 +329,12 @@
   }
 
   @if (live(); as s) {
-    <div class="status-card" [attr.data-running]="s.status === 'running'">
+    <div class="status-card" [attr.data-running]="liveIsRunning(s)">
       <h3>Live</h3>
-      <p>{{ s.status || 'idle' }}{{ s.message ? ' · ' + s.message : '' }}</p>
+      <p>{{ liveIsRunning(s) ? 'running' : (s.status || 'idle') }}{{ s.message ? ' · ' + s.message : '' }}</p>
       @if (s.events?.length) {
         <ul class="events">
-          @for (ev of (s.events || []).slice(0, 12); track $index) {
+          @for (ev of (s.events || []).slice(0, 40); track $index) {
             <li>
               <code>{{ ev.action }}</code>
               <span>{{ ev.detail }}</span>

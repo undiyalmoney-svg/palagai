@@ -351,6 +351,16 @@ export class TradeBotComponent implements OnInit, OnDestroy {
     return !!this.fromDate && !!this.toDate && this.fromDate <= t && this.toDate >= t;
   }
 
+  protected liveSessionOn(): boolean {
+    const s = this.live();
+    return this.liveMoney || this.liveIsRunning(s);
+  }
+
+  protected liveIsRunning(s?: LiveStatus | null): boolean {
+    if (!s) return false;
+    return s.status === 'running' || !!s.running || s.liveMoney === true;
+  }
+
   protected controlsLocked(): boolean {
     return this.liveMoney || this.busy();
   }
@@ -495,7 +505,7 @@ export class TradeBotComponent implements OnInit, OnDestroy {
   protected tradesHint(): string {
     return this.isCrudeDesk()
       ? 'Paper ₹ is Mini points × ₹10 × lots (see Why for fut pts). In/Out are the future prints. Option premium is the small OHLC under In/Out. Hide extra columns if the table is wide; scroll sideways for the rest.'
-      : 'Yes — every fill has a protective SL. Paper ₹ is CE/PE premium × lot, same as Live. Paper uses the same option-premium trigger Live rests on Kite (SL ₹). Hide extra columns if the table is wide; scroll sideways for the rest.';
+      : 'Yes — every fill has a protective SL. Paper ₹ is CE/PE premium × lot, same as Live. Paper uses 5-minute option bars; Live uses the Kite fill + SL-M. Re-open the tab and Live stays attached. Hide extra columns if the table is wide; scroll sideways for the rest.';
   }
 
   protected colStoreKey(): string {
@@ -834,12 +844,15 @@ export class TradeBotComponent implements OnInit, OnDestroy {
   }
 
   protected resultBoard(): PaperResult | null {
-    if (this.liveMoney) {
-      const live = this.live();
-      if (!live) return null;
+    const live = this.live();
+    const showLive =
+      this.liveMoney
+      || this.liveIsRunning(live)
+      || (!this.paper() && !!(live?.trades?.length || live?.events?.length || live?.positions?.length));
+    if (showLive && live) {
       const trades = live.trades?.length ? live.trades : this.tradesFromLive(live);
-      const running = live.status === 'running' || !!live.running;
-      if (!running && !trades.length) return null;
+      const running = this.liveIsRunning(live);
+      if (!running && !trades.length && !live.events?.length) return this.paper();
       const net = Number(live.kitePnl?.netRs);
       const profit = this.paperProfit({ trades });
       const loss = this.paperLoss({ trades });
@@ -877,6 +890,13 @@ export class TradeBotComponent implements OnInit, OnDestroy {
 
   protected isOpenTrade(t: PaperTrade): boolean {
     return !!(t.open || String(t.exitReason || '').toUpperCase().startsWith('OPEN'));
+  }
+
+  protected tradePnlRs(t: PaperTrade): number | null {
+    const n = t.netOptionPnlRs ?? t.optionPnlRs;
+    if (n == null || n === ('' as unknown)) return null;
+    const v = Number(n);
+    return Number.isFinite(v) ? v : null;
   }
 
   protected async run(): Promise<void> {
@@ -997,11 +1017,18 @@ export class TradeBotComponent implements OnInit, OnDestroy {
       this.live.set(s);
       const checks = s?.liveAssistant?.checks;
       if (checks?.length) this.liveAssistant.set(checks);
-      if (s?.status === 'running') {
-        this.startPoll();
-      }
+      this.attachLiveFromStatus(s);
+      this.cdr.detectChanges();
     } catch {
       /* idle / not signed in for auto module */
+    }
+  }
+
+  private attachLiveFromStatus(s: LiveStatus): void {
+    if (this.liveIsRunning(s)) {
+      this.liveMoney = true;
+      this.fundSource = 'actual';
+      this.startPoll();
     }
   }
 
