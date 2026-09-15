@@ -229,6 +229,7 @@ interface LiveStatus {
   liveMoney?: boolean;
   realOrders?: boolean;
   lastError?: string | null;
+  lastTickAt?: string | null;
   liveAssistant?: { ok?: boolean; checks?: Array<{ id?: string; ok: boolean; detail: string }> };
   events?: Array<{ at?: string; action?: string; detail?: string }>;
   totals?: { netRs?: number; trades?: number };
@@ -505,7 +506,7 @@ export class TradeBotComponent implements OnInit, OnDestroy {
   protected tradesHint(): string {
     return this.isCrudeDesk()
       ? 'Paper ₹ is Mini points × ₹10 × lots (see Why for fut pts). In/Out are the future prints. Option premium is the small OHLC under In/Out. Hide extra columns if the table is wide; scroll sideways for the rest.'
-      : 'Yes — every fill has a protective SL. Paper ₹ is CE/PE premium × lot, same as Live. Paper uses 5-minute option bars; Live uses the Kite fill + SL-M. Re-open the tab and Live stays attached. Hide extra columns if the table is wide; scroll sideways for the rest.';
+      : 'Yes — every fill has a protective SL. Paper ₹ is CE/PE × lot like Live. Today paper marks Live-skip on stale rows. Hide extra columns if the table is wide; scroll sideways for the rest.';
   }
 
   protected colStoreKey(): string {

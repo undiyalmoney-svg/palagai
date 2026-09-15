@@ -311,7 +311,7 @@
                     ₹{{ tradePnlRs(t)! | number: '1.0-0' }}
                   }
                 </td>
-                <td [class.off]="!colOn('why')">{{ isOpenTrade(t) ? (t.slOn === false ? 'OPEN · SL missing' : 'OPEN') : t.exitReason }}</td>
+                <td [class.off]="!colOn('why')">{{ isOpenTrade(t) ? (t.slOn === false ? 'OPEN · SL missing' : 'OPEN') : (t.skipReason || t.exitReason) }}</td>
               </tr>
             }
             @if (!(p.trades || []).length) {
@@ -332,6 +332,9 @@
     <div class="status-card" [attr.data-running]="liveIsRunning(s)">
       <h3>Live</h3>
       <p>{{ liveIsRunning(s) ? 'running' : (s.status || 'idle') }}{{ s.message ? ' · ' + s.message : '' }}</p>
+      @if (s.lastTickAt) {
+        <p class="hint">Last tick {{ s.lastTickAt }}</p>
+      }
       @if (s.events?.length) {
         <ul class="events">
           @for (ev of (s.events || []).slice(0, 40); track $index) {
