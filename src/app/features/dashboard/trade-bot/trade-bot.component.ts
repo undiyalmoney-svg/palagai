@@ -500,7 +500,7 @@ export class TradeBotComponent implements OnInit, OnDestroy {
   protected deskLede(): string {
     return this.isCrudeDesk()
       ? 'Only Crude Oil Mini ATM PE after NSE close. Session OR 09:00–09:30 (skip if wider than 60 pts), confirm, 16:00–19:00, max 2/day. Afternoon CE is off. Paper ₹ is Mini points × ₹10 × lots. In/Out are the Mini future prints for that ₹. Live buys one ATM PE from Kite — never the future print.'
-      : 'Only Nifty 50 and Bank Nifty. Crude and stocks stay off. This is S/R wall-break: with-trend, profit lock, day ±₹3,500. Paper In/Out are NSE 5-minute option OHLC. Paper ₹ is the same as Live: CE/PE premium × lot (65 / 30). Live buys one ATM CE or PE from Kite — it does not sell both sides.';
+      : 'Only Nifty 50 and Bank Nifty. Buys one ATM CE or PE per book (qty 65 / 30). Holds about 6 five-minute bars like the 15 Sep Kite book (Nifty 23200 PE 133.35→141.25, Bank 56000 PE 505→536) — not a +20 index TARGET scratch. Paper ₹ is CE/PE × lot. Live rests an option SL.';
   }
 
   protected tradesHint(): string {
