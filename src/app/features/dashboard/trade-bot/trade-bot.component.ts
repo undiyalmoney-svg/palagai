@@ -500,7 +500,7 @@ export class TradeBotComponent implements OnInit, OnDestroy {
   protected deskLede(): string {
     return this.isCrudeDesk()
       ? 'Only Crude Oil Mini ATM PE after NSE close. Session OR 09:00–09:30 (skip if wider than 60 pts), confirm, 16:00–19:00, max 2/day. Afternoon CE is off. Paper ₹ is Mini points × ₹10 × lots. In/Out are the Mini future prints for that ₹. Live buys one ATM PE from Kite — never the future print.'
-      : 'Only Nifty 50 and Bank Nifty. Buys one ATM CE or PE per book (qty 65 / 30). Holds about 6 five-minute bars like the 15 Sep Kite book (Nifty 23200 PE 133.35→141.25, Bank 56000 PE 505→536) — not a +20 index TARGET scratch. Paper ₹ is CE/PE × lot. Live rests an option SL.';
+      : 'Only Nifty 50 and Bank Nifty. One ATM CE or PE per book per day (qty 65 / 30, MIS). Holds the move to 15:15 unless the rupee stop hits — not a 6-bar TIME flatten, not FAIL on a 1-bar close through the wall, not a +20 index TARGET. Paper ₹ is CE/PE × lot. Live rests an option SL.';
   }
 
   protected tradesHint(): string {
@@ -921,7 +921,7 @@ export class TradeBotComponent implements OnInit, OnDestroy {
         title: this.isCrudeDesk() ? 'Place live Crude Mini orders?' : 'Place live Kite orders?',
         message: this.isCrudeDesk()
           ? 'Live places a real MIS buy on one Crude Oil Mini ATM CE or PE when the Nifty/Bank-style retest fires. Not the future print. Not Nifty or Bank. Protective option SL. Day ±₹3,500.'
-          : 'Live places real MIS buys on Nifty + Bank S/R signals (one ATM CE or PE). It does not sell a straddle. Day ±₹3,500. Crude stays off.',
+          : 'Live places real MIS buys on Nifty + Bank S/R signals (one ATM CE or PE per book per day, held to 15:15). It does not sell a straddle. Day ±₹3,500. Crude stays off.',
         confirmLabel: 'Start live',
         cancelLabel: 'Cancel',
         tone: 'danger',
