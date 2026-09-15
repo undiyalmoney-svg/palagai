@@ -518,7 +518,7 @@ export class TradeBotComponent implements OnInit, OnDestroy {
   protected tradesHint(): string {
     return this.isCrudeDesk()
       ? 'Paper ₹ is Mini points × ₹10 × lots (see Why for fut pts). In/Out are the future prints. Option premium is the small OHLC under In/Out. Hide extra columns if the table is wide; scroll sideways for the rest.'
-      : 'Yes — every fill has a protective SL. Paper ₹ is CE/PE × lot like Live. Pink/teal boxes are the engine wall, not a UI overlay. Today paper marks Live-skip on stale rows. Hide extra columns if the table is wide; scroll sideways for the rest.';
+      : 'Yes — every fill has a protective SL. Paper ₹ is CE/PE × lot like Live. Pink/teal boxes are the engine wall, not a UI overlay. Live takes the same engine row Paper is in (enter if still OPEN, stay flat if Paper already exited). Hide extra columns if the table is wide; scroll sideways for the rest.';
   }
 
   protected colStoreKey(): string {
