@@ -20,6 +20,7 @@ import {
 } from '../../../core/live-desk/option-sl-premium.util';
 import { UiDialogService } from '../../../shared/ui/dialog/ui-dialog.service';
 import { toErrorText } from '../../../core/utils/kite-error.util';
+import { SrStructureChartComponent, SrChartBar, SrStructureBox } from './sr-structure-chart.component';
 
 interface PaperTrade {
   instrumentName?: string;
@@ -58,6 +59,11 @@ interface PaperTrade {
   liveWouldTake?: boolean;
   skipReason?: string;
   lots?: number;
+  quantity?: number | null;
+  level?: number | null;
+  wallHi?: number | null;
+  wallLo?: number | null;
+  structure?: SrStructureBox | null;
 }
 
 interface PaperTotals {
@@ -87,6 +93,7 @@ interface PaperResult {
   trades?: PaperTrade[];
   message?: string;
   note?: string;
+  deskChart?: { books?: Array<{ id?: string; label?: string; days?: Record<string, SrChartBar[]>; trades?: PaperTrade[] }> };
   capitalRs?: number;
   capitalSource?: 'actual' | 'mine';
   maxLots?: number;
@@ -141,6 +148,8 @@ interface PaperResult {
     why?: string;
     specText?: string;
     totals?: PaperTotals;
+    trades?: PaperTrade[];
+    chart?: { id?: string; label?: string; days?: Record<string, SrChartBar[]>; trades?: PaperTrade[] };
     error?: string;
   }>;
   coreBooks?: Array<{
@@ -235,6 +244,7 @@ interface LiveStatus {
   totals?: { netRs?: number; trades?: number };
   trades?: PaperTrade[];
   kitePnl?: { closedRs?: number; openRs?: number; netRs?: number };
+  deskChart?: PaperResult['deskChart'];
   positions?: Array<{
     instrumentId?: string;
     symbol?: string;
@@ -259,6 +269,7 @@ const TRADE_COLS = [
   { id: 'exitTime', label: 'Exit time' },
   { id: 'instrument', label: 'Instrument' },
   { id: 'option', label: 'Option' },
+  { id: 'qty', label: 'Qty' },
   { id: 'side', label: 'Side' },
   { id: 'in', label: 'In' },
   { id: 'sl', label: 'SL ₹' },
@@ -272,7 +283,7 @@ type TradeColId = (typeof TRADE_COLS)[number]['id'];
 @Component({
   selector: 'app-trade-bot',
   standalone: true,
-  imports: [FormsModule, DecimalPipe, MatButtonModule],
+  imports: [FormsModule, DecimalPipe, MatButtonModule, SrStructureChartComponent],
   templateUrl: './trade-bot.component.html',
   styleUrl: './trade-bot.component.css',
 })
@@ -307,6 +318,7 @@ export class TradeBotComponent implements OnInit, OnDestroy {
   protected readonly liveAssistant = signal<Array<{ id?: string; ok: boolean; detail: string }>>([]);
   protected readonly tradeCols = TRADE_COLS;
   protected readonly hiddenCols = signal<Set<string>>(new Set());
+  protected readonly selectedTradeKey = signal<string>('');
 
   private pollTimer: ReturnType<typeof setInterval> | null = null;
   private deskSub: Subscription | null = null;
@@ -500,13 +512,13 @@ export class TradeBotComponent implements OnInit, OnDestroy {
   protected deskLede(): string {
     return this.isCrudeDesk()
       ? 'Only Crude Oil Mini ATM PE after NSE close. Session OR 09:00–09:30 (skip if wider than 60 pts), confirm, 16:00–19:00, max 2/day. Afternoon CE is off. Paper ₹ is Mini points × ₹10 × lots. In/Out are the Mini future prints for that ₹. Live buys one ATM PE from Kite — never the future print.'
-      : 'Only Nifty 50 and Bank Nifty. One ATM CE or PE per book per day (qty 65 / 30, MIS). Holds the move to 15:15 unless the rupee stop hits — not a 6-bar TIME flatten, not FAIL on a 1-bar close through the wall, not a +20 index TARGET. Paper ₹ is CE/PE × lot. Live rests an option SL.';
+      : 'Only Nifty 50 and Bank Nifty. With-trend S/R wall break + retest, one ATM CE or PE per book per day (qty 65 / 30, MIS). Holds the S/R box to 15:15 unless the rupee stop hits, or the index completes the same measured-move the chart draws. Not a 6-bar TIME flatten, not FAIL on a 1-bar close through the wall, not a +20 index TARGET. Paper ₹ is CE/PE × lot. Live rests an option SL.';
   }
 
   protected tradesHint(): string {
     return this.isCrudeDesk()
       ? 'Paper ₹ is Mini points × ₹10 × lots (see Why for fut pts). In/Out are the future prints. Option premium is the small OHLC under In/Out. Hide extra columns if the table is wide; scroll sideways for the rest.'
-      : 'Yes — every fill has a protective SL. Paper ₹ is CE/PE × lot like Live. Today paper marks Live-skip on stale rows. Hide extra columns if the table is wide; scroll sideways for the rest.';
+      : 'Yes — every fill has a protective SL. Paper ₹ is CE/PE × lot like Live. Pink/teal boxes are the engine wall, not a UI overlay. Today paper marks Live-skip on stale rows. Hide extra columns if the table is wide; scroll sideways for the rest.';
   }
 
   protected colStoreKey(): string {
@@ -844,6 +856,56 @@ export class TradeBotComponent implements OnInit, OnDestroy {
     }
   }
 
+  protected tradeKey(t: PaperTrade, index: number): string {
+    return `${t.instrumentName || ''}|${t.entryTime || t.entryHm || ''}|${index}`;
+  }
+
+  protected tradeQty(t: PaperTrade): number {
+    const q = Number(t.quantity);
+    if (Number.isFinite(q) && q > 0) return q;
+    const lots = Math.max(1, Number(t.lots) || 1);
+    const name = `${t.instrumentName || ''} ${t.selectedInstrument || ''}`.toLowerCase();
+    if (/bank/i.test(name)) return 30 * lots;
+    if (this.isCrudeDesk() || name.includes('crude')) return 10 * lots;
+    return 65 * lots;
+  }
+
+  protected selectTrade(t: PaperTrade, index: number): void {
+    this.selectedTradeKey.set(this.tradeKey(t, index));
+  }
+
+  protected chartModel(): { bars: SrChartBar[]; structure: SrStructureBox | null; title: string; subtitle: string } | null {
+    if (this.isCrudeDesk()) return null;
+    const board = this.resultBoard();
+    if (!board) return null;
+    const trades = board.trades || [];
+    const key = this.selectedTradeKey();
+    let picked = trades.find((t, i) => this.tradeKey(t, i) === key);
+    if (!picked) picked = trades.find((t) => t.structure) || trades[0];
+    if (!picked) return null;
+    const day = String(picked.entryTime || picked.exitTime || board.toDate || '').slice(0, 10);
+    const books = [
+      ...(board.deskChart?.books || []),
+      ...((board.books || []).map((b) => b.chart).filter(Boolean) as NonNullable<PaperResult['books']>[number]['chart'][]),
+    ];
+    const live = this.live();
+    if (live?.deskChart?.books) books.push(...live.deskChart.books);
+    const name = picked.instrumentName || '';
+    const book = books.find((b) => b && (b.label === name || (name.includes('Bank') && b.id === 'bank') || (!name.includes('Bank') && (b.id === 'nifty' || b.label === 'Nifty 50'))));
+    const bars = (day && book?.days?.[day]) || Object.values(book?.days || {})[0] || [];
+    const structure = picked.structure
+      || (book?.trades || []).find((row) => String(row.entryTime || '') === String(picked.entryTime || picked.entryHm || ''))?.structure
+      || null;
+    if (!bars.length && !structure) return null;
+    const why = picked.exitReason || (picked.open ? 'OPEN' : '');
+    return {
+      bars,
+      structure: structure || null,
+      title: `${name || 'Index'} 5m`,
+      subtitle: `${picked.optionSymbol || picked.selectedInstrument || ''} · ${why}`.trim(),
+    };
+  }
+
   protected resultBoard(): PaperResult | null {
     const live = this.live();
     const showLive =
@@ -862,6 +924,7 @@ export class TradeBotComponent implements OnInit, OnDestroy {
         toDate: istToday(),
         liveMoney: true,
         trades,
+        deskChart: live.deskChart,
         totals: {
           netRs: Number.isFinite(net) ? net : this.paperNet({ trades }),
           grossProfitRs: profit,
@@ -921,7 +984,7 @@ export class TradeBotComponent implements OnInit, OnDestroy {
         title: this.isCrudeDesk() ? 'Place live Crude Mini orders?' : 'Place live Kite orders?',
         message: this.isCrudeDesk()
           ? 'Live places a real MIS buy on one Crude Oil Mini ATM CE or PE when the Nifty/Bank-style retest fires. Not the future print. Not Nifty or Bank. Protective option SL. Day ±₹3,500.'
-          : 'Live places real MIS buys on Nifty + Bank S/R signals (one ATM CE or PE per book per day, held to 15:15). It does not sell a straddle. Day ±₹3,500. Crude stays off.',
+          : 'Live places real MIS buys on Nifty + Bank S/R wall-break + retest (one ATM CE or PE per book per day, S/R box hold). It does not sell a straddle. Day ±₹3,500. Crude stays off.',
         confirmLabel: 'Start live',
         cancelLabel: 'Cancel',
         tone: 'danger',

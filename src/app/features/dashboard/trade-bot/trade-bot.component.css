@@ -672,6 +672,14 @@
   font-weight: 650;
 }
 
+.trade-bot tbody tr {
+  cursor: pointer;
+}
+
+.trade-bot tr.chart-row td {
+  box-shadow: inset 3px 0 0 #0f172a;
+}
+
 .trade-bot tr.why-row td {
   white-space: normal;
   color: var(--pg-muted);

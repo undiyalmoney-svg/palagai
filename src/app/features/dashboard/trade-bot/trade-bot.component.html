@@ -241,6 +241,17 @@
         <p class="hint">{{ p.note }}</p>
       }
 
+      @if (!isCrudeDesk() && chartModel(); as chart) {
+        <h3>S/R box</h3>
+        <p class="hint">Index 5m. Pink is the failed side of the broken wall. Teal is the measured continuation from that same height. Click a row to pin it.</p>
+        <app-sr-structure-chart
+          [bars]="chart.bars"
+          [structure]="chart.structure"
+          [title]="chart.title"
+          [subtitle]="chart.subtitle"
+        />
+      }
+
       <h3>Trades</h3>
       <p class="hint">{{ tradesHint() }}</p>
       <div class="col-toggles" data-testid="trade-bot-col-toggles">
@@ -259,6 +270,7 @@
               <th [class.off]="!colOn('exitTime')">Exit time</th>
               <th [class.off]="!colOn('instrument')">Instrument</th>
               <th [class.off]="!colOn('option')">Option</th>
+              <th [class.off]="!colOn('qty')">Qty</th>
               <th [class.off]="!colOn('side')">Side</th>
               <th [class.off]="!colOn('in')">In</th>
               <th [class.off]="!colOn('sl')">SL ₹</th>
@@ -270,11 +282,16 @@
           </thead>
           <tbody>
             @for (t of p.trades || []; track $index) {
-              <tr [class.open-row]="isOpenTrade(t)">
+              <tr
+                [class.open-row]="isOpenTrade(t)"
+                [class.chart-row]="tradeKey(t, $index) === selectedTradeKey() || (!selectedTradeKey() && $index === 0)"
+                (click)="selectTrade(t, $index)"
+              >
                 <td class="trade-hms" [class.off]="!colOn('entryTime')">{{ formatTradeWhen(t.entryTime, t.entryClock) }}</td>
                 <td class="trade-hms" [class.off]="!colOn('exitTime')">{{ isOpenTrade(t) ? 'OPEN' : formatTradeWhen(t.exitTime, t.exitClock) }}</td>
                 <td [class.off]="!colOn('instrument')">{{ t.instrumentName || '—' }}</td>
                 <td [class.off]="!colOn('option')" class="opt-cell">{{ optionLabel(t) }}</td>
+                <td [class.off]="!colOn('qty')">{{ tradeQty(t) }}</td>
                 <td [class.off]="!colOn('side')">{{ tradeSide(t) }}</td>
                 <td class="px" [class.off]="!colOn('in')">
                   <div>{{ formatPrice(displayFillPrice(t, 'entry')) }}</div>
