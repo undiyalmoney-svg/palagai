@@ -512,7 +512,7 @@ export class TradeBotComponent implements OnInit, OnDestroy {
   protected deskLede(): string {
     return this.isCrudeDesk()
       ? 'Only Crude Oil Mini ATM PE after NSE close. Session OR 09:00–09:30 (skip if wider than 60 pts), confirm, 16:00–19:00, max 2/day. Afternoon CE is off. Paper ₹ is Mini points × ₹10 × lots. In/Out are the Mini future prints for that ₹. Live buys one ATM PE from Kite — never the future print.'
-      : 'Only Nifty 50 and Bank Nifty. With-trend S/R wall break + retest, one ATM CE or PE per book per day (qty 65 / 30, MIS). Holds ~30 minutes (6×5m TIME) unless the rupee stop hits first (Nifty ₹5,000 / Bank ₹2,500), or the index completes the measured-move the chart draws. Not FAIL on a 1-bar close through the wall, not a +20 index TARGET. Paper ₹ is CE/PE × lot. Live rests an option SL.';
+      : 'Only Nifty 50 and Bank Nifty. With-trend S/R wall break + retest, up to two ATM CE or PE per book per day (qty 65 / 30, MIS). Holds ~30 minutes (6×5m TIME) unless the rupee stop hits first (Nifty ₹5,000 / Bank ₹2,500), the trade makes no +12 index pts by bar 4 (give-up), or the index completes the measured-move the chart draws. Not FAIL on a 1-bar close through the wall, not a +20 index TARGET. Paper ₹ is CE/PE × lot. Live rests an option SL.';
   }
 
   protected tradesHint(): string {
@@ -984,7 +984,7 @@ export class TradeBotComponent implements OnInit, OnDestroy {
         title: this.isCrudeDesk() ? 'Place live Crude Mini orders?' : 'Place live Kite orders?',
         message: this.isCrudeDesk()
           ? 'Live places a real MIS buy on one Crude Oil Mini ATM CE or PE when the Nifty/Bank-style retest fires. Not the future print. Not Nifty or Bank. Protective option SL. Day ±₹3,500.'
-          : 'Live places real MIS buys on Nifty + Bank S/R wall-break + retest (one ATM CE or PE per book per day, S/R box hold). It does not sell a straddle. Day ±₹3,500. Crude stays off.',
+          : 'Live places real MIS buys on Nifty + Bank S/R wall-break + retest (up to two ATM CE or PE per book per day, S/R box hold). It does not sell a straddle. Day ±₹3,500. Crude stays off.',
         confirmLabel: 'Start live',
         cancelLabel: 'Cancel',
         tone: 'danger',
