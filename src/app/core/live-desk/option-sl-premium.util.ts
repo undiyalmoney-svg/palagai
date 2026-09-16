@@ -44,6 +44,11 @@ export function mcxMinSlGapPts(fillPremium: number): number {
 export function computeProtectiveSlTrigger(params: {
   fillPremium: number;
   indexRiskPts: number;
+  /**
+   * Override NFO 0.5Δ. S/R stopPts is already ₹cap / lotUnits, so Live
+   * execution SL must use 1 or the Kite trigger is a Live-only haircut.
+   */
+  premiumDelta?: number | null;
   exchange?: string | null;
   tradingSymbol?: string | null;
   /** Current option LTP when placing (optional; do not pass fill as fake LTP). */
@@ -61,7 +66,9 @@ export function computeProtectiveSlTrigger(params: {
   const fill = Math.max(0, params.fillPremium);
   const risk = Math.max(0, params.indexRiskPts);
   const mcx = isMcxOptionContext(params.exchange, params.tradingSymbol);
-  const delta = mcx ? 1 : 0.5;
+  const delta = params.premiumDelta != null && Number(params.premiumDelta) > 0
+    ? Number(params.premiumDelta)
+    : (mcx ? 1 : 0.5);
   const fromRisk = fill - risk * delta;
   // NFO: never park SL within ~3% / ₹3 of fill — stops tuck-tuck ₹8–10 after peak trail.
   const nfoMinGap = Math.max(3, fill * 0.03);

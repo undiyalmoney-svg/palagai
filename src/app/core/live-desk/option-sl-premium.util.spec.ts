@@ -71,6 +71,29 @@ describe('computeProtectiveSlTrigger', () => {
     expect(lossRs).toBeLessThanOrEqual(300 + 0.05 * 75);
   });
 
+  it('S/R execution SL uses full ₹cap pts (premiumDelta 1), not 0.5× index', () => {
+    const fill = 776.75;
+    const t = computeProtectiveSlTrigger({
+      fillPremium: fill,
+      indexRiskPts: 2500 / 30,
+      premiumDelta: 1,
+      exchange: 'NFO',
+      tradingSymbol: 'BANKNIFTY26SEP56200CE',
+      maxLossRs: 2500,
+      lotUnits: 30,
+    });
+    expect(Math.abs((fill - t) - 2500 / 30)).toBeLessThan(1);
+    const haircut = computeProtectiveSlTrigger({
+      fillPremium: fill,
+      indexRiskPts: 2500 / 30,
+      exchange: 'NFO',
+      tradingSymbol: 'BANKNIFTY26SEP56200CE',
+      maxLossRs: 2500,
+      lotUnits: 30,
+    });
+    expect(fill - haircut).toBeCloseTo((2500 / 30) * 0.5, 0);
+  });
+
   it('does not loosen the stop when maxLossRs is wider than the structural stop', () => {
     const withoutCap = computeProtectiveSlTrigger({
       fillPremium: 109.9,

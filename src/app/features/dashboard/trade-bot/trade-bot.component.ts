@@ -57,6 +57,7 @@ interface PaperTrade {
   exitOhlc?: { open: number; high: number; low: number; close: number } | null;
   premiumSource?: string | null;
   liveWouldTake?: boolean;
+  liveMatched?: boolean;
   skipReason?: string;
   lots?: number;
   quantity?: number | null;
@@ -524,7 +525,7 @@ export class TradeBotComponent implements OnInit, OnDestroy {
   protected tradesHint(): string {
     return this.isCrudeDesk()
       ? 'Paper ₹ is Mini points × ₹10 × lots (see Why for fut pts). In/Out are the future prints. Option premium is the small OHLC under In/Out. Hide extra columns if the table is wide; scroll sideways for the rest.'
-      : 'Yes — every fill has a protective SL. Paper ₹ is CE/PE × lot like Live. Pink/teal boxes are the engine wall, not a UI overlay. Live takes the same engine row Paper is in (enter if still OPEN, stay flat if Paper already exited). Hide extra columns if the table is wide; scroll sideways for the rest.';
+      : 'Yes — every fill has a protective SL. Paper ₹ is CE/PE × lot like Live. If Live already filled today, Why and In/Out overlay that Kite fill (not a later CLOSE bar). Pink/teal boxes are the engine wall, not a UI overlay. Live takes the same engine row Paper is in, on the same 5m stamp. Hide extra columns if the table is wide; scroll sideways for the rest.';
   }
 
   protected colStoreKey(): string {
