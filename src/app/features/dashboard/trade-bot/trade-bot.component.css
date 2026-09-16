@@ -688,6 +688,73 @@
   border-bottom: 1px solid var(--pg-line);
 }
 
+.trade-bot .announcer-panes {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
+  margin: 0 0 1rem;
+}
+
+.trade-bot .announcer-card {
+  padding: 0.95rem 1.05rem;
+  border: 1px solid var(--pg-line);
+  border-radius: var(--pg-radius);
+  background: #0f172a;
+  color: #f8fafc;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.trade-bot .announcer-card header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.45rem 0.7rem;
+}
+
+.trade-bot .announcer-card strong {
+  font-size: 0.92rem;
+  letter-spacing: -0.02em;
+}
+
+.trade-bot .announcer-card span,
+.trade-bot .announcer-card time {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #94a3b8;
+}
+
+.trade-bot .announcer-card p {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.25;
+}
+
+.trade-bot .announcer-card[data-state='in_trade'] {
+  background: #14532d;
+  border-color: #86efac;
+}
+
+.trade-bot .announcer-card[data-state='wait_confirm'] {
+  background: #1e3a5f;
+  border-color: #7dd3fc;
+}
+
+.trade-bot .announcer-card[data-state='out'] {
+  background: #3f1d1d;
+  border-color: #fca5a5;
+}
+
+@media (max-width: 640px) {
+  .trade-bot .announcer-card p {
+    font-size: 1.15rem;
+  }
+}
+
 .trade-bot .sr-chart-panes {
   display: grid;
   grid-template-columns: 1fr;
@@ -696,6 +763,7 @@
 }
 
 @media (min-width: 900px) {
+  .trade-bot .announcer-panes,
   .trade-bot .sr-chart-panes {
     grid-template-columns: 1fr 1fr;
   }

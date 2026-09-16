@@ -117,6 +117,10 @@ interface PaperResult {
       option?: string | null;
     }>;
   };
+  announcer?: {
+    nifty?: { at?: string; text?: string; state?: string };
+    banknifty?: { at?: string; text?: string; state?: string };
+  };
   capitalRs?: number;
   capitalSource?: 'actual' | 'mine';
   maxLots?: number;
@@ -268,6 +272,7 @@ interface LiveStatus {
   trades?: PaperTrade[];
   kitePnl?: { closedRs?: number; openRs?: number; netRs?: number };
   deskChart?: PaperResult['deskChart'];
+  announcer?: PaperResult['announcer'];
   positions?: Array<{
     instrumentId?: string;
     symbol?: string;
@@ -344,6 +349,7 @@ export class TradeBotComponent implements OnInit, OnDestroy {
   protected readonly selectedTradeKey = signal<string>('');
 
   private pollTimer: ReturnType<typeof setInterval> | null = null;
+  private statusPulse: ReturnType<typeof setInterval> | null = null;
   private deskSub: Subscription | null = null;
 
   protected readonly allowLiveMoney =
@@ -362,12 +368,15 @@ export class TradeBotComponent implements OnInit, OnDestroy {
       this.liveAssistant.set([]);
       this.loadHiddenCols();
       void this.refreshLiveStatus();
+      this.startStatusPulse();
     });
     void this.refreshKiteFunds();
+    this.startStatusPulse();
   }
 
   ngOnDestroy(): void {
     this.clearPoll();
+    this.clearStatusPulse();
     this.deskSub?.unsubscribe();
   }
 
@@ -908,6 +917,32 @@ export class TradeBotComponent implements OnInit, OnDestroy {
     return blob.includes('bank');
   }
 
+  protected announcerCards(): Array<{ id: string; title: string; text: string; at?: string; state?: string }> {
+    if (this.isCrudeDesk()) return [];
+    const a = this.live()?.announcer || this.resultBoard()?.announcer || this.paper()?.announcer;
+    if (!a) return [];
+    return [
+      { id: 'nifty', title: 'Nifty 50', text: a.nifty?.text || 'No setups yet this session.', at: a.nifty?.at, state: a.nifty?.state },
+      { id: 'banknifty', title: 'Bank Nifty', text: a.banknifty?.text || 'No setups yet this session.', at: a.banknifty?.at, state: a.banknifty?.state },
+    ];
+  }
+
+  protected announcerStateLabel(state?: string): string {
+    if (state === 'in_trade') return 'in trade';
+    if (state === 'wait_confirm') return 'confirm';
+    if (state === 'wait_breakout') return 'breakout';
+    if (state === 'out') return 'out';
+    if (state === 'no_setup') return 'watching';
+    return 'watching';
+  }
+
+  protected announcerClock(at?: string): string {
+    if (!at) return '';
+    const d = new Date(at);
+    if (Number.isNaN(d.getTime())) return '';
+    return d.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+  }
+
   private deskBooks(): NonNullable<NonNullable<PaperResult['deskChart']>['books']> {
     const board = this.resultBoard();
     const live = this.live();
@@ -1006,6 +1041,7 @@ export class TradeBotComponent implements OnInit, OnDestroy {
         liveMoney: true,
         trades,
         deskChart: live.deskChart,
+        announcer: live.announcer,
         totals: {
           netRs: Number.isFinite(net) ? net : this.paperNet({ trades }),
           grossProfitRs: profit,
@@ -1174,6 +1210,22 @@ export class TradeBotComponent implements OnInit, OnDestroy {
       this.liveMoney = true;
       this.fundSource = 'actual';
       this.startPoll();
+    }
+  }
+
+  private startStatusPulse(): void {
+    this.clearStatusPulse();
+    if (this.isCrudeDesk()) return;
+    this.statusPulse = setInterval(() => {
+      if (this.pollTimer) return;
+      void this.refreshLiveStatus();
+    }, 15_000);
+  }
+
+  private clearStatusPulse(): void {
+    if (this.statusPulse) {
+      clearInterval(this.statusPulse);
+      this.statusPulse = null;
     }
   }
 

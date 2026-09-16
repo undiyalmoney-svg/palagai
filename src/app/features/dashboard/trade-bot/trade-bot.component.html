@@ -163,6 +163,23 @@
     }
   </div>
 
+  @if (!isCrudeDesk() && announcerCards().length && !resultBoard()) {
+    <div class="announcer-panes" data-testid="live-announcer">
+      @for (card of announcerCards(); track card.id) {
+        <article class="announcer-card" [attr.data-state]="card.state || 'watching'">
+          <header>
+            <strong>{{ card.title }}</strong>
+            <span>{{ announcerStateLabel(card.state) }}</span>
+            @if (announcerClock(card.at); as clock) {
+              <time>{{ clock }}</time>
+            }
+          </header>
+          <p>{{ card.text }}</p>
+        </article>
+      }
+    </div>
+  }
+
   @if (resultBoard(); as p) {
     <div class="paper-card paper-hero" [attr.data-up]="paperNet(p) >= 0">
       <h3>{{ p.fromDate }} → {{ p.toDate }}</h3>
@@ -239,6 +256,23 @@
 
       @if (p.note) {
         <p class="hint">{{ p.note }}</p>
+      }
+
+      @if (!isCrudeDesk() && announcerCards().length) {
+        <div class="announcer-panes" data-testid="live-announcer">
+          @for (card of announcerCards(); track card.id) {
+            <article class="announcer-card" [attr.data-state]="card.state || 'watching'">
+              <header>
+                <strong>{{ card.title }}</strong>
+                <span>{{ announcerStateLabel(card.state) }}</span>
+                @if (announcerClock(card.at); as clock) {
+                  <time>{{ clock }}</time>
+                }
+              </header>
+              <p>{{ card.text }}</p>
+            </article>
+          }
+        </div>
       }
 
       @if (!isCrudeDesk() && chartPanes().length) {
