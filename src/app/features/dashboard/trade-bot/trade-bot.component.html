@@ -241,15 +241,19 @@
         <p class="hint">{{ p.note }}</p>
       }
 
-      @if (!isCrudeDesk() && chartModel(); as chart) {
-        <h3>S/R box</h3>
-        <p class="hint">Index 5m. Pink is the failed side of the broken wall. Teal is the measured continuation from that same height. Click a row to pin it.</p>
-        <app-sr-structure-chart
-          [bars]="chart.bars"
-          [structure]="chart.structure"
-          [title]="chart.title"
-          [subtitle]="chart.subtitle"
-        />
+      @if (!isCrudeDesk() && chartPanes().length) {
+        <h3>S/R → breakout → confirm (retest) → enter</h3>
+        <p class="hint">Two 5m diagrams, one per book. Same payload on Paper and Live. Support / resistance = the engine wall. Breakout is the with-trend close. Confirm is the retest. Entered is the ATM CE or PE fill.</p>
+        <div class="sr-chart-panes" data-testid="sr-chart-panes">
+          @for (chart of chartPanes(); track chart.id) {
+            <app-sr-structure-chart
+              [bars]="chart.bars"
+              [structure]="chart.structure"
+              [title]="chart.title"
+              [subtitle]="chart.subtitle"
+            />
+          }
+        </div>
       }
 
       <h3>Trades</h3>

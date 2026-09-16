@@ -64,6 +64,12 @@ interface PaperTrade {
   level?: number | null;
   wallHi?: number | null;
   wallLo?: number | null;
+  breakoutTime?: string | null;
+  breakoutPrice?: number | null;
+  confirmationTime?: string | null;
+  confirmationPrice?: number | null;
+  retestTime?: string | null;
+  optionKind?: string | null;
   structure?: SrStructureBox | null;
 }
 
@@ -94,7 +100,23 @@ interface PaperResult {
   trades?: PaperTrade[];
   message?: string;
   note?: string;
-  deskChart?: { books?: Array<{ id?: string; label?: string; days?: Record<string, SrChartBar[]>; trades?: PaperTrade[] }> };
+  play?: string;
+  deskChart?: {
+    books?: Array<{
+      id?: string;
+      label?: string;
+      days?: Record<string, SrChartBar[]>;
+      candles?: SrChartBar[];
+      trades?: PaperTrade[];
+      resistance?: number | null;
+      support?: number | null;
+      breakout?: { hm?: string | null; price?: number | null } | null;
+      confirmation?: { hm?: string | null; price?: number | null } | null;
+      entry?: { hm?: string | null; price?: number | null; option?: string | null } | null;
+      exit?: { hm?: string | null; price?: number | null; reason?: string | null } | null;
+      option?: string | null;
+    }>;
+  };
   capitalRs?: number;
   capitalSource?: 'actual' | 'mine';
   maxLots?: number;
@@ -519,13 +541,13 @@ export class TradeBotComponent implements OnInit, OnDestroy {
   protected deskLede(): string {
     return this.isCrudeDesk()
       ? 'Only Crude Oil Mini ATM PE after NSE close. Session OR 09:00–09:30 (skip if wider than 60 pts), confirm, 16:00–19:00, max 2/day. Afternoon CE is off. Paper ₹ is Mini points × ₹10 × lots. In/Out are the Mini future prints for that ₹. Live buys one ATM PE from Kite — never the future print.'
-      : 'Only Nifty 50 and Bank Nifty. With-trend S/R wall break + retest, up to two ATM CE or PE per book per day (qty 65 / 30, MIS). Nifty holds ~30 minutes (6×5m TIME); Bank holds ~40 minutes (8×5m TIME) unless the rupee stop hits first (Nifty ₹5,000 / Bank ₹3,500) or the trade makes no +12 index pts by bar 4 (give-up). The chart still draws the S/R box; this DNA does not flatten on that measured-move. Bank does not buy CE below the day open or PE above it. Not FAIL on a 1-bar close through the wall, not a +20 index TARGET. Paper ₹ is CE/PE × lot. Live rests an option SL.';
+      : 'S/R → breakout → confirm (retest) → enter ATM CE/PE. Same play on Paper and Live, for Nifty 50 and Bank Nifty. Up to two ATM CE or PE per book per day (qty 65 / 30, MIS). Nifty holds ~30 minutes (6×5m TIME); Bank holds ~40 minutes (8×5m TIME) unless the rupee stop hits first (Nifty ₹5,000 / Bank ₹3,500) or the trade makes no +12 index pts by bar 4 (give-up). Two 5m diagrams mark support, resistance, breakout, confirm, and entry. The box is still drawn; this DNA does not flatten on that measured-move. Bank does not buy CE below the day open or PE above it. Not FAIL on a 1-bar close through the wall, not a +20 index TARGET. Paper ₹ is CE/PE × lot. Live rests an option SL.';
   }
 
   protected tradesHint(): string {
     return this.isCrudeDesk()
       ? 'Paper ₹ is Mini points × ₹10 × lots (see Why for fut pts). In/Out are the future prints. Option premium is the small OHLC under In/Out. Hide extra columns if the table is wide; scroll sideways for the rest.'
-      : 'Yes — every fill has a protective SL. Paper ₹ is CE/PE × lot like Live. If Live already filled today, Why and In/Out overlay that Kite fill (not a later CLOSE bar). Pink/teal boxes are the engine wall, not a UI overlay. Live takes the same engine row Paper is in, on the same 5m stamp. Hide extra columns if the table is wide; scroll sideways for the rest.';
+      : 'S/R → breakout → confirm (retest) → enter ATM CE/PE. Yes — every fill has a protective SL. Two 5m diagrams (Nifty 50 and Bank Nifty) mark support, resistance, breakout, confirm, and entry. Paper ₹ is CE/PE × lot like Live. Hide extra columns if the table is wide; scroll sideways for the rest.';
   }
 
   protected colStoreKey(): string {
@@ -635,7 +657,7 @@ export class TradeBotComponent implements OnInit, OnDestroy {
   }
 
   protected optionKind(t: PaperTrade): 'CE' | 'PE' | '' {
-    const dir = String(t.direction || '').toUpperCase();
+    const dir = String(t.direction || t.optionKind || '').toUpperCase();
     if (dir === 'CE' || dir === 'PE') return dir;
     const blob = `${t.selectedInstrument || ''} ${t.optionSymbol || ''} ${t.option?.tradingSymbol || ''}`.toUpperCase();
     if (/\bCE\b/.test(blob) || /CE$/.test(blob.trim())) return 'CE';
@@ -881,36 +903,88 @@ export class TradeBotComponent implements OnInit, OnDestroy {
     this.selectedTradeKey.set(this.tradeKey(t, index));
   }
 
-  protected chartModel(): { bars: SrChartBar[]; structure: SrStructureBox | null; title: string; subtitle: string } | null {
-    if (this.isCrudeDesk()) return null;
+  private isBankBook(id?: string, label?: string, name?: string): boolean {
+    const blob = `${id || ''} ${label || ''} ${name || ''}`.toLowerCase();
+    return blob.includes('bank');
+  }
+
+  private deskBooks(): NonNullable<NonNullable<PaperResult['deskChart']>['books']> {
     const board = this.resultBoard();
-    if (!board) return null;
+    const live = this.live();
+    const books = [
+      ...(board?.deskChart?.books || []),
+      ...((board?.books || []).map((b) => b.chart).filter(Boolean) as NonNullable<PaperResult['deskChart']>['books']),
+      ...(live?.deskChart?.books || []),
+    ];
+    return books.filter(Boolean);
+  }
+
+  protected chartPanes(): Array<{
+    id: string;
+    title: string;
+    subtitle: string;
+    bars: SrChartBar[];
+    structure: SrStructureBox | null;
+  }> {
+    if (this.isCrudeDesk()) return [];
+    const board = this.resultBoard();
+    if (!board) return [];
+    const books = this.deskBooks();
     const trades = board.trades || [];
     const key = this.selectedTradeKey();
-    let picked = trades.find((t, i) => this.tradeKey(t, i) === key);
-    if (!picked) picked = trades.find((t) => t.structure) || trades[0];
-    if (!picked) return null;
-    const day = String(picked.entryTime || picked.exitTime || board.toDate || '').slice(0, 10);
-    const books = [
-      ...(board.deskChart?.books || []),
-      ...((board.books || []).map((b) => b.chart).filter(Boolean) as NonNullable<PaperResult['books']>[number]['chart'][]),
-    ];
-    const live = this.live();
-    if (live?.deskChart?.books) books.push(...live.deskChart.books);
-    const name = picked.instrumentName || '';
-    const book = books.find((b) => b && (b.label === name || (name.includes('Bank') && b.id === 'bank') || (!name.includes('Bank') && (b.id === 'nifty' || b.label === 'Nifty 50'))));
-    const bars = (day && book?.days?.[day]) || Object.values(book?.days || {})[0] || [];
-    const structure = picked.structure
-      || (book?.trades || []).find((row) => String(row.entryTime || '') === String(picked.entryTime || picked.entryHm || ''))?.structure
-      || null;
-    if (!bars.length && !structure) return null;
-    const why = picked.exitReason || (picked.open ? 'OPEN' : '');
-    return {
-      bars,
-      structure: structure || null,
-      title: `${name || 'Index'} 5m`,
-      subtitle: `${picked.optionSymbol || picked.selectedInstrument || ''} · ${why}`.trim(),
-    };
+    const selected = trades.find((t, i) => this.tradeKey(t, i) === key) || null;
+    const dayHint = String(selected?.entryTime || board.toDate || '').slice(0, 10);
+    return [
+      { id: 'nifty', title: 'Nifty 50', bank: false },
+      { id: 'bank', title: 'Bank Nifty', bank: true },
+    ].map((pane) => {
+      const book = books.find((b) => this.isBankBook(b?.id, b?.label) === pane.bank)
+        || books.find((b) => (pane.bank ? b?.id === 'bank' : b?.id === 'nifty' || b?.id === 'nifty-50'));
+      const bookTrades = [
+        ...(book?.trades || []),
+        ...trades.filter((t) => this.isBankBook(undefined, undefined, t.instrumentName) === pane.bank),
+      ];
+      const picked = (selected && this.isBankBook(undefined, undefined, selected.instrumentName) === pane.bank)
+        ? selected
+        : bookTrades.find((t) => t.structure) || bookTrades[0] || null;
+      const day = String(picked?.entryTime || picked?.exitTime || dayHint || book?.candles?.[0]?.t || '').slice(0, 10);
+      const bars = (book?.candles && book.candles.length ? book.candles : null)
+        || (day && book?.days?.[day])
+        || Object.values(book?.days || {})[0]
+        || [];
+      const fromTrade = picked?.structure || null;
+      const structure: SrStructureBox | null = fromTrade || book?.support != null || book?.resistance != null || book?.breakout || book?.entry
+        ? {
+            wall: fromTrade?.wall || picked?.level || book?.breakout?.price || 0,
+            wallHi: fromTrade?.wallHi ?? picked?.wallHi ?? book?.resistance ?? undefined,
+            wallLo: fromTrade?.wallLo ?? picked?.wallLo ?? book?.support ?? undefined,
+            support: fromTrade?.support ?? book?.support ?? picked?.wallLo ?? undefined,
+            resistance: fromTrade?.resistance ?? book?.resistance ?? picked?.wallHi ?? undefined,
+            option: fromTrade?.option || book?.option || picked?.optionKind || undefined,
+            pink: fromTrade?.pink,
+            teal: fromTrade?.teal,
+            breakout: fromTrade?.breakout || book?.breakout || (picked?.breakoutTime
+              ? { hm: picked.breakoutTime, price: picked.breakoutPrice }
+              : null),
+            confirm: fromTrade?.confirm || book?.confirmation || (picked?.confirmationTime
+              ? { hm: picked.confirmationTime, price: picked.confirmationPrice ?? picked.level }
+              : null),
+            entry: fromTrade?.entry || book?.entry || (picked?.entryTime
+              ? { hm: String(picked.entryTime).slice(11, 16) || picked.entryHm, price: picked.indexEntry ?? picked.entryPrice, option: book?.option || picked.optionKind }
+              : null),
+            exit: fromTrade?.exit === undefined ? (book?.exit || null) : fromTrade.exit,
+          }
+        : null;
+      const why = picked?.exitReason || (picked?.open ? 'OPEN' : (structure?.breakout ? 'waiting for confirm' : 'waiting for breakout'));
+      const side = book?.option || picked?.optionKind || '';
+      return {
+        id: pane.id,
+        title: pane.title,
+        subtitle: `${side ? `ATM ${side}` : 'S/R → breakout → confirm (retest) → enter'} · ${why}`.trim(),
+        bars,
+        structure,
+      };
+    });
   }
 
   protected resultBoard(): PaperResult | null {
@@ -991,7 +1065,7 @@ export class TradeBotComponent implements OnInit, OnDestroy {
         title: this.isCrudeDesk() ? 'Place live Crude Mini orders?' : 'Place live Kite orders?',
         message: this.isCrudeDesk()
           ? 'Live places a real MIS buy on one Crude Oil Mini ATM CE or PE when the Nifty/Bank-style retest fires. Not the future print. Not Nifty or Bank. Protective option SL. Day ±₹3,500.'
-          : 'Live places real MIS buys on Nifty + Bank S/R wall-break + retest (up to two ATM CE or PE per book per day, S/R box hold). It does not sell a straddle. Day ±₹3,500. Crude stays off.',
+          : 'Live places real MIS buys after S/R → breakout → confirm (retest) → enter ATM CE/PE on Nifty 50 and Bank Nifty (up to two per book per day). It does not sell a straddle. Day ±₹3,500. Crude stays off.',
         confirmLabel: 'Start live',
         cancelLabel: 'Cancel',
         tone: 'danger',

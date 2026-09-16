@@ -17,18 +17,30 @@ export interface SrChartBar {
   c: number;
 }
 
+export interface SrChartMark {
+  hm?: string | null;
+  price?: number | null;
+  reason?: string | null;
+  option?: string | null;
+}
+
 export interface SrStructureBox {
   wall: number;
   wallHi?: number;
   wallLo?: number;
+  support?: number;
+  resistance?: number;
   dir?: number;
+  option?: string | null;
   height?: number;
   adverseExtreme?: number;
   measuredMove?: number;
   pink?: { lo: number; hi: number; fromHm?: string | null; toHm?: string | null };
   teal?: { lo: number; hi: number; fromHm?: string | null; toHm?: string | null };
-  entry?: { hm?: string | null; price?: number | null };
-  exit?: { hm?: string | null; price?: number | null; reason?: string | null } | null;
+  breakout?: SrChartMark | null;
+  confirm?: SrChartMark | null;
+  entry?: SrChartMark | null;
+  exit?: SrChartMark | null;
 }
 
 @Component({
@@ -69,7 +81,7 @@ export class SrStructureChartComponent implements AfterViewInit, OnChanges, OnDe
     if (!canvas) return;
     const parent = canvas.parentElement;
     const cssW = Math.max(320, parent?.clientWidth || 640);
-    const cssH = 280;
+    const cssH = 300;
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     canvas.width = Math.floor(cssW * dpr);
     canvas.height = Math.floor(cssH * dpr);
@@ -108,9 +120,27 @@ export class SrStructureChartComponent implements AfterViewInit, OnChanges, OnDe
       lows.push(box.teal.lo);
       highs.push(box.teal.hi);
     }
-    if (box?.wall) {
-      lows.push(box.wall);
-      highs.push(box.wall);
+    if (box?.wallHi != null) {
+      lows.push(box.wallHi);
+      highs.push(box.wallHi);
+    }
+    if (box?.wallLo != null) {
+      lows.push(box.wallLo);
+      highs.push(box.wallLo);
+    }
+    if (box?.support != null) {
+      lows.push(box.support);
+      highs.push(box.support);
+    }
+    if (box?.resistance != null) {
+      lows.push(box.resistance);
+      highs.push(box.resistance);
+    }
+    for (const m of [box?.breakout, box?.confirm, box?.entry, box?.exit]) {
+      if (m?.price != null) {
+        lows.push(m.price);
+        highs.push(m.price);
+      }
     }
     let min = Math.min(...lows);
     let max = Math.max(...highs);
@@ -160,6 +190,20 @@ export class SrStructureChartComponent implements AfterViewInit, OnChanges, OnDe
       fillBand(box.teal.lo, box.teal.hi, box.teal.fromHm, box.teal.toHm, 'rgba(45, 212, 191, 0.28)');
     }
 
+    const dashLine = (px: number | null | undefined, color: string) => {
+      if (px == null || !Number.isFinite(px)) return;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1.2;
+      ctx.setLineDash([5, 4]);
+      ctx.beginPath();
+      ctx.moveTo(padL, yOf(px));
+      ctx.lineTo(padL + plotW, yOf(px));
+      ctx.stroke();
+      ctx.setLineDash([]);
+    };
+    dashLine(box?.resistance ?? box?.wallHi, '#b91c1c');
+    dashLine(box?.support ?? box?.wallLo, '#15803d');
+
     if (box?.wall) {
       ctx.strokeStyle = '#0f172a';
       ctx.lineWidth = 1.4;
@@ -198,7 +242,12 @@ export class SrStructureChartComponent implements AfterViewInit, OnChanges, OnDe
       ctx.font = '11px ui-sans-serif, system-ui, sans-serif';
       ctx.fillText(label, x + 6, y - 6);
     };
-    if (box?.entry) mark(box.entry.hm, box.entry.price, '#2563eb', 'In');
+    if (box?.breakout) mark(box.breakout.hm, box.breakout.price, '#ea580c', 'Breakout');
+    if (box?.confirm) mark(box.confirm.hm, box.confirm.price, '#0f766e', 'Confirm');
+    if (box?.entry) {
+      const side = box.entry.option || box.option || '';
+      mark(box.entry.hm, box.entry.price, '#2563eb', side ? `Entered ${side}` : 'Entered');
+    }
     if (box?.exit) mark(box.exit.hm, box.exit.price, '#7c3aed', box.exit.reason || 'Out');
 
     ctx.fillStyle = '#64748b';

@@ -103,7 +103,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   private readonly titles: Record<string, { title: string; subtitle: string }> = {
     '/dashboard/trade-bot': {
       title: 'Trade Bot',
-      subtitle: 'Only Nifty 50 and Bank Nifty. S/R wall-break. Not a straddle.',
+      subtitle: 'S/R → breakout → confirm (retest) → enter ATM CE/PE. Not a straddle.',
     },
     '/dashboard/crude-bot': {
       title: 'Crude Bot',
