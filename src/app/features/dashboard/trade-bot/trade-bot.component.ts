@@ -374,6 +374,12 @@ export class TradeBotComponent implements OnInit, OnDestroy {
     return s.status === 'running' || !!s.running || s.liveMoney === true;
   }
 
+  /** Newest 40 — the payload used to be 80 and the template took slice(0, 40). */
+  protected liveLogEvents(s: LiveStatus): Array<{ at?: string; action?: string; detail?: string }> {
+    const ev = s.events || [];
+    return ev.slice(-40);
+  }
+
   protected controlsLocked(): boolean {
     return this.liveMoney || this.busy();
   }

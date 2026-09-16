@@ -354,9 +354,12 @@
       }
       @if (s.events?.length) {
         <ul class="events">
-          @for (ev of (s.events || []).slice(0, 40); track $index) {
+          @for (ev of liveLogEvents(s); track $index) {
             <li>
               <code>{{ ev.action }}</code>
+              @if (ev.at) {
+                <time class="hint">{{ ev.at }}</time>
+              }
               <span>{{ ev.detail }}</span>
             </li>
           }
