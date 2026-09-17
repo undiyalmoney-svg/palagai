@@ -27,7 +27,10 @@ export function roundPaise(n: number): number {
 
 /**
  * Round-trip charge estimate for one closed leg.
- * Zerodha FO: ₹20/order cap-style brokerage; options STT on sell premium; GST 18% on (brokerage+exchange+sebi).
+ * Zerodha FO: flat ₹20/order brokerage on options; options STT on sell premium;
+ * GST 18% on (brokerage+exchange+sebi). Mirrors the Order-API's
+ * `live/charge-entry-gate.js` so the entry gate, the paper net ₹ and the exit
+ * floor all price a round trip the same way.
  */
 export function estimateRoundTripCharges(input: ChargeEstimateInput): ChargeEstimate {
   const qty = Math.max(0, Math.floor(input.quantity) || 0);
@@ -40,10 +43,14 @@ export function estimateRoundTripCharges(input: ChargeEstimateInput): ChargeEsti
   const buyTurnover = entry * qty;
   const sellTurnover = exit * qty;
 
-  // Zerodha: lower of 0.03% or ₹20 per executed order (equity & F&O).
-  const brokerageBuy = Math.min(20, buyTurnover * 0.0003);
-  const brokerageSell = Math.min(20, sellTurnover * 0.0003);
-  const brokerageRs = roundPaise(brokerageBuy + brokerageSell);
+  // Zerodha bills OPTIONS at a flat ₹20 per executed order. The "lower of ₹20
+  // or 0.03%" slab is the intraday equity/futures rule and does not apply — on
+  // one Nifty lot it understated the round trip by ~₹35 (₹20 vs ₹62), which is
+  // why paper "net" read profitable while the same fills lost money live.
+  const brokerageRs =
+    input.segment === 'nse_equity'
+      ? roundPaise(Math.min(20, buyTurnover * 0.0003) + Math.min(20, sellTurnover * 0.0003))
+      : roundPaise((buyTurnover > 0 ? 20 : 0) + (sellTurnover > 0 ? 20 : 0));
 
   let exchangeRs = 0;
   let sttRs = 0;
