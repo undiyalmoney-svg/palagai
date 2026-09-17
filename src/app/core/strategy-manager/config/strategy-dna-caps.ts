@@ -50,6 +50,14 @@ export const TRAP_1LOT_DAILY_DNA_EXTRAS: Record<string, number | boolean | strin
   profitLockArmRs: 100,
   profitLockLockRs: 50,
   profitLockGivebackRs: 50,
+  /**
+   * Round-trip charges the locked ₹ must cover (audit C1). The ₹50 lock above
+   * is below the ~₹58 cost of one Nifty lot, so every trail exit at the lock
+   * settled NET NEGATIVE — the smallest win was a loss and breakeven needed a
+   * ~91% strike rate. At 2× the trail arms and rests on cost-covering ₹ only,
+   * which cannot manufacture an edge but stops the desk booking losses as wins.
+   */
+  profitLockChargeMultiple: 2,
   slConfirmCutoffEnabled: false,
   slConfirmCutoffFracR: 0,
   slConfirmCutoffMaxMfeR: 0,

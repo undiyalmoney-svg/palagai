@@ -39,15 +39,15 @@ __export(bundle_entry_exports, {
   createTrapStrategy: () => createTrapStrategy,
   createTrapStrategyV2: () => createTrapStrategyV2,
   effectiveProtectiveStop: () => effectiveProtectiveStop,
+  evaluateOptionPeakTrail: () => evaluateOptionPeakTrail,
+  optionPeakTrailSettingsFromExtras: () => optionPeakTrailSettingsFromExtras,
   replayPaperOnCrude: () => replayPaperOnCrude,
   replayPaperOnIndex: () => replayPaperOnIndex,
   resolveAtmCrudeMiniOption: () => resolveAtmCrudeMiniOption,
   resolveAtmWeeklyOption: () => resolveAtmWeeklyOption,
   resolveCrudeOilMiniFuturesToken: () => resolveCrudeOilMiniFuturesToken,
   resolveCrudeProfileDayLossPts: () => resolveCrudeProfileDayLossPts,
-  resolveCrudeStrategyProfile: () => resolveCrudeStrategyProfile,
-  evaluateOptionPeakTrail: () => evaluateOptionPeakTrail,
-  optionPeakTrailSettingsFromExtras: () => optionPeakTrailSettingsFromExtras
+  resolveCrudeStrategyProfile: () => resolveCrudeStrategyProfile
 });
 module.exports = __toCommonJS(bundle_entry_exports);
 
@@ -814,9 +814,7 @@ function estimateRoundTripCharges(input) {
   }
   const buyTurnover = entry * qty;
   const sellTurnover = exit * qty;
-  const brokerageBuy = Math.min(20, buyTurnover * 3e-4);
-  const brokerageSell = Math.min(20, sellTurnover * 3e-4);
-  const brokerageRs = roundPaise(brokerageBuy + brokerageSell);
+  const brokerageRs = input.segment === "nse_equity" ? roundPaise(Math.min(20, buyTurnover * 3e-4) + Math.min(20, sellTurnover * 3e-4)) : roundPaise((buyTurnover > 0 ? 20 : 0) + (sellTurnover > 0 ? 20 : 0));
   let exchangeRs = 0;
   let sttRs = 0;
   let stampRs = 0;
@@ -939,7 +937,9 @@ var MANAGED_STRATEGY_IDS = {
    */
   SR_TRAP_CONFIRM_V2: "sr-trap-confirm-v2",
   /** Stocks Desk champion — gap-up fade ₹500 book. */
-  GAP_FADE_500: "gap-fade-500"
+  GAP_FADE_500: "gap-fade-500",
+  /** Exhaustion Fade — volume-climax blow-off fade on stocks. Paper-first. */
+  EXHAUSTION_FADE: "exhaustion-fade-v1"
 };
 var DEFAULT_CHANNEL_ASSIGNMENTS = {
   nifty: {
@@ -2844,6 +2844,51 @@ function sessionOr(candles, tradingDate, orStart, orEnd) {
   }
   return { high, low };
 }
+function priorDayHighLow(candles, tradingDate) {
+  const days = [];
+  for (const c of candles) {
+    const d = extractTradeDate(c.date);
+    if (d >= tradingDate) {
+      break;
+    }
+    if (days[days.length - 1] !== d) {
+      days.push(d);
+    }
+  }
+  const prev = days[days.length - 1];
+  if (!prev) {
+    return null;
+  }
+  let high = -Infinity;
+  let low = Infinity;
+  for (const c of candles) {
+    if (extractTradeDate(c.date) !== prev) {
+      continue;
+    }
+    high = Math.max(high, c.high);
+    low = Math.min(low, c.low);
+  }
+  if (!Number.isFinite(high) || !Number.isFinite(low)) {
+    return null;
+  }
+  return { high, low };
+}
+function isFadePriorDay(action, price, pd, bufferPts) {
+  if (!pd || !Number.isFinite(price)) {
+    return false;
+  }
+  const buf = Math.max(0, Number(bufferPts) || 0);
+  if (action === "SELL" && price > pd.high - buf) {
+    return true;
+  }
+  if (action === "BUY" && price < pd.low + buf) {
+    return true;
+  }
+  return false;
+}
+function fadeSkipReason(action) {
+  return action === "SELL" ? "Skip fade \u2014 SELL into/above prior-day high" : "Skip fade \u2014 BUY into/below prior-day low";
+}
 function wait5(candle, reason) {
   return {
     action: "WAITING",
@@ -2866,8 +2911,14 @@ function runCrudeSessionOr(params) {
   const orStart = params.orStart ?? CRUDE_SOR_OR_START;
   const orEnd = params.orEnd ?? CRUDE_SOR_OR_END;
   const maxOrWidth = params.maxOrWidth ?? CRUDE_SOR_MAX_OR_WIDTH;
+  const minOrWidth = params.minOrWidth ?? 0;
   const maxTradesDay = params.maxTradesDay ?? CRUDE_SOR_MAX_TRADES_DAY;
+  const allowBuy = params.allowBuy !== false;
+  const allowSell = params.allowSell !== false;
+  const skipFadePriorDay = params.skipFadePriorDay === true;
+  const fadeBufferPts = params.fadeBufferPts ?? 0;
   const tradingDate = extractTradeDate(candle.date);
+  const priorDay = skipFadePriorDay ? priorDayHighLow(series, tradingDate) : null;
   const month = tradingDate.slice(0, 7);
   const time = extractHhMm(candle.date);
   if (state.tradingDate !== tradingDate) {
@@ -2911,13 +2962,16 @@ function runCrudeSessionOr(params) {
     if (time < entryStart || time > entryEnd) {
       return wait5(candle, "Confirm outside entry window");
     }
-    const bullOk = p.dir === 1 && candle.close > candle.open && candle.close > p.signalClose;
-    const bearOk = p.dir === -1 && candle.close < candle.open && candle.close < p.signalClose;
+    const bullOk = p.dir === 1 && allowBuy && candle.close > candle.open && candle.close > p.signalClose;
+    const bearOk = p.dir === -1 && allowSell && candle.close < candle.open && candle.close < p.signalClose;
     if (!bullOk && !bearOk) {
       return wait5(candle, "Session OR confirm failed");
     }
     const action2 = p.dir === 1 ? "BUY" : "SELL";
     const entry2 = candle.open;
+    if (skipFadePriorDay && isFadePriorDay(action2, entry2, priorDay, fadeBufferPts)) {
+      return wait5(candle, fadeSkipReason(action2));
+    }
     const stopLoss2 = action2 === "BUY" ? entry2 - stopPts : entry2 + stopPts;
     const target2 = action2 === "BUY" ? entry2 + targetPts : entry2 - targetPts;
     if (crudeDayLossActive(dayLossStopPts) && state.dayNetPts - stopPts < -dayLossStopPts) {
@@ -2948,6 +3002,9 @@ function runCrudeSessionOr(params) {
     return wait5(candle, "Session OR not ready");
   }
   const width = orb.high - orb.low;
+  if (minOrWidth > 0 && width < minOrWidth) {
+    return wait5(candle, `OR too narrow (${width.toFixed(1)}<${minOrWidth})`);
+  }
   if (maxOrWidth > 0 && width > maxOrWidth) {
     return wait5(candle, `OR too wide (${width.toFixed(1)}>${maxOrWidth})`);
   }
@@ -2959,6 +3016,15 @@ function runCrudeSessionOr(params) {
   }
   if (!action) {
     return wait5(candle, `Waiting OR break (${orb.low.toFixed(1)}\u2013${orb.high.toFixed(1)})`);
+  }
+  if (action === "BUY" && !allowBuy) {
+    return wait5(candle, "Longs off \u2014 PE only");
+  }
+  if (action === "SELL" && !allowSell) {
+    return wait5(candle, "Shorts off \u2014 CE only");
+  }
+  if (skipFadePriorDay && isFadePriorDay(action, candle.close, priorDay, fadeBufferPts)) {
+    return wait5(candle, fadeSkipReason(action));
   }
   if (requireConfirm) {
     state.pendingConfirm = {
@@ -3122,6 +3188,34 @@ var CRUDE_DAILY_INCOME_PARAMS = {
   dailyBandLabel: "SL40 / TP80\xB750 \xB7 unlimited \xB7 no day stop",
   ...PROTECT_OFF
 };
+var CRUDE_STEADY_500_STOP_PTS = 35;
+var CRUDE_STEADY_500_TARGET_PTS = 50;
+var CRUDE_STEADY_500_DAY_LOCK_PTS = 100;
+var CRUDE_STEADY_500_MAX_TRADES_DAY = 3;
+var CRUDE_STEADY_500_PARAMS = {
+  profileId: "steady-500",
+  label: "Steady \u20B9500 (\u20B9300\u20131,000)",
+  stopPts: CRUDE_STEADY_500_STOP_PTS,
+  morningTargetPts: CRUDE_STEADY_500_TARGET_PTS,
+  eveningTargetPts: CRUDE_STEADY_500_TARGET_PTS,
+  targetRMultiple: 0,
+  dayLossStopPts: CRUDE_DAY_LOSS_STOP_PTS,
+  strictDayLossPts: CRUDE_STRICT_DAY_LOSS_PTS,
+  dayProfitLockPts: CRUDE_STEADY_500_DAY_LOCK_PTS,
+  entryMode: "session-or",
+  requireConfirm: false,
+  firstWinLock: false,
+  eveningEntryStart: "09:45",
+  eveningEntryEnd: "22:00",
+  sessionOrStart: "09:00",
+  sessionOrEnd: "09:45",
+  maxOrWidth: 150,
+  maxEveningTradesDay: CRUDE_STEADY_500_MAX_TRADES_DAY,
+  defaultEnableMorning: false,
+  defaultEnableEvening: true,
+  dailyBandLabel: "OR breakout \xB7 SL35/TP50 \xB7 lock +\u20B91,000 \xB7 \u22643/day \xB7 target \u20B9300\u2013\u20B91,000",
+  ...PROTECT_OFF
+};
 var CRUDE_TRAP_CONFIRM_PARAMS = {
   profileId: "trap-confirm",
   label: "Trap Confirm (like Nifty Trap)",
@@ -3179,6 +3273,7 @@ var CRUDE_STRATEGY_PROFILES = {
   "daily-profit-ng": NATGAS_DAILY_PROFIT_PARAMS,
   champion: CRUDE_CHAMPION_PARAMS,
   "daily-income": CRUDE_DAILY_INCOME_PARAMS,
+  "steady-500": CRUDE_STEADY_500_PARAMS,
   "trap-confirm": CRUDE_TRAP_CONFIRM_PARAMS
 };
 function resolveCrudeStrategyProfile(profileId) {
@@ -3661,7 +3756,12 @@ function replayPaperOnCrude(params) {
           orStart: tradeParams.sessionOrStart,
           orEnd: tradeParams.sessionOrEnd,
           maxOrWidth: tradeParams.maxOrWidth,
-          maxTradesDay: tradeParams.maxEveningTradesDay
+          minOrWidth: tradeParams.minOrWidth,
+          maxTradesDay: tradeParams.maxEveningTradesDay,
+          allowBuy: tradeParams.allowBuy,
+          allowSell: tradeParams.allowSell,
+          skipFadePriorDay: tradeParams.skipFadePriorDay,
+          fadeBufferPts: tradeParams.fadeBufferPts
         });
         if (afternoon.action === "BUY" || afternoon.action === "SELL") {
           signal = afternoon;
@@ -3860,6 +3960,14 @@ var TRAP_1LOT_DAILY_DNA_EXTRAS = {
   profitLockArmRs: 100,
   profitLockLockRs: 50,
   profitLockGivebackRs: 50,
+  /**
+   * Round-trip charges the locked ₹ must cover (audit C1). The ₹50 lock above
+   * is below the ~₹58 cost of one Nifty lot, so every trail exit at the lock
+   * settled NET NEGATIVE — the smallest win was a loss and breakeven needed a
+   * ~91% strike rate. At 2× the trail arms and rests on cost-covering ₹ only,
+   * which cannot manufacture an edge but stops the desk booking losses as wins.
+   */
+  profitLockChargeMultiple: 2,
   slConfirmCutoffEnabled: false,
   slConfirmCutoffFracR: 0,
   slConfirmCutoffMaxMfeR: 0,
@@ -3917,6 +4025,131 @@ function dnaCapsForStrategy(strategyId, channel) {
     default:
       return { maxTradesPerDay: 0 };
   }
+}
+
+// src/app/core/live-desk/option-sl-premium.util.ts
+function isMcxOptionContext(exchange, tradingSymbol) {
+  if ((exchange ?? "").toUpperCase() === "MCX") {
+    return true;
+  }
+  const sym = (tradingSymbol ?? "").toUpperCase();
+  return sym.startsWith("CRUDEOIL") || sym.startsWith("NATURALGAS") || sym.startsWith("NATGAS");
+}
+function roundOptionPremiumTick(price) {
+  return Math.max(0.05, Math.round(price / 0.05) * 0.05);
+}
+function mcxMinSlGapPts(fillPremium) {
+  return Math.max(25, fillPremium * 0.05);
+}
+function computeProtectiveSlTrigger(params) {
+  const fill = Math.max(0, params.fillPremium);
+  const risk = Math.max(0, params.indexRiskPts);
+  const mcx = isMcxOptionContext(params.exchange, params.tradingSymbol);
+  const delta = params.premiumDelta != null && Number(params.premiumDelta) > 0 ? Number(params.premiumDelta) : mcx ? 1 : 0.5;
+  const fromRisk = fill - risk * delta;
+  const nfoMinGap = Math.max(3, fill * 0.03);
+  const fromMinGap = mcx ? fill - mcxMinSlGapPts(fill) : fill - nfoMinGap;
+  let trigger = roundOptionPremiumTick(Math.max(0.05, Math.min(fromRisk, fromMinGap)));
+  const ltp = params.ltp;
+  if (ltp != null && ltp > 0 && trigger >= ltp - 0.049) {
+    const cushion = Math.max(
+      risk * delta,
+      mcx ? mcxMinSlGapPts(ltp) : Math.max(nfoMinGap, ltp * 0.03),
+      mcx ? 25 : 3
+    );
+    trigger = roundOptionPremiumTick(Math.max(0.05, ltp - cushion));
+  }
+  const maxLossRs = Math.max(0, Number(params.maxLossRs) || 0);
+  const lotUnits = Math.max(0, Number(params.lotUnits) || 0);
+  if (maxLossRs > 0 && lotUnits > 0) {
+    const fromCap = fill - maxLossRs / lotUnits;
+    trigger = roundOptionPremiumTick(Math.max(trigger, fromCap));
+  }
+  return trigger;
+}
+
+// src/app/core/paper-desk/option-peak-trail.util.ts
+function minNetProfitFloorRs(params) {
+  const multiple = Number(params.chargeFloorMultiple) || 0;
+  if (!(multiple > 0) || !(params.entryPremium > 0) || !(params.lotUnits > 0)) {
+    return 0;
+  }
+  const { totalRs } = estimateRoundTripCharges({
+    segment: params.segment ?? "nfo_option",
+    entryPrice: params.entryPremium,
+    exitPrice: params.entryPremium,
+    quantity: params.lotUnits
+  });
+  return roundPaise(multiple * totalRs);
+}
+function resolveTrailFloorRs(params) {
+  const effectiveArmRs = Math.max(params.armRs, params.minFloorRs);
+  if (!(params.optionPeakMfeRs >= effectiveArmRs)) {
+    return { armed: false, floorRs: 0 };
+  }
+  const floorRs = Math.max(
+    params.minFloorRs,
+    params.lockRs,
+    params.optionPeakMfeRs - Math.max(0, params.givebackRs)
+  );
+  return { armed: true, floorRs: Math.min(params.optionPeakMfeRs, floorRs) };
+}
+function clampTrailLots(lots) {
+  return Math.max(1, Math.floor(Number(lots) || 1) || 1);
+}
+function scaleOptionPeakTrailSettings(base, lots) {
+  const n = clampTrailLots(lots);
+  return {
+    armRs: base.armRs * n,
+    lockRs: base.lockRs * n,
+    givebackRs: base.givebackRs * n,
+    // A multiple of charges, and charges already scale with quantity.
+    chargeFloorMultiple: base.chargeFloorMultiple
+  };
+}
+function optionPeakTrailSettingsFromExtras(extras, lots = 1) {
+  const x = extras ?? {};
+  const base = {
+    armRs: typeof x["profitLockArmRs"] === "number" ? x["profitLockArmRs"] : 600,
+    lockRs: typeof x["profitLockLockRs"] === "number" ? x["profitLockLockRs"] : 300,
+    givebackRs: typeof x["profitLockGivebackRs"] === "number" ? x["profitLockGivebackRs"] : 300,
+    chargeFloorMultiple: typeof x["profitLockChargeMultiple"] === "number" ? x["profitLockChargeMultiple"] : 0
+  };
+  return scaleOptionPeakTrailSettings(base, lots);
+}
+function evaluateOptionPeakTrail(params) {
+  const entry = params.entryPremium;
+  const units = params.lotUnits;
+  if (!(entry > 0) || !(units > 0) || !(params.armRs > 0)) {
+    return null;
+  }
+  const { armed, floorRs } = resolveTrailFloorRs({
+    optionPeakMfeRs: params.optionPeakMfeRs,
+    armRs: params.armRs,
+    lockRs: params.lockRs,
+    givebackRs: params.givebackRs,
+    minFloorRs: minNetProfitFloorRs({
+      entryPremium: entry,
+      lotUnits: units,
+      chargeFloorMultiple: params.chargeFloorMultiple,
+      segment: params.segment
+    })
+  });
+  if (!armed) {
+    return {
+      armed: false,
+      floorRs: 0,
+      floorPremium: entry,
+      hit: false
+    };
+  }
+  const floorPremium = roundOptionPremiumTick(entry + floorRs / units);
+  return {
+    armed: true,
+    floorRs,
+    floorPremium,
+    hit: params.optionBarLow <= floorPremium + 1e-9
+  };
 }
 
 // src/app/core/strategy-manager/engines/smart-pullback-pro.engine.ts
@@ -4472,95 +4705,6 @@ function recordSmartPbTradeClosed(state, points, dayStopPts) {
   recordRuleTradeClosed(state, points, dayStopPts);
 }
 
-// src/app/core/live-desk/option-sl-premium.util.ts
-function isMcxOptionContext(exchange, tradingSymbol) {
-  if ((exchange ?? "").toUpperCase() === "MCX") {
-    return true;
-  }
-  const sym = (tradingSymbol ?? "").toUpperCase();
-  return sym.startsWith("CRUDEOIL") || sym.startsWith("NATURALGAS") || sym.startsWith("NATGAS");
-}
-function roundOptionPremiumTick(price) {
-  return Math.max(0.05, Math.round(price / 0.05) * 0.05);
-}
-function mcxMinSlGapPts(fillPremium) {
-  return Math.max(25, fillPremium * 0.05);
-}
-function computeProtectiveSlTrigger(params) {
-  const fill = Math.max(0, params.fillPremium);
-  const risk = Math.max(0, params.indexRiskPts);
-  const mcx = isMcxOptionContext(params.exchange, params.tradingSymbol);
-  const delta = mcx ? 1 : 0.5;
-  const fromRisk = fill - risk * delta;
-  const nfoMinGap = Math.max(3, fill * 0.03);
-  const fromMinGap = mcx ? fill - mcxMinSlGapPts(fill) : fill - nfoMinGap;
-  let trigger = roundOptionPremiumTick(Math.max(0.05, Math.min(fromRisk, fromMinGap)));
-  const ltp = params.ltp;
-  if (ltp != null && ltp > 0 && trigger >= ltp - 0.049) {
-    const cushion = Math.max(
-      risk * delta,
-      mcx ? mcxMinSlGapPts(ltp) : Math.max(nfoMinGap, ltp * 0.03),
-      mcx ? 25 : 3
-    );
-    trigger = roundOptionPremiumTick(Math.max(0.05, ltp - cushion));
-  }
-  const maxLossRs = Math.max(0, Number(params.maxLossRs) || 0);
-  const lotUnits = Math.max(0, Number(params.lotUnits) || 0);
-  if (maxLossRs > 0 && lotUnits > 0) {
-    const fromCap = fill - maxLossRs / lotUnits;
-    trigger = roundOptionPremiumTick(Math.max(trigger, fromCap));
-  }
-  return trigger;
-}
-
-// src/app/core/paper-desk/option-peak-trail.util.ts
-function clampTrailLots(lots) {
-  return Math.max(1, Math.floor(Number(lots) || 1) || 1);
-}
-function scaleOptionPeakTrailSettings(base, lots) {
-  const n = clampTrailLots(lots);
-  return {
-    armRs: base.armRs * n,
-    lockRs: base.lockRs * n,
-    givebackRs: base.givebackRs * n
-  };
-}
-function optionPeakTrailSettingsFromExtras(extras, lots = 1) {
-  const x = extras ?? {};
-  const base = {
-    armRs: typeof x["profitLockArmRs"] === "number" ? x["profitLockArmRs"] : 600,
-    lockRs: typeof x["profitLockLockRs"] === "number" ? x["profitLockLockRs"] : 300,
-    givebackRs: typeof x["profitLockGivebackRs"] === "number" ? x["profitLockGivebackRs"] : 300
-  };
-  return scaleOptionPeakTrailSettings(base, lots);
-}
-function evaluateOptionPeakTrail(params) {
-  const entry = params.entryPremium;
-  const units = params.lotUnits;
-  if (!(entry > 0) || !(units > 0) || !(params.armRs > 0)) {
-    return null;
-  }
-  if (!(params.optionPeakMfeRs >= params.armRs)) {
-    return {
-      armed: false,
-      floorRs: 0,
-      floorPremium: entry,
-      hit: false
-    };
-  }
-  const floorRs = Math.max(
-    params.lockRs,
-    params.optionPeakMfeRs - Math.max(0, params.givebackRs)
-  );
-  const floorPremium = roundOptionPremiumTick(entry + floorRs / units);
-  return {
-    armed: true,
-    floorRs,
-    floorPremium,
-    hit: params.optionBarLow <= floorPremium + 1e-9
-  };
-}
-
 // src/app/core/strategy-manager/engines/sr-trap-confirm.engine.ts
 function createSrTrapDayState() {
   return {
@@ -4800,7 +4944,7 @@ function runSrTrapConfirm(ctx, state, settings) {
   });
 }
 function srTrapExitLogic(candle, open, closes, settings, ctx) {
-  const { armRs, lockRs, givebackRs } = optionPeakTrailSettingsFromExtras(
+  const { armRs, lockRs, givebackRs, chargeFloorMultiple } = optionPeakTrailSettingsFromExtras(
     settings.extras,
     open.lotsMultiplier
   );
@@ -4832,7 +4976,8 @@ function srTrapExitLogic(candle, open, closes, settings, ctx) {
       lotUnits: open.optionLotUnits,
       armRs,
       lockRs,
-      givebackRs
+      givebackRs,
+      chargeFloorMultiple
     });
     if (trail?.hit) {
       return {
@@ -4947,7 +5092,7 @@ var TRAP_V2_DEFAULTS = defaultStrategySettings({
   positionSizeLots: 1,
   extras: { ...TRAP_V2_ENTRY_DNA_EXTRAS }
 });
-var STRATEGY_BUNDLE_VERSION = "sr-trap-v2.2026-08-22.2";
+var STRATEGY_BUNDLE_VERSION = "sr-trap-v2.2026-09-17.1-charge-floor";
 var GENIE_DEFAULTS = defaultStrategySettings({
   entryTimeStart: "10:15",
   entryTimeEnd: "14:30",
@@ -5198,6 +5343,8 @@ function createGenieStrategy() {
   createTrapStrategy,
   createTrapStrategyV2,
   effectiveProtectiveStop,
+  evaluateOptionPeakTrail,
+  optionPeakTrailSettingsFromExtras,
   replayPaperOnCrude,
   replayPaperOnIndex,
   resolveAtmCrudeMiniOption,
