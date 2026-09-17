@@ -4,9 +4,10 @@
       <p class="pg-eyebrow">Live charts</p>
       <h1>Support &amp; Resistance</h1>
       <p class="pg-lede">
-        Crude Oil Mini, Nifty 50 and Bank Nifty on live Kite candles. Shaded bands are
-        support/resistance zones clustered from swing pivots; the dark lines join consecutive
-        pivots so structure direction is visible. Read-only — no orders are placed from this tab.
+        Crude Oil Mini, Nifty 50 and Bank Nifty on live Kite candles, from 1 minute to 1 hour.
+        Shaded bands are support/resistance zones clustered from swing pivots; the dark lines
+        join consecutive pivots so structure direction is visible. Read-only — no orders are
+        placed from this tab.
       </p>
     </div>
 
@@ -47,6 +48,25 @@
       </div>
     </div>
   </header>
+
+  @if (sessionExpired()) {
+    <div class="session-banner">
+      <app-pg-icon name="key" [size]="18" />
+      <div>
+        <strong>Kite session not live.</strong>
+        Access tokens expire every day around 06:00 IST and cannot be refreshed automatically,
+        so candles stop loading until you connect again.
+      </div>
+      <a class="session-cta" routerLink="/dashboard/get-token">Connect Kite</a>
+    </div>
+  }
+
+  @if (derivedInterval()) {
+    <p class="chart-hint">
+      Kite serves no 45-minute candle, so 45m bars are folded from three 15-minute bars,
+      aligned to each session's open.
+    </p>
+  }
 
   <div class="chart-stack">
     @for (pane of panes(); track trackPane($index, pane)) {
@@ -122,7 +142,7 @@
     }
   </div>
 
-  @if (anyError()) {
+  @if (anyError() && !sessionExpired()) {
     <p class="chart-hint">
       Candles come from your Kite session. If a book errors, refresh the access token in the
       Token tab — and for Crude, refresh the instrument list in Settings so the current

@@ -15,19 +15,24 @@ import {
   signal,
 } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
+import { RouterLink } from '@angular/router';
 import { Candle } from '../../../core/models/candle.model';
 import { SrChartModel, SrZone, buildSrChartModel } from '../../../core/charts/sr-chart.util';
 import {
   CHART_BOOKS,
-  CHART_INTERVAL_LABELS,
   ChartBookDef,
   ChartBookId,
-  ChartInterval,
   LiveChartDataService,
 } from '../../../core/charts/live-chart-data.service';
+import {
+  CHART_INTERVALS,
+  CHART_INTERVAL_LABELS,
+  ChartInterval,
+} from '../../../core/charts/chart-intervals.util';
 import { PgIconComponent } from '../../../shared/ui/icon/pg-icon.component';
 import { TvCandleChartComponent } from './tv-candle-chart.component';
 import { formatUnknownError } from '../../../core/utils/kite-error.util';
+import { isKiteAuthError } from '../../../core/utils/kite-auth-error.util';
 
 interface ChartPane {
   def: ChartBookDef;
@@ -39,8 +44,8 @@ interface ChartPane {
   updatedAt: string | null;
 }
 
-const INTERVALS: readonly ChartInterval[] = ['5minute', '15minute', '30minute', '60minute'];
-const DEFAULT_INTERVAL: ChartInterval = '15minute';
+const INTERVALS = CHART_INTERVALS;
+const DEFAULT_INTERVAL: ChartInterval = '15m';
 const REFRESH_MS = 30_000;
 /** Kite historical allows 3 req/s; keep a gap so three books never trip it. */
 const BOOK_STAGGER_MS = 350;
@@ -48,7 +53,7 @@ const BOOK_STAGGER_MS = 350;
 @Component({
   selector: 'app-live-charts',
   standalone: true,
-  imports: [TvCandleChartComponent, PgIconComponent],
+  imports: [TvCandleChartComponent, PgIconComponent, RouterLink],
   templateUrl: './live-charts.component.html',
   styleUrl: './live-charts.component.css',
 })
@@ -75,6 +80,16 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
   );
 
   protected readonly anyError = computed(() => this.panes().some((p) => p.error));
+
+  /**
+   * Kite tokens expire daily and the app has no refresh flow, so a dead
+   * session is the most likely reason every book fails at once. Say that
+   * plainly instead of repeating a Kite error string three times.
+   */
+  protected readonly sessionExpired = signal(false);
+
+  /** 45m is folded from 15m bars because Kite serves no 45-minute candle. */
+  protected readonly derivedInterval = computed(() => this.data.isDerived(this.interval()));
 
   private timer: ReturnType<typeof setInterval> | null = null;
   /** Guards against a slow poll overlapping the next tick. */
@@ -115,22 +130,28 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
     this.inFlight = true;
     this.refreshing.set(true);
     const interval = this.interval();
+    let authFailures = 0;
     try {
       for (const def of CHART_BOOKS) {
-        await this.refreshBook(def.id, interval);
+        if (!(await this.refreshBook(def.id, interval))) {
+          authFailures += 1;
+        }
         if (interval !== this.interval()) {
           // Interval changed mid-sweep; the new sweep owns the panes now.
           return;
         }
         await delay(BOOK_STAGGER_MS);
       }
+      // One book failing on auth could be a fluke; all of them is the session.
+      this.sessionExpired.set(authFailures === CHART_BOOKS.length);
     } finally {
       this.inFlight = false;
       this.refreshing.set(false);
     }
   }
 
-  private async refreshBook(id: ChartBookId, interval: ChartInterval): Promise<void> {
+  /** Resolves false when the book failed because Kite rejected the session. */
+  private async refreshBook(id: ChartBookId, interval: ChartInterval): Promise<boolean> {
     try {
       const instrument = await this.data.resolveInstrument(id);
       const candles = await this.data.loadCandles({ token: instrument.token, interval });
@@ -139,7 +160,7 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
           error: `Kite returned no ${this.intervalLabels[interval]} candles.`,
           loading: false,
         });
-        return;
+        return true;
       }
       this.patch(id, {
         symbol: instrument.symbol,
@@ -149,8 +170,10 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
         loading: false,
         updatedAt: new Date().toLocaleTimeString('en-IN', { hour12: false }),
       });
+      return true;
     } catch (error) {
       this.patch(id, { error: formatUnknownError(error, 'Charts'), loading: false });
+      return !isKiteAuthError(error);
     }
   }
 

@@ -504,7 +504,14 @@ export class TvCandleChartComponent implements AfterViewInit, OnChanges, OnDestr
       lastDay = day;
       const x = xOf(i);
       if (x < PAD.left || x > PAD.left + plotW) continue;
-      ctx.fillText(label, x, cssH - 8);
+      // The first and last bars sit close to the frame, so a centred label
+      // would hang off the edge and lose a character. Nudge it inside.
+      const half = ctx.measureText(label).width / 2;
+      const clamped = Math.min(
+        Math.max(x, PAD.left + half),
+        PAD.left + plotW - half,
+      );
+      ctx.fillText(label, clamped, cssH - 8);
     }
     ctx.textAlign = 'left';
   }

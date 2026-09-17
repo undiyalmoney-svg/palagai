@@ -7,15 +7,24 @@
 
 .interval-group {
   display: inline-flex;
+  max-width: 100%;
   padding: 2px;
   border: 1px solid var(--pg-line);
   border-radius: 999px;
   background: var(--pg-bg-muted);
+  /* Seven intervals do not fit a narrow phone; let the group scroll. */
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.interval-group::-webkit-scrollbar {
+  display: none;
 }
 
 .interval-btn {
-  min-width: 2.75rem;
-  padding: 0.34rem 0.7rem;
+  flex: 0 0 auto;
+  min-width: 2.6rem;
+  padding: 0.34rem 0.62rem;
   border: 0;
   border-radius: 999px;
   background: transparent;
@@ -72,6 +81,46 @@
   border-color: #b7ebd0;
   background: var(--pg-bull-soft);
   color: var(--pg-bull-deep);
+}
+
+.session-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.7rem;
+  margin-bottom: 1rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid #fed7aa;
+  border-radius: var(--pg-radius);
+  background: var(--pg-warn-soft);
+  color: #9a3412;
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.session-banner > div {
+  flex: 1 1 18rem;
+  min-width: 0;
+}
+
+.session-banner app-pg-icon {
+  flex: 0 0 auto;
+  color: var(--pg-warn);
+}
+
+.session-cta {
+  flex: 0 0 auto;
+  padding: 0.4rem 0.9rem;
+  border-radius: 999px;
+  background: var(--pg-warn);
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.session-cta:hover {
+  background: #c2410c;
 }
 
 .chart-stack {
