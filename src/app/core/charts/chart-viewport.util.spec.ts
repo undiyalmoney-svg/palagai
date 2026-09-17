@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
   MIN_DEFAULT_BARS,
   MIN_VISIBLE_BARS,
-  RIGHT_GAP_BARS,
+  canExpandRight,
   clampViewport,
+  defaultGapBars,
+  maxGapBars,
   defaultViewport,
   followRight,
   isAtRightEdge,
@@ -18,9 +20,9 @@ describe('clampViewport', () => {
     expect(clampViewport({ start: -5, count: 40 }, 180)).toEqual({ start: 0, count: 40 });
   });
 
-  it('allows the right gap past the last bar but no further', () => {
+  it('allows the series to be pushed out to the max right margin, no further', () => {
     const v = clampViewport({ start: 999, count: 40 }, 180);
-    expect(v.start).toBe(180 + RIGHT_GAP_BARS - 40);
+    expect(v.start).toBe(180 + maxGapBars(40) - 40);
   });
 
   it('never zooms in past the minimum window', () => {
@@ -85,7 +87,7 @@ describe('zoomViewport', () => {
   it('clamps rather than running off the end when anchored right', () => {
     const zoomed = zoomViewport({ start: 120, count: 60 }, 180, 2, 1);
     expect(zoomed.start).toBeGreaterThanOrEqual(0);
-    expect(zoomed.start + zoomed.count).toBeLessThanOrEqual(180 + RIGHT_GAP_BARS);
+    expect(zoomed.start + zoomed.count).toBeLessThanOrEqual(180 + maxGapBars(zoomed.count));
   });
 
   it('ignores a nonsense factor', () => {
@@ -122,13 +124,49 @@ describe('panViewport', () => {
     expect(panViewport({ start: 5, count: 40 }, 180, -100).start).toBe(0);
   });
 
-  it('stops at the right gap', () => {
+  it('stops at the max right margin', () => {
     const v = panViewport({ start: 100, count: 40 }, 180, 500);
-    expect(v.start).toBe(180 + RIGHT_GAP_BARS - 40);
+    expect(v.start).toBe(180 + maxGapBars(40) - 40);
   });
 
   it('keeps the zoom level while panning', () => {
     expect(panViewport({ start: 60, count: 37 }, 180, 25).count).toBe(37);
+  });
+});
+
+describe('right margin', () => {
+  it('leaves breathing room after the newest candle by default', () => {
+    const v = followRight(40, 180);
+    // The window runs past the last bar, so the live candle is not flush
+    // against the price axis.
+    expect(v.start + v.count).toBeGreaterThan(180);
+    expect(v.start + v.count - 180).toBe(defaultGapBars(40));
+  });
+
+  it('scales the margin with the zoom level', () => {
+    expect(defaultGapBars(100)).toBeGreaterThan(defaultGapBars(20));
+    expect(maxGapBars(100)).toBeGreaterThan(defaultGapBars(100));
+  });
+
+  it('can be expanded well past the default by scrolling right', () => {
+    const settled = followRight(40, 180);
+    expect(canExpandRight(settled, 180)).toBe(true);
+
+    const pushed = panViewport(settled, 180, 500);
+    expect(pushed.start + pushed.count - 180).toBe(maxGapBars(40));
+    expect(canExpandRight(pushed, 180)).toBe(false);
+  });
+
+  it('still counts as following the live candle once expanded', () => {
+    const pushed = panViewport(followRight(40, 180), 180, 500);
+    expect(isAtRightEdge(pushed, 180)).toBe(true);
+  });
+
+  it('keeps an expanded margin when a new candle arrives', () => {
+    const pushed = panViewport(followRight(40, 180), 180, 500);
+    const gapBefore = pushed.start + pushed.count - 180;
+    const next = reanchorViewport(pushed, 180, 181);
+    expect(next.start + next.count - 181).toBe(gapBefore);
   });
 });
 
@@ -162,7 +200,7 @@ describe('reanchorViewport', () => {
 
   it('pulls a stale window back in when the series shrinks', () => {
     const next = reanchorViewport({ start: 150, count: 40 }, 180, 60);
-    expect(next.start).toBeLessThanOrEqual(60 + RIGHT_GAP_BARS - 40);
+    expect(next.start).toBeLessThanOrEqual(60 + maxGapBars(40) - 40);
     expect(next.count).toBe(40);
   });
 

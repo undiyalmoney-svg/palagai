@@ -52,8 +52,8 @@
       <button
         type="button"
         class="tv-tool"
-        aria-label="Scroll to newer candles"
-        [disabled]="atLiveEdge()"
+        aria-label="Scroll right and widen the space after the last candle"
+        [disabled]="!canScrollRight()"
         (click)="pageForward()"
       >
         &#8250;

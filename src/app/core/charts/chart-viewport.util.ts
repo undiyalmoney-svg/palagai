@@ -8,12 +8,32 @@
 
 /** Smallest window a user can zoom into, so candles never become a single blob. */
 export const MIN_VISIBLE_BARS = 12;
-/** Empty bars kept past the newest candle, like TradingView's scroll-ahead gap. */
-export const RIGHT_GAP_BARS = 2;
 /** Zoomed-out enough to read a body, not so far that 180 bars are hairlines. */
 export const TARGET_PX_PER_BAR = 9;
 /** A phone-width plot fits very few bars at the target width; show at least this many. */
 export const MIN_DEFAULT_BARS = 24;
+
+/**
+ * Breathing room past the newest candle, as a share of the visible window —
+ * TradingView's right margin. Proportional rather than a fixed bar count so
+ * the gap looks the same at every zoom level.
+ */
+export const DEFAULT_RIGHT_GAP_FRACTION = 0.12;
+/**
+ * How far right the series can be pushed. Well past the default so levels can
+ * be projected forward into empty space, which is the point of the margin.
+ */
+export const MAX_RIGHT_GAP_FRACTION = 0.6;
+
+/** Empty bars the opening window leaves after the last candle. */
+export function defaultGapBars(count: number): number {
+  return Math.max(2, Math.round(count * DEFAULT_RIGHT_GAP_FRACTION));
+}
+
+/** Empty bars the window may be scrolled out to. */
+export function maxGapBars(count: number): number {
+  return Math.max(defaultGapBars(count), Math.round(count * MAX_RIGHT_GAP_FRACTION));
+}
 
 export interface Viewport {
   /** First visible bar index. Fractional so a pan can stop mid-bar. */
@@ -25,8 +45,8 @@ export interface Viewport {
 /**
  * Pull a window back inside the series.
  *
- * `start` may run up to RIGHT_GAP_BARS past the last bar, which is what keeps
- * the newest candle clear of the price axis instead of flush against it.
+ * `start` may run well past the last bar — up to maxGapBars — so the chart can
+ * be scrolled out to the right, leaving empty space to project levels into.
  */
 export function clampViewport(view: Viewport, total: number): Viewport {
   if (total <= 0) {
@@ -34,13 +54,15 @@ export function clampViewport(view: Viewport, total: number): Viewport {
   }
   const minCount = Math.min(MIN_VISIBLE_BARS, total);
   const count = clamp(view.count, minCount, total);
-  const maxStart = Math.max(0, total + RIGHT_GAP_BARS - count);
+  const maxStart = Math.max(0, total + maxGapBars(count) - count);
   return { start: clamp(view.start, 0, maxStart), count };
 }
 
-/** Window of `count` bars pinned to the newest candle. */
+/** Window of `count` bars sitting on the newest candle, with the default margin. */
 export function followRight(count: number, total: number): Viewport {
-  return clampViewport({ start: total + RIGHT_GAP_BARS - count, count }, total);
+  const settled = clampViewport({ start: 0, count }, total);
+  const start = total + defaultGapBars(settled.count) - settled.count;
+  return clampViewport({ start, count: settled.count }, total);
 }
 
 /**
@@ -95,12 +117,25 @@ export function panViewport(view: Viewport, total: number, deltaBars: number): V
   return clampViewport({ start: current.start + deltaBars, count: current.count }, total);
 }
 
-/** True when the window is parked on the newest bar. */
+/**
+ * True when the window is following the newest bar.
+ *
+ * Scrolling out into the right margin still counts: the newest candle is
+ * still what is being watched, just with more space ahead of it.
+ */
 export function isAtRightEdge(view: Viewport, total: number): boolean {
   if (total <= 0) return true;
   const current = clampViewport(view, total);
-  const maxStart = Math.max(0, total + RIGHT_GAP_BARS - current.count);
-  return current.start >= maxStart - 0.5;
+  const settled = Math.max(0, total + defaultGapBars(current.count) - current.count);
+  return current.start >= settled - 0.5;
+}
+
+/** True when there is still room to push the series further left. */
+export function canExpandRight(view: Viewport, total: number): boolean {
+  if (total <= 0) return false;
+  const current = clampViewport(view, total);
+  const maxStart = Math.max(0, total + maxGapBars(current.count) - current.count);
+  return current.start < maxStart - 0.5;
 }
 
 /**
@@ -118,10 +153,17 @@ export function reanchorViewport(
   if (nextTotal <= 0) {
     return { start: 0, count: 1 };
   }
-  if (isAtRightEdge(view, prevTotal)) {
-    return followRight(clampViewport(view, prevTotal).count, nextTotal);
+  const current = clampViewport(view, prevTotal);
+  if (isAtRightEdge(current, prevTotal)) {
+    // Carry the trailing gap across, so a margin the reader opened up by
+    // scrolling right is not collapsed the moment a candle closes.
+    const gap = current.start + current.count - prevTotal;
+    return clampViewport(
+      { start: nextTotal + gap - current.count, count: current.count },
+      nextTotal,
+    );
   }
-  return clampViewport(view, nextTotal);
+  return clampViewport(current, nextTotal);
 }
 
 /** Inclusive bar indices to draw, padded a bar each side so partials clip cleanly. */
