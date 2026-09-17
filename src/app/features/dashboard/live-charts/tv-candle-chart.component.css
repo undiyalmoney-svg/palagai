@@ -5,6 +5,14 @@
   min-width: 0;
 }
 
+.tv-topbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+}
+
 .tv-legend {
   display: flex;
   flex-wrap: wrap;
@@ -16,6 +24,62 @@
   font-size: 0.72rem;
   font-weight: 500;
   color: #131722;
+}
+
+.tv-tools {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+  flex-shrink: 0;
+}
+
+.tv-tool {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* Comfortably tappable on a phone without dominating the card. */
+  min-width: 2rem;
+  height: 2rem;
+  padding: 0 0.35rem;
+  border: 1px solid var(--pg-line);
+  border-radius: var(--pg-radius-sm);
+  background: #fff;
+  color: #131722;
+  font-family: var(--pg-font);
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.tv-tool:hover:not(:disabled) {
+  background: #f0f3fa;
+}
+
+.tv-tool:disabled {
+  color: #b2b5be;
+  cursor: default;
+}
+
+.tv-tool-reset {
+  font-size: 0.72rem;
+  letter-spacing: 0.02em;
+}
+
+.tv-zoom-count {
+  min-width: 3.4rem;
+  padding: 0 0.1rem;
+  font-family: var(--pg-font-mono);
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #131722;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.tv-zoom-total {
+  color: #787b86;
+  font-weight: 500;
 }
 
 .tv-legend-hint {
@@ -47,15 +111,28 @@
   position: relative;
   width: 100%;
   min-width: 0;
+  /* The canvas measures this, so height lives here and can be responsive. */
+  height: 360px;
   border: 1px solid var(--pg-line);
   border-radius: var(--pg-radius-sm);
   background: #fff;
   overflow: hidden;
 }
 
+/* A phone has the width to spare vertically, and candles need the room. */
+@media (max-width: 640px) {
+  .tv-canvas-wrap {
+    height: 440px;
+  }
+}
+
 .tv-canvas-wrap canvas {
   display: block;
-  /* Vertical pans should scroll the page; the crosshair owns horizontal drags. */
+  /* Vertical swipes scroll the page; horizontal drags scroll the series. */
   touch-action: pan-y;
   cursor: crosshair;
+}
+
+.tv-canvas-wrap canvas:active {
+  cursor: grabbing;
 }

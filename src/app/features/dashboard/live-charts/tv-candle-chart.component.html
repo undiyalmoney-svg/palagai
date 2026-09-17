@@ -1,30 +1,86 @@
 <div class="tv-chart">
-  <div class="tv-legend" [class.tv-legend-active]="hover()">
-    @if (hover(); as bar) {
-      <span class="tv-legend-time">{{ bar.date.slice(11, 16) }}</span>
-      <span class="tv-legend-pair"><i>O</i>{{ fmt(bar.open) }}</span>
-      <span class="tv-legend-pair"><i>H</i>{{ fmt(bar.high) }}</span>
-      <span class="tv-legend-pair"><i>L</i>{{ fmt(bar.low) }}</span>
-      <span class="tv-legend-pair"><i>C</i>{{ fmt(bar.close) }}</span>
-      <span
-        class="tv-legend-chg"
-        [class.up]="(bar.changePct ?? 0) >= 0"
-        [class.down]="(bar.changePct ?? 0) < 0"
+  <div class="tv-topbar">
+    <div class="tv-legend" [class.tv-legend-active]="hover()">
+      @if (hover(); as bar) {
+        <span class="tv-legend-time">{{ bar.date.slice(11, 16) }}</span>
+        <span class="tv-legend-pair"><i>O</i>{{ fmt(bar.open) }}</span>
+        <span class="tv-legend-pair"><i>H</i>{{ fmt(bar.high) }}</span>
+        <span class="tv-legend-pair"><i>L</i>{{ fmt(bar.low) }}</span>
+        <span class="tv-legend-pair"><i>C</i>{{ fmt(bar.close) }}</span>
+        <span
+          class="tv-legend-chg"
+          [class.up]="(bar.changePct ?? 0) >= 0"
+          [class.down]="(bar.changePct ?? 0) < 0"
+        >
+          {{ (bar.changePct ?? 0) >= 0 ? '+' : '' }}{{ fmt(bar.changePct, 2) }}%
+        </span>
+      } @else {
+        <span class="tv-legend-hint">Pinch to zoom · drag to scroll · tap a bar</span>
+      }
+    </div>
+
+    <div class="tv-tools" role="group" aria-label="Zoom and scroll">
+      <button
+        type="button"
+        class="tv-tool"
+        aria-label="Scroll to older candles"
+        (click)="pageBack()"
       >
-        {{ (bar.changePct ?? 0) >= 0 ? '+' : '' }}{{ fmt(bar.changePct, 2) }}%
+        &#8249;
+      </button>
+      <button
+        type="button"
+        class="tv-tool"
+        aria-label="Zoom out"
+        [disabled]="!canZoomOut()"
+        (click)="zoomOut()"
+      >
+        &minus;
+      </button>
+      <span class="tv-zoom-count" aria-live="polite">
+        {{ visibleCount() }}<span class="tv-zoom-total">/{{ totalCount() }}</span>
       </span>
-    } @else {
-      <span class="tv-legend-hint">Hover or drag for bar detail</span>
-    }
+      <button
+        type="button"
+        class="tv-tool"
+        aria-label="Zoom in"
+        [disabled]="!canZoomIn()"
+        (click)="zoomIn()"
+      >
+        +
+      </button>
+      <button
+        type="button"
+        class="tv-tool"
+        aria-label="Scroll to newer candles"
+        [disabled]="atLiveEdge()"
+        (click)="pageForward()"
+      >
+        &#8250;
+      </button>
+      <button
+        type="button"
+        class="tv-tool tv-tool-reset"
+        aria-label="Reset zoom and jump to the latest candle"
+        (click)="resetView()"
+      >
+        Fit
+      </button>
+    </div>
   </div>
 
   <div class="tv-canvas-wrap">
     <canvas
       #canvas
       (mousemove)="onPointerMove($event)"
+      (mousedown)="onMouseDown($event)"
+      (mouseup)="onMouseUp()"
       (mouseleave)="onPointerLeave()"
+      (wheel)="onWheel($event)"
+      (touchstart)="onTouchStart($event)"
       (touchmove)="onTouchMove($event)"
-      (touchend)="onPointerLeave()"
+      (touchend)="onTouchEnd()"
+      (touchcancel)="onTouchEnd()"
     ></canvas>
   </div>
 </div>
