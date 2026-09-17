@@ -25,6 +25,7 @@ import { Candle } from '../../../core/models/candle.model';
 import { SrChartModel, SrZone } from '../../../core/charts/sr-chart.util';
 import {
   Viewport,
+  canExpandRight,
   clampViewport,
   defaultViewport,
   isAtRightEdge,
@@ -42,19 +43,29 @@ const COLORS = {
   axisLine: '#e0e3eb',
   bull: '#26a69a',
   bear: '#ef5350',
-  link: '#363a45',
+  link: 'rgba(120, 123, 134, 0.75)',
+  pivot: '#787b86',
   crosshair: '#9598a1',
   lastUp: '#26a69a',
   lastDown: '#ef5350',
-  supportFill: 'rgba(38, 166, 154, 0.13)',
-  supportEdge: 'rgba(38, 166, 154, 0.55)',
-  resistanceFill: 'rgba(239, 83, 80, 0.13)',
-  resistanceEdge: 'rgba(239, 83, 80, 0.55)',
+  supportFill: 'rgba(38, 166, 154, 0.20)',
+  supportEdge: 'rgba(38, 166, 154, 0.75)',
+  supportTagBg: 'rgba(38, 166, 154, 0.85)',
+  supportInk: '#ffffff',
+  resistanceFill: 'rgba(239, 83, 80, 0.20)',
+  resistanceEdge: 'rgba(239, 83, 80, 0.75)',
+  resistanceTagBg: 'rgba(239, 83, 80, 0.85)',
+  resistanceInk: '#ffffff',
   legendInk: '#131722',
 } as const;
 
 const FONT = '11px ui-sans-serif, system-ui, -apple-system, sans-serif';
 const FONT_BOLD = '600 11px ui-sans-serif, system-ui, -apple-system, sans-serif';
+const FONT_ZONE = '600 9px ui-sans-serif, system-ui, -apple-system, sans-serif';
+/** Thin levels still need a band with presence. */
+const MIN_ZONE_H = 6;
+/** Below this the label would not fit inside the band. */
+const ZONE_LABEL_MIN_H = 15;
 
 const PAD = { top: 14, right: 68, bottom: 26, left: 8 } as const;
 /** Axis pill height; also the minimum gap two axis labels may sit apart. */
@@ -111,6 +122,8 @@ export class TvCandleChartComponent implements AfterViewInit, OnChanges, OnDestr
   protected readonly canZoomIn = signal(false);
   protected readonly canZoomOut = signal(false);
   protected readonly atLiveEdge = signal(true);
+  /** Room left to push the series further into the right margin. */
+  protected readonly canScrollRight = signal(true);
 
   private ro: ResizeObserver | null = null;
   private crosshairIndex: number | null = null;
@@ -455,6 +468,7 @@ export class TvCandleChartComponent implements AfterViewInit, OnChanges, OnDestr
     this.drawZones(ctx, zones, xOf, yOf, plotW, slotW);
     this.drawLinks(ctx, xOf, yOf);
     this.drawCandles(ctx, bars, xOf, yOf, slotW, first, last);
+    this.drawZoneLabels(ctx, zones, xOf, yOf, plotW, slotW);
     this.drawLastPriceLine(ctx, bars, plotW, yOf);
     ctx.restore();
 
@@ -483,6 +497,7 @@ export class TvCandleChartComponent implements AfterViewInit, OnChanges, OnDestr
       this.canZoomIn.set(false);
       this.canZoomOut.set(false);
       this.atLiveEdge.set(true);
+      this.canScrollRight.set(false);
       return;
     }
     const shown = Math.min(total, Math.round(view.count));
@@ -490,6 +505,7 @@ export class TvCandleChartComponent implements AfterViewInit, OnChanges, OnDestr
     this.canZoomIn.set(zoomViewport(view, total, 1 / BUTTON_ZOOM, 0.5).count < view.count);
     this.canZoomOut.set(shown < total);
     this.atLiveEdge.set(isAtRightEdge(view, total));
+    this.canScrollRight.set(canExpandRight(view, total));
   }
 
   /**
@@ -601,24 +617,86 @@ export class TvCandleChartComponent implements AfterViewInit, OnChanges, OnDestr
     for (const zone of zones) {
       const support = zone.kind === 'support';
       const x0 = Math.max(PAD.left, xOf(zone.fromIndex) - slotW / 2);
+      // Bands run to the right edge so they carry through the empty margin,
+      // which is what makes a level readable as something price may return to.
       const x1 = PAD.left + plotW;
       const yTop = yOf(zone.hi);
       const yBot = yOf(zone.lo);
-      const h = Math.max(2, yBot - yTop);
+      // A one-tick level still has to be a band you can see.
+      const h = Math.max(MIN_ZONE_H, yBot - yTop);
+      const top = yBot - yTop < MIN_ZONE_H ? (yTop + yBot) / 2 - MIN_ZONE_H / 2 : yTop;
 
       ctx.fillStyle = support ? COLORS.supportFill : COLORS.resistanceFill;
-      ctx.fillRect(x0, yTop, Math.max(6, x1 - x0), h);
+      ctx.fillRect(x0, top, Math.max(6, x1 - x0), h);
 
       // Edges only — a mid rule inside a thin band reads as clutter.
       ctx.strokeStyle = support ? COLORS.supportEdge : COLORS.resistanceEdge;
       ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.moveTo(x0, Math.round(yTop) + 0.5);
-      ctx.lineTo(x1, Math.round(yTop) + 0.5);
-      ctx.moveTo(x0, Math.round(yBot) + 0.5);
-      ctx.lineTo(x1, Math.round(yBot) + 0.5);
+      ctx.moveTo(x0, Math.round(top) + 0.5);
+      ctx.lineTo(x1, Math.round(top) + 0.5);
+      ctx.moveTo(x0, Math.round(top + h) + 0.5);
+      ctx.lineTo(x1, Math.round(top + h) + 0.5);
       ctx.stroke();
+
     }
+  }
+
+  /**
+   * Labels go on after the candles. Drawn with the bands they were painted
+   * over by any candle crossing the level, which chopped the text in half.
+   */
+  private drawZoneLabels(
+    ctx: CanvasRenderingContext2D,
+    zones: SrZone[],
+    xOf: (i: number) => number,
+    yOf: (p: number) => number,
+    plotW: number,
+    slotW: number,
+  ): void {
+    const placed: { x0: number; x1: number; y0: number; y1: number }[] = [];
+    for (const zone of zones) {
+      const x0 = Math.max(PAD.left, xOf(zone.fromIndex) - slotW / 2);
+      const x1 = PAD.left + plotW;
+      const yTop = yOf(zone.hi);
+      const yBot = yOf(zone.lo);
+      const h = Math.max(MIN_ZONE_H, yBot - yTop);
+      const top = yBot - yTop < MIN_ZONE_H ? (yTop + yBot) / 2 - MIN_ZONE_H / 2 : yTop;
+      this.zoneLabel(ctx, zone.kind === 'support', x0, top, h, x1, placed);
+    }
+  }
+
+  /**
+   * Name the band, as TradingView's zone indicators do — but only when it
+   * fits and would not land on a label already drawn. Two nearby levels were
+   * otherwise printing one on top of the other and both became unreadable.
+   */
+  private zoneLabel(
+    ctx: CanvasRenderingContext2D,
+    support: boolean,
+    x0: number,
+    top: number,
+    h: number,
+    x1: number,
+    placed: { x0: number; x1: number; y0: number; y1: number }[],
+  ): void {
+    if (h < ZONE_LABEL_MIN_H) return;
+    const text = support ? 'SUPPORT' : 'RESISTANCE';
+    ctx.font = FONT_ZONE;
+    const w = ctx.measureText(text).width + 8;
+    const left = x0 + 2;
+    if (x1 - left < w + 4) return;
+
+    const box = { x0: left, x1: left + w, y0: top + h / 2 - 6.5, y1: top + h / 2 + 6.5 };
+    if (placed.some((p) => overlaps(p, box))) return;
+    placed.push(box);
+
+    ctx.fillStyle = support ? COLORS.supportTagBg : COLORS.resistanceTagBg;
+    ctx.fillRect(box.x0, box.y0, w, 13);
+    ctx.fillStyle = support ? COLORS.supportInk : COLORS.resistanceInk;
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, box.x0 + 4, top + h / 2);
+    ctx.textBaseline = 'alphabetic';
   }
 
   private drawLinks(
@@ -627,8 +705,10 @@ export class TvCandleChartComponent implements AfterViewInit, OnChanges, OnDestr
     yOf: (p: number) => number,
   ): void {
     const links = this.model?.links ?? [];
+    // Structure lines are context, not the subject. Near-black at 1.3px read
+    // as the main content and buried the candles and zones.
     ctx.strokeStyle = COLORS.link;
-    ctx.lineWidth = 1.3;
+    ctx.lineWidth = 1;
     for (const link of links) {
       ctx.beginPath();
       ctx.moveTo(xOf(link.fromIndex), yOf(link.fromPrice));
@@ -639,7 +719,7 @@ export class TvCandleChartComponent implements AfterViewInit, OnChanges, OnDestr
     // Pivot handles, so it is obvious which bar anchored each line.
     const pivots = this.model?.pivots ?? [];
     for (const pivot of pivots) {
-      ctx.fillStyle = COLORS.link;
+      ctx.fillStyle = COLORS.pivot;
       ctx.beginPath();
       ctx.arc(xOf(pivot.index), yOf(pivot.price), 1.8, 0, Math.PI * 2);
       ctx.fill();
@@ -828,6 +908,13 @@ export function niceTicks(min: number, max: number, count: number): number[] {
 
 function touchDistance(a: Touch, b: Touch): number {
   return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+}
+
+function overlaps(
+  a: { x0: number; x1: number; y0: number; y1: number },
+  b: { x0: number; x1: number; y0: number; y1: number },
+): boolean {
+  return a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1;
 }
 
 function formatDayLabel(date: string): string {
