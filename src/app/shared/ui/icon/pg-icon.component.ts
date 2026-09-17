@@ -82,6 +82,14 @@ import { Component, Input } from '@angular/core';
         @case ('activity') {
           <path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2" />
         }
+        @case ('candles') {
+          <rect x="4" y="8" width="4" height="9" rx="1" />
+          <line x1="6" x2="6" y1="4" y2="8" />
+          <line x1="6" x2="6" y1="17" y2="20" />
+          <rect x="15" y="5" width="4" height="8" rx="1" />
+          <line x1="17" x2="17" y1="2" y2="5" />
+          <line x1="17" x2="17" y1="13" y2="18" />
+        }
         @case ('trending-up') {
           <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" />
           <polyline points="16 7 22 7 22 13" />

@@ -85,6 +85,13 @@ export class DashboardComponent implements OnInit, OnDestroy {
       module: 'auto',
     },
     {
+      label: 'Charts',
+      shortLabel: 'Charts',
+      route: '/dashboard/charts',
+      icon: 'candles',
+      module: 'auto',
+    },
+    {
       label: 'Test',
       shortLabel: 'Test',
       route: '/dashboard/order-test',
@@ -108,6 +115,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
     '/dashboard/crude-bot': {
       title: 'Crude Bot',
       subtitle: 'Crude Oil Mini ATM CE/PE. Same retest playbook as Nifty/Bank.',
+    },
+    '/dashboard/charts': {
+      title: 'Charts',
+      subtitle: 'Live 15m candles with support/resistance — Crude, Nifty 50, Bank Nifty.',
     },
     '/dashboard/order-test': {
       title: 'Order Test',
