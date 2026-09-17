@@ -97,6 +97,17 @@
       <button mat-stroked-button type="button" [disabled]="controlsLocked()" (click)="setRangeDays(365)">Last 365 days</button>
     </div>
 
+    @if (isCrudeDesk()) {
+      <label class="field crude-strategy-field">
+        <span>Crude strategy</span>
+        <select [(ngModel)]="crudeStrategy" [disabled]="controlsLocked()">
+          @for (s of crudeStrategyOptions; track s.id) {
+            <option [value]="s.id">{{ s.label }}</option>
+          }
+        </select>
+      </label>
+    }
+
     <div class="checks">
       <label class="check">
         <input type="checkbox" [(ngModel)]="today" (ngModelChange)="onTodayChange()" [disabled]="controlsLocked()" />

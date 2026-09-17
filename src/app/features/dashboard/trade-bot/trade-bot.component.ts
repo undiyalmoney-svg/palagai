@@ -15,6 +15,10 @@ import { KiteFundsService } from '../../../core/services/kite-funds.service';
 import { DEFAULT_TRADING_CAPITAL_RS } from '../../../core/paper-desk/capital-plan.util';
 import { lotsFromAvailableFunds } from '../../../core/paper-desk/lots-from-funds';
 import {
+  CrudeStrategyProfileId,
+  CRUDE_STRATEGY_PROFILES,
+} from '../../../core/strategy-engine/strategies/crude-pdhl-evening/crude-strategy-profile';
+import {
   computeProtectiveSlTrigger,
   roundOptionPremiumTick,
 } from '../../../core/live-desk/option-sl-premium.util';
@@ -338,6 +342,13 @@ export class TradeBotComponent implements OnInit, OnDestroy {
   protected fundSource: 'actual' | 'mine' = 'actual';
   protected capitalRs = DEFAULT_TRADING_CAPITAL_RS;
   protected mineFundText = String(DEFAULT_TRADING_CAPITAL_RS);
+  /** Crude Bot only — selected crude strategy profile. */
+  protected crudeStrategy: CrudeStrategyProfileId = 'selective';
+  /** Crude strategy picker options (id + label). */
+  protected readonly crudeStrategyOptions = Object.values(CRUDE_STRATEGY_PROFILES).map((p) => ({
+    id: p.profileId,
+    label: p.label,
+  }));
 
   protected readonly busy = signal(false);
   protected readonly error = signal('');
@@ -948,7 +959,9 @@ export class TradeBotComponent implements OnInit, OnDestroy {
     const live = this.live();
     const books = [
       ...(board?.deskChart?.books || []),
-      ...((board?.books || []).map((b) => b.chart).filter(Boolean) as NonNullable<PaperResult['deskChart']>['books']),
+      ...((board?.books || [])
+        .map((b) => b.chart)
+        .filter(Boolean) as NonNullable<NonNullable<PaperResult['deskChart']>['books']>),
       ...(live?.deskChart?.books || []),
     ];
     return books.filter(Boolean);
@@ -1126,6 +1139,9 @@ export class TradeBotComponent implements OnInit, OnDestroy {
         capitalRs: number;
         capitalSource: 'actual' | 'mine';
         engine: string;
+        enableCrude?: boolean;
+        crudeStrategy?: CrudeStrategyProfileId;
+        crudeLots?: number;
       } = {
         fromDate: this.fromDate,
         toDate: this.toDate,
@@ -1138,6 +1154,11 @@ export class TradeBotComponent implements OnInit, OnDestroy {
         capitalSource: this.fundMode(),
         engine: this.isCrudeDesk() ? 'crude-desk' : 'sr-desk',
       };
+      if (this.isCrudeDesk()) {
+        body.enableCrude = true;
+        body.crudeStrategy = this.crudeStrategy;
+        body.crudeLots = this.systemLots();
+      }
       const kite = this.kiteSession.getAuthorizationHeader();
       const headers: Record<string, string> = kite ? { 'X-Kite-Authorization': kite } : {};
 

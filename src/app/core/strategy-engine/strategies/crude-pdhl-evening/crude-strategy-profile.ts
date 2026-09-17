@@ -6,6 +6,7 @@
  * - daily-profit: Trap-style evening PDHL + confirm · tight SL/TP
  * - champion: hunt pair (larger SL/TP)
  * - daily-income: sized for ~₹300–₹1,000 / day on 1 lot (₹10/pt)
+ * - steady-500: OR breakout · SL35/TP50 · day-lock +₹1,000 · ≤3/day (₹300–₹1,000 band)
  * - trap-confirm: S/R Trap + Confirm (Nifty Trap DNA port)
  *
  * Live without real money = Live tab with "Live money" unchecked (paper fills).
@@ -34,6 +35,7 @@ export type CrudeStrategyProfileId =
   | 'daily-profit-ng'
   | 'champion'
   | 'daily-income'
+  | 'steady-500'
   | 'trap-confirm';
 
 /** Trap arm style — Nat Gas daily-profit uses trap-only (no soft bounce). */
@@ -286,6 +288,45 @@ export const CRUDE_DAILY_INCOME_PARAMS: CrudeTradeParams = {
 };
 
 /**
+ * Steady ₹500 — tight OR-breakout scalp aimed at the ₹300–₹1,000/day band (1 mini lot, ₹10/pt).
+ *
+ *   OR 09:00–09:45 · entries 09:45–22:00 · SL 35 (−₹350) / TP 50 (+₹500)
+ *   Day profit lock +100 pts (₹1,000 ceiling) · ≤3 trades/day · skip OR width > 150
+ *
+ * One TP lands ₹500; a second stacks toward the ₹1,000 lock. Paper-first target,
+ * not a guarantee — losing days can still hit the day loss stop.
+ */
+export const CRUDE_STEADY_500_STOP_PTS = 35;
+export const CRUDE_STEADY_500_TARGET_PTS = 50;
+export const CRUDE_STEADY_500_DAY_LOCK_PTS = 100;
+export const CRUDE_STEADY_500_MAX_TRADES_DAY = 3;
+
+export const CRUDE_STEADY_500_PARAMS: CrudeTradeParams = {
+  profileId: 'steady-500',
+  label: 'Steady ₹500 (₹300–1,000)',
+  stopPts: CRUDE_STEADY_500_STOP_PTS,
+  morningTargetPts: CRUDE_STEADY_500_TARGET_PTS,
+  eveningTargetPts: CRUDE_STEADY_500_TARGET_PTS,
+  targetRMultiple: 0,
+  dayLossStopPts: CRUDE_DAY_LOSS_STOP_PTS,
+  strictDayLossPts: CRUDE_STRICT_DAY_LOSS_PTS,
+  dayProfitLockPts: CRUDE_STEADY_500_DAY_LOCK_PTS,
+  entryMode: 'session-or',
+  requireConfirm: false,
+  firstWinLock: false,
+  eveningEntryStart: '09:45',
+  eveningEntryEnd: '22:00',
+  sessionOrStart: '09:00',
+  sessionOrEnd: '09:45',
+  maxOrWidth: 150,
+  maxEveningTradesDay: CRUDE_STEADY_500_MAX_TRADES_DAY,
+  defaultEnableMorning: false,
+  defaultEnableEvening: true,
+  dailyBandLabel: 'OR breakout · SL35/TP50 · lock +₹1,000 · ≤3/day · target ₹300–₹1,000',
+  ...PROTECT_OFF,
+};
+
+/**
  * Crude Trap + Confirm — Trap DNA port (paper / research).
  * Unlimited · no day stop · per-trade wick SL / 3.5R TP.
  */
@@ -353,6 +394,7 @@ export const CRUDE_STRATEGY_PROFILES: Record<CrudeStrategyProfileId, CrudeTradeP
   'daily-profit-ng': NATGAS_DAILY_PROFIT_PARAMS,
   champion: CRUDE_CHAMPION_PARAMS,
   'daily-income': CRUDE_DAILY_INCOME_PARAMS,
+  'steady-500': CRUDE_STEADY_500_PARAMS,
   'trap-confirm': CRUDE_TRAP_CONFIRM_PARAMS,
 };
 

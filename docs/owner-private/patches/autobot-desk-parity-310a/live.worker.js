@@ -428,9 +428,8 @@ class LiveWorker {
       }
 
       if (config.enableCrude && crudeSession && this.candles.crude.length) {
-        const crudeProfile =
-          config.crudeStrategy === 'all-green' ? 'all-green' : 'selective';
-        const tradeParams = resolveCrudeStrategyProfile(crudeProfile);
+        // resolveCrudeStrategyProfile falls back to a safe default for unknown ids.
+        const tradeParams = resolveCrudeStrategyProfile(config.crudeStrategy);
         const dayLossStopPts = resolveCrudeProfileDayLossPts(
           tradeParams,
           !!config.strictDayStop,
