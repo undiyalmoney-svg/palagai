@@ -135,7 +135,7 @@ const TRAP_V2_DEFAULTS = defaultStrategySettings({
  * instead of silently trading last week's DNA (doc 51 RCA — the failure
  * mode this guard exists to catch).
  */
-const STRATEGY_BUNDLE_VERSION = 'sr-trap-v2.2026-08-22.2';
+const STRATEGY_BUNDLE_VERSION = 'sr-trap-v2.2026-09-17.1-charge-floor';
 
 const GENIE_DEFAULTS = defaultStrategySettings({
   entryTimeStart: '10:15',

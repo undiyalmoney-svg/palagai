@@ -370,7 +370,7 @@ export function srTrapExitLogic(
   ctx: StrategyContext,
 ): ManagedExitDecision | null {
   // DNA extras are 1-lot; option MFE ₹ includes lots — scale trail with fill size.
-  const { armRs, lockRs, givebackRs } = optionPeakTrailSettingsFromExtras(
+  const { armRs, lockRs, givebackRs, chargeFloorMultiple } = optionPeakTrailSettingsFromExtras(
     settings.extras,
     open.lotsMultiplier,
   );
@@ -416,6 +416,7 @@ export function srTrapExitLogic(
       armRs,
       lockRs,
       givebackRs,
+      chargeFloorMultiple,
     });
     if (trail?.hit) {
       return {
