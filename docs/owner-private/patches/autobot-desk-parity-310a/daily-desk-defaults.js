@@ -131,7 +131,11 @@ function normalizeStartConfig(config = {}) {
     // Daily path: Trap only (Genie only if client explicitly asks).
     bankStrategy: config.bankStrategy === 'genie' ? 'genie' : 'trap',
     niftyStrategy: 'trap',
-    crudeStrategy: config.crudeStrategy === 'all-green' ? 'all-green' : 'selective',
+    // Pass the selected crude profile through; strategy-core resolves/falls back.
+    crudeStrategy:
+      typeof config.crudeStrategy === 'string' && config.crudeStrategy
+        ? config.crudeStrategy
+        : 'selective',
     // Desk risk: profit lock ON unless client opts out; strict ON unless client opts out.
     dayProfitLock: config.dayProfitLock !== false,
     strictDayStop: config.strictDayStop !== false,
