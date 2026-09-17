@@ -27,8 +27,16 @@ INSTRUMENTS = {
     "nifty": (256265, "nifty-5m-2020-2026.json"),
     "bank": (260105, "banknifty-5m-2020-2026.json"),
 }
-FROM = datetime(2020, 1, 1, 9, 15, 0)
-TO = datetime(2026, 7, 28, 15, 30, 0)
+def env_datetime(name: str, default: datetime) -> datetime:
+    value = os.environ.get(name, "").strip()
+    if not value:
+        return default
+    return datetime.fromisoformat(value)
+
+
+today = datetime.now().astimezone().date()
+FROM = env_datetime("FROM", datetime(2020, 1, 1, 9, 15, 0))
+TO = env_datetime("TO", datetime(today.year, today.month, today.day, 15, 30, 0))
 CHUNK_DAYS = 90
 DELAY = 0.45
 

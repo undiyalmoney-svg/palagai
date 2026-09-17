@@ -25,12 +25,20 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timezone, timedelta
 from itertools import product
 from pathlib import Path
+from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 CACHE = Path("/tmp/palagai-full-day-research")
 OUT = ROOT / "reports" / "full-day-market-research"
 CACHE.mkdir(parents=True, exist_ok=True)
 OUT.mkdir(parents=True, exist_ok=True)
+
+KITE_CACHE = ROOT / "reports" / "analyst-cache"
+KITE_FILES = {
+    "nifty": KITE_CACHE / "nifty-5m-2020-2026.json",
+    "bank": KITE_CACHE / "banknifty-5m-2020-2026.json",
+    "crude": KITE_CACHE / "crudeoilm-5m-merged.json",
+}
 
 
 @dataclass(frozen=True)
@@ -144,6 +152,31 @@ def to_minute(hhmm: str) -> int:
     return h * 60 + m
 
 
+def rows_to_bars(market: Market, rows: list[dict[str, Any]], scale: float) -> list[Bar]:
+    start = to_minute(market.session_start)
+    end = to_minute(market.force_exit)
+    bars: list[Bar] = []
+    for row in rows:
+        stamp = str(row["date"]).replace("T", " ").split("+")[0][:19]
+        minute = to_minute(stamp[11:16])
+        if minute < start or minute > end:
+            continue
+        bars.append(
+            Bar(
+                stamp=stamp,
+                day=stamp[:10],
+                minute=minute,
+                open=float(row["open"]) * scale,
+                high=float(row["high"]) * scale,
+                low=float(row["low"]) * scale,
+                close=float(row["close"]) * scale,
+            )
+        )
+    bars.sort(key=lambda bar: bar.stamp)
+    add_indicators(bars)
+    return bars
+
+
 def fetch_yahoo(market: Market) -> list[Bar]:
     cache_path = CACHE / f"{market.key}-5m-60d.json"
     if cache_path.exists():
@@ -171,31 +204,36 @@ def fetch_yahoo(market: Market) -> list[Bar]:
     result = payload["chart"]["result"][0]
     timestamps = result.get("timestamp") or []
     quote = result["indicators"]["quote"][0]
-    start = to_minute(market.session_start)
-    end = to_minute(market.force_exit)
-    rows: list[Bar] = []
+    rows: list[dict[str, Any]] = []
     for i, epoch in enumerate(timestamps):
         values = (quote["open"][i], quote["high"][i], quote["low"][i], quote["close"][i])
         if any(value is None for value in values):
             continue
         ist = datetime.fromtimestamp(epoch, tz=timezone.utc) + timedelta(hours=5, minutes=30)
-        minute = ist.hour * 60 + ist.minute
-        if minute < start or minute > end:
-            continue
         rows.append(
-            Bar(
-                stamp=ist.strftime("%Y-%m-%d %H:%M:%S"),
-                day=ist.strftime("%Y-%m-%d"),
-                minute=minute,
-                open=float(values[0]) * market.scale,
-                high=float(values[1]) * market.scale,
-                low=float(values[2]) * market.scale,
-                close=float(values[3]) * market.scale,
-            )
+            {
+                "date": ist.strftime("%Y-%m-%d %H:%M:%S"),
+                "open": values[0],
+                "high": values[1],
+                "low": values[2],
+                "close": values[3],
+            }
         )
-    rows.sort(key=lambda bar: bar.stamp)
-    add_indicators(rows)
-    return rows
+    return rows_to_bars(market, rows, market.scale)
+
+
+def load_market_bars(market: Market) -> tuple[list[Bar], str]:
+    kite_path = KITE_FILES[market.key]
+    if kite_path.exists():
+        rows = json.loads(kite_path.read_text())
+        bars = rows_to_bars(market, rows, 1.0)
+        note = {
+            "nifty": "Real Kite NIFTY 50 index candles; ATM option P&L approximated at 0.5 delta.",
+            "bank": "Real Kite BANKNIFTY index candles; ATM option P&L approximated at 0.5 delta.",
+            "crude": "Real Kite CRUDEOILM front-month candles merged from available contracts.",
+        }[market.key]
+        return bars, note
+    return fetch_yahoo(market), market.data_note
 
 
 def add_indicators(bars: list[Bar]) -> None:
@@ -428,7 +466,7 @@ def rank_train(row: tuple[Spec, list[Trade], dict]) -> tuple:
     return (eligible, score, pf, stat["trades"])
 
 
-def research_market(market: Market, bars: list[Bar]) -> dict:
+def research_market(market: Market, bars: list[Bar], data_note: str) -> dict:
     days = sorted({bar.day for bar in bars})
     split = max(1, int(len(days) * 0.60))
     train_days = set(days[:split])
@@ -465,7 +503,7 @@ def research_market(market: Market, bars: list[Bar]) -> dict:
     today = days[-1] if days else None
     return {
         "market": market.key,
-        "data_note": market.data_note,
+        "data_note": data_note,
         "bars": len(bars),
         "sessions": len(days),
         "from": days[0] if days else None,
@@ -491,9 +529,9 @@ def research_market(market: Market, bars: list[Bar]) -> dict:
 def main() -> None:
     reports = []
     for market in MARKETS:
-        bars = fetch_yahoo(market)
+        bars, data_note = load_market_bars(market)
         print(f"{market.key}: {len(bars)} bars; researching full session...", flush=True)
-        reports.append(research_market(market, bars))
+        reports.append(research_market(market, bars, data_note))
 
     combined_trades: list[Trade] = []
     holdout_days: set[str] = set()
