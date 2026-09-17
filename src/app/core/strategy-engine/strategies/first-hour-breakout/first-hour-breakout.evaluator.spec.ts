@@ -4,12 +4,22 @@ import {
   createFirstHourBreakoutState,
   evaluateBreakoutDistanceFilter,
   firstHourRangeFrom5m,
+  FirstHourBreakoutState,
   FIRST_HOUR_MAX_BREAKOUT_DISTANCE_PTS,
   runFirstHourBreakout,
 } from './first-hour-breakout.evaluator';
 
 function candle(date: string, o: number, h: number, l: number, c: number): Candle {
   return { date, open: o, high: h, low: l, close: c, volume: 1000 };
+}
+
+/**
+ * The evaluator takes the regime as an argument rather than reading it off the
+ * context, so call it the way FirstHourBreakoutStrategy does. Passing only
+ * (ctx, state) silently evaluates every case as UNKNOWN, which skips.
+ */
+function run(ctx: StrategyContext, state: FirstHourBreakoutState) {
+  return runFirstHourBreakout(ctx, state, ctx.marketRegime ?? 'UNKNOWN');
 }
 
 function buildContext(params: {
@@ -72,18 +82,20 @@ describe('FirstHourBreakoutEvaluator', () => {
       candle('2026-06-24T09:20:00+0530', 104, 106, 103, 105),
     ];
 
+    // First hour range is 99–106, so this closes clear of it with a 92% body
+    // and a token lower wick — a breakout candle the quality gate accepts.
     const ctx = buildContext({
       date: '2026-06-24T10:20:00+0530',
-      open: 106,
-      close: 108,
-      high: 109,
-      low: 107,
+      open: 106.2,
+      close: 108.4,
+      high: 108.5,
+      low: 106.1,
       previous5m: firstHourBars,
       replayStepIndex: 10,
     });
 
     const state = createFirstHourBreakoutState();
-    const result = runFirstHourBreakout(ctx, state);
+    const result = run(ctx, state);
 
     expect(result.action).toBe('WAITING');
     expect(state.pendingBreakout).not.toBeNull();
@@ -95,30 +107,32 @@ describe('FirstHourBreakoutEvaluator', () => {
       candle('2026-06-24T09:15:00+0530', 100, 105, 99, 104),
       candle('2026-06-24T09:20:00+0530', 104, 106, 103, 105),
     ];
-    const breakoutBar = candle('2026-06-24T10:20:00+0530', 106, 109, 107, 108);
+    const breakoutBar = candle('2026-06-24T10:20:00+0530', 106.2, 108.5, 106.1, 108.4);
 
     const state = createFirstHourBreakoutState();
     const breakoutCtx = buildContext({
       date: breakoutBar.date,
-      open: 106,
-      close: 108,
-      high: 109,
-      low: 107,
+      open: 106.2,
+      close: 108.4,
+      high: 108.5,
+      low: 106.1,
       previous5m: [...firstHourBars],
       replayStepIndex: 10,
     });
-    runFirstHourBreakout(breakoutCtx, state);
+    run(breakoutCtx, state);
 
+    // Holds above the first hour high, and strong enough to clear the 80-point
+    // entry quality floor.
     const confirmCtx = buildContext({
       date: '2026-06-24T10:25:00+0530',
-      open: 108,
-      close: 109,
-      high: 110,
-      low: 108,
+      open: 108.5,
+      close: 109.5,
+      high: 109.6,
+      low: 108.4,
       previous5m: [...firstHourBars, breakoutBar],
       replayStepIndex: 11,
     });
-    const result = runFirstHourBreakout(confirmCtx, state);
+    const result = run(confirmCtx, state);
 
     expect(result.action).toBe('BUY');
     expect(state.tradedToday).toBe(true);
@@ -135,7 +149,7 @@ describe('FirstHourBreakoutEvaluator', () => {
     ctx.marketRegime = 'RANGING';
 
     const state = createFirstHourBreakoutState();
-    const result = runFirstHourBreakout(ctx, state);
+    const result = run(ctx, state);
 
     expect(result.action).toBe('SKIPPED');
   });
@@ -161,7 +175,7 @@ describe('FirstHourBreakoutEvaluator', () => {
     expect(dist.distancePts).toBeGreaterThan(FIRST_HOUR_MAX_BREAKOUT_DISTANCE_PTS);
 
     const state = createFirstHourBreakoutState();
-    const result = runFirstHourBreakout(ctx, state);
+    const result = run(ctx, state);
     expect(result.action).toBe('WAITING');
     expect(result.reason).toContain('Breakout distance');
   });
