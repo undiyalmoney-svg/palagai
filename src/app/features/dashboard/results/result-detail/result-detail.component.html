@@ -81,7 +81,7 @@
               <td>{{ trade.stopLoss }}</td>
               <td>{{ trade.targetPrice }}</td>
               <td>{{ trade.points | number: '1.2-2' }}</td>
-              <td>{{ trade.outcome ?? (trade.profitLoss > 0 ? 'WIN' : 'LOSS') }}</td>
+              <td>{{ trade.outcome }}</td>
               <td>{{ trade.holdingMinutes }}</td>
               <td>{{ trade.confidence }}%</td>
               <td>{{ trade.entryReason }}</td>
