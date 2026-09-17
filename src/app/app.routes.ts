@@ -14,6 +14,7 @@ import { DashboardHomeComponent } from './features/dashboard/dashboard-home.comp
 import { OrderTestComponent } from './features/dashboard/order-test/order-test.component';
 import { GetTokenComponent } from './features/dashboard/get-token/get-token.component';
 import { TradeBotComponent } from './features/dashboard/trade-bot/trade-bot.component';
+import { LiveChartsComponent } from './features/dashboard/live-charts/live-charts.component';
 import { SettingsComponent } from './features/dashboard/settings/settings.component';
 import { PnlRecordsComponent } from './features/dashboard/pnl-records/pnl-records.component';
 import { VaultPageComponent } from './features/dashboard/vault/vault-page.component';
@@ -87,6 +88,11 @@ export const routes: Routes = [
         canActivate: [moduleGuard('auto')],
         data: { desk: 'crude' },
         component: TradeBotComponent,
+      },
+      {
+        path: 'charts',
+        canActivate: [moduleGuard('auto')],
+        component: LiveChartsComponent,
       },
       {
         path: 'order-test',
