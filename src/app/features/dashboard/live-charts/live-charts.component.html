@@ -35,7 +35,7 @@
           (click)="toggleAutoRefresh()"
         >
           <app-pg-icon name="activity" [size]="15" />
-          <span>{{ autoRefresh() ? 'Live · 30s' : 'Paused' }}</span>
+          <span>{{ autoRefresh() ? 'Live · ' + refreshSeconds() + 's' : 'Paused' }}</span>
         </button>
         <button
           type="button"
@@ -110,7 +110,7 @@
           [candles]="pane.candles"
           [model]="pane.model"
           [decimals]="pane.def.decimals"
-          [height]="340"
+          [resetKey]="interval()"
           [emptyMessage]="pane.error ? 'Chart unavailable' : 'Waiting for candles…'"
         />
 

@@ -46,7 +46,25 @@ interface ChartPane {
 
 const INTERVALS = CHART_INTERVALS;
 const DEFAULT_INTERVAL: ChartInterval = '15m';
-const REFRESH_MS = 30_000;
+/**
+ * Poll cadence per interval.
+ *
+ * These are historical-candle reads, not a tick feed, so the only thing that
+ * changes between polls is the forming candle. Polling a 1-hour chart every
+ * few seconds would burn Kite quota to redraw the same bar, while a 1-minute
+ * chart genuinely moves — so the fast intervals poll faster.
+ */
+const REFRESH_MS: Record<ChartInterval, number> = {
+  '1m': 10_000,
+  '5m': 15_000,
+  '10m': 20_000,
+  '15m': 30_000,
+  '30m': 30_000,
+  '45m': 30_000,
+  '1h': 60_000,
+};
+/** The scheduler ticks at the fastest cadence and each interval skips its turns. */
+const TICK_MS = 5_000;
 /** Kite historical allows 3 req/s; keep a gap so three books never trip it. */
 const BOOK_STAGGER_MS = 350;
 
@@ -91,9 +109,13 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
   /** 45m is folded from 15m bars because Kite serves no 45-minute candle. */
   protected readonly derivedInterval = computed(() => this.data.isDerived(this.interval()));
 
+  /** Seconds between polls at the current interval, for the Live button label. */
+  protected readonly refreshSeconds = computed(() => REFRESH_MS[this.interval()] / 1000);
+
   private timer: ReturnType<typeof setInterval> | null = null;
   /** Guards against a slow poll overlapping the next tick. */
   private inFlight = false;
+  private lastPollAt = 0;
 
   ngOnInit(): void {
     if (!isPlatformBrowser(this.platformId)) {
@@ -104,8 +126,9 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
       if (!this.autoRefresh()) return;
       // Nothing to show a hidden tab; skip the Kite call entirely.
       if (typeof document !== 'undefined' && document.hidden) return;
+      if (Date.now() - this.lastPollAt < REFRESH_MS[this.interval()]) return;
       void this.refreshAll();
-    }, REFRESH_MS);
+    }, TICK_MS);
   }
 
   ngOnDestroy(): void {
@@ -128,6 +151,7 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
   protected async refreshAll(): Promise<void> {
     if (this.inFlight) return;
     this.inFlight = true;
+    this.lastPollAt = Date.now();
     this.refreshing.set(true);
     const interval = this.interval();
     let authFailures = 0;
