@@ -1,0 +1,61 @@
+.tv-chart {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.tv-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  min-height: 1.15rem;
+  padding: 0 0.15rem;
+  font-family: var(--pg-font-mono);
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: #131722;
+}
+
+.tv-legend-hint {
+  font-family: var(--pg-font);
+  font-size: 0.72rem;
+  color: var(--pg-muted);
+}
+
+.tv-legend-time {
+  font-weight: 700;
+}
+
+.tv-legend-pair i {
+  margin-right: 0.18rem;
+  font-style: normal;
+  font-weight: 600;
+  color: #787b86;
+}
+
+.tv-legend-chg.up {
+  color: #26a69a;
+}
+
+.tv-legend-chg.down {
+  color: #ef5350;
+}
+
+.tv-canvas-wrap {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--pg-line);
+  border-radius: var(--pg-radius-sm);
+  background: #fff;
+  overflow: hidden;
+}
+
+.tv-canvas-wrap canvas {
+  display: block;
+  /* Vertical pans should scroll the page; the crosshair owns horizontal drags. */
+  touch-action: pan-y;
+  cursor: crosshair;
+}

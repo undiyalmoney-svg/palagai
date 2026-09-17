@@ -1,0 +1,30 @@
+<div class="tv-chart">
+  <div class="tv-legend" [class.tv-legend-active]="hover()">
+    @if (hover(); as bar) {
+      <span class="tv-legend-time">{{ bar.date.slice(11, 16) }}</span>
+      <span class="tv-legend-pair"><i>O</i>{{ fmt(bar.open) }}</span>
+      <span class="tv-legend-pair"><i>H</i>{{ fmt(bar.high) }}</span>
+      <span class="tv-legend-pair"><i>L</i>{{ fmt(bar.low) }}</span>
+      <span class="tv-legend-pair"><i>C</i>{{ fmt(bar.close) }}</span>
+      <span
+        class="tv-legend-chg"
+        [class.up]="(bar.changePct ?? 0) >= 0"
+        [class.down]="(bar.changePct ?? 0) < 0"
+      >
+        {{ (bar.changePct ?? 0) >= 0 ? '+' : '' }}{{ fmt(bar.changePct, 2) }}%
+      </span>
+    } @else {
+      <span class="tv-legend-hint">Hover or drag for bar detail</span>
+    }
+  </div>
+
+  <div class="tv-canvas-wrap">
+    <canvas
+      #canvas
+      (mousemove)="onPointerMove($event)"
+      (mouseleave)="onPointerLeave()"
+      (touchmove)="onTouchMove($event)"
+      (touchend)="onPointerLeave()"
+    ></canvas>
+  </div>
+</div>

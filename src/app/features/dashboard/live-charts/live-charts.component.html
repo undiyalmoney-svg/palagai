@@ -1,0 +1,132 @@
+<section class="pg-page charts-page">
+  <header class="pg-page-hero">
+    <div>
+      <p class="pg-eyebrow">Live charts</p>
+      <h1>Support &amp; Resistance</h1>
+      <p class="pg-lede">
+        Crude Oil Mini, Nifty 50 and Bank Nifty on live Kite candles. Shaded bands are
+        support/resistance zones clustered from swing pivots; the dark lines join consecutive
+        pivots so structure direction is visible. Read-only — no orders are placed from this tab.
+      </p>
+    </div>
+
+    <div class="charts-controls">
+      <div class="interval-group" role="group" aria-label="Candle interval">
+        @for (option of intervals; track option) {
+          <button
+            type="button"
+            class="interval-btn"
+            [class.active]="interval() === option"
+            [attr.aria-pressed]="interval() === option"
+            (click)="setInterval_(option)"
+          >
+            {{ intervalLabels[option] }}
+          </button>
+        }
+      </div>
+
+      <div class="charts-actions">
+        <button
+          type="button"
+          class="ghost-btn"
+          [class.on]="autoRefresh()"
+          [attr.aria-pressed]="autoRefresh()"
+          (click)="toggleAutoRefresh()"
+        >
+          <app-pg-icon name="activity" [size]="15" />
+          <span>{{ autoRefresh() ? 'Live · 30s' : 'Paused' }}</span>
+        </button>
+        <button
+          type="button"
+          class="ghost-btn"
+          [disabled]="refreshing()"
+          (click)="refreshAll()"
+        >
+          {{ refreshing() ? 'Refreshing…' : 'Refresh now' }}
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <div class="chart-stack">
+    @for (pane of panes(); track trackPane($index, pane)) {
+      <article class="pg-card chart-card">
+        <header class="chart-head">
+          <div class="chart-id">
+            <h2>{{ pane.def.label }}</h2>
+            <span class="chart-symbol">
+              {{ pane.def.exchange }}:{{ pane.symbol }} ·
+              {{ intervalLabels[interval()] }}
+            </span>
+          </div>
+
+          @if (pane.model?.last) {
+            <div class="chart-quote">
+              <strong
+                [class.pg-up]="(pane.model?.changeAbs ?? 0) >= 0"
+                [class.pg-down]="(pane.model?.changeAbs ?? 0) < 0"
+              >
+                {{ fmt(pane.model?.last?.price, pane.def.decimals) }}
+              </strong>
+              <span
+                class="chart-change"
+                [class.pg-up]="(pane.model?.changeAbs ?? 0) >= 0"
+                [class.pg-down]="(pane.model?.changeAbs ?? 0) < 0"
+              >
+                {{ signed(pane.model?.changeAbs, pane.def.decimals) }}
+                ({{ signed(pane.model?.changePct, 2) }}%)
+              </span>
+            </div>
+          }
+        </header>
+
+        @if (pane.error) {
+          <p class="chart-error">{{ pane.error }}</p>
+        } @else if (pane.loading && !pane.candles.length) {
+          <p class="chart-note">Loading {{ intervalLabels[interval()] }} candles…</p>
+        }
+
+        <app-tv-candle-chart
+          [candles]="pane.candles"
+          [model]="pane.model"
+          [decimals]="pane.def.decimals"
+          [height]="340"
+          [emptyMessage]="pane.error ? 'Chart unavailable' : 'Waiting for candles…'"
+        />
+
+        <footer class="chart-foot">
+          <div class="zone-chips">
+            <span class="zone-chip resistance">
+              <i></i>
+              Resistance
+              <b>{{ zoneLabel(nearestZone(pane, 'resistance'), pane.def.decimals) }}</b>
+            </span>
+            <span class="zone-chip support">
+              <i></i>
+              Support
+              <b>{{ zoneLabel(nearestZone(pane, 'support'), pane.def.decimals) }}</b>
+            </span>
+          </div>
+          <span class="chart-meta">
+            {{ barCount(pane) }} bars ·
+            {{ pane.model?.zones?.length ?? 0 }} zones
+            @if (pane.model?.atr) {
+              · ATR {{ fmt(pane.model?.atr, pane.def.decimals) }}
+            }
+            @if (pane.updatedAt) {
+              · updated {{ pane.updatedAt }}
+            }
+          </span>
+        </footer>
+      </article>
+    }
+  </div>
+
+  @if (anyError()) {
+    <p class="chart-hint">
+      Candles come from your Kite session. If a book errors, refresh the access token in the
+      Token tab — and for Crude, refresh the instrument list in Settings so the current
+      CRUDEOILM contract can be resolved.
+    </p>
+  }
+</section>

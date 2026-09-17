@@ -1,0 +1,235 @@
+.charts-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.interval-group {
+  display: inline-flex;
+  padding: 2px;
+  border: 1px solid var(--pg-line);
+  border-radius: 999px;
+  background: var(--pg-bg-muted);
+}
+
+.interval-btn {
+  min-width: 2.75rem;
+  padding: 0.34rem 0.7rem;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--pg-muted);
+  font-family: var(--pg-font);
+  font-size: 0.78rem;
+  font-weight: 650;
+  cursor: pointer;
+  transition: background var(--pg-ease), color var(--pg-ease);
+}
+
+.interval-btn:hover {
+  color: var(--pg-ink);
+}
+
+.interval-btn.active {
+  background: var(--pg-bg-elevated);
+  color: var(--pg-ink);
+  box-shadow: var(--pg-shadow-soft);
+}
+
+.charts-actions {
+  display: inline-flex;
+  gap: 0.4rem;
+}
+
+.ghost-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.38rem 0.75rem;
+  border: 1px solid var(--pg-line);
+  border-radius: 999px;
+  background: var(--pg-bg-elevated);
+  color: var(--pg-muted);
+  font-family: var(--pg-font);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color var(--pg-ease), color var(--pg-ease);
+}
+
+.ghost-btn:hover:not(:disabled) {
+  border-color: var(--pg-line-strong);
+  color: var(--pg-ink);
+}
+
+.ghost-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.ghost-btn.on {
+  border-color: #b7ebd0;
+  background: var(--pg-bull-soft);
+  color: var(--pg-bull-deep);
+}
+
+.chart-stack {
+  display: grid;
+  gap: 1.1rem;
+}
+
+.chart-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  padding: 1.1rem 1.15rem 0.9rem;
+  min-width: 0;
+}
+
+.chart-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.chart-id h2 {
+  margin: 0;
+  font-size: 1.02rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--pg-ink);
+}
+
+.chart-symbol {
+  display: block;
+  margin-top: 0.15rem;
+  font-family: var(--pg-font-mono);
+  font-size: 0.72rem;
+  color: var(--pg-muted);
+}
+
+.chart-quote {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.25;
+}
+
+.chart-quote strong {
+  font-family: var(--pg-font-mono);
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.chart-change {
+  font-family: var(--pg-font-mono);
+  font-size: 0.76rem;
+  font-weight: 600;
+}
+
+.chart-error,
+.chart-note {
+  margin: 0;
+  padding: 0.5rem 0.7rem;
+  border-radius: var(--pg-radius-sm);
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.chart-error {
+  border: 1px solid #fecdd3;
+  background: var(--pg-bear-soft);
+  color: var(--pg-bear-deep);
+}
+
+.chart-note {
+  background: var(--pg-bg-muted);
+  color: var(--pg-muted);
+}
+
+.chart-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.zone-chips {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.zone-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.24rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid var(--pg-line);
+  background: var(--pg-bg-muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--pg-muted);
+}
+
+.zone-chip b {
+  font-family: var(--pg-font-mono);
+  font-weight: 700;
+  color: var(--pg-ink);
+}
+
+.zone-chip i {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+.zone-chip.resistance i {
+  background: rgba(239, 83, 80, 0.3);
+  border: 1px solid rgba(239, 83, 80, 0.6);
+}
+
+.zone-chip.support i {
+  background: rgba(38, 166, 154, 0.3);
+  border: 1px solid rgba(38, 166, 154, 0.6);
+}
+
+.chart-meta {
+  font-family: var(--pg-font-mono);
+  font-size: 0.7rem;
+  color: var(--pg-muted);
+}
+
+.chart-hint {
+  margin: 0.25rem 0 0;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: var(--pg-muted);
+}
+
+@media (min-width: 1280px) {
+  .chart-stack {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* Crude leads the stack and gets the full width. */
+  .chart-stack > .chart-card:first-child {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 640px) {
+  .chart-card {
+    padding: 0.9rem 0.75rem 0.75rem;
+  }
+
+  .chart-quote {
+    align-items: flex-start;
+  }
+}
