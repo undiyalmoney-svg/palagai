@@ -5,6 +5,25 @@
   gap: 0.6rem;
 }
 
+.charts-funds {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 10rem;
+  margin-right: auto;
+}
+
+.charts-funds strong {
+  font-size: 1.05rem;
+  letter-spacing: -0.02em;
+}
+
+.charts-funds span {
+  font-family: var(--pg-font-mono);
+  font-size: 0.72rem;
+  color: var(--pg-muted);
+}
+
 .interval-group {
   display: inline-flex;
   /* Hug the pills rather than stretching across the card it now sits in. */

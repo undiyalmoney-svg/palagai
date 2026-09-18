@@ -199,7 +199,8 @@
 .tv-expanded {
   position: fixed;
   inset: 0;
-  z-index: 1000;
+  /* Below Angular Material dialogs (cdk overlay ~1000) so Buy/Sell confirm sits on top. */
+  z-index: 800;
   gap: 0.5rem;
   padding: 0.5rem;
   background: #fff;
@@ -213,4 +214,63 @@
   flex: 1 1 auto;
   height: auto;
   min-height: 0;
+}
+
+.tv-orderbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.35rem 0.15rem 0.15rem;
+  flex-shrink: 0;
+}
+
+.tv-order-buttons {
+  display: inline-flex;
+  gap: 0.4rem;
+}
+
+.tv-order-btn {
+  min-width: 5.6rem;
+  padding: 0.55rem 1rem;
+  border: 1px solid transparent;
+  border-radius: var(--pg-radius-sm);
+  font-family: var(--pg-font);
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #fff;
+  cursor: pointer;
+}
+
+.tv-order-btn:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+
+.tv-order-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.tv-order-btn.call {
+  background: #00897b;
+}
+
+.tv-order-btn.put {
+  background: #d32f2f;
+}
+
+.tv-order-lots,
+.tv-order-result {
+  font-family: var(--pg-font-mono);
+  font-size: 0.74rem;
+  color: var(--pg-muted);
+}
+
+.tv-order-result {
+  color: #00695c;
+}
+
+.tv-order-result.bad {
+  color: #c62828;
 }

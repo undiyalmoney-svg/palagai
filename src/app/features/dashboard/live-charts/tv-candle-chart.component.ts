@@ -20,11 +20,13 @@ import {
   OnDestroy,
   SimpleChanges,
   ViewChild,
+  output,
   signal,
 } from '@angular/core';
 import { Candle } from '../../../core/models/candle.model';
 import { SrChartModel, SrZone } from '../../../core/charts/sr-chart.util';
 import { SrConfidenceBand, SrSignal } from '../../../core/charts/sr-signals.util';
+import { AtmOptionSide } from '../../../core/orders/atm-order.util';
 import {
   Viewport,
   canExpandRight,
@@ -153,6 +155,13 @@ export class TvCandleChartComponent implements AfterViewInit, OnChanges, OnDestr
    * interval, because 30 bars of 15m and 30 bars of 1m are not the same view.
    */
   @Input() resetKey = '';
+  /** Full-view ATM buttons — CE is Buy, PE is Sell of the index. */
+  @Input() canOrder = false;
+  @Input() orderLots = 1;
+  @Input() ordering: AtmOptionSide | null = null;
+  @Input() orderHint = '';
+  @Input() orderResult: { ok: boolean; text: string } | null = null;
+  readonly buyAtm = output<AtmOptionSide>();
 
   @ViewChild('canvas', { static: true }) canvasRef?: ElementRef<HTMLCanvasElement>;
 

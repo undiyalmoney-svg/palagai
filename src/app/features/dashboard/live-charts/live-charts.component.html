@@ -13,6 +13,13 @@
     </div>
 
     <div class="charts-controls">
+      <div class="charts-funds" data-testid="chart-funds">
+        <strong>₹{{ fmt(sizingCapitalRs(), 0) }}</strong>
+        <span>
+          {{ fundsLabel() }} · {{ lotsFor('nifty') }} index lot{{ lotsFor('nifty') === 1 ? '' : 's' }}
+          · {{ lotsFor('crude') }} crude
+        </span>
+      </div>
       <div class="charts-actions">
         <button
           type="button"
@@ -140,6 +147,12 @@
           [decimals]="pane.def.decimals"
           [resetKey]="pane.interval"
           [emptyMessage]="pane.error ? 'Chart unavailable' : 'Waiting for candles…'"
+          [canOrder]="!!pane.model?.last && statusOf(pane).open"
+          [orderLots]="lotsFor(pane.def.id)"
+          [ordering]="pane.ordering"
+          [orderHint]="statusOf(pane).open ? '' : statusOf(pane).detail"
+          [orderResult]="pane.order"
+          (buyAtm)="buyAtm(pane.def.id, $event)"
         />
 
         <div class="order-row">
@@ -165,7 +178,7 @@
           </div>
           <span class="order-lots">
             @if (statusOf(pane).open) {
-              {{ lots() }} lot{{ lots() > 1 ? 's' : '' }} · MIS · market
+              {{ lotsFor(pane.def.id) }} lot{{ lotsFor(pane.def.id) > 1 ? 's' : '' }} · MIS · market
             } @else {
               Buying resumes at {{ pane.session.marketOpen }} IST
             }
@@ -233,10 +246,11 @@
 
   <p class="chart-hint warn">
     <strong>Buy ATM CE / PE places a real market order</strong> for the front-expiry
-    at-the-money contract, at the lots set in Settings. It runs outside the Trade Bot:
-    no premium cap, no daily loss stop, and no stop-loss is attached, so you manage the
-    exit yourself. Each press shows the exact contract, its live premium and the rupee
-    cost before anything is sent.
+    at-the-money contract, sized from Kite funds the same way Trade Bot is
+    (₹40,000 per index lot; Crude 3×). It runs outside the Trade Bot: no premium
+    cap, no daily loss stop, and no stop-loss is attached, so you manage the exit
+    yourself. Each press shows the exact contract, its live premium and the rupee
+    cost before anything is sent. The same Buy / Sell buttons sit in full chart view.
   </p>
 
   @if (anyError() && !sessionExpired()) {

@@ -156,4 +156,41 @@
       (dblclick)="resetPriceScale()"
     ></div>
   </div>
+
+  @if (expanded()) {
+    <div class="tv-orderbar" data-testid="tv-full-orderbar">
+      <div class="tv-order-buttons" role="group" aria-label="Buy or sell the ATM option">
+        <button
+          type="button"
+          class="tv-order-btn call"
+          [disabled]="!canOrder || !!ordering"
+          [title]="canOrder ? 'Buy the ATM call' : orderHint"
+          aria-label="Buy ATM CE"
+          (click)="buyAtm.emit('CE')"
+        >
+          {{ ordering === 'CE' ? 'Working…' : 'Buy' }}
+        </button>
+        <button
+          type="button"
+          class="tv-order-btn put"
+          [disabled]="!canOrder || !!ordering"
+          [title]="canOrder ? 'Buy the ATM put' : orderHint"
+          aria-label="Buy ATM PE"
+          (click)="buyAtm.emit('PE')"
+        >
+          {{ ordering === 'PE' ? 'Working…' : 'Sell' }}
+        </button>
+      </div>
+      <span class="tv-order-lots">
+        @if (canOrder) {
+          {{ orderLots }} lot{{ orderLots > 1 ? 's' : '' }} · MIS · market
+        } @else {
+          {{ orderHint || 'Market closed' }}
+        }
+      </span>
+      @if (orderResult) {
+        <span class="tv-order-result" [class.bad]="!orderResult.ok">{{ orderResult.text }}</span>
+      }
+    </div>
+  }
 </div>

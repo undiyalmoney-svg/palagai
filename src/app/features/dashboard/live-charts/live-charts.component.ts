@@ -40,9 +40,12 @@ import {
 } from '../../../core/charts/chart-intervals.util';
 import { PgIconComponent } from '../../../shared/ui/icon/pg-icon.component';
 import { UiDialogService } from '../../../shared/ui/dialog/ui-dialog.service';
-import { LotsPreferenceService } from '../../../core/services/lots-preference.service';
+import { CapitalPreferenceService } from '../../../core/services/capital-preference.service';
+import { KiteFundsService } from '../../../core/services/kite-funds.service';
 import { AtmOrderService } from '../../../core/orders/atm-order.service';
 import { AtmOptionSide, AtmOrderTicket, atmOrderCost } from '../../../core/orders/atm-order.util';
+import { lotsForChartBook, sizingCapitalFromFunds } from '../../../core/charts/chart-lots.util';
+import { RS_PER_LOT } from '../../../core/paper-desk/lots-from-funds';
 import { TvCandleChartComponent } from './tv-candle-chart.component';
 import { formatUnknownError } from '../../../core/utils/kite-error.util';
 import { isKiteAuthError } from '../../../core/utils/kite-auth-error.util';
@@ -113,7 +116,8 @@ const BOOK_STAGGER_MS = 350;
 export class LiveChartsComponent implements OnInit, OnDestroy {
   private readonly data = inject(LiveChartDataService);
   private readonly orders = inject(AtmOrderService);
-  private readonly lotsPref = inject(LotsPreferenceService);
+  private readonly kiteFunds = inject(KiteFundsService);
+  private readonly capitalPref = inject(CapitalPreferenceService);
   private readonly uiDialog = inject(UiDialogService);
   private readonly platformId = inject(PLATFORM_ID);
 
@@ -195,6 +199,7 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
     }
     // One load regardless of the clock: a shut market should still show the
     // session that just ended rather than an empty frame.
+    void this.kiteFunds.refresh();
     void this.refreshAll();
     this.timer = setInterval(() => {
       this.clock.set(Date.now());
@@ -366,7 +371,8 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
 
     this.patch(id, { ordering: side, order: null });
     try {
-      const lots = this.lotsPref.get();
+      await this.kiteFunds.refresh();
+      const lots = this.lotsFor(id);
       const plan = await this.orders.plan({ book: id, side, spot, lots });
       if (!plan.ok) {
         this.patch(id, { order: { ok: false, text: plan.reason } });
@@ -399,7 +405,8 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
     const cost = premium != null ? atmOrderCost(ticket, premium) : null;
     const lines = [
       `${ticket.tradingSymbol}`,
-      `${ticket.lots} lot${ticket.lots > 1 ? 's' : ''} · qty ${ticket.quantity} · ${ticket.product} · MARKET`,
+      `${ticket.lots} lot${ticket.lots > 1 ? 's' : ''} from ${this.fundsLabel()} ₹${this.fmt(this.sizingCapitalRs(), 0)} (₹${this.fmt(RS_PER_LOT, 0)} per index lot)`,
+      `qty ${ticket.quantity} · ${ticket.product} · MARKET`,
       premium != null
         ? `Premium ₹${this.fmt(premium, 2)}${cost != null ? ` · about ₹${this.fmt(cost, 0)} to buy` : ''}`
         : 'Live premium unavailable — cost unknown.',
@@ -417,8 +424,18 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
     });
   }
 
-  protected lots(): number {
-    return this.lotsPref.get();
+  protected sizingCapitalRs(): number {
+    return sizingCapitalFromFunds(this.kiteFunds.equityAvailable(), this.capitalPref.get());
+  }
+
+  /** Same ladder as Trade Bot: ₹40,000 per index lot, Crude 3× that band. */
+  protected lotsFor(id: ChartBookId): number {
+    return lotsForChartBook(id, this.kiteFunds.equityAvailable(), this.capitalPref.get());
+  }
+
+  protected fundsLabel(): string {
+    const actual = this.kiteFunds.equityAvailable();
+    return actual != null && actual > 0 ? 'Kite funds' : 'saved capital';
   }
 
   protected statusOf(pane: ChartPane): MarketStatus {
