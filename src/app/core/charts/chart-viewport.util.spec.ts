@@ -2,8 +2,12 @@ import { describe, expect, it } from 'vitest';
 import {
   MIN_DEFAULT_BARS,
   MIN_VISIBLE_BARS,
+  PRICE_ZOOM_MAX,
+  PRICE_ZOOM_MIN,
   canExpandRight,
+  clampPriceZoom,
   clampViewport,
+  stretchPriceRange,
   defaultGapBars,
   maxGapBars,
   defaultViewport,
@@ -221,5 +225,59 @@ describe('visibleRange', () => {
 
   it('reports an empty range for an empty series', () => {
     expect(visibleRange({ start: 0, count: 1 }, 0)).toEqual({ first: 0, last: -1 });
+  });
+});
+
+describe('clampPriceZoom', () => {
+  it('holds the stretch inside its limits', () => {
+    expect(clampPriceZoom(100)).toBe(PRICE_ZOOM_MAX);
+    expect(clampPriceZoom(0.001)).toBe(PRICE_ZOOM_MIN);
+    expect(clampPriceZoom(Number.NaN)).toBe(1);
+  });
+});
+
+describe('stretchPriceRange', () => {
+  it('leaves a fitted range alone at 1x', () => {
+    expect(stretchPriceRange(9_400, 10_200, 9_700, 1)).toEqual({ min: 9_400, max: 10_200 });
+  });
+
+  it('narrows the range as it stretches, keeping the focus on screen', () => {
+    const range = stretchPriceRange(9_400, 10_200, 9_700, 2);
+
+    expect(range.max - range.min).toBeCloseTo(400, 6);
+    expect(range.min).toBeLessThan(9_700);
+    expect(range.max).toBeGreaterThan(9_700);
+  });
+
+  it('holds the focus at the share of the frame it already had', () => {
+    // 9,700 sits 5/8 of the way up an 800-point range, and should stay there.
+    const before = (10_200 - 9_700) / 800;
+    const range = stretchPriceRange(9_400, 10_200, 9_700, 3);
+
+    expect((range.max - 9_700) / (range.max - range.min)).toBeCloseTo(before, 6);
+  });
+
+  it('widens the range when squashed below 1x', () => {
+    const range = stretchPriceRange(9_400, 10_200, 9_700, 0.5);
+
+    expect(range.max - range.min).toBeCloseTo(1_600, 6);
+  });
+
+  it('pulls a focus outside the range back onto it', () => {
+    const range = stretchPriceRange(9_400, 10_200, 12_000, 2);
+
+    expect(range.max).toBeCloseTo(10_200, 6);
+    expect(range.max - range.min).toBeCloseTo(400, 6);
+  });
+
+  it('survives a flat range', () => {
+    expect(stretchPriceRange(100, 100, 100, 4)).toEqual({ min: 100, max: 100 });
+  });
+
+  it('refuses to stretch past the limit', () => {
+    const capped = stretchPriceRange(9_400, 10_200, 9_700, 999);
+    const atMax = stretchPriceRange(9_400, 10_200, 9_700, PRICE_ZOOM_MAX);
+
+    expect(capped).toEqual(atMax);
   });
 });

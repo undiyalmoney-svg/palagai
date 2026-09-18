@@ -35,6 +35,43 @@ export function maxGapBars(count: number): number {
   return Math.max(defaultGapBars(count), Math.round(count * MAX_RIGHT_GAP_FRACTION));
 }
 
+/**
+ * Price-scale stretch limits. 1 is auto-fit; above 1 shows a narrower price
+ * range over the same height, which is what taller candles means.
+ */
+export const PRICE_ZOOM_MIN = 0.2;
+export const PRICE_ZOOM_MAX = 6;
+
+export function clampPriceZoom(zoom: number): number {
+  if (!Number.isFinite(zoom)) return 1;
+  return clamp(zoom, PRICE_ZOOM_MIN, PRICE_ZOOM_MAX);
+}
+
+/**
+ * Stretch a fitted price range about `focus`.
+ *
+ * The focus keeps the share of the frame it already had, so stretching grows
+ * the candles in place rather than sliding them. Anchoring on the newest close
+ * rather than the middle of the range matters: at 6x a centred window can end
+ * up holding no candles at all, which just looks broken.
+ */
+export function stretchPriceRange(
+  lo: number,
+  hi: number,
+  focus: number,
+  zoom: number,
+): { min: number; max: number } {
+  const span = hi - lo;
+  const factor = clampPriceZoom(zoom);
+  if (span <= 0 || factor === 1) {
+    return { min: lo, max: hi };
+  }
+  const at = clamp(focus, lo, hi);
+  const next = span / factor;
+  const share = (hi - at) / span;
+  return { min: at - next * (1 - share), max: at + next * share };
+}
+
 export interface Viewport {
   /** First visible bar index. Fractional so a pan can stop mid-bar. */
   start: number;
