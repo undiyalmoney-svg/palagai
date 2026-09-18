@@ -71,6 +71,23 @@ export const CHART_INTERVAL_LABELS: Record<ChartInterval, string> = {
   '1h': INTERVAL_SPECS['1h'].label,
 };
 
+const KITE_INTERVAL_MINUTES: Record<KiteInterval, number> = {
+  minute: 1,
+  '3minute': 3,
+  '5minute': 5,
+  '10minute': 10,
+  '15minute': 15,
+  '30minute': 30,
+  '60minute': 60,
+  day: 24 * 60,
+};
+
+/** Displayed bar length in minutes (45m is 3 × 15m). */
+export function chartIntervalMinutes(interval: ChartInterval): number {
+  const spec = chartIntervalSpec(interval);
+  return KITE_INTERVAL_MINUTES[spec.fetch] * spec.groupSize;
+}
+
 /**
  * Most recent bars kept for display. A 1-minute request spans several
  * sessions' worth of bars; drawing them all would be an unreadable smear.

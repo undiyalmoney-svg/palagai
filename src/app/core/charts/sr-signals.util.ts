@@ -10,6 +10,11 @@
  *   SELL rejection  — pushed into resistance and closed back below it
  *   SELL breakdown  — closed clear below a support band it was over
  *
+ * Approach is judged against the previous close, not the last price on the
+ * chart: a band now sitting under price still shows the SELL rejections that
+ * happened when it was overhead. The forming candle is skipped so arrows do
+ * not appear and vanish while Kite is still painting the bar.
+ *
  * Each marker carries a CONFIDENCE percentage. Read the warning on
  * scoreConfidence before showing that number anywhere it could be mistaken for
  * an edge: it grades how textbook the setup looks, and nothing more.
@@ -22,7 +27,8 @@
  * Pure over `Candle[]` and `SrZone[]` — no DOM, no signals, no Kite.
  */
 import { Candle } from '../models/candle.model';
-import { SrZone } from './sr-chart.util';
+import { SrZone, SrZoneKind } from './sr-chart.util';
+import { dropFormingBars } from '../paper-desk/forming-bar.util';
 
 export type SrSignalSide = 'BUY' | 'SELL';
 export type SrSignalKind = 'bounce' | 'breakout' | 'rejection' | 'breakdown';
@@ -81,9 +87,16 @@ export interface SrSignalOptions {
   minRangeAtr?: number;
   /** Drop signals scoring under this (0–100). Default 0 — draw them all. */
   minConfidence?: number;
+  /**
+   * When set, trailing bars that have not closed yet are ignored. Kite's
+   * historical feed includes the forming candle, and scoring it makes BUY/SELL
+   * arrows appear and vanish on every poll.
+   */
+  intervalMinutes?: number;
+  now?: Date;
 }
 
-const DEFAULTS: Required<SrSignalOptions> = {
+const DEFAULTS = {
   cooldownBars: 3,
   maxSignals: 12,
   minRangeAtr: 0.25,
@@ -155,19 +168,23 @@ export function detectSrSignals(
   options: SrSignalOptions = {},
 ): SrSignal[] {
   const opts = { ...DEFAULTS, ...options };
-  if (candles.length < 2 || !zones.length) {
+  const series =
+    opts.intervalMinutes != null && opts.intervalMinutes > 0
+      ? dropFormingBars(candles, opts.now ?? new Date(), opts.intervalMinutes)
+      : candles;
+  if (series.length < 2 || !zones.length) {
     return [];
   }
   // Without ATR every bar clears the filter, which is the safe direction: a
   // short series should still annotate rather than silently draw nothing.
   const minRange = atr != null && atr > 0 ? atr * opts.minRangeAtr : 0;
-  const volumeBaseline = volumeBaselines(candles);
+  const volumeBaseline = volumeBaselines(series);
   const peerTouches = Math.max(...zones.map((z) => z.touches));
 
   const found: SrSignal[] = [];
-  for (let i = 1; i < candles.length; i += 1) {
-    const bar = candles[i]!;
-    const prev = candles[i - 1]!;
+  for (let i = 1; i < series.length; i += 1) {
+    const bar = series[i]!;
+    const prev = series[i - 1]!;
     if (bar.high - bar.low < minRange) {
       continue;
     }
@@ -402,7 +419,11 @@ function clamp01(value: number): number {
 }
 
 function patternAt(bar: Candle, prev: Candle, zone: SrZone): SrSignalKind | null {
-  if (zone.kind === 'support') {
+  // Role is how THIS bar approached the band, not where price sits now.
+  // Classifying zones by the last close made historical BUY/SELL arrows flip
+  // (or vanish) every time price crossed a band.
+  const role = zoneRoleAt(prev, zone);
+  if (role === 'support') {
     // Traded into the band and closed back above it, finishing in the upper
     // half of its own range. A red bar with a long tail is still a rejection,
     // so the close is judged against the bar's range rather than its open.
@@ -433,6 +454,16 @@ function patternAt(bar: Candle, prev: Candle, zone: SrZone): SrSignalKind | null
     return 'breakout';
   }
   return null;
+}
+
+/**
+ * Support vs resistance for one bar: approached from above is a support test,
+ * from below is a resistance test. Independent of the zone's current label.
+ */
+export function zoneRoleAt(prev: Candle, zone: SrZone): SrZoneKind {
+  if (prev.close > zone.hi) return 'support';
+  if (prev.close < zone.lo) return 'resistance';
+  return prev.close >= zone.mid ? 'support' : 'resistance';
 }
 
 /** Closed in the upper half of its own range. */

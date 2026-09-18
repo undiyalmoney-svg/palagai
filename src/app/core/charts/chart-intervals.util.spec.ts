@@ -4,6 +4,7 @@ import {
   CHART_INTERVAL_LABELS,
   KITE_MAX_DAYS_PER_REQUEST,
   KiteInterval,
+  chartIntervalMinutes,
   chartIntervalSpec,
   formatKiteDateTime,
 } from './chart-intervals.util';
@@ -44,6 +45,14 @@ describe('chart interval specs', () => {
     const spec = chartIntervalSpec('45m');
     expect(spec.fetch).toBe('15minute');
     expect(spec.groupSize).toBe(3);
+  });
+
+  it('reports the displayed bar length in minutes', () => {
+    expect(chartIntervalMinutes('1m')).toBe(1);
+    expect(chartIntervalMinutes('5m')).toBe(5);
+    expect(chartIntervalMinutes('15m')).toBe(15);
+    expect(chartIntervalMinutes('45m')).toBe(45);
+    expect(chartIntervalMinutes('1h')).toBe(60);
   });
 
   it('takes every other interval straight from Kite without folding', () => {

@@ -37,6 +37,7 @@ import {
   CHART_INTERVALS,
   CHART_INTERVAL_LABELS,
   ChartInterval,
+  chartIntervalMinutes,
 } from '../../../core/charts/chart-intervals.util';
 import { PgIconComponent } from '../../../shared/ui/icon/pg-icon.component';
 import { UiDialogService } from '../../../shared/ui/dialog/ui-dialog.service';
@@ -321,7 +322,9 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
         symbol: instrument.symbol,
         candles,
         model,
-        signals: detectSrSignals(candles, model.zones, model.atr),
+        signals: detectSrSignals(candles, model.zones, model.atr, {
+          intervalMinutes: chartIntervalMinutes(interval),
+        }),
         error: null,
         loading: false,
         updatedAt: new Date().toLocaleTimeString('en-IN', { hour12: false }),

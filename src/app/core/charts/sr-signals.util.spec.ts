@@ -7,6 +7,7 @@ import {
   confidenceBand,
   detectSrSignals,
   scoreConfidence,
+  zoneRoleAt,
 } from './sr-signals.util';
 
 function bar(o: number, h: number, l: number, c: number, i = 0, volume = 0): Candle {
@@ -199,6 +200,56 @@ describe('detectSrSignals', () => {
       }),
     ).toEqual([]);
   });
+
+  it('keeps a historical SELL rejection after price has broken above the band', () => {
+    // Last close is above the band, so the box is currently drawn as support.
+    // The earlier rejection from below must still read SELL, or the arrows
+    // flip every time price crosses the level.
+    const candles = series([
+      [100, 101, 99, 100],
+      [100, 106, 99, 99],
+      [100, 101, 99, 100],
+      [100, 101, 99, 100],
+      [100, 101, 99, 100],
+      [100, 108, 100, 107],
+      [107, 110, 108, 109],
+    ]);
+    const signals = detectSrSignals(candles, [support(104, 106)], 1);
+
+    expect(signals.some((s) => s.side === 'SELL' && s.kind === 'rejection' && s.index === 1)).toBe(
+      true,
+    );
+    expect(signals.some((s) => s.side === 'BUY' && s.kind === 'breakout' && s.index === 5)).toBe(
+      true,
+    );
+  });
+
+  it('does not mark the forming candle', () => {
+    const candles = series([
+      [105, 106, 104, 105],
+      [105, 106, 99, 104],
+    ]);
+    // i=1 is 09:30; a 15m bar stamped 09:30 is only closed at 09:45.
+    const now = new Date('2026-09-17T09:32:00+05:30');
+    expect(detectSrSignals(candles, [support(99, 101)], 1).map((s) => s.index)).toContain(1);
+    expect(
+      detectSrSignals(candles, [support(99, 101)], 1, { intervalMinutes: 15, now }).map(
+        (s) => s.index,
+      ),
+    ).not.toContain(1);
+  });
+
+  it('marks a bounce once that bar has closed', () => {
+    const candles = series([
+      [105, 106, 104, 105],
+      [105, 106, 99, 104],
+    ]);
+    const signals = detectSrSignals(candles, [support(99, 101)], 1, {
+      intervalMinutes: 15,
+      now: new Date('2026-09-17T09:46:00+05:30'),
+    });
+    expect(signals[0]).toMatchObject({ index: 1, side: 'BUY', kind: 'bounce' });
+  });
 });
 
 describe('scoreConfidence', () => {
@@ -313,5 +364,18 @@ describe('confidenceBand', () => {
     expect(confidenceBand(55)).toBe('medium');
     expect(confidenceBand(74)).toBe('medium');
     expect(confidenceBand(75)).toBe('high');
+  });
+});
+
+describe('zoneRoleAt', () => {
+  it('treats a band below the previous close as support and one above as resistance', () => {
+    expect(zoneRoleAt(bar(105, 106, 104, 105), support(99, 101))).toBe('support');
+    expect(zoneRoleAt(bar(100, 101, 99, 100), resistance(104, 106))).toBe('resistance');
+  });
+
+  it('does not follow the zone label when last price has crossed the band', () => {
+    // Drawn as support because price is now above it, but this bar approached
+    // from below, so it is a resistance test.
+    expect(zoneRoleAt(bar(100, 101, 99, 100), support(104, 106))).toBe('resistance');
   });
 });
