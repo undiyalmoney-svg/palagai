@@ -1,4 +1,4 @@
-<div class="tv-chart">
+<div class="tv-chart" [class.tv-expanded]="expanded()" [class.tv-crosshair-on]="crosshairMode()">
   <div class="tv-topbar">
     <div class="tv-legend" [class.tv-legend-active]="hover()">
       @if (hover(); as bar) {
@@ -14,12 +14,16 @@
         >
           {{ (bar.changePct ?? 0) >= 0 ? '+' : '' }}{{ fmt(bar.changePct, 2) }}%
         </span>
+      } @else if (crosshairMode()) {
+        <span class="tv-legend-hint">Slide a finger across the candles to read them</span>
       } @else {
-        <span class="tv-legend-hint">Pinch to zoom · drag to scroll · tap a bar</span>
+        <span class="tv-legend-hint">
+          Drag to scroll · drag the price axis to stretch · hold to read bars
+        </span>
       }
     </div>
 
-    <div class="tv-tools" role="group" aria-label="Zoom and scroll">
+    <div class="tv-tools" role="group" aria-label="Chart controls">
       <button
         type="button"
         class="tv-tool"
@@ -58,6 +62,50 @@
       >
         &#8250;
       </button>
+      <span class="tv-tool-sep" aria-hidden="true"></span>
+      <button
+        type="button"
+        class="tv-tool"
+        [class.tv-tool-on]="priceStretched()"
+        aria-label="Squash the price scale so candles are shorter"
+        (click)="squashPrice()"
+      >
+        &#8597;&minus;
+      </button>
+      <button
+        type="button"
+        class="tv-tool"
+        [class.tv-tool-on]="priceStretched()"
+        aria-label="Stretch the price scale so candles are taller"
+        (click)="stretchPrice()"
+      >
+        &#8597;+
+      </button>
+      <span class="tv-tool-sep" aria-hidden="true"></span>
+      <button
+        type="button"
+        class="tv-tool"
+        [class.tv-tool-on]="crosshairMode()"
+        [attr.aria-pressed]="crosshairMode()"
+        aria-label="Crosshair mode: drag one finger to read candles instead of scrolling"
+        (click)="toggleCrosshairMode()"
+      >
+        &#10011;
+      </button>
+      <button
+        type="button"
+        class="tv-tool"
+        [class.tv-tool-on]="expanded()"
+        [attr.aria-pressed]="expanded()"
+        [attr.aria-label]="expanded() ? 'Exit full chart view' : 'Open full chart view'"
+        (click)="toggleExpanded()"
+      >
+        @if (expanded()) {
+          &#10005;
+        } @else {
+          &#9974;
+        }
+      </button>
       <button
         type="button"
         class="tv-tool tv-tool-reset"
@@ -69,18 +117,32 @@
     </div>
   </div>
 
-  <div class="tv-canvas-wrap">
+  <div
+    class="tv-canvas-wrap"
+    (mousemove)="onPointerMove($event)"
+    (mousedown)="onMouseDown($event)"
+    (mouseup)="onMouseUp()"
+    (mouseleave)="onPointerLeave()"
+    (wheel)="onWheel($event)"
+  >
     <canvas
       #canvas
-      (mousemove)="onPointerMove($event)"
-      (mousedown)="onMouseDown($event)"
-      (mouseup)="onMouseUp()"
-      (mouseleave)="onPointerLeave()"
-      (wheel)="onWheel($event)"
       (touchstart)="onTouchStart($event)"
       (touchmove)="onTouchMove($event)"
       (touchend)="onTouchEnd()"
       (touchcancel)="onTouchEnd()"
     ></canvas>
+    <!-- Its own element so it can opt out of page scrolling without the plot
+         losing the vertical swipe that scrolls the page. -->
+    <div
+      class="tv-price-grip"
+      role="separator"
+      aria-label="Drag up or down to stretch the price scale"
+      (touchstart)="onGripTouchStart($event)"
+      (touchmove)="onGripTouchMove($event)"
+      (touchend)="onGripTouchEnd()"
+      (touchcancel)="onGripTouchEnd()"
+      (dblclick)="resetPriceScale()"
+    ></div>
   </div>
 </div>

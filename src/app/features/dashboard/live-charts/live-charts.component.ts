@@ -18,6 +18,7 @@ import { isPlatformBrowser } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { Candle } from '../../../core/models/candle.model';
 import { SrChartModel, SrZone, buildSrChartModel } from '../../../core/charts/sr-chart.util';
+import { SrSignal, detectSrSignals } from '../../../core/charts/sr-signals.util';
 import {
   CHART_BOOKS,
   ChartBookDef,
@@ -39,6 +40,7 @@ interface ChartPane {
   symbol: string;
   candles: Candle[];
   model: SrChartModel | null;
+  signals: SrSignal[];
   error: string | null;
   loading: boolean;
   updatedAt: string | null;
@@ -91,6 +93,7 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
       symbol: def.label,
       candles: [],
       model: null,
+      signals: [],
       error: null,
       loading: true,
       updatedAt: null,
@@ -186,10 +189,12 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
         });
         return true;
       }
+      const model = buildSrChartModel(candles);
       this.patch(id, {
         symbol: instrument.symbol,
         candles,
-        model: buildSrChartModel(candles),
+        model,
+        signals: detectSrSignals(candles, model.zones, model.atr),
         error: null,
         loading: false,
         updatedAt: new Date().toLocaleTimeString('en-IN', { hour12: false }),
