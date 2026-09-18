@@ -468,6 +468,11 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
   protected barCount(pane: ChartPane): number {
     return pane.candles.length;
   }
+
+  /** Newest marker on the book — the one a reader is actually looking at. */
+  protected latestSignal(pane: ChartPane): SrSignal | null {
+    return pane.signals.length ? pane.signals[pane.signals.length - 1]! : null;
+  }
 }
 
 function delay(ms: number): Promise<void> {

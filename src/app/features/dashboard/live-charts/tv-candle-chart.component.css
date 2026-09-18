@@ -119,6 +119,34 @@
   color: #ef5350;
 }
 
+.tv-legend-signal {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.3rem;
+  padding: 0.08rem 0.42rem;
+  border-radius: 999px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: help;
+}
+
+.tv-legend-signal.buy {
+  background: rgba(0, 137, 123, 0.12);
+  color: #00695c;
+}
+
+.tv-legend-signal.sell {
+  background: rgba(211, 47, 47, 0.12);
+  color: #c62828;
+}
+
+/* The reason behind the score, quieter than the score itself. */
+.tv-legend-signal i {
+  font-style: normal;
+  font-weight: 500;
+  opacity: 0.75;
+}
+
 .tv-canvas-wrap {
   position: relative;
   width: 100%;

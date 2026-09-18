@@ -24,7 +24,7 @@ import {
 } from '@angular/core';
 import { Candle } from '../../../core/models/candle.model';
 import { SrChartModel, SrZone } from '../../../core/charts/sr-chart.util';
-import { SrSignal } from '../../../core/charts/sr-signals.util';
+import { SrConfidenceBand, SrSignal } from '../../../core/charts/sr-signals.util';
 import {
   Viewport,
   canExpandRight,
@@ -75,6 +75,15 @@ const FONT_SIGNAL_H = 9;
 const SIGNAL_W = 9;
 const SIGNAL_H = 8;
 const SIGNAL_GAP = 7;
+/**
+ * A weak marker is drawn faint so the eye lands on the strong ones first.
+ * Never fully transparent: the arrow still has to be findable once seen.
+ */
+const SIGNAL_ALPHA: Record<SrConfidenceBand, number> = {
+  high: 1,
+  medium: 0.72,
+  low: 0.45,
+};
 /** Thin levels still need a band with presence. */
 const MIN_ZONE_H = 6;
 /** Below this the label would not fit inside the band. */
@@ -103,6 +112,14 @@ interface AxisTag {
   ink: string;
 }
 
+/** Screen rectangle a caption occupies, for collision tests. */
+interface LabelBox {
+  x0: number;
+  x1: number;
+  y0: number;
+  y1: number;
+}
+
 export interface TvCrosshairBar {
   date: string;
   open: number;
@@ -110,6 +127,8 @@ export interface TvCrosshairBar {
   low: number;
   close: number;
   changePct: number | null;
+  /** Signal that fired on this bar, so the legend can explain its score. */
+  signal: SrSignal | null;
 }
 
 @Component({
@@ -161,7 +180,7 @@ export class TvCandleChartComponent implements AfterViewInit, OnChanges, OnDestr
 
   private ro: ResizeObserver | null = null;
   /** Zone caption boxes from the current paint, for signal labels to dodge. */
-  private zoneLabelBoxes: { x0: number; x1: number; y0: number; y1: number }[] = [];
+  private zoneLabelBoxes: LabelBox[] = [];
   private crosshairIndex: number | null = null;
   private crosshairY: number | null = null;
   private frame: number | null = null;
@@ -594,6 +613,7 @@ export class TvCandleChartComponent implements AfterViewInit, OnChanges, OnDestr
             low: bar.low,
             close: bar.close,
             changePct: bar.open !== 0 ? ((bar.close - bar.open) / bar.open) * 100 : null,
+            signal: this.signals.find((s) => s.index === this.crosshairIndex) ?? null,
           }
         : null,
     );
@@ -621,6 +641,23 @@ export class TvCandleChartComponent implements AfterViewInit, OnChanges, OnDestr
       minimumFractionDigits: decimals,
       maximumFractionDigits: decimals,
     });
+  }
+
+  /** The one thing that earned this signal most of its score. */
+  protected topFactor(signal: SrSignal): string {
+    return signal.factors[0]?.label ?? '';
+  }
+
+  /** Full breakdown on hover, so the percentage is never just asserted. */
+  protected factorTooltip(signal: SrSignal): string {
+    const lines = signal.factors.map(
+      (f) => `${f.label}: ${Math.round(f.score * 100)}% (weight ${Math.round(f.weight * 100)}%)`,
+    );
+    return [
+      `${signal.side} ${signal.label} — ${signal.confidence}% setup quality`,
+      ...lines,
+      'Scores how textbook the setup looks. Not a win rate.',
+    ].join('\n');
   }
 
   private draw(): void {
@@ -757,39 +794,71 @@ export class TvCandleChartComponent implements AfterViewInit, OnChanges, OnDestr
       }
       const pointsDown = tipY < at;
 
-      const label = `${signal.side} ${signal.label}`;
-      const labelW = ctx.measureText(label).width;
       const labelY = pointsDown ? tipY - SIGNAL_H - 3 : tipY + SIGNAL_H + 3;
-      // A marker on one of the first or last visible bars would otherwise have
-      // its caption sliced off by the frame.
-      const labelX = clampNumber(
+      // Pattern name first, but the score is the part worth keeping: when the
+      // full caption will not fit, shed the word rather than the percentage.
+      // The name is still one hover away in the legend.
+      const fitted = this.fitSignalLabel(
+        ctx,
+        [
+          `${signal.side} ${signal.label} ${signal.confidence}%`,
+          `${signal.side} ${signal.confidence}%`,
+          `${signal.confidence}%`,
+        ],
         x,
-        PAD.left + labelW / 2 + 2,
-        PAD.left + this.plotW - labelW / 2 - 2,
+        tipY,
+        labelY,
+        placed,
       );
-      const box = {
-        x0: labelX - Math.max(labelW, SIGNAL_W) / 2 - 2,
-        x1: labelX + Math.max(labelW, SIGNAL_W) / 2 + 2,
-        y0: Math.min(tipY, labelY) - FONT_SIGNAL_H,
-        y1: Math.max(tipY, labelY) + FONT_SIGNAL_H,
-      };
-      // Two signals a bar apart would print on top of each other when zoomed
-      // out; the arrow still shows, the caption is what gets dropped.
-      const clear = !placed.some((p) => overlaps(p, box));
-      if (clear) placed.push(box);
+      if (fitted) placed.push(fitted.box);
 
       const fill = buy ? COLORS.signalBuy : COLORS.signalSell;
+      ctx.globalAlpha = SIGNAL_ALPHA[signal.confidenceBand];
       this.signalArrow(ctx, x, tipY, pointsDown, fill);
 
-      if (clear) {
+      if (fitted) {
         ctx.fillStyle = fill;
         ctx.textBaseline = pointsDown ? 'bottom' : 'top';
-        ctx.fillText(label, labelX, labelY);
+        ctx.fillText(fitted.text, fitted.x, labelY);
       }
+      ctx.globalAlpha = 1;
     }
 
     ctx.textAlign = 'left';
     ctx.textBaseline = 'alphabetic';
+  }
+
+  /**
+   * First caption from `candidates` that clears everything already drawn.
+   *
+   * Two markers a bar apart would otherwise print on top of each other when
+   * zoomed out. Null means even the shortest form collided, and only the arrow
+   * is drawn — a smudge of overlapping text reads worse than no text.
+   */
+  private fitSignalLabel(
+    ctx: CanvasRenderingContext2D,
+    candidates: string[],
+    x: number,
+    tipY: number,
+    labelY: number,
+    placed: LabelBox[],
+  ): { text: string; x: number; box: LabelBox } | null {
+    for (const text of candidates) {
+      const w = ctx.measureText(text).width;
+      // A marker on one of the first or last visible bars would otherwise have
+      // its caption sliced off by the frame.
+      const cx = clampNumber(x, PAD.left + w / 2 + 2, PAD.left + this.plotW - w / 2 - 2);
+      const box = {
+        x0: cx - Math.max(w, SIGNAL_W) / 2 - 2,
+        x1: cx + Math.max(w, SIGNAL_W) / 2 + 2,
+        y0: Math.min(tipY, labelY) - FONT_SIGNAL_H,
+        y1: Math.max(tipY, labelY) + FONT_SIGNAL_H,
+      };
+      if (!placed.some((p) => overlaps(p, box))) {
+        return { text, x: cx, box };
+      }
+    }
+    return null;
   }
 
   private signalArrow(

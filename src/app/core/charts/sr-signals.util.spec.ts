@@ -1,12 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import { Candle } from '../models/candle.model';
 import { SrZone } from './sr-chart.util';
-import { detectSrSignals } from './sr-signals.util';
+import {
+  CONFIDENCE_CEILING,
+  CONFIDENCE_FLOOR,
+  confidenceBand,
+  detectSrSignals,
+  scoreConfidence,
+} from './sr-signals.util';
 
-function bar(o: number, h: number, l: number, c: number, i = 0): Candle {
+function bar(o: number, h: number, l: number, c: number, i = 0, volume = 0): Candle {
   const mins = 9 * 60 + 15 + i * 15;
   const hm = `${String(Math.floor(mins / 60)).padStart(2, '0')}:${String(mins % 60).padStart(2, '0')}`;
-  return { date: `2026-09-17T${hm}:00+0530`, open: o, high: h, low: l, close: c, volume: 0 };
+  return { date: `2026-09-17T${hm}:00+0530`, open: o, high: h, low: l, close: c, volume };
 }
 
 function series(rows: [number, number, number, number][]): Candle[] {
@@ -158,5 +164,154 @@ describe('detectSrSignals', () => {
     ]);
 
     expect(detectSrSignals(candles, [support(99, 101)], null)).toHaveLength(1);
+  });
+
+  it('prefers the better-scoring level, not merely the better-touched one', () => {
+    // A shallow poke at a five-touch band versus a decisive recovery off a
+    // two-touch one. The zones overlap, so the same bar qualifies on both.
+    const candles = series([
+      [105, 106, 104, 105],
+      [105, 106, 99, 104],
+    ]);
+    const signals = detectSrSignals(
+      candles,
+      [support(99, 101, 0, 2), support(90, 91, 0, 5)],
+      1,
+    );
+
+    // The distant five-touch band was never traded into, so it cannot fire at
+    // all; only the level the bar actually tested is annotated.
+    expect(signals).toHaveLength(1);
+    expect(signals[0]!.strength).toBe(2);
+  });
+
+  it('drops signals under a requested confidence floor', () => {
+    const candles = series([
+      [105, 106, 104, 105],
+      [105, 106, 99, 104],
+    ]);
+    const all = detectSrSignals(candles, [support(99, 101)], 1);
+
+    expect(all).toHaveLength(1);
+    expect(
+      detectSrSignals(candles, [support(99, 101)], 1, {
+        minConfidence: all[0]!.confidence + 1,
+      }),
+    ).toEqual([]);
+  });
+});
+
+describe('scoreConfidence', () => {
+  const bounceBar = bar(105, 106, 99, 104);
+
+  function score(overrides: Partial<Parameters<typeof scoreConfidence>[0]> = {}) {
+    return scoreConfidence({
+      bar: bounceBar,
+      zone: support(99, 101),
+      kind: 'bounce',
+      side: 'BUY',
+      atr: 1,
+      volumeBaseline: null,
+      ...overrides,
+    });
+  }
+
+  it('reports inside the band it promises', () => {
+    const { confidence } = score();
+    expect(confidence).toBeGreaterThanOrEqual(CONFIDENCE_FLOOR);
+    expect(confidence).toBeLessThanOrEqual(CONFIDENCE_CEILING);
+  });
+
+  it('weights the factors it used to exactly one whole', () => {
+    const { factors } = score();
+    const total = factors.reduce((sum, f) => sum + f.weight, 0);
+    expect(total).toBeCloseTo(1, 10);
+  });
+
+  it('rebuilds the percentage from its own factor breakdown', () => {
+    const { confidence, factors } = score();
+    const raw = factors.reduce((sum, f) => sum + f.score * f.weight, 0);
+    expect(Math.round(CONFIDENCE_FLOOR + raw * (CONFIDENCE_CEILING - CONFIDENCE_FLOOR))).toBe(
+      confidence,
+    );
+  });
+
+  it('rates a well-tested level above a one-touch line', () => {
+    const once = score({ zone: support(99, 101, 0, 1), peerTouches: 8 }).confidence;
+    const often = score({ zone: support(99, 101, 0, 8), peerTouches: 8 }).confidence;
+    expect(often).toBeGreaterThan(once);
+  });
+
+  it('ranks a level against the others on the same chart', () => {
+    // Six touches is the best band on a quiet chart and an also-ran on a busy
+    // one, and the score says so rather than reading the same on both.
+    const bestOnChart = score({ zone: support(99, 101, 0, 6), peerTouches: 6 });
+    const alsoRan = score({ zone: support(99, 101, 0, 6), peerTouches: 20 });
+    expect(bestOnChart.confidence).toBeGreaterThan(alsoRan.confidence);
+  });
+
+  it('will not call the best of a set of untested lines a strong level', () => {
+    // Top band on the chart, but touched twice: relative standing is 100% and
+    // the absolute backstop is what has to win.
+    const { factors } = score({ zone: support(99, 101, 0, 2), peerTouches: 2 });
+    expect(factors.find((f) => f.key === 'level')!.score).toBe(0.5);
+  });
+
+  it('rates a close on the high above one that limped back over the band', () => {
+    const strong = score({ bar: bar(105, 106, 99, 106) }).confidence;
+    const weak = score({ bar: bar(105, 106, 99, 101.5) }).confidence;
+    expect(strong).toBeGreaterThan(weak);
+  });
+
+  it('rates a breakout that cleared the band above one that grazed it', () => {
+    const clear = scoreConfidence({
+      bar: bar(100, 108, 100, 107),
+      zone: resistance(104, 106),
+      kind: 'breakout',
+      side: 'BUY',
+      atr: 1,
+      volumeBaseline: null,
+    }).confidence;
+    const graze = scoreConfidence({
+      bar: bar(100, 108, 100, 106.05),
+      zone: resistance(104, 106),
+      kind: 'breakout',
+      side: 'BUY',
+      atr: 1,
+      volumeBaseline: null,
+    }).confidence;
+    expect(clear).toBeGreaterThan(graze);
+  });
+
+  it('counts volume when the instrument reports it', () => {
+    const quiet = score({ bar: bar(105, 106, 99, 104, 0, 100), volumeBaseline: 1000 }).confidence;
+    const heavy = score({ bar: bar(105, 106, 99, 104, 0, 5000), volumeBaseline: 1000 }).confidence;
+    expect(heavy).toBeGreaterThan(quiet);
+  });
+
+  it('leaves volume out entirely on an index, which reports none', () => {
+    const { factors } = score({ bar: bar(105, 106, 99, 104, 0, 0), volumeBaseline: 1000 });
+    expect(factors.map((f) => f.key)).not.toContain('volume');
+    expect(factors.reduce((sum, f) => sum + f.weight, 0)).toBeCloseTo(1, 10);
+  });
+
+  it('stays neutral on bar size when there is no ATR to measure against', () => {
+    const { factors } = score({ atr: null });
+    expect(factors.find((f) => f.key === 'range')!.score).toBe(0.5);
+  });
+
+  it('leads with the factor that carried the most of the score', () => {
+    const { factors } = score();
+    const contributions = factors.map((f) => f.score * f.weight);
+    expect(contributions).toEqual([...contributions].sort((a, b) => b - a));
+  });
+});
+
+describe('confidenceBand', () => {
+  it('splits low, medium and high at the documented marks', () => {
+    expect(confidenceBand(54)).toBe('low');
+    expect(confidenceBand(55)).toBe('medium');
+    expect(confidenceBand(74)).toBe('medium');
+    expect(confidenceBand(75)).toBe('high');
   });
 });

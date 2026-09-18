@@ -188,6 +188,16 @@
               Support
               <b>{{ zoneLabel(nearestZone(pane, 'support'), pane.def.decimals) }}</b>
             </span>
+            @if (latestSignal(pane); as sig) {
+              <span
+                class="zone-chip signal-chip"
+                [class.buy]="sig.side === 'BUY'"
+                [class.sell]="sig.side === 'SELL'"
+              >
+                Latest {{ sig.side }} {{ sig.label }}
+                <b>{{ sig.confidence }}%</b>
+              </span>
+            }
           </div>
           <span class="chart-meta">
             {{ barCount(pane) }} bars ·
@@ -209,6 +219,16 @@
     BUY / SELL arrows mark where a candle turned at, or closed through, one of the
     support and resistance bands drawn above. They are chart reading aids — the live
     desk decides its own trades and does not act on them.
+  </p>
+
+  <p class="chart-hint">
+    The percentage on each arrow is <strong>setup quality, not a win rate</strong>. It
+    scores how textbook the bar looks against the level — how well tested the band was,
+    how strongly the candle closed, how far it cleared or recovered the band, its size
+    against ATR, and volume where the instrument reports any (indices do not). Nothing
+    in it is measured against what happened next, so an 85% is a cleaner-looking setup
+    than a 45%, not a likelier profit. Faint arrows are the low-scoring ones; hover a
+    marked candle to see the breakdown behind its score.
   </p>
 
   <p class="chart-hint warn">

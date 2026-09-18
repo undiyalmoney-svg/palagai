@@ -14,6 +14,17 @@
         >
           {{ (bar.changePct ?? 0) >= 0 ? '+' : '' }}{{ fmt(bar.changePct, 2) }}%
         </span>
+        @if (bar.signal; as sig) {
+          <span
+            class="tv-legend-signal"
+            [class.buy]="sig.side === 'BUY'"
+            [class.sell]="sig.side === 'SELL'"
+            [title]="factorTooltip(sig)"
+          >
+            {{ sig.side }} {{ sig.label }} · {{ sig.confidence }}%
+            <i>{{ topFactor(sig) }}</i>
+          </span>
+        }
       } @else if (crosshairMode()) {
         <span class="tv-legend-hint">Slide a finger across the candles to read them</span>
       } @else {

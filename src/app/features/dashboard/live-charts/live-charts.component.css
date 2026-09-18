@@ -307,6 +307,18 @@
   border: 1px solid rgba(38, 166, 154, 0.6);
 }
 
+.signal-chip.buy {
+  border-color: rgba(0, 137, 123, 0.45);
+  background: rgba(0, 137, 123, 0.1);
+  color: #00695c;
+}
+
+.signal-chip.sell {
+  border-color: rgba(211, 47, 47, 0.45);
+  background: rgba(211, 47, 47, 0.1);
+  color: #c62828;
+}
+
 .chart-meta {
   font-family: var(--pg-font-mono);
   font-size: 0.7rem;
