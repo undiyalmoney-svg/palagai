@@ -38,6 +38,8 @@ import { isKiteAuthError } from '../../../core/utils/kite-auth-error.util';
 interface ChartPane {
   def: ChartBookDef;
   symbol: string;
+  /** Each book carries its own timeframe; crude and the indices rarely suit the same one. */
+  interval: ChartInterval;
   candles: Candle[];
   model: SrChartModel | null;
   signals: SrSignal[];
@@ -84,13 +86,13 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
   protected readonly intervals = INTERVALS;
   protected readonly intervalLabels = CHART_INTERVAL_LABELS;
 
-  protected readonly interval = signal<ChartInterval>(DEFAULT_INTERVAL);
   protected readonly autoRefresh = signal(true);
   protected readonly refreshing = signal(false);
   protected readonly panes = signal<ChartPane[]>(
     CHART_BOOKS.map((def) => ({
       def,
       symbol: def.label,
+      interval: DEFAULT_INTERVAL,
       candles: [],
       model: null,
       signals: [],
@@ -110,15 +112,23 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
   protected readonly sessionExpired = signal(false);
 
   /** 45m is folded from 15m bars because Kite serves no 45-minute candle. */
-  protected readonly derivedInterval = computed(() => this.data.isDerived(this.interval()));
+  protected readonly derivedInterval = computed(() =>
+    this.panes().some((pane) => this.data.isDerived(pane.interval)),
+  );
 
-  /** Seconds between polls at the current interval, for the Live button label. */
-  protected readonly refreshSeconds = computed(() => REFRESH_MS[this.interval()] / 1000);
+  /**
+   * Fastest cadence in play, for the Live button. Each book polls on its own
+   * timeframe, so one number cannot describe all three — the quickest is the
+   * one that says how live the page feels.
+   */
+  protected readonly refreshSeconds = computed(() =>
+    Math.min(...this.panes().map((pane) => REFRESH_MS[pane.interval])) / 1000,
+  );
 
   private timer: ReturnType<typeof setInterval> | null = null;
   /** Guards against a slow poll overlapping the next tick. */
   private inFlight = false;
-  private lastPollAt = 0;
+  private readonly lastPollAt = new Map<ChartBookId, number>();
 
   ngOnInit(): void {
     if (!isPlatformBrowser(this.platformId)) {
@@ -129,8 +139,13 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
       if (!this.autoRefresh()) return;
       // Nothing to show a hidden tab; skip the Kite call entirely.
       if (typeof document !== 'undefined' && document.hidden) return;
-      if (Date.now() - this.lastPollAt < REFRESH_MS[this.interval()]) return;
-      void this.refreshAll();
+      const now = Date.now();
+      const due = this.panes()
+        .filter((pane) => now - (this.lastPollAt.get(pane.def.id) ?? 0) >= REFRESH_MS[pane.interval])
+        .map((pane) => pane.def.id);
+      if (due.length) {
+        void this.refreshPanes(due);
+      }
     }, TICK_MS);
   }
 
@@ -140,37 +155,50 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
     }
   }
 
-  protected setInterval_(next: ChartInterval): void {
-    if (next === this.interval()) return;
-    this.interval.set(next);
-    this.panes.update((list) => list.map((p) => ({ ...p, loading: true })));
-    void this.refreshAll();
+  protected setPaneInterval(id: ChartBookId, next: ChartInterval): void {
+    const pane = this.paneById(id);
+    if (!pane || pane.interval === next) return;
+    this.patch(id, { interval: next, loading: true });
+    void this.refreshPanes([id]);
   }
 
   protected toggleAutoRefresh(): void {
     this.autoRefresh.update((on) => !on);
   }
 
-  protected async refreshAll(): Promise<void> {
-    if (this.inFlight) return;
+  protected refreshAll(): Promise<void> {
+    return this.refreshPanes(CHART_BOOKS.map((def) => def.id));
+  }
+
+  /**
+   * Sweep the given books one at a time.
+   *
+   * Sequential with a gap because Kite historical allows 3 requests a second,
+   * and three books firing together would trip it.
+   */
+  private async refreshPanes(ids: ChartBookId[]): Promise<void> {
+    if (this.inFlight || !ids.length) return;
     this.inFlight = true;
-    this.lastPollAt = Date.now();
     this.refreshing.set(true);
-    const interval = this.interval();
     let authFailures = 0;
     try {
-      for (const def of CHART_BOOKS) {
-        if (!(await this.refreshBook(def.id, interval))) {
+      for (const id of ids) {
+        const pane = this.paneById(id);
+        if (!pane) continue;
+        this.lastPollAt.set(id, Date.now());
+        if (!(await this.refreshBook(id, pane.interval))) {
           authFailures += 1;
-        }
-        if (interval !== this.interval()) {
-          // Interval changed mid-sweep; the new sweep owns the panes now.
-          return;
         }
         await delay(BOOK_STAGGER_MS);
       }
       // One book failing on auth could be a fluke; all of them is the session.
-      this.sessionExpired.set(authFailures === CHART_BOOKS.length);
+      // Only a full sweep can say that, so a single-book refresh may clear the
+      // banner but never raise it.
+      if (ids.length === CHART_BOOKS.length) {
+        this.sessionExpired.set(authFailures === CHART_BOOKS.length);
+      } else if (!authFailures) {
+        this.sessionExpired.set(false);
+      }
     } finally {
       this.inFlight = false;
       this.refreshing.set(false);
@@ -182,6 +210,11 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
     try {
       const instrument = await this.data.resolveInstrument(id);
       const candles = await this.data.loadCandles({ token: instrument.token, interval });
+      // The timeframe can be changed while the request is in the air, and
+      // 1-minute bars must not land in a pane now showing hours.
+      if (this.paneById(id)?.interval !== interval) {
+        return true;
+      }
       if (!candles.length) {
         this.patch(id, {
           error: `Kite returned no ${this.intervalLabels[interval]} candles.`,
@@ -201,9 +234,16 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
       });
       return true;
     } catch (error) {
+      if (this.paneById(id)?.interval !== interval) {
+        return true;
+      }
       this.patch(id, { error: formatUnknownError(error, 'Charts'), loading: false });
       return !isKiteAuthError(error);
     }
+  }
+
+  private paneById(id: ChartBookId): ChartPane | undefined {
+    return this.panes().find((pane) => pane.def.id === id);
   }
 
   private patch(id: ChartBookId, patch: Partial<ChartPane>): void {

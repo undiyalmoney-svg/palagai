@@ -7,6 +7,8 @@
 
 .interval-group {
   display: inline-flex;
+  /* Hug the pills rather than stretching across the card it now sits in. */
+  align-self: flex-start;
   max-width: 100%;
   padding: 2px;
   border: 1px solid var(--pg-line);

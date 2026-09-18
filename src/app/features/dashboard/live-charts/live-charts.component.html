@@ -4,28 +4,14 @@
       <p class="pg-eyebrow">Live charts</p>
       <h1>Support &amp; Resistance</h1>
       <p class="pg-lede">
-        Crude Oil Mini, Nifty 50 and Bank Nifty on live Kite candles, from 1 minute to 1 hour.
-        Shaded bands are support/resistance zones clustered from swing pivots; the dark lines
-        join consecutive pivots so structure direction is visible. Read-only — no orders are
-        placed from this tab.
+        Crude Oil Mini, Nifty 50 and Bank Nifty on live Kite candles, each on its own
+        timeframe from 1 minute to 1 hour. Shaded bands are support/resistance zones
+        clustered from swing pivots; the dark lines join consecutive pivots so structure
+        direction is visible.
       </p>
     </div>
 
     <div class="charts-controls">
-      <div class="interval-group" role="group" aria-label="Candle interval">
-        @for (option of intervals; track option) {
-          <button
-            type="button"
-            class="interval-btn"
-            [class.active]="interval() === option"
-            [attr.aria-pressed]="interval() === option"
-            (click)="setInterval_(option)"
-          >
-            {{ intervalLabels[option] }}
-          </button>
-        }
-      </div>
-
       <div class="charts-actions">
         <button
           type="button"
@@ -48,6 +34,7 @@
       </div>
     </div>
   </header>
+
 
   @if (sessionExpired()) {
     <div class="session-banner">
@@ -76,7 +63,7 @@
             <h2>{{ pane.def.label }}</h2>
             <span class="chart-symbol">
               {{ pane.def.exchange }}:{{ pane.symbol }} ·
-              {{ intervalLabels[interval()] }}
+              {{ intervalLabels[pane.interval] }}
             </span>
           </div>
 
@@ -100,10 +87,28 @@
           }
         </header>
 
+        <div
+          class="interval-group"
+          role="group"
+          [attr.aria-label]="pane.def.label + ' candle interval'"
+        >
+          @for (option of intervals; track option) {
+            <button
+              type="button"
+              class="interval-btn"
+              [class.active]="pane.interval === option"
+              [attr.aria-pressed]="pane.interval === option"
+              (click)="setPaneInterval(pane.def.id, option)"
+            >
+              {{ intervalLabels[option] }}
+            </button>
+          }
+        </div>
+
         @if (pane.error) {
           <p class="chart-error">{{ pane.error }}</p>
         } @else if (pane.loading && !pane.candles.length) {
-          <p class="chart-note">Loading {{ intervalLabels[interval()] }} candles…</p>
+          <p class="chart-note">Loading {{ intervalLabels[pane.interval] }} candles…</p>
         }
 
         <app-tv-candle-chart
@@ -111,7 +116,7 @@
           [model]="pane.model"
           [signals]="pane.signals"
           [decimals]="pane.def.decimals"
-          [resetKey]="interval()"
+          [resetKey]="pane.interval"
           [emptyMessage]="pane.error ? 'Chart unavailable' : 'Waiting for candles…'"
         />
 
