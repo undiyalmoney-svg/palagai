@@ -262,9 +262,50 @@
 
 .tv-order-lots,
 .tv-order-result {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
   font-family: var(--pg-font-mono);
   font-size: 0.74rem;
   color: var(--pg-muted);
+}
+
+.tv-order-lots em {
+  font-style: normal;
+}
+
+.tv-lots-stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.tv-lots-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 1px solid var(--pg-line);
+  border-radius: var(--pg-radius-sm);
+  background: #fff;
+  color: #131722;
+  font-family: var(--pg-font);
+  font-size: 1.1rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.tv-lots-btn:hover:not(:disabled) {
+  background: #f0f3fa;
+}
+
+.tv-lots-btn:disabled {
+  color: #b2b5be;
+  cursor: default;
 }
 
 .tv-order-result {

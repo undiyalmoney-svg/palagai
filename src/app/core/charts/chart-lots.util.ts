@@ -6,7 +6,7 @@
  * fetch still sizes rather than silently falling back to Settings lots.
  */
 import { ChartBookId } from './live-chart-data.service';
-import { lotsFromAvailableFunds } from '../paper-desk/lots-from-funds';
+import { MAX_CRUDE_LOTS, MAX_DESK_LOTS, lotsFromAvailableFunds } from '../paper-desk/lots-from-funds';
 
 export function chartBookKind(book: ChartBookId): 'index' | 'crude' {
   return book === 'crude' ? 'crude' : 'index';
@@ -30,4 +30,22 @@ export function lotsForChartBook(
     sizingCapitalFromFunds(equityAvailableRs, savedCapitalRs),
     chartBookKind(book),
   );
+}
+
+export function maxChartLots(book: ChartBookId): number {
+  return book === 'crude' ? MAX_CRUDE_LOTS : MAX_DESK_LOTS;
+}
+
+/** Manual +/− on a chart. Floor is 1 so a reader can size below the Crude 3-lot band. */
+export function clampChartLots(book: ChartBookId, lots: number): number {
+  const n = Math.floor(Number(lots) || 0);
+  return Math.min(maxChartLots(book), Math.max(1, n));
+}
+
+export function lotsWithDelta(
+  book: ChartBookId,
+  baseLots: number,
+  delta: number,
+): number {
+  return clampChartLots(book, baseLots + (Math.floor(Number(delta) || 0)));
 }

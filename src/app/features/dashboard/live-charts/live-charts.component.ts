@@ -44,7 +44,7 @@ import { CapitalPreferenceService } from '../../../core/services/capital-prefere
 import { KiteFundsService } from '../../../core/services/kite-funds.service';
 import { AtmOrderService } from '../../../core/orders/atm-order.service';
 import { AtmOptionSide, AtmOrderTicket, atmOrderCost } from '../../../core/orders/atm-order.util';
-import { lotsForChartBook, sizingCapitalFromFunds } from '../../../core/charts/chart-lots.util';
+import { clampChartLots, lotsForChartBook, maxChartLots, sizingCapitalFromFunds } from '../../../core/charts/chart-lots.util';
 import { RS_PER_LOT } from '../../../core/paper-desk/lots-from-funds';
 import { TvCandleChartComponent } from './tv-candle-chart.component';
 import { formatUnknownError } from '../../../core/utils/kite-error.util';
@@ -192,6 +192,8 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
   private readonly lastPollAt = new Map<ChartBookId, number>();
   /** Last seen session state per book, so the close can be caught as it happens. */
   private readonly wasOpen = new Map<ChartBookId, boolean>();
+  /** Once a reader taps +/−, that book keeps their count instead of following funds. */
+  private readonly lotsOverride = signal<Partial<Record<ChartBookId, number>>>({});
 
   ngOnInit(): void {
     if (!isPlatformBrowser(this.platformId)) {
@@ -429,8 +431,23 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
   }
 
   /** Same ladder as Trade Bot: ₹40,000 per index lot, Crude 3× that band. */
-  protected lotsFor(id: ChartBookId): number {
+  protected autoLotsFor(id: ChartBookId): number {
     return lotsForChartBook(id, this.kiteFunds.equityAvailable(), this.capitalPref.get());
+  }
+
+  protected lotsFor(id: ChartBookId): number {
+    const override = this.lotsOverride()[id];
+    if (override != null) return clampChartLots(id, override);
+    return this.autoLotsFor(id);
+  }
+
+  protected maxLots(id: ChartBookId): number {
+    return maxChartLots(id);
+  }
+
+  protected bumpLots(id: ChartBookId, step: number): void {
+    const next = clampChartLots(id, this.lotsFor(id) + step);
+    this.lotsOverride.update((current) => ({ ...current, [id]: next }));
   }
 
   protected fundsLabel(): string {

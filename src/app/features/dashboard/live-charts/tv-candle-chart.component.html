@@ -181,13 +181,36 @@
           {{ ordering === 'PE' ? 'Working…' : 'Sell' }}
         </button>
       </div>
-      <span class="tv-order-lots">
-        @if (canOrder) {
-          {{ orderLots }} lot{{ orderLots > 1 ? 's' : '' }} · MIS · market
-        } @else {
-          {{ orderHint || 'Market closed' }}
-        }
-      </span>
+      <div class="tv-order-lots">
+        <div class="tv-lots-stepper" role="group" aria-label="Lot size">
+          <button
+            type="button"
+            class="tv-lots-btn"
+            [disabled]="orderLots <= 1"
+            aria-label="Decrease lots"
+            (click)="adjustLots.emit(-1)"
+          >
+            −
+          </button>
+          <span>{{ orderLots }} lot{{ orderLots === 1 ? '' : 's' }}</span>
+          <button
+            type="button"
+            class="tv-lots-btn"
+            [disabled]="orderLots >= maxOrderLots"
+            aria-label="Increase lots"
+            (click)="adjustLots.emit(1)"
+          >
+            +
+          </button>
+        </div>
+        <em>
+          @if (canOrder) {
+            MIS · market
+          } @else {
+            {{ orderHint || 'Market closed' }}
+          }
+        </em>
+      </div>
       @if (orderResult) {
         <span class="tv-order-result" [class.bad]="!orderResult.ok">{{ orderResult.text }}</span>
       }

@@ -158,10 +158,12 @@ export class TvCandleChartComponent implements AfterViewInit, OnChanges, OnDestr
   /** Full-view ATM buttons — CE is Buy, PE is Sell of the index. */
   @Input() canOrder = false;
   @Input() orderLots = 1;
+  @Input() maxOrderLots = 10;
   @Input() ordering: AtmOptionSide | null = null;
   @Input() orderHint = '';
   @Input() orderResult: { ok: boolean; text: string } | null = null;
   readonly buyAtm = output<AtmOptionSide>();
+  readonly adjustLots = output<number>();
 
   @ViewChild('canvas', { static: true }) canvasRef?: ElementRef<HTMLCanvasElement>;
 

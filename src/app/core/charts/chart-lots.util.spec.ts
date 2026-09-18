@@ -3,6 +3,8 @@ import { lotsFromAvailableFunds } from '../paper-desk/lots-from-funds';
 import {
   chartBookKind,
   lotsForChartBook,
+  lotsWithDelta,
+  maxChartLots,
   sizingCapitalFromFunds,
 } from './chart-lots.util';
 
@@ -54,5 +56,16 @@ describe('chart lots from funds', () => {
   it('uses saved capital when the funds snapshot has not loaded', () => {
     expect(lotsForChartBook('nifty', null, 80_000)).toBe(2);
     expect(lotsForChartBook('crude', null, 80_000)).toBe(6);
+  });
+
+  it('lets +/− move lots from the funds base, clamped 1…max', () => {
+    expect(lotsWithDelta('nifty', 2, 1)).toBe(3);
+    expect(lotsWithDelta('nifty', 2, -1)).toBe(1);
+    expect(lotsWithDelta('nifty', 1, -1)).toBe(1);
+    expect(lotsWithDelta('nifty', 10, 1)).toBe(10);
+    expect(lotsWithDelta('crude', 3, -2)).toBe(1);
+    expect(lotsWithDelta('crude', 3, 40)).toBe(30);
+    expect(maxChartLots('nifty')).toBe(10);
+    expect(maxChartLots('crude')).toBe(30);
   });
 });

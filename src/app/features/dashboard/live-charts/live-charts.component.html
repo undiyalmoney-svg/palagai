@@ -149,10 +149,12 @@
           [emptyMessage]="pane.error ? 'Chart unavailable' : 'Waiting for candles…'"
           [canOrder]="!!pane.model?.last && statusOf(pane).open"
           [orderLots]="lotsFor(pane.def.id)"
+          [maxOrderLots]="maxLots(pane.def.id)"
           [ordering]="pane.ordering"
           [orderHint]="statusOf(pane).open ? '' : statusOf(pane).detail"
           [orderResult]="pane.order"
           (buyAtm)="buyAtm(pane.def.id, $event)"
+          (adjustLots)="bumpLots(pane.def.id, $event)"
         />
 
         <div class="order-row">
@@ -176,13 +178,34 @@
               {{ pane.ordering === 'PE' ? 'Working…' : 'Buy ATM PE' }}
             </button>
           </div>
-          <span class="order-lots">
+          <div class="order-lots">
+            <div class="lots-stepper" role="group" [attr.aria-label]="pane.def.label + ' lots'">
+              <button
+                type="button"
+                class="lots-btn"
+                [disabled]="lotsFor(pane.def.id) <= 1"
+                [attr.aria-label]="'Decrease ' + pane.def.label + ' lots'"
+                (click)="bumpLots(pane.def.id, -1)"
+              >
+                −
+              </button>
+              <span>{{ lotsFor(pane.def.id) }} lot{{ lotsFor(pane.def.id) === 1 ? '' : 's' }}</span>
+              <button
+                type="button"
+                class="lots-btn"
+                [disabled]="lotsFor(pane.def.id) >= maxLots(pane.def.id)"
+                [attr.aria-label]="'Increase ' + pane.def.label + ' lots'"
+                (click)="bumpLots(pane.def.id, 1)"
+              >
+                +
+              </button>
+            </div>
             @if (statusOf(pane).open) {
-              {{ lotsFor(pane.def.id) }} lot{{ lotsFor(pane.def.id) > 1 ? 's' : '' }} · MIS · market
+              <em>MIS · market</em>
             } @else {
-              Buying resumes at {{ pane.session.marketOpen }} IST
+              <em>Buying resumes at {{ pane.session.marketOpen }} IST</em>
             }
-          </span>
+          </div>
         </div>
 
         @if (pane.order) {
@@ -247,10 +270,12 @@
   <p class="chart-hint warn">
     <strong>Buy ATM CE / PE places a real market order</strong> for the front-expiry
     at-the-money contract, sized from Kite funds the same way Trade Bot is
-    (₹40,000 per index lot; Crude 3×). It runs outside the Trade Bot: no premium
-    cap, no daily loss stop, and no stop-loss is attached, so you manage the exit
-    yourself. Each press shows the exact contract, its live premium and the rupee
-    cost before anything is sent. The same Buy / Sell buttons sit in full chart view.
+    (₹40,000 per index lot; Crude 3×). Use +/− on a card or in full view to
+    change that lot count for the next order. It runs outside the Trade Bot: no
+    premium cap, no daily loss stop, and no stop-loss is attached, so you manage
+    the exit yourself. Each press shows the exact contract, its live premium and
+    the rupee cost before anything is sent. The same Buy / Sell buttons sit in
+    full chart view.
   </p>
 
   @if (anyError() && !sessionExpired()) {
