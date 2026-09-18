@@ -109,6 +109,7 @@
         <app-tv-candle-chart
           [candles]="pane.candles"
           [model]="pane.model"
+          [signals]="pane.signals"
           [decimals]="pane.def.decimals"
           [resetKey]="interval()"
           [emptyMessage]="pane.error ? 'Chart unavailable' : 'Waiting for candles…'"
@@ -129,7 +130,8 @@
           </div>
           <span class="chart-meta">
             {{ barCount(pane) }} bars ·
-            {{ pane.model?.zones?.length ?? 0 }} zones
+            {{ pane.model?.zones?.length ?? 0 }} zones ·
+            {{ pane.signals.length }} signals
             @if (pane.model?.atr) {
               · ATR {{ fmt(pane.model?.atr, pane.def.decimals) }}
             }
@@ -141,6 +143,12 @@
       </article>
     }
   </div>
+
+  <p class="chart-hint">
+    BUY / SELL arrows mark where a candle turned at, or closed through, one of the
+    support and resistance bands drawn above. They are chart reading aids — the live
+    desk decides its own trades and does not act on them.
+  </p>
 
   @if (anyError() && !sessionExpired()) {
     <p class="chart-hint">

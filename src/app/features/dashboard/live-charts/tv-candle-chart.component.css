@@ -61,6 +61,18 @@
   cursor: default;
 }
 
+.tv-tool-on {
+  border-color: #2962ff;
+  color: #2962ff;
+}
+
+.tv-tool-sep {
+  width: 1px;
+  height: 1.3rem;
+  margin: 0 0.15rem;
+  background: var(--pg-line);
+}
+
 .tv-tool-reset {
   font-size: 0.72rem;
   letter-spacing: 0.02em;
@@ -135,4 +147,42 @@
 
 .tv-canvas-wrap canvas:active {
   cursor: grabbing;
+}
+
+/* Overlays the price axis; width tracks PAD.right in the component. */
+.tv-price-grip {
+  position: absolute;
+  inset: 0 0 0 auto;
+  width: 68px;
+  touch-action: none;
+  cursor: ns-resize;
+}
+
+/* In crosshair mode the finger is the cursor, so the page must not take the
+   swipe. The class lands before the gesture starts, which touch-action needs. */
+.tv-crosshair-on .tv-canvas-wrap canvas {
+  touch-action: none;
+}
+
+/*
+ * Full chart view. A fixed overlay rather than the Fullscreen API: it needs no
+ * permission, behaves the same on every browser, and keeps the toolbar usable.
+ */
+.tv-expanded {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  background: #fff;
+  /* Clear of the iOS home indicator and any notch. */
+  padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+  padding-top: max(0.5rem, env(safe-area-inset-top));
+}
+
+.tv-expanded .tv-canvas-wrap {
+  /* Fill whatever the toolbar leaves, so the candles get the whole screen. */
+  flex: 1 1 auto;
+  height: auto;
+  min-height: 0;
 }
