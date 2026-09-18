@@ -284,3 +284,69 @@
     align-items: flex-start;
   }
 }
+
+.order-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.order-buttons {
+  display: inline-flex;
+  gap: 0.4rem;
+}
+
+.order-btn {
+  min-width: 7.2rem;
+  padding: 0.5rem 0.85rem;
+  border: 1px solid transparent;
+  border-radius: var(--pg-radius-sm);
+  font-family: var(--pg-font);
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #fff;
+  cursor: pointer;
+  transition: filter var(--pg-ease);
+}
+
+.order-btn:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+
+.order-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* Same green/red the candles use, so CE/PE read as up/down at a glance. */
+.order-btn.call {
+  background: #00897b;
+}
+
+.order-btn.put {
+  background: #d32f2f;
+}
+
+.order-lots {
+  font-family: var(--pg-font-mono);
+  font-size: 0.72rem;
+  color: var(--pg-muted);
+}
+
+.order-result {
+  margin: 0;
+  font-family: var(--pg-font-mono);
+  font-size: 0.74rem;
+  color: #00695c;
+}
+
+.order-result.bad {
+  color: #c62828;
+}
+
+.chart-hint.warn {
+  border-left: 3px solid #d32f2f;
+  padding-left: 0.6rem;
+}

@@ -1,9 +1,11 @@
 /**
  * Charts tab — live candles with support/resistance for Crude Oil Mini,
- * Nifty 50 and Bank Nifty, at a switchable interval (15m by default).
+ * Nifty 50 and Bank Nifty, each on its own interval (15m by default).
  *
- * Read-only: this tab only reads Kite historical candles. It places no order
- * and does not touch the live desk.
+ * Candles are read-only Kite history. The ATM CE/PE buttons are not: they
+ * place real market orders through the Kite proxy, outside the live desk and
+ * outside its rails. See AtmOrderService for what that does and does not
+ * protect. Nothing here touches the desk's own state either way.
  */
 import {
   Component,
@@ -31,6 +33,10 @@ import {
   ChartInterval,
 } from '../../../core/charts/chart-intervals.util';
 import { PgIconComponent } from '../../../shared/ui/icon/pg-icon.component';
+import { UiDialogService } from '../../../shared/ui/dialog/ui-dialog.service';
+import { LotsPreferenceService } from '../../../core/services/lots-preference.service';
+import { AtmOrderService } from '../../../core/orders/atm-order.service';
+import { AtmOptionSide, AtmOrderTicket, atmOrderCost } from '../../../core/orders/atm-order.util';
 import { TvCandleChartComponent } from './tv-candle-chart.component';
 import { formatUnknownError } from '../../../core/utils/kite-error.util';
 import { isKiteAuthError } from '../../../core/utils/kite-auth-error.util';
@@ -46,6 +52,15 @@ interface ChartPane {
   error: string | null;
   loading: boolean;
   updatedAt: string | null;
+  /** Outcome of the last manual ATM buy on this book. */
+  order: OrderFeedback | null;
+  /** Side currently being resolved/placed, so only that button shows busy. */
+  ordering: AtmOptionSide | null;
+}
+
+interface OrderFeedback {
+  ok: boolean;
+  text: string;
 }
 
 const INTERVALS = CHART_INTERVALS;
@@ -81,6 +96,9 @@ const BOOK_STAGGER_MS = 350;
 })
 export class LiveChartsComponent implements OnInit, OnDestroy {
   private readonly data = inject(LiveChartDataService);
+  private readonly orders = inject(AtmOrderService);
+  private readonly lotsPref = inject(LotsPreferenceService);
+  private readonly uiDialog = inject(UiDialogService);
   private readonly platformId = inject(PLATFORM_ID);
 
   protected readonly intervals = INTERVALS;
@@ -99,6 +117,8 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
       error: null,
       loading: true,
       updatedAt: null,
+      order: null,
+      ordering: null,
     })),
   );
 
@@ -246,6 +266,81 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
     return this.panes().find((pane) => pane.def.id === id);
   }
 
+  /**
+   * Buy the ATM CE or PE on one book.
+   *
+   * Resolve the exact contract and its live premium first, then show both and
+   * the rupee cost in a confirmation before anything is sent. A manual buy
+   * runs outside the desk's rails, so the only protection is the reader
+   * knowing precisely what they are about to pay for.
+   */
+  protected async buyAtm(id: ChartBookId, side: AtmOptionSide): Promise<void> {
+    const pane = this.paneById(id);
+    if (!pane || pane.ordering) return;
+
+    const spot = pane.model?.last?.price;
+    if (spot == null) {
+      this.patch(id, { order: { ok: false, text: 'No live price yet — wait for candles.' } });
+      return;
+    }
+
+    this.patch(id, { ordering: side, order: null });
+    try {
+      const lots = this.lotsPref.get();
+      const plan = await this.orders.plan({ book: id, side, spot, lots });
+      if (!plan.ok) {
+        this.patch(id, { order: { ok: false, text: plan.reason } });
+        return;
+      }
+
+      const ticket = plan.ticket;
+      const premium = await this.orders.premium(ticket);
+      if (!(await this.confirmBuy(pane, ticket, premium))) {
+        return;
+      }
+
+      const result = await this.orders.place(ticket);
+      this.patch(id, {
+        order: {
+          ok: result.ok,
+          text: result.ok ? `${shortSymbol(ticket)} · ${result.message}` : result.message,
+        },
+      });
+    } finally {
+      this.patch(id, { ordering: null });
+    }
+  }
+
+  private confirmBuy(
+    pane: ChartPane,
+    ticket: AtmOrderTicket,
+    premium: number | null,
+  ): Promise<boolean> {
+    const cost = premium != null ? atmOrderCost(ticket, premium) : null;
+    const lines = [
+      `${ticket.tradingSymbol}`,
+      `${ticket.lots} lot${ticket.lots > 1 ? 's' : ''} · qty ${ticket.quantity} · ${ticket.product} · MARKET`,
+      premium != null
+        ? `Premium ₹${this.fmt(premium, 2)}${cost != null ? ` · about ₹${this.fmt(cost, 0)} to buy` : ''}`
+        : 'Live premium unavailable — cost unknown.',
+      '',
+      'This is a real order at market price. No stop-loss is attached and the',
+      "desk's daily limits do not apply to it — you manage the exit.",
+    ];
+
+    return this.uiDialog.confirm({
+      title: `Buy ${pane.def.label} ATM ${ticket.side}?`,
+      message: lines.join('\n'),
+      confirmLabel: `Buy ${ticket.side}`,
+      cancelLabel: 'Cancel',
+      tone: 'danger',
+    });
+  }
+
+  protected lots(): number {
+    return this.lotsPref.get();
+  }
+
   private patch(id: ChartBookId, patch: Partial<ChartPane>): void {
     this.panes.update((list) =>
       list.map((pane) => (pane.def.id === id ? { ...pane, ...patch } : pane)),
@@ -293,4 +388,9 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** Strike and side are what identify the trade in a one-line result. */
+function shortSymbol(ticket: AtmOrderTicket): string {
+  return `${ticket.strike}${ticket.side}`;
 }

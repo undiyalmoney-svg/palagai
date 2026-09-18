@@ -1,0 +1,120 @@
+/**
+ * Manual ATM option buys for the charts tab.
+ *
+ * This places REAL orders straight through the Kite proxy, which means it
+ * bypasses every rail the autobot runs behind: no regime filter, no premium
+ * cap, no per-day trade count, no desk loss stop, and no protective stop after
+ * the fill. That is the point — it is a human pressing a button — but it is
+ * also why the flow is: resolve the exact contract, fetch its live premium,
+ * show both, and only then send anything.
+ *
+ * The order is tagged PALAGAI_CHART rather than PALAGAI so a manual buy is
+ * distinguishable in the order book and is never mistaken for a desk fill.
+ */
+import { Injectable, inject } from '@angular/core';
+import { firstValueFrom } from 'rxjs';
+import { KiteApiService } from '../kite/kite-api.service';
+import { KiteSessionService } from '../kite/kite-session.service';
+import { InstrumentStoreService } from '../services/instrument-store.service';
+import { ChartBookId } from '../charts/live-chart-data.service';
+import {
+  AtmOptionSide,
+  AtmOrderPlan,
+  AtmOrderTicket,
+  atmOrderFields,
+  atmQuoteKey,
+  buildAtmOrderPlan,
+} from './atm-order.util';
+
+export interface AtmOrderResult {
+  ok: boolean;
+  orderId: string | null;
+  message: string;
+}
+
+@Injectable({ providedIn: 'root' })
+export class AtmOrderService {
+  private readonly kiteApi = inject(KiteApiService);
+  private readonly kiteSession = inject(KiteSessionService);
+  private readonly instrumentStore = inject(InstrumentStoreService);
+
+  /** Resolve the contract a button press would buy, without sending anything. */
+  async plan(params: {
+    book: ChartBookId;
+    side: AtmOptionSide;
+    spot: number;
+    lots: number;
+  }): Promise<AtmOrderPlan> {
+    if (!this.kiteSession.getAuthorizationHeader()) {
+      return { ok: false, reason: 'Kite session required. Connect in the Token tab.' };
+    }
+    try {
+      await this.instrumentStore.ensureLoaded();
+    } catch {
+      return { ok: false, reason: 'Could not load the instrument list. Refresh it in Settings.' };
+    }
+    return buildAtmOrderPlan({
+      book: params.book,
+      instruments: this.instrumentStore.allInstruments(),
+      side: params.side,
+      spot: params.spot,
+      asOfDateTime: new Date().toISOString(),
+      lots: params.lots,
+    });
+  }
+
+  /**
+   * Live premium for the resolved contract.
+   *
+   * Null rather than throwing: a missing quote should not stop the order being
+   * offered, it should just be shown honestly as unknown so the confirmation
+   * step never invents a cost.
+   */
+  async premium(ticket: AtmOrderTicket): Promise<number | null> {
+    const authorization = this.kiteSession.getAuthorizationHeader();
+    if (!authorization) return null;
+    const key = atmQuoteKey(ticket);
+    try {
+      const res = (await firstValueFrom(this.kiteApi.getQuotes(authorization, [key]))) as {
+        data?: Record<string, { last_price?: number } | undefined>;
+      };
+      const price = Number(res?.data?.[key]?.last_price);
+      return Number.isFinite(price) && price > 0 ? price : null;
+    } catch {
+      return null;
+    }
+  }
+
+  async place(ticket: AtmOrderTicket): Promise<AtmOrderResult> {
+    const authorization = this.kiteSession.getAuthorizationHeader();
+    if (!authorization) {
+      return { ok: false, orderId: null, message: 'Kite session required.' };
+    }
+    try {
+      const res = (await firstValueFrom(
+        this.kiteApi.placeRegularOrder(authorization, atmOrderFields(ticket)),
+      )) as { status?: string; message?: string; data?: { order_id?: string } };
+
+      const orderId = res?.data?.order_id ?? null;
+      if (orderId) {
+        return { ok: true, orderId, message: `Order ${orderId} sent.` };
+      }
+      // Kite answered without an id, so whether it reached the exchange is
+      // genuinely unknown — say that rather than claiming either outcome.
+      return {
+        ok: false,
+        orderId: null,
+        message: res?.message || 'Kite returned no order id. Check the order book.',
+      };
+    } catch (error) {
+      return { ok: false, orderId: null, message: describeOrderError(error) };
+    }
+  }
+}
+
+function describeOrderError(error: unknown): string {
+  const body = (error as { error?: { message?: string } } | null)?.error;
+  if (body?.message) return body.message;
+  if (error instanceof Error && error.message) return error.message;
+  return 'Order failed. Check the order book before retrying.';
+}

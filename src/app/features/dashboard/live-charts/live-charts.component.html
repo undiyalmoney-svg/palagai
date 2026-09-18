@@ -120,6 +120,32 @@
           [emptyMessage]="pane.error ? 'Chart unavailable' : 'Waiting for candles…'"
         />
 
+        <div class="order-row">
+          <div class="order-buttons" role="group" [attr.aria-label]="'Buy ' + pane.def.label + ' ATM option'">
+            <button
+              type="button"
+              class="order-btn call"
+              [disabled]="!!pane.ordering || !pane.model?.last"
+              (click)="buyAtm(pane.def.id, 'CE')"
+            >
+              {{ pane.ordering === 'CE' ? 'Working…' : 'Buy ATM CE' }}
+            </button>
+            <button
+              type="button"
+              class="order-btn put"
+              [disabled]="!!pane.ordering || !pane.model?.last"
+              (click)="buyAtm(pane.def.id, 'PE')"
+            >
+              {{ pane.ordering === 'PE' ? 'Working…' : 'Buy ATM PE' }}
+            </button>
+          </div>
+          <span class="order-lots">{{ lots() }} lot{{ lots() > 1 ? 's' : '' }} · MIS · market</span>
+        </div>
+
+        @if (pane.order) {
+          <p class="order-result" [class.bad]="!pane.order.ok">{{ pane.order.text }}</p>
+        }
+
         <footer class="chart-foot">
           <div class="zone-chips">
             <span class="zone-chip resistance">
@@ -153,6 +179,14 @@
     BUY / SELL arrows mark where a candle turned at, or closed through, one of the
     support and resistance bands drawn above. They are chart reading aids — the live
     desk decides its own trades and does not act on them.
+  </p>
+
+  <p class="chart-hint warn">
+    <strong>Buy ATM CE / PE places a real market order</strong> for the front-expiry
+    at-the-money contract, at the lots set in Settings. It runs outside the Trade Bot:
+    no premium cap, no daily loss stop, and no stop-loss is attached, so you manage the
+    exit yourself. Each press shows the exact contract, its live premium and the rupee
+    cost before anything is sent.
   </p>
 
   @if (anyError() && !sessionExpired()) {
