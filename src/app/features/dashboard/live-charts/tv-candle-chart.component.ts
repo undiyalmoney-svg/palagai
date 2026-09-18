@@ -64,6 +64,8 @@ const COLORS = {
   // Deeper than the candle bodies so an arrow never reads as another wick.
   signalBuy: '#00897b',
   signalSell: '#d32f2f',
+  /** Laid under a marker caption so it stays readable over the candles. */
+  signalHalo: 'rgba(255, 255, 255, 0.86)',
 } as const;
 
 const FONT = '11px ui-sans-serif, system-ui, -apple-system, sans-serif';
@@ -817,8 +819,18 @@ export class TvCandleChartComponent implements AfterViewInit, OnChanges, OnDestr
       this.signalArrow(ctx, x, tipY, pointsDown, fill);
 
       if (fitted) {
-        ctx.fillStyle = fill;
         ctx.textBaseline = pointsDown ? 'bottom' : 'top';
+        // A caption often lands on top of the candles it describes, and 9px
+        // text over a wick is unreadable. Lay the chart background under it.
+        const w = ctx.measureText(fitted.text).width;
+        ctx.fillStyle = COLORS.signalHalo;
+        ctx.fillRect(
+          fitted.x - w / 2 - 2,
+          (pointsDown ? labelY - FONT_SIGNAL_H : labelY) - 1,
+          w + 4,
+          FONT_SIGNAL_H + 2,
+        );
+        ctx.fillStyle = fill;
         ctx.fillText(fitted.text, fitted.x, labelY);
       }
       ctx.globalAlpha = 1;
