@@ -146,6 +146,62 @@
   gap: 0.5rem;
 }
 
+.chart-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.market-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.16rem 0.5rem;
+  border: 1px solid var(--pg-line);
+  border-radius: 999px;
+  background: var(--pg-bg-muted);
+  color: var(--pg-muted);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+.market-badge i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.market-badge.open {
+  border-color: #b7ebd0;
+  background: var(--pg-bull-soft);
+  color: var(--pg-bull-deep);
+}
+
+/* The live dot should read as a heartbeat, not decoration. */
+.market-badge.open i {
+  animation: market-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes market-pulse {
+  50% {
+    opacity: 0.25;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .market-badge.open i {
+    animation: none;
+  }
+}
+
+.market-note {
+  font-size: 0.76rem;
+}
+
 .chart-id h2 {
   margin: 0;
   font-size: 1.02rem;

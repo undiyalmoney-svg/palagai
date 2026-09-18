@@ -2,6 +2,12 @@
  * Charts tab — live candles with support/resistance for Crude Oil Mini,
  * Nifty 50 and Bank Nifty, each on its own interval (15m by default).
  *
+ * Each book knows its own session (indices 09:15–15:30, crude 09:00–23:30) and
+ * only polls while that session is running: outside it, Kite would keep
+ * serving the same closed candles and every read would spend quota for
+ * nothing. Polling restarts by itself at the open — the scheduler keeps
+ * ticking through the shut hours and simply skips the fetch.
+ *
  * Candles are read-only Kite history. The ATM CE/PE buttons are not: they
  * place real market orders through the Kite proxy, outside the live desk and
  * outside its rails. See AtmOrderService for what that does and does not
@@ -40,10 +46,14 @@ import { AtmOptionSide, AtmOrderTicket, atmOrderCost } from '../../../core/order
 import { TvCandleChartComponent } from './tv-candle-chart.component';
 import { formatUnknownError } from '../../../core/utils/kite-error.util';
 import { isKiteAuthError } from '../../../core/utils/kite-auth-error.util';
+import { MarketStatus, marketStatusAt } from '../../../core/utils/market-status.util';
+import { InstrumentSessionConfig, resolveSessionConfig } from '../../../core/config/session.config';
 
 interface ChartPane {
   def: ChartBookDef;
   symbol: string;
+  /** Trading hours for this book's exchange. */
+  session: InstrumentSessionConfig;
   /** Each book carries its own timeframe; crude and the indices rarely suit the same one. */
   interval: ChartInterval;
   candles: Candle[];
@@ -84,6 +94,12 @@ const REFRESH_MS: Record<ChartInterval, number> = {
 };
 /** The scheduler ticks at the fastest cadence and each interval skips its turns. */
 const TICK_MS = 5_000;
+/** Crude is MCX and runs to 23:30; the indices are NSE and stop at 15:30. */
+const SESSIONS: Record<ChartBookId, InstrumentSessionConfig> = {
+  crude: resolveSessionConfig({ exchange: 'MCX' }),
+  nifty: resolveSessionConfig({ exchange: 'NSE' }),
+  bank: resolveSessionConfig({ exchange: 'NSE' }),
+};
 /** Kite historical allows 3 req/s; keep a gap so three books never trip it. */
 const BOOK_STAGGER_MS = 350;
 
@@ -110,6 +126,7 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
     CHART_BOOKS.map((def) => ({
       def,
       symbol: def.label,
+      session: SESSIONS[def.id],
       interval: DEFAULT_INTERVAL,
       candles: [],
       model: null,
@@ -123,6 +140,26 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
   );
 
   protected readonly anyError = computed(() => this.panes().some((p) => p.error));
+
+  /**
+   * Re-read on every scheduler tick so the badges cross the open and the close
+   * on their own rather than waiting for the next candle to land.
+   */
+  private readonly clock = signal(Date.now());
+
+  protected readonly marketStatus = computed<Record<ChartBookId, MarketStatus>>(() => {
+    const now = new Date(this.clock());
+    return {
+      crude: marketStatusAt(SESSIONS.crude, now),
+      nifty: marketStatusAt(SESSIONS.nifty, now),
+      bank: marketStatusAt(SESSIONS.bank, now),
+    };
+  });
+
+  /** Drives the header badge: the page is only "live" while something trades. */
+  protected readonly anyMarketOpen = computed(() =>
+    Object.values(this.marketStatus()).some((status) => status.open),
+  );
 
   /**
    * Kite tokens expire daily and the app has no refresh flow, so a dead
@@ -149,24 +186,54 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
   /** Guards against a slow poll overlapping the next tick. */
   private inFlight = false;
   private readonly lastPollAt = new Map<ChartBookId, number>();
+  /** Last seen session state per book, so the close can be caught as it happens. */
+  private readonly wasOpen = new Map<ChartBookId, boolean>();
 
   ngOnInit(): void {
     if (!isPlatformBrowser(this.platformId)) {
       return;
     }
+    // One load regardless of the clock: a shut market should still show the
+    // session that just ended rather than an empty frame.
     void this.refreshAll();
     this.timer = setInterval(() => {
+      this.clock.set(Date.now());
       if (!this.autoRefresh()) return;
       // Nothing to show a hidden tab; skip the Kite call entirely.
       if (typeof document !== 'undefined' && document.hidden) return;
-      const now = Date.now();
-      const due = this.panes()
-        .filter((pane) => now - (this.lastPollAt.get(pane.def.id) ?? 0) >= REFRESH_MS[pane.interval])
-        .map((pane) => pane.def.id);
+      const due = this.duePanes();
       if (due.length) {
         void this.refreshPanes(due);
       }
     }, TICK_MS);
+  }
+
+  /**
+   * Books worth polling on this tick.
+   *
+   * A shut book is skipped — its candles cannot change. The one exception is
+   * the tick that notices the close: the final bar completes exactly at the
+   * closing bell, so each book gets one last read on the way out.
+   */
+  private duePanes(): ChartBookId[] {
+    const now = Date.now();
+    const status = this.marketStatus();
+    const due: ChartBookId[] = [];
+    for (const pane of this.panes()) {
+      const id = pane.def.id;
+      const open = status[id].open;
+      const justClosed = !open && this.wasOpen.get(id) === true;
+      this.wasOpen.set(id, open);
+      if (justClosed) {
+        due.push(id);
+        continue;
+      }
+      if (!open) continue;
+      if (now - (this.lastPollAt.get(id) ?? 0) >= REFRESH_MS[pane.interval]) {
+        due.push(id);
+      }
+    }
+    return due;
   }
 
   ngOnDestroy(): void {
@@ -278,6 +345,19 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
     const pane = this.paneById(id);
     if (!pane || pane.ordering) return;
 
+    // The broker would reject it anyway, but saying so here names the session
+    // instead of returning a Kite error code.
+    const status = this.marketStatus()[id];
+    if (!status.open) {
+      this.patch(id, {
+        order: {
+          ok: false,
+          text: `${pane.def.label} is closed — trades ${pane.session.marketOpen}–${pane.session.marketClose} IST.`,
+        },
+      });
+      return;
+    }
+
     const spot = pane.model?.last?.price;
     if (spot == null) {
       this.patch(id, { order: { ok: false, text: 'No live price yet — wait for candles.' } });
@@ -339,6 +419,10 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
 
   protected lots(): number {
     return this.lotsPref.get();
+  }
+
+  protected statusOf(pane: ChartPane): MarketStatus {
+    return this.marketStatus()[pane.def.id];
   }
 
   private patch(id: ChartBookId, patch: Partial<ChartPane>): void {

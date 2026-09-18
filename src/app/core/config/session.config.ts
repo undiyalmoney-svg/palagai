@@ -26,10 +26,10 @@ export const NSE_SESSION: InstrumentSessionConfig = {
   sessionCloseLabel: 'Market close (15:15 candle)',
 };
 
-/** MCX Crude Oil — trades until 11:15 PM IST. */
+/** MCX Crude Oil — 09:00 to 11:30 PM IST, with exits taken on the 23:15 candle. */
 export const MCX_CRUDE_SESSION: InstrumentSessionConfig = {
   marketOpen: '09:00',
-  marketClose: '23:15',
+  marketClose: '23:30',
   sessionCloseCandle: '23:15',
   lastEntryTime: '22:15',
   firstHourReadyTime: '10:00',

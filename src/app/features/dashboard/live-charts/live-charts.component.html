@@ -7,7 +7,8 @@
         Crude Oil Mini, Nifty 50 and Bank Nifty on live Kite candles, each on its own
         timeframe from 1 minute to 1 hour. Shaded bands are support/resistance zones
         clustered from swing pivots; the dark lines join consecutive pivots so structure
-        direction is visible.
+        direction is visible. Each book follows its own session — crude 09:00–23:30,
+        the indices 09:15–15:30 IST — and starts updating by itself at the open.
       </p>
     </div>
 
@@ -21,7 +22,15 @@
           (click)="toggleAutoRefresh()"
         >
           <app-pg-icon name="activity" [size]="15" />
-          <span>{{ autoRefresh() ? 'Live · ' + refreshSeconds() + 's' : 'Paused' }}</span>
+          <span>
+            @if (!autoRefresh()) {
+              Paused
+            } @else if (anyMarketOpen()) {
+              Live · {{ refreshSeconds() }}s
+            } @else {
+              Idle · markets shut
+            }
+          </span>
         </button>
         <button
           type="button"
@@ -60,7 +69,16 @@
       <article class="pg-card chart-card">
         <header class="chart-head">
           <div class="chart-id">
-            <h2>{{ pane.def.label }}</h2>
+            <div class="chart-title">
+              <h2>{{ pane.def.label }}</h2>
+              <span
+                class="market-badge"
+                [class.open]="statusOf(pane).open"
+                [title]="statusOf(pane).detail"
+              >
+                <i></i>{{ statusOf(pane).label }}
+              </span>
+            </div>
             <span class="chart-symbol">
               {{ pane.def.exchange }}:{{ pane.symbol }} ·
               {{ intervalLabels[pane.interval] }}
@@ -105,6 +123,10 @@
           }
         </div>
 
+        @if (!statusOf(pane).open) {
+          <p class="chart-note market-note">{{ statusOf(pane).detail }}</p>
+        }
+
         @if (pane.error) {
           <p class="chart-error">{{ pane.error }}</p>
         } @else if (pane.loading && !pane.candles.length) {
@@ -125,7 +147,8 @@
             <button
               type="button"
               class="order-btn call"
-              [disabled]="!!pane.ordering || !pane.model?.last"
+              [disabled]="!!pane.ordering || !pane.model?.last || !statusOf(pane).open"
+              [title]="statusOf(pane).open ? '' : statusOf(pane).detail"
               (click)="buyAtm(pane.def.id, 'CE')"
             >
               {{ pane.ordering === 'CE' ? 'Working…' : 'Buy ATM CE' }}
@@ -133,13 +156,20 @@
             <button
               type="button"
               class="order-btn put"
-              [disabled]="!!pane.ordering || !pane.model?.last"
+              [disabled]="!!pane.ordering || !pane.model?.last || !statusOf(pane).open"
+              [title]="statusOf(pane).open ? '' : statusOf(pane).detail"
               (click)="buyAtm(pane.def.id, 'PE')"
             >
               {{ pane.ordering === 'PE' ? 'Working…' : 'Buy ATM PE' }}
             </button>
           </div>
-          <span class="order-lots">{{ lots() }} lot{{ lots() > 1 ? 's' : '' }} · MIS · market</span>
+          <span class="order-lots">
+            @if (statusOf(pane).open) {
+              {{ lots() }} lot{{ lots() > 1 ? 's' : '' }} · MIS · market
+            } @else {
+              Buying resumes at {{ pane.session.marketOpen }} IST
+            }
+          </span>
         </div>
 
         @if (pane.order) {
