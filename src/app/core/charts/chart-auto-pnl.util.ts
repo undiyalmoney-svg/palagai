@@ -4,9 +4,10 @@
  * Same ATM delta × lot ladder Trade Bot uses when option OHLC is missing.
  * Charts-tab only — does not call the desk.
  */
+import { Candle } from '../models/candle.model';
 import { ATM_OPTION_DELTA, BOOK_LOT_SIZE } from '../paper-desk/option-delta.util';
 import { extractTradeDate } from '../utils/trade-date.util';
-import { ChartStructure } from './chart-structure.util';
+import { ChartStructure, structureResolvedIndex } from './chart-structure.util';
 import { ChartBookId } from './live-chart-data.service';
 
 export const AUTO_BOT_LABELS: Record<ChartBookId, string> = {
@@ -81,6 +82,44 @@ export function structurePaperPnlRs(
 export function structuresOnDay(boxes: ChartStructure[], day: string): ChartStructure[] {
   if (!day) return boxes;
   return boxes.filter((box) => extractTradeDate(box.date) === day);
+}
+
+export function lastPriceOnDay(candles: Candle[], day: string): number | null {
+  const onDay = day ? candles.filter((bar) => extractTradeDate(bar.date) === day) : candles;
+  const last = onDay.length ? onDay[onDay.length - 1] : candles[candles.length - 1];
+  const close = Number(last?.close);
+  return Number.isFinite(close) ? close : null;
+}
+
+/**
+ * One auto-bot position at a time: take a fresh 1:1, hold to SL / EXIT / EOD,
+ * then the next break may fire. Stacking every zone pierce was painting a
+ * pile of overlapping −1R tickets that never appeared as entries on the chart.
+ */
+export function replayChartAutoTrades(
+  boxes: ChartStructure[],
+  candles: Candle[],
+): ChartStructure[] {
+  const ordered = [...boxes].sort((a, b) => a.breakIndex - b.breakIndex);
+  const taken: ChartStructure[] = [];
+  let busyUntil = -1;
+  for (const box of ordered) {
+    if (box.breakIndex <= busyUntil) continue;
+    taken.push(clipStructureToOutcome(box, candles));
+    busyUntil = structureResolvedIndex(box, candles);
+  }
+  return taken;
+}
+
+/** Stop the pink/teal box at SL / EXIT / EOD so an old entry does not paint to the last bar. */
+export function clipStructureToOutcome(box: ChartStructure, candles: Candle[]): ChartStructure {
+  const end = structureResolvedIndex(box, candles);
+  return {
+    ...box,
+    toIndex: end,
+    pink: { ...box.pink, toIndex: end },
+    teal: { ...box.teal, toIndex: end },
+  };
 }
 
 export function sumChartPnlRs(

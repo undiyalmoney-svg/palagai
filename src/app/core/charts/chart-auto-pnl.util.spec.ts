@@ -7,6 +7,8 @@ import {
   endOfIstDay,
   isLiveChartDay,
   istToday,
+  lastPriceOnDay,
+  replayChartAutoTrades,
   structureIndexPoints,
   structurePaperPnlRs,
   structuresOnDay,
@@ -107,5 +109,48 @@ describe('structure paper P&L', () => {
       structurePaperPnlRs('crude', box({ status: 'hit_exit' }), 3) +
         structurePaperPnlRs('nifty', box({ status: 'hit_sl' }), 1),
     );
+  });
+
+  it('reads the last close on the test date, not a leftover live bar', () => {
+    const candles = [
+      { date: '2026-03-31T15:15:00+05:30', open: 1, high: 1, low: 1, close: 100, volume: 0 },
+      { date: '2026-04-01T09:15:00+05:30', open: 1, high: 1, low: 1, close: 200, volume: 0 },
+      { date: '2026-04-01T15:15:00+05:30', open: 1, high: 1, low: 1, close: 220, volume: 0 },
+    ];
+    expect(lastPriceOnDay(candles, '2026-04-01')).toBe(220);
+  });
+
+  it('takes one auto-bot position at a time so overlapping −1R tickets are dropped', () => {
+    const candles = [
+      { date: '2026-04-01T09:15:00+05:30', open: 100, high: 100, low: 100, close: 100, volume: 0 },
+      { date: '2026-04-01T09:30:00+05:30', open: 100, high: 110, low: 90, close: 109, volume: 0 },
+      { date: '2026-04-01T09:45:00+05:30', open: 109, high: 110, low: 108, close: 109, volume: 0 },
+      { date: '2026-04-01T10:00:00+05:30', open: 109, high: 109, low: 89, close: 90, volume: 0 },
+      { date: '2026-04-01T10:15:00+05:30', open: 90, high: 100, low: 88, close: 99, volume: 0 },
+    ];
+    const first = box({
+      breakIndex: 1,
+      status: 'hit_sl',
+      date: '2026-04-01T09:30:00+05:30',
+      sl: 90,
+      exit: 120,
+    });
+    const overlap = box({
+      breakIndex: 2,
+      status: 'hit_sl',
+      date: '2026-04-01T09:45:00+05:30',
+      sl: 90,
+      exit: 120,
+    });
+    const after = box({
+      breakIndex: 4,
+      status: 'live',
+      date: '2026-04-01T10:15:00+05:30',
+      sl: 80,
+      exit: 120,
+    });
+    const taken = replayChartAutoTrades([first, overlap, after], candles);
+    expect(taken.map((b) => b.breakIndex)).toEqual([1, 4]);
+    expect(taken[0]!.toIndex).toBe(3);
   });
 });

@@ -262,6 +262,28 @@ function boxOf(args: {
   };
 }
 
+/** Bar where SL or EXIT printed; last bar if the box is still open. */
+export function structureResolvedIndex(
+  box: { dir: ChartStructureDir; sl: number; exit: number; breakIndex: number; status?: ChartStructureStatus },
+  candles: Candle[],
+): number {
+  if (box.status === 'live') {
+    return Math.max(box.breakIndex, candles.length - 1);
+  }
+  for (let i = box.breakIndex; i < candles.length; i += 1) {
+    const bar = candles[i]!;
+    if (i > box.breakIndex) {
+      if (box.dir > 0 ? bar.low <= box.sl : bar.high >= box.sl) {
+        return i;
+      }
+    }
+    if (box.dir > 0 ? bar.high >= box.exit : bar.low <= box.exit) {
+      return i;
+    }
+  }
+  return Math.max(box.breakIndex, candles.length - 1);
+}
+
 function structureStatus(
   box: { dir: ChartStructureDir; sl: number; exit: number; breakIndex: number },
   candles: Candle[],

@@ -162,6 +162,8 @@ export class TvCandleChartComponent implements AfterViewInit, OnChanges, OnDestr
   @Input() signals: SrSignal[] = [];
   /** Live 1:1 measured-move box (pink SL, teal EXIT) drawn on this pane. */
   @Input() structure: ChartStructure | null = null;
+  /** Every auto-bot 1:1 on the selected day — drawn so P&L matches the entries. */
+  @Input() structures: ChartStructure[] = [];
   /**
    * Changing this throws the zoom away and refits. The parent passes the
    * interval, because 30 bars of 15m and 30 bars of 1m are not the same view.
@@ -671,6 +673,11 @@ export class TvCandleChartComponent implements AfterViewInit, OnChanges, OnDestr
     });
   }
 
+  private boxes(): ChartStructure[] {
+    if (this.structures.length) return this.structures;
+    return this.structure ? [this.structure] : [];
+  }
+
   /** The one thing that earned this signal most of its score. */
   protected topFactor(signal: SrSignal): string {
     return signal.factors[0]?.label ?? '';
@@ -955,10 +962,11 @@ export class TvCandleChartComponent implements AfterViewInit, OnChanges, OnDestr
       if (b.low < min) min = b.low;
       if (b.high > max) max = b.high;
     }
-    const box = this.structure;
-    if (box && box.toIndex >= first && box.fromIndex <= last) {
-      min = Math.min(min, box.sl, box.exit, box.wall);
-      max = Math.max(max, box.sl, box.exit, box.wall);
+    for (const box of this.boxes()) {
+      if (box.toIndex >= first && box.fromIndex <= last) {
+        min = Math.min(min, box.sl, box.exit, box.wall);
+        max = Math.max(max, box.sl, box.exit, box.wall);
+      }
     }
     if (!Number.isFinite(min) || !Number.isFinite(max)) {
       return { min: 0, max: 1 };
@@ -1000,7 +1008,7 @@ export class TvCandleChartComponent implements AfterViewInit, OnChanges, OnDestr
       });
     }
 
-    const box = this.structure;
+    const box = this.boxes().at(-1);
     if (box && box.toIndex >= first && box.fromIndex <= last) {
       this.pushAxisTag(tags, yOf(box.entry), plotH, 'ENTRY', COLORS.entryBg, COLORS.entryInk);
       this.pushAxisTag(
@@ -1062,28 +1070,29 @@ export class TvCandleChartComponent implements AfterViewInit, OnChanges, OnDestr
     first: number,
     last: number,
   ): void {
-    const box = this.structure;
-    if (!box || box.toIndex < first || box.fromIndex > last) return;
+    for (const box of this.boxes()) {
+      if (box.toIndex < first || box.fromIndex > last) continue;
 
-    const fill = (band: { lo: number; hi: number; fromIndex: number; toIndex: number }, color: string) => {
-      const x0 = Math.max(PAD.left, xOf(Math.max(first, band.fromIndex)) - slotW / 2);
-      const x1 = Math.min(PAD.left + this.plotW, xOf(Math.min(last, band.toIndex)) + slotW / 2);
-      const y0 = yOf(band.hi);
-      const y1 = yOf(band.lo);
-      ctx.fillStyle = color;
-      ctx.fillRect(x0, y0, Math.max(4, x1 - x0), Math.max(2, y1 - y0));
-    };
-    fill(box.pink, COLORS.pinkFill);
-    fill(box.teal, COLORS.tealFill);
+      const fill = (band: { lo: number; hi: number; fromIndex: number; toIndex: number }, color: string) => {
+        const x0 = Math.max(PAD.left, xOf(Math.max(first, band.fromIndex)) - slotW / 2);
+        const x1 = Math.min(PAD.left + this.plotW, xOf(Math.min(last, band.toIndex)) + slotW / 2);
+        const y0 = yOf(band.hi);
+        const y1 = yOf(band.lo);
+        ctx.fillStyle = color;
+        ctx.fillRect(x0, y0, Math.max(4, x1 - x0), Math.max(2, y1 - y0));
+      };
+      fill(box.pink, COLORS.pinkFill);
+      fill(box.teal, COLORS.tealFill);
 
-    const x0 = Math.max(PAD.left, xOf(Math.max(first, box.fromIndex)) - slotW / 2);
-    const x1 = Math.min(PAD.left + this.plotW, xOf(Math.min(last, box.toIndex)) + slotW / 2);
-    ctx.strokeStyle = COLORS.wall;
-    ctx.lineWidth = 1.4;
-    ctx.beginPath();
-    ctx.moveTo(x0, Math.round(yOf(box.wall)) + 0.5);
-    ctx.lineTo(x1, Math.round(yOf(box.wall)) + 0.5);
-    ctx.stroke();
+      const x0 = Math.max(PAD.left, xOf(Math.max(first, box.fromIndex)) - slotW / 2);
+      const x1 = Math.min(PAD.left + this.plotW, xOf(Math.min(last, box.toIndex)) + slotW / 2);
+      ctx.strokeStyle = COLORS.wall;
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.moveTo(x0, Math.round(yOf(box.wall)) + 0.5);
+      ctx.lineTo(x1, Math.round(yOf(box.wall)) + 0.5);
+      ctx.stroke();
+    }
   }
 
   private drawStructureLabels(
@@ -1094,30 +1103,39 @@ export class TvCandleChartComponent implements AfterViewInit, OnChanges, OnDestr
     first: number,
     last: number,
   ): void {
-    const box = this.structure;
-    if (!box || box.toIndex < first || box.fromIndex > last) return;
+    for (const box of this.boxes()) {
+      if (box.toIndex < first || box.fromIndex > last) continue;
 
-    const x0 = Math.max(PAD.left, xOf(Math.max(first, box.fromIndex)) - slotW / 2);
-    const entryX = clampNumber(xOf(box.breakIndex), PAD.left + 4, PAD.left + this.plotW - 4);
-    this.structurePill(
-      ctx,
-      x0 + 4,
-      yOf(box.sl),
-      box.status === 'hit_sl' ? 'SL HIT' : 'SL',
-      COLORS.slBg,
-      '#ffffff',
-      box.dir > 0 ? 'above' : 'below',
-    );
-    this.structurePill(
-      ctx,
-      x0 + 4,
-      yOf(box.exit),
-      box.status === 'hit_exit' ? 'EXIT HIT' : 'EXIT',
-      COLORS.exitBg,
-      COLORS.exitInk,
-      box.dir > 0 ? 'below' : 'above',
-    );
-    this.structurePill(ctx, entryX + 8, yOf(box.entry), 'ENTRY', COLORS.entryBg, COLORS.entryInk, 'center');
+      const x0 = Math.max(PAD.left, xOf(Math.max(first, box.fromIndex)) - slotW / 2);
+      const entryX = clampNumber(xOf(box.breakIndex), PAD.left + 4, PAD.left + this.plotW - 4);
+      this.structurePill(
+        ctx,
+        x0 + 4,
+        yOf(box.sl),
+        box.status === 'hit_sl' ? 'SL HIT' : 'SL',
+        COLORS.slBg,
+        '#ffffff',
+        box.dir > 0 ? 'above' : 'below',
+      );
+      this.structurePill(
+        ctx,
+        x0 + 4,
+        yOf(box.exit),
+        box.status === 'hit_exit' ? 'EXIT HIT' : 'EXIT',
+        COLORS.exitBg,
+        COLORS.exitInk,
+        box.dir > 0 ? 'below' : 'above',
+      );
+      this.structurePill(
+        ctx,
+        entryX + 8,
+        yOf(box.entry),
+        'ENTRY',
+        COLORS.entryBg,
+        COLORS.entryInk,
+        'center',
+      );
+    }
   }
 
   private structurePill(

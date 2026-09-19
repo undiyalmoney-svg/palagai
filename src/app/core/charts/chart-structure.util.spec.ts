@@ -7,6 +7,7 @@ import {
   detectAllChartStructures,
   detectChartStructure,
   optionStopTrigger,
+  structureResolvedIndex,
 } from './chart-structure.util';
 
 function bar(o: number, h: number, l: number, c: number, i = 0): Candle {
@@ -176,6 +177,19 @@ describe('detectChartStructure', () => {
       [100, 101.2, 99.9, 101.1],
     ]);
     expect(detectChartStructure(candles, [resistance(100.5, 101)], 10)).toBeNull();
+  });
+});
+
+describe('structureResolvedIndex', () => {
+  it('returns the bar that tagged SL', () => {
+    const candles = series([
+      [100, 101, 96, 100],
+      [102, 110, 102, 109],
+      [108, 108, 95, 107],
+    ]);
+    const box = detectChartStructure(candles, [resistance(104, 106)], 2)!;
+    expect(box.status).toBe('hit_sl');
+    expect(structureResolvedIndex(box, candles)).toBe(2);
   });
 });
 

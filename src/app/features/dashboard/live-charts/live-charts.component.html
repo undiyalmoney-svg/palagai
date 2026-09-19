@@ -35,7 +35,12 @@
             [class.up]="pnlTone(pnl().books[book].amount) === 'up'"
             [class.down]="pnlTone(pnl().books[book].amount) === 'down'"
           >
-            <span>{{ pnl().books[book].label }}</span>
+            <span>
+              {{ pnl().books[book].label }}
+              @if (pnl().books[book].trades) {
+                · {{ pnl().books[book].trades }} trade{{ pnl().books[book].trades === 1 ? '' : 's' }}
+              }
+            </span>
             <strong>₹{{ signed(pnl().books[book].amount, 0) }}</strong>
           </div>
         }
@@ -191,7 +196,7 @@
 
         @if (!liveDay()) {
           <p class="chart-note market-note" data-testid="chart-test-note">
-            Testing {{ testDate() }} (start and end are the same). Paper profit only — no live orders.
+            Testing {{ testDate() }} (start and end are the same). Paper profit is one auto-bot position at a time — entries are marked on the chart.
           </p>
         } @else if (!statusOf(pane).open) {
           <p class="chart-note market-note">{{ statusOf(pane).detail }}</p>
@@ -208,6 +213,7 @@
           [model]="pane.model"
           [signals]="pane.signals"
           [structure]="pane.structure"
+          [structures]="pane.dayStructures"
           [decimals]="pane.def.decimals"
           [resetKey]="pane.interval + '|' + testDate()"
           [emptyMessage]="pane.error ? 'Chart unavailable' : 'Waiting for candles…'"
@@ -277,6 +283,23 @@
 
         @if (pane.order) {
           <p class="order-result" [class.bad]="!pane.order.ok">{{ pane.order.text }}</p>
+        }
+
+        @if (pane.dayStructures.length) {
+          <div class="trade-list" data-testid="chart-day-trades">
+            @for (box of pane.dayStructures; track box.date + box.wall + box.dir) {
+              <span
+                class="trade-chip"
+                [class.up]="tradePnl(pane.def.id, box) > 0.5"
+                [class.down]="tradePnl(pane.def.id, box) < -0.5"
+              >
+                {{ tradeTime(box) }} {{ box.option }}
+                · Entry {{ fmt(box.entry, pane.def.decimals) }}
+                · {{ tradeResult(box) }}
+                · ₹{{ signed(tradePnl(pane.def.id, box), 0) }}
+              </span>
+            }
+          </div>
         }
 
         <footer class="chart-foot">

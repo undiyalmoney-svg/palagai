@@ -6,6 +6,7 @@ import {
   KiteInterval,
   chartIntervalMinutes,
   chartIntervalSpec,
+  formatIstDateTime,
   formatKiteDateTime,
 } from './chart-intervals.util';
 
@@ -103,6 +104,11 @@ describe('formatKiteDateTime', () => {
 
   it('zero-pads every field', () => {
     expect(formatKiteDateTime(new Date(2026, 0, 5, 7, 4, 3))).toBe('2026-01-05 07:04:03');
+  });
+
+  it('prints an IST wall clock even when the host is UTC', () => {
+    expect(formatIstDateTime(new Date('2026-04-01T23:59:59+05:30'))).toBe('2026-04-01 23:59:59');
+    expect(formatIstDateTime(new Date('2026-04-01T18:29:59.000Z'))).toBe('2026-04-01 23:59:59');
   });
 });
 

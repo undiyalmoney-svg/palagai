@@ -41,8 +41,9 @@ export function resolveCrudeOilFuturesToken(
 /** Nearest MCX CRUDEOILM (mini) futures contract. */
 export function resolveCrudeOilMiniFuturesToken(
   instruments: Instrument[],
+  asOf?: Date,
 ): Instrument | undefined {
-  return resolveMcxMiniFuturesToken(instruments, ['CRUDEOILM']);
+  return resolveMcxMiniFuturesToken(instruments, ['CRUDEOILM'], asOf);
 }
 
 /**
@@ -66,8 +67,9 @@ export function resolveNatGasMiniFuturesToken(
 export function resolveMcxMiniFuturesToken(
   instruments: Instrument[],
   prefixes: string[],
+  asOf?: Date,
 ): Instrument | undefined {
-  const today = startOfDay(new Date());
+  const today = startOfDay(asOf ?? new Date());
   const prefs = prefixes.map((p) => p.toUpperCase());
 
   const pool = instruments

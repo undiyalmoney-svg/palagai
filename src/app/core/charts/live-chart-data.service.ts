@@ -24,7 +24,7 @@ import {
   ChartIntervalSpec,
   MAX_CHART_BARS,
   chartIntervalSpec,
-  formatKiteDateTime,
+  formatIstDateTime,
 } from './chart-intervals.util';
 
 export type ChartBookId = 'nifty' | 'bank' | 'crude';
@@ -72,7 +72,7 @@ export class LiveChartDataService {
    * engine reads, so the chart shows the levels the bot actually trades.
    * Crude has no index, so it resolves the nearest CRUDEOILM futures contract.
    */
-  async resolveInstrument(book: ChartBookId): Promise<ResolvedChartInstrument> {
+  async resolveInstrument(book: ChartBookId, asOf?: Date): Promise<ResolvedChartInstrument> {
     if (book === 'nifty') {
       return {
         token: NIFTY_50_INSTRUMENT.instrumentToken,
@@ -89,7 +89,10 @@ export class LiveChartDataService {
     }
 
     await this.instrumentStore.ensureLoaded();
-    const contract = resolveCrudeOilMiniFuturesToken(this.instrumentStore.allInstruments());
+    const contract = resolveCrudeOilMiniFuturesToken(
+      this.instrumentStore.allInstruments(),
+      asOf,
+    );
     if (!contract) {
       throw new Error(
         'No CRUDEOILM futures contract in the instrument list. Refresh instruments in Settings.',
@@ -123,8 +126,8 @@ export class LiveChartDataService {
         this.kiteApi.getHistoricalData({
           instrumentToken: String(params.token),
           interval: spec.fetch,
-          from: formatKiteDateTime(from),
-          to: formatKiteDateTime(to),
+          from: formatIstDateTime(from),
+          to: formatIstDateTime(to),
           authorization,
         }),
       );

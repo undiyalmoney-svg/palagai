@@ -43,6 +43,9 @@ import {
   chartCandleAsOf,
   isLiveChartDay,
   istToday,
+  lastPriceOnDay,
+  replayChartAutoTrades,
+  structurePaperPnlRs,
   structuresOnDay,
   summarizeChartPnl,
 } from '../../../core/charts/chart-auto-pnl.util';
@@ -371,8 +374,8 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
   private async refreshBook(id: ChartBookId, interval: ChartInterval): Promise<boolean> {
     const day = this.testDate();
     try {
-      const instrument = await this.data.resolveInstrument(id);
       const asOf = chartCandleAsOf(day);
+      const instrument = await this.data.resolveInstrument(id, asOf);
       const candles = await this.data.loadCandles({
         token: instrument.token,
         interval,
@@ -384,19 +387,36 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
       }
       if (!candles.length) {
         this.patch(id, {
-          error: `Kite returned no ${this.intervalLabels[interval]} candles.`,
+          error:
+            id === 'crude'
+              ? `No Crude candles on ${day} — that day's CRUDEOILM contract has expired out of the instrument list.`
+              : `Kite returned no ${this.intervalLabels[interval]} candles for ${day}.`,
           loading: false,
+          candles: [],
+          model: null,
+          signals: [],
+          structure: null,
+          dayStructures: [],
+          symbol: instrument.symbol,
         });
         return true;
       }
       const model = buildSrChartModel(candles);
       const intervalMinutes = chartIntervalMinutes(interval);
       const detectOpts = { intervalMinutes, now: asOf };
-      const structure = detectChartStructure(candles, model.zones, model.atr, detectOpts);
-      const dayStructures = structuresOnDay(
-        detectAllChartStructures(candles, model.zones, model.atr, detectOpts),
-        day,
+      const dayStructures = replayChartAutoTrades(
+        structuresOnDay(
+          detectAllChartStructures(candles, model.zones, model.atr, detectOpts),
+          day,
+        ),
+        candles,
       );
+      const liveBox = detectChartStructure(candles, model.zones, model.atr, detectOpts);
+      const structure = this.liveDay()
+        ? liveBox
+        : dayStructures.length
+          ? dayStructures[dayStructures.length - 1]!
+          : null;
       this.patch(id, {
         symbol: instrument.symbol,
         candles,
@@ -414,7 +434,15 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
       if (this.paneById(id)?.interval !== interval || this.testDate() !== day) {
         return true;
       }
-      this.patch(id, { error: formatUnknownError(error, 'Charts'), loading: false });
+      this.patch(id, {
+        error: formatUnknownError(error, 'Charts'),
+        loading: false,
+        candles: [],
+        model: null,
+        signals: [],
+        structure: null,
+        dayStructures: [],
+      });
       return !isKiteAuthError(error);
     }
   }
@@ -557,7 +585,17 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
     this.testDate.set(next);
     this.tradedKeys.clear();
     this.panes.update((list) =>
-      list.map((pane) => ({ ...pane, loading: true, dayStructures: [], order: null })),
+      list.map((pane) => ({
+        ...pane,
+        loading: true,
+        candles: [],
+        model: null,
+        signals: [],
+        structure: null,
+        dayStructures: [],
+        order: null,
+        error: null,
+      })),
     );
     void this.refreshAll();
   }
@@ -580,7 +618,7 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
     return {
       boxes: pane?.dayStructures ?? [],
       lots: this.lotsFor(id),
-      lastPrice: pane?.model?.last?.price,
+      lastPrice: lastPriceOnDay(pane?.candles ?? [], this.testDate()),
     };
   }
 
@@ -674,6 +712,22 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
       return `Viewing ${this.testDate()} — switch to today to trade`;
     }
     return this.statusOf(pane).open ? '' : this.statusOf(pane).detail;
+  }
+
+  protected tradeTime(box: ChartStructure): string {
+    const raw = String(box.date);
+    const time = raw.includes('T') ? raw.split('T')[1] : raw.slice(11);
+    return (time ?? '').slice(0, 5) || raw.slice(0, 10);
+  }
+
+  protected tradePnl(id: ChartBookId, box: ChartStructure): number {
+    return structurePaperPnlRs(id, box, this.lotsFor(id), lastPriceOnDay(this.paneById(id)?.candles ?? [], this.testDate()));
+  }
+
+  protected tradeResult(box: ChartStructure): string {
+    if (box.status === 'hit_exit') return 'EXIT';
+    if (box.status === 'hit_sl') return 'SL';
+    return 'OPEN';
   }
 
   protected pnlTone(amount: number): 'up' | 'down' | 'flat' {
