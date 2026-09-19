@@ -259,6 +259,39 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
     return buildMasterGuide(day, byBook);
   });
 
+  protected masterButtonLabel(): string {
+    if (this.masterOn()) {
+      return this.liveDay() ? 'Master is taking care' : 'Master view on';
+    }
+    return this.liveDay() ? 'Let Master take care' : 'Master';
+  }
+
+  /** Always-visible decision — test dates do not need the button pressed. */
+  protected masterMessage(): string {
+    const guide = this.masterGuide();
+    if (!this.liveDay()) {
+      return `Decision for ${this.testDate()}: ${guide.headline}`;
+    }
+    if (!this.masterOn()) {
+      return `${guide.headline} Turn Master on and it will take the trades — or stand down.`;
+    }
+    const stopped = CHART_PNL_BOOKS.filter((book) => this.masterStopped()[book]).map(
+      (book) => this.masterGuide().books[book].label,
+    );
+    const waiting = CHART_PNL_BOOKS.every((book) => guide.books[book].action === 'wait');
+    const trading = CHART_PNL_BOOKS.filter(
+      (book) => guide.books[book].action === 'buy_ce' || guide.books[book].action === 'buy_pe',
+    );
+    if (waiting) {
+      return 'Master is watching the opening drive. No trade yet.';
+    }
+    if (!trading.length) {
+      return 'Master: no trade — chop on Crude, Nifty and Bank Nifty.';
+    }
+    const care = `Master is taking care. ${guide.headline}`;
+    return stopped.length ? `${care} Stopped ${stopped.join(', ')} after a loser.` : care;
+  }
+
   protected readonly marketStatus = computed<Record<ChartBookId, MarketStatus>>(() => {
     const now = new Date(this.clock());
     return {

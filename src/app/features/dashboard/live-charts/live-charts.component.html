@@ -31,23 +31,6 @@
           }
           · bot books 0.5R
         </p>
-        <div class="master-guide" data-testid="chart-master-guide">
-          <p class="master-headline">{{ masterGuide().headline }}</p>
-          <div class="master-calls">
-            @for (book of botBooks; track book) {
-              <span
-                class="master-call"
-                [attr.data-action]="masterGuide().books[book].action"
-              >
-                {{ masterGuide().books[book].label }}
-                · {{ masterActionLabels[masterGuide().books[book].action] }}
-                @if (masterOn() && masterStopped()[book]) {
-                  · stopped
-                }
-              </span>
-            }
-          </div>
-        </div>
         <p class="pnl-caption compare">Without Master</p>
         @if (rawWhyCaption()) {
           <p class="pnl-why">{{ rawWhyCaption() }}</p>
@@ -105,16 +88,6 @@
         <p class="pnl-strategy" data-testid="chart-strategy-note">{{ strategyBlurb }}</p>
       </div>
       <div class="charts-actions">
-        <button
-          type="button"
-          class="ghost-btn master-btn"
-          [class.on]="masterOn()"
-          [attr.aria-pressed]="masterOn()"
-          data-testid="chart-master"
-          (click)="toggleMaster()"
-        >
-          <span>{{ masterOn() ? 'Master on' : 'Master' }}</span>
-        </button>
         <div class="auto-bot-row" role="group" aria-label="Auto bots">
           @for (book of botBooks; track book) {
             <button
@@ -173,6 +146,48 @@
     </div>
   </header>
 
+  <aside class="master-bar" data-testid="chart-master-bar" [class.on]="masterOn()">
+    <div class="master-bar-main">
+      <button
+        type="button"
+        class="master-take-btn"
+        [class.on]="masterOn()"
+        [attr.aria-pressed]="masterOn()"
+        data-testid="chart-master"
+        (click)="toggleMaster()"
+      >
+        {{ masterButtonLabel() }}
+      </button>
+      <div class="master-copy">
+        <p class="master-kicker">
+          Master · {{ testDate() }}
+          @if (liveDay()) {
+            · live
+          } @else {
+            · paper test — decision below, no live order
+          }
+        </p>
+        <p class="master-message" data-testid="chart-master-guide">{{ masterMessage() }}</p>
+      </div>
+    </div>
+    <div class="master-calls">
+      @for (book of botBooks; track book) {
+        <span class="master-call" [attr.data-action]="masterGuide().books[book].action">
+          {{ masterGuide().books[book].label }}
+          · {{ masterActionLabels[masterGuide().books[book].action] }}
+          @if (masterOn() && masterStopped()[book]) {
+            · stopped
+          }
+        </span>
+      }
+    </div>
+    @if (!liveDay()) {
+      <p class="master-compare">
+        Without Master ₹{{ signed(pnl().total, 0) }}
+        · With Master ₹{{ signed(masterPnl().total, 0) }}
+      </p>
+    }
+  </aside>
 
   @if (sessionExpired()) {
     <div class="session-banner">
