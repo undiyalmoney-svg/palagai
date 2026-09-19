@@ -145,6 +145,28 @@ export function optionStopTrigger(
   return roundToTick(trigger, tick);
 }
 
+/**
+ * Option LIMIT target from the fill premium and the index box height.
+ *
+ * ATM delta is treated as ~0.5, so 0.5R on the index is a quarter of the
+ * box height on the premium. Always at least one tick above the fill.
+ */
+export function optionTargetPremium(
+  fillPremium: number,
+  indexHeight: number,
+  r = 0.5,
+  tickSize = 0.05,
+): number | null {
+  const fill = Number(fillPremium);
+  const height = Number(indexHeight);
+  const ratio = Number(r);
+  const tick = Number(tickSize) > 0 ? Number(tickSize) : 0.05;
+  if (!(fill > 0) || !(height > 0) || !(ratio > 0)) return null;
+  const raw = fill + 0.5 * ratio * height;
+  const target = Math.max(fill + tick, raw);
+  return roundToTick(target, tick);
+}
+
 function bestBreakAt(
   series: Candle[],
   zones: SrZone[],

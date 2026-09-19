@@ -5,6 +5,7 @@ import {
   atmOrderFields,
   atmQuoteKey,
   atmStopFields,
+  atmTargetFields,
   buildAtmOrderPlan,
 } from './atm-order.util';
 
@@ -291,6 +292,31 @@ describe('atmOrderFields', () => {
       trigger_price: '160.00',
       price: '144.00',
       tag: 'PALAGAI_CHART_SL',
+    });
+  });
+
+  it('rests a Charts-tagged 0.5R LIMIT sell above the fill', () => {
+    const plan = buildAtmOrderPlan({
+      book: 'nifty',
+      instruments: niftyChain(),
+      side: 'CE',
+      spot: 24_487,
+      asOfDateTime: AS_OF,
+      lots: 1,
+    });
+    expect(plan.ok).toBe(true);
+    if (!plan.ok) return;
+
+    expect(atmTargetFields(plan.ticket, 220)).toEqual({
+      exchange: 'NFO',
+      tradingsymbol: plan.ticket.tradingSymbol,
+      transaction_type: 'SELL',
+      order_type: 'LIMIT',
+      quantity: '65',
+      product: 'MIS',
+      validity: 'DAY',
+      price: '220.00',
+      tag: 'PALAGAI_CHART_TP',
     });
   });
 

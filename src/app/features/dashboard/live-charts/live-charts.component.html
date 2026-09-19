@@ -9,8 +9,8 @@
         resistance band, the chart paints the same 1:1 box as a measured move:
         pink is the stop, teal is the target, labelled Entry / SL / Exit. Trade from
         that, or turn on Crude / Nifty / Bank Nifty auto bot and Charts will buy the
-        ATM CE/PE and rest the SL. Pick one date to test a past session — start and
-        end are the same day.
+        ATM CE/PE, rest the SL, and book 0.5R — the teal 1:1 is the drawing, not the
+        exit. Pick one date to test a past session — start and end are the same day.
       </p>
     </div>
 
@@ -28,7 +28,11 @@
           @if (!liveDay()) {
             · paper test
           }
+          · bot books 0.5R
         </p>
+        @if (whyCaption()) {
+          <p class="pnl-why" data-testid="chart-pnl-why">{{ whyCaption() }}</p>
+        }
         @for (book of botBooks; track book) {
           <div
             class="pnl-cell"
@@ -52,6 +56,7 @@
           <span>Total</span>
           <strong>₹{{ signed(pnl().total, 0) }}</strong>
         </div>
+        <p class="pnl-strategy" data-testid="chart-strategy-note">{{ strategyBlurb }}</p>
       </div>
       <div class="charts-actions">
         <div class="auto-bot-row" role="group" aria-label="Auto bots">
@@ -196,7 +201,7 @@
 
         @if (!liveDay()) {
           <p class="chart-note market-note" data-testid="chart-test-note">
-            Testing {{ testDate() }} (start and end are the same). Paper profit is one auto-bot position at a time — entries are marked on the chart.
+            Testing {{ testDate() }} (start and end are the same). Paper profit books 0.5R, not the teal 1:1 — one auto-bot position at a time.
           </p>
         } @else if (!statusOf(pane).open) {
           <p class="chart-note market-note">{{ statusOf(pane).detail }}</p>
@@ -292,10 +297,11 @@
                 class="trade-chip"
                 [class.up]="tradePnl(pane.def.id, box) > 0.5"
                 [class.down]="tradePnl(pane.def.id, box) < -0.5"
+                [attr.data-why]="tradeWhy(pane.def.id, box)"
               >
                 {{ tradeTime(box) }} {{ box.option }}
                 · Entry {{ fmt(box.entry, pane.def.decimals) }}
-                · {{ tradeResult(box) }}
+                · {{ whyLabels[tradeWhy(pane.def.id, box)] }}
                 · ₹{{ signed(tradePnl(pane.def.id, box), 0) }}
               </span>
             }
@@ -360,8 +366,10 @@
     The pink / teal box is a <strong>1:1 measured move</strong> on a closed
     candle that broke a support or resistance band. Pink is the stop (the swing
     against the break), teal is the equal-height target. Labels mark Entry at
-    the wall, SL at the far pink edge, and Exit at the far teal edge. It updates
-    as live candles arrive and does not wait for Trade Bot.
+    the wall, SL at the far pink edge, and Exit at the far teal edge. The auto
+    bot does <strong>not</strong> wait for that teal — it books 0.5R. A “Failed
+    break” never ran; a “Gave back” ran toward teal then hit the pink SL. It
+    updates as live candles arrive and does not wait for Trade Bot.
   </p>
 
   <p class="chart-hint">
@@ -389,12 +397,14 @@
     change that lot count for the next order. It runs outside the Trade Bot: no
     premium cap, no daily loss stop. Manual Buy / Sell still has no stop —
     you manage that exit. <strong>Crude / Nifty / Bank Nifty auto bot</strong> each
-    buy the CE or PE the 1:1 box names when that bar closes, then rest an SL —
-    only on today's live session. A past date on the calendar is a paper test
-    (start and end are the same day) and the profit strip shows Crude Oil, Nifty,
-    Bank Nifty and the total. Each manual press still shows the exact contract,
-    its live premium and the rupee cost before anything is sent. The same Buy /
-    Sell buttons sit in full chart view.
+    buy the CE or PE the 1:1 box names when that bar closes, rest an SL, and rest
+    a 0.5R LIMIT target — only on today's live session. If the target fills,
+    cancel the leftover SL in the order book. A past date on the calendar is a
+    paper test (start and end are the same day) and the profit strip shows Crude
+    Oil, Nifty, Bank Nifty and the total, scored at 0.5R not the teal 1:1. Each
+    manual press still shows the exact contract, its live premium and the rupee
+    cost before anything is sent. The same Buy / Sell buttons sit in full chart
+    view.
   </p>
 
   @if (anyError() && !sessionExpired()) {

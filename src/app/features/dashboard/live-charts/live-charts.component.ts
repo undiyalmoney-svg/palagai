@@ -34,13 +34,19 @@ import {
   detectAllChartStructures,
   detectChartStructure,
   optionStopTrigger,
+  optionTargetPremium,
 } from '../../../core/charts/chart-structure.util';
 import {
   AUTO_BOT_LABELS,
   AUTO_BOT_SHORT,
   CHART_PNL_BOOKS,
+  CHART_STRATEGY_BLURB,
+  CHART_WHY_LABELS,
   ChartPnlSummary,
+  ChartTradeWhy,
+  analyzeChartTrade,
   chartCandleAsOf,
+  chartWhyCaption,
   isLiveChartDay,
   istToday,
   lastPriceOnDay,
@@ -166,6 +172,8 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
   protected readonly botBooks = CHART_PNL_BOOKS;
   protected readonly botLabels = AUTO_BOT_LABELS;
   protected readonly botShort = AUTO_BOT_SHORT;
+  protected readonly whyLabels = CHART_WHY_LABELS;
+  protected readonly strategyBlurb = CHART_STRATEGY_BLURB;
   protected readonly refreshing = signal(false);
   protected readonly panes = signal<ChartPane[]>(
     CHART_BOOKS.map((def) => ({
@@ -526,11 +534,18 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
       if (opts.auto && box) {
         const fill = await this.orders.fillPrice(result.orderId, premium);
         const trigger = fill != null ? optionStopTrigger(fill, box.height) : null;
+        const target = fill != null ? optionTargetPremium(fill, box.height) : null;
         if (trigger == null) {
           text += ' · SL not rested — no fill premium yet. Manage the exit.';
         } else {
           const sl = await this.orders.placeStop(ticket, trigger);
           text += sl.ok ? ` · ${sl.message}` : ` · entry sent, SL failed: ${sl.message}`;
+        }
+        if (target == null) {
+          text += ' · 0.5R TP not rested.';
+        } else {
+          const tp = await this.orders.placeTarget(ticket, target);
+          text += tp.ok ? ` · ${tp.message}` : ` · TP failed: ${tp.message}`;
         }
       }
 
@@ -557,7 +572,9 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
       message: live
         ? [
             `When a 1:1 box prints on a just-closed ${this.paneById(id)?.def.label ?? label} candle,`,
-            'Charts will buy the ATM CE (breakout) or PE (breakdown) at market and rest an SL.',
+            'Charts will buy the ATM CE (breakout) or PE (breakdown) at market, rest an SL,',
+            'and rest a 0.5R LIMIT target. The teal box is still the full 1:1 — the bot does not wait for it.',
+            'If the target fills, cancel the leftover SL in the order book (Kite has no OCO).',
             '',
             'This is the Charts tab only. The other two auto bots stay as they are.',
             'Trade Bot is not involved, and the desk rails do not apply.',
@@ -565,7 +582,7 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
         : [
             `Test date ${this.testDate()} — start and end are the same day.`,
             `${label} will not place live orders on a past session.`,
-            'Profit below is paper P&L from that day’s 1:1 boxes.',
+            'Profit below is paper P&L: the bot books 0.5R, the teal box is still 1:1.',
           ].join('\n'),
       confirmLabel: `Enable ${label}`,
       cancelLabel: 'Cancel',
@@ -613,12 +630,14 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
     boxes: ChartStructure[];
     lots: number;
     lastPrice?: number | null;
+    candles?: Candle[];
   } {
     const pane = this.paneById(id);
     return {
       boxes: pane?.dayStructures ?? [],
       lots: this.lotsFor(id),
       lastPrice: lastPriceOnDay(pane?.candles ?? [], this.testDate()),
+      candles: pane?.candles ?? [],
     };
   }
 
@@ -721,13 +740,27 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
   }
 
   protected tradePnl(id: ChartBookId, box: ChartStructure): number {
-    return structurePaperPnlRs(id, box, this.lotsFor(id), lastPriceOnDay(this.paneById(id)?.candles ?? [], this.testDate()));
+    const pane = this.paneById(id);
+    return structurePaperPnlRs(
+      id,
+      box,
+      this.lotsFor(id),
+      lastPriceOnDay(pane?.candles ?? [], this.testDate()),
+      pane?.candles ?? [],
+    );
   }
 
-  protected tradeResult(box: ChartStructure): string {
-    if (box.status === 'hit_exit') return 'EXIT';
-    if (box.status === 'hit_sl') return 'SL';
-    return 'OPEN';
+  protected tradeWhy(id: ChartBookId, box: ChartStructure): ChartTradeWhy {
+    const pane = this.paneById(id);
+    return analyzeChartTrade(
+      box,
+      pane?.candles ?? [],
+      lastPriceOnDay(pane?.candles ?? [], this.testDate()),
+    ).why;
+  }
+
+  protected whyCaption(): string {
+    return chartWhyCaption(this.pnl().why);
   }
 
   protected pnlTone(amount: number): 'up' | 'down' | 'flat' {

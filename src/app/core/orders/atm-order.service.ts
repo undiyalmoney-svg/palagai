@@ -24,6 +24,7 @@ import {
   atmOrderFields,
   atmQuoteKey,
   atmStopFields,
+  atmTargetFields,
   buildAtmOrderPlan,
 } from './atm-order.util';
 
@@ -139,6 +140,40 @@ export class AtmOrderService {
         ok: false,
         orderId: null,
         message: res?.message || 'Kite returned no stop order id. Check the order book.',
+      };
+    } catch (error) {
+      return { ok: false, orderId: null, message: describeOrderError(error) };
+    }
+  }
+
+  /**
+   * Rest a LIMIT SELL at the Charts auto-bot 0.5R. Charts-tab only — the live
+   * desk places its own targets and never reads these. Kite regular orders
+   * are not OCO: if this fills, cancel the SL in the order book.
+   */
+  async placeTarget(ticket: AtmOrderTicket, targetPremium: number): Promise<AtmOrderResult> {
+    const authorization = this.kiteSession.getAuthorizationHeader();
+    if (!authorization) {
+      return { ok: false, orderId: null, message: 'Kite session required.' };
+    }
+    const fields = atmTargetFields(ticket, targetPremium);
+    if (!fields) {
+      return { ok: false, orderId: null, message: 'Could not rest a target at that premium.' };
+    }
+    try {
+      const res = (await firstValueFrom(this.kiteApi.placeRegularOrder(authorization, fields))) as {
+        status?: string;
+        message?: string;
+        data?: { order_id?: string };
+      };
+      const orderId = res?.data?.order_id ?? null;
+      if (orderId) {
+        return { ok: true, orderId, message: `TP ${orderId} resting at ₹${fields['price']}.` };
+      }
+      return {
+        ok: false,
+        orderId: null,
+        message: res?.message || 'Kite returned no target order id. Check the order book.',
       };
     } catch (error) {
       return { ok: false, orderId: null, message: describeOrderError(error) };

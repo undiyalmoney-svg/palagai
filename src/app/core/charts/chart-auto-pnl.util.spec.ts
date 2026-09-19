@@ -2,8 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { ATM_OPTION_DELTA, BOOK_LOT_SIZE } from '../paper-desk/option-delta.util';
 import {
   AUTO_BOT_LABELS,
+  BOT_TARGET_R,
+  analyzeChartTrade,
   chartCandleAsOf,
   chartBookDeltaKind,
+  chartWhyCaption,
   endOfIstDay,
   isLiveChartDay,
   istToday,
@@ -74,16 +77,17 @@ describe('structure paper P&L', () => {
     expect(structureIndexPoints(box({ dir: -1, option: 'PE', status: 'live' }), 96)).toBe(4);
   });
 
-  it('uses each book\'s ATM delta × lot size', () => {
+  it('uses each book\'s ATM delta × lot size and books 0.5R, not the teal 1:1', () => {
     const win = box({ status: 'hit_exit', height: 10 });
+    expect(structureIndexPoints(win)).toBe(10);
     expect(structurePaperPnlRs('nifty', win, 1)).toBeCloseTo(
-      10 * ATM_OPTION_DELTA.nifty * BOOK_LOT_SIZE.nifty,
+      BOT_TARGET_R * 10 * ATM_OPTION_DELTA.nifty * BOOK_LOT_SIZE.nifty,
     );
     expect(structurePaperPnlRs('bank', win, 2)).toBeCloseTo(
-      10 * ATM_OPTION_DELTA.bank * BOOK_LOT_SIZE.bank * 2,
+      BOT_TARGET_R * 10 * ATM_OPTION_DELTA.bank * BOOK_LOT_SIZE.bank * 2,
     );
     expect(structurePaperPnlRs('crude', win, 3)).toBeCloseTo(
-      10 * ATM_OPTION_DELTA.crude * BOOK_LOT_SIZE.crude * 3,
+      BOT_TARGET_R * 10 * ATM_OPTION_DELTA.crude * BOOK_LOT_SIZE.crude * 3,
     );
     expect(chartBookDeltaKind('bank')).toBe('bank');
   });
@@ -123,7 +127,7 @@ describe('structure paper P&L', () => {
   it('takes one auto-bot position at a time so overlapping −1R tickets are dropped', () => {
     const candles = [
       { date: '2026-04-01T09:15:00+05:30', open: 100, high: 100, low: 100, close: 100, volume: 0 },
-      { date: '2026-04-01T09:30:00+05:30', open: 100, high: 110, low: 90, close: 109, volume: 0 },
+      { date: '2026-04-01T09:30:00+05:30', open: 100, high: 103, low: 96, close: 102, volume: 0 },
       { date: '2026-04-01T09:45:00+05:30', open: 109, high: 110, low: 108, close: 109, volume: 0 },
       { date: '2026-04-01T10:00:00+05:30', open: 109, high: 109, low: 89, close: 90, volume: 0 },
       { date: '2026-04-01T10:15:00+05:30', open: 90, high: 100, low: 88, close: 99, volume: 0 },
@@ -134,6 +138,8 @@ describe('structure paper P&L', () => {
       date: '2026-04-01T09:30:00+05:30',
       sl: 90,
       exit: 120,
+      height: 10,
+      entry: 100,
     });
     const overlap = box({
       breakIndex: 2,
@@ -152,5 +158,56 @@ describe('structure paper P&L', () => {
     const taken = replayChartAutoTrades([first, overlap, after], candles);
     expect(taken.map((b) => b.breakIndex)).toEqual([1, 4]);
     expect(taken[0]!.toIndex).toBe(3);
+  });
+
+  it('names failed breaks, give-backs, and 0.5R books', () => {
+    const base = [
+      { date: '2026-04-01T09:15:00+05:30', open: 100, high: 100, low: 100, close: 100, volume: 0 },
+      { date: '2026-04-01T09:30:00+05:30', open: 100, high: 103, low: 99, close: 102, volume: 0 },
+    ];
+    const ce = box({ breakIndex: 1, height: 10, entry: 100, sl: 90, exit: 110, status: 'live' });
+
+    const failed = analyzeChartTrade(ce, [
+      ...base,
+      { date: '2026-04-01T09:45:00+05:30', open: 102, high: 102, low: 89, close: 91, volume: 0 },
+    ]);
+    expect(failed.why).toBe('failed_break');
+    expect(failed.points).toBe(-10);
+
+    const gave = analyzeChartTrade(ce, [
+      ...base,
+      { date: '2026-04-01T09:45:00+05:30', open: 102, high: 104, low: 101, close: 103, volume: 0 },
+      { date: '2026-04-01T10:00:00+05:30', open: 103, high: 103, low: 89, close: 91, volume: 0 },
+    ]);
+    expect(gave.why).toBe('gave_back');
+    expect(gave.mfeR).toBeGreaterThan(0.35);
+    expect(gave.points).toBe(-10);
+
+    const half = analyzeChartTrade(ce, [
+      ...base,
+      { date: '2026-04-01T09:45:00+05:30', open: 102, high: 106, low: 101, close: 105, volume: 0 },
+    ]);
+    expect(half.why).toBe('booked_half');
+    expect(half.points).toBe(5);
+    expect(half.hold1rPoints).toBe(0);
+
+    const eod = analyzeChartTrade(ce, [
+      ...base,
+      { date: '2026-04-01T09:45:00+05:30', open: 102, high: 103, low: 101, close: 102, volume: 0 },
+    ]);
+    expect(eod.why).toBe('eod');
+    expect(eod.points).toBe(2);
+  });
+
+  it('summarises why counts so the P&L strip can say failed vs gave-back', () => {
+    const summary = summarizeChartPnl({
+      crude: { boxes: [box({ status: 'hit_exit' })], lots: 1 },
+      nifty: { boxes: [box({ status: 'hit_sl' })], lots: 1 },
+      bank: { boxes: [box({ status: 'live' })], lots: 1 },
+    });
+    expect(summary.why.booked_half).toBe(1);
+    expect(summary.why.failed_break).toBe(1);
+    expect(summary.why.eod).toBe(1);
+    expect(chartWhyCaption(summary.why)).toBe('1 Failed break · 1 Booked 0.5R · 1 EOD');
   });
 });

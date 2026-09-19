@@ -7,6 +7,7 @@ import {
   detectAllChartStructures,
   detectChartStructure,
   optionStopTrigger,
+  optionTargetPremium,
   structureResolvedIndex,
 } from './chart-structure.util';
 
@@ -270,5 +271,20 @@ describe('optionStopTrigger', () => {
   it('refuses a useless fill', () => {
     expect(optionStopTrigger(0, 80)).toBeNull();
     expect(optionStopTrigger(200, 0)).toBeNull();
+  });
+});
+
+describe('optionTargetPremium', () => {
+  it('books 0.5R as a quarter of the index height on the ATM premium', () => {
+    expect(optionTargetPremium(200, 80, 0.5, 0.05)).toBe(220);
+  });
+
+  it('never rests at or below the fill', () => {
+    expect(optionTargetPremium(10, 0.01, 0.5, 0.05)).toBeGreaterThan(10);
+  });
+
+  it('refuses a useless fill', () => {
+    expect(optionTargetPremium(0, 80)).toBeNull();
+    expect(optionTargetPremium(200, 0)).toBeNull();
   });
 });

@@ -12,12 +12,24 @@
   width: 100%;
 }
 
-.pnl-caption {
+.pnl-caption,
+.pnl-why,
+.pnl-strategy {
   grid-column: 1 / -1;
   margin: 0;
   font-size: 0.7rem;
   font-weight: 650;
   color: var(--pg-muted);
+}
+
+.pnl-why {
+  font-family: var(--pg-font-mono);
+  font-weight: 600;
+}
+
+.pnl-strategy {
+  font-weight: 500;
+  line-height: 1.45;
 }
 
 .pnl-cell {

@@ -174,6 +174,32 @@ export function atmStopFields(
   };
 }
 
+/**
+ * LIMIT SELL to book the Charts auto-bot 0.5R. Tagged PALAGAI_CHART_TP so it
+ * is never mistaken for a desk target. Kite has no OCO on regular orders —
+ * if this fills, the SL must be cancelled in the order book.
+ */
+export function atmTargetFields(
+  ticket: AtmOrderTicket,
+  targetPremium: number,
+  tickSize = 0.05,
+): Record<string, string> | null {
+  const tick = tickSize > 0 ? tickSize : 0.05;
+  const price = roundToTick(Number(targetPremium), tick);
+  if (!(price > 0) || price >= 1e9) return null;
+  return {
+    exchange: ticket.exchange,
+    tradingsymbol: ticket.tradingSymbol,
+    transaction_type: 'SELL',
+    order_type: 'LIMIT',
+    quantity: String(ticket.quantity),
+    product: ticket.product,
+    validity: 'DAY',
+    price: price.toFixed(2),
+    tag: 'PALAGAI_CHART_TP',
+  };
+}
+
 function roundToTick(value: number, tick: number): number {
   return Math.round(value / tick) * tick;
 }
