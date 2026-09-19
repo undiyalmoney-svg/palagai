@@ -67,6 +67,79 @@
   border-color: var(--pg-line-strong);
 }
 
+.pnl-cell.master-cell {
+  border-style: dashed;
+}
+
+.pnl-caption.compare {
+  margin-top: 0.25rem;
+  color: var(--pg-ink);
+}
+
+.master-guide {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid #c4b5fd;
+  border-radius: var(--pg-radius-sm);
+  background: #f5f3ff;
+}
+
+.master-headline {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #5b21b6;
+  line-height: 1.4;
+}
+
+.master-calls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.master-call {
+  padding: 0.16rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid #ddd6fe;
+  background: #fff;
+  font-size: 0.68rem;
+  font-weight: 650;
+  color: #5b21b6;
+}
+
+.master-call[data-action='buy_ce'] {
+  border-color: #b7ebd0;
+  background: var(--pg-bull-soft);
+  color: var(--pg-bull-deep);
+}
+
+.master-call[data-action='buy_pe'] {
+  border-color: #fecdd3;
+  background: var(--pg-bear-soft);
+  color: var(--pg-bear-deep);
+}
+
+.master-call[data-action='stand_down'],
+.master-call[data-action='wait'] {
+  color: var(--pg-muted);
+}
+
+.ghost-btn.master-btn.on {
+  border-color: #c4b5fd;
+  background: #f5f3ff;
+  color: #5b21b6;
+}
+
+.market-badge.master-on {
+  border-color: #c4b5fd;
+  background: #f5f3ff;
+  color: #5b21b6;
+}
+
 .auto-bot-row {
   display: inline-flex;
   flex-wrap: wrap;

@@ -56,6 +56,16 @@ import {
   summarizeChartPnl,
 } from '../../../core/charts/chart-auto-pnl.util';
 import {
+  MASTER_ACTION_LABELS,
+  MasterBookCall,
+  MasterGuide,
+  buildMasterBookCall,
+  buildMasterGuide,
+  emptyMasterCall,
+  masterAllowsBox,
+  replayMasterTrades,
+} from '../../../core/charts/chart-master.util';
+import {
   CHART_BOOKS,
   ChartBookDef,
   ChartBookId,
@@ -102,6 +112,9 @@ interface ChartPane {
   structure: ChartStructure | null;
   /** Every 1:1 break on the selected test date, for paper P&L. */
   dayStructures: ChartStructure[];
+  /** Same day, Master-filtered (with-trend after the open drive). */
+  masterStructures: ChartStructure[];
+  masterCall: MasterBookCall;
 }
 
 interface OrderFeedback {
@@ -167,6 +180,18 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
     nifty: false,
     bank: false,
   });
+  /**
+   * Master decides trend vs chop on all three books and, when on, places the
+   * with-trend ATM trades. Individual auto bots stay the unfiltered path.
+   */
+  protected readonly masterOn = signal(false);
+  /** After a Master loser on a live day, that book stands down. */
+  protected readonly masterStopped = signal<Record<ChartBookId, boolean>>({
+    crude: false,
+    nifty: false,
+    bank: false,
+  });
+  protected readonly masterActionLabels = MASTER_ACTION_LABELS;
   /** One calendar day. Start and end are the same — live when it is today. */
   protected readonly testDate = signal(istToday());
   protected readonly botBooks = CHART_PNL_BOOKS;
@@ -191,6 +216,8 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
       ordering: null,
       structure: null,
       dayStructures: [],
+      masterStructures: [],
+      masterCall: emptyMasterCall(def.id),
     })),
   );
 
@@ -209,11 +236,28 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
 
   protected readonly pnl = computed<ChartPnlSummary>(() =>
     summarizeChartPnl({
-      crude: this.pnlInput('crude'),
-      nifty: this.pnlInput('nifty'),
-      bank: this.pnlInput('bank'),
+      crude: this.pnlInput('crude', false),
+      nifty: this.pnlInput('nifty', false),
+      bank: this.pnlInput('bank', false),
     }),
   );
+
+  protected readonly masterPnl = computed<ChartPnlSummary>(() =>
+    summarizeChartPnl({
+      crude: this.pnlInput('crude', true),
+      nifty: this.pnlInput('nifty', true),
+      bank: this.pnlInput('bank', true),
+    }),
+  );
+
+  protected readonly masterGuide = computed<MasterGuide>(() => {
+    const day = this.testDate();
+    const byBook = {} as Record<ChartBookId, MasterBookCall>;
+    for (const book of CHART_PNL_BOOKS) {
+      byBook[book] = this.paneById(book)?.masterCall ?? emptyMasterCall(book);
+    }
+    return buildMasterGuide(day, byBook);
+  });
 
   protected readonly marketStatus = computed<Record<ChartBookId, MarketStatus>>(() => {
     const now = new Date(this.clock());
@@ -405,6 +449,8 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
           signals: [],
           structure: null,
           dayStructures: [],
+          masterStructures: [],
+          masterCall: emptyMasterCall(id),
           symbol: instrument.symbol,
         });
         return true;
@@ -412,18 +458,27 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
       const model = buildSrChartModel(candles);
       const intervalMinutes = chartIntervalMinutes(interval);
       const detectOpts = { intervalMinutes, now: asOf };
-      const dayStructures = replayChartAutoTrades(
-        structuresOnDay(
-          detectAllChartStructures(candles, model.zones, model.atr, detectOpts),
-          day,
-        ),
+      const detected = structuresOnDay(
+        detectAllChartStructures(candles, model.zones, model.atr, detectOpts),
+        day,
+      );
+      const dayStructures = replayChartAutoTrades(detected, candles);
+      const last = lastPriceOnDay(candles, day);
+      const masterCall = buildMasterBookCall(id, candles, day, intervalMinutes, model.atr);
+      const masterStructures = replayMasterTrades(
+        detected,
         candles,
+        day,
+        intervalMinutes,
+        model.atr,
+        last,
       );
       const liveBox = detectChartStructure(candles, model.zones, model.atr, detectOpts);
+      const drawn = this.masterOn() ? masterStructures : dayStructures;
       const structure = this.liveDay()
         ? liveBox
-        : dayStructures.length
-          ? dayStructures[dayStructures.length - 1]!
+        : drawn.length
+          ? drawn[drawn.length - 1]!
           : null;
       this.patch(id, {
         symbol: instrument.symbol,
@@ -432,10 +487,13 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
         signals: detectSrSignals(candles, model.zones, model.atr, { intervalMinutes, now: asOf }),
         structure,
         dayStructures,
+        masterStructures,
+        masterCall,
         error: null,
         loading: false,
         updatedAt: new Date().toLocaleTimeString('en-IN', { hour12: false }),
       });
+      this.syncMasterStops();
       void this.maybeAutoTrade(id);
       return true;
     } catch (error) {
@@ -450,6 +508,8 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
         signals: [],
         structure: null,
         dayStructures: [],
+        masterStructures: [],
+        masterCall: emptyMasterCall(id),
       });
       return !isKiteAuthError(error);
     }
@@ -529,7 +589,7 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
         return false;
       }
 
-      let text = `${opts.auto ? 'Auto · ' : ''}${shortSymbol(ticket)} · ${result.message}`;
+      let text = `${opts.auto ? (this.masterOn() ? 'Master · ' : 'Auto · ') : ''}${shortSymbol(ticket)} · ${result.message}`;
       const box = opts.structure ?? pane.structure;
       if (opts.auto && box) {
         const fill = await this.orders.fillPrice(result.orderId, premium);
@@ -558,6 +618,57 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
 
   protected autoBotOn(id: ChartBookId): boolean {
     return this.autoBots()[id];
+  }
+
+  protected async toggleMaster(): Promise<void> {
+    if (this.masterOn()) {
+      this.masterOn.set(false);
+      this.relabelDrawnStructures();
+      return;
+    }
+    const live = this.liveDay();
+    const ok = await this.uiDialog.confirm({
+      title: live ? 'Enable Master?' : 'Use Master on this test date?',
+      message: live
+        ? [
+            'Master reads the opening drive on Crude, Nifty and Bank Nifty.',
+            'On a trend it buys only that side (CE up / PE down), rests SL and 0.5R.',
+            'On chop it stands down. After a failed break or give-back, that book stops.',
+            '',
+            'This places real ATM orders. Individual auto bots stay as they are —',
+            'Master is the filtered path. Trade Bot is not involved.',
+          ].join('\n')
+        : [
+            `Test date ${this.testDate()} — start and end are the same day.`,
+            'Master will not place live orders. Paper P&L below splits Without Master',
+            '(every 0.5R break) and With Master (trend-only after the open drive).',
+          ].join('\n'),
+      confirmLabel: live ? 'Enable Master' : 'Classify with Master',
+      cancelLabel: 'Cancel',
+      tone: live ? 'danger' : 'default',
+    });
+    if (!ok) return;
+    this.masterStopped.set({ crude: false, nifty: false, bank: false });
+    this.masterOn.set(true);
+    this.relabelDrawnStructures();
+    if (live) {
+      for (const book of CHART_PNL_BOOKS) {
+        void this.maybeAutoTrade(book);
+      }
+    }
+  }
+
+  private relabelDrawnStructures(): void {
+    if (this.liveDay()) return;
+    this.panes.update((list) =>
+      list.map((pane) => {
+        const drawn = this.masterOn() ? pane.masterStructures : pane.dayStructures;
+        return {
+          ...pane,
+          structure: drawn.length ? drawn[drawn.length - 1]! : null,
+        };
+      }),
+    );
   }
 
   protected async toggleAutoBot(id: ChartBookId): Promise<void> {
@@ -601,6 +712,7 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
     if (next === this.testDate()) return;
     this.testDate.set(next);
     this.tradedKeys.clear();
+    this.masterStopped.set({ crude: false, nifty: false, bank: false });
     this.panes.update((list) =>
       list.map((pane) => ({
         ...pane,
@@ -610,6 +722,8 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
         signals: [],
         structure: null,
         dayStructures: [],
+        masterStructures: [],
+        masterCall: emptyMasterCall(pane.def.id),
         order: null,
         error: null,
       })),
@@ -626,7 +740,10 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
     this.setTestDate(value);
   }
 
-  private pnlInput(id: ChartBookId): {
+  private pnlInput(
+    id: ChartBookId,
+    master: boolean,
+  ): {
     boxes: ChartStructure[];
     lots: number;
     lastPrice?: number | null;
@@ -634,20 +751,53 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
   } {
     const pane = this.paneById(id);
     return {
-      boxes: pane?.dayStructures ?? [],
+      boxes: (master ? pane?.masterStructures : pane?.dayStructures) ?? [],
       lots: this.lotsFor(id),
       lastPrice: lastPriceOnDay(pane?.candles ?? [], this.testDate()),
       candles: pane?.candles ?? [],
     };
   }
 
+  protected displayedStructures(pane: ChartPane): ChartStructure[] {
+    return this.masterOn() ? pane.masterStructures : pane.dayStructures;
+  }
+
+  private syncMasterStops(): void {
+    if (!this.masterOn() || !this.liveDay()) return;
+    const next = { ...this.masterStopped() };
+    let changed = false;
+    for (const pane of this.panes()) {
+      const last = lastPriceOnDay(pane.candles, this.testDate());
+      for (const box of pane.masterStructures) {
+        const why = analyzeChartTrade(box, pane.candles, last).why;
+        if (why === 'failed_break' || why === 'gave_back') {
+          if (!next[pane.def.id]) {
+            next[pane.def.id] = true;
+            changed = true;
+          }
+        }
+      }
+    }
+    if (changed) this.masterStopped.set(next);
+  }
+
+  private masterWillTrade(id: ChartBookId, box: ChartStructure): boolean {
+    if (this.masterStopped()[id]) return false;
+    const call = this.paneById(id)?.masterCall ?? emptyMasterCall(id);
+    return masterAllowsBox(call, box);
+  }
+
   private async maybeAutoTrade(id: ChartBookId): Promise<void> {
-    if (!this.liveDay() || !this.autoBots()[id]) return;
+    if (!this.liveDay()) return;
+    const master = this.masterOn();
+    if (!master && !this.autoBots()[id]) return;
     const pane = this.paneById(id);
     if (!pane || pane.ordering) return;
     const box = pane.structure;
     if (!canAutoEnter(box)) return;
-    const key = chartStructureKey(id, box);
+    if (master && !this.masterWillTrade(id, box)) return;
+    if (!master && !this.autoBots()[id]) return;
+    const key = `${master ? 'master' : 'solo'}|${chartStructureKey(id, box)}`;
     if (this.tradedKeys.has(key)) return;
     this.tradedKeys.add(key);
     const sent = await this.buyAtm(id, box.option, { auto: true, structure: box });
@@ -759,7 +909,11 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
     ).why;
   }
 
-  protected whyCaption(): string {
+  protected masterWhyCaption(): string {
+    return chartWhyCaption(this.masterPnl().why);
+  }
+
+  protected rawWhyCaption(): string {
     return chartWhyCaption(this.pnl().why);
   }
 
