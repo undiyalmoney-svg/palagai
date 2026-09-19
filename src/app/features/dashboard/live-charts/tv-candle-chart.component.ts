@@ -25,6 +25,7 @@ import {
 } from '@angular/core';
 import { Candle } from '../../../core/models/candle.model';
 import { SrChartModel, SrZone } from '../../../core/charts/sr-chart.util';
+import { ChartStructure } from '../../../core/charts/chart-structure.util';
 import { SrConfidenceBand, SrSignal } from '../../../core/charts/sr-signals.util';
 import { AtmOptionSide } from '../../../core/orders/atm-order.util';
 import {
@@ -68,6 +69,15 @@ const COLORS = {
   signalSell: '#d32f2f',
   /** Laid under a marker caption so it stays readable over the candles. */
   signalHalo: 'rgba(255, 255, 255, 0.86)',
+  pinkFill: 'rgba(244, 114, 182, 0.30)',
+  tealFill: 'rgba(45, 212, 191, 0.30)',
+  wall: '#0f172a',
+  slInk: '#be185d',
+  slBg: 'rgba(244, 114, 182, 0.92)',
+  exitInk: '#0f766e',
+  exitBg: 'rgba(45, 212, 191, 0.92)',
+  entryInk: '#ffffff',
+  entryBg: '#0f172a',
 } as const;
 
 const FONT = '11px ui-sans-serif, system-ui, -apple-system, sans-serif';
@@ -150,6 +160,8 @@ export class TvCandleChartComponent implements AfterViewInit, OnChanges, OnDestr
   @Input() emptyMessage = 'No candles yet.';
   /** Chart annotations, not orders — see sr-signals.util for what they mean. */
   @Input() signals: SrSignal[] = [];
+  /** Live 1:1 measured-move box (pink SL, teal EXIT) drawn on this pane. */
+  @Input() structure: ChartStructure | null = null;
   /**
    * Changing this throws the zoom away and refits. The parent passes the
    * interval, because 30 bars of 15m and 30 bars of 1m are not the same view.
@@ -162,8 +174,10 @@ export class TvCandleChartComponent implements AfterViewInit, OnChanges, OnDestr
   @Input() ordering: AtmOptionSide | null = null;
   @Input() orderHint = '';
   @Input() orderResult: { ok: boolean; text: string } | null = null;
+  @Input() autoTrade = false;
   readonly buyAtm = output<AtmOptionSide>();
   readonly adjustLots = output<number>();
+  readonly toggleAutoTrade = output<void>();
 
   @ViewChild('canvas', { static: true }) canvasRef?: ElementRef<HTMLCanvasElement>;
 
@@ -719,7 +733,7 @@ export class TvCandleChartComponent implements AfterViewInit, OnChanges, OnDestr
     const zones = this.model?.zones ?? [];
     // The scale follows the window, so zooming in opens the price action up
     // rather than keeping it squashed against the full range.
-    const { min, max } = this.priceRange(windowBars);
+    const { min, max } = this.priceRange(windowBars, first, last);
     const span = max - min || 1;
     const yOf = (price: number) => PAD.top + ((max - price) / span) * plotH;
     const slotW = plotW / view.count;
@@ -735,7 +749,7 @@ export class TvCandleChartComponent implements AfterViewInit, OnChanges, OnDestr
 
     // Axis pills are laid out before anything is painted so a level label can
     // never sit on top of the last-price label.
-    const tags = this.layoutAxisTags(bars, zones, yOf, axisDecimals, plotH);
+    const tags = this.layoutAxisTags(bars, zones, yOf, axisDecimals, plotH, first, last);
 
     this.drawGrid(ctx, plotW, plotH, ticks, yOf, axisDecimals, tags);
 
@@ -747,9 +761,11 @@ export class TvCandleChartComponent implements AfterViewInit, OnChanges, OnDestr
     ctx.rect(PAD.left, PAD.top, plotW, plotH);
     ctx.clip();
     this.drawZones(ctx, zones, xOf, yOf, plotW, slotW);
+    this.drawStructure(ctx, xOf, yOf, slotW, first, last);
     this.drawLinks(ctx, xOf, yOf);
     this.drawCandles(ctx, bars, xOf, yOf, slotW, first, last);
     this.drawZoneLabels(ctx, zones, xOf, yOf, plotW, slotW);
+    this.drawStructureLabels(ctx, xOf, yOf, slotW, first, last);
     this.drawSignals(ctx, xOf, yOf, first, last, plotH);
     this.drawLastPriceLine(ctx, bars, plotW, yOf);
     ctx.restore();
@@ -931,12 +947,17 @@ export class TvCandleChartComponent implements AfterViewInit, OnChanges, OnDestr
    * the panel out and flatten the price action. Out-of-range zones clip instead,
    * which is what TradingView does with a drawing off the visible scale.
    */
-  private priceRange(bars: Candle[]): { min: number; max: number } {
+  private priceRange(bars: Candle[], first: number, last: number): { min: number; max: number } {
     let min = Infinity;
     let max = -Infinity;
     for (const b of bars) {
       if (b.low < min) min = b.low;
       if (b.high > max) max = b.high;
+    }
+    const box = this.structure;
+    if (box && box.toIndex >= first && box.fromIndex <= last) {
+      min = Math.min(min, box.sl, box.exit, box.wall);
+      max = Math.max(max, box.sl, box.exit, box.wall);
     }
     if (!Number.isFinite(min) || !Number.isFinite(max)) {
       return { min: 0, max: 1 };
@@ -960,20 +981,43 @@ export class TvCandleChartComponent implements AfterViewInit, OnChanges, OnDestr
     yOf: (p: number) => number,
     axisDecimals: number,
     plotH: number,
+    first: number,
+    last: number,
   ): AxisTag[] {
-    const last = bars[bars.length - 1]!;
-    const up = this.model?.changeAbs == null ? last.close >= last.open : this.model.changeAbs >= 0;
-    const lastY = yOf(last.close);
+    const lastBar = bars[bars.length - 1]!;
+    const up = this.model?.changeAbs == null ? lastBar.close >= lastBar.open : this.model.changeAbs >= 0;
+    const lastY = yOf(lastBar.close);
     const tags: AxisTag[] = [];
     // Panning back can put the live price off the window's scale, and a pill
     // pinned to the frame edge would be a lie about where that price sits.
     if (lastY >= PAD.top && lastY <= PAD.top + plotH) {
       tags.push({
         y: lastY,
-        text: this.fmt(last.close),
+        text: this.fmt(lastBar.close),
         bg: up ? COLORS.lastUp : COLORS.lastDown,
         ink: '#ffffff',
       });
+    }
+
+    const box = this.structure;
+    if (box && box.toIndex >= first && box.fromIndex <= last) {
+      this.pushAxisTag(tags, yOf(box.entry), plotH, 'ENTRY', COLORS.entryBg, COLORS.entryInk);
+      this.pushAxisTag(
+        tags,
+        yOf(box.sl),
+        plotH,
+        box.status === 'hit_sl' ? 'SL HIT' : 'SL',
+        COLORS.slBg,
+        '#ffffff',
+      );
+      this.pushAxisTag(
+        tags,
+        yOf(box.exit),
+        plotH,
+        box.status === 'hit_exit' ? 'EXIT HIT' : 'EXIT',
+        COLORS.exitBg,
+        COLORS.exitInk,
+      );
     }
 
     for (const zone of zones) {
@@ -994,6 +1038,108 @@ export class TvCandleChartComponent implements AfterViewInit, OnChanges, OnDestr
       });
     }
     return tags;
+  }
+
+  private pushAxisTag(
+    tags: AxisTag[],
+    y: number,
+    plotH: number,
+    text: string,
+    bg: string,
+    ink: string,
+  ): void {
+    if (y < PAD.top || y > PAD.top + plotH) return;
+    if (tags.some((t) => Math.abs(t.y - y) < TAG_H + 1)) return;
+    tags.push({ y, text, bg, ink });
+  }
+
+  private drawStructure(
+    ctx: CanvasRenderingContext2D,
+    xOf: (i: number) => number,
+    yOf: (p: number) => number,
+    slotW: number,
+    first: number,
+    last: number,
+  ): void {
+    const box = this.structure;
+    if (!box || box.toIndex < first || box.fromIndex > last) return;
+
+    const fill = (band: { lo: number; hi: number; fromIndex: number; toIndex: number }, color: string) => {
+      const x0 = Math.max(PAD.left, xOf(Math.max(first, band.fromIndex)) - slotW / 2);
+      const x1 = Math.min(PAD.left + this.plotW, xOf(Math.min(last, band.toIndex)) + slotW / 2);
+      const y0 = yOf(band.hi);
+      const y1 = yOf(band.lo);
+      ctx.fillStyle = color;
+      ctx.fillRect(x0, y0, Math.max(4, x1 - x0), Math.max(2, y1 - y0));
+    };
+    fill(box.pink, COLORS.pinkFill);
+    fill(box.teal, COLORS.tealFill);
+
+    const x0 = Math.max(PAD.left, xOf(Math.max(first, box.fromIndex)) - slotW / 2);
+    const x1 = Math.min(PAD.left + this.plotW, xOf(Math.min(last, box.toIndex)) + slotW / 2);
+    ctx.strokeStyle = COLORS.wall;
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.moveTo(x0, Math.round(yOf(box.wall)) + 0.5);
+    ctx.lineTo(x1, Math.round(yOf(box.wall)) + 0.5);
+    ctx.stroke();
+  }
+
+  private drawStructureLabels(
+    ctx: CanvasRenderingContext2D,
+    xOf: (i: number) => number,
+    yOf: (p: number) => number,
+    slotW: number,
+    first: number,
+    last: number,
+  ): void {
+    const box = this.structure;
+    if (!box || box.toIndex < first || box.fromIndex > last) return;
+
+    const x0 = Math.max(PAD.left, xOf(Math.max(first, box.fromIndex)) - slotW / 2);
+    const entryX = clampNumber(xOf(box.breakIndex), PAD.left + 4, PAD.left + this.plotW - 4);
+    this.structurePill(
+      ctx,
+      x0 + 4,
+      yOf(box.sl),
+      box.status === 'hit_sl' ? 'SL HIT' : 'SL',
+      COLORS.slBg,
+      '#ffffff',
+      box.dir > 0 ? 'above' : 'below',
+    );
+    this.structurePill(
+      ctx,
+      x0 + 4,
+      yOf(box.exit),
+      box.status === 'hit_exit' ? 'EXIT HIT' : 'EXIT',
+      COLORS.exitBg,
+      COLORS.exitInk,
+      box.dir > 0 ? 'below' : 'above',
+    );
+    this.structurePill(ctx, entryX + 8, yOf(box.entry), 'ENTRY', COLORS.entryBg, COLORS.entryInk, 'center');
+  }
+
+  private structurePill(
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    text: string,
+    bg: string,
+    ink: string,
+    align: 'above' | 'below' | 'center',
+  ): void {
+    ctx.font = FONT_ZONE;
+    const w = ctx.measureText(text).width + 8;
+    const h = 13;
+    const left = clampNumber(x, PAD.left + 2, PAD.left + this.plotW - w - 2);
+    const top =
+      align === 'above' ? y - h - 2 : align === 'below' ? y + 2 : y - h / 2;
+    ctx.fillStyle = bg;
+    ctx.fillRect(left, top, w, h);
+    ctx.fillStyle = ink;
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, left + 4, top + h / 2);
+    ctx.textBaseline = 'alphabetic';
   }
 
   private drawGrid(

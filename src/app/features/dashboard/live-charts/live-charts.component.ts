@@ -28,6 +28,13 @@ import { Candle } from '../../../core/models/candle.model';
 import { SrChartModel, SrZone, buildSrChartModel } from '../../../core/charts/sr-chart.util';
 import { SrSignal, detectSrSignals } from '../../../core/charts/sr-signals.util';
 import {
+  ChartStructure,
+  canAutoEnter,
+  chartStructureKey,
+  detectChartStructure,
+  optionStopTrigger,
+} from '../../../core/charts/chart-structure.util';
+import {
   CHART_BOOKS,
   ChartBookDef,
   ChartBookId,
@@ -70,6 +77,8 @@ interface ChartPane {
   order: OrderFeedback | null;
   /** Side currently being resolved/placed, so only that button shows busy. */
   ordering: AtmOptionSide | null;
+  /** Latest 1:1 measured-move box, or null when no wall has broken. */
+  structure: ChartStructure | null;
 }
 
 interface OrderFeedback {
@@ -126,6 +135,11 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
   protected readonly intervalLabels = CHART_INTERVAL_LABELS;
 
   protected readonly autoRefresh = signal(true);
+  /**
+   * When on, a fresh 1:1 break on a just-closed candle buys the ATM CE/PE and
+   * rests an SL. Off by default; Charts-tab only, not the Trade Bot.
+   */
+  protected readonly autoTrade = signal(false);
   protected readonly refreshing = signal(false);
   protected readonly panes = signal<ChartPane[]>(
     CHART_BOOKS.map((def) => ({
@@ -141,6 +155,7 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
       updatedAt: null,
       order: null,
       ordering: null,
+      structure: null,
     })),
   );
 
@@ -195,6 +210,8 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
   private readonly wasOpen = new Map<ChartBookId, boolean>();
   /** Once a reader taps +/−, that book keeps their count instead of following funds. */
   private readonly lotsOverride = signal<Partial<Record<ChartBookId, number>>>({});
+  /** Structure keys already sent so Auto Trade cannot double-fire one break. */
+  private readonly tradedKeys = new Set<string>();
 
   ngOnInit(): void {
     if (!isPlatformBrowser(this.platformId)) {
@@ -318,17 +335,21 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
         return true;
       }
       const model = buildSrChartModel(candles);
+      const intervalMinutes = chartIntervalMinutes(interval);
+      const structure = detectChartStructure(candles, model.zones, model.atr, {
+        intervalMinutes,
+      });
       this.patch(id, {
         symbol: instrument.symbol,
         candles,
         model,
-        signals: detectSrSignals(candles, model.zones, model.atr, {
-          intervalMinutes: chartIntervalMinutes(interval),
-        }),
+        signals: detectSrSignals(candles, model.zones, model.atr, { intervalMinutes }),
+        structure,
         error: null,
         loading: false,
         updatedAt: new Date().toLocaleTimeString('en-IN', { hour12: false }),
       });
+      void this.maybeAutoTrade(id);
       return true;
     } catch (error) {
       if (this.paneById(id)?.interval !== interval) {
@@ -350,10 +371,17 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
    * the rupee cost in a confirmation before anything is sent. A manual buy
    * runs outside the desk's rails, so the only protection is the reader
    * knowing precisely what they are about to pay for.
+   *
+   * Auto Trade skips the dialog, buys the side the 1:1 box names, and rests
+   * an SL on that option after the fill.
    */
-  protected async buyAtm(id: ChartBookId, side: AtmOptionSide): Promise<void> {
+  protected async buyAtm(
+    id: ChartBookId,
+    side: AtmOptionSide,
+    opts: { auto?: boolean; structure?: ChartStructure | null } = {},
+  ): Promise<boolean> {
     const pane = this.paneById(id);
-    if (!pane || pane.ordering) return;
+    if (!pane || pane.ordering) return false;
 
     // The broker would reject it anyway, but saying so here names the session
     // instead of returning a Kite error code.
@@ -365,13 +393,13 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
           text: `${pane.def.label} is closed — trades ${pane.session.marketOpen}–${pane.session.marketClose} IST.`,
         },
       });
-      return;
+      return false;
     }
 
     const spot = pane.model?.last?.price;
     if (spot == null) {
       this.patch(id, { order: { ok: false, text: 'No live price yet — wait for candles.' } });
-      return;
+      return false;
     }
 
     this.patch(id, { ordering: side, order: null });
@@ -381,24 +409,78 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
       const plan = await this.orders.plan({ book: id, side, spot, lots });
       if (!plan.ok) {
         this.patch(id, { order: { ok: false, text: plan.reason } });
-        return;
+        return false;
       }
 
       const ticket = plan.ticket;
       const premium = await this.orders.premium(ticket);
-      if (!(await this.confirmBuy(pane, ticket, premium))) {
-        return;
+      if (!opts.auto && !(await this.confirmBuy(pane, ticket, premium))) {
+        return false;
       }
 
       const result = await this.orders.place(ticket);
-      this.patch(id, {
-        order: {
-          ok: result.ok,
-          text: result.ok ? `${shortSymbol(ticket)} · ${result.message}` : result.message,
-        },
-      });
+      if (!result.ok) {
+        this.patch(id, { order: { ok: false, text: result.message } });
+        return false;
+      }
+
+      let text = `${opts.auto ? 'Auto · ' : ''}${shortSymbol(ticket)} · ${result.message}`;
+      const box = opts.structure ?? pane.structure;
+      if (opts.auto && box) {
+        const fill = await this.orders.fillPrice(result.orderId, premium);
+        const trigger = fill != null ? optionStopTrigger(fill, box.height) : null;
+        if (trigger == null) {
+          text += ' · SL not rested — no fill premium yet. Manage the exit.';
+        } else {
+          const sl = await this.orders.placeStop(ticket, trigger);
+          text += sl.ok ? ` · ${sl.message}` : ` · entry sent, SL failed: ${sl.message}`;
+        }
+      }
+
+      this.patch(id, { order: { ok: true, text } });
+      return true;
     } finally {
       this.patch(id, { ordering: null });
+    }
+  }
+
+  protected async toggleAutoTrade(): Promise<void> {
+    if (this.autoTrade()) {
+      this.autoTrade.set(false);
+      return;
+    }
+    const ok = await this.uiDialog.confirm({
+      title: 'Enable Auto Trade on Charts?',
+      message: [
+        'When a 1:1 box prints on a just-closed candle, Charts will buy the ATM',
+        'CE (breakout) or PE (breakdown) at market and rest an SL on that option.',
+        '',
+        'This is the Charts tab only. Trade Bot is not involved, and the desk',
+        'rails do not apply. Turn it off at any time. You can still press Buy / Sell yourself.',
+      ].join('\n'),
+      confirmLabel: 'Enable Auto Trade',
+      cancelLabel: 'Cancel',
+      tone: 'danger',
+    });
+    if (!ok) return;
+    this.autoTrade.set(true);
+    for (const pane of this.panes()) {
+      void this.maybeAutoTrade(pane.def.id);
+    }
+  }
+
+  private async maybeAutoTrade(id: ChartBookId): Promise<void> {
+    if (!this.autoTrade()) return;
+    const pane = this.paneById(id);
+    if (!pane || pane.ordering) return;
+    const box = pane.structure;
+    if (!canAutoEnter(box)) return;
+    const key = chartStructureKey(id, box);
+    if (this.tradedKeys.has(key)) return;
+    this.tradedKeys.add(key);
+    const sent = await this.buyAtm(id, box.option, { auto: true, structure: box });
+    if (!sent) {
+      this.tradedKeys.delete(key);
     }
   }
 

@@ -104,6 +104,12 @@
   color: var(--pg-bull-deep);
 }
 
+.ghost-btn.auto-trade.on {
+  border-color: #fecaca;
+  background: #fff1f2;
+  color: #be123c;
+}
+
 .session-banner {
   display: flex;
   flex-wrap: wrap;
@@ -336,6 +342,18 @@
   border-color: rgba(211, 47, 47, 0.45);
   background: rgba(211, 47, 47, 0.1);
   color: #c62828;
+}
+
+.structure-chip {
+  border-color: rgba(45, 212, 191, 0.45);
+  background: rgba(45, 212, 191, 0.12);
+  color: #0f766e;
+}
+
+.structure-chip.sell {
+  border-color: rgba(244, 114, 182, 0.45);
+  background: rgba(244, 114, 182, 0.12);
+  color: #be185d;
 }
 
 .chart-meta {

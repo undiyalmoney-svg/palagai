@@ -4,6 +4,7 @@ import {
   atmOrderCost,
   atmOrderFields,
   atmQuoteKey,
+  atmStopFields,
   buildAtmOrderPlan,
 } from './atm-order.util';
 
@@ -264,6 +265,32 @@ describe('atmOrderFields', () => {
       validity: 'DAY',
       market_protection: '-1',
       tag: 'PALAGAI_CHART',
+    });
+  });
+
+  it('rests a Charts-tagged SL sell under the fill', () => {
+    const plan = buildAtmOrderPlan({
+      book: 'nifty',
+      instruments: niftyChain(),
+      side: 'CE',
+      spot: 24_487,
+      asOfDateTime: AS_OF,
+      lots: 1,
+    });
+    expect(plan.ok).toBe(true);
+    if (!plan.ok) return;
+
+    expect(atmStopFields(plan.ticket, 160)).toEqual({
+      exchange: 'NFO',
+      tradingsymbol: plan.ticket.tradingSymbol,
+      transaction_type: 'SELL',
+      order_type: 'SL',
+      quantity: '65',
+      product: 'MIS',
+      validity: 'DAY',
+      trigger_price: '160.00',
+      price: '144.00',
+      tag: 'PALAGAI_CHART_SL',
     });
   });
 

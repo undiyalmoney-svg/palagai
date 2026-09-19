@@ -5,10 +5,10 @@
       <h1>Support &amp; Resistance</h1>
       <p class="pg-lede">
         Crude Oil Mini, Nifty 50 and Bank Nifty on live Kite candles, each on its own
-        timeframe from 1 minute to 1 hour. Shaded bands are support/resistance zones
-        clustered from swing pivots; the dark lines join consecutive pivots so structure
-        direction is visible. Each book follows its own session — crude 09:00–23:30,
-        the indices 09:15–15:30 IST — and starts updating by itself at the open.
+        timeframe from 1 minute to 1 hour. When a closed candle breaks a support or
+        resistance band, the chart paints the same 1:1 box as a measured move:
+        pink is the stop, teal is the target, labelled Entry / SL / Exit. Trade from
+        that, or turn Auto Trade on and Charts will buy the ATM CE/PE and rest the SL.
       </p>
     </div>
 
@@ -38,6 +38,16 @@
               Idle · markets shut
             }
           </span>
+        </button>
+        <button
+          type="button"
+          class="ghost-btn auto-trade"
+          [class.on]="autoTrade()"
+          [attr.aria-pressed]="autoTrade()"
+          data-testid="chart-auto-trade"
+          (click)="toggleAutoTrade()"
+        >
+          <span>{{ autoTrade() ? 'Auto Trade on' : 'Auto Trade' }}</span>
         </button>
         <button
           type="button"
@@ -144,6 +154,7 @@
           [candles]="pane.candles"
           [model]="pane.model"
           [signals]="pane.signals"
+          [structure]="pane.structure"
           [decimals]="pane.def.decimals"
           [resetKey]="pane.interval"
           [emptyMessage]="pane.error ? 'Chart unavailable' : 'Waiting for candles…'"
@@ -153,8 +164,10 @@
           [ordering]="pane.ordering"
           [orderHint]="statusOf(pane).open ? '' : statusOf(pane).detail"
           [orderResult]="pane.order"
+          [autoTrade]="autoTrade()"
           (buyAtm)="buyAtm(pane.def.id, $event)"
           (adjustLots)="bumpLots(pane.def.id, $event)"
+          (toggleAutoTrade)="toggleAutoTrade()"
         />
 
         <div class="order-row">
@@ -224,6 +237,21 @@
               Support
               <b>{{ zoneLabel(nearestZone(pane, 'support'), pane.def.decimals) }}</b>
             </span>
+            @if (pane.structure; as box) {
+              <span
+                class="zone-chip structure-chip"
+                [class.buy]="box.dir > 0"
+                [class.sell]="box.dir < 0"
+                data-testid="chart-structure-chip"
+              >
+                {{ box.option }} 1:1
+                <b>
+                  Entry {{ fmt(box.entry, pane.def.decimals) }}
+                  · SL {{ fmt(box.sl, pane.def.decimals) }}
+                  · Exit {{ fmt(box.exit, pane.def.decimals) }}
+                </b>
+              </span>
+            }
             @if (latestSignal(pane); as sig) {
               <span
                 class="zone-chip signal-chip"
@@ -252,6 +280,14 @@
   </div>
 
   <p class="chart-hint">
+    The pink / teal box is a <strong>1:1 measured move</strong> on a closed
+    candle that broke a support or resistance band. Pink is the stop (the swing
+    against the break), teal is the equal-height target. Labels mark Entry at
+    the wall, SL at the far pink edge, and Exit at the far teal edge. It updates
+    as live candles arrive and does not wait for Trade Bot.
+  </p>
+
+  <p class="chart-hint">
     BUY / SELL arrows mark where a <strong>closed</strong> candle turned at, or closed
     through, one of the support and resistance bands drawn above. They wait for
     the bar to finish so they do not flip while it is still forming. They are
@@ -274,10 +310,11 @@
     at-the-money contract, sized from Kite funds the same way Trade Bot is
     (₹40,000 per index lot; Crude 3×). Use +/− on a card or in full view to
     change that lot count for the next order. It runs outside the Trade Bot: no
-    premium cap, no daily loss stop, and no stop-loss is attached, so you manage
-    the exit yourself. Each press shows the exact contract, its live premium and
-    the rupee cost before anything is sent. The same Buy / Sell buttons sit in
-    full chart view.
+    premium cap, no daily loss stop. Manual Buy / Sell still has no stop —
+    you manage that exit. <strong>Auto Trade</strong> buys the CE or PE the 1:1
+    box names when that bar closes, then rests an SL on the option. Each manual
+    press still shows the exact contract, its live premium and the rupee cost
+    before anything is sent. The same Buy / Sell buttons sit in full chart view.
   </p>
 
   @if (anyError() && !sessionExpired()) {

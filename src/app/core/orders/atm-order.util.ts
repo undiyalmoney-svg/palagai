@@ -144,6 +144,40 @@ export function atmOrderFields(ticket: AtmOrderTicket): Record<string, string> {
   };
 }
 
+/**
+ * Protective SELL stop for a long option the Charts tab just bought.
+ *
+ * F&O no longer accepts SL-M, so this is a stop-loss LIMIT with the limit 10%
+ * under the trigger — the same shape the order proxy uses for a long option
+ * stop. Tagged PALAGAI_CHART_SL so it is never mistaken for a desk stop.
+ */
+export function atmStopFields(
+  ticket: AtmOrderTicket,
+  triggerPremium: number,
+  tickSize = 0.05,
+): Record<string, string> | null {
+  const tick = tickSize > 0 ? tickSize : 0.05;
+  const trig = roundToTick(Number(triggerPremium), tick);
+  if (!(trig > 0) || trig >= 1e9) return null;
+  const limit = roundToTick(Math.max(tick, trig * 0.9), tick);
+  return {
+    exchange: ticket.exchange,
+    tradingsymbol: ticket.tradingSymbol,
+    transaction_type: 'SELL',
+    order_type: 'SL',
+    quantity: String(ticket.quantity),
+    product: ticket.product,
+    validity: 'DAY',
+    trigger_price: trig.toFixed(2),
+    price: limit.toFixed(2),
+    tag: 'PALAGAI_CHART_SL',
+  };
+}
+
+function roundToTick(value: number, tick: number): number {
+  return Math.round(value / tick) * tick;
+}
+
 /** Rupee cost of the position at a given premium, for the confirmation step. */
 export function atmOrderCost(ticket: AtmOrderTicket, premium: number): number | null {
   if (!Number.isFinite(premium) || premium <= 0) {

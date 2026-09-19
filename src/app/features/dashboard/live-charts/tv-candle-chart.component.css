@@ -260,6 +260,19 @@
   background: #d32f2f;
 }
 
+.tv-order-btn.auto {
+  background: #fff;
+  color: #9f1239;
+  border: 1px solid #fecaca;
+  min-width: 6.2rem;
+}
+
+.tv-order-btn.auto.on {
+  background: #be123c;
+  color: #fff;
+  border-color: #be123c;
+}
+
 .tv-order-lots,
 .tv-order-result {
   display: flex;

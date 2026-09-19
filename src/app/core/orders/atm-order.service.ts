@@ -23,6 +23,7 @@ import {
   AtmOrderTicket,
   atmOrderFields,
   atmQuoteKey,
+  atmStopFields,
   buildAtmOrderPlan,
 } from './atm-order.util';
 
@@ -110,6 +111,78 @@ export class AtmOrderService {
       return { ok: false, orderId: null, message: describeOrderError(error) };
     }
   }
+
+  /**
+   * Rest a protective SELL stop on the same contract the Charts tab just bought.
+   * Charts-tab only — the live desk places its own stops and never reads these.
+   */
+  async placeStop(ticket: AtmOrderTicket, triggerPremium: number): Promise<AtmOrderResult> {
+    const authorization = this.kiteSession.getAuthorizationHeader();
+    if (!authorization) {
+      return { ok: false, orderId: null, message: 'Kite session required.' };
+    }
+    const fields = atmStopFields(ticket, triggerPremium);
+    if (!fields) {
+      return { ok: false, orderId: null, message: 'Could not rest a stop at that premium.' };
+    }
+    try {
+      const res = (await firstValueFrom(this.kiteApi.placeRegularOrder(authorization, fields))) as {
+        status?: string;
+        message?: string;
+        data?: { order_id?: string };
+      };
+      const orderId = res?.data?.order_id ?? null;
+      if (orderId) {
+        return { ok: true, orderId, message: `SL ${orderId} resting at ₹${fields.trigger_price}.` };
+      }
+      return {
+        ok: false,
+        orderId: null,
+        message: res?.message || 'Kite returned no stop order id. Check the order book.',
+      };
+    } catch (error) {
+      return { ok: false, orderId: null, message: describeOrderError(error) };
+    }
+  }
+
+  /**
+   * Average fill of a just-sent MARKET buy. Falls back to `fallback` if the
+   * order book has not caught up yet — the stop still has to rest.
+   */
+  async fillPrice(orderId: string | null, fallback: number | null): Promise<number | null> {
+    if (!orderId) return fallback;
+    const authorization = this.kiteSession.getAuthorizationHeader();
+    if (!authorization) return fallback;
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const price = await this.readAveragePrice(authorization, orderId);
+      if (price != null) return price;
+      await delay(350);
+    }
+    return fallback;
+  }
+
+  private async readAveragePrice(authorization: string, orderId: string): Promise<number | null> {
+    try {
+      const res = (await firstValueFrom(this.kiteApi.getOrderHistory(authorization, orderId))) as {
+        data?: Array<{ status?: string; average_price?: number | string }>;
+      };
+      const rows = Array.isArray(res?.data) ? res.data : [];
+      for (let i = rows.length - 1; i >= 0; i -= 1) {
+        const row = rows[i]!;
+        const px = Number(row.average_price);
+        if (/complete/i.test(String(row.status || '')) && px > 0) {
+          return px;
+        }
+      }
+    } catch {
+      // The stop can still rest off the quote we already showed.
+    }
+    return null;
+  }
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function describeOrderError(error: unknown): string {

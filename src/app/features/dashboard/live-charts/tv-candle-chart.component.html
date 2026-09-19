@@ -211,6 +211,16 @@
           }
         </em>
       </div>
+      <button
+        type="button"
+        class="tv-order-btn auto"
+        [class.on]="autoTrade"
+        [attr.aria-pressed]="autoTrade"
+        data-testid="tv-full-auto-trade"
+        (click)="toggleAutoTrade.emit()"
+      >
+        {{ autoTrade ? 'Auto on' : 'Auto Trade' }}
+      </button>
       @if (orderResult) {
         <span class="tv-order-result" [class.bad]="!orderResult.ok">{{ orderResult.text }}</span>
       }
