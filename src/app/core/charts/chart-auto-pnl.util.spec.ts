@@ -157,7 +157,9 @@ describe('structure paper P&L', () => {
     });
     const taken = replayChartAutoTrades([first, overlap, after], candles);
     expect(taken.map((b) => b.breakIndex)).toEqual([1, 4]);
-    expect(taken[0]!.toIndex).toBe(3);
+    // Bar 2 prints 110 — that is 0.5R (105). The bot books there and does not
+    // wait for the SL on bar 3.
+    expect(taken[0]!.toIndex).toBe(2);
   });
 
   it('names failed breaks, give-backs, and 0.5R books', () => {
