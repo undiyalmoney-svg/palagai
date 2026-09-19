@@ -133,7 +133,7 @@ export class AtmOrderService {
       };
       const orderId = res?.data?.order_id ?? null;
       if (orderId) {
-        return { ok: true, orderId, message: `SL ${orderId} resting at ₹${fields.trigger_price}.` };
+        return { ok: true, orderId, message: `SL ${orderId} resting at ₹${fields['trigger_price']}.` };
       }
       return {
         ok: false,
