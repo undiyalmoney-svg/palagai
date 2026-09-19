@@ -5,6 +5,90 @@
   gap: 0.6rem;
 }
 
+.charts-pnl {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(5.4rem, 1fr));
+  gap: 0.4rem;
+  width: 100%;
+}
+
+.pnl-caption {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 0.7rem;
+  font-weight: 650;
+  color: var(--pg-muted);
+}
+
+.pnl-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.08rem;
+  min-width: 0;
+  padding: 0.4rem 0.55rem;
+  border: 1px solid var(--pg-line);
+  border-radius: var(--pg-radius-sm);
+  background: var(--pg-bg-elevated);
+}
+
+.pnl-cell span {
+  font-size: 0.68rem;
+  font-weight: 650;
+  color: var(--pg-muted);
+}
+
+.pnl-cell strong {
+  font-family: var(--pg-font-mono);
+  font-size: 0.92rem;
+  letter-spacing: -0.02em;
+}
+
+.pnl-cell.up strong {
+  color: var(--pg-bull-deep);
+}
+
+.pnl-cell.down strong {
+  color: var(--pg-bear-deep);
+}
+
+.pnl-cell.total {
+  border-color: var(--pg-line-strong);
+}
+
+.auto-bot-row {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.chart-date {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.28rem 0.7rem;
+  border: 1px solid var(--pg-line);
+  border-radius: 999px;
+  background: var(--pg-bg-elevated);
+  color: var(--pg-muted);
+  font-size: 0.78rem;
+  font-weight: 650;
+}
+
+.chart-date input {
+  border: 0;
+  background: transparent;
+  color: var(--pg-ink);
+  font-family: var(--pg-font);
+  font-size: 0.78rem;
+  font-weight: 650;
+}
+
+.market-badge.bot-on {
+  border-color: #fecaca;
+  background: #fff1f2;
+  color: #be123c;
+}
+
 .charts-funds {
   display: flex;
   flex-direction: column;
@@ -69,6 +153,8 @@
 
 .charts-actions {
   display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 0.4rem;
 }
 
@@ -387,6 +473,10 @@
 
   .chart-quote {
     align-items: flex-start;
+  }
+
+  .charts-pnl {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 

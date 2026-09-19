@@ -4,6 +4,7 @@ import { SrZone } from './sr-chart.util';
 import {
   canAutoEnter,
   chartStructureKey,
+  detectAllChartStructures,
   detectChartStructure,
   optionStopTrigger,
 } from './chart-structure.util';
@@ -175,6 +176,28 @@ describe('detectChartStructure', () => {
       [100, 101.2, 99.9, 101.1],
     ]);
     expect(detectChartStructure(candles, [resistance(100.5, 101)], 10)).toBeNull();
+  });
+});
+
+describe('detectAllChartStructures', () => {
+  it('keeps every 1:1 break on the series, latest last', () => {
+    const candles = series([
+      [100, 101, 96, 100],
+      [100, 110, 100, 109],
+      [109, 110, 108, 109],
+      [109, 109, 94, 95],
+    ]);
+    const all = detectAllChartStructures(
+      candles,
+      [resistance(104, 106, 0), support(98, 100, 0)],
+      2,
+    );
+    expect(all.map((box) => box.option)).toEqual(['CE', 'PE']);
+    expect(all[0]).toMatchObject({ breakIndex: 1, option: 'CE', fresh: false });
+    expect(all[1]).toMatchObject({ breakIndex: 3, option: 'PE', fresh: true });
+    expect(detectChartStructure(candles, [resistance(104, 106, 0), support(98, 100, 0)], 2)).toEqual(
+      all[1],
+    );
   });
 });
 

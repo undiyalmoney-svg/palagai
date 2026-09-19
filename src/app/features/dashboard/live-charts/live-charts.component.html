@@ -8,7 +8,9 @@
         timeframe from 1 minute to 1 hour. When a closed candle breaks a support or
         resistance band, the chart paints the same 1:1 box as a measured move:
         pink is the stop, teal is the target, labelled Entry / SL / Exit. Trade from
-        that, or turn Auto Trade on and Charts will buy the ATM CE/PE and rest the SL.
+        that, or turn on Crude / Nifty / Bank Nifty auto bot and Charts will buy the
+        ATM CE/PE and rest the SL. Pick one date to test a past session — start and
+        end are the same day.
       </p>
     </div>
 
@@ -20,17 +22,71 @@
           · {{ lotsFor('crude') }} crude
         </span>
       </div>
+      <div class="charts-pnl" data-testid="chart-pnl">
+        <p class="pnl-caption">
+          Profit · {{ testDate() }}
+          @if (!liveDay()) {
+            · paper test
+          }
+        </p>
+        @for (book of botBooks; track book) {
+          <div
+            class="pnl-cell"
+            [class.up]="pnlTone(pnl().books[book].amount) === 'up'"
+            [class.down]="pnlTone(pnl().books[book].amount) === 'down'"
+          >
+            <span>{{ pnl().books[book].label }}</span>
+            <strong>₹{{ signed(pnl().books[book].amount, 0) }}</strong>
+          </div>
+        }
+        <div
+          class="pnl-cell total"
+          [class.up]="pnlTone(pnl().total) === 'up'"
+          [class.down]="pnlTone(pnl().total) === 'down'"
+        >
+          <span>Total</span>
+          <strong>₹{{ signed(pnl().total, 0) }}</strong>
+        </div>
+      </div>
       <div class="charts-actions">
+        <div class="auto-bot-row" role="group" aria-label="Auto bots">
+          @for (book of botBooks; track book) {
+            <button
+              type="button"
+              class="ghost-btn auto-trade"
+              [class.on]="autoBotOn(book)"
+              [attr.aria-pressed]="autoBotOn(book)"
+              [attr.data-testid]="'chart-auto-bot-' + book"
+              (click)="toggleAutoBot(book)"
+            >
+              <span>{{ autoBotOn(book) ? botLabels[book] + ' on' : botLabels[book] }}</span>
+            </button>
+          }
+        </div>
+        <label class="chart-date" data-testid="chart-test-date">
+          <span>Test date</span>
+          <input
+            type="date"
+            [value]="testDate()"
+            [max]="todayIst()"
+            (change)="onTestDateInput($event)"
+          />
+        </label>
+        @if (!liveDay()) {
+          <button type="button" class="ghost-btn" (click)="jumpToToday()">Today</button>
+        }
         <button
           type="button"
           class="ghost-btn"
-          [class.on]="autoRefresh()"
+          [class.on]="autoRefresh() && liveDay()"
           [attr.aria-pressed]="autoRefresh()"
           (click)="toggleAutoRefresh()"
         >
           <app-pg-icon name="activity" [size]="15" />
           <span>
-            @if (!autoRefresh()) {
+            @if (!liveDay()) {
+              Test · {{ testDate() }}
+            } @else if (!autoRefresh()) {
               Paused
             } @else if (anyMarketOpen()) {
               Live · {{ refreshSeconds() }}s
@@ -38,16 +94,6 @@
               Idle · markets shut
             }
           </span>
-        </button>
-        <button
-          type="button"
-          class="ghost-btn auto-trade"
-          [class.on]="autoTrade()"
-          [attr.aria-pressed]="autoTrade()"
-          data-testid="chart-auto-trade"
-          (click)="toggleAutoTrade()"
-        >
-          <span>{{ autoTrade() ? 'Auto Trade on' : 'Auto Trade' }}</span>
         </button>
         <button
           type="button"
@@ -95,6 +141,9 @@
               >
                 <i></i>{{ statusOf(pane).label }}
               </span>
+              @if (autoBotOn(pane.def.id)) {
+                <span class="market-badge bot-on">{{ botShort[pane.def.id] }} on</span>
+              }
             </div>
             <span class="chart-symbol">
               {{ pane.def.exchange }}:{{ pane.symbol }} ·
@@ -140,7 +189,11 @@
           }
         </div>
 
-        @if (!statusOf(pane).open) {
+        @if (!liveDay()) {
+          <p class="chart-note market-note" data-testid="chart-test-note">
+            Testing {{ testDate() }} (start and end are the same). Paper profit only — no live orders.
+          </p>
+        } @else if (!statusOf(pane).open) {
           <p class="chart-note market-note">{{ statusOf(pane).detail }}</p>
         }
 
@@ -156,18 +209,19 @@
           [signals]="pane.signals"
           [structure]="pane.structure"
           [decimals]="pane.def.decimals"
-          [resetKey]="pane.interval"
+          [resetKey]="pane.interval + '|' + testDate()"
           [emptyMessage]="pane.error ? 'Chart unavailable' : 'Waiting for candles…'"
-          [canOrder]="!!pane.model?.last && statusOf(pane).open"
+          [canOrder]="canPlaceOrders(pane)"
           [orderLots]="lotsFor(pane.def.id)"
           [maxOrderLots]="maxLots(pane.def.id)"
           [ordering]="pane.ordering"
-          [orderHint]="statusOf(pane).open ? '' : statusOf(pane).detail"
+          [orderHint]="orderHintFor(pane)"
           [orderResult]="pane.order"
-          [autoTrade]="autoTrade()"
+          [autoTrade]="autoBotOn(pane.def.id)"
+          [autoBotLabel]="botShort[pane.def.id]"
           (buyAtm)="buyAtm(pane.def.id, $event)"
           (adjustLots)="bumpLots(pane.def.id, $event)"
-          (toggleAutoTrade)="toggleAutoTrade()"
+          (toggleAutoTrade)="toggleAutoBot(pane.def.id)"
         />
 
         <div class="order-row">
@@ -175,8 +229,8 @@
             <button
               type="button"
               class="order-btn call"
-              [disabled]="!!pane.ordering || !pane.model?.last || !statusOf(pane).open"
-              [title]="statusOf(pane).open ? '' : statusOf(pane).detail"
+              [disabled]="!!pane.ordering || !canPlaceOrders(pane)"
+              [title]="orderHintFor(pane)"
               (click)="buyAtm(pane.def.id, 'CE')"
             >
               {{ pane.ordering === 'CE' ? 'Working…' : 'Buy ATM CE' }}
@@ -184,8 +238,8 @@
             <button
               type="button"
               class="order-btn put"
-              [disabled]="!!pane.ordering || !pane.model?.last || !statusOf(pane).open"
-              [title]="statusOf(pane).open ? '' : statusOf(pane).detail"
+              [disabled]="!!pane.ordering || !canPlaceOrders(pane)"
+              [title]="orderHintFor(pane)"
               (click)="buyAtm(pane.def.id, 'PE')"
             >
               {{ pane.ordering === 'PE' ? 'Working…' : 'Buy ATM PE' }}
@@ -213,10 +267,10 @@
                 +
               </button>
             </div>
-            @if (statusOf(pane).open) {
+            @if (canPlaceOrders(pane)) {
               <em>MIS · market</em>
             } @else {
-              <em>Buying resumes at {{ pane.session.marketOpen }} IST</em>
+              <em>{{ orderHintFor(pane) || ('Buying resumes at ' + pane.session.marketOpen + ' IST') }}</em>
             }
           </div>
         </div>
@@ -311,10 +365,13 @@
     (₹40,000 per index lot; Crude 3×). Use +/− on a card or in full view to
     change that lot count for the next order. It runs outside the Trade Bot: no
     premium cap, no daily loss stop. Manual Buy / Sell still has no stop —
-    you manage that exit. <strong>Auto Trade</strong> buys the CE or PE the 1:1
-    box names when that bar closes, then rests an SL on the option. Each manual
-    press still shows the exact contract, its live premium and the rupee cost
-    before anything is sent. The same Buy / Sell buttons sit in full chart view.
+    you manage that exit. <strong>Crude / Nifty / Bank Nifty auto bot</strong> each
+    buy the CE or PE the 1:1 box names when that bar closes, then rest an SL —
+    only on today's live session. A past date on the calendar is a paper test
+    (start and end are the same day) and the profit strip shows Crude Oil, Nifty,
+    Bank Nifty and the total. Each manual press still shows the exact contract,
+    its live premium and the rupee cost before anything is sent. The same Buy /
+    Sell buttons sit in full chart view.
   </p>
 
   @if (anyError() && !sessionExpired()) {

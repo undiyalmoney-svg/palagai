@@ -219,7 +219,7 @@
         data-testid="tv-full-auto-trade"
         (click)="toggleAutoTrade.emit()"
       >
-        {{ autoTrade ? 'Auto on' : 'Auto Trade' }}
+        {{ autoTrade ? autoBotLabel + ' on' : autoBotLabel }}
       </button>
       @if (orderResult) {
         <span class="tv-order-result" [class.bad]="!orderResult.ok">{{ orderResult.text }}</span>

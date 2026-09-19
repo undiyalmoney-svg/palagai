@@ -175,6 +175,7 @@ export class TvCandleChartComponent implements AfterViewInit, OnChanges, OnDestr
   @Input() orderHint = '';
   @Input() orderResult: { ok: boolean; text: string } | null = null;
   @Input() autoTrade = false;
+  @Input() autoBotLabel = 'Auto Trade';
   readonly buyAtm = output<AtmOptionSide>();
   readonly adjustLots = output<number>();
   readonly toggleAutoTrade = output<void>();

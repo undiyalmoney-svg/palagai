@@ -71,12 +71,12 @@ const DEFAULTS = {
   lookbackBars: 24,
 };
 
-export function detectChartStructure(
+export function detectAllChartStructures(
   candles: Candle[],
   zones: SrZone[],
   atr: number | null,
   options: ChartStructureOptions = {},
-): ChartStructure | null {
+): ChartStructure[] {
   const minHeightAtr = options.minHeightAtr ?? DEFAULTS.minHeightAtr;
   const lookbackBars = options.lookbackBars ?? DEFAULTS.lookbackBars;
   const series =
@@ -84,23 +84,34 @@ export function detectChartStructure(
       ? dropFormingBars(candles, options.now ?? new Date(), options.intervalMinutes)
       : candles;
   if (series.length < 2 || !zones.length) {
-    return null;
+    return [];
   }
 
   const minHeight = atr != null && atr > 0 ? atr * minHeightAtr : 0;
   const lastClosed = series.length - 1;
   const drawTo = Math.max(lastClosed, candles.length - 1);
+  const found: ChartStructure[] = [];
 
-  for (let i = lastClosed; i >= 1; i -= 1) {
+  for (let i = 1; i <= lastClosed; i += 1) {
     const built = bestBreakAt(series, zones, i, lookbackBars, minHeight, drawTo);
     if (!built) continue;
-    return {
+    found.push({
       ...built,
       status: structureStatus(built, candles),
       fresh: i === lastClosed,
-    };
+    });
   }
-  return null;
+  return found;
+}
+
+export function detectChartStructure(
+  candles: Candle[],
+  zones: SrZone[],
+  atr: number | null,
+  options: ChartStructureOptions = {},
+): ChartStructure | null {
+  const found = detectAllChartStructures(candles, zones, atr, options);
+  return found.length ? found[found.length - 1]! : null;
 }
 
 /** Idempotent key so Auto Trade cannot send the same break twice. */
