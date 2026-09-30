@@ -163,7 +163,7 @@ export class DecisionResultComponent {
   readonly executeAll = output<void>();
 
   protected readonly open = signal<string | null>(null);
-  protected readonly showWait = signal(false);
+  protected readonly showWait = signal(true);
 
   protected readonly inr = inr;
   protected readonly num = num;
