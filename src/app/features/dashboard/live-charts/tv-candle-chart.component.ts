@@ -1,12 +1,12 @@
 /**
- * TradingView-style candlestick panel: candles, S/R zone boxes, pivot
- * connection lines, a right-hand price axis with level tags, and a crosshair
- * with an OHLC legend.
+ * TradingView-style candlestick panel: candles, the Smart Money Concepts
+ * overlay (see smc-chart-painter), a right-hand price axis with trade-level
+ * tags, and a crosshair with an OHLC legend.
  *
  * Only a window of the series is drawn at a time — see chart-viewport.util —
  * so candles stay readable on a phone and can be zoomed and panned.
  *
- * Canvas 2D and no charting dependency, matching sr-structure-chart.component
+ * Canvas 2D and no charting dependency, matching the Trade Bot's structure chart
  * — the desk ships no chart library and one 176KB bundle budget is not worth a
  * second renderer.
  */
@@ -24,9 +24,9 @@ import {
   signal,
 } from '@angular/core';
 import { Candle } from '../../../core/models/candle.model';
-import { SrChartModel, SrZone } from '../../../core/charts/sr-chart.util';
-import { ChartStructure } from '../../../core/charts/chart-structure.util';
-import { SrConfidenceBand, SrSignal } from '../../../core/charts/sr-signals.util';
+import { SmcAnalysis } from '../../../core/charts/smc/smc.types';
+import { SmcLayers, defaultSmcSettings } from '../../../core/charts/smc/smc-settings';
+import { focusTrades, paintSmcOver, paintSmcUnder, smcNoteAt } from './smc-chart-painter';
 import { AtmOptionSide } from '../../../core/orders/atm-order.util';
 import {
   Viewport,
@@ -55,53 +55,14 @@ const COLORS = {
   crosshair: '#9598a1',
   lastUp: '#26a69a',
   lastDown: '#ef5350',
-  supportFill: 'rgba(38, 166, 154, 0.20)',
-  supportEdge: 'rgba(38, 166, 154, 0.75)',
-  supportTagBg: 'rgba(38, 166, 154, 0.85)',
-  supportInk: '#ffffff',
-  resistanceFill: 'rgba(239, 83, 80, 0.20)',
-  resistanceEdge: 'rgba(239, 83, 80, 0.75)',
-  resistanceTagBg: 'rgba(239, 83, 80, 0.85)',
-  resistanceInk: '#ffffff',
   legendInk: '#131722',
-  // Deeper than the candle bodies so an arrow never reads as another wick.
-  signalBuy: '#00897b',
-  signalSell: '#d32f2f',
-  /** Laid under a marker caption so it stays readable over the candles. */
-  signalHalo: 'rgba(255, 255, 255, 0.86)',
-  pinkFill: 'rgba(244, 114, 182, 0.30)',
-  tealFill: 'rgba(45, 212, 191, 0.30)',
-  wall: '#0f172a',
-  slInk: '#be185d',
-  slBg: 'rgba(244, 114, 182, 0.92)',
-  exitInk: '#0f766e',
-  exitBg: 'rgba(45, 212, 191, 0.92)',
-  entryInk: '#ffffff',
+  slBg: 'rgba(211, 47, 47, 0.92)',
   entryBg: '#0f172a',
+  tpBg: 'rgba(0, 137, 123, 0.92)',
 } as const;
 
 const FONT = '11px ui-sans-serif, system-ui, -apple-system, sans-serif';
 const FONT_BOLD = '600 11px ui-sans-serif, system-ui, -apple-system, sans-serif';
-const FONT_ZONE = '600 9px ui-sans-serif, system-ui, -apple-system, sans-serif';
-const FONT_SIGNAL = '600 9px ui-sans-serif, system-ui, -apple-system, sans-serif';
-const FONT_SIGNAL_H = 9;
-/** Marker geometry, and the clearance it keeps from the wick it belongs to. */
-const SIGNAL_W = 9;
-const SIGNAL_H = 8;
-const SIGNAL_GAP = 7;
-/**
- * A weak marker is drawn faint so the eye lands on the strong ones first.
- * Never fully transparent: the arrow still has to be findable once seen.
- */
-const SIGNAL_ALPHA: Record<SrConfidenceBand, number> = {
-  high: 1,
-  medium: 0.72,
-  low: 0.45,
-};
-/** Thin levels still need a band with presence. */
-const MIN_ZONE_H = 6;
-/** Below this the label would not fit inside the band. */
-const ZONE_LABEL_MIN_H = 15;
 
 const PAD = { top: 14, right: 68, bottom: 26, left: 8 } as const;
 /** Axis pill height; also the minimum gap two axis labels may sit apart. */
@@ -126,14 +87,6 @@ interface AxisTag {
   ink: string;
 }
 
-/** Screen rectangle a caption occupies, for collision tests. */
-interface LabelBox {
-  x0: number;
-  x1: number;
-  y0: number;
-  y1: number;
-}
-
 export interface TvCrosshairBar {
   date: string;
   open: number;
@@ -141,8 +94,8 @@ export interface TvCrosshairBar {
   low: number;
   close: number;
   changePct: number | null;
-  /** Signal that fired on this bar, so the legend can explain its score. */
-  signal: SrSignal | null;
+  /** What the SMC engine did on this bar: breaks, entries, exits. */
+  notes: string[];
 }
 
 @Component({
@@ -153,17 +106,17 @@ export interface TvCrosshairBar {
 })
 export class TvCandleChartComponent implements AfterViewInit, OnChanges, OnDestroy {
   @Input() candles: Candle[] = [];
-  @Input() model: SrChartModel | null = null;
+  /** SMC engine output for these candles; null before the first analysis. */
+  @Input() smc: SmcAnalysis | null = null;
+  @Input() layers: SmcLayers = defaultSmcSettings().layers;
+  /** Colours the last-price line and tag. */
+  @Input() changeUp: boolean | null = null;
+  /** Name of the higher timeframe, for the trend badge. */
+  @Input() htfLabel = '1h';
   @Input() decimals = 2;
   /** Fallback only; the wrapper's CSS height wins so it can be responsive. */
   @Input() height = 340;
   @Input() emptyMessage = 'No candles yet.';
-  /** Chart annotations, not orders — see sr-signals.util for what they mean. */
-  @Input() signals: SrSignal[] = [];
-  /** Live 1:1 measured-move box (pink SL, teal EXIT) drawn on this pane. */
-  @Input() structure: ChartStructure | null = null;
-  /** Every auto-bot 1:1 on the selected day — drawn so P&L matches the entries. */
-  @Input() structures: ChartStructure[] = [];
   /**
    * Changing this throws the zoom away and refits. The parent passes the
    * interval, because 30 bars of 15m and 30 bars of 1m are not the same view.
@@ -176,11 +129,8 @@ export class TvCandleChartComponent implements AfterViewInit, OnChanges, OnDestr
   @Input() ordering: AtmOptionSide | null = null;
   @Input() orderHint = '';
   @Input() orderResult: { ok: boolean; text: string } | null = null;
-  @Input() autoTrade = false;
-  @Input() autoBotLabel = 'Auto Trade';
   readonly buyAtm = output<AtmOptionSide>();
   readonly adjustLots = output<number>();
-  readonly toggleAutoTrade = output<void>();
 
   @ViewChild('canvas', { static: true }) canvasRef?: ElementRef<HTMLCanvasElement>;
 
@@ -209,8 +159,6 @@ export class TvCandleChartComponent implements AfterViewInit, OnChanges, OnDestr
   protected readonly crosshairMode = signal(false);
 
   private ro: ResizeObserver | null = null;
-  /** Zone caption boxes from the current paint, for signal labels to dodge. */
-  private zoneLabelBoxes: LabelBox[] = [];
   private crosshairIndex: number | null = null;
   private crosshairY: number | null = null;
   private frame: number | null = null;
@@ -643,7 +591,7 @@ export class TvCandleChartComponent implements AfterViewInit, OnChanges, OnDestr
             low: bar.low,
             close: bar.close,
             changePct: bar.open !== 0 ? ((bar.close - bar.open) / bar.open) * 100 : null,
-            signal: this.signals.find((s) => s.index === this.crosshairIndex) ?? null,
+            notes: smcNoteAt(this.smc, this.crosshairIndex!),
           }
         : null,
     );
@@ -665,34 +613,16 @@ export class TvCandleChartComponent implements AfterViewInit, OnChanges, OnDestr
     });
   }
 
+  protected trendText(trend: string): string {
+    return trend === 'sideways' ? 'SIDEWAYS' : trend.toUpperCase();
+  }
+
   protected fmt(value: number | null | undefined, decimals = this.decimals): string {
     if (value == null || !Number.isFinite(value)) return '—';
     return value.toLocaleString('en-IN', {
       minimumFractionDigits: decimals,
       maximumFractionDigits: decimals,
     });
-  }
-
-  private boxes(): ChartStructure[] {
-    if (this.structures.length) return this.structures;
-    return this.structure ? [this.structure] : [];
-  }
-
-  /** The one thing that earned this signal most of its score. */
-  protected topFactor(signal: SrSignal): string {
-    return signal.factors[0]?.label ?? '';
-  }
-
-  /** Full breakdown on hover, so the percentage is never just asserted. */
-  protected factorTooltip(signal: SrSignal): string {
-    const lines = signal.factors.map(
-      (f) => `${f.label}: ${Math.round(f.score * 100)}% (weight ${Math.round(f.weight * 100)}%)`,
-    );
-    return [
-      `${signal.side} ${signal.label} — ${signal.confidence}% setup quality`,
-      ...lines,
-      'Scores how textbook the setup looks. Not a win rate.',
-    ].join('\n');
   }
 
   private draw(): void {
@@ -738,7 +668,6 @@ export class TvCandleChartComponent implements AfterViewInit, OnChanges, OnDestr
     const windowBars = bars.slice(first, last + 1);
     this.publishViewState(view, bars.length);
 
-    const zones = this.model?.zones ?? [];
     // The scale follows the window, so zooming in opens the price action up
     // rather than keeping it squashed against the full range.
     const { min, max } = this.priceRange(windowBars, first, last);
@@ -757,26 +686,39 @@ export class TvCandleChartComponent implements AfterViewInit, OnChanges, OnDestr
 
     // Axis pills are laid out before anything is painted so a level label can
     // never sit on top of the last-price label.
-    const tags = this.layoutAxisTags(bars, zones, yOf, axisDecimals, plotH, first, last);
+    const tags = this.layoutAxisTags(bars, yOf, plotH, first, last);
 
     this.drawGrid(ctx, plotW, plotH, ticks, yOf, axisDecimals, tags);
 
     // Everything price-scaled is clipped to the plot: the scale fits the
-    // candles, so a zone or pivot line may legitimately fall off the edge and
-    // must not paint over the axes.
+    // candles, so a level may legitimately fall off the edge and must not
+    // paint over the axes.
+    const frame = this.smc
+      ? {
+          ctx,
+          bars,
+          smc: this.smc,
+          layers: this.layers,
+          xOf,
+          yOf,
+          slotW,
+          first,
+          last,
+          left: PAD.left,
+          right: PAD.left + plotW,
+          top: PAD.top,
+          bottom: PAD.top + plotH,
+        }
+      : null;
+    if (frame) paintSmcUnder(frame);
     ctx.save();
     ctx.beginPath();
     ctx.rect(PAD.left, PAD.top, plotW, plotH);
     ctx.clip();
-    this.drawZones(ctx, zones, xOf, yOf, plotW, slotW);
-    this.drawStructure(ctx, xOf, yOf, slotW, first, last);
-    this.drawLinks(ctx, xOf, yOf);
     this.drawCandles(ctx, bars, xOf, yOf, slotW, first, last);
-    this.drawZoneLabels(ctx, zones, xOf, yOf, plotW, slotW);
-    this.drawStructureLabels(ctx, xOf, yOf, slotW, first, last);
-    this.drawSignals(ctx, xOf, yOf, first, last, plotH);
     this.drawLastPriceLine(ctx, bars, plotW, yOf);
     ctx.restore();
+    if (frame) paintSmcOver(frame);
 
     for (const tag of tags) {
       this.axisTag(ctx, tag.y, cssW, tag.text, tag.bg, tag.ink);
@@ -792,140 +734,6 @@ export class TvCandleChartComponent implements AfterViewInit, OnChanges, OnDestr
     ctx.lineTo(PAD.left + plotW + 0.5, PAD.top + plotH);
     ctx.moveTo(PAD.left, PAD.top + plotH + 0.5);
     ctx.lineTo(PAD.left + plotW, PAD.top + plotH + 0.5);
-    ctx.stroke();
-  }
-
-  /**
-   * Buy / sell markers: a filled arrow just outside the bar it fired on,
-   * pointing the way the signal reads, with the pattern name beside it.
-   *
-   * Drawn after the candles so a marker is never buried by a body, and only for
-   * bars in the window so panning does not cost anything.
-   */
-  private drawSignals(
-    ctx: CanvasRenderingContext2D,
-    xOf: (i: number) => number,
-    yOf: (p: number) => number,
-    first: number,
-    last: number,
-    plotH: number,
-  ): void {
-    const signals = this.signals;
-    if (!signals.length) return;
-
-    ctx.font = FONT_SIGNAL;
-    ctx.textAlign = 'center';
-    const placed = [...this.zoneLabelBoxes];
-
-    for (const signal of signals) {
-      if (signal.index < first || signal.index > last) continue;
-      const buy = signal.side === 'BUY';
-      const x = xOf(signal.index);
-      const at = yOf(signal.price);
-      // Sit clear of the wick, and flip inside the frame near an edge so a
-      // marker on a bar at the top or bottom of the scale is still readable.
-      const outward = buy ? SIGNAL_GAP : -SIGNAL_GAP;
-      let tipY = at + outward;
-      if (tipY > PAD.top + plotH - SIGNAL_H || tipY < PAD.top + SIGNAL_H) {
-        tipY = at - outward;
-      }
-      const pointsDown = tipY < at;
-
-      const labelY = pointsDown ? tipY - SIGNAL_H - 3 : tipY + SIGNAL_H + 3;
-      // Pattern name first, but the score is the part worth keeping: when the
-      // full caption will not fit, shed the word rather than the percentage.
-      // The name is still one hover away in the legend.
-      const fitted = this.fitSignalLabel(
-        ctx,
-        [
-          `${signal.side} ${signal.label} ${signal.confidence}%`,
-          `${signal.side} ${signal.confidence}%`,
-          `${signal.confidence}%`,
-        ],
-        x,
-        tipY,
-        labelY,
-        placed,
-      );
-      if (fitted) placed.push(fitted.box);
-
-      const fill = buy ? COLORS.signalBuy : COLORS.signalSell;
-      ctx.globalAlpha = SIGNAL_ALPHA[signal.confidenceBand];
-      this.signalArrow(ctx, x, tipY, pointsDown, fill);
-
-      if (fitted) {
-        ctx.textBaseline = pointsDown ? 'bottom' : 'top';
-        // A caption often lands on top of the candles it describes, and 9px
-        // text over a wick is unreadable. Lay the chart background under it.
-        const w = ctx.measureText(fitted.text).width;
-        ctx.fillStyle = COLORS.signalHalo;
-        ctx.fillRect(
-          fitted.x - w / 2 - 2,
-          (pointsDown ? labelY - FONT_SIGNAL_H : labelY) - 1,
-          w + 4,
-          FONT_SIGNAL_H + 2,
-        );
-        ctx.fillStyle = fill;
-        ctx.fillText(fitted.text, fitted.x, labelY);
-      }
-      ctx.globalAlpha = 1;
-    }
-
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'alphabetic';
-  }
-
-  /**
-   * First caption from `candidates` that clears everything already drawn.
-   *
-   * Two markers a bar apart would otherwise print on top of each other when
-   * zoomed out. Null means even the shortest form collided, and only the arrow
-   * is drawn — a smudge of overlapping text reads worse than no text.
-   */
-  private fitSignalLabel(
-    ctx: CanvasRenderingContext2D,
-    candidates: string[],
-    x: number,
-    tipY: number,
-    labelY: number,
-    placed: LabelBox[],
-  ): { text: string; x: number; box: LabelBox } | null {
-    for (const text of candidates) {
-      const w = ctx.measureText(text).width;
-      // A marker on one of the first or last visible bars would otherwise have
-      // its caption sliced off by the frame.
-      const cx = clampNumber(x, PAD.left + w / 2 + 2, PAD.left + this.plotW - w / 2 - 2);
-      const box = {
-        x0: cx - Math.max(w, SIGNAL_W) / 2 - 2,
-        x1: cx + Math.max(w, SIGNAL_W) / 2 + 2,
-        y0: Math.min(tipY, labelY) - FONT_SIGNAL_H,
-        y1: Math.max(tipY, labelY) + FONT_SIGNAL_H,
-      };
-      if (!placed.some((p) => overlaps(p, box))) {
-        return { text, x: cx, box };
-      }
-    }
-    return null;
-  }
-
-  private signalArrow(
-    ctx: CanvasRenderingContext2D,
-    x: number,
-    tipY: number,
-    pointsDown: boolean,
-    fill: string,
-  ): void {
-    const dir = pointsDown ? 1 : -1;
-    ctx.beginPath();
-    ctx.moveTo(x, tipY);
-    ctx.lineTo(x - SIGNAL_W / 2, tipY - dir * SIGNAL_H);
-    ctx.lineTo(x + SIGNAL_W / 2, tipY - dir * SIGNAL_H);
-    ctx.closePath();
-    ctx.fillStyle = fill;
-    ctx.fill();
-    // A hairline of background keeps the arrow off the wick it belongs to.
-    ctx.strokeStyle = COLORS.bg;
-    ctx.lineWidth = 1;
     ctx.stroke();
   }
 
@@ -951,9 +759,10 @@ export class TvCandleChartComponent implements AfterViewInit, OnChanges, OnDestr
   /**
    * Fit the scale to the visible candles and pad so nothing touches the frame.
    *
-   * Zones are deliberately excluded: a level 6 ATR away would otherwise zoom
-   * the panel out and flatten the price action. Out-of-range zones clip instead,
-   * which is what TradingView does with a drawing off the visible scale.
+   * Only a live trade's entry and stop widen the scale. Zones and targets are
+   * deliberately excluded: a level 6 ATR away would otherwise zoom the panel
+   * out and flatten the price action. They clip instead, which is what
+   * TradingView does with a drawing off the visible scale.
    */
   private priceRange(bars: Candle[], first: number, last: number): { min: number; max: number } {
     let min = Infinity;
@@ -962,10 +771,13 @@ export class TvCandleChartComponent implements AfterViewInit, OnChanges, OnDestr
       if (b.low < min) min = b.low;
       if (b.high > max) max = b.high;
     }
-    for (const box of this.boxes()) {
-      if (box.toIndex >= first && box.fromIndex <= last) {
-        min = Math.min(min, box.sl, box.exit, box.wall);
-        max = Math.max(max, box.sl, box.exit, box.wall);
+    if (this.smc && this.layers.levels) {
+      for (const t of focusTrades(this.smc)) {
+        const end = t.status === 'open' ? Infinity : (t.exitIndex ?? Infinity);
+        if (end >= first && t.entryIndex <= last) {
+          min = Math.min(min, t.sl, t.entryPrice);
+          max = Math.max(max, t.sl, t.entryPrice);
+        }
       }
     }
     if (!Number.isFinite(min) || !Number.isFinite(max)) {
@@ -981,20 +793,18 @@ export class TvCandleChartComponent implements AfterViewInit, OnChanges, OnDestr
   }
 
   /**
-   * Price-axis pills: the live price always wins, then S/R levels strongest
-   * first, and anything that would collide is dropped rather than drawn over.
+   * Price-axis pills: the live price always wins, then the working trade's
+   * levels, and anything that would collide is dropped rather than drawn over.
    */
   private layoutAxisTags(
     bars: Candle[],
-    zones: SrZone[],
     yOf: (p: number) => number,
-    axisDecimals: number,
     plotH: number,
     first: number,
     last: number,
   ): AxisTag[] {
     const lastBar = bars[bars.length - 1]!;
-    const up = this.model?.changeAbs == null ? lastBar.close >= lastBar.open : this.model.changeAbs >= 0;
+    const up = this.changeUp ?? lastBar.close >= lastBar.open;
     const lastY = yOf(lastBar.close);
     const tags: AxisTag[] = [];
     // Panning back can put the live price off the window's scale, and a pill
@@ -1008,43 +818,16 @@ export class TvCandleChartComponent implements AfterViewInit, OnChanges, OnDestr
       });
     }
 
-    const box = this.boxes().at(-1);
-    if (box && box.toIndex >= first && box.fromIndex <= last) {
-      this.pushAxisTag(tags, yOf(box.entry), plotH, 'ENTRY', COLORS.entryBg, COLORS.entryInk);
-      this.pushAxisTag(
-        tags,
-        yOf(box.sl),
-        plotH,
-        box.status === 'hit_sl' ? 'SL HIT' : 'SL',
-        COLORS.slBg,
-        '#ffffff',
-      );
-      this.pushAxisTag(
-        tags,
-        yOf(box.exit),
-        plotH,
-        box.status === 'hit_exit' ? 'EXIT HIT' : 'EXIT',
-        COLORS.exitBg,
-        COLORS.exitInk,
-      );
-    }
-
-    for (const zone of zones) {
-      const y = yOf(zone.mid);
-      // A zone clipped off the scale gets no axis label either.
-      if (y < PAD.top || y > PAD.top + plotH) {
-        continue;
+    const trade = this.smc && this.layers.levels ? focusTrades(this.smc).at(-1) : undefined;
+    if (trade) {
+      const end = trade.status === 'open' ? Infinity : (trade.exitIndex ?? Infinity);
+      if (end >= first && trade.entryIndex <= last) {
+        this.pushAxisTag(tags, yOf(trade.entryPrice), plotH, 'ENTRY', COLORS.entryBg, '#ffffff');
+        this.pushAxisTag(tags, yOf(trade.slNow), plotH, 'SL', COLORS.slBg, '#ffffff');
+        this.pushAxisTag(tags, yOf(trade.tpFinal), plotH, 'FINAL TP', COLORS.tpBg, '#ffffff');
+        this.pushAxisTag(tags, yOf(trade.tp2), plotH, 'TP2', COLORS.tpBg, '#ffffff');
+        this.pushAxisTag(tags, yOf(trade.tp1), plotH, 'TP1', COLORS.tpBg, '#ffffff');
       }
-      if (tags.some((t) => Math.abs(t.y - y) < TAG_H + 1)) {
-        continue;
-      }
-      const support = zone.kind === 'support';
-      tags.push({
-        y,
-        text: this.fmt(zone.mid, axisDecimals),
-        bg: support ? 'rgba(38, 166, 154, 0.16)' : 'rgba(239, 83, 80, 0.16)',
-        ink: support ? '#0f766e' : '#b91c1c',
-      });
     }
     return tags;
   }
@@ -1060,105 +843,6 @@ export class TvCandleChartComponent implements AfterViewInit, OnChanges, OnDestr
     if (y < PAD.top || y > PAD.top + plotH) return;
     if (tags.some((t) => Math.abs(t.y - y) < TAG_H + 1)) return;
     tags.push({ y, text, bg, ink });
-  }
-
-  private drawStructure(
-    ctx: CanvasRenderingContext2D,
-    xOf: (i: number) => number,
-    yOf: (p: number) => number,
-    slotW: number,
-    first: number,
-    last: number,
-  ): void {
-    for (const box of this.boxes()) {
-      if (box.toIndex < first || box.fromIndex > last) continue;
-
-      const fill = (band: { lo: number; hi: number; fromIndex: number; toIndex: number }, color: string) => {
-        const x0 = Math.max(PAD.left, xOf(Math.max(first, band.fromIndex)) - slotW / 2);
-        const x1 = Math.min(PAD.left + this.plotW, xOf(Math.min(last, band.toIndex)) + slotW / 2);
-        const y0 = yOf(band.hi);
-        const y1 = yOf(band.lo);
-        ctx.fillStyle = color;
-        ctx.fillRect(x0, y0, Math.max(4, x1 - x0), Math.max(2, y1 - y0));
-      };
-      fill(box.pink, COLORS.pinkFill);
-      fill(box.teal, COLORS.tealFill);
-
-      const x0 = Math.max(PAD.left, xOf(Math.max(first, box.fromIndex)) - slotW / 2);
-      const x1 = Math.min(PAD.left + this.plotW, xOf(Math.min(last, box.toIndex)) + slotW / 2);
-      ctx.strokeStyle = COLORS.wall;
-      ctx.lineWidth = 1.4;
-      ctx.beginPath();
-      ctx.moveTo(x0, Math.round(yOf(box.wall)) + 0.5);
-      ctx.lineTo(x1, Math.round(yOf(box.wall)) + 0.5);
-      ctx.stroke();
-    }
-  }
-
-  private drawStructureLabels(
-    ctx: CanvasRenderingContext2D,
-    xOf: (i: number) => number,
-    yOf: (p: number) => number,
-    slotW: number,
-    first: number,
-    last: number,
-  ): void {
-    for (const box of this.boxes()) {
-      if (box.toIndex < first || box.fromIndex > last) continue;
-
-      const x0 = Math.max(PAD.left, xOf(Math.max(first, box.fromIndex)) - slotW / 2);
-      const entryX = clampNumber(xOf(box.breakIndex), PAD.left + 4, PAD.left + this.plotW - 4);
-      this.structurePill(
-        ctx,
-        x0 + 4,
-        yOf(box.sl),
-        box.status === 'hit_sl' ? 'SL HIT' : 'SL',
-        COLORS.slBg,
-        '#ffffff',
-        box.dir > 0 ? 'above' : 'below',
-      );
-      this.structurePill(
-        ctx,
-        x0 + 4,
-        yOf(box.exit),
-        box.status === 'hit_exit' ? 'EXIT HIT' : 'EXIT',
-        COLORS.exitBg,
-        COLORS.exitInk,
-        box.dir > 0 ? 'below' : 'above',
-      );
-      this.structurePill(
-        ctx,
-        entryX + 8,
-        yOf(box.entry),
-        'ENTRY',
-        COLORS.entryBg,
-        COLORS.entryInk,
-        'center',
-      );
-    }
-  }
-
-  private structurePill(
-    ctx: CanvasRenderingContext2D,
-    x: number,
-    y: number,
-    text: string,
-    bg: string,
-    ink: string,
-    align: 'above' | 'below' | 'center',
-  ): void {
-    ctx.font = FONT_ZONE;
-    const w = ctx.measureText(text).width + 8;
-    const h = 13;
-    const left = clampNumber(x, PAD.left + 2, PAD.left + this.plotW - w - 2);
-    const top =
-      align === 'above' ? y - h - 2 : align === 'below' ? y + 2 : y - h / 2;
-    ctx.fillStyle = bg;
-    ctx.fillRect(left, top, w, h);
-    ctx.fillStyle = ink;
-    ctx.textBaseline = 'middle';
-    ctx.fillText(text, left + 4, top + h / 2);
-    ctx.textBaseline = 'alphabetic';
   }
 
   private drawGrid(
@@ -1190,129 +874,6 @@ export class TvCandleChartComponent implements AfterViewInit, OnChanges, OnDestr
       ctx.fillText(this.fmt(price, axisDecimals), PAD.left + plotW + 6, y);
     }
     ctx.textBaseline = 'alphabetic';
-  }
-
-  private drawZones(
-    ctx: CanvasRenderingContext2D,
-    zones: SrZone[],
-    xOf: (i: number) => number,
-    yOf: (p: number) => number,
-    plotW: number,
-    slotW: number,
-  ): void {
-    for (const zone of zones) {
-      const support = zone.kind === 'support';
-      const x0 = Math.max(PAD.left, xOf(zone.fromIndex) - slotW / 2);
-      // Bands run to the right edge so they carry through the empty margin,
-      // which is what makes a level readable as something price may return to.
-      const x1 = PAD.left + plotW;
-      const yTop = yOf(zone.hi);
-      const yBot = yOf(zone.lo);
-      // A one-tick level still has to be a band you can see.
-      const h = Math.max(MIN_ZONE_H, yBot - yTop);
-      const top = yBot - yTop < MIN_ZONE_H ? (yTop + yBot) / 2 - MIN_ZONE_H / 2 : yTop;
-
-      ctx.fillStyle = support ? COLORS.supportFill : COLORS.resistanceFill;
-      ctx.fillRect(x0, top, Math.max(6, x1 - x0), h);
-
-      // Edges only — a mid rule inside a thin band reads as clutter.
-      ctx.strokeStyle = support ? COLORS.supportEdge : COLORS.resistanceEdge;
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(x0, Math.round(top) + 0.5);
-      ctx.lineTo(x1, Math.round(top) + 0.5);
-      ctx.moveTo(x0, Math.round(top + h) + 0.5);
-      ctx.lineTo(x1, Math.round(top + h) + 0.5);
-      ctx.stroke();
-
-    }
-  }
-
-  /**
-   * Labels go on after the candles. Drawn with the bands they were painted
-   * over by any candle crossing the level, which chopped the text in half.
-   */
-  private drawZoneLabels(
-    ctx: CanvasRenderingContext2D,
-    zones: SrZone[],
-    xOf: (i: number) => number,
-    yOf: (p: number) => number,
-    plotW: number,
-    slotW: number,
-  ): void {
-    const placed: { x0: number; x1: number; y0: number; y1: number }[] = [];
-    for (const zone of zones) {
-      const x0 = Math.max(PAD.left, xOf(zone.fromIndex) - slotW / 2);
-      const x1 = PAD.left + plotW;
-      const yTop = yOf(zone.hi);
-      const yBot = yOf(zone.lo);
-      const h = Math.max(MIN_ZONE_H, yBot - yTop);
-      const top = yBot - yTop < MIN_ZONE_H ? (yTop + yBot) / 2 - MIN_ZONE_H / 2 : yTop;
-      this.zoneLabel(ctx, zone.kind === 'support', x0, top, h, x1, placed);
-    }
-    // Signal captions are drawn next and must dodge these, or a "BUY Bounce"
-    // lands on the SUPPORT tag of the very band that produced it.
-    this.zoneLabelBoxes = placed;
-  }
-
-  /**
-   * Name the band, as TradingView's zone indicators do — but only when it
-   * fits and would not land on a label already drawn. Two nearby levels were
-   * otherwise printing one on top of the other and both became unreadable.
-   */
-  private zoneLabel(
-    ctx: CanvasRenderingContext2D,
-    support: boolean,
-    x0: number,
-    top: number,
-    h: number,
-    x1: number,
-    placed: { x0: number; x1: number; y0: number; y1: number }[],
-  ): void {
-    if (h < ZONE_LABEL_MIN_H) return;
-    const text = support ? 'SUPPORT' : 'RESISTANCE';
-    ctx.font = FONT_ZONE;
-    const w = ctx.measureText(text).width + 8;
-    const left = x0 + 2;
-    if (x1 - left < w + 4) return;
-
-    const box = { x0: left, x1: left + w, y0: top + h / 2 - 6.5, y1: top + h / 2 + 6.5 };
-    if (placed.some((p) => overlaps(p, box))) return;
-    placed.push(box);
-
-    ctx.fillStyle = support ? COLORS.supportTagBg : COLORS.resistanceTagBg;
-    ctx.fillRect(box.x0, box.y0, w, 13);
-    ctx.fillStyle = support ? COLORS.supportInk : COLORS.resistanceInk;
-    ctx.textBaseline = 'middle';
-    ctx.fillText(text, box.x0 + 4, top + h / 2);
-    ctx.textBaseline = 'alphabetic';
-  }
-
-  private drawLinks(
-    ctx: CanvasRenderingContext2D,
-    xOf: (i: number) => number,
-    yOf: (p: number) => number,
-  ): void {
-    const links = this.model?.links ?? [];
-    // Structure lines are context, not the subject. Near-black at 1.3px read
-    // as the main content and buried the candles and zones.
-    ctx.strokeStyle = COLORS.link;
-    ctx.lineWidth = 1;
-    for (const link of links) {
-      ctx.beginPath();
-      ctx.moveTo(xOf(link.fromIndex), yOf(link.fromPrice));
-      ctx.lineTo(xOf(link.toIndex), yOf(link.toPrice));
-      ctx.stroke();
-    }
-
-    // Pivot handles, so it is obvious which bar anchored each line.
-    const pivots = this.model?.pivots ?? [];
-    for (const pivot of pivots) {
-      ctx.fillStyle = COLORS.pivot;
-      ctx.beginPath();
-      ctx.arc(xOf(pivot.index), yOf(pivot.price), 1.8, 0, Math.PI * 2);
-      ctx.fill();
-    }
   }
 
   private drawCandles(
@@ -1354,7 +915,7 @@ export class TvCandleChartComponent implements AfterViewInit, OnChanges, OnDestr
   ): void {
     const last = bars[bars.length - 1]!;
     const y = yOf(last.close);
-    const up = this.model?.changeAbs == null ? last.close >= last.open : this.model.changeAbs >= 0;
+    const up = this.changeUp ?? last.close >= last.open;
 
     ctx.strokeStyle = up ? COLORS.lastUp : COLORS.lastDown;
     ctx.lineWidth = 1;

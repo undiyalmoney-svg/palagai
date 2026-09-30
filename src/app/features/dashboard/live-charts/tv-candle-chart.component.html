@@ -14,15 +14,13 @@
         >
           {{ (bar.changePct ?? 0) >= 0 ? '+' : '' }}{{ fmt(bar.changePct, 2) }}%
         </span>
-        @if (bar.signal; as sig) {
+        @for (note of bar.notes; track note) {
           <span
             class="tv-legend-signal"
-            [class.buy]="sig.side === 'BUY'"
-            [class.sell]="sig.side === 'SELL'"
-            [title]="factorTooltip(sig)"
+            [class.buy]="note.startsWith('BUY') || note.startsWith('Bullish')"
+            [class.sell]="note.startsWith('SELL') || note.startsWith('Bearish')"
           >
-            {{ sig.side }} {{ sig.label }} · {{ sig.confidence }}%
-            <i>{{ topFactor(sig) }}</i>
+            {{ note }}
           </span>
         }
       } @else if (crosshairMode()) {
@@ -136,6 +134,18 @@
     (mouseleave)="onPointerLeave()"
     (wheel)="onWheel($event)"
   >
+    @if (smc; as analysis) {
+      <div class="tv-smc-badge" data-testid="smc-trend-badge">
+        <span class="tv-trend" [attr.data-trend]="analysis.snapshot.trend">
+          Trend: {{ trendText(analysis.snapshot.trend) }}
+        </span>
+        @if (analysis.snapshot.htfTrend; as htf) {
+          <span class="tv-trend-sub">
+            {{ htfLabel }} {{ trendText(htf) }} · entry {{ trendText(analysis.snapshot.ltfTrend) }}
+          </span>
+        }
+      </div>
+    }
     <canvas
       #canvas
       (touchstart)="onTouchStart($event)"
@@ -211,16 +221,6 @@
           }
         </em>
       </div>
-      <button
-        type="button"
-        class="tv-order-btn auto"
-        [class.on]="autoTrade"
-        [attr.aria-pressed]="autoTrade"
-        data-testid="tv-full-auto-trade"
-        (click)="toggleAutoTrade.emit()"
-      >
-        {{ autoTrade ? autoBotLabel + ' on' : autoBotLabel }}
-      </button>
       @if (orderResult) {
         <span class="tv-order-result" [class.bad]="!orderResult.ok">{{ orderResult.text }}</span>
       }

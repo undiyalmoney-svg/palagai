@@ -1,0 +1,125 @@
+.smc-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-top: 0.7rem;
+  font-size: 0.78rem;
+}
+
+.smc-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(8.6rem, 1fr));
+  gap: 0.35rem;
+  margin: 0;
+}
+
+.smc-grid > div {
+  min-width: 0;
+  padding: 0.35rem 0.55rem;
+  border: 1px solid var(--pg-line);
+  border-radius: var(--pg-radius-sm);
+  background: var(--pg-bg-elevated);
+}
+
+dt {
+  font-size: 0.64rem;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--pg-muted);
+}
+
+dd {
+  margin: 0.1rem 0 0;
+  font-family: var(--pg-font-mono);
+  font-size: 0.86rem;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+dd small {
+  display: block;
+  font-family: var(--pg-font);
+  font-size: 0.62rem;
+  font-weight: 600;
+  color: var(--pg-muted);
+  letter-spacing: 0;
+}
+
+.buy,
+dd.trend[data-trend='bullish'] {
+  color: var(--pg-bull-deep, #00695c);
+}
+
+.sell,
+dd.trend[data-trend='bearish'] {
+  color: var(--pg-bear-deep, #c62828);
+}
+
+dd.sl {
+  color: var(--pg-bear-deep, #c62828);
+}
+
+dd.tp {
+  color: var(--pg-bull-deep, #00695c);
+}
+
+.smc-note {
+  margin: 0;
+  font-size: 0.72rem;
+  line-height: 1.4;
+  color: var(--pg-muted);
+}
+
+.smc-fold {
+  border: 1px solid var(--pg-line);
+  border-radius: var(--pg-radius-sm);
+  padding: 0.35rem 0.6rem;
+}
+
+.smc-fold summary {
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 0.78rem;
+}
+
+.smc-scroll {
+  overflow-x: auto;
+}
+
+.smc-table {
+  width: 100%;
+  margin-top: 0.4rem;
+  border-collapse: collapse;
+  font-size: 0.74rem;
+}
+
+.smc-table th,
+.smc-table td {
+  padding: 0.22rem 0.4rem;
+  text-align: right;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--pg-line);
+}
+
+.smc-table th:first-child,
+.smc-table th[scope='row'],
+.smc-table td:first-child {
+  text-align: left;
+}
+
+.smc-table thead th {
+  font-size: 0.64rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--pg-muted);
+}
+
+.smc-table td {
+  font-family: var(--pg-font-mono);
+}
+
+.smc-table.trades td:nth-child(9) {
+  font-family: var(--pg-font);
+  text-align: left;
+}

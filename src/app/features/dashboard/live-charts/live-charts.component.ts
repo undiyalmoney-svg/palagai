@@ -1,6 +1,10 @@
 /**
- * Charts tab — live candles with support/resistance for Crude Oil Mini,
- * Nifty 50 and Bank Nifty, each on its own interval (15m by default).
+ * Charts tab — Smart Money Concepts on Crude Oil Mini, Nifty 50 and Bank Nifty.
+ *
+ * One deterministic engine (core/charts/smc) reads the closed candles of every
+ * book. History, the live session and a replayed test date all go through the
+ * same `analyzeSmc` call, so a signal on the chart is the signal the engine
+ * would have produced in real time and it never changes afterwards.
  *
  * Each book knows its own session (indices 09:15–15:30, crude 09:00–23:30) and
  * only polls while that session is running: outside it, Kite would keep
@@ -11,7 +15,8 @@
  * Candles are read-only Kite history. The ATM CE/PE buttons are not: they
  * place real market orders through the Kite proxy, outside the live desk and
  * outside its rails. See AtmOrderService for what that does and does not
- * protect. Nothing here touches the desk's own state either way.
+ * protect. Nothing here touches the desk's own state either way, and SMC
+ * signals never place an order by themselves.
  */
 import {
   Component,
@@ -25,46 +30,6 @@ import {
 import { isPlatformBrowser } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { Candle } from '../../../core/models/candle.model';
-import { SrChartModel, SrZone, buildSrChartModel } from '../../../core/charts/sr-chart.util';
-import { SrSignal, detectSrSignals } from '../../../core/charts/sr-signals.util';
-import {
-  ChartStructure,
-  canAutoEnter,
-  chartStructureKey,
-  detectAllChartStructures,
-  detectChartStructure,
-  optionStopTrigger,
-  optionTargetPremium,
-} from '../../../core/charts/chart-structure.util';
-import {
-  AUTO_BOT_LABELS,
-  AUTO_BOT_SHORT,
-  CHART_PNL_BOOKS,
-  CHART_STRATEGY_BLURB,
-  CHART_WHY_LABELS,
-  ChartPnlSummary,
-  ChartTradeWhy,
-  analyzeChartTrade,
-  chartCandleAsOf,
-  chartWhyCaption,
-  isLiveChartDay,
-  istToday,
-  lastPriceOnDay,
-  replayChartAutoTrades,
-  structurePaperPnlRs,
-  structuresOnDay,
-  summarizeChartPnl,
-} from '../../../core/charts/chart-auto-pnl.util';
-import {
-  MASTER_ACTION_LABELS,
-  MasterBookCall,
-  MasterGuide,
-  buildMasterBookCall,
-  buildMasterGuide,
-  emptyMasterCall,
-  masterAllowsBox,
-  replayMasterTrades,
-} from '../../../core/charts/chart-master.util';
 import {
   CHART_BOOKS,
   ChartBookDef,
@@ -77,6 +42,27 @@ import {
   ChartInterval,
   chartIntervalMinutes,
 } from '../../../core/charts/chart-intervals.util';
+import { chartCandleAsOf, isLiveChartDay, istToday } from '../../../core/charts/chart-day.util';
+import { ChartQuote, chartQuote } from '../../../core/charts/chart-quote.util';
+import { analyzeSmc } from '../../../core/charts/smc/smc-analyze';
+import { SmcAlertTracker } from '../../../core/charts/smc/smc-alerts';
+import { DEFAULT_SMC_CONFIG, SmcConfig } from '../../../core/charts/smc/smc.config';
+import {
+  SMC_ALERT_LABELS,
+  SMC_ALERT_TYPES,
+  SmcAlertEvent,
+  SmcAlertType,
+  SmcAnalysis,
+} from '../../../core/charts/smc/smc.types';
+import {
+  SmcLayers,
+  SmcSettings,
+  defaultSmcSettings,
+  effectiveHtf,
+  enabledAlertTypes,
+  loadSmcSettings,
+  saveSmcSettings,
+} from '../../../core/charts/smc/smc-settings';
 import { PgIconComponent } from '../../../shared/ui/icon/pg-icon.component';
 import { UiDialogService } from '../../../shared/ui/dialog/ui-dialog.service';
 import { CapitalPreferenceService } from '../../../core/services/capital-preference.service';
@@ -86,21 +72,33 @@ import { AtmOptionSide, AtmOrderTicket, atmOrderCost } from '../../../core/order
 import { clampChartLots, lotsForChartBook, maxChartLots, sizingCapitalFromFunds } from '../../../core/charts/chart-lots.util';
 import { RS_PER_LOT } from '../../../core/paper-desk/lots-from-funds';
 import { TvCandleChartComponent } from './tv-candle-chart.component';
+import { SmcPanelComponent } from './smc-panel.component';
 import { formatUnknownError } from '../../../core/utils/kite-error.util';
 import { isKiteAuthError } from '../../../core/utils/kite-auth-error.util';
 import { MarketStatus, marketStatusAt } from '../../../core/utils/market-status.util';
 import { InstrumentSessionConfig, resolveSessionConfig } from '../../../core/config/session.config';
+
+/** Higher-timeframe candles kept beside a book so the trend filter costs one fetch per bar. */
+interface HtfCache {
+  interval: ChartInterval;
+  day: string;
+  candles: Candle[];
+  /** The `asOf` clock the candles were read at. */
+  asOf: number;
+}
 
 interface ChartPane {
   def: ChartBookDef;
   symbol: string;
   /** Trading hours for this book's exchange. */
   session: InstrumentSessionConfig;
-  /** Each book carries its own timeframe; crude and the indices rarely suit the same one. */
-  interval: ChartInterval;
+  token: number | null;
   candles: Candle[];
-  model: SrChartModel | null;
-  signals: SrSignal[];
+  /** Clock the candles were read at; re-analysis must not move it forward. */
+  asOf: Date | null;
+  htf: HtfCache | null;
+  smc: SmcAnalysis | null;
+  quote: ChartQuote | null;
   error: string | null;
   loading: boolean;
   updatedAt: string | null;
@@ -108,13 +106,6 @@ interface ChartPane {
   order: OrderFeedback | null;
   /** Side currently being resolved/placed, so only that button shows busy. */
   ordering: AtmOptionSide | null;
-  /** Latest 1:1 measured-move box, or null when no wall has broken. */
-  structure: ChartStructure | null;
-  /** Every 1:1 break on the selected test date, for paper P&L. */
-  dayStructures: ChartStructure[];
-  /** Same day, Master-filtered (with-trend after the open drive). */
-  masterStructures: ChartStructure[];
-  masterCall: MasterBookCall;
 }
 
 interface OrderFeedback {
@@ -122,10 +113,25 @@ interface OrderFeedback {
   text: string;
 }
 
+export interface SmcFeedItem extends SmcAlertEvent {
+  book: ChartBookId;
+  bookLabel: string;
+  /** Wall-clock time the alert reached the tab. */
+  at: string;
+}
+
+interface NumericField {
+  key: keyof SmcConfig;
+  label: string;
+  min: number;
+  max: number;
+  step: number;
+  hint: string;
+}
+
 const INTERVALS = CHART_INTERVALS;
-const DEFAULT_INTERVAL: ChartInterval = '15m';
 /**
- * Poll cadence per interval.
+ * Poll cadence per entry timeframe.
  *
  * These are historical-candle reads, not a tick feed, so the only thing that
  * changes between polls is the forming candle. Polling a 1-hour chart every
@@ -151,11 +157,20 @@ const SESSIONS: Record<ChartBookId, InstrumentSessionConfig> = {
 };
 /** Kite historical allows 3 req/s; keep a gap so three books never trip it. */
 const BOOK_STAGGER_MS = 350;
+const FEED_LIMIT = 40;
+
+const NUMERIC_FIELDS: readonly NumericField[] = [
+  { key: 'riskPerTradePct', label: 'Risk per trade %', min: 0.05, max: 100, step: 0.1, hint: 'Share of equity risked to the stop' },
+  { key: 'minRR', label: 'Minimum RR', min: 0.5, max: 20, step: 0.5, hint: 'Setups below 1 : RR are rejected' },
+  { key: 'targetMultiplier', label: 'Target multiplier', min: 0.5, max: 10, step: 0.25, hint: 'Final TP = minimum RR × this' },
+  { key: 'maxOpenPositions', label: 'Max open positions', min: 1, max: 10, step: 1, hint: 'Per market' },
+  { key: 'swingLength', label: 'Swing length', min: 1, max: 20, step: 1, hint: 'Bars each side of a pivot' },
+];
 
 @Component({
   selector: 'app-live-charts',
   standalone: true,
-  imports: [TvCandleChartComponent, PgIconComponent, RouterLink],
+  imports: [TvCandleChartComponent, SmcPanelComponent, PgIconComponent, RouterLink],
   templateUrl: './live-charts.component.html',
   styleUrl: './live-charts.component.css',
 })
@@ -166,58 +181,53 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
   private readonly capitalPref = inject(CapitalPreferenceService);
   private readonly uiDialog = inject(UiDialogService);
   private readonly platformId = inject(PLATFORM_ID);
+  private readonly isBrowser = isPlatformBrowser(this.platformId);
+  private readonly alertTracker = new SmcAlertTracker();
 
   protected readonly intervals = INTERVALS;
   protected readonly intervalLabels = CHART_INTERVAL_LABELS;
+  protected readonly numericFields = NUMERIC_FIELDS;
+  protected readonly alertTypes = SMC_ALERT_TYPES;
+  protected readonly alertLabels = SMC_ALERT_LABELS;
+  protected readonly layerOptions: readonly { key: keyof SmcLayers; label: string }[] = [
+    { key: 'structure', label: 'BOS / CHoCH' },
+    { key: 'swings', label: 'Swings HH HL LH LL' },
+    { key: 'orderBlocks', label: 'Order blocks' },
+    { key: 'fvg', label: 'Fair value gaps' },
+    { key: 'liquidity', label: 'Liquidity & equal H/L' },
+    { key: 'premiumDiscount', label: 'Premium / discount' },
+    { key: 'levels', label: 'Entry, SL & TP levels' },
+  ];
 
+  protected readonly settings = signal<SmcSettings>(
+    loadSmcSettings(this.isBrowser ? safeStorage() : null),
+  );
+  protected readonly ltf = computed(() => this.settings().ltf);
+  protected readonly htf = computed(() => effectiveHtf(this.settings().ltf, this.settings().htf));
+  protected readonly layers = computed(() => this.settings().layers);
+
+  /** Newest first; only alerts that fired while the tab was watching. */
+  protected readonly feed = signal<SmcFeedItem[]>([]);
   protected readonly autoRefresh = signal(true);
-  /**
-   * Per-book auto bot. When on for a live session, a fresh 1:1 break buys the
-   * ATM CE/PE and rests an SL. Off by default; Charts-tab only.
-   */
-  protected readonly autoBots = signal<Record<ChartBookId, boolean>>({
-    crude: false,
-    nifty: false,
-    bank: false,
-  });
-  /**
-   * Master decides trend vs chop on all three books and, when on, places the
-   * with-trend ATM trades. Individual auto bots stay the unfiltered path.
-   */
-  protected readonly masterOn = signal(false);
-  /** After a Master loser on a live day, that book stands down. */
-  protected readonly masterStopped = signal<Record<ChartBookId, boolean>>({
-    crude: false,
-    nifty: false,
-    bank: false,
-  });
-  protected readonly masterActionLabels = MASTER_ACTION_LABELS;
   /** One calendar day. Start and end are the same — live when it is today. */
   protected readonly testDate = signal(istToday());
-  protected readonly botBooks = CHART_PNL_BOOKS;
-  protected readonly botLabels = AUTO_BOT_LABELS;
-  protected readonly botShort = AUTO_BOT_SHORT;
-  protected readonly whyLabels = CHART_WHY_LABELS;
-  protected readonly strategyBlurb = CHART_STRATEGY_BLURB;
   protected readonly refreshing = signal(false);
   protected readonly panes = signal<ChartPane[]>(
     CHART_BOOKS.map((def) => ({
       def,
       symbol: def.label,
       session: SESSIONS[def.id],
-      interval: DEFAULT_INTERVAL,
+      token: null,
       candles: [],
-      model: null,
-      signals: [],
+      asOf: null,
+      htf: null,
+      smc: null,
+      quote: null,
       error: null,
       loading: true,
       updatedAt: null,
       order: null,
       ordering: null,
-      structure: null,
-      dayStructures: [],
-      masterStructures: [],
-      masterCall: emptyMasterCall(def.id),
     })),
   );
 
@@ -231,66 +241,8 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
 
   protected readonly todayIst = computed(() => istToday(new Date(this.clock())));
 
-  /** Today is live; any earlier date is a paper test of that session. */
+  /** Today is live; any earlier date is a replayed session (backtest only). */
   protected readonly liveDay = computed(() => isLiveChartDay(this.testDate(), new Date(this.clock())));
-
-  protected readonly pnl = computed<ChartPnlSummary>(() =>
-    summarizeChartPnl({
-      crude: this.pnlInput('crude', false),
-      nifty: this.pnlInput('nifty', false),
-      bank: this.pnlInput('bank', false),
-    }),
-  );
-
-  protected readonly masterPnl = computed<ChartPnlSummary>(() =>
-    summarizeChartPnl({
-      crude: this.pnlInput('crude', true),
-      nifty: this.pnlInput('nifty', true),
-      bank: this.pnlInput('bank', true),
-    }),
-  );
-
-  protected readonly masterGuide = computed<MasterGuide>(() => {
-    const day = this.testDate();
-    const byBook = {} as Record<ChartBookId, MasterBookCall>;
-    for (const book of CHART_PNL_BOOKS) {
-      byBook[book] = this.paneById(book)?.masterCall ?? emptyMasterCall(book);
-    }
-    return buildMasterGuide(day, byBook);
-  });
-
-  protected masterButtonLabel(): string {
-    if (this.masterOn()) {
-      return this.liveDay() ? 'Master is taking care' : 'Master view on';
-    }
-    return this.liveDay() ? 'Let Master take care' : 'Master';
-  }
-
-  /** Always-visible decision — test dates do not need the button pressed. */
-  protected masterMessage(): string {
-    const guide = this.masterGuide();
-    if (!this.liveDay()) {
-      return `Decision for ${this.testDate()}: ${guide.headline}`;
-    }
-    if (!this.masterOn()) {
-      return `${guide.headline} Turn Master on and it will take the trades — or stand down.`;
-    }
-    const stopped = CHART_PNL_BOOKS.filter((book) => this.masterStopped()[book]).map(
-      (book) => this.masterGuide().books[book].label,
-    );
-    const waiting = CHART_PNL_BOOKS.every((book) => guide.books[book].action === 'wait');
-    const trading = CHART_PNL_BOOKS.filter(
-      (book) => guide.books[book].action === 'buy_ce' || guide.books[book].action === 'buy_pe',
-    );
-    if (waiting) {
-      return 'Master is watching the opening drive. No trade yet.';
-    }
-    if (!trading.length) {
-      return 'Master: no trade — chop on Crude, Nifty and Bank Nifty.';
-    }
-    const care = `Master is taking care. ${guide.headline}`;
-    return stopped.length ? `${care} Stopped ${stopped.join(', ')} after a loser.` : care;
-  }
 
   protected readonly marketStatus = computed<Record<ChartBookId, MarketStatus>>(() => {
     const now = new Date(this.clock());
@@ -314,18 +266,13 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
   protected readonly sessionExpired = signal(false);
 
   /** 45m is folded from 15m bars because Kite serves no 45-minute candle. */
-  protected readonly derivedInterval = computed(() =>
-    this.panes().some((pane) => this.data.isDerived(pane.interval)),
+  protected readonly derivedInterval = computed(
+    () => this.data.isDerived(this.ltf()) || this.data.isDerived(this.htf()),
   );
 
-  /**
-   * Fastest cadence in play, for the Live button. Each book polls on its own
-   * timeframe, so one number cannot describe all three — the quickest is the
-   * one that says how live the page feels.
-   */
-  protected readonly refreshSeconds = computed(() =>
-    Math.min(...this.panes().map((pane) => REFRESH_MS[pane.interval])) / 1000,
-  );
+  protected readonly refreshSeconds = computed(() => REFRESH_MS[this.ltf()] / 1000);
+
+  protected readonly notificationsSupported = this.isBrowser && typeof Notification !== 'undefined';
 
   private timer: ReturnType<typeof setInterval> | null = null;
   /** Guards against a slow poll overlapping the next tick. */
@@ -337,11 +284,9 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
   private readonly wasOpen = new Map<ChartBookId, boolean>();
   /** Once a reader taps +/−, that book keeps their count instead of following funds. */
   private readonly lotsOverride = signal<Partial<Record<ChartBookId, number>>>({});
-  /** Structure keys already sent so Auto Trade cannot double-fire one break. */
-  private readonly tradedKeys = new Set<string>();
 
   ngOnInit(): void {
-    if (!isPlatformBrowser(this.platformId)) {
+    if (!this.isBrowser) {
       return;
     }
     // One load regardless of the clock: a shut market should still show the
@@ -358,6 +303,12 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
         void this.refreshPanes(due);
       }
     }, TICK_MS);
+  }
+
+  ngOnDestroy(): void {
+    if (this.timer != null) {
+      clearInterval(this.timer);
+    }
   }
 
   /**
@@ -382,25 +333,109 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
         continue;
       }
       if (!open) continue;
-      if (now - (this.lastPollAt.get(id) ?? 0) >= REFRESH_MS[pane.interval]) {
+      if (now - (this.lastPollAt.get(id) ?? 0) >= REFRESH_MS[this.ltf()]) {
         due.push(id);
       }
     }
     return due;
   }
 
-  ngOnDestroy(): void {
-    if (this.timer != null) {
-      clearInterval(this.timer);
+  // ── Settings ────────────────────────────────────────────────────────────
+
+  private commit(next: SmcSettings): void {
+    this.settings.set(next);
+    saveSmcSettings(this.isBrowser ? safeStorage() : null, next);
+  }
+
+  protected setLtf(next: ChartInterval): void {
+    const current = this.settings();
+    if (current.ltf === next) return;
+    this.commit({ ...current, ltf: next });
+    this.reloadAll();
+  }
+
+  protected setHtf(next: ChartInterval): void {
+    const current = this.settings();
+    if (current.htf === next) return;
+    this.commit({ ...current, htf: next });
+    this.reloadAll();
+  }
+
+  protected configValue<K extends keyof SmcConfig>(key: K): SmcConfig[K] {
+    const override = this.settings().config[key];
+    return (override ?? DEFAULT_SMC_CONFIG[key]) as SmcConfig[K];
+  }
+
+  protected setConfigNumber(field: NumericField, event: Event): void {
+    const raw = Number((event.target as HTMLInputElement).value);
+    if (!Number.isFinite(raw)) return;
+    const value = Math.min(field.max, Math.max(field.min, raw));
+    this.patchConfig({ [field.key]: value } as Partial<SmcConfig>);
+  }
+
+  protected setSlMethod(event: Event): void {
+    this.patchConfig({ slMethod: (event.target as HTMLSelectElement).value as SmcConfig['slMethod'] });
+  }
+
+  protected setTpMethod(event: Event): void {
+    this.patchConfig({ tpMethod: (event.target as HTMLSelectElement).value as SmcConfig['tpMethod'] });
+  }
+
+  protected toggleHtfFilter(event: Event): void {
+    this.patchConfig({ requireHtfTrend: (event.target as HTMLInputElement).checked });
+  }
+
+  private patchConfig(patch: Partial<SmcConfig>): void {
+    const current = this.settings();
+    this.commit({ ...current, config: { ...current.config, ...patch } });
+    this.reanalyzeAll();
+  }
+
+  protected toggleLayer(key: keyof SmcLayers): void {
+    const current = this.settings();
+    this.commit({ ...current, layers: { ...current.layers, [key]: !current.layers[key] } });
+  }
+
+  protected toggleAlert(type: SmcAlertType): void {
+    const current = this.settings();
+    this.commit({ ...current, alerts: { ...current.alerts, [type]: !current.alerts[type] } });
+  }
+
+  protected async toggleBrowserNotifications(): Promise<void> {
+    const current = this.settings();
+    if (current.browserNotifications) {
+      this.commit({ ...current, browserNotifications: false });
+      return;
+    }
+    if (!this.notificationsSupported) return;
+    const permission =
+      Notification.permission === 'default'
+        ? await Notification.requestPermission()
+        : Notification.permission;
+    this.commit({ ...this.settings(), browserNotifications: permission === 'granted' });
+  }
+
+  protected resetSettings(): void {
+    const before = this.settings();
+    const next = defaultSmcSettings();
+    next.browserNotifications = before.browserNotifications;
+    this.commit(next);
+    if (before.ltf !== next.ltf || before.htf !== next.htf) {
+      this.reloadAll();
+    } else {
+      this.reanalyzeAll();
     }
   }
 
-  protected setPaneInterval(id: ChartBookId, next: ChartInterval): void {
-    const pane = this.paneById(id);
-    if (!pane || pane.interval === next) return;
-    this.patch(id, { interval: next, loading: true });
-    void this.refreshPanes([id]);
+  protected isAlertOn(type: SmcAlertType): boolean {
+    return this.settings().alerts[type];
   }
+
+  protected clearFeed(): void {
+    this.feed.set([]);
+  }
+
+  // ── Loading ─────────────────────────────────────────────────────────────
 
   protected toggleAutoRefresh(): void {
     this.autoRefresh.update((on) => !on);
@@ -408,6 +443,25 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
 
   protected refreshAll(): Promise<void> {
     return this.refreshPanes(CHART_BOOKS.map((def) => def.id));
+  }
+
+  /** Drop everything shown and read it again: timeframe or date changed. */
+  private reloadAll(): void {
+    this.alertTracker.reset();
+    this.panes.update((list) =>
+      list.map((pane) => ({
+        ...pane,
+        loading: true,
+        candles: [],
+        asOf: null,
+        htf: null,
+        smc: null,
+        quote: null,
+        order: null,
+        error: null,
+      })),
+    );
+    void this.refreshAll();
   }
 
   /**
@@ -429,10 +483,8 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
     let authFailures = 0;
     try {
       for (const id of ids) {
-        const pane = this.paneById(id);
-        if (!pane) continue;
         this.lastPollAt.set(id, Date.now());
-        if (!(await this.refreshBook(id, pane.interval))) {
+        if (!(await this.refreshBook(id))) {
           authFailures += 1;
         }
         await delay(BOOK_STAGGER_MS);
@@ -456,18 +508,19 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
   }
 
   /** Resolves false when the book failed because Kite rejected the session. */
-  private async refreshBook(id: ChartBookId, interval: ChartInterval): Promise<boolean> {
+  private async refreshBook(id: ChartBookId): Promise<boolean> {
     const day = this.testDate();
+    const ltf = this.ltf();
+    const htf = this.htf();
     try {
       const asOf = chartCandleAsOf(day);
       const instrument = await this.data.resolveInstrument(id, asOf);
       const candles = await this.data.loadCandles({
         token: instrument.token,
-        interval,
+        interval: ltf,
         now: asOf,
       });
-      // The timeframe or test date can change while the request is in the air.
-      if (this.paneById(id)?.interval !== interval || this.testDate() !== day) {
+      if (this.superseded(ltf, htf, day)) {
         return true;
       }
       if (!candles.length) {
@@ -475,78 +528,195 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
           error:
             id === 'crude'
               ? `No Crude candles on ${day} — that day's CRUDEOILM contract has expired out of the instrument list.`
-              : `Kite returned no ${this.intervalLabels[interval]} candles for ${day}.`,
+              : `Kite returned no ${this.intervalLabels[ltf]} candles for ${day}.`,
           loading: false,
           candles: [],
-          model: null,
-          signals: [],
-          structure: null,
-          dayStructures: [],
-          masterStructures: [],
-          masterCall: emptyMasterCall(id),
+          asOf: null,
+          smc: null,
+          quote: null,
           symbol: instrument.symbol,
         });
         return true;
       }
-      const model = buildSrChartModel(candles);
-      const intervalMinutes = chartIntervalMinutes(interval);
-      const detectOpts = { intervalMinutes, now: asOf };
-      const detected = structuresOnDay(
-        detectAllChartStructures(candles, model.zones, model.atr, detectOpts),
-        day,
-      );
-      const dayStructures = replayChartAutoTrades(detected, candles);
-      const last = lastPriceOnDay(candles, day);
-      const masterCall = buildMasterBookCall(id, candles, day, intervalMinutes, model.atr);
-      const masterStructures = replayMasterTrades(
-        detected,
-        candles,
-        day,
-        intervalMinutes,
-        model.atr,
-        last,
-      );
-      const liveBox = detectChartStructure(candles, model.zones, model.atr, detectOpts);
-      const drawn = this.masterOn() ? masterStructures : dayStructures;
-      const structure = this.liveDay()
-        ? liveBox
-        : drawn.length
-          ? drawn[drawn.length - 1]!
-          : null;
+
+      const htfCache = await this.ensureHtf(id, instrument.token, ltf, htf, day, asOf);
+      if (this.superseded(ltf, htf, day)) {
+        return true;
+      }
+      const smc = this.analyze(id, candles, htfCache, asOf);
       this.patch(id, {
         symbol: instrument.symbol,
+        token: instrument.token,
         candles,
-        model,
-        signals: detectSrSignals(candles, model.zones, model.atr, { intervalMinutes, now: asOf }),
-        structure,
-        dayStructures,
-        masterStructures,
-        masterCall,
+        asOf,
+        htf: htfCache,
+        smc,
+        quote: chartQuote(candles),
         error: null,
         loading: false,
         updatedAt: new Date().toLocaleTimeString('en-IN', { hour12: false }),
       });
-      this.syncMasterStops();
-      void this.maybeAutoTrade(id);
+      this.announce(id, smc, false);
       return true;
     } catch (error) {
-      if (this.paneById(id)?.interval !== interval || this.testDate() !== day) {
+      if (this.superseded(ltf, htf, day)) {
         return true;
       }
       this.patch(id, {
         error: formatUnknownError(error, 'Charts'),
         loading: false,
         candles: [],
-        model: null,
-        signals: [],
-        structure: null,
-        dayStructures: [],
-        masterStructures: [],
-        masterCall: emptyMasterCall(id),
+        asOf: null,
+        smc: null,
+        quote: null,
       });
       return !isKiteAuthError(error);
     }
   }
+
+  private superseded(ltf: ChartInterval, htf: ChartInterval, day: string): boolean {
+    return this.ltf() !== ltf || this.htf() !== htf || this.testDate() !== day;
+  }
+
+  /**
+   * Higher-timeframe candles for the trend filter.
+   *
+   * Read again only when the timeframe or date changed, or when the newest
+   * cached bar has closed since it was read (so its final high/low is in).
+   * Any failure falls back to a trend derived from the entry candles rather
+   * than losing the chart.
+   */
+  private async ensureHtf(
+    id: ChartBookId,
+    token: number,
+    ltf: ChartInterval,
+    htf: ChartInterval,
+    day: string,
+    asOf: Date,
+  ): Promise<HtfCache | null> {
+    if (chartIntervalMinutes(htf) <= chartIntervalMinutes(ltf)) {
+      return null;
+    }
+    const cached = this.paneById(id)?.htf ?? null;
+    if (cached && cached.interval === htf && cached.day === day && !this.htfStale(cached, htf, asOf)) {
+      return cached;
+    }
+    try {
+      await delay(BOOK_STAGGER_MS);
+      const candles = await this.data.loadCandles({ token, interval: htf, now: asOf });
+      return candles.length ? { interval: htf, day, candles, asOf: asOf.getTime() } : null;
+    } catch {
+      return cached && cached.interval === htf && cached.day === day ? cached : null;
+    }
+  }
+
+  private htfStale(cache: HtfCache, htf: ChartInterval, asOf: Date): boolean {
+    const last = cache.candles[cache.candles.length - 1];
+    if (!last) return true;
+    const end = Date.parse(last.date) + chartIntervalMinutes(htf) * 60_000;
+    return Number.isFinite(end) && end <= asOf.getTime() && cache.asOf < end;
+  }
+
+  private analyze(
+    id: ChartBookId,
+    candles: Candle[],
+    htf: HtfCache | null,
+    asOf: Date,
+  ): SmcAnalysis {
+    const ltf = this.ltf();
+    const htfInterval = this.htf();
+    return analyzeSmc({
+      market: id,
+      candles,
+      intervalMinutes: chartIntervalMinutes(ltf),
+      htf: htf ? { candles: htf.candles, minutes: chartIntervalMinutes(htf.interval) } : null,
+      htfMinutes: chartIntervalMinutes(htfInterval),
+      now: asOf,
+      live: this.liveDay(),
+      config: this.settings().config,
+    });
+  }
+
+  /** Settings changed: recompute from the candles already held, no refetch. */
+  private reanalyzeAll(): void {
+    this.panes.update((list) =>
+      list.map((pane) =>
+        pane.candles.length && pane.asOf
+          ? { ...pane, smc: this.analyze(pane.def.id, pane.candles, pane.htf, pane.asOf) }
+          : pane,
+      ),
+    );
+    // New parameters mean a different history; it is a baseline, not news.
+    for (const pane of this.panes()) {
+      if (pane.smc) this.announce(pane.def.id, pane.smc, true);
+    }
+  }
+
+  // ── Alerts ──────────────────────────────────────────────────────────────
+
+  private alertScope(id: ChartBookId): string {
+    return `${id}|${this.ltf()}|${this.htf()}|${this.testDate()}`;
+  }
+
+  /**
+   * Feed newly confirmed events to the alert list. A replayed date never
+   * alerts, and the first batch a stream sees — or the first after a settings
+   * change — is history, remembered silently.
+   */
+  private announce(id: ChartBookId, smc: SmcAnalysis, rebaseline: boolean): void {
+    const scope = this.alertScope(id);
+    if (!this.liveDay()) {
+      this.alertTracker.reset(scope);
+      return;
+    }
+    if (rebaseline) {
+      this.alertTracker.reset(scope);
+    }
+    const fresh = this.alertTracker.ingest(scope, smc.alerts, enabledAlertTypes(this.settings()));
+    if (!fresh.length) return;
+    const def = CHART_BOOKS.find((book) => book.id === id);
+    const at = new Date().toLocaleTimeString('en-IN', { hour12: false });
+    const items: SmcFeedItem[] = fresh
+      .map((event) => ({ ...event, book: id, bookLabel: def?.label ?? id, at }))
+      .reverse();
+    this.feed.update((list) => [...items, ...list].slice(0, FEED_LIMIT));
+    if (this.settings().browserNotifications) {
+      for (const item of items.slice().reverse()) this.notify(item);
+    }
+  }
+
+  private notify(item: SmcFeedItem): void {
+    if (!this.notificationsSupported || Notification.permission !== 'granted') return;
+    try {
+      new Notification(`${item.bookLabel} · ${SMC_ALERT_LABELS[item.type]}`, {
+        body: item.message,
+        tag: item.id,
+      });
+    } catch {
+      // Some browsers only allow notifications from a service worker.
+    }
+  }
+
+  // ── Date ────────────────────────────────────────────────────────────────
+
+  protected setTestDate(value: string): void {
+    const today = this.todayIst();
+    const next = value && value <= today ? value : today;
+    if (next === this.testDate()) return;
+    this.testDate.set(next);
+    this.reloadAll();
+  }
+
+  protected jumpToToday(): void {
+    this.setTestDate(this.todayIst());
+  }
+
+  protected onTestDateInput(event: Event): void {
+    const value = (event.target as HTMLInputElement | null)?.value ?? '';
+    this.setTestDate(value);
+  }
+
+  // ── Manual ATM orders ───────────────────────────────────────────────────
 
   private paneById(id: ChartBookId): ChartPane | undefined {
     return this.panes().find((pane) => pane.def.id === id);
@@ -559,15 +729,8 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
    * the rupee cost in a confirmation before anything is sent. A manual buy
    * runs outside the desk's rails, so the only protection is the reader
    * knowing precisely what they are about to pay for.
-   *
-   * Auto Trade skips the dialog, buys the side the 1:1 box names, and rests
-   * an SL on that option after the fill.
    */
-  protected async buyAtm(
-    id: ChartBookId,
-    side: AtmOptionSide,
-    opts: { auto?: boolean; structure?: ChartStructure | null } = {},
-  ): Promise<boolean> {
+  protected async buyAtm(id: ChartBookId, side: AtmOptionSide): Promise<boolean> {
     const pane = this.paneById(id);
     if (!pane || pane.ordering) return false;
 
@@ -594,7 +757,7 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
       return false;
     }
 
-    const spot = pane.model?.last?.price;
+    const spot = pane.quote?.price;
     if (spot == null) {
       this.patch(id, { order: { ok: false, text: 'No live price yet — wait for candles.' } });
       return false;
@@ -612,7 +775,7 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
 
       const ticket = plan.ticket;
       const premium = await this.orders.premium(ticket);
-      if (!opts.auto && !(await this.confirmBuy(pane, ticket, premium))) {
+      if (!(await this.confirmBuy(pane, ticket, premium))) {
         return false;
       }
 
@@ -622,220 +785,10 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
         return false;
       }
 
-      let text = `${opts.auto ? (this.masterOn() ? 'Master · ' : 'Auto · ') : ''}${shortSymbol(ticket)} · ${result.message}`;
-      const box = opts.structure ?? pane.structure;
-      if (opts.auto && box) {
-        const fill = await this.orders.fillPrice(result.orderId, premium);
-        const trigger = fill != null ? optionStopTrigger(fill, box.height) : null;
-        const target = fill != null ? optionTargetPremium(fill, box.height) : null;
-        if (trigger == null) {
-          text += ' · SL not rested — no fill premium yet. Manage the exit.';
-        } else {
-          const sl = await this.orders.placeStop(ticket, trigger);
-          text += sl.ok ? ` · ${sl.message}` : ` · entry sent, SL failed: ${sl.message}`;
-        }
-        if (target == null) {
-          text += ' · 0.5R TP not rested.';
-        } else {
-          const tp = await this.orders.placeTarget(ticket, target);
-          text += tp.ok ? ` · ${tp.message}` : ` · TP failed: ${tp.message}`;
-        }
-      }
-
-      this.patch(id, { order: { ok: true, text } });
+      this.patch(id, { order: { ok: true, text: `${shortSymbol(ticket)} · ${result.message}` } });
       return true;
     } finally {
       this.patch(id, { ordering: null });
-    }
-  }
-
-  protected autoBotOn(id: ChartBookId): boolean {
-    return this.autoBots()[id];
-  }
-
-  protected async toggleMaster(): Promise<void> {
-    if (this.masterOn()) {
-      this.masterOn.set(false);
-      this.relabelDrawnStructures();
-      return;
-    }
-    const live = this.liveDay();
-    const ok = await this.uiDialog.confirm({
-      title: live ? 'Enable Master?' : 'Use Master on this test date?',
-      message: live
-        ? [
-            'Master reads the opening drive on Crude, Nifty and Bank Nifty.',
-            'On a trend it buys only that side (CE up / PE down), rests SL and 0.5R.',
-            'On chop it stands down. After a failed break or give-back, that book stops.',
-            '',
-            'This places real ATM orders. Individual auto bots stay as they are —',
-            'Master is the filtered path. Trade Bot is not involved.',
-          ].join('\n')
-        : [
-            `Test date ${this.testDate()} — start and end are the same day.`,
-            'Master will not place live orders. Paper P&L below splits Without Master',
-            '(every 0.5R break) and With Master (trend-only after the open drive).',
-          ].join('\n'),
-      confirmLabel: live ? 'Enable Master' : 'Classify with Master',
-      cancelLabel: 'Cancel',
-      tone: live ? 'danger' : 'default',
-    });
-    if (!ok) return;
-    this.masterStopped.set({ crude: false, nifty: false, bank: false });
-    this.masterOn.set(true);
-    this.relabelDrawnStructures();
-    if (live) {
-      for (const book of CHART_PNL_BOOKS) {
-        void this.maybeAutoTrade(book);
-      }
-    }
-  }
-
-  private relabelDrawnStructures(): void {
-    if (this.liveDay()) return;
-    this.panes.update((list) =>
-      list.map((pane) => {
-        const drawn = this.masterOn() ? pane.masterStructures : pane.dayStructures;
-        return {
-          ...pane,
-          structure: drawn.length ? drawn[drawn.length - 1]! : null,
-        };
-      }),
-    );
-  }
-
-  protected async toggleAutoBot(id: ChartBookId): Promise<void> {
-    if (this.autoBots()[id]) {
-      this.autoBots.update((current) => ({ ...current, [id]: false }));
-      return;
-    }
-    const label = AUTO_BOT_LABELS[id];
-    const live = this.liveDay();
-    const ok = await this.uiDialog.confirm({
-      title: `Enable ${label}?`,
-      message: live
-        ? [
-            `When a 1:1 box prints on a just-closed ${this.paneById(id)?.def.label ?? label} candle,`,
-            'Charts will buy the ATM CE (breakout) or PE (breakdown) at market, rest an SL,',
-            'and rest a 0.5R LIMIT target. The teal box is still the full 1:1 — the bot does not wait for it.',
-            'If the target fills, cancel the leftover SL in the order book (Kite has no OCO).',
-            '',
-            'This is the Charts tab only. The other two auto bots stay as they are.',
-            'Trade Bot is not involved, and the desk rails do not apply.',
-          ].join('\n')
-        : [
-            `Test date ${this.testDate()} — start and end are the same day.`,
-            `${label} will not place live orders on a past session.`,
-            'Profit below is paper P&L: the bot books 0.5R, the teal box is still 1:1.',
-          ].join('\n'),
-      confirmLabel: `Enable ${label}`,
-      cancelLabel: 'Cancel',
-      tone: live ? 'danger' : 'default',
-    });
-    if (!ok) return;
-    this.autoBots.update((current) => ({ ...current, [id]: true }));
-    if (live) {
-      void this.maybeAutoTrade(id);
-    }
-  }
-
-  protected setTestDate(value: string): void {
-    const today = this.todayIst();
-    const next = value && value <= today ? value : today;
-    if (next === this.testDate()) return;
-    this.testDate.set(next);
-    this.tradedKeys.clear();
-    this.masterStopped.set({ crude: false, nifty: false, bank: false });
-    this.panes.update((list) =>
-      list.map((pane) => ({
-        ...pane,
-        loading: true,
-        candles: [],
-        model: null,
-        signals: [],
-        structure: null,
-        dayStructures: [],
-        masterStructures: [],
-        masterCall: emptyMasterCall(pane.def.id),
-        order: null,
-        error: null,
-      })),
-    );
-    void this.refreshAll();
-  }
-
-  protected jumpToToday(): void {
-    this.setTestDate(this.todayIst());
-  }
-
-  protected onTestDateInput(event: Event): void {
-    const value = (event.target as HTMLInputElement | null)?.value ?? '';
-    this.setTestDate(value);
-  }
-
-  private pnlInput(
-    id: ChartBookId,
-    master: boolean,
-  ): {
-    boxes: ChartStructure[];
-    lots: number;
-    lastPrice?: number | null;
-    candles?: Candle[];
-  } {
-    const pane = this.paneById(id);
-    return {
-      boxes: (master ? pane?.masterStructures : pane?.dayStructures) ?? [],
-      lots: this.lotsFor(id),
-      lastPrice: lastPriceOnDay(pane?.candles ?? [], this.testDate()),
-      candles: pane?.candles ?? [],
-    };
-  }
-
-  protected displayedStructures(pane: ChartPane): ChartStructure[] {
-    return this.masterOn() ? pane.masterStructures : pane.dayStructures;
-  }
-
-  private syncMasterStops(): void {
-    if (!this.masterOn() || !this.liveDay()) return;
-    const next = { ...this.masterStopped() };
-    let changed = false;
-    for (const pane of this.panes()) {
-      const last = lastPriceOnDay(pane.candles, this.testDate());
-      for (const box of pane.masterStructures) {
-        const why = analyzeChartTrade(box, pane.candles, last).why;
-        if (why === 'failed_break' || why === 'gave_back') {
-          if (!next[pane.def.id]) {
-            next[pane.def.id] = true;
-            changed = true;
-          }
-        }
-      }
-    }
-    if (changed) this.masterStopped.set(next);
-  }
-
-  private masterWillTrade(id: ChartBookId, box: ChartStructure): boolean {
-    if (this.masterStopped()[id]) return false;
-    const call = this.paneById(id)?.masterCall ?? emptyMasterCall(id);
-    return masterAllowsBox(call, box);
-  }
-
-  private async maybeAutoTrade(id: ChartBookId): Promise<void> {
-    if (!this.liveDay()) return;
-    const master = this.masterOn();
-    if (!master && !this.autoBots()[id]) return;
-    const pane = this.paneById(id);
-    if (!pane || pane.ordering) return;
-    const box = pane.structure;
-    if (!canAutoEnter(box)) return;
-    if (master && !this.masterWillTrade(id, box)) return;
-    if (!master && !this.autoBots()[id]) return;
-    const key = `${master ? 'master' : 'solo'}|${chartStructureKey(id, box)}`;
-    if (this.tradedKeys.has(key)) return;
-    this.tradedKeys.add(key);
-    const sent = await this.buyAtm(id, box.option, { auto: true, structure: box });
-    if (!sent) {
-      this.tradedKeys.delete(key);
     }
   }
 
@@ -906,7 +859,7 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
   }
 
   protected canPlaceOrders(pane: ChartPane): boolean {
-    return this.liveDay() && !!pane.model?.last && this.statusOf(pane).open;
+    return this.liveDay() && !!pane.quote && this.statusOf(pane).open;
   }
 
   protected orderHintFor(pane: ChartPane): string {
@@ -914,46 +867,6 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
       return `Viewing ${this.testDate()} — switch to today to trade`;
     }
     return this.statusOf(pane).open ? '' : this.statusOf(pane).detail;
-  }
-
-  protected tradeTime(box: ChartStructure): string {
-    const raw = String(box.date);
-    const time = raw.includes('T') ? raw.split('T')[1] : raw.slice(11);
-    return (time ?? '').slice(0, 5) || raw.slice(0, 10);
-  }
-
-  protected tradePnl(id: ChartBookId, box: ChartStructure): number {
-    const pane = this.paneById(id);
-    return structurePaperPnlRs(
-      id,
-      box,
-      this.lotsFor(id),
-      lastPriceOnDay(pane?.candles ?? [], this.testDate()),
-      pane?.candles ?? [],
-    );
-  }
-
-  protected tradeWhy(id: ChartBookId, box: ChartStructure): ChartTradeWhy {
-    const pane = this.paneById(id);
-    return analyzeChartTrade(
-      box,
-      pane?.candles ?? [],
-      lastPriceOnDay(pane?.candles ?? [], this.testDate()),
-    ).why;
-  }
-
-  protected masterWhyCaption(): string {
-    return chartWhyCaption(this.masterPnl().why);
-  }
-
-  protected rawWhyCaption(): string {
-    return chartWhyCaption(this.pnl().why);
-  }
-
-  protected pnlTone(amount: number): 'up' | 'down' | 'flat' {
-    if (amount > 0.5) return 'up';
-    if (amount < -0.5) return 'down';
-    return 'flat';
   }
 
   protected trackPane = (_: number, pane: ChartPane) => pane.def.id;
@@ -971,37 +884,27 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
     return `${value >= 0 ? '+' : ''}${this.fmt(value, decimals)}`;
   }
 
-  /** Tightest resistance above price / support below, for the pane header. */
-  protected nearestZone(pane: ChartPane, kind: 'support' | 'resistance'): SrZone | null {
-    const last = pane.model?.last?.price;
-    const zones = pane.model?.zones ?? [];
-    if (last == null || !zones.length) return null;
-    const side = zones.filter((z) => z.kind === kind);
-    if (!side.length) return null;
-    return side.reduce((best, z) =>
-      Math.abs(z.mid - last) < Math.abs(best.mid - last) ? z : best,
-    );
-  }
-
-  protected zoneLabel(zone: SrZone | null, decimals: number): string {
-    if (!zone) return '—';
-    // Spaced dash: both bounds already carry commas and a decimal point, and
-    // "24,969.98–24,971.48" runs together without it.
-    return `${this.fmt(zone.lo, decimals)} – ${this.fmt(zone.hi, decimals)}`;
-  }
-
   protected barCount(pane: ChartPane): number {
     return pane.candles.length;
   }
 
-  /** Newest marker on the book — the one a reader is actually looking at. */
-  protected latestSignal(pane: ChartPane): SrSignal | null {
-    return pane.signals.length ? pane.signals[pane.signals.length - 1]! : null;
+  protected tradeCount(pane: ChartPane): number {
+    return pane.smc?.trades.length ?? 0;
   }
+
+  protected trackFeed = (_: number, item: SmcFeedItem) => `${item.book}|${item.id}`;
 }
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function safeStorage(): Storage | null {
+  try {
+    return typeof localStorage === 'undefined' ? null : localStorage;
+  } catch {
+    return null;
+  }
 }
 
 /** Strike and side are what identify the trade in a one-line result. */

@@ -2,16 +2,14 @@
   <header class="pg-page-hero">
     <div>
       <p class="pg-eyebrow">Live charts</p>
-      <h1>Support &amp; Resistance</h1>
+      <h1>Smart Money Concepts</h1>
       <p class="pg-lede">
-        Crude Oil Mini, Nifty 50 and Bank Nifty on live Kite candles, each on its own
-        timeframe from 1 minute to 1 hour. When a closed candle breaks a support or
-        resistance band, the chart paints the same 1:1 box as a measured move:
-        pink is the stop, teal is the target, labelled Entry / SL / Exit. Trade from
-        that, or turn on Master — it reads the opening drive on Crude, Nifty and
-        Bank Nifty, trades only the trending side, and stands down on chop. The
-        per-book auto bots still take every break (without Master). Pick one date
-        to compare With Master vs Without Master — start and end are the same day.
+        NIFTY 50, BANK NIFTY and CRUDE OIL on live Kite candles. One deterministic engine
+        reads market structure (swings, HH / HL / LH / LL, BOS, CHoCH), order blocks, fair
+        value gaps, liquidity and premium / discount, filters entries by the higher-timeframe
+        trend, and plans every trade with stop loss, TP1, TP2 and a final target. History,
+        the live session and a replayed date all run the same logic, and a confirmed signal
+        never changes afterwards.
       </p>
     </div>
 
@@ -23,87 +21,9 @@
           · {{ lotsFor('crude') }} crude
         </span>
       </div>
-      <div class="charts-pnl" data-testid="chart-pnl">
-        <p class="pnl-caption">
-          Profit · {{ testDate() }}
-          @if (!liveDay()) {
-            · paper test
-          }
-          · bot books 0.5R
-        </p>
-        <p class="pnl-caption compare">Without Master</p>
-        @if (rawWhyCaption()) {
-          <p class="pnl-why">{{ rawWhyCaption() }}</p>
-        }
-        @for (book of botBooks; track book) {
-          <div
-            class="pnl-cell"
-            [class.up]="pnlTone(pnl().books[book].amount) === 'up'"
-            [class.down]="pnlTone(pnl().books[book].amount) === 'down'"
-          >
-            <span>
-              {{ pnl().books[book].label }}
-              @if (pnl().books[book].trades) {
-                · {{ pnl().books[book].trades }} trade{{ pnl().books[book].trades === 1 ? '' : 's' }}
-              }
-            </span>
-            <strong>₹{{ signed(pnl().books[book].amount, 0) }}</strong>
-          </div>
-        }
-        <div
-          class="pnl-cell total"
-          [class.up]="pnlTone(pnl().total) === 'up'"
-          [class.down]="pnlTone(pnl().total) === 'down'"
-        >
-          <span>Total</span>
-          <strong>₹{{ signed(pnl().total, 0) }}</strong>
-        </div>
-        <p class="pnl-caption compare">With Master</p>
-        @if (masterWhyCaption()) {
-          <p class="pnl-why">{{ masterWhyCaption() }}</p>
-        }
-        @for (book of botBooks; track book) {
-          <div
-            class="pnl-cell master-cell"
-            [class.up]="pnlTone(masterPnl().books[book].amount) === 'up'"
-            [class.down]="pnlTone(masterPnl().books[book].amount) === 'down'"
-          >
-            <span>
-              {{ masterPnl().books[book].label }}
-              @if (masterPnl().books[book].trades) {
-                · {{ masterPnl().books[book].trades }} trade{{ masterPnl().books[book].trades === 1 ? '' : 's' }}
-              }
-            </span>
-            <strong>₹{{ signed(masterPnl().books[book].amount, 0) }}</strong>
-          </div>
-        }
-        <div
-          class="pnl-cell total master-cell"
-          [class.up]="pnlTone(masterPnl().total) === 'up'"
-          [class.down]="pnlTone(masterPnl().total) === 'down'"
-        >
-          <span>Total</span>
-          <strong>₹{{ signed(masterPnl().total, 0) }}</strong>
-        </div>
-        <p class="pnl-strategy" data-testid="chart-strategy-note">{{ strategyBlurb }}</p>
-      </div>
       <div class="charts-actions">
-        <div class="auto-bot-row" role="group" aria-label="Auto bots">
-          @for (book of botBooks; track book) {
-            <button
-              type="button"
-              class="ghost-btn auto-trade"
-              [class.on]="autoBotOn(book)"
-              [attr.aria-pressed]="autoBotOn(book)"
-              [attr.data-testid]="'chart-auto-bot-' + book"
-              (click)="toggleAutoBot(book)"
-            >
-              <span>{{ autoBotOn(book) ? botLabels[book] + ' on' : botLabels[book] }}</span>
-            </button>
-          }
-        </div>
         <label class="chart-date" data-testid="chart-test-date">
-          <span>Test date</span>
+          <span>Date</span>
           <input
             type="date"
             [value]="testDate()"
@@ -124,7 +44,7 @@
           <app-pg-icon name="activity" [size]="15" />
           <span>
             @if (!liveDay()) {
-              Test · {{ testDate() }}
+              Backtest · {{ testDate() }}
             } @else if (!autoRefresh()) {
               Paused
             } @else if (anyMarketOpen()) {
@@ -146,48 +66,144 @@
     </div>
   </header>
 
-  <aside class="master-bar" data-testid="chart-master-bar" [class.on]="masterOn()">
-    <div class="master-bar-main">
-      <button
-        type="button"
-        class="master-take-btn"
-        [class.on]="masterOn()"
-        [attr.aria-pressed]="masterOn()"
-        data-testid="chart-master"
-        (click)="toggleMaster()"
-      >
-        {{ masterButtonLabel() }}
-      </button>
-      <div class="master-copy">
-        <p class="master-kicker">
-          Master · {{ testDate() }}
-          @if (liveDay()) {
-            · live
-          } @else {
-            · paper test — decision below, no live order
+  <details class="smc-settings" data-testid="smc-settings">
+    <summary>
+      <app-pg-icon name="settings" [size]="15" />
+      SMC settings
+      <span class="smc-settings-sum">
+        entry {{ intervalLabels[ltf()] }} · trend filter {{ intervalLabels[htf()] }} ·
+        min RR 1 : {{ configValue('minRR') }} · risk {{ configValue('riskPerTradePct') }}%
+      </span>
+    </summary>
+
+    <div class="smc-settings-body">
+      <fieldset class="smc-fieldset">
+        <legend>Timeframes</legend>
+        <div class="smc-tf-row">
+          <span class="smc-tf-label">Entry timeframe</span>
+          <div class="interval-group" role="group" aria-label="Entry timeframe">
+            @for (option of intervals; track option) {
+              <button
+                type="button"
+                class="interval-btn"
+                [class.active]="ltf() === option"
+                [attr.aria-pressed]="ltf() === option"
+                (click)="setLtf(option)"
+              >
+                {{ intervalLabels[option] }}
+              </button>
+            }
+          </div>
+        </div>
+        <div class="smc-tf-row">
+          <span class="smc-tf-label">Higher-timeframe trend</span>
+          <div class="interval-group" role="group" aria-label="Higher timeframe trend filter">
+            @for (option of intervals; track option) {
+              <button
+                type="button"
+                class="interval-btn"
+                [class.active]="settings().htf === option"
+                [attr.aria-pressed]="settings().htf === option"
+                (click)="setHtf(option)"
+              >
+                {{ intervalLabels[option] }}
+              </button>
+            }
+          </div>
+        </div>
+        @if (htf() !== settings().htf) {
+          <p class="smc-note">
+            A trend filter finer than the entry timeframe is meaningless, so it runs on
+            {{ intervalLabels[htf()] }} instead.
+          </p>
+        }
+        <label class="smc-check">
+          <input
+            type="checkbox"
+            [checked]="configValue('requireHtfTrend')"
+            (change)="toggleHtfFilter($event)"
+          />
+          Only take entries that agree with the higher-timeframe trend
+        </label>
+      </fieldset>
+
+      <fieldset class="smc-fieldset">
+        <legend>Risk &amp; targets</legend>
+        <div class="smc-fields">
+          @for (field of numericFields; track field.key) {
+            <label class="smc-field" [title]="field.hint">
+              <span>{{ field.label }}</span>
+              <input
+                type="number"
+                [min]="field.min"
+                [max]="field.max"
+                [step]="field.step"
+                [value]="configValue(field.key)"
+                (change)="setConfigNumber(field, $event)"
+              />
+            </label>
           }
-        </p>
-        <p class="master-message" data-testid="chart-master-guide">{{ masterMessage() }}</p>
+          <label class="smc-field">
+            <span>Stop-loss method</span>
+            <select [value]="configValue('slMethod')" (change)="setSlMethod($event)">
+              <option value="swing">Beyond swing</option>
+              <option value="orderBlock">Beyond order block</option>
+              <option value="atr">ATR</option>
+            </select>
+          </label>
+          <label class="smc-field">
+            <span>Take-profit method</span>
+            <select [value]="configValue('tpMethod')" (change)="setTpMethod($event)">
+              <option value="rr">Risk / reward multiples</option>
+              <option value="structure">Liquidity / structure</option>
+            </select>
+          </label>
+        </div>
+      </fieldset>
+
+      <fieldset class="smc-fieldset">
+        <legend>Chart layers</legend>
+        <div class="smc-checks">
+          @for (layer of layerOptions; track layer.key) {
+            <label class="smc-check">
+              <input
+                type="checkbox"
+                [checked]="layers()[layer.key]"
+                (change)="toggleLayer(layer.key)"
+              />
+              {{ layer.label }}
+            </label>
+          }
+        </div>
+      </fieldset>
+
+      <fieldset class="smc-fieldset">
+        <legend>Alerts</legend>
+        <div class="smc-checks">
+          @for (type of alertTypes; track type) {
+            <label class="smc-check">
+              <input type="checkbox" [checked]="isAlertOn(type)" (change)="toggleAlert(type)" />
+              {{ alertLabels[type] }}
+            </label>
+          }
+        </div>
+        @if (notificationsSupported) {
+          <label class="smc-check">
+            <input
+              type="checkbox"
+              [checked]="settings().browserNotifications"
+              (change)="toggleBrowserNotifications()"
+            />
+            Also send browser notifications
+          </label>
+        }
+      </fieldset>
+
+      <div class="smc-settings-foot">
+        <button type="button" class="ghost-btn" (click)="resetSettings()">Reset to defaults</button>
       </div>
     </div>
-    <div class="master-calls">
-      @for (book of botBooks; track book) {
-        <span class="master-call" [attr.data-action]="masterGuide().books[book].action">
-          {{ masterGuide().books[book].label }}
-          · {{ masterActionLabels[masterGuide().books[book].action] }}
-          @if (masterOn() && masterStopped()[book]) {
-            · stopped
-          }
-        </span>
-      }
-    </div>
-    @if (!liveDay()) {
-      <p class="master-compare">
-        Without Master ₹{{ signed(pnl().total, 0) }}
-        · With Master ₹{{ signed(masterPnl().total, 0) }}
-      </p>
-    }
-  </aside>
+  </details>
 
   @if (sessionExpired()) {
     <div class="session-banner">
@@ -208,6 +224,31 @@
     </p>
   }
 
+  @if (liveDay()) {
+    <aside class="alert-feed" data-testid="smc-alert-feed">
+      <header>
+        <strong>Alerts</strong>
+        <span>Each confirmed event fires once, on candle close.</span>
+        @if (feed().length) {
+          <button type="button" class="ghost-btn" (click)="clearFeed()">Clear</button>
+        }
+      </header>
+      @if (feed().length) {
+        <ul>
+          @for (item of feed(); track trackFeed($index, item)) {
+            <li [attr.data-type]="item.type">
+              <time>{{ item.at }}</time>
+              <b>{{ item.bookLabel }}</b>
+              <span>{{ item.message }}</span>
+            </li>
+          }
+        </ul>
+      } @else {
+        <p class="alert-empty">Nothing new since you opened this tab.</p>
+      }
+    </aside>
+  }
+
   <div class="chart-stack">
     @for (pane of panes(); track trackPane($index, pane)) {
       <article class="pg-card chart-card">
@@ -222,61 +263,36 @@
               >
                 <i></i>{{ statusOf(pane).label }}
               </span>
-              @if (masterOn()) {
-                <span class="market-badge master-on">
-                  Master · {{ masterActionLabels[pane.masterCall.action] }}
-                </span>
-              } @else if (autoBotOn(pane.def.id)) {
-                <span class="market-badge bot-on">{{ botShort[pane.def.id] }} on</span>
-              }
             </div>
             <span class="chart-symbol">
               {{ pane.def.exchange }}:{{ pane.symbol }} ·
-              {{ intervalLabels[pane.interval] }}
+              {{ intervalLabels[ltf()] }} entry · {{ intervalLabels[htf()] }} trend
             </span>
           </div>
 
-          @if (pane.model?.last) {
+          @if (pane.quote; as quote) {
             <div class="chart-quote">
               <strong
-                [class.pg-up]="(pane.model?.changeAbs ?? 0) >= 0"
-                [class.pg-down]="(pane.model?.changeAbs ?? 0) < 0"
+                [class.pg-up]="(quote.changeAbs ?? 0) >= 0"
+                [class.pg-down]="(quote.changeAbs ?? 0) < 0"
               >
-                {{ fmt(pane.model?.last?.price, pane.def.decimals) }}
+                {{ fmt(quote.price, pane.def.decimals) }}
               </strong>
               <span
                 class="chart-change"
-                [class.pg-up]="(pane.model?.changeAbs ?? 0) >= 0"
-                [class.pg-down]="(pane.model?.changeAbs ?? 0) < 0"
+                [class.pg-up]="(quote.changeAbs ?? 0) >= 0"
+                [class.pg-down]="(quote.changeAbs ?? 0) < 0"
               >
-                {{ signed(pane.model?.changeAbs, pane.def.decimals) }}
-                ({{ signed(pane.model?.changePct, 2) }}%)
+                {{ signed(quote.changeAbs, pane.def.decimals) }}
+                ({{ signed(quote.changePct, 2) }}%)
               </span>
             </div>
           }
         </header>
 
-        <div
-          class="interval-group"
-          role="group"
-          [attr.aria-label]="pane.def.label + ' candle interval'"
-        >
-          @for (option of intervals; track option) {
-            <button
-              type="button"
-              class="interval-btn"
-              [class.active]="pane.interval === option"
-              [attr.aria-pressed]="pane.interval === option"
-              (click)="setPaneInterval(pane.def.id, option)"
-            >
-              {{ intervalLabels[option] }}
-            </button>
-          }
-        </div>
-
         @if (!liveDay()) {
           <p class="chart-note market-note" data-testid="chart-test-note">
-            Testing {{ testDate() }} (start and end are the same). Compare Without Master (every break) and With Master (trend only). Chart chips follow {{ masterOn() ? 'Master' : 'every break' }}.
+            Replaying {{ testDate() }}. Every trade below is backtest; nothing is live.
           </p>
         } @else if (!statusOf(pane).open) {
           <p class="chart-note market-note">{{ statusOf(pane).detail }}</p>
@@ -285,17 +301,17 @@
         @if (pane.error) {
           <p class="chart-error">{{ pane.error }}</p>
         } @else if (pane.loading && !pane.candles.length) {
-          <p class="chart-note">Loading {{ intervalLabels[pane.interval] }} candles…</p>
+          <p class="chart-note">Loading {{ intervalLabels[ltf()] }} candles…</p>
         }
 
         <app-tv-candle-chart
           [candles]="pane.candles"
-          [model]="pane.model"
-          [signals]="pane.signals"
-          [structure]="pane.structure"
-          [structures]="displayedStructures(pane)"
+          [smc]="pane.smc"
+          [layers]="layers()"
+          [changeUp]="pane.quote?.changeAbs == null ? null : pane.quote!.changeAbs! >= 0"
+          [htfLabel]="intervalLabels[htf()]"
           [decimals]="pane.def.decimals"
-          [resetKey]="pane.interval + '|' + testDate() + '|' + (masterOn() ? 'master' : 'raw')"
+          [resetKey]="ltf() + '|' + testDate()"
           [emptyMessage]="pane.error ? 'Chart unavailable' : 'Waiting for candles…'"
           [canOrder]="canPlaceOrders(pane)"
           [orderLots]="lotsFor(pane.def.id)"
@@ -303,11 +319,16 @@
           [ordering]="pane.ordering"
           [orderHint]="orderHintFor(pane)"
           [orderResult]="pane.order"
-          [autoTrade]="masterOn() || autoBotOn(pane.def.id)"
-          [autoBotLabel]="masterOn() ? 'Master' : botShort[pane.def.id]"
           (buyAtm)="buyAtm(pane.def.id, $event)"
           (adjustLots)="bumpLots(pane.def.id, $event)"
-          (toggleAutoTrade)="masterOn() ? toggleMaster() : toggleAutoBot(pane.def.id)"
+        />
+
+        <app-smc-panel
+          [smc]="pane.smc"
+          [decimals]="pane.def.decimals"
+          [htfLabel]="intervalLabels[htf()]"
+          [ltfLabel]="intervalLabels[ltf()]"
+          [liveDay]="liveDay()"
         />
 
         <div class="order-row">
@@ -365,68 +386,14 @@
           <p class="order-result" [class.bad]="!pane.order.ok">{{ pane.order.text }}</p>
         }
 
-        @if (displayedStructures(pane).length) {
-          <div class="trade-list" data-testid="chart-day-trades">
-            @for (box of displayedStructures(pane); track box.date + box.wall + box.dir) {
-              <span
-                class="trade-chip"
-                [class.up]="tradePnl(pane.def.id, box) > 0.5"
-                [class.down]="tradePnl(pane.def.id, box) < -0.5"
-                [attr.data-why]="tradeWhy(pane.def.id, box)"
-              >
-                {{ tradeTime(box) }} {{ box.option }}
-                · Entry {{ fmt(box.entry, pane.def.decimals) }}
-                · {{ whyLabels[tradeWhy(pane.def.id, box)] }}
-                · ₹{{ signed(tradePnl(pane.def.id, box), 0) }}
-              </span>
-            }
-          </div>
-        }
-
         <footer class="chart-foot">
-          <div class="zone-chips">
-            <span class="zone-chip resistance">
-              <i></i>
-              Resistance
-              <b>{{ zoneLabel(nearestZone(pane, 'resistance'), pane.def.decimals) }}</b>
-            </span>
-            <span class="zone-chip support">
-              <i></i>
-              Support
-              <b>{{ zoneLabel(nearestZone(pane, 'support'), pane.def.decimals) }}</b>
-            </span>
-            @if (pane.structure; as box) {
-              <span
-                class="zone-chip structure-chip"
-                [class.buy]="box.dir > 0"
-                [class.sell]="box.dir < 0"
-                data-testid="chart-structure-chip"
-              >
-                {{ box.option }} 1:1
-                <b>
-                  Entry {{ fmt(box.entry, pane.def.decimals) }}
-                  · SL {{ fmt(box.sl, pane.def.decimals) }}
-                  · Exit {{ fmt(box.exit, pane.def.decimals) }}
-                </b>
-              </span>
-            }
-            @if (latestSignal(pane); as sig) {
-              <span
-                class="zone-chip signal-chip"
-                [class.buy]="sig.side === 'BUY'"
-                [class.sell]="sig.side === 'SELL'"
-              >
-                Latest {{ sig.side }} {{ sig.label }}
-                <b>{{ sig.confidence }}%</b>
-              </span>
-            }
-          </div>
           <span class="chart-meta">
-            {{ barCount(pane) }} bars ·
-            {{ pane.model?.zones?.length ?? 0 }} zones ·
-            {{ pane.signals.length }} signals
-            @if (pane.model?.atr) {
-              · ATR {{ fmt(pane.model?.atr, pane.def.decimals) }}
+            {{ barCount(pane) }} bars · {{ tradeCount(pane) }} trades
+            @if (pane.smc?.atr) {
+              · ATR {{ fmt(pane.smc?.atr, pane.def.decimals) }}
+            }
+            @if (pane.smc && !pane.smc.htfAvailable) {
+              · trend filter uses entry timeframe
             }
             @if (pane.updatedAt) {
               · updated {{ pane.updatedAt }}
@@ -438,33 +405,30 @@
   </div>
 
   <p class="chart-hint">
-    The pink / teal box is a <strong>1:1 measured move</strong> on a closed
-    candle that broke a support or resistance band. Pink is the stop (the swing
-    against the break), teal is the equal-height target. Labels mark Entry at
-    the wall, SL at the far pink edge, and Exit at the far teal edge. The auto
-    bot does <strong>not</strong> wait for that teal — it books 0.5R. A “Failed
-    break” never ran; a “Gave back” ran toward teal then hit the pink SL.
-    <strong>Master</strong> waits for the opening drive, trades only the trending
-    side on Crude / Nifty / Bank Nifty, and stands down on chop. It
-    updates as live candles arrive and does not wait for Trade Bot.
+    <strong>How a signal is built.</strong> The higher-timeframe trend (bullish, bearish
+    or sideways, from confirmed structure only) sets the allowed direction. Price then has
+    to reach a point of interest — discount / premium, an active order block, a fair value
+    gap or swept liquidity — react, and a BOS or CHoCH in the trade direction must be
+    confirmed by a candle closing beyond the broken level. Stops sit beyond the swing or
+    order block; TP1, TP2 and the final target follow the risk-reward setting (default
+    1 : 2 minimum). After TP1 the stop moves to break-even, after TP2 to TP1.
   </p>
 
   <p class="chart-hint">
-    BUY / SELL arrows mark where a <strong>closed</strong> candle turned at, or closed
-    through, one of the support and resistance bands drawn above. They wait for
-    the bar to finish so they do not flip while it is still forming. They are
-    chart reading aids — the live desk decides its own trades and does not act
-    on them.
+    <strong>No repainting.</strong> Only closed candles are analysed. Swings are marked a
+    few bars after they form, structure breaks on a candle close, and past trend values are
+    never rewritten. A setup building on the candle still forming is drawn dashed as
+    “SETUP — NOT CONFIRMED” and cannot become a BUY or SELL until that candle closes.
+    An adverse wick or a single temporary pullback does not exit a trade — only the stop,
+    a target, an opposite confirmed structure break, a higher-timeframe reversal or an
+    invalidated order block does.
   </p>
 
   <p class="chart-hint">
-    The percentage on each arrow is <strong>setup quality, not a win rate</strong>. It
-    scores how textbook the bar looks against the level — how well tested the band was,
-    how strongly the candle closed, how far it cleared or recovered the band, its size
-    against ATR, and volume where the instrument reports any (indices do not). Nothing
-    in it is measured against what happened next, so an 85% is a cleaner-looking setup
-    than a 45%, not a likelier profit. Faint arrows are the low-scoring ones; hover a
-    marked candle to see the breakdown behind its score.
+    <strong>Statistics.</strong> Backtest and live results are kept apart: live is trades
+    entered during today's session, backtest is everything before it, and a replayed date is
+    all backtest. Results are in R-multiples of the planned risk with no look-ahead, and
+    are chart-reading aids — SMC signals never place an order on their own.
   </p>
 
   <p class="chart-hint warn">
@@ -472,16 +436,9 @@
     at-the-money contract, sized from Kite funds the same way Trade Bot is
     (₹40,000 per index lot; Crude 3×). Use +/− on a card or in full view to
     change that lot count for the next order. It runs outside the Trade Bot: no
-    premium cap, no daily loss stop. Manual Buy / Sell still has no stop —
-    you manage that exit. <strong>Master</strong> reads the opening drive on Crude,
-    Nifty and Bank Nifty and, when enabled, buys only the trending side — or
-    stands down on chop. The per-book auto bots still take every 1:1 break
-    (without Master). Both rest an SL and a 0.5R LIMIT target on today's live
-    session. If the target fills, cancel the leftover SL in the order book. A
-    past date is a paper test: the profit strip shows Without Master and With
-    Master so you can classify the day both ways. Each manual press still shows
-    the exact contract, its live premium and the rupee cost before anything is
-    sent. The same Buy / Sell buttons sit in full chart view.
+    premium cap, no daily loss stop, and no stop-loss is attached — you manage the exit.
+    Each press shows the exact contract, its live premium and the rupee cost before
+    anything is sent. The same Buy / Sell buttons sit in full chart view.
   </p>
 
   @if (anyError() && !sessionExpired()) {

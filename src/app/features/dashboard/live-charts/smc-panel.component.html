@@ -1,0 +1,120 @@
+@if (smc; as a) {
+  @let s = a.snapshot;
+  <section class="smc-panel" data-testid="smc-panel">
+    <dl class="smc-grid">
+      <div><dt>Market</dt><dd>{{ s.marketName }}</dd></div>
+      <div>
+        <dt>Trend</dt>
+        <dd class="trend" [attr.data-trend]="s.trend">
+          {{ trendText(s.trend) }}
+          @if (s.htfTrend) {
+            <small>{{ htfLabel }} · entry {{ ltfLabel }} {{ trendText(s.ltfTrend) }}</small>
+          } @else {
+            <small>{{ ltfLabel }} only</small>
+          }
+        </dd>
+      </div>
+      <div><dt>Structure</dt><dd>{{ s.structure }}</dd></div>
+      <div><dt>Last BOS</dt><dd>{{ s.lastBos ?? '—' }}</dd></div>
+      <div><dt>Last CHoCH</dt><dd>{{ s.lastChoch ?? '—' }}</dd></div>
+      <div>
+        <dt>Current setup</dt>
+        <dd
+          [class.buy]="s.setup === 'Buy Setup'"
+          [class.sell]="s.setup === 'Sell Setup'"
+        >
+          {{ s.setup }}
+          @if (s.setupUnconfirmed) {
+            <small>NOT CONFIRMED</small>
+          }
+        </dd>
+      </div>
+      <div>
+        <dt>Signal</dt>
+        <dd class="signal" [class.buy]="s.signal === 'BUY'" [class.sell]="s.signal === 'SELL'">
+          {{ s.signal }}
+        </dd>
+      </div>
+      <div><dt>Entry</dt><dd>{{ price(s.entry) }}</dd></div>
+      <div><dt>Stop loss</dt><dd class="sl">{{ price(s.sl) }}</dd></div>
+      <div><dt>TP1</dt><dd class="tp">{{ price(s.tp1) }}</dd></div>
+      <div><dt>TP2</dt><dd class="tp">{{ price(s.tp2) }}</dd></div>
+      <div><dt>Final TP</dt><dd class="tp">{{ price(s.tpFinal) }}</dd></div>
+      <div><dt>Risk/reward</dt><dd>{{ rr(s.rr) }}</dd></div>
+      <div>
+        <dt>Position</dt>
+        <dd
+          [class.buy]="s.position === 'Long'"
+          [class.sell]="s.position === 'Short'"
+        >
+          {{ s.position }}
+        </dd>
+      </div>
+      @if (s.zone) {
+        <div><dt>Price zone</dt><dd>{{ s.zone | titlecase }}</dd></div>
+      }
+    </dl>
+
+    @if (!a.htfAvailable) {
+      <p class="smc-note">
+        Higher-timeframe trend is not available for this timeframe pair — entries use the
+        entry-timeframe trend instead.
+      </p>
+    }
+
+    <details class="smc-fold">
+      <summary>Performance · backtest vs live</summary>
+      <p class="smc-note">{{ liveNote() }}</p>
+      <table class="smc-table" data-testid="smc-stats">
+        <thead>
+          <tr><th></th><th>Backtest</th><th>Live</th></tr>
+        </thead>
+        <tbody>
+          @for (row of statRows(); track row.label) {
+            <tr>
+              <th scope="row">{{ row.label }}</th>
+              <td>{{ row.backtest }}</td>
+              <td>{{ row.live }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </details>
+
+    <details class="smc-fold">
+      <summary>Trades ({{ a.trades.length }})</summary>
+      @if (!a.trades.length) {
+        <p class="smc-note">No confirmed entries on these candles.</p>
+      } @else {
+        <div class="smc-scroll">
+          <table class="smc-table trades" data-testid="smc-trades">
+            <thead>
+              <tr>
+                <th>Time</th><th>Side</th><th>Entry</th><th>SL</th><th>TP1</th><th>TP2</th>
+                <th>Final</th><th>Exit</th><th>Reason</th><th>Result</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (t of recentTrades(); track t.id) {
+                <tr>
+                  <td>{{ time(t.entryDate) }}</td>
+                  <td [class.buy]="t.side === 'BUY'" [class.sell]="t.side === 'SELL'">{{ t.side }}</td>
+                  <td>{{ price(t.entryPrice) }}</td>
+                  <td>{{ price(t.sl) }}</td>
+                  <td>{{ price(t.tp1) }}</td>
+                  <td>{{ price(t.tp2) }}</td>
+                  <td>{{ price(t.tpFinal) }}</td>
+                  <td>{{ t.status === 'open' ? 'open' : price(t.exitPrice) }}</td>
+                  <td>{{ t.exitReason ? exitLabels[t.exitReason] : '—' }}</td>
+                  <td [class.buy]="(t.rMultiple ?? 0) > 0" [class.sell]="(t.rMultiple ?? 0) < 0">
+                    {{ signedR(t.rMultiple) }}
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </details>
+  </section>
+}
