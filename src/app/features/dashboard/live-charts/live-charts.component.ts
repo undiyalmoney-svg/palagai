@@ -196,6 +196,7 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
     { key: 'fvg', label: 'Fair value gaps' },
     { key: 'liquidity', label: 'Liquidity & equal H/L' },
     { key: 'premiumDiscount', label: 'Premium / discount' },
+    { key: 'fib', label: 'Fibonacci & golden zone' },
     { key: 'levels', label: 'Entry, SL & TP levels' },
   ];
 

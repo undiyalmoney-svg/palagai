@@ -10,6 +10,7 @@ export interface SmcLayers {
   fvg: boolean;
   liquidity: boolean;
   premiumDiscount: boolean;
+  fib: boolean;
   levels: boolean;
 }
 
@@ -41,6 +42,7 @@ export function defaultSmcSettings(): SmcSettings {
       fvg: true,
       liquidity: true,
       premiumDiscount: true,
+      fib: true,
       levels: true,
     },
     alerts: Object.fromEntries(SMC_ALERT_TYPES.map((t) => [t, true])) as Record<

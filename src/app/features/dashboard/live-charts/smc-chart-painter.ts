@@ -61,8 +61,11 @@ const C = {
   ink: '#0f172a',
   halo: 'rgba(255, 255, 255, 0.88)',
   pending: '#b45309',
-  riskBand: 'rgba(239, 83, 80, 0.09)',
-  rewardBand: 'rgba(38, 166, 154, 0.08)',
+  riskBand: 'rgba(239, 83, 80, 0.16)',
+  rewardBand: 'rgba(34, 184, 207, 0.16)',
+  golden: 'rgba(120, 123, 134, 0.22)',
+  goldenEdge: 'rgba(71, 85, 105, 0.6)',
+  fibLine: 'rgba(120, 123, 134, 0.55)',
   neutral: '#475569',
 } as const;
 
@@ -113,6 +116,7 @@ export function paintSmcUnder(f: PaintFrame): void {
   ctx.clip();
 
   if (layers.premiumDiscount && smc.range) paintPremiumDiscount(f);
+  if (layers.fib) paintFibonacci(f);
   if (layers.fvg) paintFvgs(f);
   if (layers.orderBlocks) paintOrderBlocks(f);
   ctx.restore();
@@ -141,6 +145,7 @@ export function paintSmcOver(f: PaintFrame): void {
   if (layers.structure) paintStructureLabels(f, placed);
   if (layers.orderBlocks) paintZoneLabels(f, placed);
   if (layers.liquidity) paintLiquidityLabels(f, placed);
+  if (layers.fib) paintFibLabels(f, placed);
   if (layers.premiumDiscount && smc.range) paintPdLabels(f, placed);
   if (layers.swings) paintSwingLabels(f, placed);
 
@@ -361,6 +366,104 @@ function paintPdLabels(f: PaintFrame, placed: Box[]): void {
   pill(f, placed, 'DISCOUNT', x, f.yOf(r.lo + (th * span) / 2), 'rgba(0,137,123,0.55)', '#ffffff', 'right');
 }
 
+
+// --------------------------------------------------------------- fibonacci
+
+const FIB_LEVELS = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1] as const;
+const GOLDEN_FROM = 0.5;
+const GOLDEN_TO = 0.618;
+/** Legs smaller than this many ATRs are noise, not a swing worth retracing. */
+const FIB_MIN_LEG_ATR = 1.5;
+
+interface FibLeg {
+  /** True when the leg fell, so the retracement is a supply zone. */
+  down: boolean;
+  startIndex: number;
+  price: (ratio: number) => number;
+}
+
+/**
+ * Retracement of the latest confirmed leg: the two most recent opposite
+ * swings. Only confirmed pivots are used, so the grid appears after the swing
+ * is known and never moves back.
+ */
+function fibLeg(smc: SmcAnalysis): FibLeg | null {
+  const s = smc.swings;
+  if (s.length < 2) return null;
+  const end = s[s.length - 1]!;
+  let start: (typeof s)[number] | null = null;
+  for (let i = s.length - 2; i >= 0; i -= 1) {
+    if (s[i]!.kind !== end.kind) {
+      start = s[i]!;
+      break;
+    }
+  }
+  if (!start) return null;
+  const down = end.kind === 'low';
+  const hi = down ? start.price : end.price;
+  const lo = down ? end.price : start.price;
+  if (hi - lo < (smc.atr ?? 0) * FIB_MIN_LEG_ATR || hi <= lo) return null;
+  return {
+    down,
+    startIndex: end.index,
+    price: (ratio) => (down ? lo + ratio * (hi - lo) : hi - ratio * (hi - lo)),
+  };
+}
+
+function paintFibonacci(f: PaintFrame): void {
+  const leg = fibLeg(f.smc);
+  if (!leg) return;
+  const { ctx } = f;
+  const x0 = clampX(f, f.xOf(leg.startIndex));
+  const a = f.yOf(leg.price(GOLDEN_FROM));
+  const b = f.yOf(leg.price(GOLDEN_TO));
+  ctx.fillStyle = C.golden;
+  ctx.fillRect(x0, Math.min(a, b), f.right - x0, Math.max(2, Math.abs(b - a)));
+  ctx.strokeStyle = C.fibLine;
+  ctx.lineWidth = 1;
+  for (const ratio of FIB_LEVELS) {
+    const y = Math.round(f.yOf(leg.price(ratio))) + 0.5;
+    const golden = ratio === GOLDEN_FROM || ratio === GOLDEN_TO;
+    ctx.strokeStyle = golden ? C.goldenEdge : C.fibLine;
+    ctx.setLineDash(ratio === 0 || ratio === 1 ? [] : [4, 4]);
+    ctx.beginPath();
+    ctx.moveTo(x0, y);
+    ctx.lineTo(f.right, y);
+    ctx.stroke();
+  }
+  ctx.setLineDash([]);
+}
+
+function paintFibLabels(f: PaintFrame, placed: Box[]): void {
+  const leg = fibLeg(f.smc);
+  if (!leg) return;
+  const { ctx } = f;
+  const x0 = clampX(f, f.xOf(leg.startIndex));
+  ctx.textAlign = 'left';
+  for (const ratio of FIB_LEVELS) {
+    const y = f.yOf(leg.price(ratio)) - 5;
+    if (y < f.top + 4 || y > f.bottom - 4) continue;
+    const text = String(ratio);
+    const w = ctx.measureText(text).width;
+    const box = { x0: x0 + 2, x1: x0 + 4 + w, y0: y - FONT_H / 2, y1: y + FONT_H / 2 };
+    if (collides(placed, box)) continue;
+    placed.push(box);
+    ctx.fillStyle = C.neutral;
+    ctx.fillText(text, x0 + 3, y);
+  }
+  const mid = (f.yOf(leg.price(GOLDEN_FROM)) + f.yOf(leg.price(GOLDEN_TO))) / 2;
+  pill(
+    f,
+    placed,
+    leg.down ? 'SUPPLY + GOLDEN ZONE' : 'DEMAND + GOLDEN ZONE',
+    Math.max(x0 + 26, f.left),
+    mid,
+    'rgba(71,85,105,0.8)',
+    '#ffffff',
+    'left',
+  );
+}
+
 // ------------------------------------------------------------------ trades
 
 function paintTradeLevels(f: PaintFrame): void {
@@ -404,12 +507,36 @@ function paintLevelLabels(f: PaintFrame, placed: Box[]): void {
     const endIndex = t.status === 'open' ? f.bars.length - 1 : (t.exitIndex ?? f.bars.length - 1);
     if (endIndex < f.first || t.entryIndex > f.last) continue;
     const anchor = t.status === 'open' ? f.right - 4 : clampX(f, f.xOf(endIndex)) - 2;
-    pill(f, placed, 'ENTRY', anchor, f.yOf(t.entryPrice), C.ink, '#ffffff', 'right');
-    pill(f, placed, 'SL', anchor, f.yOf(t.sl), C.bear, '#ffffff', 'right');
+    const long = t.side === 'BUY';
+    pill(f, placed, long ? 'ENTRY LONG' : 'ENTRY SHORT', anchor, f.yOf(t.entryPrice), C.ink, '#ffffff', 'right');
+    pill(f, placed, 'STOP LOSS', anchor, f.yOf(t.sl), C.bear, '#ffffff', 'right');
     pill(f, placed, 'FINAL TP', anchor, f.yOf(t.tpFinal), C.bull, '#ffffff', 'right');
     pill(f, placed, 'TP2', anchor, f.yOf(t.tp2), 'rgba(0,137,123,0.8)', '#ffffff', 'right');
     pill(f, placed, 'TP1', anchor, f.yOf(t.tp1), 'rgba(0,137,123,0.8)', '#ffffff', 'right');
+    paintRiskRewardBoxes(f, placed, t, anchor);
   }
+}
+
+function pctOf(distance: number, entry: number): string {
+  return entry > 0 ? `${((distance / entry) * 100).toFixed(2)}%` : '—';
+}
+
+/** Distance boxes at the stop and target edges and a central R/R + open P&L box. */
+function paintRiskRewardBoxes(f: PaintFrame, placed: Box[], t: SmcTrade, anchor: number): void {
+  const risk = Math.abs(t.entryPrice - t.sl);
+  const reward = Math.abs(t.tpFinal - t.entryPrice);
+  const x = anchor - 64;
+  pill(f, placed, `${risk.toFixed(2)} (${pctOf(risk, t.entryPrice)})`, x, f.yOf(t.sl) + (t.side === 'BUY' ? -8 : 8), 'rgba(211,47,47,0.75)', '#ffffff', 'right');
+  pill(f, placed, `${reward.toFixed(2)} (${pctOf(reward, t.entryPrice)})`, x, f.yOf(t.tpFinal) + (t.side === 'BUY' ? 8 : -8), 'rgba(14,116,144,0.8)', '#ffffff', 'right');
+
+  const mid = (f.yOf(t.entryPrice) + f.yOf(t.tpFinal)) / 2;
+  let text = `R/R ${t.rr.toFixed(2)}`;
+  if (t.status === 'open' && risk > 0) {
+    const last = f.bars[f.bars.length - 1]!.close;
+    const open = (t.side === 'BUY' ? last - t.entryPrice : t.entryPrice - last);
+    text += ` · P&L ${open >= 0 ? '+' : ''}${open.toFixed(2)} (${(open / risk).toFixed(2)}R)`;
+  }
+  pill(f, placed, text, x, mid, 'rgba(0,137,123,0.85)', '#ffffff', 'right');
 }
 
 function paintSignals(f: PaintFrame, placed: Box[]): void {
