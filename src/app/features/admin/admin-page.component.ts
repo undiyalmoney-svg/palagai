@@ -5,7 +5,7 @@ import { firstValueFrom } from 'rxjs';
 import { SiteModule, SiteUser } from '../../core/auth/auth.constants';
 import { UiDialogService } from '../../shared/ui/dialog/ui-dialog.service';
 
-const CUSTOMER_MODS: SiteModule[] = ['trade', 'crude', 'auto', 'token', 'test', 'strat'];
+const CUSTOMER_MODS: SiteModule[] = ['trade', 'crude', 'auto', 'momentum', 'token', 'test', 'strat'];
 
 @Component({
   selector: 'app-admin-page',
@@ -34,7 +34,7 @@ export class AdminPageComponent implements OnInit {
   protected newPassword = '';
   protected newKiteKey = '';
   protected newNote = '';
-  protected newMods: SiteModule[] = ['trade', 'crude', 'token', 'test'];
+  protected newMods: SiteModule[] = ['trade', 'crude', 'momentum', 'token', 'test'];
 
   /** UI-only list filter — does not touch APIs. */
   protected readonly filteredUsers = computed(() => {
@@ -66,6 +66,7 @@ export class AdminPageComponent implements OnInit {
       trade: 'Trade',
       crude: 'Crude',
       auto: 'Auto',
+      momentum: 'Momentum',
       token: 'Token',
       test: 'Test',
       strat: 'Strategy',

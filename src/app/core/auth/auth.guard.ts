@@ -10,7 +10,7 @@ import {
 } from '../kite/kite-request-token.util';
 
 const MODULE_HOME: Array<{ module: SiteModule; path: string }> = [
-  { module: 'auto', path: '/dashboard/trade-bot' },
+  { module: 'momentum', path: '/dashboard/momentum' },
   { module: 'token', path: '/dashboard/get-token' },
   { module: 'test', path: '/dashboard/order-test' },
 ];

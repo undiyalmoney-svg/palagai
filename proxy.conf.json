@@ -17,12 +17,12 @@
     },
     "logLevel": "debug"
   },
-  "/api/live": {
+  "/api/momentum": {
     "target": "http://168.144.28.89:3000",
     "secure": false,
     "changeOrigin": true,
     "pathRewrite": {
-      "^/api/live": "/live"
+      "^/api/momentum": "/momentum"
     },
     "logLevel": "debug"
   },

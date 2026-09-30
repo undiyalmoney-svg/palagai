@@ -13,7 +13,6 @@ import { DashboardComponent } from './features/dashboard/dashboard.component';
 import { DashboardHomeComponent } from './features/dashboard/dashboard-home.component';
 import { OrderTestComponent } from './features/dashboard/order-test/order-test.component';
 import { GetTokenComponent } from './features/dashboard/get-token/get-token.component';
-import { TradeBotComponent } from './features/dashboard/trade-bot/trade-bot.component';
 import { LiveChartsComponent } from './features/dashboard/live-charts/live-charts.component';
 import { SettingsComponent } from './features/dashboard/settings/settings.component';
 import { PnlRecordsComponent } from './features/dashboard/pnl-records/pnl-records.component';
@@ -79,15 +78,10 @@ export const routes: Routes = [
         component: DashboardHomeComponent,
       },
       {
-        path: 'trade-bot',
-        canActivate: [moduleGuard('auto')],
-        component: TradeBotComponent,
-      },
-      {
-        path: 'crude-bot',
-        canActivate: [moduleGuard('auto')],
-        data: { desk: 'crude' },
-        component: TradeBotComponent,
+        path: 'momentum',
+        canActivate: [moduleGuard('momentum')],
+        loadChildren: () =>
+          import('./features/dashboard/momentum/momentum.routes').then((m) => m.MOMENTUM_ROUTES),
       },
       {
         path: 'charts',

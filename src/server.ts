@@ -393,7 +393,7 @@ orderKiteRouter.use(async (req, res) => {
 app.use('/api/order-kite', orderKiteRouter);
 
 /**
- * Forward Auto Trader (/live) and P/L records (/pnl) to the same Order-API droplet.
+ * Forward Momentum Portfolio Manager (/momentum) and P/L records (/pnl) to the same Order-API droplet.
  * Same-origin in prod (avoids mixed content); local ng serve uses proxy.conf.json.
  */
 async function proxyOrderBackendJson(
@@ -410,8 +410,8 @@ async function proxyOrderBackendJson(
   let upstreamPath = pathOnly;
   if (pathOnly.startsWith('/api/auth')) {
     upstreamPath = pathOnly.replace(/^\/api\/auth/, '/auth');
-  } else if (pathOnly.startsWith('/api/live')) {
-    upstreamPath = pathOnly.replace(/^\/api\/live/, '/live');
+  } else if (pathOnly.startsWith('/api/momentum')) {
+    upstreamPath = pathOnly.replace(/^\/api\/momentum/, '/momentum');
   } else if (pathOnly.startsWith('/api/pnl')) {
     upstreamPath = pathOnly.replace(/^\/api\/pnl/, '/pnl');
   } else {
@@ -429,7 +429,7 @@ async function proxyOrderBackendJson(
   if (typeof req.headers['x-vault-password'] === 'string') {
     headers['X-Vault-Password'] = req.headers['x-vault-password'];
   }
-  // Browser Kite session — Angular sends this; without it GET /live/funds 400s.
+  // Browser Kite session — Angular sends this; without it GET /momentum/broker/funds 400s.
   if (typeof req.headers['x-kite-authorization'] === 'string') {
     headers['X-Kite-Authorization'] = req.headers['x-kite-authorization'];
   }
@@ -476,12 +476,12 @@ async function proxyOrderBackendJson(
   }
 }
 
-const liveApiRouter = express.Router();
-liveApiRouter.use(express.json());
-liveApiRouter.use((req, res) => {
-  void proxyOrderBackendJson('/live', 'live', req, res);
+const momentumApiRouter = express.Router();
+momentumApiRouter.use(express.json());
+momentumApiRouter.use((req, res) => {
+  void proxyOrderBackendJson('/momentum', 'momentum', req, res);
 });
-app.use('/api/live', liveApiRouter);
+app.use('/api/momentum', momentumApiRouter);
 
 const pnlApiRouter = express.Router();
 pnlApiRouter.use(express.json());

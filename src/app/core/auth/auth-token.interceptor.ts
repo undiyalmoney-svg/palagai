@@ -2,7 +2,7 @@ import { HttpInterceptorFn } from '@angular/common/http';
 import { inject } from '@angular/core';
 import { AuthService } from './auth.service';
 
-/** Attach site or admin Bearer token for Order-API auth/live/pnl/vault calls. */
+/** Attach site or admin Bearer token for Order-API auth/momentum/pnl/vault calls. */
 export const authTokenInterceptor: HttpInterceptorFn = (req, next) => {
   const auth = inject(AuthService);
   const url = req.url;
@@ -12,7 +12,7 @@ export const authTokenInterceptor: HttpInterceptorFn = (req, next) => {
     url.includes('/api/pnl');
   const needsSite =
     url.includes('/api/auth/me') ||
-    url.includes('/api/live');
+    url.includes('/api/momentum');
 
   if (needsAdmin) {
     const t = auth.getAdminToken();

@@ -32,6 +32,8 @@ interface NavItem {
   route: string;
   icon: string;
   module: SiteModule | null;
+  /** false = stay highlighted for nested routes (default: exact match). */
+  exact?: boolean;
 }
 
 @Component({
@@ -65,24 +67,18 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   protected readonly clockLabel = signal('');
   protected readonly pageTitle = signal('Palagai');
-  protected readonly pageSubtitle = signal('Trade Bot, Crude Bot, Token, and Test.');
+  protected readonly pageSubtitle = signal('Momentum Portfolio Manager, Charts, Token, and Test.');
   protected readonly sidebarOpen = signal(true);
   protected readonly profileOpen = signal(false);
 
   private readonly allNav: NavItem[] = [
     {
-      label: 'Trade Bot',
-      shortLabel: 'Bot',
-      route: '/dashboard/trade-bot',
-      icon: 'bot',
-      module: 'auto',
-    },
-    {
-      label: 'Crude Bot',
-      shortLabel: 'Crude',
-      route: '/dashboard/crude-bot',
-      icon: 'droplet',
-      module: 'auto',
+      label: 'Momentum',
+      shortLabel: 'Momentum',
+      route: '/dashboard/momentum',
+      icon: 'pie-chart',
+      module: 'momentum',
+      exact: false,
     },
     {
       label: 'Charts',
@@ -108,13 +104,9 @@ export class DashboardComponent implements OnInit, OnDestroy {
   ];
 
   private readonly titles: Record<string, { title: string; subtitle: string }> = {
-    '/dashboard/trade-bot': {
-      title: 'Trade Bot',
-      subtitle: 'S/R → breakout → confirm (retest) → enter ATM CE/PE. Not a straddle.',
-    },
-    '/dashboard/crude-bot': {
-      title: 'Crude Bot',
-      subtitle: 'Crude Oil Mini ATM CE/PE. Same retest playbook as Nifty/Bank.',
+    '/dashboard/momentum': {
+      title: 'Momentum Portfolio Manager',
+      subtitle: 'Rank, decide, size and execute — one deterministic engine for signals, paper, live and backtests.',
     },
     '/dashboard/charts': {
       title: 'Charts',

@@ -6,8 +6,8 @@ export const environment = {
    * Prod: SSR /api/order-kite → droplet (avoids mixed content).
    */
   orderApiBaseUrl: '/api/order-kite',
-  /** Auto Trader control plane — local proxy / prod SSR → droplet /live. */
-  liveApiBaseUrl: '/api/live',
+  /** Momentum Portfolio Manager + broker session — local proxy / prod SSR → droplet /momentum. */
+  momentumApiBaseUrl: '/api/momentum',
   /** Manual daily P/L — local proxy / prod SSR → droplet /pnl. */
   pnlApiBaseUrl: '/api/pnl',
   /** Default lots multiplier across desks (exchange lot × this). */

@@ -36,13 +36,9 @@ import { Component, Input } from '@angular/core';
           <line x1="10" x2="14" y1="8" y2="8" />
           <line x1="18" x2="22" y1="16" y2="16" />
         }
-        @case ('droplet') {
-          <path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z" />
-        }
-        @case ('bot') {
-          <path d="M12 8V4H8" />
-          <rect width="16" height="12" x="4" y="8" rx="2" />
-          <path d="M2 14h2m16 0h2M9 13v2m6-2v2" />
+        @case ('pie-chart') {
+          <path d="M21.21 15.89A10 10 0 1 1 8 2.83" />
+          <path d="M22 12A10 10 0 0 0 12 2v10z" />
         }
         @case ('flask') {
           <path d="M10 2v7.527a2 2 0 0 1-.211.896L4.72 20.55a1 1 0 0 0 .9 1.45h12.76a1 1 0 0 0 .9-1.45l-5.069-10.127A2 2 0 0 1 14 9.527V2" />

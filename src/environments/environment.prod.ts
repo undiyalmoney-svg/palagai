@@ -5,7 +5,7 @@ export const environment = {
    * Kite sees the droplet static egress IP.
    */
   orderApiBaseUrl: '/api/order-kite',
-  liveApiBaseUrl: '/api/live',
+  momentumApiBaseUrl: '/api/momentum',
   pnlApiBaseUrl: '/api/pnl',
   defaultLots: 1,
   allowLiveMoney: true,

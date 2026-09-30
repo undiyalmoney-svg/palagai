@@ -24,8 +24,8 @@ export class KiteFundsService {
   private readonly http = inject(HttpClient);
   private readonly kiteSession = inject(KiteSessionService);
   private readonly capitalPreference = inject(CapitalPreferenceService);
-  private readonly liveApiBase =
-    (environment as { liveApiBaseUrl?: string }).liveApiBaseUrl || '/api/live';
+  private readonly momentumApiBase =
+    (environment as { momentumApiBaseUrl?: string }).momentumApiBaseUrl || '/api/momentum';
 
   readonly busy = signal(false);
   readonly error = signal('');
@@ -54,7 +54,7 @@ export class KiteFundsService {
     this.error.set('');
     try {
       const res = await firstValueFrom(
-        this.http.get<KiteFundsSnapshot>(`${this.liveApiBase}/funds`, { headers }),
+        this.http.get<KiteFundsSnapshot>(`${this.momentumApiBase}/broker/funds`, { headers }),
       );
       this.apply({ ...res, fetchedAt: res.fetchedAt || new Date().toISOString() });
       if (!this.equityAvailable() && res.message) this.error.set(res.message);
@@ -71,7 +71,7 @@ export class KiteFundsService {
     if (!data?.api_key || !data.access_token) return false;
     try {
       await firstValueFrom(
-        this.http.put(`${this.liveApiBase}/auth`, {
+        this.http.put(`${this.momentumApiBase}/broker/auth`, {
           apiKey: data.api_key,
           accessToken: data.access_token,
         }),

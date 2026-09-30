@@ -1,7 +1,7 @@
 export const environment = {
   production: false,
   orderApiBaseUrl: '/api/order-kite',
-  liveApiBaseUrl: '/api/live',
+  momentumApiBaseUrl: '/api/momentum',
   pnlApiBaseUrl: '/api/pnl',
   defaultLots: 1,
   allowLiveMoney: true,

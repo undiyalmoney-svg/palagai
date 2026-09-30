@@ -2,6 +2,7 @@ export type SiteModule =
   | 'trade'
   | 'crude'
   | 'auto'
+  | 'momentum'
   | 'token'
   | 'test'
   | 'strat'
