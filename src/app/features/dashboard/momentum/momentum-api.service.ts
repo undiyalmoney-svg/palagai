@@ -49,6 +49,8 @@ export interface ScreenerResponse {
   regime: RegimeReading;
   universeSize: number;
   sectors: string[];
+  /** Fast / mid / slow / long EMA lengths. Defaults are 20 / 50 / 100 / 200. */
+  emaPeriods?: number[];
   rows: RankRow[];
 }
 

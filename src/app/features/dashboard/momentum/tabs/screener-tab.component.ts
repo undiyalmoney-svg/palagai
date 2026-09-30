@@ -64,7 +64,7 @@ type SortKey = 'rank' | 'score' | 'price' | 'd1' | 'w1' | 'm1' | 'm3' | 'm6' | '
                 <th class="num sortable" (click)="sortBy('rsi')">RSI{{ arrow('rsi') }}</th>
                 <th class="num sortable" (click)="sortBy('adx')">ADX{{ arrow('adx') }}</th>
                 <th class="num sortable" (click)="sortBy('atrPct')">ATR%{{ arrow('atrPct') }}</th>
-                <th>EMA 20/50/100/200</th>
+                <th>EMA {{ emaLabel() }}</th>
               </tr>
             </thead>
             <tbody>
@@ -89,7 +89,7 @@ type SortKey = 'rank' | 'score' | 'price' | 'd1' | 'w1' | 'm1' | 'm3' | 'm6' | '
                   <td class="num">{{ num(r.adx, 0) }}</td>
                   <td class="num">{{ pctFrac(r.atrPct, 1) }}</td>
                   <td class="ema">
-                    @for (k of emaKeys; track k) { <i [class.on]="r.aboveEma[k]" [title]="'Price above EMA ' + k"></i> }
+                    @for (slot of emaSlots(); track slot.key) { <i [class.on]="r.aboveEma[slot.key]" [title]="'Price above EMA ' + slot.period"></i> }
                   </td>
                 </tr>
               } @empty {
@@ -201,7 +201,12 @@ export class ScreenerTabComponent implements OnInit {
   protected readonly sortKey = signal<SortKey>('rank');
   protected readonly sortDir = signal<1 | -1>(1);
 
-  protected readonly emaKeys = ['20', '50', '100', '200'];
+  protected readonly emaSlots = computed(() => {
+    const periods = this.data()?.emaPeriods ?? [20, 50, 100, 200];
+    const keys = ['fast', 'mid', 'slow', 'long'] as const;
+    return keys.map((key, i) => ({ key, period: periods[i] ?? [20, 50, 100, 200][i] }));
+  });
+  protected readonly emaLabel = computed(() => this.emaSlots().map((s) => s.period).join('/'));
   protected readonly inr = inr;
   protected readonly num = num;
   protected readonly pctFrac = pctFrac;
