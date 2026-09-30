@@ -9,6 +9,8 @@
  * known `swingLength` bars later).
  */
 
+import type { SmcConfig } from './smc.config';
+
 export type SmcMarketId = 'nifty' | 'bank' | 'crude';
 
 export const SMC_MARKET_NAMES: Record<SmcMarketId, string> = {
@@ -337,6 +339,8 @@ export interface SmcStatsSplit {
 
 export interface SmcAnalysis {
   market: SmcMarketId;
+  /** Effective configuration the run used. */
+  config: SmcConfig;
   /** Closed candles the analysis ran over. */
   bars: number;
   swings: SmcSwing[];

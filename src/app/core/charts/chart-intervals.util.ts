@@ -41,13 +41,13 @@ export interface ChartIntervalSpec {
  */
 const INTERVAL_SPECS: Record<ChartInterval, ChartIntervalSpec> = {
   '1m': { label: '1m', fetch: 'minute', groupSize: 1, lookbackDays: 4 },
-  '5m': { label: '5m', fetch: '5minute', groupSize: 1, lookbackDays: 5 },
-  '10m': { label: '10m', fetch: '10minute', groupSize: 1, lookbackDays: 8 },
-  '15m': { label: '15m', fetch: '15minute', groupSize: 1, lookbackDays: 10 },
-  '30m': { label: '30m', fetch: '30minute', groupSize: 1, lookbackDays: 20 },
+  '5m': { label: '5m', fetch: '5minute', groupSize: 1, lookbackDays: 8 },
+  '10m': { label: '10m', fetch: '10minute', groupSize: 1, lookbackDays: 14 },
+  '15m': { label: '15m', fetch: '15minute', groupSize: 1, lookbackDays: 20 },
+  '30m': { label: '30m', fetch: '30minute', groupSize: 1, lookbackDays: 30 },
   // Kite has no 45-minute candle, so fold three 15-minute bars.
-  '45m': { label: '45m', fetch: '15minute', groupSize: 3, lookbackDays: 30 },
-  '1h': { label: '1h', fetch: '60minute', groupSize: 1, lookbackDays: 30 },
+  '45m': { label: '45m', fetch: '15minute', groupSize: 3, lookbackDays: 40 },
+  '1h': { label: '1h', fetch: '60minute', groupSize: 1, lookbackDays: 60 },
 };
 
 /** Intervals in the order the tab offers them. */
@@ -89,10 +89,11 @@ export function chartIntervalMinutes(interval: ChartInterval): number {
 }
 
 /**
- * Most recent bars kept for display. A 1-minute request spans several
- * sessions' worth of bars; drawing them all would be an unreadable smear.
+ * Most recent bars kept. The SMC engine needs several sessions of history to
+ * confirm swings and produce a meaningful backtest; the chart only draws a
+ * window of them at a time (see chart-viewport.util).
  */
-export const MAX_CHART_BARS = 180;
+export const MAX_CHART_BARS = 400;
 
 /**
  * Kite's ceiling on days per historical request, per interval. Mirrors

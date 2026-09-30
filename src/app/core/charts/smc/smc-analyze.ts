@@ -76,6 +76,7 @@ export function analyzeSmc(input: AnalyzeSmcInput): SmcAnalysis {
 
   return {
     market: input.market,
+    config: cfg,
     bars: closed.length,
     swings: engine.tracker.swings,
     structure: engine.tracker.events,

@@ -68,8 +68,7 @@ export class LiveChartDataService {
   }
 
   /**
-   * Nifty and Bank Nifty use their index tokens — the same series the S/R
-   * engine reads, so the chart shows the levels the bot actually trades.
+   * Nifty and Bank Nifty use their index tokens.
    * Crude has no index, so it resolves the nearest CRUDEOILM futures contract.
    */
   async resolveInstrument(book: ChartBookId, asOf?: Date): Promise<ResolvedChartInstrument> {
