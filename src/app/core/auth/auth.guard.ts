@@ -11,18 +11,24 @@ import {
 
 const MODULE_HOME: Array<{ module: SiteModule; path: string }> = [
   { module: 'momentum', path: '/dashboard/momentum' },
+  { module: 'auto', path: '/dashboard/charts' },
   { module: 'token', path: '/dashboard/get-token' },
   { module: 'test', path: '/dashboard/order-test' },
 ];
 
 /** First desk the user is allowed to open. */
-export function firstDashboardPath(auth: AuthService): string {
+export function firstDashboardPathFor(hasModule: (mod: SiteModule) => boolean): string {
   for (const row of MODULE_HOME) {
-    if (auth.hasModule(row.module)) {
+    if (hasModule(row.module)) {
       return row.path;
     }
   }
   return '/dashboard/home';
+}
+
+/** First desk the user is allowed to open. */
+export function firstDashboardPath(auth: AuthService): string {
+  return firstDashboardPathFor((mod) => auth.hasModule(mod));
 }
 
 function allowGetTokenDuringKiteOAuth(

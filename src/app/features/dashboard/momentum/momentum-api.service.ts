@@ -171,7 +171,19 @@ export class MomentumApiService {
   // ---- broker / live
   brokerStatus = () => this.get<BrokerStatus>('/broker/status');
   brokerFunds = () => this.get<{ equityCash?: number; equityNet?: number; capitalRs?: number; fetchedAt?: string }>('/broker/funds');
-  enableLive = (phrase: string) => this.post<{ enabled: boolean }>('/live/enable', { phrase });
+  enableLive = (phrase: string) =>
+    this.post<{
+      enabled: boolean;
+      holdings?: { imported: string[]; updated: string[]; removed: string[]; skipped: Array<{ symbol: string; reason: string }>; error?: string };
+    }>('/live/enable', { phrase });
   disableLive = () => this.post<{ enabled: boolean }>('/live/disable');
   syncFunds = () => this.post<{ cash: number }>('/live/sync-funds');
+  importHoldings = () =>
+    this.post<{
+      imported: string[];
+      updated: string[];
+      removed: string[];
+      skipped: Array<{ symbol: string; reason: string }>;
+      cash: number;
+    }>('/live/import-holdings');
 }

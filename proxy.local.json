@@ -1,0 +1,42 @@
+{
+  "/api/kite": {
+    "target": "https://api.kite.trade",
+    "secure": true,
+    "changeOrigin": true,
+    "pathRewrite": {
+      "^/api/kite": ""
+    }
+  },
+  "/api/order-kite": {
+    "target": "http://127.0.0.1:3000",
+    "secure": false,
+    "changeOrigin": true,
+    "pathRewrite": {
+      "^/api/order-kite": "/api/kite"
+    }
+  },
+  "/api/momentum": {
+    "target": "http://127.0.0.1:3000",
+    "secure": false,
+    "changeOrigin": true,
+    "pathRewrite": {
+      "^/api/momentum": "/momentum"
+    }
+  },
+  "/api/pnl": {
+    "target": "http://168.144.28.89:3000",
+    "secure": false,
+    "changeOrigin": true,
+    "pathRewrite": {
+      "^/api/pnl": "/pnl"
+    }
+  },
+  "/api/auth": {
+    "target": "http://168.144.28.89:3000",
+    "secure": false,
+    "changeOrigin": true,
+    "pathRewrite": {
+      "^/api/auth": "/auth"
+    }
+  }
+}

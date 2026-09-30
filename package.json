@@ -5,6 +5,7 @@
     "ng": "cross-env NODE_OPTIONS=\"--no-deprecation --no-warnings\" ng",
     "clean": "if exist .angular rmdir /s /q .angular && if exist node_modules\\.vite rmdir /s /q node_modules\\.vite && if exist .vite rmdir /s /q .vite && if exist dist rmdir /s /q dist && if exist .angular\\cache rmdir /s /q .angular\\cache && echo Cache cleared",
     "start": "cross-env NODE_OPTIONS=\"--no-deprecation --no-warnings\" ng serve",
+    "start:local": "cross-env NODE_OPTIONS=\"--no-deprecation --no-warnings\" ng serve --proxy-config proxy.local.json",
     "build": "cross-env NODE_OPTIONS=\"--no-deprecation --no-warnings\" ng build && node scripts/ensure-browser-index.mjs",
     "watch": "cross-env NODE_OPTIONS=\"--no-deprecation --no-warnings\" ng build --watch --configuration development",
     "test": "cross-env NODE_OPTIONS=\"--no-deprecation\" ng test",

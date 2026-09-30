@@ -53,6 +53,7 @@ import { dateTime, errorMessage, inr, signedInr } from '../format.util';
         } @else {
           <div class="mp-row enable">
             <button type="button" class="ui-btn ui-btn-secondary" [disabled]="busy()" (click)="syncFunds()">Sync cash with broker funds</button>
+            <button type="button" class="ui-btn ui-btn-secondary" [disabled]="busy()" (click)="importHoldings()">Import broker holdings</button>
             <button type="button" class="ui-btn ui-btn-danger" [disabled]="busy()" (click)="disable()">Disable live trading</button>
           </div>
         }
@@ -147,9 +148,12 @@ export class LiveTradingTabComponent implements OnInit {
 
   protected enable(): Promise<void> {
     return this.act(async () => {
-      await this.api.enableLive(this.phrase().trim());
+      const r = await this.api.enableLive(this.phrase().trim());
       this.phrase.set('');
-      return 'Live trading enabled. Automated execution remains OFF until you enable it below.';
+      const n = r.holdings?.imported?.length ?? 0;
+      const skip = r.holdings?.skipped?.length ?? 0;
+      const extra = n || skip ? ` Imported ${n} holding(s)` + (skip ? `, skipped ${skip} outside the universe.` : '.') : '';
+      return 'Live trading enabled. Automated execution remains OFF until you enable it below.' + extra;
     });
   }
 
@@ -164,6 +168,14 @@ export class LiveTradingTabComponent implements OnInit {
     return this.act(async () => {
       const r = await this.api.syncFunds();
       return `Live cash synced to ${inr(r.cash)}.`;
+    });
+  }
+
+  protected importHoldings(): Promise<void> {
+    return this.act(async () => {
+      const r = await this.api.importHoldings();
+      const skip = r.skipped.length ? ` Skipped ${r.skipped.length} name(s) outside the universe.` : '';
+      return `Holdings sync: ${r.imported.length} new, ${r.updated.length} updated, ${r.removed.length} removed. Cash ${inr(r.cash)}.${skip}`;
     });
   }
 }

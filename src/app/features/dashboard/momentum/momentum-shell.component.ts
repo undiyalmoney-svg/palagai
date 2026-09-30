@@ -2,13 +2,13 @@ import { ChangeDetectionStrategy, Component, OnInit, computed, inject } from '@a
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { MomentumStateService } from './momentum-state.service';
 
-interface Tab {
+export interface Tab {
   label: string;
   path: string;
   liveOnly?: boolean;
 }
 
-const TABS: Tab[] = [
+export const MOMENTUM_TABS: Tab[] = [
   { label: 'Dashboard', path: 'dashboard' },
   { label: 'Momentum Screener', path: 'screener' },
   { label: 'Portfolio', path: 'portfolio' },
@@ -19,6 +19,10 @@ const TABS: Tab[] = [
   { label: 'Live Trading', path: 'live-trading', liveOnly: true },
   { label: 'Settings', path: 'settings' },
 ];
+
+export function visibleMomentumTabs(liveAvailable: boolean): Tab[] {
+  return MOMENTUM_TABS.filter((t) => !t.liveOnly || liveAvailable);
+}
 
 @Component({
   selector: 'app-momentum-shell',
@@ -63,7 +67,7 @@ const TABS: Tab[] = [
 })
 export class MomentumShellComponent implements OnInit {
   protected readonly state = inject(MomentumStateService);
-  protected readonly tabs = computed(() => TABS.filter((t) => !t.liveOnly || this.state.liveAvailable()));
+  protected readonly tabs = computed(() => visibleMomentumTabs(this.state.liveAvailable()));
 
   ngOnInit(): void {
     void this.state.refreshStatus();
