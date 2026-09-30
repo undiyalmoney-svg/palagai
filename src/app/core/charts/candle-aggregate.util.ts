@@ -7,7 +7,7 @@
  * serve.
  */
 import { Candle } from '../models/candle.model';
-import { sessionKey } from './sr-chart.util';
+import { sessionDay as sessionKey } from './smc/smc-utils';
 
 /**
  * Group every `groupSize` bars into one, restarting at each session.
