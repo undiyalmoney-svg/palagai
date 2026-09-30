@@ -824,7 +824,7 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
     return sizingCapitalFromFunds(this.kiteFunds.equityAvailable(), this.capitalPref.get());
   }
 
-  /** Same ladder as Trade Bot: ₹40,000 per index lot, Crude 3× that band. */
+  /** Funds ladder: ₹40,000 per index lot, Crude 3× that band. */
   protected autoLotsFor(id: ChartBookId): number {
     return lotsForChartBook(id, this.kiteFunds.equityAvailable(), this.capitalPref.get());
   }

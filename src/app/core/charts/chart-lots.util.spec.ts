@@ -27,7 +27,7 @@ describe('chart lots from funds', () => {
     expect(sizingCapitalFromFunds(-10, 40_000)).toBe(40_000);
   });
 
-  it('matches Trade Bot: ₹40,000 per index lot, Crude 3×, min 1 / 3, max 10 / 30', () => {
+  it('₹40,000 per index lot, Crude 3×, min 1 / 3, max 10 / 30', () => {
     const cases: Array<[number, number, number]> = [
       [0, 1, 3],
       [39_999, 1, 3],

@@ -6,7 +6,7 @@
  * Only a window of the series is drawn at a time — see chart-viewport.util —
  * so candles stay readable on a phone and can be zoomed and panned.
  *
- * Canvas 2D and no charting dependency, matching the Trade Bot's structure chart
+ * Canvas 2D and no charting dependency, keeping the desk free of a chart library
  * — the desk ships no chart library and one 176KB bundle budget is not worth a
  * second renderer.
  */
