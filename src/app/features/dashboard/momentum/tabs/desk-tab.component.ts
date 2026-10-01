@@ -28,7 +28,7 @@ import { actionTone, errorMessage, inr, pctNum, shortDate, signedInr, tone } fro
         <div class="mp-card">
           <div class="mp-card-head"><div>
             <h2>Paper — see what the system did</h2>
-            <p class="mp-sub">Pick a date range and capital — ₹10,000 is enough. The scanner ranks 1,000+ NSE names, buys the weekly momentum leaders at the next 09:15 IST open, and sells the same way. A 10k book holds 2–3 stocks.</p>
+            <p class="mp-sub">Pick a date range and capital — ₹10,000 is enough. The scanner ranks every NSE large-cap and mid-cap (Nifty 100 + Midcap 150), buys the weekly momentum leaders at the next 09:15 IST open, and sells the same way. A 10k book holds 2–3 stocks.</p>
           </div></div>
           <form class="mp-row" (ngSubmit)="runPaper()">
             <div class="mp-field"><label for="desk-from">From</label>
@@ -132,7 +132,7 @@ import { actionTone, errorMessage, inr, pctNum, shortDate, signedInr, tone } fro
         <div class="mp-card">
           <div class="mp-card-head"><div>
             <h2>This week</h2>
-            <p class="mp-sub">Scans 1,000+ NSE stocks. Start with ₹10,000 — qty is sized so 2–3 names can actually be bought. Press Buy or Sell only on the rows you want.</p>
+            <p class="mp-sub">Scans every NSE large-cap and mid-cap. Start with ₹10,000 — qty is sized so 2–3 names can actually be bought. Press Buy or Sell only on the rows you want.</p>
           </div></div>
           <form class="mp-row" (ngSubmit)="runScan()">
             <div class="mp-field"><label for="live-cap">Capital (₹)</label>
