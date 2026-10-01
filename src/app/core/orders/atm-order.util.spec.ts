@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { Instrument } from '../models/instrument.model';
 import {
+  atmExitFields,
   atmOrderCost,
   atmOrderFields,
+  atmProtectiveTicketFromFill,
   atmQuoteKey,
+  atmRupeePerPoint,
   atmStopFields,
   atmTargetFields,
   buildAtmOrderPlan,
@@ -376,5 +379,42 @@ describe('atmQuoteKey', () => {
     if (!plan.ok) return;
 
     expect(atmQuoteKey(plan.ticket)).toBe(`NFO:${plan.ticket.tradingSymbol}`);
+  });
+});
+
+describe('atmRupeePerPoint', () => {
+  it('uses underlying units, not crude order quantity', () => {
+    expect(atmRupeePerPoint({ unitsPerLot: 65, lots: 1 })).toBe(65);
+    expect(atmRupeePerPoint({ unitsPerLot: 10, lots: 2 })).toBe(20);
+  });
+});
+
+describe('atmExitFields', () => {
+  it('builds a Charts-tagged MARKET sell to flatten an open fill', () => {
+    expect(
+      atmExitFields({ instrument: 'NIFTY25OCT24500CE', exchange: 'NFO', qty: 65 }),
+    ).toMatchObject({
+      transaction_type: 'SELL',
+      order_type: 'MARKET',
+      quantity: '65',
+      tag: 'PALAGAI_CHART_EXIT',
+    });
+    expect(atmExitFields({ instrument: 'X', qty: 0 })).toBeNull();
+  });
+
+  it('rebuilds an SL/TP ticket from an already-open fill', () => {
+    expect(
+      atmProtectiveTicketFromFill({
+        instrument: 'NIFTY25OCT24500CE',
+        exchange: 'NFO',
+        qty: 65,
+      }),
+    ).toEqual({
+      exchange: 'NFO',
+      tradingSymbol: 'NIFTY25OCT24500CE',
+      quantity: 65,
+      product: 'MIS',
+    });
+    expect(atmProtectiveTicketFromFill({ instrument: 'X', qty: 0 })).toBeNull();
   });
 });

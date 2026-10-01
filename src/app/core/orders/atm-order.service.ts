@@ -21,7 +21,9 @@ import {
   AtmOptionSide,
   AtmOrderPlan,
   AtmOrderTicket,
+  atmExitFields,
   atmOrderFields,
+  atmProtectiveTicketFromFill,
   atmQuoteKey,
   atmStopFields,
   atmTargetFields,
@@ -123,7 +125,10 @@ export class AtmOrderService {
    * Rest a protective SELL stop on the same contract the Charts tab just bought.
    * Charts-tab only — the live desk places its own stops and never reads these.
    */
-  async placeStop(ticket: AtmOrderTicket, triggerPremium: number): Promise<AtmOrderResult> {
+  async placeStop(
+    ticket: Parameters<typeof atmStopFields>[0],
+    triggerPremium: number,
+  ): Promise<AtmOrderResult> {
     const authorization = this.kiteSession.getAuthorizationHeader();
     if (!authorization) {
       return { ok: false, orderId: null, message: 'Kite session required.' };
@@ -157,7 +162,10 @@ export class AtmOrderService {
    * desk places its own targets and never reads these. Kite regular orders
    * are not OCO: if this fills, cancel the SL in the order book.
    */
-  async placeTarget(ticket: AtmOrderTicket, targetPremium: number): Promise<AtmOrderResult> {
+  async placeTarget(
+    ticket: Parameters<typeof atmTargetFields>[0],
+    targetPremium: number,
+  ): Promise<AtmOrderResult> {
     const authorization = this.kiteSession.getAuthorizationHeader();
     if (!authorization) {
       return { ok: false, orderId: null, message: 'Kite session required.' };
@@ -219,6 +227,134 @@ export class AtmOrderService {
       // The stop can still rest off the quote we already showed.
     }
     return null;
+  }
+
+  async cancelChartOrder(orderId: string): Promise<AtmOrderResult> {
+    const authorization = this.kiteSession.getAuthorizationHeader();
+    if (!authorization) {
+      return { ok: false, orderId: null, message: 'Kite session required.' };
+    }
+    const id = String(orderId || '').trim();
+    if (!id) {
+      return { ok: false, orderId: null, message: 'No order id to cancel.' };
+    }
+    try {
+      await firstValueFrom(this.kiteApi.cancelRegularOrder(authorization, id));
+      return { ok: true, orderId: id, message: `Cancelled ${id}.` };
+    } catch (error) {
+      return { ok: false, orderId: id, message: describeOrderError(error) };
+    }
+  }
+
+  /**
+   * Move this fill's resting SL/TP to new rupee (or system) levels after the
+   * reader edits max profit / max loss, or when an already-open fill is first
+   * seen with caps set. Cancels only the side that drifted, then rests again.
+   */
+  async replaceChartProtectives(
+    trade: ChartLiveTrade,
+    levels: { stop: number; target: number },
+  ): Promise<AtmOrderResult> {
+    const ticket = atmProtectiveTicketFromFill(trade);
+    if (!ticket) {
+      return { ok: false, orderId: null, message: 'Could not rebuild a stop for that fill.' };
+    }
+    const extras: string[] = [];
+    let ok = true;
+    const slSame = trade.sl != null && Math.abs(trade.sl - levels.stop) < 0.03;
+    const tpSame = trade.tp != null && Math.abs(trade.tp - levels.target) < 0.03;
+
+    if (!slSame) {
+      if (trade.slOrderId) extras.push((await this.cancelChartOrder(trade.slOrderId)).message);
+      const sl = await this.placeStop(ticket, levels.stop);
+      extras.push(sl.message);
+      ok = ok && sl.ok;
+    }
+    if (!tpSame) {
+      if (trade.tpOrderId) extras.push((await this.cancelChartOrder(trade.tpOrderId)).message);
+      const tp = await this.placeTarget(ticket, levels.target);
+      extras.push(tp.message);
+      ok = ok && tp.ok;
+    }
+    return {
+      ok,
+      orderId: null,
+      message: `Protectives updated on ${trade.instrument}: ${extras.join(' ')}`.trim(),
+    };
+  }
+
+  /**
+   * Cap hit: cancel the resting Charts SL/TP on this contract, then MARKET
+   * sell whatever quantity is still open so we do not double-exit a fill
+   * that the stop already took.
+   */
+  async flattenChartTrade(
+    trade: ChartLiveTrade,
+    reason: 'PROFIT' | 'LOSS',
+  ): Promise<AtmOrderResult> {
+    const extras: string[] = [];
+    const cancelIds = [
+      ...new Set(
+        [...(trade.protectiveOrderIds ?? []), trade.slOrderId, trade.tpOrderId].filter(
+          (id): id is string => !!id,
+        ),
+      ),
+    ];
+    for (const id of cancelIds) {
+      extras.push((await this.cancelChartOrder(id)).message);
+    }
+
+    const live = await this.chartLiveTrades();
+    const latest = live?.find((row) => row.instrument === trade.instrument) ?? trade;
+    const qty = latest.qty > 0 && latest.status === 'OPEN' ? latest.qty : 0;
+    const label = reason === 'PROFIT' ? 'Max profit' : 'Max loss';
+    if (!(qty > 0)) {
+      return {
+        ok: true,
+        orderId: null,
+        message: `${label} — already flat on ${trade.instrument}. ${extras.join(' ')}`.trim(),
+      };
+    }
+
+    const sell = await this.placeExit(latest, qty);
+    return {
+      ok: sell.ok,
+      orderId: sell.orderId,
+      message: `${label} — ${sell.message}${extras.length ? ' · ' + extras.join(' ') : ''}`,
+    };
+  }
+
+  private async placeExit(trade: ChartLiveTrade, qty: number): Promise<AtmOrderResult> {
+    const authorization = this.kiteSession.getAuthorizationHeader();
+    if (!authorization) {
+      return { ok: false, orderId: null, message: 'Kite session required.' };
+    }
+    const fields = atmExitFields({
+      instrument: trade.instrument,
+      exchange: trade.exchange,
+      qty,
+    });
+    if (!fields) {
+      return { ok: false, orderId: null, message: 'Could not build an exit for that fill.' };
+    }
+    try {
+      const res = (await firstValueFrom(this.kiteApi.placeRegularOrder(authorization, fields))) as {
+        status?: string;
+        message?: string;
+        data?: { order_id?: string };
+      };
+      const orderId = res?.data?.order_id ?? null;
+      if (orderId) {
+        return { ok: true, orderId, message: `sold ${trade.instrument} qty ${qty} (${orderId}).` };
+      }
+      return {
+        ok: false,
+        orderId: null,
+        message: res?.message || 'Kite returned no exit order id. Check the order book.',
+      };
+    } catch (error) {
+      return { ok: false, orderId: null, message: describeOrderError(error) };
+    }
   }
 
   /**

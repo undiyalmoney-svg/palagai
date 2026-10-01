@@ -69,13 +69,15 @@ import { UiDialogService } from '../../../shared/ui/dialog/ui-dialog.service';
 import { CapitalPreferenceService } from '../../../core/services/capital-preference.service';
 import { KiteFundsService } from '../../../core/services/kite-funds.service';
 import { AtmOrderService } from '../../../core/orders/atm-order.service';
-import { AtmOptionSide, AtmOrderTicket, atmOrderCost } from '../../../core/orders/atm-order.util';
+import { AtmOptionSide, AtmOrderTicket, atmOrderCost, atmRupeePerPoint } from '../../../core/orders/atm-order.util';
 import { clampChartLots, lotsForChartBook, maxChartLots, sizingCapitalFromFunds } from '../../../core/charts/chart-lots.util';
 import {
   chartProtectiveLevels,
+  fillsNeedingProtectiveSync,
   optionSideForAlert,
   shouldAutoTrade,
 } from '../../../core/charts/chart-auto-trade.util';
+import { anyCapSet, fillsToFlatten, parseRsCap } from '../../../core/charts/chart-pnl-cap';
 import {
   ChartLiveStatus,
   ChartLiveTrade,
@@ -173,6 +175,8 @@ const BOOK_STAGGER_MS = 350;
 const FEED_LIMIT = 40;
 /** Orders/positions for the live-trades board — slower than candle polls. */
 const TRADE_POLL_MS = 15_000;
+/** When a rupee cap is set, watch fills at the scheduler tick so a gap is not 15s late. */
+const CAP_POLL_MS = 5_000;
 
 const NUMERIC_FIELDS: readonly NumericField[] = [
   { key: 'riskPerTradePct', label: 'Risk per trade %', min: 0.05, max: 100, step: 0.1, hint: 'Share of equity risked to the stop' },
@@ -260,6 +264,8 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
     () => this.liveTrades().filter((t) => t.status === 'OPEN' || t.status === 'WORKING').length,
   );
 
+  protected readonly anyCapWatching = computed(() => anyCapSet(this.settings().pnlCaps));
+
   /**
    * Re-read on every scheduler tick so the badges cross the open and the close
    * on their own rather than waiting for the next candle to land.
@@ -315,6 +321,12 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
   private tradesInFlight = false;
   /** Just-sent fills held until Kite lists that contract. */
   private readonly pendingLocal = new Map<string, ChartLiveTrade>();
+  /** Fill ids currently being flattened so a cap cannot double-sell the same fill. */
+  private readonly flattenInFlight = new Set<string>();
+  /** Fill ids whose SL/TP are being moved to a newly edited cap. */
+  private readonly protectSyncInFlight = new Set<string>();
+  /** Last cap fingerprint successfully applied to an open fill, so Kite lag does not rest a second SL. */
+  private readonly syncedProtectives = new Map<string, string>();
 
   ngOnInit(): void {
     if (!this.isBrowser) {
@@ -487,7 +499,7 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
   protected async refreshLiveTrades(force = false): Promise<void> {
     if (this.tradesInFlight) return;
     const now = Date.now();
-    if (!force && now - this.lastTradePollAt < TRADE_POLL_MS) return;
+    if (!force && now - this.lastTradePollAt < this.tradePollMs()) return;
     this.tradesInFlight = true;
     this.lastTradePollAt = now;
     try {
@@ -506,6 +518,9 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
       this.liveTradesReady.set(true);
     } finally {
       this.tradesInFlight = false;
+    }
+    if (!this.liveTradesError()) {
+      void this.afterLiveTrades(this.liveTrades());
     }
   }
 
@@ -531,6 +546,105 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
 
   protected statusLabel(status: ChartLiveStatus): string {
     return TRADE_STATUS_LABELS[status];
+  }
+
+  private tradePollMs(): number {
+    return anyCapSet(this.settings().pnlCaps) ? CAP_POLL_MS : TRADE_POLL_MS;
+  }
+
+  protected capValue(id: ChartBookId, key: 'maxProfitRs' | 'maxLossRs'): string {
+    const n = this.settings().pnlCaps[id][key];
+    return n == null ? '' : String(n);
+  }
+
+  protected setCap(id: ChartBookId, key: 'maxProfitRs' | 'maxLossRs', event: Event): void {
+    const raw = (event.target as HTMLInputElement).value;
+    const current = this.settings();
+    this.commit({
+      ...current,
+      pnlCaps: {
+        ...current.pnlCaps,
+        [id]: { ...current.pnlCaps[id], [key]: parseRsCap(raw) },
+      },
+    });
+    void this.refreshLiveTrades(true);
+  }
+
+  private async afterLiveTrades(trades: ChartLiveTrade[]): Promise<void> {
+    const flattened = await this.enforcePnlCaps(trades);
+    if (flattened) {
+      void this.refreshLiveTrades(true);
+      return;
+    }
+    const synced = await this.syncOpenProtectives(this.liveTrades());
+    if (synced) void this.refreshLiveTrades(true);
+  }
+
+  /**
+   * If this book's rupee cap is set and THIS open fill has crossed it, cancel
+   * the resting SL/TP and market-exit that contract. The next fill on the
+   * same chart (new id) is watched again with the same cap.
+   */
+  private async enforcePnlCaps(trades: ChartLiveTrade[]): Promise<boolean> {
+    const caps = this.settings().pnlCaps;
+    const openIds = new Set(trades.filter((t) => t.status === 'OPEN').map((t) => t.id));
+    for (const id of [...this.flattenInFlight]) {
+      if (!openIds.has(id)) this.flattenInFlight.delete(id);
+    }
+    for (const id of [...this.syncedProtectives.keys()]) {
+      if (!openIds.has(id)) this.syncedProtectives.delete(id);
+    }
+    const hits = fillsToFlatten(trades, caps, this.flattenInFlight);
+    if (!hits.length) return false;
+    const byId = new Map(trades.map((t) => [t.id, t]));
+    let anyOk = false;
+    for (const hit of hits) {
+      const trade = byId.get(hit.id);
+      if (!trade) continue;
+      this.flattenInFlight.add(trade.id);
+      const result = await this.orders.flattenChartTrade(trade, hit.reason);
+      if (trade.book) this.patch(trade.book, { order: { ok: result.ok, text: result.message } });
+      if (result.ok) anyOk = true;
+      else this.flattenInFlight.delete(trade.id);
+    }
+    return anyOk;
+  }
+
+  /**
+   * After a cap edit (or the first time we see an already-open fill with caps
+   * set), move that fill's resting stop and target to the amount now in
+   * settings. Unchanged amounts that already match are left alone.
+   */
+  private async syncOpenProtectives(trades: ChartLiveTrade[]): Promise<boolean> {
+    const caps = this.settings().pnlCaps;
+    const busy = [...this.flattenInFlight, ...this.protectSyncInFlight];
+    const hits = fillsNeedingProtectiveSync(trades, caps, busy).filter((hit) => {
+      const fp = this.capFingerprint(hit);
+      return this.syncedProtectives.get(hit.id) !== fp;
+    });
+    if (!hits.length) return false;
+    const byId = new Map(trades.map((t) => [t.id, t]));
+    let started = false;
+    for (const hit of hits) {
+      const trade = byId.get(hit.id);
+      if (!trade) continue;
+      this.protectSyncInFlight.add(trade.id);
+      const result = await this.orders.replaceChartProtectives(trade, {
+        stop: hit.stop,
+        target: hit.target,
+      });
+      if (trade.book) this.patch(trade.book, { order: { ok: result.ok, text: result.message } });
+      if (result.ok) {
+        this.syncedProtectives.set(trade.id, this.capFingerprint(hit));
+        started = true;
+      }
+      this.protectSyncInFlight.delete(trade.id);
+    }
+    return started;
+  }
+
+  private capFingerprint(hit: { stop: number; target: number }): string {
+    return `${hit.stop}|${hit.target}`;
   }
 
   /** Drop everything shown and read it again: timeframe or date changed. */
@@ -833,7 +947,7 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
         autoTrade: isAutoTradeOn(this.settings(), id),
         liveDay: this.liveDay(),
         marketOpen: this.statusOf(pane).open,
-        busy: !!pane.ordering,
+        busy: !!pane.ordering || this.flatteningBook(id),
         type,
       })
     ) {
@@ -842,6 +956,10 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
     const side = optionSideForAlert(type);
     if (!side) return;
     await this.buyAtm(id, side, { silent: true });
+  }
+
+  private flatteningBook(id: ChartBookId): boolean {
+    return this.liveTrades().some((trade) => trade.book === id && this.flattenInFlight.has(trade.id));
   }
 
   /**
@@ -913,7 +1031,15 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
       }
 
       const fill = await this.orders.fillPrice(result.orderId, premium);
-      const levels = fill != null ? chartProtectiveLevels(fill) : null;
+      const cap = this.settings().pnlCaps[id];
+      const levels =
+        fill != null
+          ? chartProtectiveLevels(fill, 0.05, {
+              maxProfitRs: cap.maxProfitRs,
+              maxLossRs: cap.maxLossRs,
+              rupeePerPoint: atmRupeePerPoint(ticket),
+            })
+          : null;
       const extras: string[] = [];
       if (levels) {
         const sl = await this.orders.placeStop(ticket, levels.stop);
@@ -960,7 +1086,10 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
         : 'Live premium unavailable — cost unknown.',
       '',
       'This is a real order at market price. A 25% premium stop and a 0.5R',
-      "target rest after the fill. The desk's daily limits do not apply.",
+      "target rest after the fill unless this book's max profit / max loss",
+      'per trade are set — then those rupee caps rest instead, and a hit',
+      'cancels the stop and sells this fill. The next fill on this chart is',
+      "watched again with the same cap. The desk's daily limits do not apply.",
     ];
 
     return this.uiDialog.confirm({

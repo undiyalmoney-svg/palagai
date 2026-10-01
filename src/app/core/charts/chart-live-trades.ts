@@ -9,6 +9,7 @@ import { CHART_BOOKS, ChartBookId } from './live-chart-data.service';
 export const CHART_ENTRY_TAG = 'PALAGAI_CHART';
 export const CHART_SL_TAG = 'PALAGAI_CHART_SL';
 export const CHART_TP_TAG = 'PALAGAI_CHART_TP';
+export const CHART_EXIT_TAG = 'PALAGAI_CHART_EXIT';
 
 export type ChartLiveStatus = 'OPEN' | 'SL_HIT' | 'TP_HIT' | 'EXITED' | 'WORKING';
 
@@ -45,6 +46,11 @@ export interface KitePositionLike {
   average_price?: number | string;
   last_price?: number | string;
   pnl?: number | string;
+  /** Unrealized P&L of the open qty — this is the per-trade figure. */
+  unrealised?: number | string;
+  unrealized?: number | string;
+  realised?: number | string;
+  realized?: number | string;
 }
 
 export interface ChartLiveTrade {
@@ -61,13 +67,19 @@ export interface ChartLiveTrade {
   tp: number | null;
   slState: string;
   tpState: string;
+  slOrderId: string | null;
+  tpOrderId: string | null;
+  /** Every resting Charts SL/TP on this fill — flatten cancels all of them. */
+  protectiveOrderIds: string[];
   status: ChartLiveStatus;
   pnl: number | null;
 }
 
 export function isChartOrderTag(tag: string | undefined | null): boolean {
   const t = String(tag || '').toUpperCase();
-  return t === CHART_ENTRY_TAG || t === CHART_SL_TAG || t === CHART_TP_TAG;
+  return (
+    t === CHART_ENTRY_TAG || t === CHART_SL_TAG || t === CHART_TP_TAG || t === CHART_EXIT_TAG
+  );
 }
 
 export function bookFromInstrument(symbol: string): ChartBookId | null {
@@ -112,10 +124,13 @@ export function buildChartLiveTrades(
   }
 
   const trades: ChartLiveTrade[] = [];
-  for (const [instrument, list] of grouped) {
+  for (const [instrument, raw] of grouped) {
+    const list = [...raw].sort(compareOrders);
     const entry = latest(list, (o) => tagOf(o) === CHART_ENTRY_TAG && sideOf(o) === 'BUY');
-    const slOrder = latest(list, (o) => tagOf(o) === CHART_SL_TAG);
-    const tpOrder = latest(list, (o) => tagOf(o) === CHART_TP_TAG);
+    const fill = ordersForFill(list, entry);
+    const slOrder = latest(fill, (o) => tagOf(o) === CHART_SL_TAG);
+    const tpOrder = latest(fill, (o) => tagOf(o) === CHART_TP_TAG);
+    const exitOrder = latest(fill, (o) => tagOf(o) === CHART_EXIT_TAG && sideOf(o) === 'SELL');
     const pos = posBySymbol.get(instrument);
     const posQty = pos ? Math.abs(num(pos.quantity)) : 0;
     const slHit = isComplete(slOrder);
@@ -130,12 +145,12 @@ export function buildChartLiveTrades(
     if (posQty > 0) status = 'OPEN';
     else if (tpHit) status = 'TP_HIT';
     else if (slHit) status = 'SL_HIT';
+    else if (isComplete(exitOrder)) status = 'EXITED';
     else if (isComplete(entry) && (protectiveResting || !pos)) status = 'OPEN';
     else if (isComplete(entry)) status = 'EXITED';
-    const pnl =
-      status === 'OPEN' && last != null && entryPx != null
-        ? (last - entryPx) * qty
-        : num(pos?.pnl) || null;
+    const computed =
+      status === 'OPEN' && last != null && entryPx != null ? (last - entryPx) * qty : NaN;
+    const pnl = openFillPnl(pos, status, computed);
     const book = bookFromInstrument(instrument);
     trades.push({
       id: `${instrument}:${entry?.order_id ?? slOrder?.order_id ?? tpOrder?.order_id ?? instrument}`,
@@ -151,6 +166,9 @@ export function buildChartLiveTrades(
       tp,
       slState: orderState(slOrder),
       tpState: orderState(tpOrder),
+      slOrderId: restingOrderId(slOrder),
+      tpOrderId: restingOrderId(tpOrder),
+      protectiveOrderIds: restingProtectiveIds(fill),
       status,
       pnl: Number.isFinite(pnl as number) ? (pnl as number) : null,
     });
@@ -184,6 +202,9 @@ export function localChartTrade(input: {
     tp: input.tp,
     slState: input.sl != null ? 'RESTING' : '—',
     tpState: input.tp != null ? 'RESTING' : '—',
+    slOrderId: null,
+    tpOrderId: null,
+    protectiveOrderIds: [],
     status: 'OPEN',
     pnl: null,
   };
@@ -209,7 +230,39 @@ function sideOf(order: KiteOrderLike): string {
 
 function latest(list: KiteOrderLike[], pred: (o: KiteOrderLike) => boolean): KiteOrderLike | undefined {
   const hits = list.filter(pred);
-  return hits.length ? hits[hits.length - 1] : undefined;
+  if (!hits.length) return undefined;
+  return hits.reduce((best, order) => (compareOrders(order, best) > 0 ? order : best));
+}
+
+/** SL / TP / EXIT that belong to this fill, not an earlier flattened one. */
+function ordersForFill(list: KiteOrderLike[], entry: KiteOrderLike | undefined): KiteOrderLike[] {
+  if (!entry) return list;
+  return list.filter((order) => order === entry || compareOrders(order, entry) >= 0);
+}
+
+function compareOrders(a: KiteOrderLike, b: KiteOrderLike): number {
+  const ta = orderMs(a);
+  const tb = orderMs(b);
+  if (ta !== tb) return ta - tb;
+  return String(a.order_id ?? '').localeCompare(String(b.order_id ?? ''), undefined, {
+    numeric: true,
+  });
+}
+
+function orderMs(order: KiteOrderLike): number {
+  const t = Date.parse(String(order.order_timestamp || ''));
+  return Number.isFinite(t) ? t : 0;
+}
+
+function restingProtectiveIds(list: KiteOrderLike[]): string[] {
+  const ids: string[] = [];
+  for (const order of list) {
+    const tag = tagOf(order);
+    if (tag !== CHART_SL_TAG && tag !== CHART_TP_TAG) continue;
+    const id = restingOrderId(order);
+    if (id && !ids.includes(id)) ids.push(id);
+  }
+  return ids;
 }
 
 function isComplete(order: KiteOrderLike | undefined): boolean {
@@ -229,6 +282,41 @@ function orderState(order: KiteOrderLike | undefined): string {
   if (st === 'CANCELLED') return 'CANCELLED';
   if (st === 'REJECTED') return 'REJECTED';
   return st || '—';
+}
+
+function restingOrderId(order: KiteOrderLike | undefined): string | null {
+  if (!order || !isOpenish(order)) return null;
+  const id = String(order.order_id ?? '').trim();
+  return id || null;
+}
+
+/**
+ * P&L of the open fill only. Kite's `pnl` is the day's total for that
+ * contract (realised + unrealised), which would turn a per-trade cap into a
+ * day stop — so an open row uses `unrealised`, then (last − entry) × qty,
+ * and never the day's net. Closed rows may still show Kite's day `pnl`.
+ */
+export function openFillPnl(
+  pos: KitePositionLike | undefined,
+  status: ChartLiveStatus,
+  computed: number,
+): number | null {
+  if (status === 'OPEN') {
+    const unreal = firstFinite(pos?.unrealised, pos?.unrealized);
+    if (unreal != null) return unreal;
+    return Number.isFinite(computed) ? computed : null;
+  }
+  const closed = firstFinite(pos?.pnl);
+  return closed ?? (Number.isFinite(computed) ? computed : null);
+}
+
+function firstFinite(...values: unknown[]): number | null {
+  for (const value of values) {
+    if (value == null || value === '') continue;
+    const n = Number(value);
+    if (Number.isFinite(n)) return n;
+  }
+  return null;
 }
 
 function filledQty(order: KiteOrderLike | undefined): number {

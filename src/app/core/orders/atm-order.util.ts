@@ -21,10 +21,16 @@
  */
 import { Instrument } from '../models/instrument.model';
 import { ChartBookId } from '../charts/live-chart-data.service';
+import { CHART_EXIT_TAG } from '../charts/chart-live-trades';
 import { IndexOptionKind, resolveAtmWeeklyOption } from '../utils/option-chain.util';
 import { crudeMiniLotSize, resolveAtmCrudeMiniOption } from '../utils/crude-option.util';
 
 export type AtmOptionSide = 'CE' | 'PE';
+
+export type AtmProtectiveTicket = Pick<
+  AtmOrderTicket,
+  'exchange' | 'tradingSymbol' | 'quantity' | 'product'
+>;
 
 export interface AtmOrderTicket {
   book: ChartBookId;
@@ -152,7 +158,7 @@ export function atmOrderFields(ticket: AtmOrderTicket): Record<string, string> {
  * stop. Tagged PALAGAI_CHART_SL so it is never mistaken for a desk stop.
  */
 export function atmStopFields(
-  ticket: AtmOrderTicket,
+  ticket: AtmProtectiveTicket,
   triggerPremium: number,
   tickSize = 0.05,
 ): Record<string, string> | null {
@@ -180,7 +186,7 @@ export function atmStopFields(
  * if this fills, the SL must be cancelled in the order book.
  */
 export function atmTargetFields(
-  ticket: AtmOrderTicket,
+  ticket: AtmProtectiveTicket,
   targetPremium: number,
   tickSize = 0.05,
 ): Record<string, string> | null {
@@ -197,6 +203,55 @@ export function atmTargetFields(
     validity: 'DAY',
     price: price.toFixed(2),
     tag: 'PALAGAI_CHART_TP',
+  };
+}
+
+/** Rupees one point of premium moves this ticket. Crude is not order quantity. */
+export function atmRupeePerPoint(ticket: Pick<AtmOrderTicket, 'unitsPerLot' | 'lots'>): number {
+  return ticket.unitsPerLot * ticket.lots;
+}
+
+/** Enough of a ticket to rest or move a Charts SL / TP on an already-open fill. */
+export function atmProtectiveTicketFromFill(trade: {
+  instrument: string;
+  exchange?: string;
+  qty: number;
+}): AtmProtectiveTicket | null {
+  const qty = Math.floor(Number(trade.qty));
+  const symbol = String(trade.instrument || '').trim();
+  if (!(qty > 0) || !symbol) return null;
+  const crude = /crude/i.test(symbol);
+  return {
+    exchange: trade.exchange === 'MCX' || crude ? 'MCX' : 'NFO',
+    tradingSymbol: symbol,
+    quantity: qty,
+    product: 'MIS',
+  };
+}
+
+/**
+ * MARKET SELL to flatten a Charts ATM that hit a rupee cap. Tagged so the
+ * live board can mark it EXITED and the desk never counts it.
+ */
+export function atmExitFields(trade: {
+  instrument: string;
+  exchange?: string;
+  qty: number;
+}): Record<string, string> | null {
+  const qty = Math.floor(Number(trade.qty));
+  const symbol = String(trade.instrument || '').trim();
+  if (!(qty > 0) || !symbol) return null;
+  const crude = /crude/i.test(symbol);
+  return {
+    exchange: trade.exchange || (crude ? 'MCX' : 'NFO'),
+    tradingsymbol: symbol,
+    transaction_type: 'SELL',
+    order_type: 'MARKET',
+    quantity: String(qty),
+    product: 'MIS',
+    validity: 'DAY',
+    market_protection: '-1',
+    tag: CHART_EXIT_TAG,
   };
 }
 
