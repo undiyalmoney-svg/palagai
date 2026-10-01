@@ -1,6 +1,11 @@
+import { ChartBookId } from '../live-chart-data.service';
 import { ChartInterval, CHART_INTERVALS, chartIntervalMinutes } from '../chart-intervals.util';
 import { SmcConfig } from './smc.config';
 import { SMC_ALERT_TYPES, SmcAlertType } from './smc.types';
+
+export type SmcAutoTrade = Record<ChartBookId, boolean>;
+
+export const CHART_AUTO_BOOKS: readonly ChartBookId[] = ['nifty', 'bank', 'crude'];
 
 /** Which drawings are on. Signals are always drawn — they are the point. */
 export interface SmcLayers {
@@ -25,8 +30,8 @@ export interface SmcSettings {
   layers: SmcLayers;
   alerts: Record<SmcAlertType, boolean>;
   browserNotifications: boolean;
-  /** Place ATM CE/PE when a confirmed BUY/SELL prints. Same on every book. */
-  autoTrade: boolean;
+  /** Place ATM CE/PE when a confirmed BUY/SELL prints. One switch per book. */
+  autoTrade: SmcAutoTrade;
 }
 
 export const SMC_DEFAULT_LTF: ChartInterval = '1m';
@@ -56,8 +61,30 @@ export function defaultSmcSettings(): SmcSettings {
       boolean
     >,
     browserNotifications: false,
-    autoTrade: false,
+    autoTrade: defaultAutoTrade(),
   };
+}
+
+export function defaultAutoTrade(): SmcAutoTrade {
+  return { nifty: false, bank: false, crude: false };
+}
+
+/** Old saves stored a single boolean that armed every book. */
+export function parseAutoTrade(value: unknown): SmcAutoTrade {
+  if (value === true) return { nifty: true, bank: true, crude: true };
+  if (value && typeof value === 'object') {
+    const row = value as Record<string, unknown>;
+    return {
+      nifty: row['nifty'] === true,
+      bank: row['bank'] === true,
+      crude: row['crude'] === true,
+    };
+  }
+  return defaultAutoTrade();
+}
+
+export function isAutoTradeOn(settings: Pick<SmcSettings, 'autoTrade'>, book: ChartBookId): boolean {
+  return settings.autoTrade[book] === true;
 }
 
 /**
@@ -85,7 +112,7 @@ export function loadSmcSettings(storage: Pick<Storage, 'getItem'> | null): SmcSe
       layers: { ...base.layers, ...(parsed.layers ?? {}) },
       alerts: { ...base.alerts, ...(parsed.alerts ?? {}) },
       browserNotifications: parsed.browserNotifications === true,
-      autoTrade: parsed.autoTrade === true,
+      autoTrade: parseAutoTrade(parsed.autoTrade),
     };
   } catch {
     return base;

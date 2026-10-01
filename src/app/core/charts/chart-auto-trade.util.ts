@@ -1,5 +1,6 @@
 /**
- * Charts auto buy/sell — same path on Nifty 50, Bank Nifty and Crude.
+ * Charts auto buy/sell — same order path on Nifty 50, Bank Nifty and Crude,
+ * armed independently on each book.
  *
  * A confirmed SMC BUY buys the ATM call. A confirmed SMC SELL buys the ATM
  * put (long the hedge, never a naked short of the option). After the market

@@ -14,8 +14,9 @@
  *
  * Candles are read-only Kite history. Buy / Sell / Auto on every book place
  * real ATM option orders through the Kite proxy, outside the live desk rails.
- * Auto buys the ATM call on a confirmed BUY and the ATM put on a confirmed
- * SELL, then rests a 25% premium stop and a 0.5R target. See AtmOrderService.
+ * Auto is per book: Nifty on does not arm Bank Nifty or Crude. Auto buys the
+ * ATM call on a confirmed BUY and the ATM put on a confirmed SELL, then rests
+ * a 25% premium stop and a 0.5R target. See AtmOrderService.
  */
 import {
   Component,
@@ -59,6 +60,7 @@ import {
   defaultSmcSettings,
   effectiveHtf,
   enabledAlertTypes,
+  isAutoTradeOn,
   loadSmcSettings,
   saveSmcSettings,
 } from '../../../core/charts/smc/smc-settings';
@@ -204,6 +206,7 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
     { key: 'fib', label: 'Fibonacci & golden zone' },
     { key: 'levels', label: 'Entry, SL & TP levels' },
   ];
+  protected readonly chartBooks = CHART_BOOKS;
 
   protected readonly settings = signal<SmcSettings>(
     loadSmcSettings(this.isBrowser ? safeStorage() : null),
@@ -732,9 +735,16 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
     return this.panes().find((pane) => pane.def.id === id);
   }
 
-  protected toggleAutoTrade(): void {
+  protected toggleAutoTrade(id: ChartBookId): void {
     const current = this.settings();
-    this.commit({ ...current, autoTrade: !current.autoTrade });
+    this.commit({
+      ...current,
+      autoTrade: { ...current.autoTrade, [id]: !current.autoTrade[id] },
+    });
+  }
+
+  protected autoOn(id: ChartBookId): boolean {
+    return isAutoTradeOn(this.settings(), id);
   }
 
   private async fireAuto(id: ChartBookId, type: SmcAlertType): Promise<void> {
@@ -742,7 +752,7 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
     if (!pane) return;
     if (
       !shouldAutoTrade({
-        autoTrade: this.settings().autoTrade,
+        autoTrade: isAutoTradeOn(this.settings(), id),
         liveDay: this.liveDay(),
         marketOpen: this.statusOf(pane).open,
         busy: !!pane.ordering,

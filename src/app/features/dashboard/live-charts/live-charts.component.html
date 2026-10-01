@@ -7,7 +7,7 @@
         The same 1-minute TradingView tape on Nifty 50, Bank Nifty and Crude Oil Mini:
         Day High / Low, a compact FVG, BOS, the 5-minute IDM, SL / PE / TG, and the two
         indicator zones. Buy / Sell / Auto work the same way on every book — ATM call
-        on BUY, ATM put on SELL, with a protective stop and 0.5R target after the fill.
+        on BUY, ATM put on SELL — but Auto is armed on that chart only.
       </p>
     </div>
 
@@ -195,14 +195,17 @@
             Also send browser notifications
           </label>
         }
-        <label class="smc-check">
-          <input
-            type="checkbox"
-            [checked]="settings().autoTrade"
-            (change)="toggleAutoTrade()"
-          />
-          Auto buy / sell on confirmed SMC signals (all three charts)
-        </label>
+        <p class="smc-note">Auto buy / sell on confirmed SMC signals — one switch per chart</p>
+        @for (book of chartBooks; track book.id) {
+          <label class="smc-check">
+            <input
+              type="checkbox"
+              [checked]="autoOn(book.id)"
+              (change)="toggleAutoTrade(book.id)"
+            />
+            Auto {{ book.label }}
+          </label>
+        }
       </fieldset>
 
       <div class="smc-settings-foot">
@@ -326,10 +329,10 @@
           [ordering]="pane.ordering"
           [orderHint]="orderHintFor(pane)"
           [orderResult]="pane.order"
-          [autoTrade]="settings().autoTrade"
+          [autoTrade]="autoOn(pane.def.id)"
           (buyAtm)="buyAtm(pane.def.id, $event)"
           (adjustLots)="bumpLots(pane.def.id, $event)"
-          (toggleAuto)="toggleAutoTrade()"
+          (toggleAuto)="toggleAutoTrade(pane.def.id)"
         />
 
         <app-smc-panel
@@ -402,8 +405,8 @@
     at-the-money contract on every book — Nifty 50, Bank Nifty and Crude. Sized from
     Kite funds (₹40,000 per index lot; Crude 3×). Auto buys the ATM call on a
     confirmed BUY and the ATM put on a confirmed SELL, then rests a 25% premium stop
-    and a 0.5R target. Manual Buy / Sell ask before sending; Auto does not, because
-    you already armed it.
+    and a 0.5R target. Auto on Nifty does not arm Bank Nifty or Crude. Manual Buy /
+    Sell ask before sending; Auto does not, because you already armed that book.
   </p>
 
   @if (anyError() && !sessionExpired()) {

@@ -194,8 +194,8 @@
           class="tv-order-btn auto"
           [class.on]="autoTrade"
           [attr.aria-pressed]="autoTrade"
-          [title]="autoTrade ? 'Auto buy/sell is on — confirmed SMC signals place ATM CE/PE' : 'Turn on Auto to buy the ATM call on BUY and the ATM put on SELL'"
-          aria-label="Toggle auto buy and sell"
+          [title]="autoTrade ? 'Auto is on for this chart only — confirmed SMC signals place ATM CE/PE here' : 'Turn on Auto for this chart only — ATM call on BUY, ATM put on SELL'"
+          aria-label="Toggle auto buy and sell for this chart"
           (click)="toggleAuto.emit()"
         >
           {{ autoTrade ? 'Auto on' : 'Auto' }}
