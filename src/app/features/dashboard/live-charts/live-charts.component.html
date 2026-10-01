@@ -64,6 +64,47 @@
     </div>
   </header>
 
+  <aside class="chart-caps" data-testid="chart-pnl-caps">
+    <header>
+      <strong>Max profit / loss per trade</strong>
+      <span>
+        Any rupee amount, one pair per chart. A change applies to the fill that is already
+        open. Blank = system 25% stop and 0.5R target.
+      </span>
+    </header>
+    <div class="smc-cap-grid">
+      @for (book of chartBooks; track book.id) {
+        <div class="smc-cap-row">
+          <strong>{{ book.label }}</strong>
+          <label class="smc-field">
+            <span>Max profit ₹</span>
+            <input
+              type="number"
+              min="0"
+              step="any"
+              [value]="capValue(book.id, 'maxProfitRs')"
+              (change)="setCap(book.id, 'maxProfitRs', $event)"
+              placeholder="system"
+              [attr.aria-label]="'Max profit per trade for ' + book.label"
+            />
+          </label>
+          <label class="smc-field">
+            <span>Max loss ₹</span>
+            <input
+              type="number"
+              min="0"
+              step="any"
+              [value]="capValue(book.id, 'maxLossRs')"
+              (change)="setCap(book.id, 'maxLossRs', $event)"
+              placeholder="system"
+              [attr.aria-label]="'Max loss per trade for ' + book.label"
+            />
+          </label>
+        </div>
+      }
+    </div>
+  </aside>
+
   <details class="smc-settings" data-testid="smc-settings">
     <summary>
       <app-pg-icon name="settings" [size]="15" />
@@ -206,48 +247,10 @@
             Auto {{ book.label }}
           </label>
         }
-      </fieldset>
-
-      <fieldset class="smc-fieldset">
-        <legend>Max profit / loss per trade</legend>
         <p class="smc-note">
-          Type any rupee amount on each chart — 550, 560, 1000, 2000, whatever you
-          want; 300 and 500 were only examples. A change applies to the fill that is
-          <strong>already open</strong>: stop and target move to the new amount, and if
-          that fill has already crossed it, the stop is cancelled and the contract is
-          sold. Leave a field unchanged and that fill keeps what it has. The next fill
-          on that chart uses the same numbers. Blank keeps the system 25% stop and 0.5R
-          target.
+          Max profit / max loss per trade is on this Charts tab — the panel under the
+          title, and on each chart — not inside this fold.
         </p>
-        <div class="smc-cap-grid" data-testid="chart-pnl-caps">
-          @for (book of chartBooks; track book.id) {
-            <div class="smc-cap-row">
-              <strong>{{ book.label }}</strong>
-              <label class="smc-field">
-                <span>Max profit per trade ₹</span>
-                <input
-                  type="number"
-                  min="0"
-                  step="any"
-                  [value]="capValue(book.id, 'maxProfitRs')"
-                  (change)="setCap(book.id, 'maxProfitRs', $event)"
-                  placeholder="system"
-                />
-              </label>
-              <label class="smc-field">
-                <span>Max loss per trade ₹</span>
-                <input
-                  type="number"
-                  min="0"
-                  step="any"
-                  [value]="capValue(book.id, 'maxLossRs')"
-                  (change)="setCap(book.id, 'maxLossRs', $event)"
-                  placeholder="system"
-                />
-              </label>
-            </div>
-          }
-        </div>
       </fieldset>
 
       <div class="smc-settings-foot">
@@ -425,6 +428,33 @@
           }
         </header>
 
+        <div class="chart-cap-inline">
+          <label class="smc-field">
+            <span>Max profit ₹</span>
+            <input
+              type="number"
+              min="0"
+              step="any"
+              [value]="capValue(pane.def.id, 'maxProfitRs')"
+              (change)="setCap(pane.def.id, 'maxProfitRs', $event)"
+              placeholder="system"
+              [attr.aria-label]="'Max profit per trade for ' + pane.def.label"
+            />
+          </label>
+          <label class="smc-field">
+            <span>Max loss ₹</span>
+            <input
+              type="number"
+              min="0"
+              step="any"
+              [value]="capValue(pane.def.id, 'maxLossRs')"
+              (change)="setCap(pane.def.id, 'maxLossRs', $event)"
+              placeholder="system"
+              [attr.aria-label]="'Max loss per trade for ' + pane.def.label"
+            />
+          </label>
+        </div>
+
         @if (!liveDay()) {
           <p class="chart-note market-note" data-testid="chart-test-note">
             Replaying {{ testDate() }}. Every trade below is backtest; nothing is live.
@@ -531,8 +561,8 @@
     at-the-money contract on every book — Nifty 50, Bank Nifty and Crude. Sized from
     Kite funds (₹40,000 per index lot; Crude 3×). Auto buys the ATM call on a
     confirmed BUY and the ATM put on a confirmed SELL, then rests a 25% premium stop
-    and a 0.5R target unless that chart's max profit / max loss is set in
-    SMC settings — then those rupee caps rest instead. Editing the amount while
+    and a 0.5R target unless that chart's max profit / max loss is set on
+    this Charts tab — then those rupee caps rest instead. Editing the amount while
     a fill is open moves that fill's stop and target; if the fill has already
     crossed the new amount, the stop is cancelled and the contract is sold.
     Any rupee figure is allowed. Caps are per trade, not a day stop. Auto on
