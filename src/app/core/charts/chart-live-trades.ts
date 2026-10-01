@@ -9,6 +9,7 @@ import { CHART_BOOKS, ChartBookId } from './live-chart-data.service';
 export const CHART_ENTRY_TAG = 'PALAGAI_CHART';
 export const CHART_SL_TAG = 'PALAGAI_CHART_SL';
 export const CHART_TP_TAG = 'PALAGAI_CHART_TP';
+export const CHART_EXIT_TAG = 'PALAGAI_CHART_EXIT';
 
 export type ChartLiveStatus = 'OPEN' | 'SL_HIT' | 'TP_HIT' | 'EXITED' | 'WORKING';
 
@@ -61,13 +62,17 @@ export interface ChartLiveTrade {
   tp: number | null;
   slState: string;
   tpState: string;
+  slOrderId: string | null;
+  tpOrderId: string | null;
   status: ChartLiveStatus;
   pnl: number | null;
 }
 
 export function isChartOrderTag(tag: string | undefined | null): boolean {
   const t = String(tag || '').toUpperCase();
-  return t === CHART_ENTRY_TAG || t === CHART_SL_TAG || t === CHART_TP_TAG;
+  return (
+    t === CHART_ENTRY_TAG || t === CHART_SL_TAG || t === CHART_TP_TAG || t === CHART_EXIT_TAG
+  );
 }
 
 export function bookFromInstrument(symbol: string): ChartBookId | null {
@@ -116,6 +121,7 @@ export function buildChartLiveTrades(
     const entry = latest(list, (o) => tagOf(o) === CHART_ENTRY_TAG && sideOf(o) === 'BUY');
     const slOrder = latest(list, (o) => tagOf(o) === CHART_SL_TAG);
     const tpOrder = latest(list, (o) => tagOf(o) === CHART_TP_TAG);
+    const exitOrder = latest(list, (o) => tagOf(o) === CHART_EXIT_TAG && sideOf(o) === 'SELL');
     const pos = posBySymbol.get(instrument);
     const posQty = pos ? Math.abs(num(pos.quantity)) : 0;
     const slHit = isComplete(slOrder);
@@ -130,12 +136,13 @@ export function buildChartLiveTrades(
     if (posQty > 0) status = 'OPEN';
     else if (tpHit) status = 'TP_HIT';
     else if (slHit) status = 'SL_HIT';
+    else if (isComplete(exitOrder)) status = 'EXITED';
     else if (isComplete(entry) && (protectiveResting || !pos)) status = 'OPEN';
     else if (isComplete(entry)) status = 'EXITED';
-    const pnl =
-      status === 'OPEN' && last != null && entryPx != null
-        ? (last - entryPx) * qty
-        : num(pos?.pnl) || null;
+    const kitePnl = pos != null && pos.pnl != null && pos.pnl !== '' ? Number(pos.pnl) : NaN;
+    const computed =
+      status === 'OPEN' && last != null && entryPx != null ? (last - entryPx) * qty : NaN;
+    const pnl = Number.isFinite(kitePnl) ? kitePnl : Number.isFinite(computed) ? computed : null;
     const book = bookFromInstrument(instrument);
     trades.push({
       id: `${instrument}:${entry?.order_id ?? slOrder?.order_id ?? tpOrder?.order_id ?? instrument}`,
@@ -151,6 +158,8 @@ export function buildChartLiveTrades(
       tp,
       slState: orderState(slOrder),
       tpState: orderState(tpOrder),
+      slOrderId: restingOrderId(slOrder),
+      tpOrderId: restingOrderId(tpOrder),
       status,
       pnl: Number.isFinite(pnl as number) ? (pnl as number) : null,
     });
@@ -184,6 +193,8 @@ export function localChartTrade(input: {
     tp: input.tp,
     slState: input.sl != null ? 'RESTING' : '—',
     tpState: input.tp != null ? 'RESTING' : '—',
+    slOrderId: null,
+    tpOrderId: null,
     status: 'OPEN',
     pnl: null,
   };
@@ -229,6 +240,12 @@ function orderState(order: KiteOrderLike | undefined): string {
   if (st === 'CANCELLED') return 'CANCELLED';
   if (st === 'REJECTED') return 'REJECTED';
   return st || '—';
+}
+
+function restingOrderId(order: KiteOrderLike | undefined): string | null {
+  if (!order || !isOpenish(order)) return null;
+  const id = String(order.order_id ?? '').trim();
+  return id || null;
 }
 
 function filledQty(order: KiteOrderLike | undefined): number {

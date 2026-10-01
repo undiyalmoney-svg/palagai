@@ -567,6 +567,33 @@
   justify-content: flex-end;
 }
 
+.smc-cap-grid {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.smc-cap-row {
+  display: grid;
+  grid-template-columns: minmax(7rem, 0.8fr) repeat(2, minmax(8rem, 1fr));
+  gap: 0.6rem;
+  align-items: end;
+}
+
+.smc-cap-row strong {
+  font-size: 0.82rem;
+  padding-bottom: 0.35rem;
+}
+
+@media (max-width: 640px) {
+  .smc-cap-row {
+    grid-template-columns: 1fr;
+  }
+
+  .smc-cap-row strong {
+    padding-bottom: 0;
+  }
+}
+
 .alert-feed {
   margin: 0 0 1rem;
   padding: 0.65rem 0.9rem;

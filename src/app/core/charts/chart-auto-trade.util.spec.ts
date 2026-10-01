@@ -17,6 +17,26 @@ describe('chart auto trade', () => {
     expect(chartProtectiveLevels(0)).toBeNull();
   });
 
+  it('moves the stop and target to the rupee caps when those are set', () => {
+    // 65 qty: ₹1,300 loss = 20 premium, ₹650 profit = 10 premium.
+    expect(
+      chartProtectiveLevels(200, 0.05, {
+        maxLossRs: 1_300,
+        maxProfitRs: 650,
+        rupeePerPoint: 65,
+      }),
+    ).toEqual({ stop: 180, target: 210 });
+  });
+
+  it('keeps the system side when only one rupee cap is set', () => {
+    expect(
+      chartProtectiveLevels(200, 0.05, {
+        maxLossRs: 1_300,
+        rupeePerPoint: 65,
+      }),
+    ).toEqual({ stop: 180, target: 225 });
+  });
+
   it('fires only on a live open book with Auto on and a BUY/SELL alert', () => {
     const base = {
       autoTrade: true,

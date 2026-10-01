@@ -69,13 +69,14 @@ import { UiDialogService } from '../../../shared/ui/dialog/ui-dialog.service';
 import { CapitalPreferenceService } from '../../../core/services/capital-preference.service';
 import { KiteFundsService } from '../../../core/services/kite-funds.service';
 import { AtmOrderService } from '../../../core/orders/atm-order.service';
-import { AtmOptionSide, AtmOrderTicket, atmOrderCost } from '../../../core/orders/atm-order.util';
+import { AtmOptionSide, AtmOrderTicket, atmOrderCost, atmRupeePerPoint } from '../../../core/orders/atm-order.util';
 import { clampChartLots, lotsForChartBook, maxChartLots, sizingCapitalFromFunds } from '../../../core/charts/chart-lots.util';
 import {
   chartProtectiveLevels,
   optionSideForAlert,
   shouldAutoTrade,
 } from '../../../core/charts/chart-auto-trade.util';
+import { anyCapSet, hitChartPnlCap, parseRsCap } from '../../../core/charts/chart-pnl-cap';
 import {
   ChartLiveStatus,
   ChartLiveTrade,
@@ -173,6 +174,8 @@ const BOOK_STAGGER_MS = 350;
 const FEED_LIMIT = 40;
 /** Orders/positions for the live-trades board — slower than candle polls. */
 const TRADE_POLL_MS = 15_000;
+/** When a rupee cap is set, watch fills at the scheduler tick so a gap is not 15s late. */
+const CAP_POLL_MS = 5_000;
 
 const NUMERIC_FIELDS: readonly NumericField[] = [
   { key: 'riskPerTradePct', label: 'Risk per trade %', min: 0.05, max: 100, step: 0.1, hint: 'Share of equity risked to the stop' },
@@ -260,6 +263,8 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
     () => this.liveTrades().filter((t) => t.status === 'OPEN' || t.status === 'WORKING').length,
   );
 
+  protected readonly anyCapWatching = computed(() => anyCapSet(this.settings().pnlCaps));
+
   /**
    * Re-read on every scheduler tick so the badges cross the open and the close
    * on their own rather than waiting for the next candle to land.
@@ -315,6 +320,8 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
   private tradesInFlight = false;
   /** Just-sent fills held until Kite lists that contract. */
   private readonly pendingLocal = new Map<string, ChartLiveTrade>();
+  /** Instruments currently being flattened so a cap cannot double-sell. */
+  private readonly flattenInFlight = new Set<string>();
 
   ngOnInit(): void {
     if (!this.isBrowser) {
@@ -487,7 +494,7 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
   protected async refreshLiveTrades(force = false): Promise<void> {
     if (this.tradesInFlight) return;
     const now = Date.now();
-    if (!force && now - this.lastTradePollAt < TRADE_POLL_MS) return;
+    if (!force && now - this.lastTradePollAt < this.tradePollMs()) return;
     this.tradesInFlight = true;
     this.lastTradePollAt = now;
     try {
@@ -506,6 +513,9 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
       this.liveTradesReady.set(true);
     } finally {
       this.tradesInFlight = false;
+    }
+    if (!this.liveTradesError()) {
+      void this.enforcePnlCaps(this.liveTrades());
     }
   }
 
@@ -531,6 +541,53 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
 
   protected statusLabel(status: ChartLiveStatus): string {
     return TRADE_STATUS_LABELS[status];
+  }
+
+  private tradePollMs(): number {
+    return anyCapSet(this.settings().pnlCaps) ? CAP_POLL_MS : TRADE_POLL_MS;
+  }
+
+  protected capValue(id: ChartBookId, key: 'maxProfitRs' | 'maxLossRs'): string {
+    const n = this.settings().pnlCaps[id][key];
+    return n == null ? '' : String(n);
+  }
+
+  protected setCap(id: ChartBookId, key: 'maxProfitRs' | 'maxLossRs', event: Event): void {
+    const raw = (event.target as HTMLInputElement).value;
+    const current = this.settings();
+    this.commit({
+      ...current,
+      pnlCaps: {
+        ...current.pnlCaps,
+        [id]: { ...current.pnlCaps[id], [key]: parseRsCap(raw) },
+      },
+    });
+  }
+
+  /**
+   * If this book's rupee cap is set and an open fill has crossed it, cancel
+   * the resting SL/TP and market-exit that contract. The same instrument is
+   * not flattened twice until it is no longer OPEN.
+   */
+  private async enforcePnlCaps(trades: ChartLiveTrade[]): Promise<void> {
+    const caps = this.settings().pnlCaps;
+    let started = false;
+    for (const trade of trades) {
+      if (trade.status !== 'OPEN') {
+        this.flattenInFlight.delete(trade.instrument);
+        continue;
+      }
+      if (!trade.book) continue;
+      const reason = hitChartPnlCap(trade.pnl, caps[trade.book]);
+      if (!reason) continue;
+      if (this.flattenInFlight.has(trade.instrument)) continue;
+      this.flattenInFlight.add(trade.instrument);
+      started = true;
+      const result = await this.orders.flattenChartTrade(trade, reason);
+      this.patch(trade.book, { order: { ok: result.ok, text: result.message } });
+      if (!result.ok) this.flattenInFlight.delete(trade.instrument);
+    }
+    if (started) void this.refreshLiveTrades(true);
   }
 
   /** Drop everything shown and read it again: timeframe or date changed. */
@@ -913,7 +970,15 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
       }
 
       const fill = await this.orders.fillPrice(result.orderId, premium);
-      const levels = fill != null ? chartProtectiveLevels(fill) : null;
+      const cap = this.settings().pnlCaps[id];
+      const levels =
+        fill != null
+          ? chartProtectiveLevels(fill, 0.05, {
+              maxProfitRs: cap.maxProfitRs,
+              maxLossRs: cap.maxLossRs,
+              rupeePerPoint: atmRupeePerPoint(ticket),
+            })
+          : null;
       const extras: string[] = [];
       if (levels) {
         const sl = await this.orders.placeStop(ticket, levels.stop);
@@ -960,7 +1025,9 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
         : 'Live premium unavailable — cost unknown.',
       '',
       'This is a real order at market price. A 25% premium stop and a 0.5R',
-      "target rest after the fill. The desk's daily limits do not apply.",
+      "target rest after the fill unless this book's max profit / max loss",
+      "are set — then those rupee caps rest instead. The desk's daily limits",
+      'do not apply.',
     ];
 
     return this.uiDialog.confirm({

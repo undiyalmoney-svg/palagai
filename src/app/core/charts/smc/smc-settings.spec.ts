@@ -43,6 +43,22 @@ describe('smc settings', () => {
     expect(defaultSmcSettings().autoTrade).toEqual({ nifty: false, bank: false, crude: false });
   });
 
+  it('leaves per-book max profit and max loss unset so the system stop/target stay', () => {
+    expect(defaultSmcSettings().pnlCaps).toEqual({
+      nifty: { maxProfitRs: null, maxLossRs: null },
+      bank: { maxProfitRs: null, maxLossRs: null },
+      crude: { maxProfitRs: null, maxLossRs: null },
+    });
+    const storage = {
+      getItem: () =>
+        JSON.stringify({
+          pnlCaps: { nifty: { maxProfitRs: 600, maxLossRs: 250 } },
+        }),
+    };
+    expect(loadSmcSettings(storage).pnlCaps.nifty).toEqual({ maxProfitRs: 600, maxLossRs: 250 });
+    expect(loadSmcSettings(storage).pnlCaps.bank).toEqual({ maxProfitRs: null, maxLossRs: null });
+  });
+
   it('migrates the old all-books Auto flag and loads one switch per book', () => {
     expect(parseAutoTrade(true)).toEqual({ nifty: true, bank: true, crude: true });
     expect(parseAutoTrade(false)).toEqual({ nifty: false, bank: false, crude: false });

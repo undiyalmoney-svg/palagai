@@ -208,6 +208,44 @@
         }
       </fieldset>
 
+      <fieldset class="smc-fieldset">
+        <legend>Max profit / loss per trade</legend>
+        <p class="smc-note">
+          Leave blank to keep the 25% premium stop and 0.5R target on that chart. A rupee
+          amount is watched on that chart's open fill: when it is hit, the resting stop
+          and target are cancelled and the contract is sold.
+        </p>
+        <div class="smc-cap-grid" data-testid="chart-pnl-caps">
+          @for (book of chartBooks; track book.id) {
+            <div class="smc-cap-row">
+              <strong>{{ book.label }}</strong>
+              <label class="smc-field">
+                <span>Max profit ₹</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="50"
+                  [value]="capValue(book.id, 'maxProfitRs')"
+                  (change)="setCap(book.id, 'maxProfitRs', $event)"
+                  placeholder="system"
+                />
+              </label>
+              <label class="smc-field">
+                <span>Max loss ₹</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="50"
+                  [value]="capValue(book.id, 'maxLossRs')"
+                  (change)="setCap(book.id, 'maxLossRs', $event)"
+                  placeholder="system"
+                />
+              </label>
+            </div>
+          }
+        </div>
+      </fieldset>
+
       <div class="smc-settings-foot">
         <button type="button" class="ghost-btn" (click)="resetSettings()">Reset to defaults</button>
       </div>
@@ -242,6 +280,9 @@
             {{ openTradeCount() }} open ·
           }
           selected instrument, stop and target from Buy / Sell / Auto
+          @if (anyCapWatching()) {
+            · rupee caps flatten when hit
+          }
         </span>
         <button type="button" class="ghost-btn" (click)="refreshLiveTrades(true)">Refresh</button>
       </header>
@@ -486,8 +527,11 @@
     at-the-money contract on every book — Nifty 50, Bank Nifty and Crude. Sized from
     Kite funds (₹40,000 per index lot; Crude 3×). Auto buys the ATM call on a
     confirmed BUY and the ATM put on a confirmed SELL, then rests a 25% premium stop
-    and a 0.5R target. Auto on Nifty does not arm Bank Nifty or Crude. Manual Buy /
-    Sell ask before sending; Auto does not, because you already armed that book.
+    and a 0.5R target unless that chart's max profit / max loss is set in
+    SMC settings — then those rupee caps rest instead, and an open fill that
+    hits them cancels the stop and target and sells the contract. Auto on
+    Nifty does not arm Bank Nifty or Crude. Manual Buy / Sell ask before
+    sending; Auto does not, because you already armed that book.
     Open fills, the selected contract, the stop and the target sit on the Live
     trades board above the charts.
   </p>

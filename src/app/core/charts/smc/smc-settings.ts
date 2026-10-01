@@ -1,5 +1,6 @@
 import { ChartBookId } from '../live-chart-data.service';
 import { ChartInterval, CHART_INTERVALS, chartIntervalMinutes } from '../chart-intervals.util';
+import { ChartPnlCaps, defaultPnlCaps, parsePnlCaps } from '../chart-pnl-cap';
 import { SmcConfig } from './smc.config';
 import { SMC_ALERT_TYPES, SmcAlertType } from './smc.types';
 
@@ -32,6 +33,11 @@ export interface SmcSettings {
   browserNotifications: boolean;
   /** Place ATM CE/PE when a confirmed BUY/SELL prints. One switch per book. */
   autoTrade: SmcAutoTrade;
+  /**
+   * Optional rupee max-profit / max-loss per book. Null on a side keeps the
+   * 25% stop / 0.5R target for that side.
+   */
+  pnlCaps: ChartPnlCaps;
 }
 
 export const SMC_DEFAULT_LTF: ChartInterval = '1m';
@@ -62,6 +68,7 @@ export function defaultSmcSettings(): SmcSettings {
     >,
     browserNotifications: false,
     autoTrade: defaultAutoTrade(),
+    pnlCaps: defaultPnlCaps(),
   };
 }
 
@@ -113,6 +120,7 @@ export function loadSmcSettings(storage: Pick<Storage, 'getItem'> | null): SmcSe
       alerts: { ...base.alerts, ...(parsed.alerts ?? {}) },
       browserNotifications: parsed.browserNotifications === true,
       autoTrade: parseAutoTrade(parsed.autoTrade),
+      pnlCaps: parsePnlCaps(parsed.pnlCaps),
     };
   } catch {
     return base;

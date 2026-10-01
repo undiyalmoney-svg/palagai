@@ -12,6 +12,7 @@ describe('chart live trades', () => {
     expect(isChartOrderTag('PALAGAI_CHART')).toBe(true);
     expect(isChartOrderTag('PALAGAI_CHART_SL')).toBe(true);
     expect(isChartOrderTag('PALAGAI_CHART_TP')).toBe(true);
+    expect(isChartOrderTag('PALAGAI_CHART_EXIT')).toBe(true);
     expect(isChartOrderTag('PALAGAI')).toBe(false);
   });
 
@@ -72,6 +73,8 @@ describe('chart live trades', () => {
       tp: 225,
       slState: 'RESTING',
       tpState: 'RESTING',
+      slOrderId: '2',
+      tpOrderId: '3',
       status: 'OPEN',
       pnl: 780,
     });
@@ -129,6 +132,33 @@ describe('chart live trades', () => {
     expect(trades[0]?.book).toBe('crude');
     expect(trades[0]?.status).toBe('SL_HIT');
     expect(trades[0]?.sl).toBe(30);
+  });
+
+  it('marks a cap flatten as EXITED once the tagged sell completes', () => {
+    const trades = buildChartLiveTrades(
+      [
+        {
+          order_id: '1',
+          tradingsymbol: 'NIFTY25OCT24500CE',
+          transaction_type: 'BUY',
+          status: 'COMPLETE',
+          filled_quantity: 65,
+          average_price: 200,
+          tag: 'PALAGAI_CHART',
+        },
+        {
+          order_id: '4',
+          tradingsymbol: 'NIFTY25OCT24500CE',
+          transaction_type: 'SELL',
+          status: 'COMPLETE',
+          filled_quantity: 65,
+          average_price: 210,
+          tag: 'PALAGAI_CHART_EXIT',
+        },
+      ],
+      [{ tradingsymbol: 'NIFTY25OCT24500CE', product: 'MIS', quantity: 0 }],
+    );
+    expect(trades[0]?.status).toBe('EXITED');
   });
 
   it('keeps a just-sent local row until Kite lists that instrument', () => {
