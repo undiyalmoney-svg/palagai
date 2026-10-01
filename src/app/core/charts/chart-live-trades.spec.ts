@@ -1,0 +1,175 @@
+import {
+  buildChartLiveTrades,
+  extractKiteOrders,
+  extractKitePositions,
+  isChartOrderTag,
+  localChartTrade,
+  mergeChartLiveTrades,
+} from './chart-live-trades';
+
+describe('chart live trades', () => {
+  it('recognises Charts tags and ignores desk tags', () => {
+    expect(isChartOrderTag('PALAGAI_CHART')).toBe(true);
+    expect(isChartOrderTag('PALAGAI_CHART_SL')).toBe(true);
+    expect(isChartOrderTag('PALAGAI_CHART_TP')).toBe(true);
+    expect(isChartOrderTag('PALAGAI')).toBe(false);
+  });
+
+  it('lists the instrument, stop and target for an open Auto fill', () => {
+    const trades = buildChartLiveTrades(
+      [
+        {
+          order_id: '1',
+          tradingsymbol: 'NIFTY25OCT24500CE',
+          exchange: 'NFO',
+          transaction_type: 'BUY',
+          status: 'COMPLETE',
+          filled_quantity: 65,
+          average_price: 200,
+          tag: 'PALAGAI_CHART',
+        },
+        {
+          order_id: '2',
+          tradingsymbol: 'NIFTY25OCT24500CE',
+          exchange: 'NFO',
+          transaction_type: 'SELL',
+          status: 'TRIGGER PENDING',
+          trigger_price: 150,
+          tag: 'PALAGAI_CHART_SL',
+        },
+        {
+          order_id: '3',
+          tradingsymbol: 'NIFTY25OCT24500CE',
+          exchange: 'NFO',
+          transaction_type: 'SELL',
+          status: 'OPEN',
+          price: 225,
+          tag: 'PALAGAI_CHART_TP',
+        },
+      ],
+      [
+        {
+          tradingsymbol: 'NIFTY25OCT24500CE',
+          product: 'MIS',
+          quantity: 65,
+          average_price: 200,
+          last_price: 212,
+          pnl: 780,
+        },
+      ],
+    );
+
+    expect(trades).toHaveLength(1);
+    expect(trades[0]).toMatchObject({
+      book: 'nifty',
+      bookLabel: 'Nifty 50',
+      instrument: 'NIFTY25OCT24500CE',
+      side: 'CE',
+      qty: 65,
+      entry: 200,
+      last: 212,
+      sl: 150,
+      tp: 225,
+      slState: 'RESTING',
+      tpState: 'RESTING',
+      status: 'OPEN',
+      pnl: 780,
+    });
+  });
+
+  it('marks a filled target as TP_HIT', () => {
+    const trades = buildChartLiveTrades([
+      {
+        order_id: '1',
+        tradingsymbol: 'BANKNIFTY25OCT52000PE',
+        transaction_type: 'BUY',
+        status: 'COMPLETE',
+        filled_quantity: 30,
+        average_price: 180,
+        tag: 'PALAGAI_CHART',
+      },
+      {
+        order_id: '3',
+        tradingsymbol: 'BANKNIFTY25OCT52000PE',
+        transaction_type: 'SELL',
+        status: 'COMPLETE',
+        price: 202.5,
+        average_price: 202.5,
+        filled_quantity: 30,
+        tag: 'PALAGAI_CHART_TP',
+      },
+    ]);
+    expect(trades[0]?.book).toBe('bank');
+    expect(trades[0]?.status).toBe('TP_HIT');
+    expect(trades[0]?.tp).toBe(202.5);
+  });
+
+  it('marks a filled stop as SL_HIT', () => {
+    const trades = buildChartLiveTrades([
+      {
+        order_id: '1',
+        tradingsymbol: 'CRUDEOILM26OCT5400CE',
+        transaction_type: 'BUY',
+        status: 'COMPLETE',
+        filled_quantity: 1,
+        average_price: 40,
+        tag: 'PALAGAI_CHART',
+      },
+      {
+        order_id: '2',
+        tradingsymbol: 'CRUDEOILM26OCT5400CE',
+        transaction_type: 'SELL',
+        status: 'COMPLETE',
+        trigger_price: 30,
+        average_price: 30,
+        filled_quantity: 1,
+        tag: 'PALAGAI_CHART_SL',
+      },
+    ]);
+    expect(trades[0]?.book).toBe('crude');
+    expect(trades[0]?.status).toBe('SL_HIT');
+    expect(trades[0]?.sl).toBe(30);
+  });
+
+  it('keeps a just-sent local row until Kite lists that instrument', () => {
+    const pending = localChartTrade({
+      book: 'nifty',
+      instrument: 'NIFTY25OCT24500CE',
+      exchange: 'NFO',
+      side: 'CE',
+      qty: 65,
+      entry: 200,
+      sl: 150,
+      tp: 225,
+    });
+    expect(pending).toMatchObject({
+      bookLabel: 'Nifty 50',
+      slState: 'RESTING',
+      tpState: 'RESTING',
+      status: 'OPEN',
+    });
+    const merged = mergeChartLiveTrades([], [pending]);
+    expect(merged).toHaveLength(1);
+    const fromKite = buildChartLiveTrades([
+      {
+        order_id: '1',
+        tradingsymbol: 'NIFTY25OCT24500CE',
+        transaction_type: 'BUY',
+        status: 'COMPLETE',
+        filled_quantity: 65,
+        average_price: 201,
+        tag: 'PALAGAI_CHART',
+      },
+    ]);
+    expect(mergeChartLiveTrades(fromKite, [pending])[0]?.entry).toBe(201);
+  });
+
+  it('unwraps Kite order and position payloads', () => {
+    expect(extractKiteOrders({ data: [{ order_id: '9' }] })).toHaveLength(1);
+    expect(
+      extractKitePositions({
+        data: { day: [{ tradingsymbol: 'X', quantity: 1 }], net: [] },
+      }),
+    ).toHaveLength(1);
+  });
+});

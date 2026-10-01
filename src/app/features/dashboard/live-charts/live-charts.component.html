@@ -234,6 +234,80 @@
   }
 
   @if (liveDay()) {
+    <aside class="live-trades" data-testid="chart-live-trades">
+      <header>
+        <strong>Live trades</strong>
+        <span>
+          @if (openTradeCount()) {
+            {{ openTradeCount() }} open ·
+          }
+          selected instrument, stop and target from Buy / Sell / Auto
+        </span>
+        <button type="button" class="ghost-btn" (click)="refreshLiveTrades(true)">Refresh</button>
+      </header>
+      @if (liveTradesError()) {
+        <p class="alert-empty">{{ liveTradesError() }}</p>
+      } @else if (!liveTradesReady()) {
+        <p class="alert-empty">Reading today's Charts fills…</p>
+      } @else if (!liveTrades().length) {
+        <p class="alert-empty">
+          No Charts ATM fills today. Buy, Sell or Auto will list the contract, stop and target here.
+        </p>
+      } @else {
+        <div class="live-trades-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Book</th>
+                <th>Instrument</th>
+                <th>Side</th>
+                <th>Qty</th>
+                <th>Entry</th>
+                <th>Last</th>
+                <th>Stop</th>
+                <th>Target</th>
+                <th>P&amp;L</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (trade of liveTrades(); track trade.id) {
+                <tr [attr.data-status]="trade.status" [attr.data-instrument]="trade.instrument">
+                  <td>{{ trade.bookLabel }}</td>
+                  <td class="inst">{{ trade.instrument }}</td>
+                  <td [class.buy]="trade.side === 'CE'" [class.sell]="trade.side === 'PE'">
+                    {{ trade.side ?? '—' }}
+                  </td>
+                  <td>{{ trade.qty || '—' }}</td>
+                  <td>{{ fmt(trade.entry, 2) }}</td>
+                  <td>{{ fmt(trade.last, 2) }}</td>
+                  <td class="sl">
+                    {{ fmt(trade.sl, 2) }}
+                    <small>{{ trade.slState }}</small>
+                  </td>
+                  <td class="tp">
+                    {{ fmt(trade.tp, 2) }}
+                    <small>{{ trade.tpState }}</small>
+                  </td>
+                  <td
+                    [class.pg-up]="(trade.pnl ?? 0) > 0"
+                    [class.pg-down]="(trade.pnl ?? 0) < 0"
+                  >
+                    {{ signed(trade.pnl, 0) }}
+                  </td>
+                  <td>
+                    <span class="trade-status">{{ statusLabel(trade.status) }}</span>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </aside>
+  }
+
+  @if (liveDay()) {
     <aside class="alert-feed" data-testid="smc-alert-feed">
       <header>
         <strong>Alerts</strong>
@@ -407,6 +481,8 @@
     confirmed BUY and the ATM put on a confirmed SELL, then rests a 25% premium stop
     and a 0.5R target. Auto on Nifty does not arm Bank Nifty or Crude. Manual Buy /
     Sell ask before sending; Auto does not, because you already armed that book.
+    Open fills, the selected contract, the stop and the target sit on the Live
+    trades board above the charts.
   </p>
 
   @if (anyError() && !sessionExpired()) {

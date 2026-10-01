@@ -27,6 +27,12 @@ import {
   atmTargetFields,
   buildAtmOrderPlan,
 } from './atm-order.util';
+import {
+  ChartLiveTrade,
+  buildChartLiveTrades,
+  extractKiteOrders,
+  extractKitePositions,
+} from '../charts/chart-live-trades';
 
 export interface AtmOrderResult {
   ok: boolean;
@@ -213,6 +219,24 @@ export class AtmOrderService {
       // The stop can still rest off the quote we already showed.
     }
     return null;
+  }
+
+  /**
+   * Today's Charts ATM fills with the resting stop and target, read from Kite.
+   * Null when there is no session — the board should say to connect, not invent rows.
+   */
+  async chartLiveTrades(): Promise<ChartLiveTrade[] | null> {
+    const authorization = this.kiteSession.getAuthorizationHeader();
+    if (!authorization) return null;
+    try {
+      const [orderRes, posRes] = await Promise.all([
+        firstValueFrom(this.kiteApi.getOrders(authorization)),
+        firstValueFrom(this.kiteApi.getPositions(authorization)),
+      ]);
+      return buildChartLiveTrades(extractKiteOrders(orderRes), extractKitePositions(posRes));
+    } catch {
+      return [];
+    }
   }
 }
 

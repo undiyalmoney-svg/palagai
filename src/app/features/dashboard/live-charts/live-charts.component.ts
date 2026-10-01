@@ -76,6 +76,13 @@ import {
   optionSideForAlert,
   shouldAutoTrade,
 } from '../../../core/charts/chart-auto-trade.util';
+import {
+  ChartLiveStatus,
+  ChartLiveTrade,
+  TRADE_STATUS_LABELS,
+  localChartTrade,
+  mergeChartLiveTrades,
+} from '../../../core/charts/chart-live-trades';
 import { RS_PER_LOT } from '../../../core/paper-desk/lots-from-funds';
 import { TvCandleChartComponent } from './tv-candle-chart.component';
 import { SmcPanelComponent } from './smc-panel.component';
@@ -164,6 +171,8 @@ const SESSIONS: Record<ChartBookId, InstrumentSessionConfig> = {
 /** Kite historical allows 3 req/s; keep a gap so three books never trip it. */
 const BOOK_STAGGER_MS = 350;
 const FEED_LIMIT = 40;
+/** Orders/positions for the live-trades board — slower than candle polls. */
+const TRADE_POLL_MS = 15_000;
 
 const NUMERIC_FIELDS: readonly NumericField[] = [
   { key: 'riskPerTradePct', label: 'Risk per trade %', min: 0.05, max: 100, step: 0.1, hint: 'Share of equity risked to the stop' },
@@ -218,6 +227,10 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
 
   /** Newest first; only alerts that fired while the tab was watching. */
   protected readonly feed = signal<SmcFeedItem[]>([]);
+  /** Charts ATM fills with instrument, stop and target — from Kite, plus a local row just after a send. */
+  protected readonly liveTrades = signal<ChartLiveTrade[]>([]);
+  protected readonly liveTradesReady = signal(false);
+  protected readonly liveTradesError = signal<string | null>(null);
   protected readonly autoRefresh = signal(true);
   /** One calendar day. Start and end are the same — live when it is today. */
   protected readonly testDate = signal(istToday());
@@ -242,6 +255,10 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
   );
 
   protected readonly anyError = computed(() => this.panes().some((p) => p.error));
+
+  protected readonly openTradeCount = computed(
+    () => this.liveTrades().filter((t) => t.status === 'OPEN' || t.status === 'WORKING').length,
+  );
 
   /**
    * Re-read on every scheduler tick so the badges cross the open and the close
@@ -294,6 +311,10 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
   private readonly wasOpen = new Map<ChartBookId, boolean>();
   /** Once a reader taps +/−, that book keeps their count instead of following funds. */
   private readonly lotsOverride = signal<Partial<Record<ChartBookId, number>>>({});
+  private lastTradePollAt = 0;
+  private tradesInFlight = false;
+  /** Just-sent fills held until Kite lists that contract. */
+  private readonly pendingLocal = new Map<string, ChartLiveTrade>();
 
   ngOnInit(): void {
     if (!this.isBrowser) {
@@ -303,6 +324,7 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
     // session that just ended rather than an empty frame.
     void this.kiteFunds.refresh();
     void this.refreshAll();
+    void this.refreshLiveTrades();
     this.timer = setInterval(() => {
       this.clock.set(Date.now());
       if (!this.autoRefresh()) return;
@@ -311,6 +333,9 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
       const due = this.duePanes();
       if (due.length) {
         void this.refreshPanes(due);
+      }
+      if (this.liveDay()) {
+        void this.refreshLiveTrades();
       }
     }, TICK_MS);
   }
@@ -453,6 +478,59 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
 
   protected refreshAll(): Promise<void> {
     return this.refreshPanes(CHART_BOOKS.map((def) => def.id));
+  }
+
+  /**
+   * Rebuild the Live trades board from today's Kite orders and positions.
+   * Throttled to TRADE_POLL_MS so candle ticks do not burn order-book quota.
+   */
+  protected async refreshLiveTrades(force = false): Promise<void> {
+    if (this.tradesInFlight) return;
+    const now = Date.now();
+    if (!force && now - this.lastTradePollAt < TRADE_POLL_MS) return;
+    this.tradesInFlight = true;
+    this.lastTradePollAt = now;
+    try {
+      const remote = await this.orders.chartLiveTrades();
+      if (remote == null) {
+        this.liveTradesError.set('Connect Kite to see live fills.');
+        this.liveTradesReady.set(true);
+        return;
+      }
+      this.liveTradesError.set(null);
+      for (const trade of remote) this.pendingLocal.delete(trade.instrument);
+      this.liveTrades.set(mergeChartLiveTrades(remote, [...this.pendingLocal.values()]));
+      this.liveTradesReady.set(true);
+    } catch {
+      this.liveTradesError.set("Could not read today's Charts fills.");
+      this.liveTradesReady.set(true);
+    } finally {
+      this.tradesInFlight = false;
+    }
+  }
+
+  private noteLocalTrade(input: {
+    book: ChartBookId;
+    instrument: string;
+    exchange: string;
+    side: AtmOptionSide;
+    qty: number;
+    entry: number | null;
+    sl: number | null;
+    tp: number | null;
+  }): void {
+    const trade = localChartTrade(input);
+    this.pendingLocal.set(trade.instrument, trade);
+    this.liveTrades.update((list) =>
+      mergeChartLiveTrades(
+        list.filter((row) => row.instrument !== trade.instrument),
+        [trade],
+      ),
+    );
+  }
+
+  protected statusLabel(status: ChartLiveStatus): string {
+    return TRADE_STATUS_LABELS[status];
   }
 
   /** Drop everything shown and read it again: timeframe or date changed. */
@@ -850,6 +928,17 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
           text: `${tag}${shortSymbol(ticket)} · ${result.message}${extras.length ? ' · ' + extras.join(' ') : ''}`,
         },
       });
+      this.noteLocalTrade({
+        book: id,
+        instrument: ticket.tradingSymbol,
+        exchange: ticket.exchange,
+        side: ticket.side,
+        qty: ticket.quantity,
+        entry: fill,
+        sl: levels?.stop ?? null,
+        tp: levels?.target ?? null,
+      });
+      void this.refreshLiveTrades(true);
       return true;
     } finally {
       this.patch(id, { ordering: null });
