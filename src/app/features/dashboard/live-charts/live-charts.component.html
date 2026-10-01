@@ -246,31 +246,31 @@
         <button type="button" class="ghost-btn" (click)="refreshLiveTrades(true)">Refresh</button>
       </header>
       @if (liveTradesError()) {
-        <p class="alert-empty">{{ liveTradesError() }}</p>
+        <p class="alert-empty">
+          {{ liveTradesError() }}
+          <a routerLink="/dashboard/get-token">Open Token</a>
+        </p>
       } @else if (!liveTradesReady()) {
         <p class="alert-empty">Reading today's Charts fills…</p>
-      } @else if (!liveTrades().length) {
-        <p class="alert-empty">
-          No Charts ATM fills today. Buy, Sell or Auto will list the contract, stop and target here.
-        </p>
-      } @else {
-        <div class="live-trades-scroll">
-          <table>
-            <thead>
-              <tr>
-                <th>Book</th>
-                <th>Instrument</th>
-                <th>Side</th>
-                <th>Qty</th>
-                <th>Entry</th>
-                <th>Last</th>
-                <th>Stop</th>
-                <th>Target</th>
-                <th>P&amp;L</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
+      }
+      <div class="live-trades-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Book</th>
+              <th>Instrument</th>
+              <th>Side</th>
+              <th>Qty</th>
+              <th>Entry</th>
+              <th>Last</th>
+              <th>Stop</th>
+              <th>Target</th>
+              <th>P&amp;L</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            @if (liveTrades().length) {
               @for (trade of liveTrades(); track trade.id) {
                 <tr [attr.data-status]="trade.status" [attr.data-instrument]="trade.instrument">
                   <td>{{ trade.bookLabel }}</td>
@@ -300,10 +300,17 @@
                   </td>
                 </tr>
               }
-            </tbody>
-          </table>
-        </div>
-      }
+            } @else if (liveTradesReady() && !liveTradesError()) {
+              <tr class="empty-row">
+                <td colspan="10">
+                  No Charts ATM fills today. Buy, Sell or Auto will list the contract, stop and
+                  target here.
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
     </aside>
   }
 

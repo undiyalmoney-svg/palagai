@@ -638,9 +638,10 @@
 }
 
 .live-trades {
+  scroll-margin-top: 5rem;
   margin: 0 0 1rem;
-  padding: 0.65rem 0.9rem;
-  border: 1px solid var(--pg-line);
+  padding: 0.85rem 1rem 0.95rem;
+  border: 1px solid var(--pg-line-strong, var(--pg-line));
   border-radius: var(--pg-radius);
   background: var(--pg-bg-elevated);
 }
@@ -696,6 +697,20 @@
 }
 
 .live-trades td.inst {
+  font-weight: 650;
+}
+
+.live-trades tr.empty-row td {
+  text-align: left;
+  font-family: var(--pg-font);
+  font-size: 0.74rem;
+  font-weight: 500;
+  color: var(--pg-muted);
+  white-space: normal;
+}
+
+.live-trades .alert-empty a {
+  margin-left: 0.35rem;
   font-weight: 650;
 }
 
