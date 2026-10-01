@@ -1,5 +1,7 @@
 import {
   chartProtectiveLevels,
+  chartRupeePerPoint,
+  fillsNeedingProtectiveSync,
   optionSideForAlert,
   shouldAutoTrade,
 } from './chart-auto-trade.util';
@@ -52,5 +54,44 @@ describe('chart auto trade', () => {
     expect(shouldAutoTrade({ ...base, marketOpen: false })).toBe(false);
     expect(shouldAutoTrade({ ...base, busy: true })).toBe(false);
     expect(shouldAutoTrade({ ...base, type: 'EXIT' })).toBe(false);
+  });
+
+  it('accepts any rupee amount and moves an already-open fill when the cap changes', () => {
+    expect(chartRupeePerPoint('nifty', 65)).toBe(65);
+    expect(chartRupeePerPoint('crude', 1)).toBe(10);
+    const open = {
+      id: 'crude:1',
+      status: 'OPEN',
+      book: 'crude' as const,
+      entry: 40,
+      qty: 100,
+      sl: 30,
+      tp: 45,
+    };
+    const unset = {
+      nifty: { maxProfitRs: null, maxLossRs: null },
+      bank: { maxProfitRs: null, maxLossRs: null },
+      crude: { maxProfitRs: null, maxLossRs: null },
+    };
+    // Already on the system 25% / 0.5R — leave it until the reader edits.
+    expect(fillsNeedingProtectiveSync([open], unset)).toEqual([]);
+
+    const crude560 = {
+      ...unset,
+      crude: { maxProfitRs: 560, maxLossRs: 560 },
+    };
+    const moved = fillsNeedingProtectiveSync([open], crude560);
+    expect(moved).toHaveLength(1);
+    expect(moved[0]?.id).toBe('crude:1');
+    const wanted = chartProtectiveLevels(40, 0.05, {
+      maxProfitRs: 560,
+      maxLossRs: 560,
+      rupeePerPoint: 1000,
+    });
+    expect(moved[0]?.stop).toBe(wanted?.stop);
+    expect(moved[0]?.target).toBe(wanted?.target);
+    expect(
+      fillsNeedingProtectiveSync([{ ...open, sl: wanted!.stop, tp: wanted!.target }], crude560),
+    ).toEqual([]);
   });
 });

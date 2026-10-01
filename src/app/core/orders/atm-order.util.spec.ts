@@ -4,6 +4,7 @@ import {
   atmExitFields,
   atmOrderCost,
   atmOrderFields,
+  atmProtectiveTicketFromFill,
   atmQuoteKey,
   atmRupeePerPoint,
   atmStopFields,
@@ -399,5 +400,21 @@ describe('atmExitFields', () => {
       tag: 'PALAGAI_CHART_EXIT',
     });
     expect(atmExitFields({ instrument: 'X', qty: 0 })).toBeNull();
+  });
+
+  it('rebuilds an SL/TP ticket from an already-open fill', () => {
+    expect(
+      atmProtectiveTicketFromFill({
+        instrument: 'NIFTY25OCT24500CE',
+        exchange: 'NFO',
+        qty: 65,
+      }),
+    ).toEqual({
+      exchange: 'NFO',
+      tradingSymbol: 'NIFTY25OCT24500CE',
+      quantity: 65,
+      product: 'MIS',
+    });
+    expect(atmProtectiveTicketFromFill({ instrument: 'X', qty: 0 })).toBeNull();
   });
 });

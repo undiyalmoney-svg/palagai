@@ -211,12 +211,13 @@
       <fieldset class="smc-fieldset">
         <legend>Max profit / loss per trade</legend>
         <p class="smc-note">
-          Each chart has its own rupee cap, applied to <strong>every fill on that
-          chart</strong> — not the day's total. Example: Crude ₹300 / ₹300 — if that
-          Crude trade is −₹300, the stop is cancelled and the contract is sold; if Auto
-          takes another Crude order, the same ₹300 / ₹300 applies to that new fill
-          (profit or loss). Nifty can be ₹500 / ₹500 while Bank is ₹300 / ₹300. Leave
-          blank to keep the 25% premium stop and 0.5R target on that side.
+          Type any rupee amount on each chart — 550, 560, 1000, 2000, whatever you
+          want; 300 and 500 were only examples. A change applies to the fill that is
+          <strong>already open</strong>: stop and target move to the new amount, and if
+          that fill has already crossed it, the stop is cancelled and the contract is
+          sold. Leave a field unchanged and that fill keeps what it has. The next fill
+          on that chart uses the same numbers. Blank keeps the system 25% stop and 0.5R
+          target.
         </p>
         <div class="smc-cap-grid" data-testid="chart-pnl-caps">
           @for (book of chartBooks; track book.id) {
@@ -227,7 +228,7 @@
                 <input
                   type="number"
                   min="0"
-                  step="50"
+                  step="any"
                   [value]="capValue(book.id, 'maxProfitRs')"
                   (change)="setCap(book.id, 'maxProfitRs', $event)"
                   placeholder="system"
@@ -238,7 +239,7 @@
                 <input
                   type="number"
                   min="0"
-                  step="50"
+                  step="any"
                   [value]="capValue(book.id, 'maxLossRs')"
                   (change)="setCap(book.id, 'maxLossRs', $event)"
                   placeholder="system"
@@ -531,12 +532,12 @@
     Kite funds (₹40,000 per index lot; Crude 3×). Auto buys the ATM call on a
     confirmed BUY and the ATM put on a confirmed SELL, then rests a 25% premium stop
     and a 0.5R target unless that chart's max profit / max loss is set in
-    SMC settings — then those rupee caps rest instead, and an open fill that
-    hits them cancels the stop and target and sells the contract. Caps are per
-    trade, not a day stop: Crude ₹300 / ₹300 exits that Crude fill at ±₹300,
-    then the next Crude fill is watched the same way; Nifty ₹500 does not use
-    Bank's ₹300. Auto on Nifty does not arm Bank Nifty or Crude. Manual Buy / Sell
-    ask before sending; Auto does not, because you already armed that book.
+    SMC settings — then those rupee caps rest instead. Editing the amount while
+    a fill is open moves that fill's stop and target; if the fill has already
+    crossed the new amount, the stop is cancelled and the contract is sold.
+    Any rupee figure is allowed. Caps are per trade, not a day stop. Auto on
+    Nifty does not arm Bank Nifty or Crude. Manual Buy / Sell ask before
+    sending; Auto does not, because you already armed that book.
     Open fills, the selected contract, the stop and the target sit on the Live
     trades board above the charts.
   </p>

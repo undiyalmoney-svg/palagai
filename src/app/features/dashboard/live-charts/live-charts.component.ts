@@ -73,6 +73,7 @@ import { AtmOptionSide, AtmOrderTicket, atmOrderCost, atmRupeePerPoint } from '.
 import { clampChartLots, lotsForChartBook, maxChartLots, sizingCapitalFromFunds } from '../../../core/charts/chart-lots.util';
 import {
   chartProtectiveLevels,
+  fillsNeedingProtectiveSync,
   optionSideForAlert,
   shouldAutoTrade,
 } from '../../../core/charts/chart-auto-trade.util';
@@ -322,6 +323,10 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
   private readonly pendingLocal = new Map<string, ChartLiveTrade>();
   /** Fill ids currently being flattened so a cap cannot double-sell the same fill. */
   private readonly flattenInFlight = new Set<string>();
+  /** Fill ids whose SL/TP are being moved to a newly edited cap. */
+  private readonly protectSyncInFlight = new Set<string>();
+  /** Last cap fingerprint successfully applied to an open fill, so Kite lag does not rest a second SL. */
+  private readonly syncedProtectives = new Map<string, string>();
 
   ngOnInit(): void {
     if (!this.isBrowser) {
@@ -515,7 +520,7 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
       this.tradesInFlight = false;
     }
     if (!this.liveTradesError()) {
-      void this.enforcePnlCaps(this.liveTrades());
+      void this.afterLiveTrades(this.liveTrades());
     }
   }
 
@@ -562,6 +567,17 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
         [id]: { ...current.pnlCaps[id], [key]: parseRsCap(raw) },
       },
     });
+    void this.refreshLiveTrades(true);
+  }
+
+  private async afterLiveTrades(trades: ChartLiveTrade[]): Promise<void> {
+    const flattened = await this.enforcePnlCaps(trades);
+    if (flattened) {
+      void this.refreshLiveTrades(true);
+      return;
+    }
+    const synced = await this.syncOpenProtectives(this.liveTrades());
+    if (synced) void this.refreshLiveTrades(true);
   }
 
   /**
@@ -569,24 +585,66 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
    * the resting SL/TP and market-exit that contract. The next fill on the
    * same chart (new id) is watched again with the same cap.
    */
-  private async enforcePnlCaps(trades: ChartLiveTrade[]): Promise<void> {
+  private async enforcePnlCaps(trades: ChartLiveTrade[]): Promise<boolean> {
     const caps = this.settings().pnlCaps;
     const openIds = new Set(trades.filter((t) => t.status === 'OPEN').map((t) => t.id));
     for (const id of [...this.flattenInFlight]) {
       if (!openIds.has(id)) this.flattenInFlight.delete(id);
     }
+    for (const id of [...this.syncedProtectives.keys()]) {
+      if (!openIds.has(id)) this.syncedProtectives.delete(id);
+    }
     const hits = fillsToFlatten(trades, caps, this.flattenInFlight);
-    if (!hits.length) return;
+    if (!hits.length) return false;
     const byId = new Map(trades.map((t) => [t.id, t]));
+    let anyOk = false;
     for (const hit of hits) {
       const trade = byId.get(hit.id);
       if (!trade) continue;
       this.flattenInFlight.add(trade.id);
       const result = await this.orders.flattenChartTrade(trade, hit.reason);
       if (trade.book) this.patch(trade.book, { order: { ok: result.ok, text: result.message } });
-      if (!result.ok) this.flattenInFlight.delete(trade.id);
+      if (result.ok) anyOk = true;
+      else this.flattenInFlight.delete(trade.id);
     }
-    void this.refreshLiveTrades(true);
+    return anyOk;
+  }
+
+  /**
+   * After a cap edit (or the first time we see an already-open fill with caps
+   * set), move that fill's resting stop and target to the amount now in
+   * settings. Unchanged amounts that already match are left alone.
+   */
+  private async syncOpenProtectives(trades: ChartLiveTrade[]): Promise<boolean> {
+    const caps = this.settings().pnlCaps;
+    const busy = [...this.flattenInFlight, ...this.protectSyncInFlight];
+    const hits = fillsNeedingProtectiveSync(trades, caps, busy).filter((hit) => {
+      const fp = this.capFingerprint(hit);
+      return this.syncedProtectives.get(hit.id) !== fp;
+    });
+    if (!hits.length) return false;
+    const byId = new Map(trades.map((t) => [t.id, t]));
+    let started = false;
+    for (const hit of hits) {
+      const trade = byId.get(hit.id);
+      if (!trade) continue;
+      this.protectSyncInFlight.add(trade.id);
+      const result = await this.orders.replaceChartProtectives(trade, {
+        stop: hit.stop,
+        target: hit.target,
+      });
+      if (trade.book) this.patch(trade.book, { order: { ok: result.ok, text: result.message } });
+      if (result.ok) {
+        this.syncedProtectives.set(trade.id, this.capFingerprint(hit));
+        started = true;
+      }
+      this.protectSyncInFlight.delete(trade.id);
+    }
+    return started;
+  }
+
+  private capFingerprint(hit: { stop: number; target: number }): string {
+    return `${hit.stop}|${hit.target}`;
   }
 
   /** Drop everything shown and read it again: timeframe or date changed. */

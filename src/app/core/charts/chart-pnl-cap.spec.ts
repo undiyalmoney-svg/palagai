@@ -15,6 +15,10 @@ describe('chart pnl caps', () => {
     expect(parseRsCap(-50)).toBeNull();
     expect(parseRsCap('abc')).toBeNull();
     expect(parseRsCap(500)).toBe(500);
+    expect(parseRsCap(550)).toBe(550);
+    expect(parseRsCap(560)).toBe(560);
+    expect(parseRsCap(1000)).toBe(1000);
+    expect(parseRsCap(2000)).toBe(2000);
     expect(parseRsCap('1,250.5')).toBe(1250.5);
   });
 
@@ -46,8 +50,9 @@ describe('chart pnl caps', () => {
     expect(hitChartPnlCap(800, { maxProfitRs: null, maxLossRs: 300 })).toBeNull();
     expect(hitChartPnlCap(-800, { maxProfitRs: 500, maxLossRs: null })).toBeNull();
     expect(hitChartPnlCap(null, cap)).toBeNull();
-    // A day's net of +₹900 does not fire a ₹500 per-trade cap if this fill is +₹100.
-    expect(hitChartPnlCap(100, cap)).toBeNull();
+    expect(hitChartPnlCap(550, { maxProfitRs: 550, maxLossRs: 560 })).toBe('PROFIT');
+    expect(hitChartPnlCap(-560, { maxProfitRs: 550, maxLossRs: 560 })).toBe('LOSS');
+    expect(hitChartPnlCap(2000, { maxProfitRs: 2000, maxLossRs: 1000 })).toBe('PROFIT');
   });
 
   it('applies each book cap to every new fill, not the day stack', () => {

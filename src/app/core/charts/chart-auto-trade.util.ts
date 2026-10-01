@@ -7,6 +7,8 @@
  * fill, a 25% premium stop and a 0.5R target rest on the same contract.
  */
 import { AtmOptionSide } from '../orders/atm-order.util';
+import { ChartBookId } from './live-chart-data.service';
+import { ChartPnlCap, ChartPnlCaps } from './chart-pnl-cap';
 import { SmcAlertType } from './smc/smc.types';
 
 export function optionSideForAlert(type: SmcAlertType): AtmOptionSide | null {
@@ -67,6 +69,82 @@ export function shouldAutoTrade(opts: {
     opts.busy !== true &&
     optionSideForAlert(opts.type) != null
   );
+}
+
+/**
+ * Rupees one point of premium moves an open Charts fill.
+ * Index quantity is the multiplier; Crude Mini qty 1 is ₹10 per point.
+ */
+export function chartRupeePerPoint(book: ChartBookId | null | undefined, qty: number): number {
+  if (!(qty > 0)) return 0;
+  if (book === 'crude') return qty * 10;
+  return qty;
+}
+
+export function sameProtectivePrice(
+  actual: number | null | undefined,
+  wanted: number,
+  tick = 0.05,
+): boolean {
+  if (actual == null || !Number.isFinite(actual)) return false;
+  const step = tick > 0 ? tick : 0.05;
+  return Math.abs(actual - wanted) < step / 2 + 1e-9;
+}
+
+export function desiredProtectiveLevels(
+  trade: {
+    status: string;
+    entry: number | null;
+    qty: number;
+    book: ChartBookId | null;
+  },
+  cap: ChartPnlCap | null | undefined,
+  tick = 0.05,
+): { stop: number; target: number } | null {
+  if (trade.status !== 'OPEN' || !(trade.entry != null && trade.entry > 0)) return null;
+  const rupeePerPoint = chartRupeePerPoint(trade.book, trade.qty);
+  return chartProtectiveLevels(trade.entry, tick, {
+    maxProfitRs: cap?.maxProfitRs,
+    maxLossRs: cap?.maxLossRs,
+    rupeePerPoint: rupeePerPoint > 0 ? rupeePerPoint : null,
+  });
+}
+
+/**
+ * Open fills whose resting SL/TP do not match the caps now in settings.
+ * Unchanged caps that already match the resting orders are skipped so a live
+ * fill is left alone until the reader edits the amount.
+ */
+export function fillsNeedingProtectiveSync(
+  trades: Array<{
+    id: string;
+    status: string;
+    book: ChartBookId | null;
+    entry: number | null;
+    qty: number;
+    sl: number | null;
+    tp: number | null;
+  }>,
+  caps: ChartPnlCaps,
+  inFlight: Iterable<string> = [],
+  tick = 0.05,
+): Array<{ id: string; stop: number; target: number }> {
+  const busy = new Set(inFlight);
+  const hits: Array<{ id: string; stop: number; target: number }> = [];
+  for (const trade of trades) {
+    if (trade.status !== 'OPEN' || !trade.book || busy.has(trade.id)) continue;
+    if (trade.id.startsWith('local:')) continue;
+    const levels = desiredProtectiveLevels(trade, caps[trade.book], tick);
+    if (!levels) continue;
+    if (
+      sameProtectivePrice(trade.sl, levels.stop, tick) &&
+      sameProtectivePrice(trade.tp, levels.target, tick)
+    ) {
+      continue;
+    }
+    hits.push({ id: trade.id, stop: levels.stop, target: levels.target });
+  }
+  return hits;
 }
 
 function roundToTick(value: number, tick: number): number {

@@ -23,6 +23,7 @@ import {
   AtmOrderTicket,
   atmExitFields,
   atmOrderFields,
+  atmProtectiveTicketFromFill,
   atmQuoteKey,
   atmStopFields,
   atmTargetFields,
@@ -124,7 +125,10 @@ export class AtmOrderService {
    * Rest a protective SELL stop on the same contract the Charts tab just bought.
    * Charts-tab only — the live desk places its own stops and never reads these.
    */
-  async placeStop(ticket: AtmOrderTicket, triggerPremium: number): Promise<AtmOrderResult> {
+  async placeStop(
+    ticket: Parameters<typeof atmStopFields>[0],
+    triggerPremium: number,
+  ): Promise<AtmOrderResult> {
     const authorization = this.kiteSession.getAuthorizationHeader();
     if (!authorization) {
       return { ok: false, orderId: null, message: 'Kite session required.' };
@@ -158,7 +162,10 @@ export class AtmOrderService {
    * desk places its own targets and never reads these. Kite regular orders
    * are not OCO: if this fills, cancel the SL in the order book.
    */
-  async placeTarget(ticket: AtmOrderTicket, targetPremium: number): Promise<AtmOrderResult> {
+  async placeTarget(
+    ticket: Parameters<typeof atmTargetFields>[0],
+    targetPremium: number,
+  ): Promise<AtmOrderResult> {
     const authorization = this.kiteSession.getAuthorizationHeader();
     if (!authorization) {
       return { ok: false, orderId: null, message: 'Kite session required.' };
@@ -237,6 +244,43 @@ export class AtmOrderService {
     } catch (error) {
       return { ok: false, orderId: id, message: describeOrderError(error) };
     }
+  }
+
+  /**
+   * Move this fill's resting SL/TP to new rupee (or system) levels after the
+   * reader edits max profit / max loss, or when an already-open fill is first
+   * seen with caps set. Cancels only the side that drifted, then rests again.
+   */
+  async replaceChartProtectives(
+    trade: ChartLiveTrade,
+    levels: { stop: number; target: number },
+  ): Promise<AtmOrderResult> {
+    const ticket = atmProtectiveTicketFromFill(trade);
+    if (!ticket) {
+      return { ok: false, orderId: null, message: 'Could not rebuild a stop for that fill.' };
+    }
+    const extras: string[] = [];
+    let ok = true;
+    const slSame = trade.sl != null && Math.abs(trade.sl - levels.stop) < 0.03;
+    const tpSame = trade.tp != null && Math.abs(trade.tp - levels.target) < 0.03;
+
+    if (!slSame) {
+      if (trade.slOrderId) extras.push((await this.cancelChartOrder(trade.slOrderId)).message);
+      const sl = await this.placeStop(ticket, levels.stop);
+      extras.push(sl.message);
+      ok = ok && sl.ok;
+    }
+    if (!tpSame) {
+      if (trade.tpOrderId) extras.push((await this.cancelChartOrder(trade.tpOrderId)).message);
+      const tp = await this.placeTarget(ticket, levels.target);
+      extras.push(tp.message);
+      ok = ok && tp.ok;
+    }
+    return {
+      ok,
+      orderId: null,
+      message: `Protectives updated on ${trade.instrument}: ${extras.join(' ')}`.trim(),
+    };
   }
 
   /**
