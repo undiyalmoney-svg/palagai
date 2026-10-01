@@ -12,11 +12,10 @@
  * nothing. Polling restarts by itself at the open — the scheduler keeps
  * ticking through the shut hours and simply skips the fetch.
  *
- * Candles are read-only Kite history. The ATM CE/PE buttons are not: they
- * place real market orders through the Kite proxy, outside the live desk and
- * outside its rails. See AtmOrderService for what that does and does not
- * protect. Nothing here touches the desk's own state either way, and SMC
- * signals never place an order by themselves.
+ * Candles are read-only Kite history. Buy / Sell / Auto on every book place
+ * real ATM option orders through the Kite proxy, outside the live desk rails.
+ * Auto buys the ATM call on a confirmed BUY and the ATM put on a confirmed
+ * SELL, then rests a 25% premium stop and a 0.5R target. See AtmOrderService.
  */
 import {
   Component,
@@ -70,6 +69,11 @@ import { KiteFundsService } from '../../../core/services/kite-funds.service';
 import { AtmOrderService } from '../../../core/orders/atm-order.service';
 import { AtmOptionSide, AtmOrderTicket, atmOrderCost } from '../../../core/orders/atm-order.util';
 import { clampChartLots, lotsForChartBook, maxChartLots, sizingCapitalFromFunds } from '../../../core/charts/chart-lots.util';
+import {
+  chartProtectiveLevels,
+  optionSideForAlert,
+  shouldAutoTrade,
+} from '../../../core/charts/chart-auto-trade.util';
 import { RS_PER_LOT } from '../../../core/paper-desk/lots-from-funds';
 import { TvCandleChartComponent } from './tv-candle-chart.component';
 import { SmcPanelComponent } from './smc-panel.component';
@@ -684,6 +688,9 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
     if (this.settings().browserNotifications) {
       for (const item of items.slice().reverse()) this.notify(item);
     }
+    for (const item of items.slice().reverse()) {
+      void this.fireAuto(id, item.type);
+    }
   }
 
   private notify(item: SmcFeedItem): void {
@@ -723,15 +730,44 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
     return this.panes().find((pane) => pane.def.id === id);
   }
 
+  protected toggleAutoTrade(): void {
+    const current = this.settings();
+    this.commit({ ...current, autoTrade: !current.autoTrade });
+  }
+
+  private async fireAuto(id: ChartBookId, type: SmcAlertType): Promise<void> {
+    const pane = this.paneById(id);
+    if (!pane) return;
+    if (
+      !shouldAutoTrade({
+        autoTrade: this.settings().autoTrade,
+        liveDay: this.liveDay(),
+        marketOpen: this.statusOf(pane).open,
+        busy: !!pane.ordering,
+        type,
+      })
+    ) {
+      return;
+    }
+    const side = optionSideForAlert(type);
+    if (!side) return;
+    await this.buyAtm(id, side, { silent: true });
+  }
+
   /**
    * Buy the ATM CE or PE on one book.
    *
    * Resolve the exact contract and its live premium first, then show both and
-   * the rupee cost in a confirmation before anything is sent. A manual buy
-   * runs outside the desk's rails, so the only protection is the reader
-   * knowing precisely what they are about to pay for.
+   * the rupee cost in a confirmation before anything is sent — unless Auto
+   * fired the same path, in which case the confirmation is skipped because
+   * the reader already armed it. A 25% premium stop and 0.5R target rest
+   * after the fill on both routes.
    */
-  protected async buyAtm(id: ChartBookId, side: AtmOptionSide): Promise<boolean> {
+  protected async buyAtm(
+    id: ChartBookId,
+    side: AtmOptionSide,
+    opts: { silent?: boolean } = {},
+  ): Promise<boolean> {
     const pane = this.paneById(id);
     if (!pane || pane.ordering) return false;
 
@@ -776,7 +812,7 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
 
       const ticket = plan.ticket;
       const premium = await this.orders.premium(ticket);
-      if (!(await this.confirmBuy(pane, ticket, premium))) {
+      if (!opts.silent && !(await this.confirmBuy(pane, ticket, premium))) {
         return false;
       }
 
@@ -786,7 +822,22 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
         return false;
       }
 
-      this.patch(id, { order: { ok: true, text: `${shortSymbol(ticket)} · ${result.message}` } });
+      const fill = await this.orders.fillPrice(result.orderId, premium);
+      const levels = fill != null ? chartProtectiveLevels(fill) : null;
+      const extras: string[] = [];
+      if (levels) {
+        const sl = await this.orders.placeStop(ticket, levels.stop);
+        extras.push(sl.message);
+        const tp = await this.orders.placeTarget(ticket, levels.target);
+        extras.push(tp.message);
+      }
+      const tag = opts.silent ? 'Auto · ' : '';
+      this.patch(id, {
+        order: {
+          ok: true,
+          text: `${tag}${shortSymbol(ticket)} · ${result.message}${extras.length ? ' · ' + extras.join(' ') : ''}`,
+        },
+      });
       return true;
     } finally {
       this.patch(id, { ordering: null });
@@ -807,8 +858,8 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
         ? `Premium ₹${this.fmt(premium, 2)}${cost != null ? ` · about ₹${this.fmt(cost, 0)} to buy` : ''}`
         : 'Live premium unavailable — cost unknown.',
       '',
-      'This is a real order at market price. No stop-loss is attached and the',
-      "desk's daily limits do not apply to it — you manage the exit.",
+      'This is a real order at market price. A 25% premium stop and a 0.5R',
+      "target rest after the fill. The desk's daily limits do not apply.",
     ];
 
     return this.uiDialog.confirm({

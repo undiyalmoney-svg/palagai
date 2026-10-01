@@ -167,8 +167,7 @@
     ></div>
   </div>
 
-  @if (expanded()) {
-    <div class="tv-orderbar" data-testid="tv-full-orderbar">
+  <div class="tv-orderbar" data-testid="tv-full-orderbar">
       <div class="tv-order-buttons" role="group" aria-label="Buy or sell the ATM option">
         <button
           type="button"
@@ -189,6 +188,17 @@
           (click)="buyAtm.emit('PE')"
         >
           {{ ordering === 'PE' ? 'Working…' : 'Sell' }}
+        </button>
+        <button
+          type="button"
+          class="tv-order-btn auto"
+          [class.on]="autoTrade"
+          [attr.aria-pressed]="autoTrade"
+          [title]="autoTrade ? 'Auto buy/sell is on — confirmed SMC signals place ATM CE/PE' : 'Turn on Auto to buy the ATM call on BUY and the ATM put on SELL'"
+          aria-label="Toggle auto buy and sell"
+          (click)="toggleAuto.emit()"
+        >
+          {{ autoTrade ? 'Auto on' : 'Auto' }}
         </button>
       </div>
       <div class="tv-order-lots">
@@ -225,5 +235,4 @@
         <span class="tv-order-result" [class.bad]="!orderResult.ok">{{ orderResult.text }}</span>
       }
     </div>
-  }
 </div>

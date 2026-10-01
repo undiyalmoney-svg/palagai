@@ -40,9 +40,9 @@ export interface ChartBookDef {
 }
 
 export const CHART_BOOKS: readonly ChartBookDef[] = [
-  { id: 'crude', label: 'Crude Oil Mini', exchange: 'MCX', decimals: 0 },
   { id: 'nifty', label: 'Nifty 50', exchange: 'NSE', decimals: 2 },
   { id: 'bank', label: 'Bank Nifty', exchange: 'NSE', decimals: 2 },
+  { id: 'crude', label: 'Crude Oil Mini', exchange: 'MCX', decimals: 0 },
 ] as const;
 
 export interface ResolvedChartInstrument {

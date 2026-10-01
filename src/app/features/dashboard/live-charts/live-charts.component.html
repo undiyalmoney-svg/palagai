@@ -4,12 +4,10 @@
       <p class="pg-eyebrow">Live charts</p>
       <h1>Smart Money Concepts</h1>
       <p class="pg-lede">
-        NIFTY 50, BANK NIFTY and CRUDE OIL on live Kite candles. One deterministic engine
-        reads market structure (swings, HH / HL / LH / LL, BOS, CHoCH), order blocks, fair
-        value gaps, liquidity and premium / discount, filters entries by the higher-timeframe
-        trend, and plans every trade with stop loss, TP1, TP2 and a final target. History,
-        the live session and a replayed date all run the same logic, and a confirmed signal
-        never changes afterwards.
+        The same TradingView candle chart on Nifty 50, Bank Nifty and Crude Oil Mini.
+        One engine reads structure, Fibonacci and SMC overlays, then Buy / Sell / Auto
+        work the same way on every book: ATM call on BUY, ATM put on SELL, with a
+        protective stop and 0.5R target after the fill.
       </p>
     </div>
 
@@ -197,6 +195,14 @@
             Also send browser notifications
           </label>
         }
+        <label class="smc-check">
+          <input
+            type="checkbox"
+            [checked]="settings().autoTrade"
+            (change)="toggleAutoTrade()"
+          />
+          Auto buy / sell on confirmed SMC signals (all three charts)
+        </label>
       </fieldset>
 
       <div class="smc-settings-foot">
@@ -319,8 +325,10 @@
           [ordering]="pane.ordering"
           [orderHint]="orderHintFor(pane)"
           [orderResult]="pane.order"
+          [autoTrade]="settings().autoTrade"
           (buyAtm)="buyAtm(pane.def.id, $event)"
           (adjustLots)="bumpLots(pane.def.id, $event)"
+          (toggleAuto)="toggleAutoTrade()"
         />
 
         <app-smc-panel
@@ -330,57 +338,6 @@
           [ltfLabel]="intervalLabels[ltf()]"
           [liveDay]="liveDay()"
         />
-
-        <div class="order-row">
-          <div class="order-buttons" role="group" [attr.aria-label]="'Buy ' + pane.def.label + ' ATM option'">
-            <button
-              type="button"
-              class="order-btn call"
-              [disabled]="!!pane.ordering || !canPlaceOrders(pane)"
-              [title]="orderHintFor(pane)"
-              (click)="buyAtm(pane.def.id, 'CE')"
-            >
-              {{ pane.ordering === 'CE' ? 'Working…' : 'Buy ATM CE' }}
-            </button>
-            <button
-              type="button"
-              class="order-btn put"
-              [disabled]="!!pane.ordering || !canPlaceOrders(pane)"
-              [title]="orderHintFor(pane)"
-              (click)="buyAtm(pane.def.id, 'PE')"
-            >
-              {{ pane.ordering === 'PE' ? 'Working…' : 'Buy ATM PE' }}
-            </button>
-          </div>
-          <div class="order-lots">
-            <div class="lots-stepper" role="group" [attr.aria-label]="pane.def.label + ' lots'">
-              <button
-                type="button"
-                class="lots-btn"
-                [disabled]="lotsFor(pane.def.id) <= 1"
-                [attr.aria-label]="'Decrease ' + pane.def.label + ' lots'"
-                (click)="bumpLots(pane.def.id, -1)"
-              >
-                −
-              </button>
-              <span>{{ lotsFor(pane.def.id) }} lot{{ lotsFor(pane.def.id) === 1 ? '' : 's' }}</span>
-              <button
-                type="button"
-                class="lots-btn"
-                [disabled]="lotsFor(pane.def.id) >= maxLots(pane.def.id)"
-                [attr.aria-label]="'Increase ' + pane.def.label + ' lots'"
-                (click)="bumpLots(pane.def.id, 1)"
-              >
-                +
-              </button>
-            </div>
-            @if (canPlaceOrders(pane)) {
-              <em>MIS · market</em>
-            } @else {
-              <em>{{ orderHintFor(pane) || ('Buying resumes at ' + pane.session.marketOpen + ' IST') }}</em>
-            }
-          </div>
-        </div>
 
         @if (pane.order) {
           <p class="order-result" [class.bad]="!pane.order.ok">{{ pane.order.text }}</p>
@@ -427,18 +384,16 @@
   <p class="chart-hint">
     <strong>Statistics.</strong> Backtest and live results are kept apart: live is trades
     entered during today's session, backtest is everything before it, and a replayed date is
-    all backtest. Results are in R-multiples of the planned risk with no look-ahead, and
-    are chart-reading aids — SMC signals never place an order on their own.
+    all backtest. Results are in R-multiples of the planned risk with no look-ahead.
   </p>
 
   <p class="chart-hint warn">
-    <strong>Buy ATM CE / PE places a real market order</strong> for the front-expiry
-    at-the-money contract, sized from Kite funds
-    (₹40,000 per index lot; Crude 3×). Use +/− on a card or in full view to
-    change that lot count for the next order. It is a manual desk: no
-    premium cap, no daily loss stop, and no stop-loss is attached — you manage the exit.
-    Each press shows the exact contract, its live premium and the rupee cost before
-    anything is sent. The same Buy / Sell buttons sit in full chart view.
+    <strong>Buy / Sell / Auto place a real market order</strong> for the front-expiry
+    at-the-money contract on every book — Nifty 50, Bank Nifty and Crude. Sized from
+    Kite funds (₹40,000 per index lot; Crude 3×). Auto buys the ATM call on a
+    confirmed BUY and the ATM put on a confirmed SELL, then rests a 25% premium stop
+    and a 0.5R target. Manual Buy / Sell ask before sending; Auto does not, because
+    you already armed it.
   </p>
 
   @if (anyError() && !sessionExpired()) {

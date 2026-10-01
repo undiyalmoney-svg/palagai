@@ -23,6 +23,8 @@ export interface SmcSettings {
   layers: SmcLayers;
   alerts: Record<SmcAlertType, boolean>;
   browserNotifications: boolean;
+  /** Place ATM CE/PE when a confirmed BUY/SELL prints. Same on every book. */
+  autoTrade: boolean;
 }
 
 export const SMC_DEFAULT_LTF: ChartInterval = '15m';
@@ -50,6 +52,7 @@ export function defaultSmcSettings(): SmcSettings {
       boolean
     >,
     browserNotifications: false,
+    autoTrade: false,
   };
 }
 
@@ -78,6 +81,7 @@ export function loadSmcSettings(storage: Pick<Storage, 'getItem'> | null): SmcSe
       layers: { ...base.layers, ...(parsed.layers ?? {}) },
       alerts: { ...base.alerts, ...(parsed.alerts ?? {}) },
       browserNotifications: parsed.browserNotifications === true,
+      autoTrade: parsed.autoTrade === true,
     };
   } catch {
     return base;

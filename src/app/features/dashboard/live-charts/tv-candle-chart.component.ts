@@ -129,8 +129,10 @@ export class TvCandleChartComponent implements AfterViewInit, OnChanges, OnDestr
   @Input() ordering: AtmOptionSide | null = null;
   @Input() orderHint = '';
   @Input() orderResult: { ok: boolean; text: string } | null = null;
+  @Input() autoTrade = false;
   readonly buyAtm = output<AtmOptionSide>();
   readonly adjustLots = output<number>();
+  readonly toggleAuto = output<void>();
 
   @ViewChild('canvas', { static: true }) canvasRef?: ElementRef<HTMLCanvasElement>;
 

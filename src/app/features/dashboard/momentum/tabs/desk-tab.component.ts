@@ -28,7 +28,7 @@ import { actionTone, errorMessage, inr, pctNum, shortDate, signedInr, tone } fro
         <div class="mp-card">
           <div class="mp-card-head"><div>
             <h2>Paper — see what the system did</h2>
-            <p class="mp-sub">Pick a date range and capital. The engine filters stocks, enters at the next morning open (09:15 IST), and sells the same way. Qty is sized from your capital.</p>
+            <p class="mp-sub">Pick a date range and capital — ₹10,000 is enough. The scanner ranks 1,000+ NSE names, buys the weekly momentum leaders at the next 09:15 IST open, and sells the same way. A 10k book holds 2–3 stocks.</p>
           </div></div>
           <form class="mp-row" (ngSubmit)="runPaper()">
             <div class="mp-field"><label for="desk-from">From</label>
@@ -36,7 +36,7 @@ import { actionTone, errorMessage, inr, pctNum, shortDate, signedInr, tone } fro
             <div class="mp-field"><label for="desk-to">To</label>
               <input id="desk-to" class="ui-input" type="date" name="to" [(ngModel)]="to" required /></div>
             <div class="mp-field"><label for="desk-cap">Capital (₹)</label>
-              <input id="desk-cap" class="ui-input" type="number" name="cap" min="10000" step="10000" [(ngModel)]="capital" required /></div>
+              <input id="desk-cap" class="ui-input" type="number" name="cap" min="10000" step="1000" [(ngModel)]="capital" required /></div>
             <button type="submit" class="ui-btn ui-btn-primary" [disabled]="busy()">{{ busy() ? 'Running…' : 'Show picks' }}</button>
           </form>
         </div>
@@ -132,11 +132,11 @@ import { actionTone, errorMessage, inr, pctNum, shortDate, signedInr, tone } fro
         <div class="mp-card">
           <div class="mp-card-head"><div>
             <h2>This week</h2>
-            <p class="mp-sub">Enter the capital you want to put to work. Qty is sized from that capital. Press Buy or Sell only on the rows you want.</p>
+            <p class="mp-sub">Scans 1,000+ NSE stocks. Start with ₹10,000 — qty is sized so 2–3 names can actually be bought. Press Buy or Sell only on the rows you want.</p>
           </div></div>
           <form class="mp-row" (ngSubmit)="runScan()">
             <div class="mp-field"><label for="live-cap">Capital (₹)</label>
-              <input id="live-cap" class="ui-input" type="number" name="lcap" min="10000" step="10000" [(ngModel)]="capital" required /></div>
+              <input id="live-cap" class="ui-input" type="number" name="lcap" min="10000" step="1000" [(ngModel)]="capital" required /></div>
             <label class="ui-check"><input type="checkbox" name="reset" [(ngModel)]="resetBook" /> Start fresh with this capital</label>
             <button type="submit" class="ui-btn ui-btn-primary" [disabled]="busy()">{{ busy() ? 'Scanning…' : 'Run scanner' }}</button>
           </form>
@@ -269,7 +269,7 @@ export class DeskTabComponent implements OnInit {
   protected readonly notice = signal('');
   protected readonly busy = signal(false);
 
-  protected capital = 100000;
+  protected capital = 10000;
   protected from = '2024-01-01';
   protected to = '2024-12-31';
   protected resetBook = false;
