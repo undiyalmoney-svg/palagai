@@ -12,6 +12,8 @@ export interface SmcLayers {
   premiumDiscount: boolean;
   fib: boolean;
   levels: boolean;
+  /** Day High / Low, HTF IDM, SL–PE–TG and the two post-BOS zones. */
+  session: boolean;
 }
 
 export interface SmcSettings {
@@ -27,10 +29,11 @@ export interface SmcSettings {
   autoTrade: boolean;
 }
 
-export const SMC_DEFAULT_LTF: ChartInterval = '15m';
-export const SMC_DEFAULT_HTF: ChartInterval = '1h';
+export const SMC_DEFAULT_LTF: ChartInterval = '1m';
+export const SMC_DEFAULT_HTF: ChartInterval = '5m';
 
-export const SMC_STORAGE_KEY = 'palagai.smc.settings.v1';
+/** Bumped so a saved 15m / 1h book does not hide the 1-minute pathway. */
+export const SMC_STORAGE_KEY = 'palagai.smc.settings.v2';
 
 export function defaultSmcSettings(): SmcSettings {
   return {
@@ -38,14 +41,15 @@ export function defaultSmcSettings(): SmcSettings {
     htf: SMC_DEFAULT_HTF,
     config: {},
     layers: {
-      swings: true,
+      swings: false,
       structure: true,
-      orderBlocks: true,
+      orderBlocks: false,
       fvg: true,
       liquidity: true,
-      premiumDiscount: true,
-      fib: true,
+      premiumDiscount: false,
+      fib: false,
       levels: true,
+      session: true,
     },
     alerts: Object.fromEntries(SMC_ALERT_TYPES.map((t) => [t, true])) as Record<
       SmcAlertType,

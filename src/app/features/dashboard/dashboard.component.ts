@@ -110,7 +110,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     },
     '/dashboard/charts': {
       title: 'Charts',
-      subtitle: 'Live 15m candles with support/resistance — Crude, Nifty 50, Bank Nifty.',
+      subtitle: 'Live 1-minute pathway on Nifty 50, Bank Nifty and Crude — Day High/Low, FVG, BOS, IDM, SL–PE–TG.',
     },
     '/dashboard/order-test': {
       title: 'Order Test',

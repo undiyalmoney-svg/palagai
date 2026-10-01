@@ -26,6 +26,7 @@ import {
 import { Candle } from '../../../core/models/candle.model';
 import { SmcAnalysis } from '../../../core/charts/smc/smc.types';
 import { SmcLayers, defaultSmcSettings } from '../../../core/charts/smc/smc-settings';
+import { pathwayPaintModel } from '../../../core/charts/pathway-overlay';
 import { focusTrades, paintSmcOver, paintSmcUnder, smcNoteAt } from './smc-chart-painter';
 import { AtmOptionSide } from '../../../core/orders/atm-order.util';
 import {
@@ -42,12 +43,12 @@ import {
   zoomViewport,
 } from '../../../core/charts/chart-viewport.util';
 
-/** TradingView's default light palette, so the panel reads as a TV chart. */
+/** TradingView dark tape — the 1-minute pathway is drawn on this canvas. */
 const COLORS = {
-  bg: '#ffffff',
-  grid: '#f0f3fa',
+  bg: '#131722',
+  grid: '#1e222d',
   axisText: '#787b86',
-  axisLine: '#e0e3eb',
+  axisLine: '#2a2e39',
   bull: '#26a69a',
   bear: '#ef5350',
   link: 'rgba(120, 123, 134, 0.75)',
@@ -55,9 +56,11 @@ const COLORS = {
   crosshair: '#9598a1',
   lastUp: '#26a69a',
   lastDown: '#ef5350',
-  legendInk: '#131722',
-  slBg: 'rgba(211, 47, 47, 0.92)',
-  entryBg: '#0f172a',
+  legendInk: '#d1d4dc',
+  slBg: 'rgba(255, 92, 138, 0.92)',
+  peBg: 'rgba(245, 215, 110, 0.92)',
+  tgBg: 'rgba(0, 230, 118, 0.92)',
+  entryBg: '#2a2e39',
   tpBg: 'rgba(0, 137, 123, 0.92)',
 } as const;
 
@@ -111,8 +114,10 @@ export class TvCandleChartComponent implements AfterViewInit, OnChanges, OnDestr
   @Input() layers: SmcLayers = defaultSmcSettings().layers;
   /** Colours the last-price line and tag. */
   @Input() changeUp: boolean | null = null;
-  /** Name of the higher timeframe, for the trend badge. */
-  @Input() htfLabel = '1h';
+  /** Name of the higher timeframe, for the trend badge and the IDM tag. */
+  @Input() htfLabel = '5m';
+  /** Entry-timeframe bar length in minutes. 1 on the default 1-minute book. */
+  @Input() intervalMinutes = 1;
   @Input() decimals = 2;
   /** Fallback only; the wrapper's CSS height wins so it can be responsive. */
   @Input() height = 340;
@@ -710,6 +715,8 @@ export class TvCandleChartComponent implements AfterViewInit, OnChanges, OnDestr
           right: PAD.left + plotW,
           top: PAD.top,
           bottom: PAD.top + plotH,
+          intervalMinutes: this.intervalMinutes,
+          htfLabel: this.htfLabel,
         }
       : null;
     if (frame) paintSmcUnder(frame);
@@ -773,13 +780,20 @@ export class TvCandleChartComponent implements AfterViewInit, OnChanges, OnDestr
       if (b.low < min) min = b.low;
       if (b.high > max) max = b.high;
     }
-    if (this.smc && this.layers.levels) {
+    if (this.smc && this.layers.levels && !this.layers.session) {
       for (const t of focusTrades(this.smc)) {
         const end = t.status === 'open' ? Infinity : (t.exitIndex ?? Infinity);
         if (end >= first && t.entryIndex <= last) {
           min = Math.min(min, t.sl, t.entryPrice);
           max = Math.max(max, t.sl, t.entryPrice);
         }
+      }
+    }
+    if (this.smc && this.layers.session && this.layers.levels) {
+      const model = this.pathwayModel();
+      if (model.levels) {
+        min = Math.min(min, model.levels.sl, model.levels.pe, model.levels.tg);
+        max = Math.max(max, model.levels.sl, model.levels.pe, model.levels.tg);
       }
     }
     if (!Number.isFinite(min) || !Number.isFinite(max)) {
@@ -820,18 +834,36 @@ export class TvCandleChartComponent implements AfterViewInit, OnChanges, OnDestr
       });
     }
 
-    const trade = this.smc && this.layers.levels ? focusTrades(this.smc).at(-1) : undefined;
-    if (trade) {
-      const end = trade.status === 'open' ? Infinity : (trade.exitIndex ?? Infinity);
-      if (end >= first && trade.entryIndex <= last) {
-        this.pushAxisTag(tags, yOf(trade.entryPrice), plotH, 'ENTRY', COLORS.entryBg, '#ffffff');
-        this.pushAxisTag(tags, yOf(trade.slNow), plotH, 'SL', COLORS.slBg, '#ffffff');
-        this.pushAxisTag(tags, yOf(trade.tpFinal), plotH, 'FINAL TP', COLORS.tpBg, '#ffffff');
-        this.pushAxisTag(tags, yOf(trade.tp2), plotH, 'TP2', COLORS.tpBg, '#ffffff');
-        this.pushAxisTag(tags, yOf(trade.tp1), plotH, 'TP1', COLORS.tpBg, '#ffffff');
+    if (this.smc && this.layers.session && this.layers.levels) {
+      const levels = this.pathwayModel().levels;
+      if (levels) {
+        this.pushAxisTag(tags, yOf(levels.sl), plotH, 'SL', COLORS.slBg, '#131722');
+        this.pushAxisTag(tags, yOf(levels.pe), plotH, 'PE', COLORS.peBg, '#131722');
+        this.pushAxisTag(tags, yOf(levels.tg), plotH, 'TG', COLORS.tgBg, '#131722');
+      }
+    } else {
+      const trade = this.smc && this.layers.levels ? focusTrades(this.smc).at(-1) : undefined;
+      if (trade) {
+        const end = trade.status === 'open' ? Infinity : (trade.exitIndex ?? Infinity);
+        if (end >= first && trade.entryIndex <= last) {
+          this.pushAxisTag(tags, yOf(trade.entryPrice), plotH, 'ENTRY', COLORS.entryBg, '#ffffff');
+          this.pushAxisTag(tags, yOf(trade.slNow), plotH, 'SL', COLORS.slBg, '#131722');
+          this.pushAxisTag(tags, yOf(trade.tpFinal), plotH, 'FINAL TP', COLORS.tpBg, '#ffffff');
+          this.pushAxisTag(tags, yOf(trade.tp2), plotH, 'TP2', COLORS.tpBg, '#ffffff');
+          this.pushAxisTag(tags, yOf(trade.tp1), plotH, 'TP1', COLORS.tpBg, '#ffffff');
+        }
       }
     }
     return tags;
+  }
+
+  private pathwayModel() {
+    const trade = this.smc ? focusTrades(this.smc).at(-1) ?? null : null;
+    return pathwayPaintModel(this.candles, this.smc, {
+      htfLabel: this.htfLabel,
+      intervalMinutes: this.intervalMinutes,
+      trade,
+    });
   }
 
   private pushAxisTag(
@@ -1020,16 +1052,16 @@ export class TvCandleChartComponent implements AfterViewInit, OnChanges, OnDestr
 
     if (y != null && y >= PAD.top && y <= PAD.top + plotH) {
       const price = max - ((y - PAD.top) / plotH) * (max - min);
-      this.axisTag(ctx, y, cssW, this.fmt(price), '#131722', '#ffffff');
+      this.axisTag(ctx, y, cssW, this.fmt(price), '#2a2e39', '#d1d4dc');
     }
 
     // Time pill under the hovered bar.
     const label = String(bars[i]!.date).slice(11, 16);
     ctx.font = FONT_BOLD;
     const w = ctx.measureText(label).width + 10;
-    ctx.fillStyle = '#131722';
+    ctx.fillStyle = '#2a2e39';
     ctx.fillRect(x - w / 2, PAD.top + plotH + 2, w, 15);
-    ctx.fillStyle = '#ffffff';
+    ctx.fillStyle = '#d1d4dc';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(label, x, PAD.top + plotH + 9.5);

@@ -194,6 +194,7 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
   protected readonly alertTypes = SMC_ALERT_TYPES;
   protected readonly alertLabels = SMC_ALERT_LABELS;
   protected readonly layerOptions: readonly { key: keyof SmcLayers; label: string }[] = [
+    { key: 'session', label: 'Day High / Low, IDM, SL–PE–TG, zones' },
     { key: 'structure', label: 'BOS / CHoCH' },
     { key: 'swings', label: 'Swings HH HL LH LL' },
     { key: 'orderBlocks', label: 'Order blocks' },
@@ -210,6 +211,7 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
   protected readonly ltf = computed(() => this.settings().ltf);
   protected readonly htf = computed(() => effectiveHtf(this.settings().ltf, this.settings().htf));
   protected readonly layers = computed(() => this.settings().layers);
+  protected readonly entryMinutes = computed(() => chartIntervalMinutes(this.ltf()));
 
   /** Newest first; only alerts that fired while the tab was watching. */
   protected readonly feed = signal<SmcFeedItem[]>([]);
