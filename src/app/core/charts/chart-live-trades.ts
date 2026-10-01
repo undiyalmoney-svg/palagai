@@ -46,6 +46,11 @@ export interface KitePositionLike {
   average_price?: number | string;
   last_price?: number | string;
   pnl?: number | string;
+  /** Unrealized P&L of the open qty — this is the per-trade figure. */
+  unrealised?: number | string;
+  unrealized?: number | string;
+  realised?: number | string;
+  realized?: number | string;
 }
 
 export interface ChartLiveTrade {
@@ -139,10 +144,9 @@ export function buildChartLiveTrades(
     else if (isComplete(exitOrder)) status = 'EXITED';
     else if (isComplete(entry) && (protectiveResting || !pos)) status = 'OPEN';
     else if (isComplete(entry)) status = 'EXITED';
-    const kitePnl = pos != null && pos.pnl != null && pos.pnl !== '' ? Number(pos.pnl) : NaN;
     const computed =
       status === 'OPEN' && last != null && entryPx != null ? (last - entryPx) * qty : NaN;
-    const pnl = Number.isFinite(kitePnl) ? kitePnl : Number.isFinite(computed) ? computed : null;
+    const pnl = openFillPnl(pos, status, computed);
     const book = bookFromInstrument(instrument);
     trades.push({
       id: `${instrument}:${entry?.order_id ?? slOrder?.order_id ?? tpOrder?.order_id ?? instrument}`,
@@ -246,6 +250,35 @@ function restingOrderId(order: KiteOrderLike | undefined): string | null {
   if (!order || !isOpenish(order)) return null;
   const id = String(order.order_id ?? '').trim();
   return id || null;
+}
+
+/**
+ * P&L of the open fill only. Kite's `pnl` is the day's total for that
+ * contract (realised + unrealised), which would turn a per-trade cap into a
+ * day stop — so an open row uses `unrealised`, then (last − entry) × qty,
+ * and never the day's net. Closed rows may still show Kite's day `pnl`.
+ */
+export function openFillPnl(
+  pos: KitePositionLike | undefined,
+  status: ChartLiveStatus,
+  computed: number,
+): number | null {
+  if (status === 'OPEN') {
+    const unreal = firstFinite(pos?.unrealised, pos?.unrealized);
+    if (unreal != null) return unreal;
+    return Number.isFinite(computed) ? computed : null;
+  }
+  const closed = firstFinite(pos?.pnl);
+  return closed ?? (Number.isFinite(computed) ? computed : null);
+}
+
+function firstFinite(...values: unknown[]): number | null {
+  for (const value of values) {
+    if (value == null || value === '') continue;
+    const n = Number(value);
+    if (Number.isFinite(n)) return n;
+  }
+  return null;
 }
 
 function filledQty(order: KiteOrderLike | undefined): number {

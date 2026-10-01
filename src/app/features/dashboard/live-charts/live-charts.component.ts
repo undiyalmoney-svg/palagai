@@ -1026,8 +1026,8 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
       '',
       'This is a real order at market price. A 25% premium stop and a 0.5R',
       "target rest after the fill unless this book's max profit / max loss",
-      "are set — then those rupee caps rest instead. The desk's daily limits",
-      'do not apply.',
+      'per trade are set — then those rupee caps rest instead. Caps apply to',
+      "this fill only, not the day's total. The desk's daily limits do not apply.",
     ];
 
     return this.uiDialog.confirm({

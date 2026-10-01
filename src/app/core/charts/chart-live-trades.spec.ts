@@ -194,6 +194,92 @@ describe('chart live trades', () => {
     expect(mergeChartLiveTrades(fromKite, [pending])[0]?.entry).toBe(201);
   });
 
+  it('reports this fill\'s unrealized P&L, not the day\'s realised total', () => {
+    const trades = buildChartLiveTrades(
+      [
+        {
+          order_id: '1',
+          tradingsymbol: 'NIFTY25OCT24500CE',
+          transaction_type: 'BUY',
+          status: 'COMPLETE',
+          filled_quantity: 65,
+          average_price: 200,
+          tag: 'PALAGAI_CHART',
+        },
+      ],
+      [
+        {
+          tradingsymbol: 'NIFTY25OCT24500CE',
+          product: 'MIS',
+          quantity: 65,
+          average_price: 200,
+          last_price: 201.5,
+          pnl: 997.5,
+          realised: 900,
+          unrealised: 97.5,
+        },
+      ],
+    );
+    expect(trades[0]?.status).toBe('OPEN');
+    expect(trades[0]?.pnl).toBe(97.5);
+  });
+
+  it('falls back to (last − entry) × qty when Kite omits unrealised, still ignoring the day pnl', () => {
+    const trades = buildChartLiveTrades(
+      [
+        {
+          order_id: '1',
+          tradingsymbol: 'NIFTY25OCT24500CE',
+          transaction_type: 'BUY',
+          status: 'COMPLETE',
+          filled_quantity: 65,
+          average_price: 200,
+          tag: 'PALAGAI_CHART',
+        },
+      ],
+      [
+        {
+          tradingsymbol: 'NIFTY25OCT24500CE',
+          product: 'MIS',
+          quantity: 65,
+          average_price: 200,
+          last_price: 201.5,
+          pnl: 997.5,
+          realised: 900,
+        },
+      ],
+    );
+    expect(trades[0]?.status).toBe('OPEN');
+    expect(trades[0]?.pnl).toBe(97.5);
+  });
+
+  it('does not treat a missing open-fill P&L as the day total', () => {
+    const trades = buildChartLiveTrades(
+      [
+        {
+          order_id: '1',
+          tradingsymbol: 'NIFTY25OCT24500CE',
+          transaction_type: 'BUY',
+          status: 'COMPLETE',
+          filled_quantity: 65,
+          average_price: 200,
+          tag: 'PALAGAI_CHART',
+        },
+      ],
+      [
+        {
+          tradingsymbol: 'NIFTY25OCT24500CE',
+          product: 'MIS',
+          quantity: 65,
+          pnl: 997.5,
+          realised: 900,
+        },
+      ],
+    );
+    expect(trades[0]?.status).toBe('OPEN');
+    expect(trades[0]?.pnl).toBeNull();
+  });
+
   it('unwraps Kite order and position payloads', () => {
     expect(extractKiteOrders({ data: [{ order_id: '9' }] })).toHaveLength(1);
     expect(

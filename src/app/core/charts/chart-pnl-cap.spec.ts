@@ -35,7 +35,7 @@ describe('chart pnl caps', () => {
     expect(anyCapSet(parsed)).toBe(true);
   });
 
-  it('fires only when that side is set and the live P&L has crossed it', () => {
+  it('fires only when that side is set and THIS fill has crossed it', () => {
     const cap = { maxProfitRs: 500, maxLossRs: 300 };
     expect(hitChartPnlCap(120, cap)).toBeNull();
     expect(hitChartPnlCap(500, cap)).toBe('PROFIT');
@@ -45,5 +45,7 @@ describe('chart pnl caps', () => {
     expect(hitChartPnlCap(800, { maxProfitRs: null, maxLossRs: 300 })).toBeNull();
     expect(hitChartPnlCap(-800, { maxProfitRs: 500, maxLossRs: null })).toBeNull();
     expect(hitChartPnlCap(null, cap)).toBeNull();
+    // A day's net of +₹900 does not fire a ₹500 per-trade cap if this fill is +₹100.
+    expect(hitChartPnlCap(100, cap)).toBeNull();
   });
 });

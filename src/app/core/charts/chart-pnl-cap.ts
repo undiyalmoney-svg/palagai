@@ -65,9 +65,9 @@ export function anyCapSet(caps: ChartPnlCaps): boolean {
 }
 
 /**
- * Whether an open fill's rupee P&L has reached that book's cap.
- * Unset sides never fire; loss is checked first so a gap that crosses both
- * still exits as a loss.
+ * Whether THIS open fill's rupee P&L has reached that book's per-trade cap.
+ * Pass the fill's unrealized P&L, never the day's net. Unset sides never fire;
+ * loss is checked first so a gap that crosses both still exits as a loss.
  */
 export function hitChartPnlCap(
   pnl: number | null | undefined,
