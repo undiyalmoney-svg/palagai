@@ -29,6 +29,9 @@ import {
   StrategySummary,
   Trade,
   WhatIfResponse,
+  DeskOverview,
+  DeskPaperReplay,
+  DeskScan,
 } from './momentum.models';
 
 export interface DashboardResponse {
@@ -102,6 +105,10 @@ export class MomentumApiService {
   private del<T>(path: string): Promise<T> {
     return firstValueFrom(this.http.delete<T>(`${this.base}${path}`));
   }
+
+  desk = () => this.get<DeskOverview>('/desk');
+  deskPaper = (body: { capital: number; from: string; to: string }) => this.post<DeskPaperReplay>('/desk/paper', body);
+  deskScan = (body: { capital: number; reset?: boolean; mode?: PortfolioMode }) => this.post<DeskScan>('/desk/scan', body);
 
   // ---- read models
   status = () => this.get<MomentumStatus>('/status');

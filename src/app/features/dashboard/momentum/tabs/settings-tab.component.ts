@@ -101,7 +101,7 @@ const RISK_FIELDS: RiskField[] = [
             @if (state.status(); as s) {
               @if (s.broker.configured) {
                 <p class="mp-sub">A broker session ({{ s.broker.apiKey }}) is configured. Live Trading is available.</p>
-                <a class="ui-btn ui-btn-secondary" routerLink="../live-trading">Open Live Trading</a>
+                <a class="ui-btn ui-btn-secondary" routerLink="../live">Open Live</a>
               } @else {
                 <p class="mp-sub">No broker session. The Live Trading tab stays hidden until one is configured. Everything else — screening, decisions, backtests and paper trading — works without a broker.</p>
                 <a class="ui-btn ui-btn-secondary" routerLink="/dashboard/get-token">Connect broker (Get Token)</a>

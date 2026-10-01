@@ -1,25 +1,26 @@
-import { inject } from '@angular/core';
-import { CanActivateFn, Router, Routes } from '@angular/router';
+import { Routes } from '@angular/router';
 import { MomentumShellComponent } from './momentum-shell.component';
-import { MomentumStateService } from './momentum-state.service';
-
-/** Live Trading exists only while a broker session is configured. */
-const liveTradingGuard: CanActivateFn = async () => {
-  const state = inject(MomentumStateService);
-  const router = inject(Router);
-  const status = state.status() ?? (await state.refreshStatus());
-  return status?.broker.configured ? true : router.parseUrl('/dashboard/momentum/settings');
-};
 
 export const MOMENTUM_ROUTES: Routes = [
   {
     path: '',
     component: MomentumShellComponent,
     children: [
-      { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
+      { path: '', pathMatch: 'full', redirectTo: 'paper' },
+      {
+        path: 'paper',
+        data: { desk: 'paper' },
+        loadComponent: () => import('./tabs/desk-tab.component').then((m) => m.DeskTabComponent),
+      },
+      {
+        path: 'live',
+        data: { desk: 'live' },
+        loadComponent: () => import('./tabs/desk-tab.component').then((m) => m.DeskTabComponent),
+      },
       {
         path: 'dashboard',
-        loadComponent: () => import('./tabs/dashboard-tab.component').then((m) => m.DashboardTabComponent),
+        redirectTo: 'paper',
+        pathMatch: 'full',
       },
       {
         path: 'screener',
@@ -43,12 +44,13 @@ export const MOMENTUM_ROUTES: Routes = [
       },
       {
         path: 'paper-trading',
-        loadComponent: () => import('./tabs/paper-trading-tab.component').then((m) => m.PaperTradingTabComponent),
+        redirectTo: 'paper',
+        pathMatch: 'full',
       },
       {
         path: 'live-trading',
-        canActivate: [liveTradingGuard],
-        loadComponent: () => import('./tabs/live-trading-tab.component').then((m) => m.LiveTradingTabComponent),
+        redirectTo: 'live',
+        pathMatch: 'full',
       },
       {
         path: 'settings',

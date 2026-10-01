@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnInit, computed, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, inject } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { MomentumStateService } from './momentum-state.service';
 
@@ -9,19 +9,13 @@ export interface Tab {
 }
 
 export const MOMENTUM_TABS: Tab[] = [
-  { label: 'Dashboard', path: 'dashboard' },
-  { label: 'Momentum Screener', path: 'screener' },
-  { label: 'Portfolio', path: 'portfolio' },
-  { label: 'Decision Center', path: 'decision-center' },
-  { label: 'Backtest', path: 'backtest' },
-  { label: 'Strategy Lab', path: 'strategy-lab' },
-  { label: 'Paper Trading', path: 'paper-trading' },
-  { label: 'Live Trading', path: 'live-trading', liveOnly: true },
+  { label: 'Paper', path: 'paper' },
+  { label: 'Live', path: 'live' },
   { label: 'Settings', path: 'settings' },
 ];
 
-export function visibleMomentumTabs(liveAvailable: boolean): Tab[] {
-  return MOMENTUM_TABS.filter((t) => !t.liveOnly || liveAvailable);
+export function visibleMomentumTabs(_liveAvailable: boolean): Tab[] {
+  return MOMENTUM_TABS;
 }
 
 @Component({
@@ -33,8 +27,8 @@ export function visibleMomentumTabs(liveAvailable: boolean): Tab[] {
     <div class="mp-page">
       @if (state.simulated()) {
         <div class="mp-banner" data-tone="warn" role="status">
-          <strong>Simulated market data.</strong>
-          <span>{{ state.status()?.provider?.simulatedNotice }} Connect a broker data provider on the server to use real prices.</span>
+          <strong>Simulated prices.</strong>
+          <span>{{ state.status()?.provider?.simulatedNotice }}</span>
         </div>
       }
       @if (state.statusError(); as err) {
@@ -44,14 +38,14 @@ export function visibleMomentumTabs(liveAvailable: boolean): Tab[] {
         </div>
       }
       <nav class="mp-tabs" aria-label="Momentum sections">
-        @for (t of tabs(); track t.path) {
+        @for (t of tabs; track t.path) {
           <a class="mp-tab" [routerLink]="t.path" routerLinkActive="active">{{ t.label }}</a>
         }
         <span class="mp-spacer"></span>
         @if (state.status(); as s) {
           <span class="meta mp-small mp-muted">
             <span class="dot" [class.open]="s.market.open"></span>
-            {{ s.market.open ? 'Market open' : s.market.reason }} · data to {{ s.data.last }} · {{ s.strategy.name }}
+            {{ s.market.open ? 'Market open' : s.market.reason }} · data to {{ s.data.last }}
           </span>
         }
       </nav>
@@ -67,7 +61,7 @@ export function visibleMomentumTabs(liveAvailable: boolean): Tab[] {
 })
 export class MomentumShellComponent implements OnInit {
   protected readonly state = inject(MomentumStateService);
-  protected readonly tabs = computed(() => visibleMomentumTabs(this.state.liveAvailable()));
+  protected readonly tabs = MOMENTUM_TABS;
 
   ngOnInit(): void {
     void this.state.refreshStatus();

@@ -654,3 +654,116 @@ export interface BrokerStatus extends ApiOk {
   liveEnabled: boolean;
   phrases: { live: string; auto: string };
 }
+
+export interface DeskScheduleSlot {
+  date: string;
+  weekday: string;
+  time: string;
+  when: string;
+  instruction: string;
+}
+
+export interface DeskSchedule {
+  horizon: string;
+  scanTime: string;
+  fillTime: string;
+  lastCompletedBar: string;
+  today: string;
+  buy: DeskScheduleSlot;
+  sell: DeskScheduleSlot;
+  holdRule: string;
+}
+
+export interface DeskLastWeekPick {
+  symbol: string;
+  name: string;
+  qty: number;
+  priceRef: number;
+  date: string;
+  action: string;
+  reason: string;
+}
+
+export interface DeskOverview {
+  status?: string;
+  schedule: DeskSchedule;
+  strategy: { id: string; name: string; horizon: string };
+  lastWeek: { week: string | null; picks: DeskLastWeekPick[] };
+  liveEnabled: boolean;
+  hasLive: boolean;
+  hasPaper: boolean;
+}
+
+export interface DeskClosedTrade {
+  symbol: string;
+  qty: number;
+  entryDate: string | null;
+  entryTime: string;
+  entryPrice: number | null;
+  exitDate: string;
+  exitTime: string;
+  exitPrice: number;
+  holdingDays: number | null;
+  pnl: number | null;
+  pnlPct: number | null;
+  exitReason: string;
+  trigger: string | null;
+}
+
+export interface DeskOpenTrade {
+  symbol: string;
+  qty: number;
+  entryDate: string;
+  entryTime: string;
+  entryPrice: number;
+  lastPrice: number;
+  holdingDays: number | null;
+  pnl: number | null;
+  status: string;
+}
+
+export interface DeskPaperReplay {
+  status?: string;
+  from: string;
+  to: string;
+  capital: number;
+  strategy: string;
+  fillTime: string;
+  scanTime: string;
+  totalProfit: number;
+  closedProfit: number;
+  openProfit: number;
+  metrics: Metrics | null;
+  closed: DeskClosedTrade[];
+  open: DeskOpenTrade[];
+}
+
+export interface DeskActionRow {
+  symbol: string;
+  name: string;
+  sector: string;
+  action: Action;
+  qty: number;
+  priceRef: number;
+  allocationValue: number;
+  reason: string;
+  score: number | null;
+  signalId: number | null;
+  canExecute: boolean;
+}
+
+export interface DeskScan {
+  status?: string;
+  mode: PortfolioMode;
+  usedPaperFallback: boolean;
+  capital: number;
+  asOf: string;
+  runId: number;
+  answer: string;
+  headline: string;
+  schedule: DeskSchedule;
+  lastWeek: { week: string | null; picks: DeskLastWeekPick[] };
+  buy: DeskActionRow[];
+  hold: DeskActionRow[];
+  sell: DeskActionRow[];
+}
