@@ -12,10 +12,15 @@
  * that would land on one already placed is dropped, never stacked.
  */
 import { Candle } from '../../../core/models/candle.model';
+import {
+  PathwayPaintModel,
+  pathwayPaintModel,
+} from '../../../core/charts/pathway-overlay';
 import { SmcLayers } from '../../../core/charts/smc/smc-settings';
 import {
   SmcAnalysis,
   SmcFill,
+  SmcFvg,
   SmcOrderBlock,
   SmcTrade,
 } from '../../../core/charts/smc/smc.types';
@@ -34,6 +39,10 @@ export interface PaintFrame {
   right: number;
   top: number;
   bottom: number;
+  /** Entry-timeframe bar length, used to place the +15m / +30m zones. */
+  intervalMinutes?: number;
+  /** Higher-timeframe name, e.g. `5m`, so the IDM reads `5M-IDM`. */
+  htfLabel?: string;
 }
 
 interface Box {
@@ -58,15 +67,24 @@ const C = {
   liquidity: '#b45309',
   liquiditySwept: 'rgba(180, 83, 9, 0.35)',
   swing: '#787b86',
-  ink: '#0f172a',
-  halo: 'rgba(255, 255, 255, 0.88)',
-  pending: '#b45309',
+  ink: '#d1d4dc',
+  halo: 'rgba(19, 23, 34, 0.88)',
+  pending: '#f0b429',
   riskBand: 'rgba(239, 83, 80, 0.16)',
   rewardBand: 'rgba(34, 184, 207, 0.16)',
   golden: 'rgba(120, 123, 134, 0.22)',
-  goldenEdge: 'rgba(71, 85, 105, 0.6)',
-  fibLine: 'rgba(120, 123, 134, 0.55)',
-  neutral: '#475569',
+  goldenEdge: 'rgba(180, 186, 196, 0.55)',
+  fibLine: 'rgba(120, 123, 134, 0.45)',
+  neutral: '#b2b5be',
+  sl: '#ff5c8a',
+  pe: '#f5d76e',
+  tg: '#00e676',
+  day: 'rgba(180, 186, 196, 0.55)',
+  dayInk: '#b2b5be',
+  idm: '#d4e157',
+  zone: 'rgba(209, 212, 220, 0.55)',
+  fvgBox: 'rgba(196, 204, 214, 0.16)',
+  fvgBoxEdge: 'rgba(214, 220, 228, 0.65)',
 } as const;
 
 const FONT = '600 9px ui-sans-serif, system-ui, -apple-system, sans-serif';
@@ -117,7 +135,8 @@ export function paintSmcUnder(f: PaintFrame): void {
 
   if (layers.premiumDiscount && smc.range) paintPremiumDiscount(f);
   if (layers.fib) paintFibonacci(f);
-  if (layers.fvg) paintFvgs(f);
+  if (layers.fvg && !layers.session) paintFvgs(f);
+  if (layers.session && layers.fvg) paintCompactFvgs(f, pathwayOf(f).fvgs);
   if (layers.orderBlocks) paintOrderBlocks(f);
   ctx.restore();
 }
@@ -133,18 +152,21 @@ export function paintSmcOver(f: PaintFrame): void {
 
   const placed: Box[] = [];
 
-  if (layers.levels) paintTradeLevels(f);
-  if (layers.liquidity) paintLiquidityLines(f);
+  if (layers.levels && !layers.session) paintTradeLevels(f);
+  if (layers.session && layers.levels) paintPathwayLevelLines(f, pathwayOf(f));
+  if (layers.liquidity && !layers.session) paintLiquidityLines(f);
+  if (layers.session) paintPathwayGuides(f, pathwayOf(f));
   if (layers.structure) paintStructureLines(f);
 
   // Text, most important first: a dropped label is always the least useful.
   paintSignals(f, placed);
   paintFills(f, placed);
-  if (layers.levels) paintLevelLabels(f, placed);
+  if (layers.session) paintPathwayLabels(f, placed, pathwayOf(f));
+  if (layers.levels && !layers.session) paintLevelLabels(f, placed);
   paintPreview(f, placed);
   if (layers.structure) paintStructureLabels(f, placed);
   if (layers.orderBlocks) paintZoneLabels(f, placed);
-  if (layers.liquidity) paintLiquidityLabels(f, placed);
+  if (layers.liquidity && !layers.session) paintLiquidityLabels(f, placed);
   if (layers.fib) paintFibLabels(f, placed);
   if (layers.premiumDiscount && smc.range) paintPdLabels(f, placed);
   if (layers.swings) paintSwingLabels(f, placed);
@@ -158,6 +180,178 @@ export function paintSmcOver(f: PaintFrame): void {
 
 function clampX(f: PaintFrame, x: number): number {
   return Math.min(f.right, Math.max(f.left, x));
+}
+
+function focusPathwayTrade(smc: SmcAnalysis): SmcTrade | null {
+  const open = smc.trades.filter((t) => t.status === 'open');
+  if (open.length) return open[open.length - 1]!;
+  return smc.trades.length ? smc.trades[smc.trades.length - 1]! : null;
+}
+
+function pathwayOf(f: PaintFrame): PathwayPaintModel {
+  return pathwayPaintModel(f.bars, f.smc, {
+    htfLabel: f.htfLabel,
+    intervalMinutes: f.intervalMinutes,
+    trade: focusPathwayTrade(f.smc),
+  });
+}
+
+function paintCompactFvgs(f: PaintFrame, gaps: SmcFvg[]): void {
+  const { ctx } = f;
+  for (const g of gaps) {
+    const x0 = clampX(f, f.xOf(g.index) - f.slotW / 2);
+    const x1 = clampX(f, f.xOf(Math.min(g.index + 16, f.bars.length - 1)) + f.slotW / 2);
+    if (x1 <= x0) continue;
+    const y0 = f.yOf(g.hi);
+    const y1 = f.yOf(g.lo);
+    const h = Math.max(12, y1 - y0);
+    ctx.fillStyle = C.fvgBox;
+    ctx.fillRect(x0, y0, x1 - x0, h);
+    ctx.strokeStyle = C.fvgBoxEdge;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x0 + 0.5, y0 + 0.5, x1 - x0 - 1, h - 1);
+    ctx.fillStyle = C.dayInk;
+    ctx.font = FONT;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('FVG', (x0 + x1) / 2, y0 + h / 2);
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
+  }
+}
+
+function paintPathwayLevelLines(f: PaintFrame, model: PathwayPaintModel): void {
+  if (!model.levels) return;
+  const { ctx } = f;
+  const x0 = model.bos ? clampX(f, f.xOf(model.bos.index)) : f.left;
+  const line = (price: number, color: string, dash: number[], width: number) => {
+    const y = Math.round(f.yOf(price)) + 0.5;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = width;
+    ctx.setLineDash(dash);
+    ctx.beginPath();
+    ctx.moveTo(x0, y);
+    ctx.lineTo(f.right, y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  };
+  line(model.levels.sl, C.sl, [2, 3], 1.1);
+  line(model.levels.pe, C.pe, [8, 5], 1.1);
+  line(model.levels.tg, C.tg, [], 1.3);
+}
+
+function paintPathwayGuides(f: PaintFrame, model: PathwayPaintModel): void {
+  const { ctx } = f;
+  if (model.session) {
+    const dayLine = (price: number) => {
+      const y = Math.round(f.yOf(price)) + 0.5;
+      ctx.strokeStyle = C.day;
+      ctx.lineWidth = 1;
+      ctx.setLineDash([3, 4]);
+      ctx.beginPath();
+      ctx.moveTo(f.left, y);
+      ctx.lineTo(f.right, y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    };
+    dayLine(model.session.high);
+    dayLine(model.session.low);
+  }
+
+  if (model.idm && f.layers.liquidity) {
+    const x0 = clampX(f, f.xOf(model.idm.index));
+    const y = Math.round(f.yOf(model.idm.price)) + 0.5;
+    ctx.strokeStyle = C.idm;
+    ctx.lineWidth = 1;
+    ctx.setLineDash([5, 4]);
+    ctx.beginPath();
+    ctx.moveTo(x0, y);
+    ctx.lineTo(f.right, y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  const markVertical = (index: number, color: string) => {
+    const x = Math.round(f.xOf(index)) + 0.5;
+    if (x < f.left || x > f.right) return;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1;
+    ctx.setLineDash([2, 3]);
+    ctx.beginPath();
+    ctx.moveTo(x, f.top);
+    ctx.lineTo(x, f.bottom);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  };
+  if (model.bos) markVertical(model.bos.index, 'rgba(209, 212, 220, 0.22)');
+  if (model.zones) {
+    markVertical(model.zones.zone1, C.zone);
+    markVertical(model.zones.zone2, C.zone);
+  }
+}
+
+function paintPathwayLabels(f: PaintFrame, placed: Box[], model: PathwayPaintModel): void {
+  if (model.session) {
+    ghost(f, placed, 'Day High', f.left + 6, f.yOf(model.session.high) - 8, C.dayInk, 'left');
+    ghost(f, placed, 'Day Low', f.left + 6, f.yOf(model.session.low) + 8, C.dayInk, 'left');
+  }
+  if (model.idm && f.layers.liquidity) {
+    ghost(f, placed, model.idm.label, f.left + 6, f.yOf(model.idm.price), C.idm, 'left');
+  }
+  if (model.levels && f.layers.levels) {
+    pill(f, placed, 'SL', f.right - 4, f.yOf(model.levels.sl), C.sl, '#131722', 'right');
+    pill(f, placed, 'PE', f.right - 4, f.yOf(model.levels.pe), C.pe, '#131722', 'right');
+    pill(f, placed, 'TG', f.right - 4, f.yOf(model.levels.tg), C.tg, '#131722', 'right');
+  }
+  if (model.zones) {
+    verticalCaption(f, placed, 'Indicator zone-1', model.zones.zone1);
+    verticalCaption(f, placed, 'Indicator zone-2', model.zones.zone2);
+  }
+}
+
+function verticalCaption(f: PaintFrame, placed: Box[], text: string, index: number): void {
+  const { ctx } = f;
+  const x = f.xOf(index);
+  if (x < f.left + 8 || x > f.right - 8) return;
+  ctx.save();
+  ctx.font = FONT;
+  const w = ctx.measureText(text).width;
+  const box = { x0: x - 7, x1: x + 7, y0: f.bottom - w - 12, y1: f.bottom - 6 };
+  if (box.y0 < f.top || collides(placed, box)) {
+    ctx.restore();
+    return;
+  }
+  placed.push(box);
+  ctx.fillStyle = C.dayInk;
+  ctx.translate(x, f.bottom - 8);
+  ctx.rotate(-Math.PI / 2);
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, 0, 0);
+  ctx.restore();
+}
+
+function ghost(
+  f: PaintFrame,
+  placed: Box[],
+  text: string,
+  x: number,
+  y: number,
+  color: string,
+  align: 'left' | 'center' | 'right',
+): void {
+  const { ctx } = f;
+  ctx.font = FONT;
+  const w = ctx.measureText(text).width;
+  const left = align === 'left' ? x : align === 'center' ? x - w / 2 : x - w;
+  const box = { x0: left, x1: left + w, y0: y - FONT_H / 2, y1: y + FONT_H / 2 };
+  if (collides(placed, box) || box.y0 < f.top || box.y1 > f.bottom) return;
+  placed.push(box);
+  ctx.fillStyle = color;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, left, y);
+  ctx.textBaseline = 'alphabetic';
 }
 
 function paintPremiumDiscount(f: PaintFrame): void {
@@ -348,6 +542,7 @@ function paintZoneLabels(f: PaintFrame, placed: Box[]): void {
     const y = (f.yOf(o.hi) + f.yOf(o.lo)) / 2;
     pill(f, placed, 'OB', x + 3, y, o.dir === 'bull' ? C.bull : C.bear, '#ffffff', 'left');
   }
+  if (f.layers.session) return;
   const gaps = f.smc.fvgs.filter((g) => g.status === 'active').slice(-f.smc.config.maxFvgs);
   for (const g of gaps) {
     const x = clampX(f, f.xOf(Math.max(g.index, f.first)));

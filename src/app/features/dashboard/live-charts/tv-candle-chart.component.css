@@ -3,6 +3,9 @@
   flex-direction: column;
   gap: 0.25rem;
   min-width: 0;
+  padding: 0.35rem 0.4rem 0.2rem;
+  border-radius: var(--pg-radius-sm);
+  background: #131722;
 }
 
 .tv-topbar {
@@ -23,7 +26,7 @@
   font-family: var(--pg-font-mono);
   font-size: 0.72rem;
   font-weight: 500;
-  color: #131722;
+  color: #d1d4dc;
 }
 
 .tv-tools {
@@ -41,10 +44,10 @@
   min-width: 2rem;
   height: 2rem;
   padding: 0 0.35rem;
-  border: 1px solid var(--pg-line);
+  border: 1px solid #2a2e39;
   border-radius: var(--pg-radius-sm);
-  background: #fff;
-  color: #131722;
+  background: #1e222d;
+  color: #d1d4dc;
   font-family: var(--pg-font);
   font-size: 0.95rem;
   font-weight: 600;
@@ -53,11 +56,11 @@
 }
 
 .tv-tool:hover:not(:disabled) {
-  background: #f0f3fa;
+  background: #2a2e39;
 }
 
 .tv-tool:disabled {
-  color: #b2b5be;
+  color: #5d606b;
   cursor: default;
 }
 
@@ -70,7 +73,7 @@
   width: 1px;
   height: 1.3rem;
   margin: 0 0.15rem;
-  background: var(--pg-line);
+  background: #2a2e39;
 }
 
 .tv-tool-reset {
@@ -84,7 +87,7 @@
   font-family: var(--pg-font-mono);
   font-size: 0.7rem;
   font-weight: 600;
-  color: #131722;
+  color: #d1d4dc;
   text-align: center;
   white-space: nowrap;
 }
@@ -97,7 +100,7 @@
 .tv-legend-hint {
   font-family: var(--pg-font);
   font-size: 0.72rem;
-  color: var(--pg-muted);
+  color: #787b86;
 }
 
 .tv-legend-time {
@@ -130,13 +133,13 @@
 }
 
 .tv-legend-signal.buy {
-  background: rgba(0, 137, 123, 0.12);
-  color: #00695c;
+  background: rgba(38, 166, 154, 0.18);
+  color: #4db6ac;
 }
 
 .tv-legend-signal.sell {
-  background: rgba(211, 47, 47, 0.12);
-  color: #c62828;
+  background: rgba(239, 83, 80, 0.18);
+  color: #ef9a9a;
 }
 
 /* Trend readout pinned to the plot so it is never off screen. */
@@ -158,25 +161,25 @@
   font-size: 0.68rem;
   font-weight: 750;
   letter-spacing: 0.03em;
-  background: rgba(71, 85, 105, 0.14);
-  color: #334155;
+  background: rgba(255, 255, 255, 0.08);
+  color: #d1d4dc;
 }
 
 .tv-trend[data-trend='bullish'] {
-  background: rgba(0, 137, 123, 0.16);
-  color: #00695c;
+  background: rgba(38, 166, 154, 0.2);
+  color: #80cbc4;
 }
 
 .tv-trend[data-trend='bearish'] {
-  background: rgba(211, 47, 47, 0.14);
-  color: #c62828;
+  background: rgba(239, 83, 80, 0.2);
+  color: #ef9a9a;
 }
 
 .tv-trend-sub {
   font-size: 0.64rem;
   font-weight: 600;
-  color: #64748b;
-  background: rgba(255, 255, 255, 0.8);
+  color: #b2b5be;
+  background: rgba(19, 23, 34, 0.72);
   padding: 0.05rem 0.3rem;
   border-radius: 4px;
 }
@@ -187,9 +190,9 @@
   min-width: 0;
   /* The canvas measures this, so height lives here and can be responsive. */
   height: 360px;
-  border: 1px solid var(--pg-line);
+  border: 1px solid #2a2e39;
   border-radius: var(--pg-radius-sm);
-  background: #fff;
+  background: #131722;
   overflow: hidden;
 }
 
@@ -237,7 +240,7 @@
   z-index: 800;
   gap: 0.5rem;
   padding: 0.5rem;
-  background: #fff;
+  background: #131722;
   /* Clear of the iOS home indicator and any notch. */
   padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
   padding-top: max(0.5rem, env(safe-area-inset-top));
@@ -295,9 +298,9 @@
 }
 
 .tv-order-btn.auto {
-  background: #fff;
-  color: #9f1239;
-  border: 1px solid #fecaca;
+  background: #1e222d;
+  color: #fda4af;
+  border: 1px solid #4c0519;
   min-width: 6.2rem;
 }
 
@@ -315,7 +318,7 @@
   gap: 0.45rem;
   font-family: var(--pg-font-mono);
   font-size: 0.74rem;
-  color: var(--pg-muted);
+  color: #787b86;
 }
 
 .tv-order-lots em {
@@ -335,10 +338,10 @@
   width: 2rem;
   height: 2rem;
   padding: 0;
-  border: 1px solid var(--pg-line);
+  border: 1px solid #2a2e39;
   border-radius: var(--pg-radius-sm);
-  background: #fff;
-  color: #131722;
+  background: #1e222d;
+  color: #d1d4dc;
   font-family: var(--pg-font);
   font-size: 1.1rem;
   font-weight: 700;
@@ -347,7 +350,7 @@
 }
 
 .tv-lots-btn:hover:not(:disabled) {
-  background: #f0f3fa;
+  background: #2a2e39;
 }
 
 .tv-lots-btn:disabled {
@@ -356,9 +359,9 @@
 }
 
 .tv-order-result {
-  color: #00695c;
+  color: #4db6ac;
 }
 
 .tv-order-result.bad {
-  color: #c62828;
+  color: #ef9a9a;
 }

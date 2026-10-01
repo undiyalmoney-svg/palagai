@@ -28,8 +28,8 @@ interface StatRow {
 export class SmcPanelComponent {
   @Input() smc: SmcAnalysis | null = null;
   @Input() decimals = 2;
-  @Input() htfLabel = '1h';
-  @Input() ltfLabel = '15m';
+  @Input() htfLabel = '5m';
+  @Input() ltfLabel = '1m';
   /** True while the chart is on today's session rather than a replayed date. */
   @Input() liveDay = true;
 

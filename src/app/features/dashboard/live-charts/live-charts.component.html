@@ -4,10 +4,10 @@
       <p class="pg-eyebrow">Live charts</p>
       <h1>Smart Money Concepts</h1>
       <p class="pg-lede">
-        The same TradingView candle chart on Nifty 50, Bank Nifty and Crude Oil Mini.
-        One engine reads structure, Fibonacci and SMC overlays, then Buy / Sell / Auto
-        work the same way on every book: ATM call on BUY, ATM put on SELL, with a
-        protective stop and 0.5R target after the fill.
+        The same 1-minute TradingView tape on Nifty 50, Bank Nifty and Crude Oil Mini:
+        Day High / Low, a compact FVG, BOS, the 5-minute IDM, SL / PE / TG, and the two
+        indicator zones. Buy / Sell / Auto work the same way on every book — ATM call
+        on BUY, ATM put on SELL, with a protective stop and 0.5R target after the fill.
       </p>
     </div>
 
@@ -316,6 +316,7 @@
           [layers]="layers()"
           [changeUp]="pane.quote?.changeAbs == null ? null : pane.quote!.changeAbs! >= 0"
           [htfLabel]="intervalLabels[htf()]"
+          [intervalMinutes]="entryMinutes()"
           [decimals]="pane.def.decimals"
           [resetKey]="ltf() + '|' + testDate()"
           [emptyMessage]="pane.error ? 'Chart unavailable' : 'Waiting for candles…'"
@@ -360,6 +361,15 @@
       </article>
     }
   </div>
+
+  <p class="chart-hint">
+    <strong>1-minute pathway.</strong> Every book opens on the 1-minute tape with a
+    5-minute trend filter. Day High / Day Low mark the session, the last FVG is a compact
+    box, the last BOS is labelled, swept liquidity before that BOS is the HTF IDM
+    (5M-IDM on the default book), SL / PE / TG are the red / yellow / green plan, and
+    Indicator zone-1 / zone-2 sit 15 and 30 minutes after the break. Turn other SMC
+    layers on in settings if you want the heavier overlay back.
+  </p>
 
   <p class="chart-hint">
     <strong>How a signal is built.</strong> The higher-timeframe trend (bullish, bearish
