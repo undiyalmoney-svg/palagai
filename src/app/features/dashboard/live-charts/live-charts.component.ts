@@ -73,6 +73,8 @@ import { AtmOptionSide, AtmOrderTicket, atmOrderCost, atmRupeePerPoint } from '.
 import { clampChartLots, lotsForChartBook, maxChartLots, sizingCapitalFromFunds } from '../../../core/charts/chart-lots.util';
 import {
   chartProtectiveLevels,
+  desiredProtectiveLevels,
+  fillsHittingPlannedLevels,
   fillsNeedingProtectiveSync,
   optionSideForAlert,
   shouldAutoTrade,
@@ -338,6 +340,8 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
   private readonly protectSyncInFlight = new Set<string>();
   /** Last cap fingerprint successfully applied to an open fill, so Kite lag does not rest a second SL. */
   private readonly syncedProtectives = new Map<string, string>();
+  /** Instruments that just got a broker SL — do not rest a second SELL while Kite catches up. */
+  private readonly slPlacedAt = new Map<string, number>();
 
   ngOnInit(): void {
     if (!this.isBrowser) {
@@ -524,7 +528,9 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
       }
       this.liveTradesError.set(null);
       for (const trade of remote) this.pendingLocal.delete(trade.instrument);
-      this.liveTrades.set(mergeChartLiveTrades(remote, [...this.pendingLocal.values()]));
+      this.liveTrades.set(
+        this.withPlannedTargets(mergeChartLiveTrades(remote, [...this.pendingLocal.values()])),
+      );
       this.liveTradesReady.set(true);
     } catch {
       this.liveTradesError.set("Could not read today's Charts fills.");
@@ -550,9 +556,11 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
     const trade = localChartTrade(input);
     this.pendingLocal.set(trade.instrument, trade);
     this.liveTrades.update((list) =>
-      mergeChartLiveTrades(
-        list.filter((row) => row.instrument !== trade.instrument),
-        [trade],
+      this.withPlannedTargets(
+        mergeChartLiveTrades(
+          list.filter((row) => row.instrument !== trade.instrument),
+          [trade],
+        ),
       ),
     );
   }
@@ -625,13 +633,22 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
     for (const id of [...this.syncedProtectives.keys()]) {
       if (!openIds.has(id)) this.syncedProtectives.delete(id);
     }
-    const hits = fillsToFlatten(trades, caps, this.flattenInFlight);
+    const capHits = fillsToFlatten(trades, caps, this.flattenInFlight);
+    const levelHits = fillsHittingPlannedLevels(trades, caps, [
+      ...this.flattenInFlight,
+      ...capHits.map((h) => h.id),
+    ]);
+    const hits = [...capHits];
+    for (const hit of levelHits) {
+      if (!hits.some((row) => row.id === hit.id)) hits.push(hit);
+    }
     if (!hits.length) return false;
     const byId = new Map(trades.map((t) => [t.id, t]));
     let anyOk = false;
     for (const hit of hits) {
       const trade = byId.get(hit.id);
       if (!trade) continue;
+      if (this.slPlacedRecently(trade.instrument)) continue;
       this.flattenInFlight.add(trade.id);
       const result = await this.orders.flattenChartTrade(trade, hit.reason);
       if (trade.book) this.patch(trade.book, { order: { ok: result.ok, text: result.message } });
@@ -659,6 +676,7 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
     for (const hit of hits) {
       const trade = byId.get(hit.id);
       if (!trade) continue;
+      if (this.slPlacedRecently(trade.instrument)) continue;
       this.protectSyncInFlight.add(trade.id);
       const result = await this.orders.replaceChartProtectives(trade, {
         stop: hit.stop,
@@ -676,6 +694,21 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
 
   private capFingerprint(hit: { stop: number; target: number }): string {
     return `${hit.stop}|${hit.target}`;
+  }
+
+  private slPlacedRecently(instrument: string): boolean {
+    const at = this.slPlacedAt.get(instrument);
+    return at != null && Date.now() - at < 15_000;
+  }
+
+  /** Show the planned target even though it is not rested at Kite. */
+  private withPlannedTargets(trades: ChartLiveTrade[]): ChartLiveTrade[] {
+    const caps = this.settings().pnlCaps;
+    return trades.map((trade) => {
+      if (trade.status !== 'OPEN' || !trade.book || trade.tp != null) return trade;
+      const levels = desiredProtectiveLevels(trade, caps[trade.book]);
+      return levels ? { ...trade, tp: levels.target, tpState: trade.tpState === '—' ? 'WATCH' : trade.tpState } : trade;
+    });
   }
 
   /** Drop everything shown and read it again: timeframe or date changed. */
@@ -1073,10 +1106,10 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
           : null;
       const extras: string[] = [];
       if (levels) {
+        extras.push(...(await this.orders.cancelRestingSells(ticket.tradingSymbol)).messages);
         const sl = await this.orders.placeStop(ticket, levels.stop);
         extras.push(sl.message);
-        const tp = await this.orders.placeTarget(ticket, levels.target);
-        extras.push(tp.message);
+        if (sl.ok) this.slPlacedAt.set(ticket.tradingSymbol, Date.now());
       }
       const tag = opts.silent ? 'Auto · ' : '';
       this.patch(id, {
@@ -1116,11 +1149,11 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
         ? `Premium ₹${this.fmt(premium, 2)}${cost != null ? ` · about ₹${this.fmt(cost, 0)} to buy` : ''}`
         : 'Live premium unavailable — cost unknown.',
       '',
-      'This is a real order at market price. A 25% premium stop and a 0.5R',
-      "target rest after the fill unless this book's max profit / max loss",
-      'per trade are set — then those rupee caps rest instead, and a hit',
-      'cancels the stop and sells this fill. The next fill on this chart is',
-      "watched again with the same cap. The desk's daily limits do not apply.",
+      'This is a real order at market price. A 25% premium (or rupee-cap) stop',
+      'rests after the fill. The target is watched on this tab and the stop is',
+      'cancelled before any exit — Kite rejects a second sell while the stop',
+      'is live. A hit sells this fill. The next fill on this chart is watched',
+      "again with the same cap. The desk's daily limits do not apply.",
     ];
 
     return this.uiDialog.confirm({

@@ -1,6 +1,7 @@
 import {
   chartProtectiveLevels,
   chartRupeePerPoint,
+  fillsHittingPlannedLevels,
   fillsNeedingProtectiveSync,
   optionSideForAlert,
   shouldAutoTrade,
@@ -93,5 +94,32 @@ describe('chart auto trade', () => {
     expect(
       fillsNeedingProtectiveSync([{ ...open, sl: wanted!.stop, tp: wanted!.target }], crude560),
     ).toEqual([]);
+    // Target is software-watched; a TP mismatch must not rest another SELL.
+    expect(
+      fillsNeedingProtectiveSync([{ ...open, sl: wanted!.stop, tp: 99 }], crude560),
+    ).toEqual([]);
+  });
+
+  it('flattens in software when last premium reaches the planned stop or target', () => {
+    const caps = {
+      nifty: { maxProfitRs: null, maxLossRs: null },
+      bank: { maxProfitRs: null, maxLossRs: null },
+      crude: { maxProfitRs: null, maxLossRs: null },
+    };
+    const open = {
+      id: 'crude:1',
+      status: 'OPEN' as const,
+      book: 'crude' as const,
+      last: 40,
+      entry: 40,
+      qty: 1,
+    };
+    expect(fillsHittingPlannedLevels([open], caps)).toEqual([]);
+    expect(fillsHittingPlannedLevels([{ ...open, last: 30 }], caps)).toEqual([
+      { id: 'crude:1', reason: 'LOSS' },
+    ]);
+    expect(fillsHittingPlannedLevels([{ ...open, last: 45 }], caps)).toEqual([
+      { id: 'crude:1', reason: 'PROFIT' },
+    ]);
   });
 });

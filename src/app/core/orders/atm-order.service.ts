@@ -34,6 +34,7 @@ import {
   buildChartLiveTrades,
   extractKiteOrders,
   extractKitePositions,
+  restingSellOrderIds,
 } from '../charts/chart-live-trades';
 
 export interface AtmOrderResult {
@@ -247,9 +248,11 @@ export class AtmOrderService {
   }
 
   /**
-   * Move this fill's resting SL/TP to new rupee (or system) levels after the
+   * Move this fill's resting SL to new rupee (or system) levels after the
    * reader edits max profit / max loss, or when an already-open fill is first
-   * seen with caps set. Cancels only the side that drifted, then rests again.
+   * seen with caps set. Cancels every resting SELL on the contract first —
+   * Kite rejects a new SELL while the old stop still holds the quantity.
+   * Target is not rested at the broker; the Charts tab watches it and flattens.
    */
   async replaceChartProtectives(
     trade: ChartLiveTrade,
@@ -259,53 +262,35 @@ export class AtmOrderService {
     if (!ticket) {
       return { ok: false, orderId: null, message: 'Could not rebuild a stop for that fill.' };
     }
-    const extras: string[] = [];
-    let ok = true;
-    const slSame = trade.sl != null && Math.abs(trade.sl - levels.stop) < 0.03;
-    const tpSame = trade.tp != null && Math.abs(trade.tp - levels.target) < 0.03;
-
-    if (!slSame) {
-      if (trade.slOrderId) extras.push((await this.cancelChartOrder(trade.slOrderId)).message);
-      const sl = await this.placeStop(ticket, levels.stop);
-      extras.push(sl.message);
-      ok = ok && sl.ok;
-    }
-    if (!tpSame) {
-      if (trade.tpOrderId) extras.push((await this.cancelChartOrder(trade.tpOrderId)).message);
-      const tp = await this.placeTarget(ticket, levels.target);
-      extras.push(tp.message);
-      ok = ok && tp.ok;
-    }
+    const extras = [...(await this.cancelRestingSells(trade.instrument)).messages];
+    const sl = await this.placeStop(ticket, levels.stop);
+    extras.push(sl.message);
     return {
-      ok,
-      orderId: null,
-      message: `Protectives updated on ${trade.instrument}: ${extras.join(' ')}`.trim(),
+      ok: sl.ok,
+      orderId: sl.orderId,
+      message: `Stop updated on ${trade.instrument}: ${extras.join(' ')}`.trim(),
     };
   }
 
   /**
-   * Cap hit: cancel the resting Charts SL/TP on this contract, then MARKET
-   * sell whatever quantity is still open so we do not double-exit a fill
-   * that the stop already took.
+   * Cap / target hit: cancel every resting SELL on this contract (SL and any
+   * leftover TP), wait until the qty is free, then MARKET sell. A sell while
+   * the stop is live is rejected and leaves the fill open.
    */
   async flattenChartTrade(
     trade: ChartLiveTrade,
     reason: 'PROFIT' | 'LOSS',
   ): Promise<AtmOrderResult> {
-    const extras: string[] = [];
-    const cancelIds = [
-      ...new Set(
-        [...(trade.protectiveOrderIds ?? []), trade.slOrderId, trade.tpOrderId].filter(
-          (id): id is string => !!id,
-        ),
-      ),
-    ];
-    for (const id of cancelIds) {
-      extras.push((await this.cancelChartOrder(id)).message);
-    }
+    const extras = [...(await this.cancelRestingSells(trade.instrument)).messages];
+    await delay(400);
 
     const live = await this.chartLiveTrades();
     const latest = live?.find((row) => row.instrument === trade.instrument) ?? trade;
+    const stillHeld = (await this.restingSellIds(trade.instrument)).length > 0;
+    if (stillHeld) {
+      extras.push(...(await this.cancelRestingSells(trade.instrument)).messages);
+      await delay(400);
+    }
     const qty = latest.qty > 0 && latest.status === 'OPEN' ? latest.qty : 0;
     const label = reason === 'PROFIT' ? 'Max profit' : 'Max loss';
     if (!(qty > 0)) {
@@ -316,12 +301,42 @@ export class AtmOrderService {
       };
     }
 
+    const remaining = await this.restingSellIds(trade.instrument);
+    if (remaining.length) {
+      return {
+        ok: false,
+        orderId: null,
+        message: `${label} — stop still live on ${trade.instrument}, sell skipped. ${extras.join(' ')}`.trim(),
+      };
+    }
+
     const sell = await this.placeExit(latest, qty);
     return {
       ok: sell.ok,
       orderId: sell.orderId,
       message: `${label} — ${sell.message}${extras.length ? ' · ' + extras.join(' ') : ''}`,
     };
+  }
+
+  /** Cancel every resting MIS SELL on this contract so a later sell can fill. */
+  async cancelRestingSells(instrument: string): Promise<{ ids: string[]; messages: string[] }> {
+    const ids = await this.restingSellIds(instrument);
+    const messages: string[] = [];
+    for (const id of ids) {
+      messages.push((await this.cancelChartOrder(id)).message);
+    }
+    return { ids, messages };
+  }
+
+  private async restingSellIds(instrument: string): Promise<string[]> {
+    const authorization = this.kiteSession.getAuthorizationHeader();
+    if (!authorization) return [];
+    try {
+      const orderRes = await firstValueFrom(this.kiteApi.getOrders(authorization));
+      return restingSellOrderIds(extractKiteOrders(orderRes), instrument);
+    } catch {
+      return [];
+    }
   }
 
   private async placeExit(trade: ChartLiveTrade, qty: number): Promise<AtmOrderResult> {

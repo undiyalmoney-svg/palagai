@@ -265,6 +265,35 @@ function restingProtectiveIds(list: KiteOrderLike[]): string[] {
   return ids;
 }
 
+/**
+ * Resting SELL ids that lock this contract's quantity at Kite.
+ * Flatten must cancel these before a MARKET exit; a second SELL while an SL
+ * is live is rejected with the qty still held by the stop.
+ */
+export function restingSellOrderIds(
+  orders: KiteOrderLike[],
+  instrument: string,
+  opts: { chartTaggedOnly?: boolean } = {},
+): string[] {
+  const symbol = String(instrument || '').trim().toUpperCase();
+  if (!symbol) return [];
+  const ids: string[] = [];
+  for (const order of orders) {
+    if (String(order.tradingsymbol || '').trim().toUpperCase() !== symbol) continue;
+    if (sideOf(order) !== 'SELL') continue;
+    if (!isOpenish(order)) continue;
+    const product = String(order.product || 'MIS').toUpperCase();
+    if (product && product !== 'MIS') continue;
+    if (opts.chartTaggedOnly) {
+      const tag = tagOf(order);
+      if (tag !== CHART_SL_TAG && tag !== CHART_TP_TAG) continue;
+    }
+    const id = String(order.order_id ?? '').trim();
+    if (id && !ids.includes(id)) ids.push(id);
+  }
+  return ids;
+}
+
 function isComplete(order: KiteOrderLike | undefined): boolean {
   return String(order?.status || '').toUpperCase() === 'COMPLETE';
 }

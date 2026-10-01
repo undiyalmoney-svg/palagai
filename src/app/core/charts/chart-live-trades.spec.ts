@@ -5,6 +5,7 @@ import {
   isChartOrderTag,
   localChartTrade,
   mergeChartLiveTrades,
+  restingSellOrderIds,
 } from './chart-live-trades';
 
 describe('chart live trades', () => {
@@ -425,5 +426,47 @@ describe('chart live trades', () => {
         data: { day: [{ tradingsymbol: 'X', quantity: 1 }], net: [] },
       }),
     ).toHaveLength(1);
+  });
+
+  it('lists every resting SELL that must be cancelled before a flatten', () => {
+    const orders = [
+      {
+        order_id: 'sl',
+        tradingsymbol: 'CRUDEOILM26OCT8850CE',
+        transaction_type: 'SELL',
+        status: 'TRIGGER PENDING',
+        product: 'MIS',
+        tag: 'PALAGAI_CHART_SL',
+      },
+      {
+        order_id: 'tp',
+        tradingsymbol: 'CRUDEOILM26OCT8850CE',
+        transaction_type: 'SELL',
+        status: 'OPEN',
+        product: 'MIS',
+        tag: 'PALAGAI_CHART_TP',
+      },
+      {
+        order_id: 'done',
+        tradingsymbol: 'CRUDEOILM26OCT8850CE',
+        transaction_type: 'SELL',
+        status: 'COMPLETE',
+        product: 'MIS',
+        tag: 'PALAGAI_CHART_EXIT',
+      },
+      {
+        order_id: 'other',
+        tradingsymbol: 'NIFTY25OCT24500CE',
+        transaction_type: 'SELL',
+        status: 'OPEN',
+        product: 'MIS',
+        tag: 'PALAGAI_CHART_SL',
+      },
+    ];
+    expect(restingSellOrderIds(orders, 'CRUDEOILM26OCT8850CE')).toEqual(['sl', 'tp']);
+    expect(restingSellOrderIds(orders, 'CRUDEOILM26OCT8850CE', { chartTaggedOnly: true })).toEqual([
+      'sl',
+      'tp',
+    ]);
   });
 });

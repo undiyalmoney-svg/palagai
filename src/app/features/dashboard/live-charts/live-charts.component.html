@@ -589,12 +589,13 @@
     <strong>Buy / Sell / Auto place a real market order</strong> for the front-expiry
     at-the-money contract on every book — Nifty 50, Bank Nifty and Crude. Sized from
     Kite funds (₹40,000 per index lot; Crude 3×). Auto buys the ATM call on a
-    confirmed BUY and the ATM put on a confirmed SELL, then rests a 25% premium stop
-    and a 0.5R target unless that chart's max profit / max loss is set on
-    this Charts tab — then those rupee caps rest instead. Press Save after
-    typing. A saved edit while a fill is open moves that fill's stop and
-    target; if the fill has already crossed the new amount, the stop is
-    cancelled and the contract is sold.
+    confirmed BUY and the ATM put on a confirmed SELL, then rests a 25% premium
+    (or rupee-cap) stop at Kite. The target is watched on this tab — Kite
+    rejects a second sell while the stop holds the quantity, so the stop is
+    cancelled first, then the contract is sold. Press Save after typing a cap.
+    A saved edit while a fill is open moves that fill's stop; if the fill has
+    already crossed the new amount, the stop is cancelled and the contract is
+    sold.
     Any rupee figure is allowed. Caps are per trade, not a day stop. Auto on
     Nifty does not arm Bank Nifty or Crude. Manual Buy / Sell ask before
     sending; Auto does not, because you already armed that book.
