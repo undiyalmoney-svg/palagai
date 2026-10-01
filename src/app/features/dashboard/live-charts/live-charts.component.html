@@ -68,8 +68,9 @@
     <header>
       <strong>Max profit / loss per trade</strong>
       <span>
-        Any rupee amount, one pair per chart. A change applies to the fill that is already
-        open. Blank = system 25% stop and 0.5R target.
+        Typing the number is not enough. Press the <strong>Save</strong> button under
+        these boxes. Until then the amounts are a draft. A saved change applies to
+        the fill that is already open. Blank = system 25% stop and 0.5R target.
       </span>
     </header>
     <div class="smc-cap-grid">
@@ -83,7 +84,8 @@
               min="0"
               step="any"
               [value]="capValue(book.id, 'maxProfitRs')"
-              (change)="setCap(book.id, 'maxProfitRs', $event)"
+              (input)="setCap(book.id, 'maxProfitRs', $event)"
+              (keydown)="onCapKeydown($event)"
               placeholder="system"
               [attr.aria-label]="'Max profit per trade for ' + book.label"
             />
@@ -95,7 +97,8 @@
               min="0"
               step="any"
               [value]="capValue(book.id, 'maxLossRs')"
-              (change)="setCap(book.id, 'maxLossRs', $event)"
+              (input)="setCap(book.id, 'maxLossRs', $event)"
+              (keydown)="onCapKeydown($event)"
               placeholder="system"
               [attr.aria-label]="'Max loss per trade for ' + book.label"
             />
@@ -103,6 +106,22 @@
         </div>
       }
     </div>
+    <footer class="chart-caps-actions">
+      <button
+        type="button"
+        class="chart-caps-save"
+        data-testid="chart-pnl-caps-save"
+        [class.dirty]="capsDirty()"
+        (click)="saveCaps()"
+      >
+        {{ capsDirty() ? 'Save changes' : 'Save' }}
+      </button>
+      @if (capsSavedNote()) {
+        <p class="chart-caps-saved" data-testid="chart-pnl-caps-saved">{{ capsSavedNote() }}</p>
+      } @else {
+        <p class="chart-caps-hint">Save stores the amounts. Enter also saves.</p>
+      }
+    </footer>
   </aside>
 
   <details class="smc-settings" data-testid="smc-settings">
@@ -436,7 +455,8 @@
               min="0"
               step="any"
               [value]="capValue(pane.def.id, 'maxProfitRs')"
-              (change)="setCap(pane.def.id, 'maxProfitRs', $event)"
+              (input)="setCap(pane.def.id, 'maxProfitRs', $event)"
+              (keydown)="onCapKeydown($event)"
               placeholder="system"
               [attr.aria-label]="'Max profit per trade for ' + pane.def.label"
             />
@@ -448,11 +468,20 @@
               min="0"
               step="any"
               [value]="capValue(pane.def.id, 'maxLossRs')"
-              (change)="setCap(pane.def.id, 'maxLossRs', $event)"
+              (input)="setCap(pane.def.id, 'maxLossRs', $event)"
+              (keydown)="onCapKeydown($event)"
               placeholder="system"
               [attr.aria-label]="'Max loss per trade for ' + pane.def.label"
             />
           </label>
+          <button
+            type="button"
+            class="chart-caps-save chart-caps-save-inline"
+            [class.dirty]="capsDirty()"
+            (click)="saveCaps()"
+          >
+            {{ capsDirty() ? 'Save changes' : 'Save' }}
+          </button>
         </div>
 
         @if (!liveDay()) {
@@ -562,9 +591,10 @@
     Kite funds (₹40,000 per index lot; Crude 3×). Auto buys the ATM call on a
     confirmed BUY and the ATM put on a confirmed SELL, then rests a 25% premium stop
     and a 0.5R target unless that chart's max profit / max loss is set on
-    this Charts tab — then those rupee caps rest instead. Editing the amount while
-    a fill is open moves that fill's stop and target; if the fill has already
-    crossed the new amount, the stop is cancelled and the contract is sold.
+    this Charts tab — then those rupee caps rest instead. Press Save after
+    typing. A saved edit while a fill is open moves that fill's stop and
+    target; if the fill has already crossed the new amount, the stop is
+    cancelled and the contract is sold.
     Any rupee figure is allowed. Caps are per trade, not a day stop. Auto on
     Nifty does not arm Bank Nifty or Crude. Manual Buy / Sell ask before
     sending; Auto does not, because you already armed that book.

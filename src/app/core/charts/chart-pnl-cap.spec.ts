@@ -1,6 +1,9 @@
 import {
   anyCapSet,
+  capDraftFromCaps,
   capSet,
+  capsFromDraft,
+  capsEqual,
   defaultPnlCaps,
   fillsToFlatten,
   hitChartPnlCap,
@@ -91,5 +94,21 @@ describe('chart pnl caps', () => {
     expect(
       fillsToFlatten([{ id: 'bank:1', status: 'OPEN', book: 'bank' as const, pnl: -300 }], caps),
     ).toEqual([{ id: 'bank:1', reason: 'LOSS' }]);
+  });
+
+  it('saves typed amounts only when they are committed from the draft', () => {
+    const draft = capDraftFromCaps({
+      nifty: { maxProfitRs: 550, maxLossRs: 560 },
+      bank: { maxProfitRs: 1000, maxLossRs: 2000 },
+      crude: { maxProfitRs: null, maxLossRs: null },
+    });
+    expect(draft.nifty).toEqual({ maxProfitRs: '550', maxLossRs: '560' });
+    expect(draft.crude).toEqual({ maxProfitRs: '', maxLossRs: '' });
+    const next = capsFromDraft({
+      ...draft,
+      crude: { maxProfitRs: '560', maxLossRs: '550' },
+    });
+    expect(next.crude).toEqual({ maxProfitRs: 560, maxLossRs: 550 });
+    expect(capsEqual(next, capsFromDraft(capDraftFromCaps(next)))).toBe(true);
   });
 });

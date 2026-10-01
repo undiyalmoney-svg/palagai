@@ -107,3 +107,35 @@ export function fillsToFlatten(
   }
   return hits;
 }
+
+export type ChartPnlCapDraft = Record<ChartBookId, { maxProfitRs: string; maxLossRs: string }>;
+
+export function capDraftFromCaps(caps: ChartPnlCaps): ChartPnlCapDraft {
+  const str = (n: number | null) => (n == null ? '' : String(n));
+  return {
+    nifty: { maxProfitRs: str(caps.nifty.maxProfitRs), maxLossRs: str(caps.nifty.maxLossRs) },
+    bank: { maxProfitRs: str(caps.bank.maxProfitRs), maxLossRs: str(caps.bank.maxLossRs) },
+    crude: { maxProfitRs: str(caps.crude.maxProfitRs), maxLossRs: str(caps.crude.maxLossRs) },
+  };
+}
+
+export function capsFromDraft(draft: ChartPnlCapDraft): ChartPnlCaps {
+  return parsePnlCaps({
+    nifty: {
+      maxProfitRs: parseRsCap(draft.nifty.maxProfitRs),
+      maxLossRs: parseRsCap(draft.nifty.maxLossRs),
+    },
+    bank: {
+      maxProfitRs: parseRsCap(draft.bank.maxProfitRs),
+      maxLossRs: parseRsCap(draft.bank.maxLossRs),
+    },
+    crude: {
+      maxProfitRs: parseRsCap(draft.crude.maxProfitRs),
+      maxLossRs: parseRsCap(draft.crude.maxLossRs),
+    },
+  });
+}
+
+export function capsEqual(a: ChartPnlCaps, b: ChartPnlCaps): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
+}

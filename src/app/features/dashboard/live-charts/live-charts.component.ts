@@ -77,7 +77,13 @@ import {
   optionSideForAlert,
   shouldAutoTrade,
 } from '../../../core/charts/chart-auto-trade.util';
-import { anyCapSet, fillsToFlatten, parseRsCap } from '../../../core/charts/chart-pnl-cap';
+import {
+  anyCapSet,
+  capDraftFromCaps,
+  capsEqual,
+  capsFromDraft,
+  fillsToFlatten,
+} from '../../../core/charts/chart-pnl-cap';
 import {
   ChartLiveStatus,
   ChartLiveTrade,
@@ -224,6 +230,11 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
   protected readonly settings = signal<SmcSettings>(
     loadSmcSettings(this.isBrowser ? safeStorage() : null),
   );
+  protected readonly capDraft = signal(capDraftFromCaps(this.settings().pnlCaps));
+  protected readonly capsDirty = computed(
+    () => !capsEqual(capsFromDraft(this.capDraft()), this.settings().pnlCaps),
+  );
+  protected readonly capsSavedNote = signal<string | null>(null);
   protected readonly ltf = computed(() => this.settings().ltf);
   protected readonly htf = computed(() => effectiveHtf(this.settings().ltf, this.settings().htf));
   protected readonly layers = computed(() => this.settings().layers);
@@ -467,6 +478,8 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
     const next = defaultSmcSettings();
     next.browserNotifications = before.browserNotifications;
     this.commit(next);
+    this.capDraft.set(capDraftFromCaps(next.pnlCaps));
+    this.capsSavedNote.set(null);
     if (before.ltf !== next.ltf || before.htf !== next.htf) {
       this.reloadAll();
     } else {
@@ -553,21 +566,39 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
   }
 
   protected capValue(id: ChartBookId, key: 'maxProfitRs' | 'maxLossRs'): string {
-    const n = this.settings().pnlCaps[id][key];
-    return n == null ? '' : String(n);
+    return this.capDraft()[id][key];
   }
 
   protected setCap(id: ChartBookId, key: 'maxProfitRs' | 'maxLossRs', event: Event): void {
     const raw = (event.target as HTMLInputElement).value;
-    const current = this.settings();
-    this.commit({
-      ...current,
-      pnlCaps: {
-        ...current.pnlCaps,
-        [id]: { ...current.pnlCaps[id], [key]: parseRsCap(raw) },
-      },
+    this.capsSavedNote.set(null);
+    this.capDraft.update((draft) => ({
+      ...draft,
+      [id]: { ...draft[id], [key]: raw },
+    }));
+  }
+
+  /** Persist the six boxes. Typing is a draft until this runs. */
+  protected saveCaps(): void {
+    const pnlCaps = capsFromDraft(this.capDraft());
+    this.commit({ ...this.settings(), pnlCaps });
+    this.capDraft.set(capDraftFromCaps(pnlCaps));
+    const bits = this.chartBooks.map((book) => {
+      const cap = pnlCaps[book.id];
+      const profit = cap.maxProfitRs == null ? 'system' : `₹${cap.maxProfitRs}`;
+      const loss = cap.maxLossRs == null ? 'system' : `₹${cap.maxLossRs}`;
+      return `${book.label} ${profit} / ${loss}`;
     });
-    void this.refreshLiveTrades(true);
+    this.capsSavedNote.set(`Saved. ${bits.join(' · ')}`);
+    if (this.liveDay()) {
+      void this.refreshLiveTrades(true);
+    }
+  }
+
+  protected onCapKeydown(event: KeyboardEvent): void {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    this.saveCaps();
   }
 
   private async afterLiveTrades(trades: ChartLiveTrade[]): Promise<void> {
