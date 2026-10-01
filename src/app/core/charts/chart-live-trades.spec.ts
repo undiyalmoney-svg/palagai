@@ -469,4 +469,36 @@ describe('chart live trades', () => {
       'tp',
     ]);
   });
+
+  it('cancels only that books resting sells so Nifty, Bank and Crude stay independent', () => {
+    const orders = [
+      {
+        order_id: 'nifty-sl',
+        tradingsymbol: 'NIFTY25OCT24500CE',
+        transaction_type: 'SELL',
+        status: 'TRIGGER PENDING',
+        product: 'MIS',
+        tag: 'PALAGAI_CHART_SL',
+      },
+      {
+        order_id: 'bank-sl',
+        tradingsymbol: 'BANKNIFTY25OCT52000PE',
+        transaction_type: 'SELL',
+        status: 'TRIGGER PENDING',
+        product: 'MIS',
+        tag: 'PALAGAI_CHART_SL',
+      },
+      {
+        order_id: 'crude-sl',
+        tradingsymbol: 'CRUDEOILM26OCT8850CE',
+        transaction_type: 'SELL',
+        status: 'TRIGGER PENDING',
+        product: 'MIS',
+        tag: 'PALAGAI_CHART_SL',
+      },
+    ];
+    expect(restingSellOrderIds(orders, 'NIFTY25OCT24500CE')).toEqual(['nifty-sl']);
+    expect(restingSellOrderIds(orders, 'BANKNIFTY25OCT52000PE')).toEqual(['bank-sl']);
+    expect(restingSellOrderIds(orders, 'CRUDEOILM26OCT8850CE')).toEqual(['crude-sl']);
+  });
 });

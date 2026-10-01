@@ -318,7 +318,11 @@ export class AtmOrderService {
     };
   }
 
-  /** Cancel every resting MIS SELL on this contract so a later sell can fill. */
+  /**
+   * Cancel every resting MIS SELL on this contract so a later sell can fill.
+   * Same path for Nifty 50, Bank Nifty and Crude — Kite locks qty per
+   * tradingsymbol, so each book's stop must be cancelled before that book's exit.
+   */
   async cancelRestingSells(instrument: string): Promise<{ ids: string[]; messages: string[] }> {
     const ids = await this.restingSellIds(instrument);
     const messages: string[] = [];

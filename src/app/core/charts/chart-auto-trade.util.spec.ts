@@ -1,3 +1,4 @@
+import { CHART_BOOKS } from './live-chart-data.service';
 import {
   chartProtectiveLevels,
   chartRupeePerPoint,
@@ -121,5 +122,39 @@ describe('chart auto trade', () => {
     expect(fillsHittingPlannedLevels([{ ...open, last: 45 }], caps)).toEqual([
       { id: 'crude:1', reason: 'PROFIT' },
     ]);
+  });
+
+  it('uses the same stop-at-broker / target-in-software path on Nifty, Bank and Crude', () => {
+    const unset = {
+      nifty: { maxProfitRs: null, maxLossRs: null },
+      bank: { maxProfitRs: null, maxLossRs: null },
+      crude: { maxProfitRs: null, maxLossRs: null },
+    };
+    const qty: Record<(typeof CHART_BOOKS)[number]['id'], number> = {
+      nifty: 65,
+      bank: 30,
+      crude: 1,
+    };
+    for (const book of CHART_BOOKS) {
+      const open = {
+        id: `${book.id}:1`,
+        status: 'OPEN' as const,
+        book: book.id,
+        last: 200,
+        entry: 200,
+        qty: qty[book.id],
+        sl: 150,
+        tp: 99,
+      };
+      expect(fillsHittingPlannedLevels([open], unset)).toEqual([]);
+      expect(fillsHittingPlannedLevels([{ ...open, last: 150 }], unset)).toEqual([
+        { id: open.id, reason: 'LOSS' },
+      ]);
+      expect(fillsHittingPlannedLevels([{ ...open, last: 225 }], unset)).toEqual([
+        { id: open.id, reason: 'PROFIT' },
+      ]);
+      // Planned target mismatch must not rest a second SELL on any book.
+      expect(fillsNeedingProtectiveSync([open], unset)).toEqual([]);
+    }
   });
 });

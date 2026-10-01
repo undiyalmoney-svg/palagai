@@ -15,8 +15,9 @@
  * Candles are read-only Kite history. Buy / Sell / Auto on every book place
  * real ATM option orders through the Kite proxy, outside the live desk rails.
  * Auto is per book: Nifty on does not arm Bank Nifty or Crude. Auto buys the
- * ATM call on a confirmed BUY and the ATM put on a confirmed SELL, then rests
- * a 25% premium stop and a 0.5R target. See AtmOrderService.
+ * ATM call on a confirmed BUY and the ATM put on a confirmed SELL. On Nifty,
+ * Bank Nifty and Crude the stop rests at Kite; the target is watched here and
+ * the stop is cancelled before any sell. See AtmOrderService.
  */
 import {
   Component,
