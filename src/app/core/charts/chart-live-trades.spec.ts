@@ -75,6 +75,7 @@ describe('chart live trades', () => {
       tpState: 'RESTING',
       slOrderId: '2',
       tpOrderId: '3',
+      protectiveOrderIds: ['2', '3'],
       status: 'OPEN',
       pnl: 780,
     });
@@ -278,6 +279,143 @@ describe('chart live trades', () => {
     );
     expect(trades[0]?.status).toBe('OPEN');
     expect(trades[0]?.pnl).toBeNull();
+  });
+
+  it('watches a second Crude fill on the same contract after the first was flattened', () => {
+    const trades = buildChartLiveTrades(
+      [
+        {
+          order_id: '10',
+          tradingsymbol: 'CRUDEOILM26OCT5400CE',
+          transaction_type: 'BUY',
+          status: 'COMPLETE',
+          filled_quantity: 100,
+          average_price: 40,
+          tag: 'PALAGAI_CHART',
+        },
+        {
+          order_id: '11',
+          tradingsymbol: 'CRUDEOILM26OCT5400CE',
+          transaction_type: 'SELL',
+          status: 'CANCELLED',
+          trigger_price: 37,
+          tag: 'PALAGAI_CHART_SL',
+        },
+        {
+          order_id: '12',
+          tradingsymbol: 'CRUDEOILM26OCT5400CE',
+          transaction_type: 'SELL',
+          status: 'COMPLETE',
+          filled_quantity: 100,
+          average_price: 37,
+          tag: 'PALAGAI_CHART_EXIT',
+        },
+        {
+          order_id: '20',
+          tradingsymbol: 'CRUDEOILM26OCT5400CE',
+          transaction_type: 'BUY',
+          status: 'COMPLETE',
+          filled_quantity: 100,
+          average_price: 42,
+          tag: 'PALAGAI_CHART',
+        },
+        {
+          order_id: '21',
+          tradingsymbol: 'CRUDEOILM26OCT5400CE',
+          transaction_type: 'SELL',
+          status: 'TRIGGER PENDING',
+          trigger_price: 39,
+          tag: 'PALAGAI_CHART_SL',
+        },
+        {
+          order_id: '22',
+          tradingsymbol: 'CRUDEOILM26OCT5400CE',
+          transaction_type: 'SELL',
+          status: 'OPEN',
+          price: 45,
+          tag: 'PALAGAI_CHART_TP',
+        },
+      ],
+      [
+        {
+          tradingsymbol: 'CRUDEOILM26OCT5400CE',
+          product: 'MIS',
+          quantity: 100,
+          average_price: 42,
+          last_price: 45,
+          pnl: 600,
+          realised: 300,
+          unrealised: 300,
+        },
+      ],
+    );
+    expect(trades).toHaveLength(1);
+    expect(trades[0]).toMatchObject({
+      book: 'crude',
+      status: 'OPEN',
+      entry: 42,
+      sl: 39,
+      tp: 45,
+      slOrderId: '21',
+      tpOrderId: '22',
+      protectiveOrderIds: ['21', '22'],
+      pnl: 300,
+    });
+  });
+
+  it('does not treat a previous fill\'s completed target as this fill', () => {
+    const trades = buildChartLiveTrades(
+      [
+        {
+          order_id: '1',
+          tradingsymbol: 'CRUDEOILM26OCT5400CE',
+          transaction_type: 'BUY',
+          status: 'COMPLETE',
+          filled_quantity: 100,
+          average_price: 40,
+          tag: 'PALAGAI_CHART',
+        },
+        {
+          order_id: '2',
+          tradingsymbol: 'CRUDEOILM26OCT5400CE',
+          transaction_type: 'SELL',
+          status: 'COMPLETE',
+          filled_quantity: 100,
+          average_price: 43,
+          tag: 'PALAGAI_CHART_TP',
+        },
+        {
+          order_id: '3',
+          tradingsymbol: 'CRUDEOILM26OCT5400CE',
+          transaction_type: 'BUY',
+          status: 'COMPLETE',
+          filled_quantity: 100,
+          average_price: 41,
+          tag: 'PALAGAI_CHART',
+        },
+        {
+          order_id: '4',
+          tradingsymbol: 'CRUDEOILM26OCT5400CE',
+          transaction_type: 'SELL',
+          status: 'TRIGGER PENDING',
+          trigger_price: 38,
+          tag: 'PALAGAI_CHART_SL',
+        },
+      ],
+      [
+        {
+          tradingsymbol: 'CRUDEOILM26OCT5400CE',
+          product: 'MIS',
+          quantity: 100,
+          average_price: 41,
+          last_price: 41,
+          unrealised: 0,
+        },
+      ],
+    );
+    expect(trades[0]?.status).toBe('OPEN');
+    expect(trades[0]?.slOrderId).toBe('4');
+    expect(trades[0]?.tpOrderId).toBeNull();
   });
 
   it('unwraps Kite order and position payloads', () => {

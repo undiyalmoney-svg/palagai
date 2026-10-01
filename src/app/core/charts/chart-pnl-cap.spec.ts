@@ -2,6 +2,7 @@ import {
   anyCapSet,
   capSet,
   defaultPnlCaps,
+  fillsToFlatten,
   hitChartPnlCap,
   parsePnlCaps,
   parseRsCap,
@@ -47,5 +48,43 @@ describe('chart pnl caps', () => {
     expect(hitChartPnlCap(null, cap)).toBeNull();
     // A day's net of +₹900 does not fire a ₹500 per-trade cap if this fill is +₹100.
     expect(hitChartPnlCap(100, cap)).toBeNull();
+  });
+
+  it('applies each book cap to every new fill, not the day stack', () => {
+    const caps = {
+      nifty: { maxProfitRs: 500, maxLossRs: 500 },
+      bank: { maxProfitRs: 300, maxLossRs: 300 },
+      crude: { maxProfitRs: 300, maxLossRs: 300 },
+    };
+    const crudeLoss = {
+      id: 'crude:1',
+      status: 'OPEN',
+      book: 'crude' as const,
+      pnl: -300,
+    };
+    expect(fillsToFlatten([crudeLoss], caps)).toEqual([{ id: 'crude:1', reason: 'LOSS' }]);
+    expect(fillsToFlatten([{ ...crudeLoss, status: 'EXITED' }], caps)).toEqual([]);
+
+    const nextCrude = {
+      id: 'crude:2',
+      status: 'OPEN',
+      book: 'crude' as const,
+      pnl: 300,
+    };
+    expect(fillsToFlatten([nextCrude], caps, ['crude:1'])).toEqual([
+      { id: 'crude:2', reason: 'PROFIT' },
+    ]);
+    expect(fillsToFlatten([{ ...nextCrude, pnl: -300 }], caps)).toEqual([
+      { id: 'crude:2', reason: 'LOSS' },
+    ]);
+
+    const nifty = { id: 'nifty:1', status: 'OPEN', book: 'nifty' as const, pnl: 300 };
+    expect(fillsToFlatten([nifty], caps)).toEqual([]);
+    expect(fillsToFlatten([{ ...nifty, pnl: 500 }], caps)).toEqual([
+      { id: 'nifty:1', reason: 'PROFIT' },
+    ]);
+    expect(
+      fillsToFlatten([{ id: 'bank:1', status: 'OPEN', book: 'bank' as const, pnl: -300 }], caps),
+    ).toEqual([{ id: 'bank:1', reason: 'LOSS' }]);
   });
 });

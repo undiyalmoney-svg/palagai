@@ -33,10 +33,7 @@ export interface SmcSettings {
   browserNotifications: boolean;
   /** Place ATM CE/PE when a confirmed BUY/SELL prints. One switch per book. */
   autoTrade: SmcAutoTrade;
-  /**
-   * Optional rupee max-profit / max-loss per book. Null on a side keeps the
-   * 25% stop / 0.5R target for that side.
-   */
+  /** Per-book rupee max profit / max loss for each fill. Null = system stop/target. */
   pnlCaps: ChartPnlCaps;
 }
 

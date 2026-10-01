@@ -76,7 +76,7 @@ import {
   optionSideForAlert,
   shouldAutoTrade,
 } from '../../../core/charts/chart-auto-trade.util';
-import { anyCapSet, hitChartPnlCap, parseRsCap } from '../../../core/charts/chart-pnl-cap';
+import { anyCapSet, fillsToFlatten, parseRsCap } from '../../../core/charts/chart-pnl-cap';
 import {
   ChartLiveStatus,
   ChartLiveTrade,
@@ -320,7 +320,7 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
   private tradesInFlight = false;
   /** Just-sent fills held until Kite lists that contract. */
   private readonly pendingLocal = new Map<string, ChartLiveTrade>();
-  /** Instruments currently being flattened so a cap cannot double-sell. */
+  /** Fill ids currently being flattened so a cap cannot double-sell the same fill. */
   private readonly flattenInFlight = new Set<string>();
 
   ngOnInit(): void {
@@ -565,29 +565,28 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * If this book's rupee cap is set and an open fill has crossed it, cancel
-   * the resting SL/TP and market-exit that contract. The same instrument is
-   * not flattened twice until it is no longer OPEN.
+   * If this book's rupee cap is set and THIS open fill has crossed it, cancel
+   * the resting SL/TP and market-exit that contract. The next fill on the
+   * same chart (new id) is watched again with the same cap.
    */
   private async enforcePnlCaps(trades: ChartLiveTrade[]): Promise<void> {
     const caps = this.settings().pnlCaps;
-    let started = false;
-    for (const trade of trades) {
-      if (trade.status !== 'OPEN') {
-        this.flattenInFlight.delete(trade.instrument);
-        continue;
-      }
-      if (!trade.book) continue;
-      const reason = hitChartPnlCap(trade.pnl, caps[trade.book]);
-      if (!reason) continue;
-      if (this.flattenInFlight.has(trade.instrument)) continue;
-      this.flattenInFlight.add(trade.instrument);
-      started = true;
-      const result = await this.orders.flattenChartTrade(trade, reason);
-      this.patch(trade.book, { order: { ok: result.ok, text: result.message } });
-      if (!result.ok) this.flattenInFlight.delete(trade.instrument);
+    const openIds = new Set(trades.filter((t) => t.status === 'OPEN').map((t) => t.id));
+    for (const id of [...this.flattenInFlight]) {
+      if (!openIds.has(id)) this.flattenInFlight.delete(id);
     }
-    if (started) void this.refreshLiveTrades(true);
+    const hits = fillsToFlatten(trades, caps, this.flattenInFlight);
+    if (!hits.length) return;
+    const byId = new Map(trades.map((t) => [t.id, t]));
+    for (const hit of hits) {
+      const trade = byId.get(hit.id);
+      if (!trade) continue;
+      this.flattenInFlight.add(trade.id);
+      const result = await this.orders.flattenChartTrade(trade, hit.reason);
+      if (trade.book) this.patch(trade.book, { order: { ok: result.ok, text: result.message } });
+      if (!result.ok) this.flattenInFlight.delete(trade.id);
+    }
+    void this.refreshLiveTrades(true);
   }
 
   /** Drop everything shown and read it again: timeframe or date changed. */
@@ -890,7 +889,7 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
         autoTrade: isAutoTradeOn(this.settings(), id),
         liveDay: this.liveDay(),
         marketOpen: this.statusOf(pane).open,
-        busy: !!pane.ordering,
+        busy: !!pane.ordering || this.flatteningBook(id),
         type,
       })
     ) {
@@ -899,6 +898,10 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
     const side = optionSideForAlert(type);
     if (!side) return;
     await this.buyAtm(id, side, { silent: true });
+  }
+
+  private flatteningBook(id: ChartBookId): boolean {
+    return this.liveTrades().some((trade) => trade.book === id && this.flattenInFlight.has(trade.id));
   }
 
   /**
@@ -1026,8 +1029,9 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
       '',
       'This is a real order at market price. A 25% premium stop and a 0.5R',
       "target rest after the fill unless this book's max profit / max loss",
-      'per trade are set — then those rupee caps rest instead. Caps apply to',
-      "this fill only, not the day's total. The desk's daily limits do not apply.",
+      'per trade are set — then those rupee caps rest instead, and a hit',
+      'cancels the stop and sells this fill. The next fill on this chart is',
+      "watched again with the same cap. The desk's daily limits do not apply.",
     ];
 
     return this.uiDialog.confirm({

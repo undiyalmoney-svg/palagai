@@ -211,10 +211,12 @@
       <fieldset class="smc-fieldset">
         <legend>Max profit / loss per trade</legend>
         <p class="smc-note">
-          Leave blank to keep the 25% premium stop and 0.5R target on that chart. A rupee
-          amount applies to that chart's <strong>open fill only</strong> — not the day's
-          total. When it is hit, the resting stop and target are cancelled and that
-          contract is sold. The next trade on that chart gets a fresh cap.
+          Each chart has its own rupee cap, applied to <strong>every fill on that
+          chart</strong> — not the day's total. Example: Crude ₹300 / ₹300 — if that
+          Crude trade is −₹300, the stop is cancelled and the contract is sold; if Auto
+          takes another Crude order, the same ₹300 / ₹300 applies to that new fill
+          (profit or loss). Nifty can be ₹500 / ₹500 while Bank is ₹300 / ₹300. Leave
+          blank to keep the 25% premium stop and 0.5R target on that side.
         </p>
         <div class="smc-cap-grid" data-testid="chart-pnl-caps">
           @for (book of chartBooks; track book.id) {
@@ -282,7 +284,7 @@
           }
           selected instrument, stop and target from Buy / Sell / Auto
           @if (anyCapWatching()) {
-            · per-trade rupee caps flatten that fill when hit
+            · per-trade rupee caps flatten that fill when hit; the next fill is watched again
           }
         </span>
         <button type="button" class="ghost-btn" (click)="refreshLiveTrades(true)">Refresh</button>
@@ -531,9 +533,10 @@
     and a 0.5R target unless that chart's max profit / max loss is set in
     SMC settings — then those rupee caps rest instead, and an open fill that
     hits them cancels the stop and target and sells the contract. Caps are per
-    trade, not a day stop; the next fill on that chart gets a fresh cap. Auto on
-    Nifty does not arm Bank Nifty or Crude. Manual Buy / Sell ask before
-    sending; Auto does not, because you already armed that book.
+    trade, not a day stop: Crude ₹300 / ₹300 exits that Crude fill at ±₹300,
+    then the next Crude fill is watched the same way; Nifty ₹500 does not use
+    Bank's ₹300. Auto on Nifty does not arm Bank Nifty or Crude. Manual Buy / Sell
+    ask before sending; Auto does not, because you already armed that book.
     Open fills, the selected contract, the stop and the target sit on the Live
     trades board above the charts.
   </p>

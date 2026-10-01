@@ -249,11 +249,15 @@ export class AtmOrderService {
     reason: 'PROFIT' | 'LOSS',
   ): Promise<AtmOrderResult> {
     const extras: string[] = [];
-    if (trade.slOrderId) {
-      extras.push((await this.cancelChartOrder(trade.slOrderId)).message);
-    }
-    if (trade.tpOrderId) {
-      extras.push((await this.cancelChartOrder(trade.tpOrderId)).message);
+    const cancelIds = [
+      ...new Set(
+        [...(trade.protectiveOrderIds ?? []), trade.slOrderId, trade.tpOrderId].filter(
+          (id): id is string => !!id,
+        ),
+      ),
+    ];
+    for (const id of cancelIds) {
+      extras.push((await this.cancelChartOrder(id)).message);
     }
 
     const live = await this.chartLiveTrades();

@@ -69,6 +69,8 @@ export interface ChartLiveTrade {
   tpState: string;
   slOrderId: string | null;
   tpOrderId: string | null;
+  /** Every resting Charts SL/TP on this fill — flatten cancels all of them. */
+  protectiveOrderIds: string[];
   status: ChartLiveStatus;
   pnl: number | null;
 }
@@ -122,11 +124,13 @@ export function buildChartLiveTrades(
   }
 
   const trades: ChartLiveTrade[] = [];
-  for (const [instrument, list] of grouped) {
+  for (const [instrument, raw] of grouped) {
+    const list = [...raw].sort(compareOrders);
     const entry = latest(list, (o) => tagOf(o) === CHART_ENTRY_TAG && sideOf(o) === 'BUY');
-    const slOrder = latest(list, (o) => tagOf(o) === CHART_SL_TAG);
-    const tpOrder = latest(list, (o) => tagOf(o) === CHART_TP_TAG);
-    const exitOrder = latest(list, (o) => tagOf(o) === CHART_EXIT_TAG && sideOf(o) === 'SELL');
+    const fill = ordersForFill(list, entry);
+    const slOrder = latest(fill, (o) => tagOf(o) === CHART_SL_TAG);
+    const tpOrder = latest(fill, (o) => tagOf(o) === CHART_TP_TAG);
+    const exitOrder = latest(fill, (o) => tagOf(o) === CHART_EXIT_TAG && sideOf(o) === 'SELL');
     const pos = posBySymbol.get(instrument);
     const posQty = pos ? Math.abs(num(pos.quantity)) : 0;
     const slHit = isComplete(slOrder);
@@ -164,6 +168,7 @@ export function buildChartLiveTrades(
       tpState: orderState(tpOrder),
       slOrderId: restingOrderId(slOrder),
       tpOrderId: restingOrderId(tpOrder),
+      protectiveOrderIds: restingProtectiveIds(fill),
       status,
       pnl: Number.isFinite(pnl as number) ? (pnl as number) : null,
     });
@@ -199,6 +204,7 @@ export function localChartTrade(input: {
     tpState: input.tp != null ? 'RESTING' : '—',
     slOrderId: null,
     tpOrderId: null,
+    protectiveOrderIds: [],
     status: 'OPEN',
     pnl: null,
   };
@@ -224,7 +230,39 @@ function sideOf(order: KiteOrderLike): string {
 
 function latest(list: KiteOrderLike[], pred: (o: KiteOrderLike) => boolean): KiteOrderLike | undefined {
   const hits = list.filter(pred);
-  return hits.length ? hits[hits.length - 1] : undefined;
+  if (!hits.length) return undefined;
+  return hits.reduce((best, order) => (compareOrders(order, best) > 0 ? order : best));
+}
+
+/** SL / TP / EXIT that belong to this fill, not an earlier flattened one. */
+function ordersForFill(list: KiteOrderLike[], entry: KiteOrderLike | undefined): KiteOrderLike[] {
+  if (!entry) return list;
+  return list.filter((order) => order === entry || compareOrders(order, entry) >= 0);
+}
+
+function compareOrders(a: KiteOrderLike, b: KiteOrderLike): number {
+  const ta = orderMs(a);
+  const tb = orderMs(b);
+  if (ta !== tb) return ta - tb;
+  return String(a.order_id ?? '').localeCompare(String(b.order_id ?? ''), undefined, {
+    numeric: true,
+  });
+}
+
+function orderMs(order: KiteOrderLike): number {
+  const t = Date.parse(String(order.order_timestamp || ''));
+  return Number.isFinite(t) ? t : 0;
+}
+
+function restingProtectiveIds(list: KiteOrderLike[]): string[] {
+  const ids: string[] = [];
+  for (const order of list) {
+    const tag = tagOf(order);
+    if (tag !== CHART_SL_TAG && tag !== CHART_TP_TAG) continue;
+    const id = restingOrderId(order);
+    if (id && !ids.includes(id)) ids.push(id);
+  }
+  return ids;
 }
 
 function isComplete(order: KiteOrderLike | undefined): boolean {

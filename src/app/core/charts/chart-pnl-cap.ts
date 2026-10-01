@@ -78,3 +78,32 @@ export function hitChartPnlCap(
   if (cap.maxProfitRs != null && cap.maxProfitRs > 0 && pnl >= cap.maxProfitRs) return 'PROFIT';
   return null;
 }
+
+export interface FlattenableFill {
+  id: string;
+  status: string;
+  book: ChartBookId | null;
+  pnl: number | null;
+}
+
+/**
+ * Open fills whose THIS-fill P&L has crossed that book's rupee cap.
+ * Each fill is independent: flattening Crude fill A does not spend the cap
+ * for Crude fill B, and Nifty's 500 never fires a Crude 300.
+ */
+export function fillsToFlatten(
+  trades: FlattenableFill[],
+  caps: ChartPnlCaps,
+  inFlight: Iterable<string> = [],
+): Array<{ id: string; reason: ChartPnlHit }> {
+  const busy = new Set(inFlight);
+  const hits: Array<{ id: string; reason: ChartPnlHit }> = [];
+  for (const trade of trades) {
+    if (trade.status !== 'OPEN' || !trade.book || busy.has(trade.id)) continue;
+    const reason = hitChartPnlCap(trade.pnl, caps[trade.book]);
+    if (!reason) continue;
+    hits.push({ id: trade.id, reason });
+    busy.add(trade.id);
+  }
+  return hits;
+}
