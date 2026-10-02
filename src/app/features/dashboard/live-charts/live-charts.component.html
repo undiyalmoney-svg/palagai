@@ -6,9 +6,9 @@
       <p class="pg-lede">
         The same 1-minute TradingView tape on Nifty 50, Bank Nifty and Crude Oil Mini:
         Day High / Low, a compact FVG, BOS, the 5-minute IDM, SL / PE / TG, and the two
-        indicator zones. Protect runs Auto for you — lots from funds, one book, first
-        fill then stand down. Off, Buy / Sell / Auto on each chart stay yours. ATM call
-        on BUY, ATM put on SELL.
+        indicator zones.         Protect runs Auto for you — lots from funds, one book, first
+        fill then stand down. The droplet places the ATM and sells the fill even if this
+        tab is closed. Off, Buy / Sell / Auto on each chart stay yours.
       </p>
     </div>
 
@@ -28,8 +28,8 @@
         [attr.aria-pressed]="protectOn()"
         [title]="
           protectOn()
-            ? 'Protect is running Auto: lots from funds, one book, first fill then off. Turn off to pick Auto yourself.'
-            : 'Turn on Protect to run Auto with capital rules. Off, Auto on each chart is yours.'
+            ? 'Protect is the super assistant: the droplet places, stops and sells. Turn off to pick Auto yourself.'
+            : 'Turn on Protect to let the droplet place and sell with capital rules. Off, Auto on each chart is yours.'
         "
         (click)="toggleProtect()"
       >

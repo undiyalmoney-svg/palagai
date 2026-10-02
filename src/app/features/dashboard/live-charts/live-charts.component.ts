@@ -14,11 +14,12 @@
  *
  * Candles are read-only Kite history. Buy / Sell / Auto on every book place
  * real ATM option orders through the Kite proxy, outside the live desk rails.
- * Auto is per book unless Protect is on: then lots come from funds, only one
- * book may fire, and the book stands down after the first fill. Auto buys the
- * ATM call on a confirmed BUY and the ATM put on a confirmed SELL. On Nifty,
- * Bank Nifty and Crude the stop rests at Kite; the target is watched here and
- * the stop is cancelled before any sell. See AtmOrderService.
+ * Auto is per book unless Protect is on: then the droplet is the brain — lots
+ * from funds, one book, first fill then stand down. This tab only places if
+ * the droplet is unreachable. Auto buys the ATM call on a confirmed BUY and
+ * the ATM put on a confirmed SELL. On Nifty, Bank Nifty and Crude the stop
+ * rests at Kite; the target is watched on the droplet (and this tab as backup)
+ * and the stop is cancelled before any sell. See AtmOrderService.
  */
 import {
   Component,
@@ -73,6 +74,7 @@ import { CapitalPreferenceService } from '../../../core/services/capital-prefere
 import { KiteFundsService } from '../../../core/services/kite-funds.service';
 import { AtmOrderService } from '../../../core/orders/atm-order.service';
 import { AtmOptionSide, AtmOrderTicket, atmOrderCost, atmRupeePerPoint } from '../../../core/orders/atm-order.util';
+import { ChartsProtectApiService, ChartsProtectView } from '../../../core/charts/charts-protect-api.service';
 import { clampChartLots, lotsForChartBook, maxChartLots, sizingCapitalFromFunds } from '../../../core/charts/chart-lots.util';
 import {
   chartProtectiveLevels,
@@ -198,6 +200,8 @@ const FEED_LIMIT = 40;
 const TRADE_POLL_MS = 15_000;
 /** When a rupee cap is set, watch fills at the scheduler tick so a gap is not 15s late. */
 const CAP_POLL_MS = 5_000;
+/** How often to ask the droplet whether it is placing and what it last did. */
+const DROPLET_POLL_MS = 15_000;
 
 const NUMERIC_FIELDS: readonly NumericField[] = [
   { key: 'riskPerTradePct', label: 'Risk per trade %', min: 0.05, max: 100, step: 0.1, hint: 'Share of equity risked to the stop' },
@@ -218,6 +222,7 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
   private readonly data = inject(LiveChartDataService);
   private readonly orders = inject(AtmOrderService);
   private readonly kiteFunds = inject(KiteFundsService);
+  private readonly protectApi = inject(ChartsProtectApiService);
   private readonly capitalPref = inject(CapitalPreferenceService);
   private readonly uiDialog = inject(UiDialogService);
   private readonly platformId = inject(PLATFORM_ID);
@@ -304,6 +309,8 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
   );
 
   protected readonly protectOn = computed(() => isProtectOn(this.settings()));
+  protected readonly protectDroplet = signal<ChartsProtectView | null>(null);
+  private wakeLock: WakeLockSentinel | null = null;
 
   protected readonly todayIst = computed(() => istToday(new Date(this.clock())));
 
@@ -358,6 +365,7 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
   private readonly flattenInFlight = new Set<string>();
   /** Protect only sends one ATM at a time, even if two books alert on the same tick. */
   private protectBusy = false;
+  private lastDropletPoll = 0;
   /** Fill ids whose SL/TP are being moved to a newly edited cap. */
   private readonly protectSyncInFlight = new Set<string>();
   /** Last cap fingerprint successfully applied to an open fill, so Kite lag does not rest a second SL. */
@@ -374,18 +382,28 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
     void this.kiteFunds.refresh();
     void this.refreshAll();
     void this.refreshLiveTrades();
+    if (this.protectOn()) void this.syncProtectToDroplet(true);
+    if (this.isBrowser) {
+      document.addEventListener('visibilitychange', this.onVisibility);
+    }
     this.timer = setInterval(() => {
       this.clock.set(Date.now());
       this.rollProtectDay();
       if (!this.autoRefresh()) return;
-      // Nothing to show a hidden tab; skip the Kite call entirely.
-      if (typeof document !== 'undefined' && document.hidden) return;
+      // Protect must keep polling in a background tab — that is how 0.5R
+      // entries fire without someone staring at the chart. Hidden skip stays
+      // only when Protect is off (display-only).
+      if (typeof document !== 'undefined' && document.hidden && !this.protectOn()) return;
       const due = this.duePanes();
       if (due.length) {
         void this.refreshPanes(due);
       }
       if (this.liveDay()) {
         void this.refreshLiveTrades();
+      }
+      if (this.protectOn() && Date.now() - this.lastDropletPoll >= DROPLET_POLL_MS) {
+        this.lastDropletPoll = Date.now();
+        void this.refreshProtectDroplet();
       }
     }, TICK_MS);
   }
@@ -394,6 +412,11 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
     if (this.timer != null) {
       clearInterval(this.timer);
     }
+    if (this.isBrowser) {
+      document.removeEventListener('visibilitychange', this.onVisibility);
+    }
+    void this.wakeLock?.release();
+    this.wakeLock = null;
   }
 
   /**
@@ -1030,6 +1053,8 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
     if (on) this.lotsOverride.set({});
     this.rollProtectDay();
     this.syncProtectFromTrades(this.liveTrades());
+    void this.syncProtectToDroplet(on);
+    void this.syncWakeLock();
   }
 
   protected protectStatus(): string {
@@ -1045,7 +1070,16 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
       day: this.protectDay(),
       openBooks: openProtectBooks(this.liveTrades()),
       trends,
-    });
+    }) + this.protectDropletNote();
+  }
+
+  private protectDropletNote(): string {
+    const drop = this.protectDroplet();
+    if (!this.protectOn()) return '';
+    if (drop?.lastError) return ` · droplet: ${drop.lastError}`;
+    if (drop?.dropletPlacing) return ' · droplet placing and watching exits';
+    if (drop?.dropletWatching) return ' · droplet watching exits — this tab still places';
+    return ' · droplet not reached — this tab still places and exits';
   }
 
   protected autoOn(id: ChartBookId): boolean {
@@ -1072,6 +1106,7 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
     const side = optionSideForAlert(type);
     if (!side) return;
     if (this.protectOn()) {
+      if (this.protectDroplet()?.dropletPlacing) return;
       if (this.protectBusy) return;
       const now = new Date(this.clock());
       const decision = decideProtectAuto({
@@ -1216,6 +1251,17 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
       });
       void this.refreshLiveTrades(true);
       if (this.protectOn()) this.noteProtectPlaced(id);
+      if (this.protectOn() && fill != null && ticket) {
+        void this.protectApi.registerFill({
+          instrument: ticket.tradingSymbol,
+          exchange: ticket.exchange,
+          book: id,
+          qty: ticket.quantity,
+          entry: fill,
+          stop: levels?.stop ?? null,
+          target: levels?.target ?? null,
+        });
+      }
       return true;
     } finally {
       this.patch(id, { ordering: null });
@@ -1355,6 +1401,36 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
   private persistProtectDay(day: ReturnType<typeof loadProtectDay>): void {
     this.protectDay.set(day);
     saveProtectDay(this.isBrowser ? safeStorage() : null, day);
+  }
+
+  private readonly onVisibility = (): void => {
+    if (this.protectOn()) void this.syncWakeLock();
+  };
+
+  private async syncProtectToDroplet(enabled: boolean): Promise<void> {
+    await this.kiteFunds.refresh();
+    const view = await this.protectApi.setEnabled(enabled);
+    this.protectDroplet.set(view);
+    this.lastDropletPoll = Date.now();
+  }
+
+  private async refreshProtectDroplet(): Promise<void> {
+    const view = await this.protectApi.get();
+    if (view) this.protectDroplet.set(view);
+  }
+
+  private async syncWakeLock(): Promise<void> {
+    if (!this.isBrowser) return;
+    try {
+      if (this.protectOn() && 'wakeLock' in navigator) {
+        this.wakeLock = await navigator.wakeLock.request('screen');
+      } else {
+        await this.wakeLock?.release();
+        this.wakeLock = null;
+      }
+    } catch {
+      this.wakeLock = null;
+    }
   }
 }
 
