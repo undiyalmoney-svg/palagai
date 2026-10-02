@@ -310,6 +310,10 @@
   border-color: #be123c;
 }
 
+.tv-order-btn.auto.on:disabled {
+  opacity: 1;
+}
+
 .tv-order-lots,
 .tv-order-result {
   display: flex;

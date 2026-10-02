@@ -5,6 +5,7 @@ import {
   SMC_STORAGE_KEY,
   defaultSmcSettings,
   isAutoTradeOn,
+  isProtectOn,
   loadSmcSettings,
   parseAutoTrade,
 } from './smc-settings';
@@ -41,6 +42,19 @@ describe('smc settings', () => {
 
   it('keeps Auto off on every book by default', () => {
     expect(defaultSmcSettings().autoTrade).toEqual({ nifty: false, bank: false, crude: false });
+    expect(defaultSmcSettings().protectCapital).toBe(false);
+    expect(isProtectOn(defaultSmcSettings())).toBe(false);
+  });
+
+  it('loads Protect from a saved book and treats a missing flag as off', () => {
+    const storage = {
+      getItem: () => JSON.stringify({ protectCapital: true, autoTrade: { nifty: true } }),
+    };
+    expect(loadSmcSettings(storage).protectCapital).toBe(true);
+    expect(isProtectOn(loadSmcSettings(storage))).toBe(true);
+    expect(loadSmcSettings({ getItem: () => JSON.stringify({ ltf: '1m' }) }).protectCapital).toBe(
+      false,
+    );
   });
 
   it('leaves per-book max profit and max loss unset so the system stop/target stay', () => {

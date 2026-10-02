@@ -48,6 +48,41 @@
   color: var(--pg-muted);
 }
 
+.protect-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.95rem;
+  border: 1px solid var(--pg-line);
+  border-radius: 999px;
+  background: var(--pg-bg-elevated);
+  color: var(--pg-ink);
+  font-family: var(--pg-font);
+  font-size: 0.84rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background var(--pg-ease), border-color var(--pg-ease), color var(--pg-ease);
+}
+
+.protect-btn:hover {
+  border-color: var(--pg-line-strong);
+}
+
+.protect-btn.on {
+  border-color: #b7ebd0;
+  background: var(--pg-bull-soft);
+  color: var(--pg-bull-deep);
+}
+
+.protect-status {
+  flex: 1 1 12rem;
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--pg-muted);
+  line-height: 1.35;
+}
+
 .interval-group {
   display: inline-flex;
   /* Hug the pills rather than stretching across the card it now sits in. */

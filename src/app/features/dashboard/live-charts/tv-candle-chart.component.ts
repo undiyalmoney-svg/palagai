@@ -135,6 +135,12 @@ export class TvCandleChartComponent implements AfterViewInit, OnChanges, OnDestr
   @Input() orderHint = '';
   @Input() orderResult: { ok: boolean; text: string } | null = null;
   @Input() autoTrade = false;
+  /** Protect owns Auto — the per-chart button is only a status. */
+  @Input() autoLocked = false;
+  /** Override the Auto / Auto on label (Protect / Done / Wait). */
+  @Input() autoLabel: string | null = null;
+  /** Protect sizes lots from funds — hide the stepper. */
+  @Input() lotsLocked = false;
   readonly buyAtm = output<AtmOptionSide>();
   readonly adjustLots = output<number>();
   readonly toggleAuto = output<void>();

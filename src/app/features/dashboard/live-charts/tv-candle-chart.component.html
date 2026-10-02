@@ -193,12 +193,21 @@
           type="button"
           class="tv-order-btn auto"
           [class.on]="autoTrade"
+          [disabled]="autoLocked"
           [attr.aria-pressed]="autoTrade"
-          [title]="autoTrade ? 'Auto is on for this chart only — confirmed SMC signals place ATM CE/PE here' : 'Turn on Auto for this chart only — ATM call on BUY, ATM put on SELL'"
-          aria-label="Toggle auto buy and sell for this chart"
+          [title]="
+            autoLocked
+              ? 'Protect is running this chart. The desk toggle above turns it off.'
+              : autoTrade
+                ? 'Auto is on for this chart only — confirmed SMC signals place ATM CE/PE here'
+                : 'Turn on Auto for this chart only — ATM call on BUY, ATM put on SELL'
+          "
+          [attr.aria-label]="
+            autoLocked ? 'Protect owns Auto on this chart' : 'Toggle auto buy and sell for this chart'
+          "
           (click)="toggleAuto.emit()"
         >
-          {{ autoTrade ? 'Auto on' : 'Auto' }}
+          {{ autoLabel || (autoTrade ? 'Auto on' : 'Auto') }}
         </button>
       </div>
       <div class="tv-order-lots">
@@ -206,7 +215,7 @@
           <button
             type="button"
             class="tv-lots-btn"
-            [disabled]="orderLots <= 1"
+            [disabled]="lotsLocked || orderLots <= 1"
             aria-label="Decrease lots"
             (click)="adjustLots.emit(-1)"
           >
@@ -216,7 +225,7 @@
           <button
             type="button"
             class="tv-lots-btn"
-            [disabled]="orderLots >= maxOrderLots"
+            [disabled]="lotsLocked || orderLots >= maxOrderLots"
             aria-label="Increase lots"
             (click)="adjustLots.emit(1)"
           >

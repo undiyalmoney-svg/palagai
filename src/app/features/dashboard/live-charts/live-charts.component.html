@@ -6,8 +6,9 @@
       <p class="pg-lede">
         The same 1-minute TradingView tape on Nifty 50, Bank Nifty and Crude Oil Mini:
         Day High / Low, a compact FVG, BOS, the 5-minute IDM, SL / PE / TG, and the two
-        indicator zones. Buy / Sell / Auto work the same way on every book — ATM call
-        on BUY, ATM put on SELL — but Auto is armed on that chart only.
+        indicator zones. Protect runs Auto for you — lots from funds, one book, first
+        fill then stand down. Off, Buy / Sell / Auto on each chart stay yours. ATM call
+        on BUY, ATM put on SELL.
       </p>
     </div>
 
@@ -19,6 +20,23 @@
           · {{ lotsFor('crude') }} crude
         </span>
       </div>
+      <button
+        type="button"
+        class="protect-btn"
+        data-testid="chart-protect"
+        [class.on]="protectOn()"
+        [attr.aria-pressed]="protectOn()"
+        [title]="
+          protectOn()
+            ? 'Protect is running Auto: lots from funds, one book, first fill then off. Turn off to pick Auto yourself.'
+            : 'Turn on Protect to run Auto with capital rules. Off, Auto on each chart is yours.'
+        "
+        (click)="toggleProtect()"
+      >
+        <app-pg-icon name="shield" [size]="15" />
+        <span>{{ protectOn() ? 'Protect on' : 'Protect' }}</span>
+      </button>
+      <p class="protect-status" data-testid="chart-protect-status">{{ protectStatus() }}</p>
       <div class="charts-actions">
         <label class="chart-date" data-testid="chart-test-date">
           <span>Date</span>
@@ -255,12 +273,20 @@
             Also send browser notifications
           </label>
         }
-        <p class="smc-note">Auto buy / sell on confirmed SMC signals — one switch per chart</p>
+        <p class="smc-note">
+          @if (protectOn()) {
+            Protect is on — it picks the book, sizes lots from funds, and stands down
+            after the first fill. Turn Protect off to use these switches.
+          } @else {
+            Auto buy / sell on confirmed SMC signals — one switch per chart
+          }
+        </p>
         @for (book of chartBooks; track book.id) {
           <label class="smc-check">
             <input
               type="checkbox"
               [checked]="autoOn(book.id)"
+              [disabled]="protectOn()"
               (change)="toggleAutoTrade(book.id)"
             />
             Auto {{ book.label }}
@@ -515,6 +541,9 @@
           [orderHint]="orderHintFor(pane)"
           [orderResult]="pane.order"
           [autoTrade]="autoOn(pane.def.id)"
+          [autoLocked]="autoLocked()"
+          [autoLabel]="autoLabel(pane.def.id)"
+          [lotsLocked]="protectOn()"
           (buyAtm)="buyAtm(pane.def.id, $event)"
           (adjustLots)="bumpLots(pane.def.id, $event)"
           (toggleAuto)="toggleAutoTrade(pane.def.id)"

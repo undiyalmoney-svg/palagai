@@ -14,7 +14,8 @@
  *
  * Candles are read-only Kite history. Buy / Sell / Auto on every book place
  * real ATM option orders through the Kite proxy, outside the live desk rails.
- * Auto is per book: Nifty on does not arm Bank Nifty or Crude. Auto buys the
+ * Auto is per book unless Protect is on: then lots come from funds, only one
+ * book may fire, and the book stands down after the first fill. Auto buys the
  * ATM call on a confirmed BUY and the ATM put on a confirmed SELL. On Nifty,
  * Bank Nifty and Crude the stop rests at Kite; the target is watched here and
  * the stop is cancelled before any sell. See AtmOrderService.
@@ -62,6 +63,7 @@ import {
   effectiveHtf,
   enabledAlertTypes,
   isAutoTradeOn,
+  isProtectOn,
   loadSmcSettings,
   saveSmcSettings,
 } from '../../../core/charts/smc/smc-settings';
@@ -81,6 +83,16 @@ import {
   shouldAutoTrade,
 } from '../../../core/charts/chart-auto-trade.util';
 import {
+  applyProtectCloses,
+  decideProtectAuto,
+  loadProtectDay,
+  markProtectPlaced,
+  openProtectBooks,
+  protectBookArmed,
+  protectStatusLine,
+  saveProtectDay,
+} from '../../../core/charts/chart-protect.util';
+import {
   anyCapSet,
   capDraftFromCaps,
   capsEqual,
@@ -99,7 +111,7 @@ import { TvCandleChartComponent } from './tv-candle-chart.component';
 import { SmcPanelComponent } from './smc-panel.component';
 import { formatUnknownError } from '../../../core/utils/kite-error.util';
 import { isKiteAuthError } from '../../../core/utils/kite-auth-error.util';
-import { MarketStatus, marketStatusAt } from '../../../core/utils/market-status.util';
+import { MarketStatus, istClockParts, marketStatusAt } from '../../../core/utils/market-status.util';
 import { InstrumentSessionConfig, resolveSessionConfig } from '../../../core/config/session.config';
 
 /** Higher-timeframe candles kept beside a book so the trend filter costs one fetch per bar. */
@@ -286,6 +298,13 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
    */
   private readonly clock = signal(Date.now());
 
+  /** Today's Protect lock — survives refresh so a win is not given back. */
+  protected readonly protectDay = signal(
+    loadProtectDay(this.isBrowser ? safeStorage() : null, istToday()),
+  );
+
+  protected readonly protectOn = computed(() => isProtectOn(this.settings()));
+
   protected readonly todayIst = computed(() => istToday(new Date(this.clock())));
 
   /** Today is live; any earlier date is a replayed session (backtest only). */
@@ -337,6 +356,8 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
   private readonly pendingLocal = new Map<string, ChartLiveTrade>();
   /** Fill ids currently being flattened so a cap cannot double-sell the same fill. */
   private readonly flattenInFlight = new Set<string>();
+  /** Protect only sends one ATM at a time, even if two books alert on the same tick. */
+  private protectBusy = false;
   /** Fill ids whose SL/TP are being moved to a newly edited cap. */
   private readonly protectSyncInFlight = new Set<string>();
   /** Last cap fingerprint successfully applied to an open fill, so Kite lag does not rest a second SL. */
@@ -355,6 +376,7 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
     void this.refreshLiveTrades();
     this.timer = setInterval(() => {
       this.clock.set(Date.now());
+      this.rollProtectDay();
       if (!this.autoRefresh()) return;
       // Nothing to show a hidden tab; skip the Kite call entirely.
       if (typeof document !== 'undefined' && document.hidden) return;
@@ -611,6 +633,7 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
   }
 
   private async afterLiveTrades(trades: ChartLiveTrade[]): Promise<void> {
+    this.syncProtectFromTrades(trades);
     const flattened = await this.enforcePnlCaps(trades);
     if (flattened) {
       void this.refreshLiveTrades(true);
@@ -993,6 +1016,7 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
   }
 
   protected toggleAutoTrade(id: ChartBookId): void {
+    if (this.protectOn()) return;
     const current = this.settings();
     this.commit({
       ...current,
@@ -1000,13 +1024,76 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
     });
   }
 
+  protected toggleProtect(): void {
+    const on = !this.protectOn();
+    this.commit({ ...this.settings(), protectCapital: on });
+    if (on) this.lotsOverride.set({});
+    this.rollProtectDay();
+    this.syncProtectFromTrades(this.liveTrades());
+  }
+
+  protected protectStatus(): string {
+    const now = new Date(this.clock());
+    const trends: Partial<Record<ChartBookId, 'bullish' | 'bearish' | 'sideways' | null>> = {};
+    for (const pane of this.panes()) {
+      trends[pane.def.id] = pane.smc?.snapshot.htfTrend ?? pane.smc?.snapshot.trend ?? null;
+    }
+    return protectStatusLine({
+      on: this.protectOn(),
+      liveDay: this.liveDay(),
+      istTime: istClockParts(now).time,
+      day: this.protectDay(),
+      openBooks: openProtectBooks(this.liveTrades()),
+      trends,
+    });
+  }
+
   protected autoOn(id: ChartBookId): boolean {
+    if (this.protectOn()) {
+      return protectBookArmed(id, this.protectDay(), istClockParts(new Date(this.clock())).time);
+    }
     return isAutoTradeOn(this.settings(), id);
+  }
+
+  protected autoLocked(): boolean {
+    return this.protectOn();
+  }
+
+  protected autoLabel(id: ChartBookId): string {
+    if (!this.protectOn()) return this.autoOn(id) ? 'Auto on' : 'Auto';
+    if (this.protectDay().done[id]) return 'Done';
+    if (this.protectDay().placed[id]) return 'In fill';
+    return this.autoOn(id) ? 'Protect' : 'Wait';
   }
 
   private async fireAuto(id: ChartBookId, type: SmcAlertType): Promise<void> {
     const pane = this.paneById(id);
     if (!pane) return;
+    const side = optionSideForAlert(type);
+    if (!side) return;
+    if (this.protectOn()) {
+      if (this.protectBusy) return;
+      const now = new Date(this.clock());
+      const decision = decideProtectAuto({
+        book: id,
+        type,
+        liveDay: this.liveDay(),
+        marketOpen: this.statusOf(pane).open,
+        busy: !!pane.ordering || this.flatteningBook(id),
+        htfTrend: pane.smc?.snapshot.htfTrend ?? pane.smc?.snapshot.trend ?? null,
+        istTime: istClockParts(now).time,
+        day: this.protectDay(),
+        openBooks: openProtectBooks(this.liveTrades()),
+      });
+      if (!decision.allow) return;
+      this.protectBusy = true;
+      try {
+        await this.buyAtm(id, side, { silent: true });
+      } finally {
+        this.protectBusy = false;
+      }
+      return;
+    }
     if (
       !shouldAutoTrade({
         autoTrade: isAutoTradeOn(this.settings(), id),
@@ -1018,8 +1105,6 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
     ) {
       return;
     }
-    const side = optionSideForAlert(type);
-    if (!side) return;
     await this.buyAtm(id, side, { silent: true });
   }
 
@@ -1130,6 +1215,7 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
         tp: levels?.target ?? null,
       });
       void this.refreshLiveTrades(true);
+      if (this.protectOn()) this.noteProtectPlaced(id);
       return true;
     } finally {
       this.patch(id, { ordering: null });
@@ -1176,6 +1262,7 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
   }
 
   protected lotsFor(id: ChartBookId): number {
+    if (this.protectOn()) return this.autoLotsFor(id);
     const override = this.lotsOverride()[id];
     if (override != null) return clampChartLots(id, override);
     return this.autoLotsFor(id);
@@ -1186,6 +1273,7 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
   }
 
   protected bumpLots(id: ChartBookId, step: number): void {
+    if (this.protectOn()) return;
     const next = clampChartLots(id, this.lotsFor(id) + step);
     this.lotsOverride.update((current) => ({ ...current, [id]: next }));
   }
@@ -1240,6 +1328,34 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
   }
 
   protected trackFeed = (_: number, item: SmcFeedItem) => `${item.book}|${item.id}`;
+
+  private rollProtectDay(): void {
+    const today = istToday(new Date(this.clock()));
+    if (this.protectDay().date === today) return;
+    this.persistProtectDay(loadProtectDay(this.isBrowser ? safeStorage() : null, today));
+  }
+
+  private noteProtectPlaced(book: ChartBookId): void {
+    this.persistProtectDay(markProtectPlaced(this.protectDay(), book));
+  }
+
+  private syncProtectFromTrades(trades: ChartLiveTrade[]): void {
+    if (!this.protectOn()) return;
+    const next = applyProtectCloses(this.protectDay(), trades);
+    if (
+      next.done.nifty === this.protectDay().done.nifty &&
+      next.done.bank === this.protectDay().done.bank &&
+      next.done.crude === this.protectDay().done.crude
+    ) {
+      return;
+    }
+    this.persistProtectDay(next);
+  }
+
+  private persistProtectDay(day: ReturnType<typeof loadProtectDay>): void {
+    this.protectDay.set(day);
+    saveProtectDay(this.isBrowser ? safeStorage() : null, day);
+  }
 }
 
 function delay(ms: number): Promise<void> {

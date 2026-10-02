@@ -78,6 +78,9 @@ import { Component, Input } from '@angular/core';
         @case ('activity') {
           <path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2" />
         }
+        @case ('shield') {
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10" />
+        }
         @case ('candles') {
           <rect x="4" y="8" width="4" height="9" rx="1" />
           <line x1="6" x2="6" y1="4" y2="8" />

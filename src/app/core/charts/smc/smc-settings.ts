@@ -33,6 +33,11 @@ export interface SmcSettings {
   browserNotifications: boolean;
   /** Place ATM CE/PE when a confirmed BUY/SELL prints. One switch per book. */
   autoTrade: SmcAutoTrade;
+  /**
+   * One desk toggle: lots from funds, one book, first fill then stand down.
+   * Off = the per-chart Auto switches are the reader's.
+   */
+  protectCapital: boolean;
   /** Per-book rupee max profit / max loss for each fill. Null = system stop/target. */
   pnlCaps: ChartPnlCaps;
 }
@@ -65,6 +70,7 @@ export function defaultSmcSettings(): SmcSettings {
     >,
     browserNotifications: false,
     autoTrade: defaultAutoTrade(),
+    protectCapital: false,
     pnlCaps: defaultPnlCaps(),
   };
 }
@@ -89,6 +95,10 @@ export function parseAutoTrade(value: unknown): SmcAutoTrade {
 
 export function isAutoTradeOn(settings: Pick<SmcSettings, 'autoTrade'>, book: ChartBookId): boolean {
   return settings.autoTrade[book] === true;
+}
+
+export function isProtectOn(settings: Pick<SmcSettings, 'protectCapital'>): boolean {
+  return settings.protectCapital === true;
 }
 
 /**
@@ -117,6 +127,7 @@ export function loadSmcSettings(storage: Pick<Storage, 'getItem'> | null): SmcSe
       alerts: { ...base.alerts, ...(parsed.alerts ?? {}) },
       browserNotifications: parsed.browserNotifications === true,
       autoTrade: parseAutoTrade(parsed.autoTrade),
+      protectCapital: parsed.protectCapital === true,
       pnlCaps: parsePnlCaps(parsed.pnlCaps),
     };
   } catch {
