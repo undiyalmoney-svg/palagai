@@ -5,7 +5,7 @@
   min-width: 0;
   padding: 0.35rem 0.4rem 0.2rem;
   border-radius: var(--pg-radius-sm);
-  background: #131722;
+  background: #ffffff;
 }
 
 .tv-topbar {
@@ -26,7 +26,7 @@
   font-family: var(--pg-font-mono);
   font-size: 0.72rem;
   font-weight: 500;
-  color: #d1d4dc;
+  color: #2a2e39;
 }
 
 .tv-tools {
@@ -44,10 +44,10 @@
   min-width: 2rem;
   height: 2rem;
   padding: 0 0.35rem;
-  border: 1px solid #2a2e39;
+  border: 1px solid #d8dce6;
   border-radius: var(--pg-radius-sm);
-  background: #1e222d;
-  color: #d1d4dc;
+  background: #f7f8fa;
+  color: #2a2e39;
   font-family: var(--pg-font);
   font-size: 0.95rem;
   font-weight: 600;
@@ -56,7 +56,7 @@
 }
 
 .tv-tool:hover:not(:disabled) {
-  background: #2a2e39;
+  background: #eceff4;
 }
 
 .tv-tool:disabled {
@@ -73,7 +73,7 @@
   width: 1px;
   height: 1.3rem;
   margin: 0 0.15rem;
-  background: #2a2e39;
+  background: #d8dce6;
 }
 
 .tv-tool-reset {
@@ -87,7 +87,7 @@
   font-family: var(--pg-font-mono);
   font-size: 0.7rem;
   font-weight: 600;
-  color: #d1d4dc;
+  color: #2a2e39;
   text-align: center;
   white-space: nowrap;
 }
@@ -133,13 +133,13 @@
 }
 
 .tv-legend-signal.buy {
-  background: rgba(38, 166, 154, 0.18);
-  color: #4db6ac;
+  background: rgba(38, 166, 154, 0.16);
+  color: #00897b;
 }
 
 .tv-legend-signal.sell {
-  background: rgba(239, 83, 80, 0.18);
-  color: #ef9a9a;
+  background: rgba(239, 83, 80, 0.14);
+  color: #d32f2f;
 }
 
 /* Trend readout pinned to the plot so it is never off screen. */
@@ -161,25 +161,25 @@
   font-size: 0.68rem;
   font-weight: 750;
   letter-spacing: 0.03em;
-  background: rgba(255, 255, 255, 0.08);
-  color: #d1d4dc;
+  background: rgba(42, 46, 57, 0.06);
+  color: #2a2e39;
 }
 
 .tv-trend[data-trend='bullish'] {
-  background: rgba(38, 166, 154, 0.2);
-  color: #80cbc4;
+  background: rgba(38, 166, 154, 0.16);
+  color: #00897b;
 }
 
 .tv-trend[data-trend='bearish'] {
-  background: rgba(239, 83, 80, 0.2);
-  color: #ef9a9a;
+  background: rgba(239, 83, 80, 0.14);
+  color: #d32f2f;
 }
 
 .tv-trend-sub {
   font-size: 0.64rem;
   font-weight: 600;
-  color: #b2b5be;
-  background: rgba(19, 23, 34, 0.72);
+  color: #6b7280;
+  background: rgba(255, 255, 255, 0.86);
   padding: 0.05rem 0.3rem;
   border-radius: 4px;
 }
@@ -190,9 +190,9 @@
   min-width: 0;
   /* The canvas measures this, so height lives here and can be responsive. */
   height: 360px;
-  border: 1px solid #2a2e39;
+  border: 1px solid #d8dce6;
   border-radius: var(--pg-radius-sm);
-  background: #131722;
+  background: #ffffff;
   overflow: hidden;
 }
 
@@ -240,7 +240,7 @@
   z-index: 800;
   gap: 0.5rem;
   padding: 0.5rem;
-  background: #131722;
+  background: #ffffff;
   /* Clear of the iOS home indicator and any notch. */
   padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
   padding-top: max(0.5rem, env(safe-area-inset-top));
@@ -298,9 +298,9 @@
 }
 
 .tv-order-btn.auto {
-  background: #1e222d;
-  color: #fda4af;
-  border: 1px solid #4c0519;
+  background: #fff1f2;
+  color: #be123c;
+  border: 1px solid #fecdd3;
   min-width: 6.2rem;
 }
 
@@ -342,10 +342,10 @@
   width: 2rem;
   height: 2rem;
   padding: 0;
-  border: 1px solid #2a2e39;
+  border: 1px solid #d8dce6;
   border-radius: var(--pg-radius-sm);
-  background: #1e222d;
-  color: #d1d4dc;
+  background: #f7f8fa;
+  color: #2a2e39;
   font-family: var(--pg-font);
   font-size: 1.1rem;
   font-weight: 700;
@@ -354,7 +354,7 @@
 }
 
 .tv-lots-btn:hover:not(:disabled) {
-  background: #2a2e39;
+  background: #eceff4;
 }
 
 .tv-lots-btn:disabled {
@@ -363,9 +363,9 @@
 }
 
 .tv-order-result {
-  color: #4db6ac;
+  color: #00897b;
 }
 
 .tv-order-result.bad {
-  color: #ef9a9a;
+  color: #d32f2f;
 }

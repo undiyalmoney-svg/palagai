@@ -207,6 +207,7 @@
 
 .chart-stack {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 1.1rem;
 }
 
@@ -357,17 +358,6 @@
   font-size: 0.78rem;
   line-height: 1.5;
   color: var(--pg-muted);
-}
-
-@media (min-width: 1280px) {
-  .chart-stack {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  /* Crude leads the stack and gets the full width. */
-  .chart-stack > .chart-card:first-child {
-    grid-column: 1 / -1;
-  }
 }
 
 @media (max-width: 640px) {

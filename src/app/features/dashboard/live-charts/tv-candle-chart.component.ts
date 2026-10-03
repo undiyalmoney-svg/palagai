@@ -45,18 +45,18 @@ import {
 
 /** TradingView dark tape — the 1-minute pathway is drawn on this canvas. */
 const COLORS = {
-  bg: '#131722',
-  grid: '#1e222d',
-  axisText: '#787b86',
-  axisLine: '#2a2e39',
+  bg: '#ffffff',
+  grid: '#eceff4',
+  axisText: '#6b7280',
+  axisLine: '#d8dce6',
   bull: '#26a69a',
   bear: '#ef5350',
-  link: 'rgba(120, 123, 134, 0.75)',
-  pivot: '#787b86',
-  crosshair: '#9598a1',
+  link: 'rgba(107, 114, 128, 0.75)',
+  pivot: '#6b7280',
+  crosshair: '#6b7280',
   lastUp: '#26a69a',
   lastDown: '#ef5350',
-  legendInk: '#d1d4dc',
+  legendInk: '#2a2e39',
   slBg: 'rgba(255, 92, 138, 0.92)',
   peBg: 'rgba(245, 215, 110, 0.92)',
   tgBg: 'rgba(0, 230, 118, 0.92)',
@@ -1058,7 +1058,7 @@ export class TvCandleChartComponent implements AfterViewInit, OnChanges, OnDestr
 
     if (y != null && y >= PAD.top && y <= PAD.top + plotH) {
       const price = max - ((y - PAD.top) / plotH) * (max - min);
-      this.axisTag(ctx, y, cssW, this.fmt(price), '#2a2e39', '#d1d4dc');
+      this.axisTag(ctx, y, cssW, this.fmt(price), '#2a2e39', '#ffffff');
     }
 
     // Time pill under the hovered bar.
@@ -1067,7 +1067,7 @@ export class TvCandleChartComponent implements AfterViewInit, OnChanges, OnDestr
     const w = ctx.measureText(label).width + 10;
     ctx.fillStyle = '#2a2e39';
     ctx.fillRect(x - w / 2, PAD.top + plotH + 2, w, 15);
-    ctx.fillStyle = '#d1d4dc';
+    ctx.fillStyle = '#ffffff';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(label, x, PAD.top + plotH + 9.5);
