@@ -718,6 +718,7 @@ export interface DeskOverview {
   liveEnabled: boolean;
   hasLive: boolean;
   hasPaper: boolean;
+  funds?: DeskFunds | null;
   lastScan?: DeskScan | null;
 }
 
@@ -787,11 +788,22 @@ export interface DeskActionRow {
   canExecute: boolean;
 }
 
+export interface DeskFunds {
+  ok: boolean;
+  error?: string | null;
+  equityCash?: number | null;
+  equityNet?: number | null;
+  capitalRs?: number | null;
+  source?: string | null;
+}
+
 export interface DeskScan {
   status?: string;
   mode: PortfolioMode;
   usedPaperFallback: boolean;
   capital: number;
+  sizedFrom?: 'kite-funds' | 'entered';
+  funds?: DeskFunds | null;
   asOf: string;
   runId: number;
   answer: string;

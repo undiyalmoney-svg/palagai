@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
@@ -132,14 +132,28 @@ import { actionTone, errorMessage, inr, pctNum, shortDate, signedInr, tone } fro
         <div class="mp-card">
           <div class="mp-card-head"><div>
             <h2>This week</h2>
-            <p class="mp-sub">Scans every NSE large-cap and mid-cap, and checks the stocks you already hold at Kite. Start with ₹10,000 — qty is sized so 2–3 names can actually be bought. Press Buy or Sell only on the rows you want. New buys show a LIMIT you can rest in advance for the next 09:15 IST open.</p>
+            <p class="mp-sub">Scans every NSE large-cap and mid-cap, and checks the stocks you already hold at Kite. New-buy qty is sized from <strong>Kite equity cash</strong> (2–3 names). Press Buy or Sell only on the rows you want. New buys show a LIMIT you can rest in advance for the next 09:15 IST open.</p>
           </div></div>
           <form class="mp-row" (ngSubmit)="runScan()">
-            <div class="mp-field"><label for="live-cap">Capital (₹)</label>
-              <input id="live-cap" class="ui-input" type="number" name="lcap" min="10000" step="1000" [(ngModel)]="capital" required /></div>
-            <label class="ui-check"><input type="checkbox" name="reset" [(ngModel)]="resetBook" /> Start fresh with this capital</label>
+            @if (kiteCash() != null) {
+              <div class="mp-field"><span class="when-kicker">Kite cash</span>
+                <div class="mp-ticket">{{ inr(kiteCash()!, 0) }}</div>
+                <small>Qty is sized from this, not a typed ₹10,000.</small></div>
+            } @else {
+              <div class="mp-field"><label for="live-cap">Capital (₹)</label>
+                <input id="live-cap" class="ui-input" type="number" name="lcap" min="10000" step="1000" [(ngModel)]="capital" required /></div>
+            }
+            @if (kiteCash() == null) {
+              <label class="ui-check"><input type="checkbox" name="reset" [(ngModel)]="resetBook" /> Start fresh with this capital</label>
+            }
             <button type="submit" class="ui-btn ui-btn-primary" [disabled]="busy()">{{ busy() ? 'Scanning…' : 'Run scanner' }}</button>
           </form>
+          @if (fundsError()) {
+            <div class="mp-banner" data-tone="down" role="alert">Could not read Kite funds: {{ fundsError() }}. Qty is using the capital box until the token works.</div>
+          }
+          @if (scan()?.sizedFrom === 'kite-funds' && scan()?.capital != null) {
+            <p class="mp-sub">This scan sized new buys from Kite cash {{ inr(scan()!.capital, 0) }}.</p>
+          }
           @if (scan()?.usedPaperFallback) {
             <div class="mp-banner" data-tone="info" role="status">Kite CNC is read for qty and sell prices even if live trading is not enabled. Buy still uses the paper book until you enable live in Settings.</div>
           }
@@ -357,6 +371,20 @@ export class DeskTabComponent implements OnInit {
   protected readonly shortDate = shortDate;
   protected readonly actionTone = actionTone;
 
+  protected readonly kiteCash = computed(() => {
+    const fromScan = this.scan()?.funds;
+    const fromOverview = this.overview()?.funds;
+    const f = fromScan?.ok ? fromScan : fromOverview?.ok ? fromOverview : null;
+    const n = f?.equityCash;
+    return n != null && Number.isFinite(n) ? n : null;
+  });
+
+  protected readonly fundsError = computed(() => {
+    const f = this.scan()?.funds ?? this.overview()?.funds;
+    if (!f || f.ok) return '';
+    return f.error || '';
+  });
+
   ngOnInit(): void {
     const last = this.state.status()?.data.last;
     if (last) this.to = last;
@@ -379,7 +407,10 @@ export class DeskTabComponent implements OnInit {
     try {
       const o = await this.api.desk();
       this.overview.set(o);
-      if (this.kind() === 'live' && o.lastScan) this.scan.set(o.lastScan);
+      if (this.kind() === 'live') {
+        if (o.lastScan) this.scan.set(o.lastScan);
+        if (o.funds?.ok && o.lastScan?.sizedFrom !== 'kite-funds') await this.runScan();
+      }
     } catch (err) {
       this.error.set(errorMessage(err, 'Could not load the scan calendar'));
     }
@@ -403,7 +434,11 @@ export class DeskTabComponent implements OnInit {
     this.notice.set('');
     try {
       const mode: PortfolioMode = 'LIVE';
-      const result = await this.api.deskScan({ capital: Number(this.capital), reset: this.resetBook, mode });
+      const result = await this.api.deskScan({
+        capital: this.kiteCash() ?? Number(this.capital),
+        reset: this.resetBook,
+        mode,
+      });
       this.scan.set(result);
     } catch (err) {
       this.error.set(errorMessage(err, 'Scanner failed'));
