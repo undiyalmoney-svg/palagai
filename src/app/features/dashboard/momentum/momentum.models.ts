@@ -824,6 +824,16 @@ export interface DeskPaperReplay {
   summary?: DeskPaperSummary;
   thisWeek?: DeskThisWeek | null;
   lastWeek?: { week: string | null; picks: DeskLastWeekPick[] };
+  lookback?: {
+    period: string;
+    periodLabel?: string;
+    from: string;
+    to: string;
+    startCapital: number;
+    endCapital: number | null;
+    totalProfit: number;
+    returnPct: number | null;
+  } | null;
   nextAction?: string;
   closed: DeskClosedTrade[];
   open: DeskOpenTrade[];

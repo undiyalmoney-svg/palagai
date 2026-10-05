@@ -62,7 +62,7 @@ import { errorMessage, inr, pctNum, shortDate, signedInr, tone } from '../format
         <div class="mp-card">
           <div class="mp-card-head"><div>
             <h3>Paper results</h3>
-            <p class="mp-sub">Last week, last 12 months, last calendar year, or custom dates. Filters apply to this replay — they are not stretched.</p>
+            <p class="mp-sub">Last 12 months and last year are the Dual Momentum book. Last week is one noisy week — not the ~15% months.</p>
           </div></div>
           <form class="mp-stack" (ngSubmit)="runPaper()">
             <div class="mp-row" role="group" aria-label="Paper period">
@@ -87,6 +87,13 @@ import { errorMessage, inr, pctNum, shortDate, signedInr, tone } from '../format
         @if (paper(); as p) {
           @if (p.priceNote) {
             <div class="mp-banner" [attr.data-tone]="p.simulated ? 'warn' : 'info'" role="status">{{ p.priceNote }}</div>
+          }
+          @if (p.lookback; as lb) {
+            <div class="mp-banner" data-tone="info" role="status">
+              Last week is noise. Same book over {{ lb.periodLabel || 'last 12 months' }}:
+              start {{ inr(lb.startCapital) }} → {{ inr(lb.endCapital) }}
+              ({{ signedInr(lb.totalProfit) }}, {{ pctNum(lb.returnPct, 1, true) }}).
+            </div>
           }
           <div class="mp-stats">
             <div class="mp-stat"><span class="mp-stat-label">Start capital</span>
@@ -351,9 +358,9 @@ export class DeskTabComponent implements OnInit {
   protected from = '';
   protected to = '';
   protected readonly periodOptions = [
-    { id: 'last_week' as const, label: 'Last week' },
     { id: 'last_12m' as const, label: 'Last 12 months' },
     { id: 'last_year' as const, label: 'Last year' },
+    { id: 'last_week' as const, label: 'Last week' },
     { id: 'custom' as const, label: 'Custom dates' },
   ];
 
