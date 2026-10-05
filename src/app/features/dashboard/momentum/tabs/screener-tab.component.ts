@@ -208,7 +208,7 @@ export class ScreenerTabComponent implements OnInit {
   protected readonly tone = tone;
   protected readonly regimeTone = regimeTone;
   protected readonly regimeLabel = regimeLabel;
-  protected readonly priceFmt = (v: number) => v.toFixed(0);
+  protected readonly priceFmt = (v: number) => v.toFixed(2);
 
   protected readonly rows = computed<RankRow[]>(() => {
     const d = this.data();

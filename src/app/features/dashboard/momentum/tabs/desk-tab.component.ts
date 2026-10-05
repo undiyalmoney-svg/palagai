@@ -9,6 +9,7 @@ import { MomentumStateService } from '../momentum-state.service';
 import {
   DeskActionRow,
   DeskGuideStep,
+  DeskLastWeekPick,
   DeskOverview,
   DeskPaperReplay,
   DeskScan,
@@ -31,16 +32,17 @@ import { errorMessage, inr, pctNum, shortDate, signedInr, tone } from '../format
           <p class="mp-kicker">Practice</p>
           <h2>Paper — Dual Momentum, virtual money</h2>
           <p>
-            Palagai ranks NSE large-caps and mid-caps by <strong>12-month return, skipping last month</strong>
-            (classic Dual Momentum). It buys 2–5 leaders, equal-weight, and sits in cash when Nifty’s own trend is broken.
-            No Kite token. ₹25,000 is enough for paper to cover delivery costs.
+            Palagai ranks NSE large-caps, mid-caps, <strong>Gold BeES, Silver BeES and Nifty BeES</strong>
+            by momentum. The <strong>Leaders + BeES</strong> book (Settings) uses 1–6 month leaders so
+            commodity runs can show stronger months than classic 12-1. Sit in cash when Nifty’s own trend is broken.
+            Pick a date filter, capital, and see start → end capital on top.
           </p>
         </section>
 
         <div class="mp-card">
           <div class="mp-card-head"><div>
             <h3>This week’s stocks</h3>
-            <p class="mp-sub">One tap. Palagai sizes the book from this virtual cash.</p>
+            <p class="mp-sub">One tap. Palagai sizes the book from this virtual cash. Gold / Silver / Nifty BeES can be buys when they lead.</p>
           </div></div>
           <form class="mp-row" (ngSubmit)="runPaperScan()">
             <div class="mp-field"><label for="paper-cap">Virtual cash (₹)</label>
@@ -56,16 +58,37 @@ import { errorMessage, inr, pctNum, shortDate, signedInr, tone } from '../format
 
         <div class="mp-card">
           <div class="mp-card-head"><div>
-            <h3>Last 12 months</h3>
-            <p class="mp-sub">How Dual Momentum would have treated this cash. A week is noise — this is the proof.</p>
+            <h3>Paper results</h3>
+            <p class="mp-sub">Last week, last 12 months, last calendar year, or custom dates. Filters apply to this replay — they are not stretched.</p>
           </div></div>
-          <button type="button" class="ui-btn ui-btn-secondary" [disabled]="busy()" (click)="runPaperYear()">
-            {{ busy() ? 'Replaying…' : 'See last 12 months' }}
-          </button>
+          <form class="mp-stack" (ngSubmit)="runPaper()">
+            <div class="mp-row" role="group" aria-label="Paper period">
+              @for (opt of periodOptions; track opt.id) {
+                <button type="button" class="ui-btn" [class.ui-btn-primary]="period === opt.id" [class.ui-btn-secondary]="period !== opt.id" (click)="setPeriod(opt.id)">{{ opt.label }}</button>
+              }
+            </div>
+            @if (period === 'custom') {
+              <div class="mp-row">
+                <div class="mp-field"><label for="desk-from">From</label>
+                  <input id="desk-from" class="ui-input" type="date" name="from" [(ngModel)]="from" required /></div>
+                <div class="mp-field"><label for="desk-to">To</label>
+                  <input id="desk-to" class="ui-input" type="date" name="to" [(ngModel)]="to" required /></div>
+              </div>
+            }
+            <div class="mp-row">
+              <button type="submit" class="ui-btn ui-btn-primary" [disabled]="busy()">{{ busy() ? 'Replaying…' : 'Show results' }}</button>
+            </div>
+          </form>
         </div>
 
         @if (paper(); as p) {
           <div class="mp-stats">
+            <div class="mp-stat"><span class="mp-stat-label">Start capital</span>
+              <span class="mp-stat-value">{{ inr(p.startCapital ?? p.summary?.started ?? p.capital) }}</span>
+              <span class="mp-stat-hint">{{ p.periodLabel || p.from }}</span></div>
+            <div class="mp-stat"><span class="mp-stat-label">End capital</span>
+              <span class="mp-stat-value" [class]="'mp-' + tone((p.endCapital ?? p.summary?.ended ?? 0) - (p.startCapital ?? p.capital))">{{ inr(p.endCapital ?? p.summary?.ended) }}</span>
+              <span class="mp-stat-hint">{{ p.to }}</span></div>
             <div class="mp-stat"><span class="mp-stat-label">Paper P&amp;L</span>
               <span class="mp-stat-value" [class]="'mp-' + tone(p.totalProfit)">{{ signedInr(p.totalProfit) }}</span>
               <span class="mp-stat-hint">{{ p.from }} → {{ p.to }}</span></div>
@@ -73,7 +96,7 @@ import { errorMessage, inr, pctNum, shortDate, signedInr, tone } from '../format
               <span class="mp-stat-value" [class]="'mp-' + tone(p.summary?.returnPct ?? p.metrics?.totalReturnPct)">
                 {{ pctNum(p.summary?.returnPct ?? p.metrics?.totalReturnPct, 1, true) }}
               </span>
-              <span class="mp-stat-hint">started {{ inr(p.capital) }}</span></div>
+              <span class="mp-stat-hint">{{ p.strategyName || 'Dual Momentum' }}</span></div>
             <div class="mp-stat"><span class="mp-stat-label">Win rate</span>
               <span class="mp-stat-value">{{ pctNum(p.summary?.winRatePct ?? p.metrics?.winRatePct, 0) }}</span>
               <span class="mp-stat-hint">{{ p.closed.length }} closed · {{ p.open.length }} still held</span></div>
@@ -99,12 +122,55 @@ import { errorMessage, inr, pctNum, shortDate, signedInr, tone } from '../format
                     <td class="num" [class]="'mp-' + tone(t.pnl)">{{ signedInr(t.pnl) }}</td>
                   </tr>
                 } @empty {
-                  <tr><td colspan="5" class="mp-empty">No completed trades — Dual Momentum held or stayed in cash.</td></tr>
+                  <tr><td colspan="5" class="mp-empty">No completed trades in this window — Dual Momentum held or stayed in cash.</td></tr>
+                }
+              </tbody>
+            </table></div>
+          </div>
+          <div class="mp-card">
+            <div class="mp-card-head"><h3>Still holding at the end</h3></div>
+            <div class="mp-table-wrap"><table class="mp-table">
+              <thead><tr><th>Stock</th><th class="num">Qty</th><th>Entry</th><th class="num">Last ₹</th><th class="num">Open P&amp;L</th></tr></thead>
+              <tbody>
+                @for (t of p.open; track t.symbol) {
+                  <tr>
+                    <td class="mp-sym">{{ t.symbol }}</td>
+                    <td class="num">{{ t.qty }}</td>
+                    <td>{{ shortDate(t.entryDate) }}<div class="mp-small mp-muted">{{ inr(t.entryPrice, 2) }}</div></td>
+                    <td class="num">{{ inr(t.lastPrice, 2) }}</td>
+                    <td class="num" [class]="'mp-' + tone(t.pnl)">{{ signedInr(t.pnl) }}</td>
+                  </tr>
+                } @empty {
+                  <tr><td colspan="5" class="mp-empty">Flat at the end of the range.</td></tr>
                 }
               </tbody>
             </table></div>
           </div>
         }
+
+        <div class="mp-card">
+          <div class="mp-card-head"><div>
+            <h3>Last week’s picks</h3>
+            <p class="mp-sub">@if (lastWeekLabel()) { Week {{ lastWeekLabel() }}. } @else { Run this week’s scan at least once to store a week. }</p>
+          </div></div>
+          <div class="mp-table-wrap"><table class="mp-table">
+            <thead><tr><th>Date</th><th>Stock</th><th class="num">Qty</th><th class="num">Ref ₹</th><th class="num">Buy at ₹</th><th>Why</th></tr></thead>
+            <tbody>
+              @for (pk of lastWeekPicks(); track pk.symbol + pk.date) {
+                <tr>
+                  <td>{{ shortDate(pk.date) }}</td>
+                  <td class="mp-sym">{{ pk.symbol }}</td>
+                  <td class="num">{{ pk.qty }}</td>
+                  <td class="num">{{ inr(pk.priceRef, 2) }}</td>
+                  <td class="num">{{ pk.suggestedLimit != null ? inr(pk.suggestedLimit, 2) : '—' }}</td>
+                  <td class="reason">{{ pk.reason }}</td>
+                </tr>
+              } @empty {
+                <tr><td colspan="6" class="mp-empty">No saved pick from last week.</td></tr>
+              }
+            </tbody>
+          </table></div>
+        </div>
 
         <p class="mp-cta">Ready to use real cash? Open <a class="mp-link" routerLink="../live">Live</a> and Get Token. Palagai reads Kite funds and prints this week’s tickets.</p>
       } @else {
@@ -171,6 +237,30 @@ import { errorMessage, inr, pctNum, shortDate, signedInr, tone } from '../format
                 </ul>
               </div>
             }
+
+            <div class="mp-card">
+              <div class="mp-card-head"><div>
+                <h3>Last week’s picks</h3>
+                <p class="mp-sub">@if (lastWeekLabel()) { Week {{ lastWeekLabel() }}. } @else { Refresh this week at least once to store a week. }</p>
+              </div></div>
+              <div class="mp-table-wrap"><table class="mp-table">
+                <thead><tr><th>Date</th><th>Stock</th><th class="num">Qty</th><th class="num">Ref ₹</th><th class="num">Buy at ₹</th><th>Why</th></tr></thead>
+                <tbody>
+                  @for (pk of lastWeekPicks(); track pk.symbol + pk.date) {
+                    <tr>
+                      <td>{{ shortDate(pk.date) }}</td>
+                      <td class="mp-sym">{{ pk.symbol }}</td>
+                      <td class="num">{{ pk.qty }}</td>
+                      <td class="num">{{ inr(pk.priceRef, 2) }}</td>
+                      <td class="num">{{ pk.suggestedLimit != null ? inr(pk.suggestedLimit, 2) : '—' }}</td>
+                      <td class="reason">{{ pk.reason }}</td>
+                    </tr>
+                  } @empty {
+                    <tr><td colspan="6" class="mp-empty">No saved pick from last week.</td></tr>
+                  }
+                </tbody>
+              </table></div>
+            </div>
           }
         }
       }
@@ -251,6 +341,15 @@ export class DeskTabComponent implements OnInit {
   protected readonly busy = signal(false);
 
   protected capital = 25000;
+  protected period: 'last_week' | 'last_12m' | 'last_year' | 'custom' = 'last_12m';
+  protected from = '';
+  protected to = '';
+  protected readonly periodOptions = [
+    { id: 'last_week' as const, label: 'Last week' },
+    { id: 'last_12m' as const, label: 'Last 12 months' },
+    { id: 'last_year' as const, label: 'Last year' },
+    { id: 'custom' as const, label: 'Custom dates' },
+  ];
 
   protected readonly inr = inr;
   protected readonly signedInr = signedInr;
@@ -278,10 +377,27 @@ export class DeskTabComponent implements OnInit {
 
   protected readonly guide = computed<DeskGuideStep[]>(() => this.overview()?.guide ?? []);
 
+  protected readonly lastWeekPicks = computed<DeskLastWeekPick[]>(() => {
+    return this.paper()?.lastWeek?.picks || this.paperScan()?.lastWeek?.picks || this.scan()?.lastWeek?.picks || this.overview()?.lastWeek?.picks || [];
+  });
+
+  protected readonly lastWeekLabel = computed(() => {
+    return this.paper()?.lastWeek?.week || this.paperScan()?.lastWeek?.week || this.scan()?.lastWeek?.week || this.overview()?.lastWeek?.week || '';
+  });
+
   ngOnInit(): void {
     const def = this.overview()?.paperDefaults?.capital;
     if (def) this.capital = def;
     void this.loadOverview();
+  }
+
+  protected setPeriod(id: typeof this.period): void {
+    this.period = id;
+    const periods = this.overview()?.paperDefaults?.periods;
+    if (id === 'custom') {
+      if (!this.from) this.from = periods?.custom?.from || periods?.last_12m?.from || '';
+      if (!this.to) this.to = periods?.custom?.to || periods?.last_12m?.to || '';
+    }
   }
 
   private async loadOverview(): Promise<void> {
@@ -289,6 +405,13 @@ export class DeskTabComponent implements OnInit {
       const o = await this.api.desk();
       this.overview.set(o);
       if (o.paperDefaults?.capital) this.capital = o.paperDefaults.capital;
+      if (o.paperDefaults?.periods?.custom) {
+        this.from = o.paperDefaults.periods.custom.from;
+        this.to = o.paperDefaults.periods.custom.to;
+      } else if (o.paperDefaults?.from && o.paperDefaults?.to) {
+        this.from = o.paperDefaults.from;
+        this.to = o.paperDefaults.to;
+      }
       if (this.kind() === 'live') {
         if (o.lastScan) this.scan.set(o.lastScan);
         if (this.tokenReady() && o.funds?.ok) await this.runScan();
@@ -310,16 +433,30 @@ export class DeskTabComponent implements OnInit {
     }
   }
 
-  protected async runPaperYear(): Promise<void> {
+  protected async runPaper(): Promise<void> {
     this.busy.set(true);
     this.error.set('');
     try {
-      this.paper.set(await this.api.deskPaper({ capital: Number(this.capital) }));
+      const body: { capital: number; period: string; from?: string; to?: string; strategyId?: string } = {
+        capital: Number(this.capital),
+        period: this.period,
+        strategyId: 'momentum-leaders-bees',
+      };
+      if (this.period === 'custom') {
+        body.from = this.from;
+        body.to = this.to;
+      }
+      this.paper.set(await this.api.deskPaper(body));
     } catch (err) {
-      this.error.set(errorMessage(err, 'Could not replay the last 12 months'));
+      this.error.set(errorMessage(err, 'Could not replay paper results'));
     } finally {
       this.busy.set(false);
     }
+  }
+
+  protected async runPaperYear(): Promise<void> {
+    this.period = 'last_12m';
+    await this.runPaper();
   }
 
   protected async runScan(): Promise<void> {

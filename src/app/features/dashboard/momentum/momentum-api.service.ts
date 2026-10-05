@@ -107,7 +107,8 @@ export class MomentumApiService {
   }
 
   desk = () => this.get<DeskOverview>('/desk');
-  deskPaper = (body: { capital: number; from?: string; to?: string }) => this.post<DeskPaperReplay>('/desk/paper', body);
+  deskPaper = (body: { capital: number; from?: string; to?: string; period?: string; strategyId?: string }) =>
+    this.post<DeskPaperReplay>('/desk/paper', body);
   deskScan = (body: { capital: number; reset?: boolean; mode?: PortfolioMode }) => this.post<DeskScan>('/desk/scan', body);
 
   // ---- read models

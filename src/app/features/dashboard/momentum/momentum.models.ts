@@ -723,7 +723,20 @@ export interface DeskOverview {
   kind?: string;
   schedule: DeskSchedule;
   strategy: { id: string; name: string; horizon: string; description?: string | null };
-  paperDefaults?: { capital: number; from: string | null; to: string | null; auto?: boolean };
+  paperDefaults?: {
+    capital: number;
+    from: string | null;
+    to: string | null;
+    auto?: boolean;
+    period?: string;
+    label?: string;
+    periods?: {
+      last_week?: { from: string; to: string; label: string };
+      last_year?: { from: string; to: string; label: string };
+      last_12m?: { from: string; to: string; label: string };
+      custom?: { from: string; to: string; label: string };
+    };
+  };
   lastWeek: { week: string | null; picks: DeskLastWeekPick[] };
   liveEnabled: boolean;
   hasLive: boolean;
@@ -788,8 +801,12 @@ export interface DeskPaperReplay {
   kind?: 'PAPER';
   from: string;
   to: string;
+  period?: string;
+  periodLabel?: string;
   autoRange?: boolean;
   capital: number;
+  startCapital?: number | null;
+  endCapital?: number | null;
   strategy: string;
   strategyName?: string;
   fillTime: string;
@@ -800,6 +817,7 @@ export interface DeskPaperReplay {
   metrics: Metrics | null;
   summary?: DeskPaperSummary;
   thisWeek?: DeskThisWeek | null;
+  lastWeek?: { week: string | null; picks: DeskLastWeekPick[] };
   nextAction?: string;
   closed: DeskClosedTrade[];
   open: DeskOpenTrade[];
