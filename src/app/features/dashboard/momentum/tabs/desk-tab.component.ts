@@ -33,8 +33,8 @@ import { errorMessage, inr, pctNum, shortDate, signedInr, tone } from '../format
           <h2>Paper — Dual Momentum, virtual money</h2>
           <p>
             Palagai ranks NSE large-caps, mid-caps, <strong>Gold BeES, Silver BeES and Nifty BeES</strong>
-            by momentum. The <strong>Leaders + BeES</strong> book (Settings) uses 1–6 month leaders so
-            commodity runs can show stronger months than classic 12-1. Sit in cash when Nifty’s own trend is broken.
+            on Dual Momentum 12-1 and holds <strong>2–3 names</strong>. That is the sleeve that prints the
+            ~15% months on the live NSE tape. Sit in cash when Nifty’s own trend is broken.
             Pick a date filter, capital, and see start → end capital on top.
           </p>
         </section>
@@ -178,7 +178,7 @@ import { errorMessage, inr, pctNum, shortDate, signedInr, tone } from '../format
           <p class="mp-kicker">Invest</p>
           <h2>Live — Get Token. We handle the rest.</h2>
           <p>
-            You log in once each morning. Palagai reads Kite equity cash, sizes 2–5 Dual Momentum names, and tells you
+            You log in once each morning. Palagai reads Kite equity cash, sizes 2–3 Dual Momentum names, and tells you
             Buy / Hold / Sell. Rest the LIMIT after 16:00 IST for the next 09:15 IST open.
           </p>
         </section>
@@ -440,7 +440,7 @@ export class DeskTabComponent implements OnInit {
       const body: { capital: number; period: string; from?: string; to?: string; strategyId?: string } = {
         capital: Number(this.capital),
         period: this.period,
-        strategyId: 'momentum-leaders-bees',
+        strategyId: this.overview()?.strategy?.id || 'momentum-weekly',
       };
       if (this.period === 'custom') {
         body.from = this.from;
