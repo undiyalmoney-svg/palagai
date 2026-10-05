@@ -26,12 +26,12 @@ describe('MomentumApiService', () => {
     http.verify();
   });
 
-  it('sends paper dates and capital to the desk replay', async () => {
+  it('sends paper capital to the desk replay and lets the server pick 12 months', async () => {
     const { api, http } = setup();
-    const pending = api.deskPaper({ capital: 200000, from: '2024-01-01', to: '2024-12-31' });
+    const pending = api.deskPaper({ capital: 200000 });
     const req = http.expectOne('/api/momentum/desk/paper');
     expect(req.request.method).toBe('POST');
-    expect(req.request.body).toEqual({ capital: 200000, from: '2024-01-01', to: '2024-12-31' });
+    expect(req.request.body).toEqual({ capital: 200000 });
     req.flush({ status: 'ok', closed: [], open: [], totalProfit: 0 });
     await pending;
     http.verify();

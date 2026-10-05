@@ -45,7 +45,7 @@ export function visibleMomentumTabs(_liveAvailable: boolean): Tab[] {
         @if (state.status(); as s) {
           <span class="meta mp-small mp-muted">
             <span class="dot" [class.open]="s.market.open"></span>
-            {{ s.market.open ? 'Market open' : s.market.reason }} · data to {{ s.data.last }}
+            {{ s.market.open ? 'Market open' : s.market.reason }}
           </span>
         }
       </nav>

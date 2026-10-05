@@ -710,15 +710,27 @@ export interface DeskAlsoHeld {
   note: string;
 }
 
+export interface DeskGuideStep {
+  step: number;
+  title: string;
+  body: string;
+  href?: string;
+  done?: boolean;
+}
+
 export interface DeskOverview {
   status?: string;
+  kind?: string;
   schedule: DeskSchedule;
-  strategy: { id: string; name: string; horizon: string };
+  strategy: { id: string; name: string; horizon: string; description?: string | null };
+  paperDefaults?: { capital: number; from: string | null; to: string | null; auto?: boolean };
   lastWeek: { week: string | null; picks: DeskLastWeekPick[] };
   liveEnabled: boolean;
   hasLive: boolean;
   hasPaper: boolean;
+  tokenReady?: boolean;
   funds?: DeskFunds | null;
+  guide?: DeskGuideStep[];
   lastScan?: DeskScan | null;
 }
 
@@ -750,18 +762,45 @@ export interface DeskOpenTrade {
   status: string;
 }
 
+export interface DeskPaperSummary {
+  headline: string;
+  bullets: string[];
+  honestNote: string;
+  started: number;
+  ended: number | null;
+  returnPct: number | null;
+  winRatePct: number | null;
+  maxDrawdownPct: number | null;
+}
+
+export interface DeskThisWeek {
+  asOf: string;
+  headline: string;
+  answer: string;
+  regime: string | null;
+  buy: DeskActionRow[];
+  hold: DeskActionRow[];
+  sell: DeskActionRow[];
+}
+
 export interface DeskPaperReplay {
   status?: string;
+  kind?: 'PAPER';
   from: string;
   to: string;
+  autoRange?: boolean;
   capital: number;
   strategy: string;
+  strategyName?: string;
   fillTime: string;
   scanTime: string;
   totalProfit: number;
   closedProfit: number;
   openProfit: number;
   metrics: Metrics | null;
+  summary?: DeskPaperSummary;
+  thisWeek?: DeskThisWeek | null;
+  nextAction?: string;
   closed: DeskClosedTrade[];
   open: DeskOpenTrade[];
 }
@@ -797,6 +836,17 @@ export interface DeskFunds {
   source?: string | null;
 }
 
+export interface DeskProduct {
+  kind: PortfolioMode;
+  strategy: string;
+  tokenReady: boolean;
+  fundsReady: boolean;
+  cash: number;
+  sizedFrom?: 'kite-funds' | 'entered';
+  nextAction: string;
+  guide: DeskGuideStep[];
+}
+
 export interface DeskScan {
   status?: string;
   mode: PortfolioMode;
@@ -812,6 +862,8 @@ export interface DeskScan {
   lastWeek: { week: string | null; picks: DeskLastWeekPick[] };
   holdingsSync?: DeskHoldingsSync | null;
   alsoHeld?: DeskAlsoHeld[];
+  product?: DeskProduct;
+  nextAction?: string;
   buy: DeskActionRow[];
   hold: DeskActionRow[];
   sell: DeskActionRow[];

@@ -39,6 +39,14 @@ const RISK_FIELDS: RiskField[] = [
       @if (error()) { <div class="mp-banner" data-tone="down" role="alert">{{ error() }}</div> }
       @if (notice()) { <div class="mp-banner" data-tone="up" role="status">{{ notice() }}</div> }
 
+      <div class="mp-card">
+        <div class="mp-card-head"><div>
+          <h2>You only need Get Token</h2>
+          <p class="mp-sub">Live reads Kite cash and prints this week’s Dual Momentum tickets. Paper needs no token. Everything below is optional.</p>
+        </div></div>
+        <a class="ui-btn ui-btn-primary" routerLink="/dashboard/get-token">Get Token</a>
+      </div>
+
       @if (cfg(); as c) {
         <div class="mp-grid">
           <div class="mp-card mp-col-6">
