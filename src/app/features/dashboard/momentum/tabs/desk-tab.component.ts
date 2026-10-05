@@ -207,9 +207,9 @@ import { actionTone, errorMessage, inr, pctNum, shortDate, signedInr, tone } fro
           </div>
 
           <div class="mp-card">
-            <div class="mp-card-head"><div><h3>Hold</h3><p class="mp-sub">Already in your book. Keep these. Do not sell.</p></div></div>
+            <div class="mp-card-head"><div><h3>Hold</h3><p class="mp-sub">Already in your book, including Nifty BeES / Gold BeES / Silver BeES. Qty and a Sell-at LIMIT are on every row. Keep these unless you want the cash.</p></div></div>
             <div class="mp-table-wrap"><table class="mp-table">
-              <thead><tr><th>Stock</th><th class="num">Qty</th><th class="num">Entry ₹</th><th class="num">Last ₹</th><th>Why</th></tr></thead>
+              <thead><tr><th>Stock</th><th class="num">Qty</th><th class="num">Entry ₹</th><th class="num">Last ₹</th><th class="num">Sell at ₹</th><th>Why</th></tr></thead>
               <tbody>
                 @for (r of s.hold; track r.symbol) {
                   <tr>
@@ -217,9 +217,11 @@ import { actionTone, errorMessage, inr, pctNum, shortDate, signedInr, tone } fro
                     <td class="num">{{ r.qty }}</td>
                     <td class="num">{{ r.avgPrice != null ? inr(r.avgPrice, 2) : '—' }}</td>
                     <td class="num">{{ inr(r.lastPrice ?? r.priceRef, 2) }}</td>
+                    <td class="num"><strong>{{ r.suggestedSell != null ? inr(r.suggestedSell, 2) : (r.suggestedLimit != null ? inr(r.suggestedLimit, 2) : '—') }}</strong>
+                      @if (r.fillHint) { <div class="mp-small mp-muted">{{ r.fillHint }}</div> }</td>
                     <td class="reason">{{ r.reason }}</td>
                   </tr>
-                } @empty { <tr><td colspan="5" class="mp-empty">No holdings to hold. If you already own stocks at Kite, update the token, enable live, and run the scanner again.</td></tr> }
+                } @empty { <tr><td colspan="6" class="mp-empty">No holdings to hold. If you already own stocks or BeES at Kite, update the token, enable live, and run the scanner again.</td></tr> }
               </tbody>
             </table></div>
           </div>
@@ -239,7 +241,7 @@ import { actionTone, errorMessage, inr, pctNum, shortDate, signedInr, tone } fro
                     <td class="mp-sym">{{ r.symbol }}</td>
                     <td><span class="mp-badge" [attr.data-tone]="actionTone(r.action)">{{ r.action }}</span></td>
                     <td class="num">{{ r.qty }}</td>
-                    <td class="num"><strong>{{ r.suggestedLimit != null ? inr(r.suggestedLimit, 2) : inr(r.priceRef, 2) }}</strong>
+                    <td class="num"><strong>{{ r.suggestedSell != null ? inr(r.suggestedSell, 2) : (r.suggestedLimit != null ? inr(r.suggestedLimit, 2) : inr(r.priceRef, 2)) }}</strong>
                       @if (r.fillHint) { <div class="mp-small mp-muted">{{ r.fillHint }}</div> }</td>
                     <td class="reason">{{ r.reason }}</td>
                     <td class="num">
@@ -257,10 +259,10 @@ import { actionTone, errorMessage, inr, pctNum, shortDate, signedInr, tone } fro
             <div class="mp-card">
               <div class="mp-card-head"><div>
                 <h3>Also in your CNC book</h3>
-                <p class="mp-sub">Held at Kite but not in the large/mid weekly scanner. The system will not auto-replace these — keep or sell yourself.</p>
+                <p class="mp-sub">Held at Kite but not in the large/mid weekly scanner. Qty and a Sell-at LIMIT are listed. The system will not auto-replace these.</p>
               </div></div>
               <div class="mp-table-wrap"><table class="mp-table">
-                <thead><tr><th>Stock</th><th class="num">Qty</th><th class="num">Avg ₹</th><th class="num">Last ₹</th><th>Why skipped</th></tr></thead>
+                <thead><tr><th>Stock</th><th class="num">Qty</th><th class="num">Avg ₹</th><th class="num">Last ₹</th><th class="num">Sell at ₹</th><th>Why skipped</th></tr></thead>
                 <tbody>
                   @for (h of s.alsoHeld; track h.symbol) {
                     <tr>
@@ -268,6 +270,8 @@ import { actionTone, errorMessage, inr, pctNum, shortDate, signedInr, tone } fro
                       <td class="num">{{ h.qty ?? '—' }}</td>
                       <td class="num">{{ h.avgPrice != null ? inr(h.avgPrice, 2) : '—' }}</td>
                       <td class="num">{{ h.lastPrice != null ? inr(h.lastPrice, 2) : '—' }}</td>
+                      <td class="num"><strong>{{ h.suggestedSell != null ? inr(h.suggestedSell, 2) : '—' }}</strong>
+                        @if (h.fillHint) { <div class="mp-small mp-muted">{{ h.fillHint }}</div> }</td>
                       <td class="reason">{{ h.reason }}</td>
                     </tr>
                   }

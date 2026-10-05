@@ -697,9 +697,13 @@ export interface DeskHoldingsSync {
 
 export interface DeskAlsoHeld {
   symbol: string;
+  name?: string;
   qty: number | null;
   avgPrice: number | null;
   lastPrice: number | null;
+  suggestedSell?: number | null;
+  suggestedLimit?: number | null;
+  fillHint?: string | null;
   reason: string;
   suggestion: string;
   note: string;
@@ -770,6 +774,8 @@ export interface DeskActionRow {
   avgPrice?: number | null;
   stopPrice?: number | null;
   suggestedLimit?: number | null;
+  suggestedBuy?: number | null;
+  suggestedSell?: number | null;
   fillHint?: string | null;
   whyThisPrice?: string | null;
   allocationValue: number;
