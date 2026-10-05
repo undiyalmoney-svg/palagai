@@ -679,9 +679,30 @@ export interface DeskLastWeekPick {
   name: string;
   qty: number;
   priceRef: number;
+  suggestedLimit?: number | null;
   date: string;
   action: string;
   reason: string;
+}
+
+export interface DeskHoldingsSync {
+  ok: boolean;
+  error?: string | null;
+  imported?: string[];
+  updated?: string[];
+  removed?: string[];
+  skipped?: Array<{ symbol: string; reason: string; qty?: number | null }>;
+  cash?: number;
+}
+
+export interface DeskAlsoHeld {
+  symbol: string;
+  qty: number | null;
+  avgPrice: number | null;
+  lastPrice: number | null;
+  reason: string;
+  suggestion: string;
+  note: string;
 }
 
 export interface DeskOverview {
@@ -745,6 +766,12 @@ export interface DeskActionRow {
   action: Action;
   qty: number;
   priceRef: number;
+  lastPrice?: number | null;
+  avgPrice?: number | null;
+  stopPrice?: number | null;
+  suggestedLimit?: number | null;
+  fillHint?: string | null;
+  whyThisPrice?: string | null;
   allocationValue: number;
   reason: string;
   score: number | null;
@@ -763,6 +790,8 @@ export interface DeskScan {
   headline: string;
   schedule: DeskSchedule;
   lastWeek: { week: string | null; picks: DeskLastWeekPick[] };
+  holdingsSync?: DeskHoldingsSync | null;
+  alsoHeld?: DeskAlsoHeld[];
   buy: DeskActionRow[];
   hold: DeskActionRow[];
   sell: DeskActionRow[];

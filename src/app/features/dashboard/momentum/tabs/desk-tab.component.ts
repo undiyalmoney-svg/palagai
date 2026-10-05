@@ -132,7 +132,7 @@ import { actionTone, errorMessage, inr, pctNum, shortDate, signedInr, tone } fro
         <div class="mp-card">
           <div class="mp-card-head"><div>
             <h2>This week</h2>
-            <p class="mp-sub">Scans every NSE large-cap and mid-cap. Start with ₹10,000 — qty is sized so 2–3 names can actually be bought. Press Buy or Sell only on the rows you want.</p>
+            <p class="mp-sub">Scans every NSE large-cap and mid-cap, and checks the stocks you already hold at Kite. Start with ₹10,000 — qty is sized so 2–3 names can actually be bought. Press Buy or Sell only on the rows you want. New buys show a LIMIT you can rest in advance for the next 09:15 IST open.</p>
           </div></div>
           <form class="mp-row" (ngSubmit)="runScan()">
             <div class="mp-field"><label for="live-cap">Capital (₹)</label>
@@ -141,7 +141,14 @@ import { actionTone, errorMessage, inr, pctNum, shortDate, signedInr, tone } fro
             <button type="submit" class="ui-btn ui-btn-primary" [disabled]="busy()">{{ busy() ? 'Scanning…' : 'Run scanner' }}</button>
           </form>
           @if (scan()?.usedPaperFallback) {
-            <p class="mp-sub">No live broker book yet — this scan uses your paper book. Connect a token and enable live trading when you want real orders.</p>
+            <p class="mp-sub">No live broker book yet — this scan uses your paper book. Connect a token and enable live trading so Hold/Sell can read your CNC holdings.</p>
+          }
+          @if (scan()?.holdingsSync; as hs) {
+            @if (hs.ok) {
+              <p class="mp-sub">Kite CNC: {{ (hs.imported?.length || 0) + (hs.updated?.length || 0) }} name(s) in the live book@if (hs.skipped?.length) { · {{ hs.skipped.length }} not in this scanner }.</p>
+            } @else if (hs.error) {
+              <p class="mp-sub">Could not refresh CNC holdings: {{ hs.error }}</p>
+            }
           }
         </div>
 
@@ -149,7 +156,7 @@ import { actionTone, errorMessage, inr, pctNum, shortDate, signedInr, tone } fro
           <div class="mp-card-head"><div><h3>Last week’s picks</h3>
             <p class="mp-sub">@if (lastWeekLabel()) { Week {{ lastWeekLabel() }}. } @else { Run the scanner at least once to store a week. }</p></div></div>
           <div class="mp-table-wrap"><table class="mp-table">
-            <thead><tr><th>Date</th><th>Stock</th><th class="num">Qty</th><th class="num">Ref ₹</th><th>Why</th></tr></thead>
+            <thead><tr><th>Date</th><th>Stock</th><th class="num">Qty</th><th class="num">Ref ₹</th><th class="num">Buy at ₹</th><th>Why</th></tr></thead>
             <tbody>
               @for (p of lastWeekPicks(); track p.symbol + p.date) {
                 <tr>
@@ -157,10 +164,11 @@ import { actionTone, errorMessage, inr, pctNum, shortDate, signedInr, tone } fro
                   <td class="mp-sym">{{ p.symbol }}</td>
                   <td class="num">{{ p.qty }}</td>
                   <td class="num">{{ inr(p.priceRef, 2) }}</td>
+                  <td class="num">{{ p.suggestedLimit != null ? inr(p.suggestedLimit, 2) : '—' }}</td>
                   <td class="reason">{{ p.reason }}</td>
                 </tr>
               } @empty {
-                <tr><td colspan="5" class="mp-empty">No saved pick from last week.</td></tr>
+                <tr><td colspan="6" class="mp-empty">No saved pick from last week.</td></tr>
               }
             </tbody>
           </table></div>
@@ -170,19 +178,21 @@ import { actionTone, errorMessage, inr, pctNum, shortDate, signedInr, tone } fro
           <p class="mp-sub">As of {{ s.asOf }} close · {{ s.headline }}</p>
           <div class="mp-card">
             <div class="mp-card-head">
-              <div><h3>Buy</h3><p class="mp-sub">New names. Fill at next 09:15 IST open.</p></div>
+              <div><h3>Buy</h3><p class="mp-sub">New names. Rest the Buy-at LIMIT for the next 09:15 IST open (AMO after 16:00). Ref is last close.</p></div>
               @if (executable(s.buy).length) {
                 <button type="button" class="ui-btn ui-btn-primary mp-btn-sm" [disabled]="busy()" (click)="executeRows(s.buy)">Buy all</button>
               }
             </div>
             <div class="mp-table-wrap"><table class="mp-table">
-              <thead><tr><th>Stock</th><th class="num">Qty</th><th class="num">Ref ₹</th><th class="num">Value</th><th>Why</th><th></th></tr></thead>
+              <thead><tr><th>Stock</th><th class="num">Qty</th><th class="num">Ref ₹</th><th class="num">Buy at ₹</th><th class="num">Value</th><th>Why</th><th></th></tr></thead>
               <tbody>
                 @for (r of s.buy; track r.symbol) {
                   <tr>
                     <td class="mp-sym">{{ r.symbol }}</td>
                     <td class="num">{{ r.qty }}</td>
                     <td class="num">{{ inr(r.priceRef, 2) }}</td>
+                    <td class="num"><strong>{{ r.suggestedLimit != null ? inr(r.suggestedLimit, 2) : '—' }}</strong>
+                      @if (r.fillHint) { <div class="mp-small mp-muted">{{ r.fillHint }}</div> }</td>
                     <td class="num">{{ inr(r.allocationValue) }}</td>
                     <td class="reason">{{ r.reason }}</td>
                     <td class="num">
@@ -191,44 +201,46 @@ import { actionTone, errorMessage, inr, pctNum, shortDate, signedInr, tone } fro
                       }
                     </td>
                   </tr>
-                } @empty { <tr><td colspan="6" class="mp-empty">Nothing to buy today.</td></tr> }
+                } @empty { <tr><td colspan="7" class="mp-empty">Nothing to buy today.</td></tr> }
               </tbody>
             </table></div>
           </div>
 
           <div class="mp-card">
-            <div class="mp-card-head"><div><h3>Hold</h3><p class="mp-sub">Keep these. Do not sell.</p></div></div>
+            <div class="mp-card-head"><div><h3>Hold</h3><p class="mp-sub">Already in your book. Keep these. Do not sell.</p></div></div>
             <div class="mp-table-wrap"><table class="mp-table">
-              <thead><tr><th>Stock</th><th class="num">Qty</th><th class="num">Ref ₹</th><th>Why</th></tr></thead>
+              <thead><tr><th>Stock</th><th class="num">Qty</th><th class="num">Entry ₹</th><th class="num">Last ₹</th><th>Why</th></tr></thead>
               <tbody>
                 @for (r of s.hold; track r.symbol) {
                   <tr>
                     <td class="mp-sym">{{ r.symbol }}</td>
                     <td class="num">{{ r.qty }}</td>
-                    <td class="num">{{ inr(r.priceRef, 2) }}</td>
+                    <td class="num">{{ r.avgPrice != null ? inr(r.avgPrice, 2) : '—' }}</td>
+                    <td class="num">{{ inr(r.lastPrice ?? r.priceRef, 2) }}</td>
                     <td class="reason">{{ r.reason }}</td>
                   </tr>
-                } @empty { <tr><td colspan="4" class="mp-empty">No holdings to hold.</td></tr> }
+                } @empty { <tr><td colspan="5" class="mp-empty">No holdings to hold. If you already own stocks at Kite, update the token, enable live, and run the scanner again.</td></tr> }
               </tbody>
             </table></div>
           </div>
 
           <div class="mp-card">
             <div class="mp-card-head">
-              <div><h3>Sell</h3><p class="mp-sub">Exit or reduce. Fill at next 09:15 IST open.</p></div>
+              <div><h3>Sell</h3><p class="mp-sub">Exit or reduce names you already hold. Rest the Sell-at LIMIT for the next 09:15 IST open.</p></div>
               @if (executable(s.sell).length) {
                 <button type="button" class="ui-btn ui-btn-danger mp-btn-sm" [disabled]="busy()" (click)="executeRows(s.sell)">Sell all</button>
               }
             </div>
             <div class="mp-table-wrap"><table class="mp-table">
-              <thead><tr><th>Stock</th><th>Action</th><th class="num">Qty</th><th class="num">Ref ₹</th><th>Why</th><th></th></tr></thead>
+              <thead><tr><th>Stock</th><th>Action</th><th class="num">Qty</th><th class="num">Sell at ₹</th><th>Why</th><th></th></tr></thead>
               <tbody>
                 @for (r of s.sell; track r.symbol + r.action) {
                   <tr>
                     <td class="mp-sym">{{ r.symbol }}</td>
                     <td><span class="mp-badge" [attr.data-tone]="actionTone(r.action)">{{ r.action }}</span></td>
                     <td class="num">{{ r.qty }}</td>
-                    <td class="num">{{ inr(r.priceRef, 2) }}</td>
+                    <td class="num"><strong>{{ r.suggestedLimit != null ? inr(r.suggestedLimit, 2) : inr(r.priceRef, 2) }}</strong>
+                      @if (r.fillHint) { <div class="mp-small mp-muted">{{ r.fillHint }}</div> }</td>
                     <td class="reason">{{ r.reason }}</td>
                     <td class="num">
                       @if (r.canExecute) {
@@ -240,6 +252,29 @@ import { actionTone, errorMessage, inr, pctNum, shortDate, signedInr, tone } fro
               </tbody>
             </table></div>
           </div>
+
+          @if (s.alsoHeld?.length) {
+            <div class="mp-card">
+              <div class="mp-card-head"><div>
+                <h3>Also in your CNC book</h3>
+                <p class="mp-sub">Held at Kite but not in the large/mid weekly scanner. The system will not auto-replace these — keep or sell yourself.</p>
+              </div></div>
+              <div class="mp-table-wrap"><table class="mp-table">
+                <thead><tr><th>Stock</th><th class="num">Qty</th><th class="num">Avg ₹</th><th class="num">Last ₹</th><th>Why skipped</th></tr></thead>
+                <tbody>
+                  @for (h of s.alsoHeld; track h.symbol) {
+                    <tr>
+                      <td class="mp-sym">{{ h.symbol }}</td>
+                      <td class="num">{{ h.qty ?? '—' }}</td>
+                      <td class="num">{{ h.avgPrice != null ? inr(h.avgPrice, 2) : '—' }}</td>
+                      <td class="num">{{ h.lastPrice != null ? inr(h.lastPrice, 2) : '—' }}</td>
+                      <td class="reason">{{ h.reason }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table></div>
+            </div>
+          }
         }
       }
 
