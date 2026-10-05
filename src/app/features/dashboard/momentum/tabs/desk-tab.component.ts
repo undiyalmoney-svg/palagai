@@ -159,7 +159,7 @@ import { actionTone, errorMessage, inr, pctNum, shortDate, signedInr, tone } fro
           }
           @if (scan()?.holdingsSync; as hs) {
             @if (hs.ok) {
-              <p class="mp-sub">Kite CNC: {{ (hs.imported?.length || 0) + (hs.updated?.length || 0) }} name(s)@if (hs.preview) { (read-only) }@if (hs.skipped?.length) { · {{ hs.skipped.length }} not in this scanner }.</p>
+              <p class="mp-sub">Kite CNC: {{ (hs.imported?.length || 0) + (hs.updated?.length || 0) }} name(s)@if (hs.preview) { (read-only) }@if (hs.skipped?.length; as skippedCount) { · {{ skippedCount }} not in this scanner }.</p>
             } @else if (hs.error) {
               <div class="mp-banner" data-tone="down" role="alert">Could not refresh CNC holdings: {{ hs.error }}</div>
             }

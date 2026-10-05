@@ -11,5 +11,5 @@ export const environment = {
   allowLiveMoney: true,
   orderEgressIp: '168.144.28.89',
   appVersion: '1.3.124',
-  appBuild: '2026.10.05-live-funds-qty',
+  appBuild: '2026.10.05-vercel-desk-build',
 };
