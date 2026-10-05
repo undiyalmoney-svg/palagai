@@ -437,10 +437,14 @@ async function proxyOrderBackendJson(
     headers['X-Kite-Authorisation'] = req.headers['x-kite-authorisation'];
   }
 
+  const longMomentum =
+    pathOnly.includes('/desk/paper') ||
+    pathOnly.includes('/desk/scan') ||
+    pathOnly.includes('/backtests');
   const init: RequestInit = {
     method: req.method,
     headers,
-    signal: AbortSignal.timeout(55_000),
+    signal: AbortSignal.timeout(longMomentum ? 180_000 : 55_000),
   };
 
   if (req.method !== 'GET' && req.method !== 'HEAD' && req.method !== 'DELETE') {
@@ -470,7 +474,7 @@ async function proxyOrderBackendJson(
       status: 'error',
       message:
         /timeout|aborted/i.test(String((err as Error)?.name || '') + (err as Error)?.message)
-          ? 'Paper timed out on the way to the trading server. Try Last 60 days, or wait and retry — year-long Crude option candles used to stall this.'
+          ? 'Paper timed out on the way to the trading server. First Kite fill can take a minute — wait and retry.'
           : `Failed to reach order backend at ${ORDER_BACKEND_BASE}${upstreamPathPrefix}`,
     });
   }

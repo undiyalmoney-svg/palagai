@@ -736,6 +736,8 @@ export interface DeskOverview {
       last_12m?: { from: string; to: string; label: string };
       custom?: { from: string; to: string; label: string };
     };
+    priceSource?: string;
+    simulated?: boolean;
   };
   lastWeek: { week: string | null; picks: DeskLastWeekPick[] };
   liveEnabled: boolean;
@@ -807,6 +809,10 @@ export interface DeskPaperReplay {
   capital: number;
   startCapital?: number | null;
   endCapital?: number | null;
+  priceSource?: 'kite' | 'synthetic' | string;
+  simulated?: boolean;
+  priceError?: string | null;
+  priceNote?: string | null;
   strategy: string;
   strategyName?: string;
   fillTime: string;
@@ -882,6 +888,9 @@ export interface DeskScan {
   alsoHeld?: DeskAlsoHeld[];
   product?: DeskProduct;
   nextAction?: string;
+  priceSource?: 'kite' | 'synthetic' | string;
+  simulated?: boolean;
+  priceNote?: string | null;
   buy: DeskActionRow[];
   hold: DeskActionRow[];
   sell: DeskActionRow[];

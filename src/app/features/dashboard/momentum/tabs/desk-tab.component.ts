@@ -52,6 +52,9 @@ import { errorMessage, inr, pctNum, shortDate, signedInr, tone } from '../format
         </div>
 
         @if (paperScan(); as s) {
+          @if (s.priceNote) {
+            <div class="mp-banner" [attr.data-tone]="s.simulated ? 'warn' : 'info'" role="status">{{ s.priceNote }}</div>
+          }
           <p class="mp-next">{{ s.nextAction || s.headline }}</p>
           <ng-container [ngTemplateOutlet]="planCards" [ngTemplateOutletContext]="{ $implicit: s }" />
         }
@@ -82,6 +85,9 @@ import { errorMessage, inr, pctNum, shortDate, signedInr, tone } from '../format
         </div>
 
         @if (paper(); as p) {
+          @if (p.priceNote) {
+            <div class="mp-banner" [attr.data-tone]="p.simulated ? 'warn' : 'info'" role="status">{{ p.priceNote }}</div>
+          }
           <div class="mp-stats">
             <div class="mp-stat"><span class="mp-stat-label">Start capital</span>
               <span class="mp-stat-value">{{ inr(p.startCapital ?? p.summary?.started ?? p.capital) }}</span>
