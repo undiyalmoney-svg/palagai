@@ -688,6 +688,7 @@ export interface DeskLastWeekPick {
 export interface DeskHoldingsSync {
   ok: boolean;
   error?: string | null;
+  preview?: boolean;
   imported?: string[];
   updated?: string[];
   removed?: string[];
@@ -717,6 +718,7 @@ export interface DeskOverview {
   liveEnabled: boolean;
   hasLive: boolean;
   hasPaper: boolean;
+  lastScan?: DeskScan | null;
 }
 
 export interface DeskClosedTrade {

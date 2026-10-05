@@ -141,16 +141,42 @@ import { actionTone, errorMessage, inr, pctNum, shortDate, signedInr, tone } fro
             <button type="submit" class="ui-btn ui-btn-primary" [disabled]="busy()">{{ busy() ? 'Scanning…' : 'Run scanner' }}</button>
           </form>
           @if (scan()?.usedPaperFallback) {
-            <p class="mp-sub">No live broker book yet — this scan uses your paper book. Connect a token and enable live trading so Hold/Sell can read your CNC holdings.</p>
+            <div class="mp-banner" data-tone="info" role="status">Kite CNC is read for qty and sell prices even if live trading is not enabled. Buy still uses the paper book until you enable live in Settings.</div>
           }
           @if (scan()?.holdingsSync; as hs) {
             @if (hs.ok) {
-              <p class="mp-sub">Kite CNC: {{ (hs.imported?.length || 0) + (hs.updated?.length || 0) }} name(s) in the live book@if (hs.skipped?.length) { · {{ hs.skipped.length }} not in this scanner }.</p>
+              <p class="mp-sub">Kite CNC: {{ (hs.imported?.length || 0) + (hs.updated?.length || 0) }} name(s)@if (hs.preview) { (read-only) }@if (hs.skipped?.length) { · {{ hs.skipped.length }} not in this scanner }.</p>
             } @else if (hs.error) {
-              <p class="mp-sub">Could not refresh CNC holdings: {{ hs.error }}</p>
+              <div class="mp-banner" data-tone="down" role="alert">Could not refresh CNC holdings: {{ hs.error }}</div>
             }
           }
         </div>
+
+        @if (scan(); as s) {
+          <div class="mp-pick-strip">
+            @for (r of s.buy; track r.symbol) {
+              <div class="mp-pick" data-kind="buy">
+                <div class="when-kicker">Buy</div>
+                <strong>{{ r.symbol }}</strong>
+                <div class="mp-ticket">{{ r.qty }} sh · {{ r.suggestedLimit != null ? inr(r.suggestedLimit, 2) : inr(r.priceRef, 2) }}</div>
+              </div>
+            }
+            @for (r of s.hold; track r.symbol) {
+              <div class="mp-pick" data-kind="hold">
+                <div class="when-kicker">Hold</div>
+                <strong>{{ r.symbol }}</strong>
+                <div class="mp-ticket">{{ r.qty }} sh · sell {{ r.suggestedSell != null ? inr(r.suggestedSell, 2) : inr(r.lastPrice ?? r.priceRef, 2) }}</div>
+              </div>
+            }
+            @for (r of s.sell; track r.symbol + r.action) {
+              <div class="mp-pick" data-kind="sell">
+                <div class="when-kicker">Sell</div>
+                <strong>{{ r.symbol }}</strong>
+                <div class="mp-ticket">{{ r.qty }} sh · {{ r.suggestedSell != null ? inr(r.suggestedSell, 2) : inr(r.suggestedLimit ?? r.priceRef, 2) }}</div>
+              </div>
+            }
+          </div>
+        }
 
         <div class="mp-card">
           <div class="mp-card-head"><div><h3>Last week’s picks</h3>
@@ -161,7 +187,8 @@ import { actionTone, errorMessage, inr, pctNum, shortDate, signedInr, tone } fro
               @for (p of lastWeekPicks(); track p.symbol + p.date) {
                 <tr>
                   <td>{{ shortDate(p.date) }}</td>
-                  <td class="mp-sym">{{ p.symbol }}</td>
+                  <td class="mp-sym">{{ p.symbol }}
+                    <div class="mp-ticket">{{ p.qty }} sh · {{ p.suggestedLimit != null ? inr(p.suggestedLimit, 2) : inr(p.priceRef, 2) }}</div></td>
                   <td class="num">{{ p.qty }}</td>
                   <td class="num">{{ inr(p.priceRef, 2) }}</td>
                   <td class="num">{{ p.suggestedLimit != null ? inr(p.suggestedLimit, 2) : '—' }}</td>
@@ -188,7 +215,8 @@ import { actionTone, errorMessage, inr, pctNum, shortDate, signedInr, tone } fro
               <tbody>
                 @for (r of s.buy; track r.symbol) {
                   <tr>
-                    <td class="mp-sym">{{ r.symbol }}</td>
+                    <td class="mp-sym">{{ r.symbol }}
+                      <div class="mp-ticket">{{ r.qty }} sh · {{ r.suggestedLimit != null ? inr(r.suggestedLimit, 2) : inr(r.priceRef, 2) }}</div></td>
                     <td class="num">{{ r.qty }}</td>
                     <td class="num">{{ inr(r.priceRef, 2) }}</td>
                     <td class="num"><strong>{{ r.suggestedLimit != null ? inr(r.suggestedLimit, 2) : '—' }}</strong>
@@ -207,13 +235,14 @@ import { actionTone, errorMessage, inr, pctNum, shortDate, signedInr, tone } fro
           </div>
 
           <div class="mp-card">
-            <div class="mp-card-head"><div><h3>Hold</h3><p class="mp-sub">Already in your book, including Nifty BeES / Gold BeES / Silver BeES. Qty and a Sell-at LIMIT are on every row. Keep these unless you want the cash.</p></div></div>
+            <div class="mp-card-head"><div><h3>Hold</h3><p class="mp-sub">Already in your Kite CNC book, including Nifty BeES / Gold BeES / Silver BeES. Qty and a Sell-at LIMIT are on every row.</p></div></div>
             <div class="mp-table-wrap"><table class="mp-table">
               <thead><tr><th>Stock</th><th class="num">Qty</th><th class="num">Entry ₹</th><th class="num">Last ₹</th><th class="num">Sell at ₹</th><th>Why</th></tr></thead>
               <tbody>
                 @for (r of s.hold; track r.symbol) {
                   <tr>
-                    <td class="mp-sym">{{ r.symbol }}</td>
+                    <td class="mp-sym">{{ r.symbol }}
+                      <div class="mp-ticket">{{ r.qty }} sh · sell {{ r.suggestedSell != null ? inr(r.suggestedSell, 2) : inr(r.lastPrice ?? r.priceRef, 2) }}</div></td>
                     <td class="num">{{ r.qty }}</td>
                     <td class="num">{{ r.avgPrice != null ? inr(r.avgPrice, 2) : '—' }}</td>
                     <td class="num">{{ inr(r.lastPrice ?? r.priceRef, 2) }}</td>
@@ -221,7 +250,7 @@ import { actionTone, errorMessage, inr, pctNum, shortDate, signedInr, tone } fro
                       @if (r.fillHint) { <div class="mp-small mp-muted">{{ r.fillHint }}</div> }</td>
                     <td class="reason">{{ r.reason }}</td>
                   </tr>
-                } @empty { <tr><td colspan="6" class="mp-empty">No holdings to hold. If you already own stocks or BeES at Kite, update the token, enable live, and run the scanner again.</td></tr> }
+                } @empty { <tr><td colspan="6" class="mp-empty">No holdings to hold. If you already own stocks or BeES at Kite, update the token and open Live again — CNC qty is read even before live trading is enabled.</td></tr> }
               </tbody>
             </table></div>
           </div>
@@ -238,7 +267,8 @@ import { actionTone, errorMessage, inr, pctNum, shortDate, signedInr, tone } fro
               <tbody>
                 @for (r of s.sell; track r.symbol + r.action) {
                   <tr>
-                    <td class="mp-sym">{{ r.symbol }}</td>
+                    <td class="mp-sym">{{ r.symbol }}
+                      <div class="mp-ticket">{{ r.qty }} sh · {{ r.suggestedSell != null ? inr(r.suggestedSell, 2) : inr(r.suggestedLimit ?? r.priceRef, 2) }}</div></td>
                     <td><span class="mp-badge" [attr.data-tone]="actionTone(r.action)">{{ r.action }}</span></td>
                     <td class="num">{{ r.qty }}</td>
                     <td class="num"><strong>{{ r.suggestedSell != null ? inr(r.suggestedSell, 2) : (r.suggestedLimit != null ? inr(r.suggestedLimit, 2) : inr(r.priceRef, 2)) }}</strong>
@@ -266,7 +296,8 @@ import { actionTone, errorMessage, inr, pctNum, shortDate, signedInr, tone } fro
                 <tbody>
                   @for (h of s.alsoHeld; track h.symbol) {
                     <tr>
-                      <td class="mp-sym">{{ h.symbol }}</td>
+                      <td class="mp-sym">{{ h.symbol }}
+                        <div class="mp-ticket">{{ h.qty ?? '—' }} sh · sell {{ h.suggestedSell != null ? inr(h.suggestedSell, 2) : '—' }}</div></td>
                       <td class="num">{{ h.qty ?? '—' }}</td>
                       <td class="num">{{ h.avgPrice != null ? inr(h.avgPrice, 2) : '—' }}</td>
                       <td class="num">{{ h.lastPrice != null ? inr(h.lastPrice, 2) : '—' }}</td>
@@ -291,6 +322,12 @@ import { actionTone, errorMessage, inr, pctNum, shortDate, signedInr, tone } fro
     .when-when { font-size: 1.15rem; font-weight: 700; margin: 0.25rem 0 0.4rem; letter-spacing: -0.02em; }
     .hold-rule { margin-top: 0.85rem; font-weight: 600; }
     .more { margin-top: 0.25rem; }
+    .mp-ticket { font-weight: 750; font-variant-numeric: tabular-nums; font-size: 0.92rem; margin-top: 0.2rem; letter-spacing: -0.02em; }
+    .mp-pick-strip { display: flex; flex-wrap: wrap; gap: 0.6rem; margin: 0 0 1rem; }
+    .mp-pick { background: #fff; border: 1px solid var(--pg-line); border-radius: 10px; padding: 0.7rem 0.9rem; min-width: 11.5rem; }
+    .mp-pick[data-kind='buy'] { border-color: #16a34a; }
+    .mp-pick[data-kind='sell'] { border-color: #dc2626; }
+    .mp-pick strong { display: block; font-size: 1.05rem; }
   `,
 })
 export class DeskTabComponent implements OnInit {
@@ -340,7 +377,9 @@ export class DeskTabComponent implements OnInit {
 
   private async loadOverview(): Promise<void> {
     try {
-      this.overview.set(await this.api.desk());
+      const o = await this.api.desk();
+      this.overview.set(o);
+      if (this.kind() === 'live' && o.lastScan) this.scan.set(o.lastScan);
     } catch (err) {
       this.error.set(errorMessage(err, 'Could not load the scan calendar'));
     }
