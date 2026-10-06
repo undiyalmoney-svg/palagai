@@ -89,40 +89,48 @@ import { errorMessage, inr, pctNum, shortDate, signedInr, tone } from '../format
             <div class="mp-banner" [attr.data-tone]="p.simulated ? 'warn' : 'info'" role="status">{{ p.priceNote }}</div>
           }
           @if (p.lookback; as lb) {
-            <div class="mp-banner" data-tone="info" role="status">
-              Last week is noise. Same book over {{ lb.periodLabel || 'last 12 months' }}:
-              start {{ inr(lb.startCapital) }} → {{ inr(lb.endCapital) }}
-              ({{ signedInr(lb.totalProfit) }}, {{ pctNum(lb.returnPct, 1, true) }}).
+            <div class="mp-banner" [attr.data-tone]="tone(p.weekWindow?.totalProfit) === 'down' ? 'warn' : 'info'" role="status">
+              Last week {{ p.from }} → {{ p.to }}
+              {{ signedInr(p.weekWindow?.totalProfit) }}
+              ({{ pctNum(p.weekWindow?.returnPct, 1, true) }}) is one noisy week — not the book.
+              Cards below are the same Dual Momentum sleeve over {{ lb.periodLabel || 'last 12 months' }}.
             </div>
           }
-          <div class="mp-stats">
-            <div class="mp-stat"><span class="mp-stat-label">Start capital</span>
-              <span class="mp-stat-value">{{ inr(p.startCapital ?? p.summary?.started ?? p.capital) }}</span>
-              <span class="mp-stat-hint">{{ p.periodLabel || p.from }}</span></div>
-            <div class="mp-stat"><span class="mp-stat-label">End capital</span>
-              <span class="mp-stat-value" [class]="'mp-' + tone((p.endCapital ?? p.summary?.ended ?? 0) - (p.startCapital ?? p.capital))">{{ inr(p.endCapital ?? p.summary?.ended) }}</span>
-              <span class="mp-stat-hint">{{ p.to }}</span></div>
-            <div class="mp-stat"><span class="mp-stat-label">Paper P&amp;L</span>
-              <span class="mp-stat-value" [class]="'mp-' + tone(p.totalProfit)">{{ signedInr(p.totalProfit) }}</span>
-              <span class="mp-stat-hint">{{ p.from }} → {{ p.to }}</span></div>
-            <div class="mp-stat"><span class="mp-stat-label">Return</span>
-              <span class="mp-stat-value" [class]="'mp-' + tone(p.summary?.returnPct ?? p.metrics?.totalReturnPct)">
-                {{ pctNum(p.summary?.returnPct ?? p.metrics?.totalReturnPct, 1, true) }}
-              </span>
-              <span class="mp-stat-hint">{{ p.strategyName || 'Dual Momentum' }}</span></div>
-            <div class="mp-stat"><span class="mp-stat-label">Win rate</span>
-              <span class="mp-stat-value">{{ pctNum(p.summary?.winRatePct ?? p.metrics?.winRatePct, 0) }}</span>
-              <span class="mp-stat-hint">{{ p.closed.length }} closed · {{ p.open.length }} still held</span></div>
-          </div>
+          @if (paperHero(p); as h) {
+            <div class="mp-stats">
+              <div class="mp-stat"><span class="mp-stat-label">Start capital</span>
+                <span class="mp-stat-value">{{ inr(h.start) }}</span>
+                <span class="mp-stat-hint">{{ h.startHint }}</span></div>
+              <div class="mp-stat"><span class="mp-stat-label">End capital</span>
+                <span class="mp-stat-value" [class]="'mp-' + tone((h.end ?? 0) - (h.start ?? 0))">{{ inr(h.end) }}</span>
+                <span class="mp-stat-hint">{{ h.endHint }}</span></div>
+              <div class="mp-stat"><span class="mp-stat-label">Paper P&amp;L</span>
+                <span class="mp-stat-value" [class]="'mp-' + tone(h.profit)">{{ signedInr(h.profit) }}</span>
+                <span class="mp-stat-hint">{{ h.profitHint }}</span></div>
+              <div class="mp-stat"><span class="mp-stat-label">Return</span>
+                <span class="mp-stat-value" [class]="'mp-' + tone(h.returnPct)">
+                  {{ pctNum(h.returnPct, 1, true) }}
+                </span>
+                <span class="mp-stat-hint">{{ p.strategyName || 'Dual Momentum' }}</span></div>
+              <div class="mp-stat"><span class="mp-stat-label">Win rate</span>
+                <span class="mp-stat-value">{{ pctNum(p.summary?.winRatePct ?? p.metrics?.winRatePct, 0) }}</span>
+                <span class="mp-stat-hint">{{ h.winHint }}</span></div>
+            </div>
+          }
           @if (p.summary; as sum) {
-            <div class="mp-callout" [attr.data-tone]="tone(p.totalProfit) === 'down' ? 'warn' : 'info'">
+            <div class="mp-callout" [attr.data-tone]="tone(paperHero(p).profit) === 'down' ? 'warn' : 'info'">
               <p class="mp-answer">{{ sum.headline }}</p>
               <ul class="mp-list">@for (b of sum.bullets; track b) { <li>{{ b }}</li> }</ul>
               <p class="mp-sub">{{ sum.honestNote }}</p>
             </div>
           }
           <div class="mp-card">
-            <div class="mp-card-head"><h3>Closed trades</h3></div>
+            <div class="mp-card-head"><div>
+              <h3>Closed trades</h3>
+              @if (p.lookback) {
+                <p class="mp-sub">Completed in the last-week window. The cards above are the 12-month Dual Momentum book, not this week’s noise.</p>
+              }
+            </div></div>
             <div class="mp-table-wrap"><table class="mp-table">
               <thead><tr><th>Stock</th><th class="num">Qty</th><th>In</th><th>Out</th><th class="num">P&amp;L</th></tr></thead>
               <tbody>
@@ -233,6 +241,21 @@ import { errorMessage, inr, pctNum, shortDate, signedInr, tone } from '../format
           </div>
 
           @if (scan(); as s) {
+            @if (s.holdingsSync; as hs) {
+              @if (hs.ok) {
+                <div class="mp-banner" data-tone="info" role="status">
+                  Read Kite CNC
+                  @if (hs.universeHoldings?.length) {
+                    : {{ cncNames(hs) }}.
+                  } @else {
+                    — no Dual Momentum names held.
+                  }
+                  Sell only if you actually hold the name.
+                </div>
+              } @else if (hs.error) {
+                <div class="mp-banner" data-tone="warn" role="status">{{ hs.error }}</div>
+              }
+            }
             <p class="mp-next">{{ s.nextAction || s.headline }}</p>
             <ng-container [ngTemplateOutlet]="planCards" [ngTemplateOutletContext]="{ $implicit: s }" />
 
@@ -397,6 +420,49 @@ export class DeskTabComponent implements OnInit {
   protected readonly lastWeekLabel = computed(() => {
     return this.paper()?.lastWeek?.week || this.paperScan()?.lastWeek?.week || this.scan()?.lastWeek?.week || this.overview()?.lastWeek?.week || '';
   });
+
+  protected paperHero(p: DeskPaperReplay): {
+    start: number;
+    end: number | null;
+    profit: number;
+    returnPct: number | null;
+    startHint: string;
+    endHint: string;
+    profitHint: string;
+    winHint: string;
+  } {
+    const lb = p.lookback;
+    if (lb) {
+      return {
+        start: lb.startCapital,
+        end: lb.endCapital ?? null,
+        profit: lb.totalProfit,
+        returnPct: lb.returnPct ?? p.summary?.returnPct ?? null,
+        startHint: lb.periodLabel || lb.from,
+        endHint: lb.to,
+        profitHint: `${lb.from} → ${lb.to}`,
+        winHint: `${lb.from} → ${lb.to}`,
+      };
+    }
+    const start = p.startCapital ?? p.summary?.started ?? p.capital;
+    const end = p.endCapital ?? p.summary?.ended ?? null;
+    return {
+      start,
+      end,
+      profit: p.totalProfit,
+      returnPct: p.summary?.returnPct ?? p.metrics?.totalReturnPct ?? null,
+      startHint: p.periodLabel || p.from,
+      endHint: p.to,
+      profitHint: `${p.from} → ${p.to}`,
+      winHint: `${p.closed.length} closed · ${p.open.length} still held`,
+    };
+  }
+
+  protected cncNames(hs: { universeHoldings?: Array<{ symbol: string; qty?: number | null }> } | null | undefined): string {
+    return (hs?.universeHoldings || [])
+      .map((h) => `${h.symbol}${h.qty != null ? ` × ${h.qty}` : ''}`)
+      .join(', ');
+  }
 
   ngOnInit(): void {
     const def = this.overview()?.paperDefaults?.capital;

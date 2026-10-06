@@ -693,6 +693,7 @@ export interface DeskHoldingsSync {
   updated?: string[];
   removed?: string[];
   skipped?: Array<{ symbol: string; reason: string; qty?: number | null }>;
+  universeHoldings?: Array<{ symbol: string; qty?: number | null; avgPrice?: number | null; lastPrice?: number | null }>;
   cash?: number;
 }
 
@@ -827,6 +828,14 @@ export interface DeskPaperReplay {
   lookback?: {
     period: string;
     periodLabel?: string;
+    from: string;
+    to: string;
+    startCapital: number;
+    endCapital: number | null;
+    totalProfit: number;
+    returnPct: number | null;
+  } | null;
+  weekWindow?: {
     from: string;
     to: string;
     startCapital: number;
