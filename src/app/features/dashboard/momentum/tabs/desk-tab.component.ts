@@ -30,47 +30,47 @@ import { errorMessage, inr } from '../format.util';
         @if (s.cashNote) { <p class="why">{{ s.cashNote }}</p> }
 
         @if (s.buyTomorrow?.length) {
-          <section class="mp-card">
+          <section class="signal-group">
             <h2>Buy tomorrow</h2>
-            <ul class="suggest">
+            <div class="signals">
               @for (r of s.buyTomorrow; track r.symbol) {
-                <li>
-                  <strong>{{ r.symbol }}</strong>
-                  @if (r.analysis) { <span class="why">{{ r.analysis }}</span> }
-                  <span>{{ line(r) }}</span>
-                </li>
+                <article class="signal">
+                  <h3>{{ r.symbol }}</h3>
+                  <p class="qty">{{ line(r) }}</p>
+                  @if (r.analysis) { <p class="why">{{ r.analysis }}</p> }
+                </article>
               }
-            </ul>
+            </div>
           </section>
         }
 
         @if (s.sellToday?.length) {
-          <section class="mp-card">
+          <section class="signal-group">
             <h2>Sell today</h2>
-            <ul class="suggest">
+            <div class="signals">
               @for (r of s.sellToday; track r.symbol) {
-                <li>
-                  <strong>{{ r.symbol }}</strong>
-                  @if (r.analysis) { <span class="why">{{ r.analysis }}</span> }
-                  <span>{{ line(r) }}</span>
-                </li>
+                <article class="signal">
+                  <h3>{{ r.symbol }}</h3>
+                  <p class="qty">{{ line(r) }}</p>
+                  @if (r.analysis) { <p class="why">{{ r.analysis }}</p> }
+                </article>
               }
-            </ul>
+            </div>
           </section>
         }
 
         @if (s.sellTomorrow?.length) {
-          <section class="mp-card">
+          <section class="signal-group">
             <h2>Sell tomorrow</h2>
-            <ul class="suggest">
+            <div class="signals">
               @for (r of s.sellTomorrow; track r.symbol) {
-                <li>
-                  <strong>{{ r.symbol }}</strong>
-                  @if (r.analysis) { <span class="why">{{ r.analysis }}</span> }
-                  <span>{{ line(r) }}</span>
-                </li>
+                <article class="signal">
+                  <h3>{{ r.symbol }}</h3>
+                  <p class="qty">{{ line(r) }}</p>
+                  @if (r.analysis) { <p class="why">{{ r.analysis }}</p> }
+                </article>
               }
-            </ul>
+            </div>
           </section>
         }
       } @else if (!error() && !busy()) {
@@ -80,9 +80,20 @@ import { errorMessage, inr } from '../format.util';
   `,
   styles: `
     h2 { margin: 0 0 0.6rem; font-size: 1.15rem; letter-spacing: -0.02em; }
-    .suggest { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 0.45rem; }
-    .suggest li { display: flex; flex-direction: column; gap: 0.15rem; font-size: 1.05rem; font-variant-numeric: tabular-nums; }
-    .why { display: block; font-size: 0.92rem; font-weight: 500; opacity: 0.8; }
+    .signal-group { display: flex; flex-direction: column; gap: 0.65rem; }
+    .signals { display: flex; flex-direction: column; gap: 0.65rem; }
+    .signal {
+      background: #fff;
+      border: 2px solid #16a34a;
+      border-radius: 14px;
+      padding: 0.9rem 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+    }
+    .signal h3 { margin: 0; font-size: 1.25rem; letter-spacing: -0.02em; }
+    .qty { margin: 0; font-weight: 750; font-variant-numeric: tabular-nums; }
+    .why { margin: 0; font-size: 0.92rem; font-weight: 500; opacity: 0.8; }
     .mp-next { margin: 0; font-weight: 700; }
   `,
 })
@@ -106,8 +117,9 @@ export class DeskTabComponent implements OnInit {
 
   protected line(row: DeskActionRow): string {
     const px = this.price(row);
-    if (row.qty > 0) return `${row.qty} shares · ${px}`;
-    return px;
+    const qty = Number(row.qty) || 0;
+    const word = qty === 1 ? 'share' : 'shares';
+    return `${qty} ${word} · ${px}`;
   }
 
   private async start(): Promise<void> {

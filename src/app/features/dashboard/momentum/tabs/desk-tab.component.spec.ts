@@ -38,7 +38,9 @@ describe('DeskTabComponent suggestions', () => {
     fixture.componentInstance['scan'].set(scan);
     fixture.componentInstance['busy'].set(false);
     fixture.detectChanges();
-    const text = fixture.nativeElement.textContent as string;
+    const root = fixture.nativeElement as HTMLElement;
+    const text = root.textContent as string;
+    expect(root.querySelectorAll('article.signal').length).toBe(3);
     expect(text).toContain('Buy tomorrow');
     expect(text).toContain('NYKAA');
     expect(text).toContain('14 shares');
