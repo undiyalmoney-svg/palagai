@@ -865,6 +865,7 @@ export interface DeskActionRow {
   whyThisPrice?: string | null;
   allocationValue: number;
   reason: string;
+  analysis?: string;
   score: number | null;
   signalId: number | null;
   canExecute: boolean;
@@ -903,6 +904,7 @@ export interface DeskScan {
   runId: number;
   answer: string;
   headline: string;
+  cashNote?: string;
   schedule: DeskSchedule;
   lastWeek: { week: string | null; picks: DeskLastWeekPick[] };
   holdingsSync?: DeskHoldingsSync | null;
