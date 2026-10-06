@@ -51,7 +51,7 @@ const RISK_FIELDS: RiskField[] = [
         <div class="mp-grid">
           <div class="mp-card mp-col-6">
             <div class="mp-card-head"><div><h2>Active strategy</h2>
-              <p class="mp-sub">Used by Decision Center, paper and live trading and as the default in Backtest. Holding period is a parameter of the strategy, never an automatic exit. Default is Dual Momentum 12-1 in 2–3 names (the ~15% month sleeve). Classic 5-name and Leaders + BeES stay here if you want them.</p></div></div>
+              <p class="mp-sub">Used by Decision Center, paper and live trading and as the default in Backtest. Holding period is a parameter of the strategy, never an automatic exit. Dual Momentum 12-1 is the 2–3 name sleeve. Momentum - 3M/6M composite is the large-and-mid filter (3-month 35%, 6-month 30%) that ranked NIACL and REC.</p></div></div>
             <div class="mp-field"><label for="st-strategy">Strategy</label>
               <select id="st-strategy" class="ui-select" [ngModel]="strategyId()" (ngModelChange)="strategyId.set($event)" name="strategy">
                 @for (s of c.strategies; track s.id) { <option [value]="s.id">{{ s.name }}</option> }
