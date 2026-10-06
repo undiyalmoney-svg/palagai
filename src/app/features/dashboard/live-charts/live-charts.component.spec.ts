@@ -51,9 +51,9 @@ describe('LiveChartsComponent trends', () => {
 
     const root = fixture.nativeElement as HTMLElement;
     expect(root.querySelector('[data-testid="trend-nifty"]')?.getAttribute('data-lamp')).toBe('up');
-    expect(root.querySelector('[data-testid="trend-bank"] .lamp.red')?.classList.contains('on')).toBe(true);
-    expect(root.querySelector('[data-testid="trend-crude"] .lamp.amber')?.classList.contains('on')).toBe(true);
-    expect(root.querySelector('[data-testid="trend-nifty"] .lamp.green')?.classList.contains('on')).toBe(true);
+    expect(root.querySelector('[data-testid="trend-bank"]')?.getAttribute('data-lamp')).toBe('down');
+    expect(root.querySelector('[data-testid="trend-crude"]')?.getAttribute('data-lamp')).toBe('side');
+    expect(root.querySelector('.lamp')).toBeNull();
     expect(root.querySelector('canvas')).toBeNull();
   });
 });

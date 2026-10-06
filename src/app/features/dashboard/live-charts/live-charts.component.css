@@ -9,8 +9,9 @@
   margin: 0;
   padding: 0.75rem 1rem;
   border-radius: 12px;
-  background: #fff4e8;
-  color: #8a3b12;
+  background: #fff;
+  border: 2px solid #16a34a;
+  color: #166534;
   font-weight: 650;
 }
 
@@ -27,12 +28,12 @@
 .trend-card {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 1rem;
-  padding: 1.5rem 1rem 1.35rem;
-  border: 1px solid var(--pg-line, #e6e8ec);
-  border-radius: 20px;
-  background: var(--pg-bg-elevated, #fff);
+  align-items: flex-start;
+  gap: 0.35rem;
+  padding: 1.15rem 1.1rem;
+  border: 2px solid #16a34a;
+  border-radius: 14px;
+  background: #fff;
 }
 
 .trend-card h2 {
@@ -41,57 +42,20 @@
   letter-spacing: -0.02em;
 }
 
-.signal {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.7rem;
-  width: 92px;
-  padding: 0.85rem 0;
-  border-radius: 46px;
-  background: #1b1e24;
-  box-shadow: inset 0 0 0 3px #2a2e36, 0 10px 24px rgb(16 18 22 / 18%);
-}
-
-.lamp {
-  width: 58px;
-  height: 58px;
-  border-radius: 50%;
-  background: #2c3038;
-  box-shadow: inset 0 6px 10px rgb(0 0 0 / 45%);
-}
-
-.lamp.red.on {
-  background: #ff3b30;
-  box-shadow: 0 0 18px 6px rgb(255 59 48 / 55%), inset 0 -8px 12px rgb(120 0 0 / 35%);
-}
-
-.lamp.amber.on {
-  background: #ffcc00;
-  box-shadow: 0 0 18px 6px rgb(255 204 0 / 55%), inset 0 -8px 12px rgb(120 80 0 / 28%);
-}
-
-.lamp.green.on {
-  background: #34c759;
-  box-shadow: 0 0 18px 6px rgb(52 199 89 / 55%), inset 0 -8px 12px rgb(0 80 20 / 28%);
-}
-
 .trend-word {
   margin: 0;
   font-size: 1.35rem;
   font-weight: 750;
   letter-spacing: -0.03em;
+  color: #148a32;
 }
 
-.trend-card[data-lamp='up'] .trend-word { color: #148a32; }
-.trend-card[data-lamp='down'] .trend-word { color: #d1242f; }
-.trend-card[data-lamp='side'] .trend-word { color: #9a6b00; }
-.trend-card[data-lamp='wait'] .trend-word { color: var(--pg-muted, #667085); }
+.trend-card[data-lamp='wait'] .trend-word {
+  color: #667085;
+}
 
 .trend-error {
   margin: 0;
-  max-width: 16rem;
-  text-align: center;
   color: #d1242f;
   font-size: 0.85rem;
 }

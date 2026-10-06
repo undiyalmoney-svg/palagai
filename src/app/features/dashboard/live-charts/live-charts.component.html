@@ -10,11 +10,6 @@
     @for (pane of panes(); track pane.def.id) {
       <article class="trend-card" [attr.data-lamp]="lamp(pane)" [attr.data-testid]="'trend-' + pane.def.id">
         <h2>{{ pane.def.label }}</h2>
-        <div class="signal" role="img" [attr.aria-label]="pane.def.label + ' ' + lampLabel(pane)">
-          <span class="lamp red" [class.on]="lamp(pane) === 'down'"></span>
-          <span class="lamp amber" [class.on]="lamp(pane) === 'side'"></span>
-          <span class="lamp green" [class.on]="lamp(pane) === 'up'"></span>
-        </div>
         <p class="trend-word">{{ lampLabel(pane) }}</p>
         @if (pane.error && !sessionExpired()) {
           <p class="trend-error">{{ pane.error }}</p>
