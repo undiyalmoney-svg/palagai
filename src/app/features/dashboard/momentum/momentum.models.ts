@@ -868,6 +868,8 @@ export interface DeskActionRow {
   score: number | null;
   signalId: number | null;
   canExecute: boolean;
+  when?: 'buy-tomorrow' | 'sell-today' | 'sell-tomorrow';
+  whenLabel?: string;
 }
 
 export interface DeskFunds {
@@ -910,6 +912,9 @@ export interface DeskScan {
   priceSource?: 'kite' | 'synthetic' | string;
   simulated?: boolean;
   priceNote?: string | null;
+  buyTomorrow?: DeskActionRow[];
+  sellToday?: DeskActionRow[];
+  sellTomorrow?: DeskActionRow[];
   buy: DeskActionRow[];
   hold: DeskActionRow[];
   sell: DeskActionRow[];

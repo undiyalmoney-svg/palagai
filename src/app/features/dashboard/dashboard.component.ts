@@ -106,7 +106,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   private readonly titles: Record<string, { title: string; subtitle: string }> = {
     '/dashboard/momentum': {
       title: 'Momentum',
-      subtitle: 'Paper: last week, last year or custom dates, start → end capital, Gold/Silver/Nifty BeES. Live: last week’s picks, hold or sell.',
+      subtitle: 'Buy tomorrow. Sell today or sell tomorrow.',
     },
     '/dashboard/charts': {
       title: 'Charts',

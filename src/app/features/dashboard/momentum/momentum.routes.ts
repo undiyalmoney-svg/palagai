@@ -6,17 +6,13 @@ export const MOMENTUM_ROUTES: Routes = [
     path: '',
     component: MomentumShellComponent,
     children: [
-      { path: '', pathMatch: 'full', redirectTo: 'paper' },
       {
-        path: 'paper',
-        data: { desk: 'paper' },
+        path: '',
+        pathMatch: 'full',
         loadComponent: () => import('./tabs/desk-tab.component').then((m) => m.DeskTabComponent),
       },
-      {
-        path: 'live',
-        data: { desk: 'live' },
-        loadComponent: () => import('./tabs/desk-tab.component').then((m) => m.DeskTabComponent),
-      },
+      { path: 'paper', pathMatch: 'full', redirectTo: '' },
+      { path: 'live', pathMatch: 'full', redirectTo: '' },
       {
         path: 'dashboard',
         redirectTo: 'paper',

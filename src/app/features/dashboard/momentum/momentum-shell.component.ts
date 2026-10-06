@@ -8,11 +8,7 @@ export interface Tab {
   liveOnly?: boolean;
 }
 
-export const MOMENTUM_TABS: Tab[] = [
-  { label: 'Paper', path: 'paper' },
-  { label: 'Live', path: 'live' },
-  { label: 'Settings', path: 'settings' },
-];
+export const MOMENTUM_TABS: Tab[] = [];
 
 export function visibleMomentumTabs(_liveAvailable: boolean): Tab[] {
   return MOMENTUM_TABS;
