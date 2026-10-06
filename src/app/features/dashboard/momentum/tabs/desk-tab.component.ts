@@ -24,6 +24,9 @@ import { errorMessage, inr } from '../format.util';
 
       @if (scan(); as s) {
         <p class="mp-next">{{ s.headline }}</p>
+        @if (s.buyTomorrow?.length && s.capital != null) {
+          <p class="why">Qty from {{ inr(s.capital, 0) }} funds.</p>
+        }
         @if (s.cashNote) { <p class="why">{{ s.cashNote }}</p> }
 
         @if (s.buyTomorrow?.length) {

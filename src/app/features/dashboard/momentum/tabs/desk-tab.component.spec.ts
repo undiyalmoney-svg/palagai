@@ -26,8 +26,9 @@ describe('DeskTabComponent suggestions', () => {
 
   it('shows buy tomorrow, sell today and sell tomorrow and no paper or live', () => {
     const scan = {
-      headline: 'Buy tomorrow: NIACL. Sell today: RECLTD.',
-      buyTomorrow: [{ symbol: 'NYKAA', qty: 0, suggestedLimit: 341, whenLabel: 'Buy tomorrow', analysis: '3M +8.3%, 6M +41.5%, 1M +0.6% · score 89.3' }],
+      headline: 'Buy tomorrow: NYKAA. Sell today: RECLTD.',
+      capital: 25000,
+      buyTomorrow: [{ symbol: 'NYKAA', qty: 14, suggestedLimit: 341, whenLabel: 'Buy tomorrow', analysis: '3M +8.3%, 6M +41.5%, 1M +0.6% · score 89.3' }],
       sellToday: [{ symbol: 'RECLTD', qty: 1, suggestedSell: 297, whenLabel: 'Sell today', analysis: '3M -16.7%, 6M -8.0% · score 41' }],
       sellTomorrow: [{ symbol: 'IDEA', qty: 10, suggestedSell: 12, whenLabel: 'Sell tomorrow', analysis: '3M -4.0% · score 30' }],
       buy: [],
@@ -40,6 +41,8 @@ describe('DeskTabComponent suggestions', () => {
     const text = fixture.nativeElement.textContent as string;
     expect(text).toContain('Buy tomorrow');
     expect(text).toContain('NYKAA');
+    expect(text).toContain('14 shares');
+    expect(text).toContain('Qty from');
     expect(text).toContain('3M +8.3%');
     expect(text).toContain('Sell today');
     expect(text).toContain('3M -16.7%');
