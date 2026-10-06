@@ -1,5 +1,6 @@
 /**
- * Charts tab — Smart Money Concepts on Crude Oil Mini, Nifty 50 and Bank Nifty.
+ * Charts tab — one traffic light each for Nifty 50, Bank Nifty and Crude.
+ * Uptrend, downtrend or sideways comes from the same SMC trend that gates entries.
  *
  * One deterministic engine (core/charts/smc) reads the closed candles of every
  * book. History, the live session and a replayed test date all go through the
@@ -68,7 +69,6 @@ import {
   loadSmcSettings,
   saveSmcSettings,
 } from '../../../core/charts/smc/smc-settings';
-import { PgIconComponent } from '../../../shared/ui/icon/pg-icon.component';
 import { UiDialogService } from '../../../shared/ui/dialog/ui-dialog.service';
 import { CapitalPreferenceService } from '../../../core/services/capital-preference.service';
 import { KiteFundsService } from '../../../core/services/kite-funds.service';
@@ -109,8 +109,6 @@ import {
   mergeChartLiveTrades,
 } from '../../../core/charts/chart-live-trades';
 import { RS_PER_LOT } from '../../../core/paper-desk/lots-from-funds';
-import { TvCandleChartComponent } from './tv-candle-chart.component';
-import { SmcPanelComponent } from './smc-panel.component';
 import { formatUnknownError } from '../../../core/utils/kite-error.util';
 import { isKiteAuthError } from '../../../core/utils/kite-auth-error.util';
 import { MarketStatus, istClockParts, marketStatusAt } from '../../../core/utils/market-status.util';
@@ -214,7 +212,7 @@ const NUMERIC_FIELDS: readonly NumericField[] = [
 @Component({
   selector: 'app-live-charts',
   standalone: true,
-  imports: [TvCandleChartComponent, SmcPanelComponent, PgIconComponent, RouterLink],
+  imports: [RouterLink],
   templateUrl: './live-charts.component.html',
   styleUrl: './live-charts.component.css',
 })
@@ -372,6 +370,23 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
   private readonly syncedProtectives = new Map<string, string>();
   /** Instruments that just got a broker SL — do not rest a second SELL while Kite catches up. */
   private readonly slPlacedAt = new Map<string, number>();
+
+  /** Higher-timeframe trend when it exists, otherwise the entry-timeframe trend. */
+  protected lamp(pane: ChartPane): 'up' | 'down' | 'side' | 'wait' {
+    if (!pane.smc) return 'wait';
+    const trend = pane.smc.snapshot.trend;
+    if (trend === 'bullish') return 'up';
+    if (trend === 'bearish') return 'down';
+    return 'side';
+  }
+
+  protected lampLabel(pane: ChartPane): string {
+    const lamp = this.lamp(pane);
+    if (lamp === 'up') return 'Uptrend';
+    if (lamp === 'down') return 'Downtrend';
+    if (lamp === 'side') return 'Sideways';
+    return pane.error ? 'Unavailable' : 'Reading';
+  }
 
   ngOnInit(): void {
     if (!this.isBrowser) {
