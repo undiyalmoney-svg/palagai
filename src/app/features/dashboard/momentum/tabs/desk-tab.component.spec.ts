@@ -32,7 +32,7 @@ describe('DeskTabComponent suggestions', () => {
       sellToday: [{ symbol: 'RECLTD', qty: 1, suggestedSell: 297, whenLabel: 'Sell today', analysis: '3M -16.7%, 6M -8.0% · score 41' }],
       sellTomorrow: [{ symbol: 'IDEA', qty: 10, suggestedSell: 12, whenLabel: 'Sell tomorrow', analysis: '3M -4.0% · score 30' }],
       buy: [],
-      hold: [{ symbol: 'TCS', action: 'HOLD', qty: 0, priceRef: 4100, analysis: '3M +10.0%, 6M +20.0% · score 80' }],
+      hold: [{ symbol: 'TCS', action: 'HOLD', qty: 2, priceRef: 4100, analysis: '3M +10.0%, 6M +20.0% · score 80' }],
       sell: [],
     } as unknown as DeskScan;
     fixture.componentInstance['scan'].set(scan);
@@ -48,6 +48,7 @@ describe('DeskTabComponent suggestions', () => {
     expect(text).toContain('3M +8.3%');
     expect(text).toContain('Hold');
     expect(text).toContain('TCS');
+    expect(text).toContain('2 shares');
     expect(text).toContain('Use my fund');
     expect(text).toContain('Custom fund');
     expect(text).toContain('Sell today');

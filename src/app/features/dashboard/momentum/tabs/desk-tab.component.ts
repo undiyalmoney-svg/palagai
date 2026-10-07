@@ -41,7 +41,7 @@ import { errorMessage, inr } from '../format.util';
 
       @if (scan(); as s) {
         <p class="mp-next">{{ s.headline }}</p>
-        @if (s.buyTomorrow?.length && s.capital != null) {
+        @if ((s.buyTomorrow?.length || s.hold.length) && s.capital != null) {
           <p class="why">Qty from {{ inr(s.capital, 0) }} funds.</p>
         }
         @if (s.cashNote) { <p class="why">{{ s.cashNote }}</p> }
@@ -172,7 +172,6 @@ export class DeskTabComponent implements OnInit {
   protected line(row: DeskActionRow): string {
     const px = this.price(row);
     const qty = Number(row.qty) || 0;
-    if (row.action === 'HOLD' && qty <= 0) return px;
     const word = qty === 1 ? 'share' : 'shares';
     return `${qty} ${word} · ${px}`;
   }
