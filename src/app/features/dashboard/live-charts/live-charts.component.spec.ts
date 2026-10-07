@@ -32,24 +32,59 @@ describe('LiveChartsComponent trends', () => {
   it('shows Sensex with a continue or wait line, a corner dot and a 15s refresh', () => {
     const panes = fixture.componentInstance['panes']();
     const byId = Object.fromEntries(panes.map((pane) => [pane.def.id, pane]));
-    const held = (trend: 'bullish' | 'bearish' | 'sideways') => ({
-      snapshot: { trend, ltfTrend: trend, htfTrend: trend === 'sideways' ? null : trend, lastChoch: null },
-      trendAt: Array.from({ length: 45 }, () => trend),
-      htfTrendAt: Array.from({ length: 45 }, () => (trend === 'sideways' ? null : trend)),
-      structure: [] as unknown[],
-      htfAvailable: trend !== 'sideways',
-    });
-    byId['nifty'] = { ...byId['nifty'], loading: false, smc: held('bullish') as never };
+    const stretch = (parts: Array<['bullish' | 'bearish' | 'sideways', number]>) => {
+      const trendAt: string[] = [];
+      for (const [trend, count] of parts) {
+        for (let i = 0; i < count; i += 1) trendAt.push(trend);
+      }
+      const trend = parts[parts.length - 1]?.[0] ?? 'sideways';
+      return {
+        snapshot: { trend, ltfTrend: trend, htfTrend: trend === 'sideways' ? null : trend, lastChoch: null },
+        trendAt,
+        htfTrendAt: trendAt.map(() => (trend === 'sideways' ? null : trend)),
+        structure: [] as unknown[],
+        htfAvailable: trend !== 'sideways',
+      };
+    };
+    byId['nifty'] = {
+      ...byId['nifty'],
+      loading: false,
+      smc: stretch([
+        ['bullish', 40],
+        ['sideways', 5],
+        ['bullish', 60],
+        ['sideways', 5],
+        ['bullish', 20],
+      ]) as never,
+    };
     byId['bank'] = {
       ...byId['bank'],
       loading: false,
       smc: {
-        ...held('bearish'),
+        ...stretch([
+          ['bearish', 40],
+          ['sideways', 5],
+          ['bearish', 60],
+          ['sideways', 5],
+          ['bearish', 20],
+        ]),
         snapshot: { trend: 'bearish', ltfTrend: 'bullish', htfTrend: 'bearish', lastChoch: 'Bullish' },
       } as never,
     };
-    byId['sensex'] = { ...byId['sensex'], loading: false, smc: held('bullish') as never };
-    byId['crude'] = { ...byId['crude'], loading: false, smc: held('sideways') as never };
+    byId['sensex'] = {
+      ...byId['sensex'],
+      loading: false,
+      smc: stretch([
+        ['bullish', 80],
+        ['sideways', 5],
+        ['bullish', 90],
+        ['sideways', 5],
+        ['bullish', 100],
+        ['sideways', 5],
+        ['bullish', 30],
+      ]) as never,
+    };
+    byId['crude'] = { ...byId['crude'], loading: false, smc: stretch([['sideways', 20]]) as never };
     fixture.componentInstance['panes'].set([byId['nifty'], byId['bank'], byId['sensex'], byId['crude']]);
     fixture.detectChanges();
 
@@ -61,7 +96,8 @@ describe('LiveChartsComponent trends', () => {
     expect(text).toContain('Sensex');
     expect(text).toContain('Crude Oil Mini');
     expect(text).toContain('Sideways');
-    expect(text).toContain('Trend continues for next 45 minutes');
+    expect(text).toContain('Trend continues for next 20 minutes');
+    expect(text).toContain('Trend continues for next 60 minutes');
     expect(text).toContain('Wait, it may change');
     expect(text).toContain('Auto refresh every 15 secs');
     expect(text).toContain('Refresh');
@@ -82,7 +118,9 @@ describe('LiveChartsComponent trends', () => {
     const nifty = root.querySelector('[data-testid="trend-nifty"]')?.textContent ?? '';
     const bank = root.querySelector('[data-testid="trend-bank"]')?.textContent ?? '';
     const crude = root.querySelector('[data-testid="trend-crude"]')?.textContent ?? '';
-    expect(nifty).toContain('Trend continues for next 45 minutes');
+    expect(nifty).toContain('Trend continues for next 20 minutes');
+    const sensex = root.querySelector('[data-testid="trend-sensex"]')?.textContent ?? '';
+    expect(sensex).toContain('Trend continues for next 60 minutes');
     expect(bank).toContain('Wait, it may change');
     expect(crude).toContain('Wait, it may change');
   });

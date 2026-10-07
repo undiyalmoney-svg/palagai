@@ -1,67 +1,111 @@
 /**
- * When the charts card may say the trend will continue.
+ * How many minutes the charts card may say the trend continues.
  *
- * The line is for the next 30 to 45 minutes, so it is withheld until that
- * same trend has already stood for 45 minutes on the entry timeframe and,
- * when a higher timeframe is in use, on that timeframe too. A break against
- * the trend inside the window keeps the card on wait.
+ * Earlier runs of the same trend on this chart set the usual length. The
+ * minutes left are that length minus how long the current run has already
+ * lasted, rounded down to 5 minutes. Under 15 minutes left, or a trend that
+ * has not yet lasted 15 minutes, stays on wait. The longest call is 2 hours.
  */
 import { SmcAnalysis, SmcDir, SmcTrend } from './smc/smc.types';
 
-/** Minutes of unbroken trend required before a continuation call. */
-export const TREND_HOLD_MINUTES = 45;
+/** A continuation shorter than this is treated as a possible change. */
+export const MIN_CONTINUE_MINUTES = 15;
+/** The current run must already have lasted this long before it is called. */
+export const MIN_CURRENT_MINUTES = 15;
+/** Do not claim a hold longer than this. */
+export const MAX_CONTINUE_MINUTES = 120;
+const ROUND_MINUTES = 5;
+const RECENT_RUNS = 6;
 
-export type TrendHoldCall = 'continue' | 'wait' | 'reading';
+export type TrendContinue =
+  | { call: 'reading' }
+  | { call: 'wait' }
+  | { call: 'continue'; minutes: number };
 
 type HoldInput = Pick<
   SmcAnalysis,
   'snapshot' | 'trendAt' | 'htfTrendAt' | 'structure' | 'htfAvailable'
 >;
 
-export function trendHoldCall(
+interface TrendRun {
+  trend: SmcTrend;
+  bars: number;
+  minutes: number;
+  endIndex: number;
+}
+
+export function trendContinue(
   smc: HoldInput | null | undefined,
   ltfMinutes: number,
   htfMinutes = ltfMinutes,
-): TrendHoldCall {
-  if (!smc) return 'reading';
+): TrendContinue {
+  if (!smc) return { call: 'reading' };
   const trend = smc.snapshot.trend;
-  if (trend !== 'bullish' && trend !== 'bearish') return 'wait';
-  if (smc.snapshot.ltfTrend !== trend) return 'wait';
+  if (trend !== 'bullish' && trend !== 'bearish') return { call: 'wait' };
+  if (smc.snapshot.ltfTrend !== trend) return { call: 'wait' };
 
-  const bars = barsForHold(ltfMinutes);
-  if (!stableFor(smc.trendAt, trend, bars)) return 'wait';
-
-  const htfSeparate = htfMinutes > ltfMinutes;
-  if (htfSeparate) {
-    if (!smc.htfAvailable || smc.snapshot.htfTrend !== trend) return 'wait';
-    if (!stableFor(smc.htfTrendAt, trend, bars)) return 'wait';
+  const barMinutes = Number.isFinite(ltfMinutes) && ltfMinutes > 0 ? ltfMinutes : 1;
+  const runs = splitRuns(smc.trendAt, barMinutes);
+  const current = runs[runs.length - 1];
+  if (!current || current.trend !== trend || current.minutes < MIN_CURRENT_MINUTES) {
+    return { call: 'wait' };
   }
 
-  if (opposingBreakInWindow(smc.structure, trend, smc.trendAt.length, bars)) return 'wait';
-  return 'continue';
+  const htfSeparate = htfMinutes > barMinutes;
+  if (htfSeparate) {
+    if (!smc.htfAvailable || smc.snapshot.htfTrend !== trend) return { call: 'wait' };
+    if (!agrees(smc.htfTrendAt, trend, current.bars)) return { call: 'wait' };
+  }
+
+  const from = smc.trendAt.length - current.bars;
+  if (opposingBreakSince(smc.structure, trend, from)) return { call: 'wait' };
+
+  const completed = runs.slice(0, -1).filter((run) => run.trend === 'bullish' || run.trend === 'bearish');
+  const same = completed.filter((run) => run.trend === trend);
+  const sample = (same.length >= 2 ? same : completed).slice(-RECENT_RUNS);
+  if (sample.length < 2) return { call: 'wait' };
+
+  const usual = lowerMedian(sample.map((run) => run.minutes));
+  const rounded = Math.floor((usual - current.minutes) / ROUND_MINUTES) * ROUND_MINUTES;
+  if (rounded < MIN_CONTINUE_MINUTES) return { call: 'wait' };
+  return { call: 'continue', minutes: Math.min(rounded, MAX_CONTINUE_MINUTES) };
 }
 
-function barsForHold(ltfMinutes: number): number {
-  const minutes = Number.isFinite(ltfMinutes) && ltfMinutes > 0 ? ltfMinutes : 1;
-  return Math.max(1, Math.ceil(TREND_HOLD_MINUTES / minutes));
+function splitRuns(trendAt: readonly (SmcTrend | null)[], barMinutes: number): TrendRun[] {
+  const runs: TrendRun[] = [];
+  trendAt.forEach((value, index) => {
+    const trend = value ?? 'sideways';
+    const last = runs[runs.length - 1];
+    if (last && last.trend === trend) {
+      last.bars += 1;
+      last.minutes += barMinutes;
+      last.endIndex = index;
+      return;
+    }
+    runs.push({ trend, bars: 1, minutes: barMinutes, endIndex: index });
+  });
+  return runs;
 }
 
-function stableFor(series: readonly (SmcTrend | null)[], trend: SmcTrend, bars: number): boolean {
+function agrees(series: readonly (SmcTrend | null)[], trend: SmcTrend, bars: number): boolean {
   if (series.length < bars) return false;
-  const start = series.length - bars;
-  for (let i = start; i < series.length; i += 1) {
+  for (let i = series.length - bars; i < series.length; i += 1) {
     if (series[i] !== trend) return false;
   }
   return true;
 }
 
-function opposingBreakInWindow(
+function opposingBreakSince(
   events: SmcAnalysis['structure'],
   trend: 'bullish' | 'bearish',
-  barCount: number,
-  bars: number,
+  fromIndex: number,
 ): boolean {
-  const from = barCount - bars;
   const against: SmcDir = trend === 'bullish' ? 'bear' : 'bull';
-  return events.some((event) => event.index >= from && event.dir === against);
+  return events.some((event) => event.index >= fromIndex && event.dir === against);
+}
+
+/** Lower of the two middle values, so an even sample does not overstate the hold. */
+function lowerMedian(values: number[]): number {
+  const sorted = [...values].sort((a, b) => a - b);
+  return sorted[Math.floor((sorted.length - 1) / 2)] ?? 0;
 }
