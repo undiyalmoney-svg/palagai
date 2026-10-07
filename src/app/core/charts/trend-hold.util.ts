@@ -23,6 +23,46 @@ export type TrendContinue =
   | { call: 'wait' }
   | { call: 'continue'; minutes: number };
 
+/** A continuation already shown to the reader. It stays until `untilMs`. */
+export interface TrendPromise {
+  trend: 'bullish' | 'bearish';
+  untilMs: number;
+}
+
+/**
+ * Keep a continuation that was already stated.
+ * A later "wait" must not replace it while that trend is still the one on
+ * the card and the stated minutes have not run out. The minutes count down.
+ */
+export function applyTrendPromise(
+  fresh: TrendContinue,
+  displayedTrend: SmcTrend | null | undefined,
+  promise: TrendPromise | null,
+  nowMs: number,
+): { call: TrendContinue; next: TrendPromise | null } {
+  const active =
+    promise != null && displayedTrend === promise.trend && nowMs < promise.untilMs;
+  if (active && promise) {
+    const minutes = Math.max(1, Math.ceil((promise.untilMs - nowMs) / 60_000));
+    return { call: { call: 'continue', minutes }, next: promise };
+  }
+
+  if (
+    fresh.call === 'continue' &&
+    (displayedTrend === 'bullish' || displayedTrend === 'bearish')
+  ) {
+    return {
+      call: fresh,
+      next: { trend: displayedTrend, untilMs: nowMs + fresh.minutes * 60_000 },
+    };
+  }
+
+  return {
+    call: fresh.call === 'reading' ? fresh : { call: 'wait' },
+    next: null,
+  };
+}
+
 type HoldInput = Pick<
   SmcAnalysis,
   'snapshot' | 'trendAt' | 'htfTrendAt' | 'structure' | 'htfAvailable'

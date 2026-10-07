@@ -128,4 +128,41 @@ describe('LiveChartsComponent trends', () => {
     expect(bank).toContain('Wait, it may change');
     expect(crude).toContain('Wait, it may change');
   });
+
+  it('counts down a 60 minute continuation instead of switching to wait', () => {
+    const panes = fixture.componentInstance['panes']();
+    const nifty = panes.find((pane) => pane.def.id === 'nifty');
+    if (!nifty) throw new Error('missing nifty');
+    const trendAt = Array.from({ length: 90 }, () => 'bullish');
+    const snapshot = { trend: 'bullish', ltfTrend: 'bullish', htfTrend: 'bullish', lastChoch: null };
+    nifty.smc = {
+      snapshot,
+      trendAt,
+      htfTrendAt: [...trendAt],
+      structure: [],
+      htfAvailable: true,
+    } as never;
+    fixture.componentInstance['panes'].set([...panes]);
+    fixture.detectChanges();
+
+    const card = () =>
+      (fixture.nativeElement as HTMLElement).querySelector('[data-testid="trend-nifty"]')?.textContent ?? '';
+    expect(card()).toContain('Trend continues for next 90 minutes');
+
+    const start = fixture.componentInstance['clock']() as number;
+    for (let i = trendAt.length - 15; i < trendAt.length; i += 1) trendAt[i] = 'bearish';
+    nifty.smc = {
+      snapshot: { ...snapshot, ltfTrend: 'bearish' },
+      trendAt: [...trendAt],
+      htfTrendAt: Array.from({ length: 90 }, () => 'bullish'),
+      structure: [],
+      htfAvailable: true,
+    } as never;
+    fixture.componentInstance['panes'].set(fixture.componentInstance['panes']().map((pane) => (pane.def.id === 'nifty' ? nifty : pane)));
+    fixture.componentInstance['clock'].set(start + 20 * 60_000);
+    fixture.detectChanges();
+
+    expect(card()).toContain('Trend continues for next 70 minutes');
+    expect(card()).not.toContain('Wait, it may change');
+  });
 });

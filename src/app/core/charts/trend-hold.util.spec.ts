@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { SmcTrend } from './smc/smc.types';
-import { trendContinue } from './trend-hold.util';
+import { applyTrendPromise, trendContinue } from './trend-hold.util';
 
 function stretch(parts: Array<[SmcTrend, number]>, htf: SmcTrend | null | 'same' = 'same') {
   const trendAt: SmcTrend[] = [];
@@ -129,5 +129,33 @@ describe('trendContinue', () => {
 
   it('reads nothing when there is no analysis yet', () => {
     expect(trendContinue(null, 1, 5)).toEqual({ call: 'reading' });
+  });
+});
+
+describe('applyTrendPromise', () => {
+  const start = 1_700_000_000_000;
+
+  it('counts down a stated 60 minutes instead of switching to wait', () => {
+    const issued = applyTrendPromise({ call: 'continue', minutes: 60 }, 'bearish', null, start);
+    expect(issued.call).toEqual({ call: 'continue', minutes: 60 });
+    expect(issued.next?.untilMs).toBe(start + 60 * 60_000);
+
+    const later = applyTrendPromise({ call: 'wait' }, 'bearish', issued.next, start + 20 * 60_000);
+    expect(later.call).toEqual({ call: 'continue', minutes: 40 });
+    expect(later.next).toEqual(issued.next);
+  });
+
+  it('drops the statement once the stated minutes have passed', () => {
+    const issued = applyTrendPromise({ call: 'continue', minutes: 60 }, 'bearish', null, start);
+    const done = applyTrendPromise({ call: 'wait' }, 'bearish', issued.next, start + 60 * 60_000);
+    expect(done.call).toEqual({ call: 'wait' });
+    expect(done.next).toBeNull();
+  });
+
+  it('drops the statement when the card trend itself changes', () => {
+    const issued = applyTrendPromise({ call: 'continue', minutes: 60 }, 'bearish', null, start);
+    const flipped = applyTrendPromise({ call: 'wait' }, 'sideways', issued.next, start + 20 * 60_000);
+    expect(flipped.call).toEqual({ call: 'wait' });
+    expect(flipped.next).toBeNull();
   });
 });

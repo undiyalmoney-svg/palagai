@@ -51,7 +51,11 @@ import {
   chartIntervalMinutes,
 } from '../../../core/charts/chart-intervals.util';
 import { chartCandleAsOf, isLiveChartDay, istToday } from '../../../core/charts/chart-day.util';
-import { trendContinue } from '../../../core/charts/trend-hold.util';
+import {
+  TrendPromise,
+  applyTrendPromise,
+  trendContinue,
+} from '../../../core/charts/trend-hold.util';
 import { ChartQuote, chartQuote } from '../../../core/charts/chart-quote.util';
 import { analyzeSmc } from '../../../core/charts/smc/smc-analyze';
 import { SmcAlertTracker } from '../../../core/charts/smc/smc-alerts';
@@ -383,18 +387,42 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Minutes follow the trend printed on the card. A one-minute bounce does
-   * not replace that with a wait.
+   * A stated "next N minutes" counts down and is not replaced by wait while
+   * that same trend is still on the card.
    */
+  private trendPromises: Record<string, TrendPromise> = readTrendPromises(
+    this.isBrowser ? browserSession() : null,
+    Date.now(),
+  );
+
   protected signalLabel(pane: ChartPane): string {
-    const call = trendContinue(
+    const now = this.clock();
+    const fresh = trendContinue(
       pane.smc,
       chartIntervalMinutes(this.ltf()),
       chartIntervalMinutes(this.htf()),
     );
-    if (call.call === 'reading') return pane.error ? 'Unavailable' : 'Reading';
-    if (call.call === 'continue') return `Trend continues for next ${call.minutes} minutes`;
+    const settled = applyTrendPromise(
+      fresh,
+      pane.smc?.snapshot.trend,
+      this.trendPromises[pane.def.id] ?? null,
+      now,
+    );
+    this.keepTrendPromise(pane.def.id, settled.next);
+    if (settled.call.call === 'reading') return pane.error ? 'Unavailable' : 'Reading';
+    if (settled.call.call === 'continue') {
+      return `Trend continues for next ${settled.call.minutes} minutes`;
+    }
     return 'Wait, it may change';
+  }
+
+  private keepTrendPromise(id: string, next: TrendPromise | null): void {
+    const prev = this.trendPromises[id] ?? null;
+    if (prev?.trend === next?.trend && prev?.untilMs === next?.untilMs) return;
+    if (!prev && !next) return;
+    if (next) this.trendPromises[id] = next;
+    else delete this.trendPromises[id];
+    writeTrendPromises(this.isBrowser ? browserSession() : null, this.trendPromises);
   }
 
   ngOnInit(): void {
@@ -1462,6 +1490,49 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+const TREND_PROMISE_KEY = 'palagai.trend.promise.v1';
+
+function readTrendPromises(
+  storage: Pick<Storage, 'getItem'> | null,
+  nowMs: number,
+): Record<string, TrendPromise> {
+  if (!storage) return {};
+  try {
+    const raw = storage.getItem(TREND_PROMISE_KEY);
+    const parsed = raw ? (JSON.parse(raw) as Record<string, TrendPromise>) : {};
+    return Object.fromEntries(
+      Object.entries(parsed).filter(
+        ([, row]) =>
+          row &&
+          (row.trend === 'bullish' || row.trend === 'bearish') &&
+          typeof row.untilMs === 'number' &&
+          row.untilMs > nowMs,
+      ),
+    );
+  } catch {
+    return {};
+  }
+}
+
+function writeTrendPromises(
+  storage: Pick<Storage, 'setItem'> | null,
+  promises: Record<string, TrendPromise>,
+): void {
+  try {
+    storage?.setItem(TREND_PROMISE_KEY, JSON.stringify(promises));
+  } catch {
+    // Private mode: the in-memory promise still covers this tab.
+  }
+}
+
+function browserSession(): Storage | null {
+  try {
+    return typeof sessionStorage === 'undefined' ? null : sessionStorage;
+  } catch {
+    return null;
+  }
 }
 
 function safeStorage(): Storage | null {
