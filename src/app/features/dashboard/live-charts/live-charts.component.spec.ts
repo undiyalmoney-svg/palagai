@@ -90,6 +90,7 @@ describe('LiveChartsComponent trends', () => {
     };
     byId['crude'] = { ...byId['crude'], loading: false, smc: stretch([['sideways', 20]]) as never };
     fixture.componentInstance['panes'].set([byId['nifty'], byId['bank'], byId['sensex'], byId['crude']]);
+    fixture.componentInstance['clock'].set(Date.parse('2026-10-07T06:30:00Z'));
     fixture.detectChanges();
 
     const text = fixture.nativeElement.textContent as string;
@@ -143,13 +144,14 @@ describe('LiveChartsComponent trends', () => {
       htfAvailable: true,
     } as never;
     fixture.componentInstance['panes'].set([...panes]);
+    const start = Date.parse('2026-10-07T06:30:00Z');
+    fixture.componentInstance['clock'].set(start);
     fixture.detectChanges();
 
     const card = () =>
       (fixture.nativeElement as HTMLElement).querySelector('[data-testid="trend-nifty"]')?.textContent ?? '';
     expect(card()).toContain('Trend continues for next 90 minutes');
 
-    const start = fixture.componentInstance['clock']() as number;
     for (let i = trendAt.length - 15; i < trendAt.length; i += 1) trendAt[i] = 'bearish';
     nifty.smc = {
       snapshot: { ...snapshot, ltfTrend: 'bearish' },
@@ -164,5 +166,45 @@ describe('LiveChartsComponent trends', () => {
 
     expect(card()).toContain('Trend continues for next 70 minutes');
     expect(card()).not.toContain('Wait, it may change');
+  });
+
+  it('drops the live trend after that market has closed', () => {
+    const panes = fixture.componentInstance['panes']();
+    const trendAt = Array.from({ length: 90 }, () => 'bullish');
+    const withTrend = (id: string) => {
+      const pane = panes.find((item) => item.def.id === id);
+      if (!pane) throw new Error(`missing ${id}`);
+      pane.smc = {
+        snapshot: { trend: 'bullish', ltfTrend: 'bullish', htfTrend: 'bullish', lastChoch: null },
+        trendAt: [...trendAt],
+        htfTrendAt: [...trendAt],
+        structure: [],
+        htfAvailable: true,
+      } as never;
+      return pane;
+    };
+    fixture.componentInstance['panes'].set([
+      withTrend('nifty'),
+      withTrend('bank'),
+      withTrend('sensex'),
+      withTrend('crude'),
+    ]);
+    fixture.componentInstance['clock'].set(Date.parse('2026-10-07T12:15:00Z'));
+    fixture.detectChanges();
+
+    const card = (id: string) =>
+      (fixture.nativeElement as HTMLElement).querySelector(`[data-testid="trend-${id}"]`);
+    for (const id of ['nifty', 'bank', 'sensex']) {
+      const text = card(id)?.textContent ?? '';
+      expect(text).toContain('Market closed');
+      expect(text).not.toContain('Uptrend');
+      expect(text).not.toContain('Trend continues');
+      expect(text).not.toContain('Wait, it may change');
+      expect(card(id)?.getAttribute('data-lamp')).toBe('wait');
+    }
+    const crude = card('crude')?.textContent ?? '';
+    expect(crude).toContain('Uptrend');
+    expect(crude).toContain('Trend continues for next');
+    expect(crude).not.toContain('Market closed');
   });
 });

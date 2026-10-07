@@ -25,7 +25,7 @@
         <span class="trend-dot" aria-hidden="true"></span>
         <h2>{{ pane.def.label }}</h2>
         <p class="trend-word">{{ lampLabel(pane) }}</p>
-        @if (pane.smc) {
+        @if (pane.smc && sessionLive(pane)) {
           <p class="trend-signal">{{ signalLabel(pane) }}</p>
         }
         @if (pane.error && !sessionExpired()) {

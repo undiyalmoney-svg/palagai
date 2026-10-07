@@ -369,8 +369,17 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
   /** Instruments that just got a broker SL — do not rest a second SELL while Kite catches up. */
   private readonly slPlacedAt = new Map<string, number>();
 
+  /** True only while this card's own session is running. Crude stays open after 15:30. */
+  protected sessionLive(pane: ChartPane): boolean {
+    return marketStatusAt(pane.session, new Date(this.clock())).open;
+  }
+
   /** Higher-timeframe trend when it exists, otherwise the entry-timeframe trend. */
   protected lamp(pane: ChartPane): 'up' | 'down' | 'side' | 'wait' {
+    if (!this.sessionLive(pane)) {
+      this.keepTrendPromise(pane.def.id, null);
+      return 'wait';
+    }
     if (!pane.smc) return 'wait';
     const trend = pane.smc.snapshot.trend;
     if (trend === 'bullish') return 'up';
@@ -379,6 +388,7 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
   }
 
   protected lampLabel(pane: ChartPane): string {
+    if (!this.sessionLive(pane)) return 'Market closed';
     const lamp = this.lamp(pane);
     if (lamp === 'up') return 'Uptrend';
     if (lamp === 'down') return 'Downtrend';
@@ -397,6 +407,7 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
 
   protected signalLabel(pane: ChartPane): string {
     const now = this.clock();
+    if (!this.sessionLive(pane)) return 'Market closed';
     const fresh = trendContinue(
       pane.smc,
       chartIntervalMinutes(this.ltf()),
