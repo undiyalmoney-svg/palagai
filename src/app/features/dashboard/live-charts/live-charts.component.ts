@@ -51,7 +51,7 @@ import {
   chartIntervalMinutes,
 } from '../../../core/charts/chart-intervals.util';
 import { chartCandleAsOf, isLiveChartDay, istToday } from '../../../core/charts/chart-day.util';
-import { trendHoldCall } from '../../../core/charts/trend-hold.util';
+import { TREND_HOLD_MINUTES, trendHoldCall } from '../../../core/charts/trend-hold.util';
 import { ChartQuote, chartQuote } from '../../../core/charts/chart-quote.util';
 import { analyzeSmc } from '../../../core/charts/smc/smc-analyze';
 import { SmcAlertTracker } from '../../../core/charts/smc/smc-alerts';
@@ -383,8 +383,8 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Continuation is the next 30 to 45 minutes. It is shown only after that
-   * trend has already held for 45 minutes on both timeframes.
+   * Shown only after the trend has already held for 45 minutes on both
+   * timeframes. The line names that next window.
    */
   protected signalLabel(pane: ChartPane): string {
     const call = trendHoldCall(
@@ -393,7 +393,7 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
       chartIntervalMinutes(this.htf()),
     );
     if (call === 'reading') return pane.error ? 'Unavailable' : 'Reading';
-    if (call === 'continue') return 'Trend will continue for 30 to 45 min';
+    if (call === 'continue') return `Trend continues for next ${TREND_HOLD_MINUTES} minutes`;
     return 'Wait, it may change';
   }
 

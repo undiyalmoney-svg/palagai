@@ -61,7 +61,7 @@ describe('LiveChartsComponent trends', () => {
     expect(text).toContain('Sensex');
     expect(text).toContain('Crude Oil Mini');
     expect(text).toContain('Sideways');
-    expect(text).toContain('Trend will continue for 30 to 45 min');
+    expect(text).toContain('Trend continues for next 45 minutes');
     expect(text).toContain('Wait, it may change');
     expect(text).toContain('Auto refresh every 15 secs');
     expect(text).toContain('Refresh');
@@ -82,7 +82,7 @@ describe('LiveChartsComponent trends', () => {
     const nifty = root.querySelector('[data-testid="trend-nifty"]')?.textContent ?? '';
     const bank = root.querySelector('[data-testid="trend-bank"]')?.textContent ?? '';
     const crude = root.querySelector('[data-testid="trend-crude"]')?.textContent ?? '';
-    expect(nifty).toContain('Trend will continue for 30 to 45 min');
+    expect(nifty).toContain('Trend continues for next 45 minutes');
     expect(bank).toContain('Wait, it may change');
     expect(crude).toContain('Wait, it may change');
   });
