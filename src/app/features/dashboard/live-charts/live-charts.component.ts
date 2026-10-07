@@ -1,6 +1,7 @@
 /**
- * Charts tab — one traffic light each for Nifty 50, Bank Nifty and Crude.
+ * Charts tab — trend cards for Nifty 50, Bank Nifty, Sensex and Crude.
  * Uptrend, downtrend or sideways comes from the same SMC trend that gates entries.
+ * Sensex is display-only: it never places an order.
  *
  * One deterministic engine (core/charts/smc) reads the closed candles of every
  * book. History, the live session and a replayed test date all go through the
@@ -36,9 +37,12 @@ import { RouterLink } from '@angular/router';
 import { Candle } from '../../../core/models/candle.model';
 import {
   CHART_BOOKS,
-  ChartBookDef,
   ChartBookId,
   LiveChartDataService,
+  TREND_BOOKS,
+  TrendBookDef,
+  TrendBookId,
+  isTradableChartBook,
 } from '../../../core/charts/live-chart-data.service';
 import {
   CHART_INTERVALS,
@@ -124,7 +128,7 @@ interface HtfCache {
 }
 
 interface ChartPane {
-  def: ChartBookDef;
+  def: TrendBookDef;
   symbol: string;
   /** Trading hours for this book's exchange. */
   session: InstrumentSessionConfig;
@@ -166,32 +170,21 @@ interface NumericField {
 }
 
 const INTERVALS = CHART_INTERVALS;
-/**
- * Poll cadence per entry timeframe.
- *
- * These are historical-candle reads, not a tick feed, so the only thing that
- * changes between polls is the forming candle. Polling a 1-hour chart every
- * few seconds would burn Kite quota to redraw the same bar, while a 1-minute
- * chart genuinely moves — so the fast intervals poll faster.
- */
-const REFRESH_MS: Record<ChartInterval, number> = {
-  '1m': 10_000,
-  '5m': 15_000,
-  '10m': 20_000,
-  '15m': 30_000,
-  '30m': 30_000,
-  '45m': 30_000,
-  '1h': 60_000,
-};
+/** Trend cards always poll on this cadence. The hint on the page names it. */
+const TREND_POLL_MS = 15_000;
 /** The scheduler ticks at the fastest cadence and each interval skips its turns. */
 const TICK_MS = 5_000;
-/** Crude is MCX and runs to 23:30; the indices are NSE and stop at 15:30. */
+/** Crude is MCX and runs to 23:30. NSE and BSE cash stop at 15:30. */
 const SESSIONS: Record<ChartBookId, InstrumentSessionConfig> = {
   crude: resolveSessionConfig({ exchange: 'MCX' }),
   nifty: resolveSessionConfig({ exchange: 'NSE' }),
   bank: resolveSessionConfig({ exchange: 'NSE' }),
 };
-/** Kite historical allows 3 req/s; keep a gap so three books never trip it. */
+const TREND_SESSIONS: Record<TrendBookId, InstrumentSessionConfig> = {
+  ...SESSIONS,
+  sensex: resolveSessionConfig({ exchange: 'BSE' }),
+};
+/** Kite historical allows 3 req/s; keep a gap so the four trend books never trip it. */
 const BOOK_STAGGER_MS = 350;
 const FEED_LIMIT = 40;
 /** Orders/positions for the live-trades board — slower than candle polls. */
@@ -269,10 +262,10 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
   protected readonly testDate = signal(istToday());
   protected readonly refreshing = signal(false);
   protected readonly panes = signal<ChartPane[]>(
-    CHART_BOOKS.map((def) => ({
+    TREND_BOOKS.map((def) => ({
       def,
       symbol: def.label,
-      session: SESSIONS[def.id],
+      session: TREND_SESSIONS[def.id],
       token: null,
       candles: [],
       asOf: null,
@@ -341,7 +334,7 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
     () => this.data.isDerived(this.ltf()) || this.data.isDerived(this.htf()),
   );
 
-  protected readonly refreshSeconds = computed(() => REFRESH_MS[this.ltf()] / 1000);
+  protected readonly refreshSeconds = computed(() => TREND_POLL_MS / 1000);
 
   protected readonly notificationsSupported = this.isBrowser && typeof Notification !== 'undefined';
 
@@ -350,9 +343,9 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
   private inFlight = false;
   /** Date/interval change while a sweep is in the air. */
   private pendingAll = false;
-  private readonly lastPollAt = new Map<ChartBookId, number>();
+  private readonly lastPollAt = new Map<TrendBookId, number>();
   /** Last seen session state per book, so the close can be caught as it happens. */
-  private readonly wasOpen = new Map<ChartBookId, boolean>();
+  private readonly wasOpen = new Map<TrendBookId, boolean>();
   /** Once a reader taps +/−, that book keeps their count instead of following funds. */
   private readonly lotsOverride = signal<Partial<Record<ChartBookId, number>>>({});
   private lastTradePollAt = 0;
@@ -386,6 +379,24 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
     if (lamp === 'down') return 'Downtrend';
     if (lamp === 'side') return 'Sideways';
     return pane.error ? 'Unavailable' : 'Reading';
+  }
+
+  /**
+   * Short read of whether the printed trend still agrees with itself.
+   * Agreement means continue. Sideways, a split between timeframes, or a
+   * change-of-character against the trend means wait.
+   */
+  protected signalLabel(pane: ChartPane): string {
+    const snap = pane.smc?.snapshot;
+    if (!snap) return pane.error ? 'Unavailable' : 'Reading';
+    const trend = snap.trend;
+    if (trend !== 'bullish' && trend !== 'bearish') return 'Wait, it may change';
+    if (snap.htfTrend && snap.ltfTrend && snap.htfTrend !== snap.ltfTrend) {
+      return 'Wait, it may change';
+    }
+    if (trend === 'bullish' && snap.lastChoch === 'Bearish') return 'Wait, it may change';
+    if (trend === 'bearish' && snap.lastChoch === 'Bullish') return 'Wait, it may change';
+    return 'Trend will continue';
   }
 
   ngOnInit(): void {
@@ -441,14 +452,14 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
    * the tick that notices the close: the final bar completes exactly at the
    * closing bell, so each book gets one last read on the way out.
    */
-  private duePanes(): ChartBookId[] {
+  private duePanes(): TrendBookId[] {
     if (!this.liveDay()) return [];
     const now = Date.now();
-    const status = this.marketStatus();
-    const due: ChartBookId[] = [];
+    const clock = new Date(this.clock());
+    const due: TrendBookId[] = [];
     for (const pane of this.panes()) {
       const id = pane.def.id;
-      const open = status[id].open;
+      const open = marketStatusAt(pane.session, clock).open;
       const justClosed = !open && this.wasOpen.get(id) === true;
       this.wasOpen.set(id, open);
       if (justClosed) {
@@ -456,7 +467,7 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
         continue;
       }
       if (!open) continue;
-      if (now - (this.lastPollAt.get(id) ?? 0) >= REFRESH_MS[this.ltf()]) {
+      if (now - (this.lastPollAt.get(id) ?? 0) >= TREND_POLL_MS) {
         due.push(id);
       }
     }
@@ -567,7 +578,7 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
   }
 
   protected refreshAll(): Promise<void> {
-    return this.refreshPanes(CHART_BOOKS.map((def) => def.id));
+    return this.refreshPanes(TREND_BOOKS.map((def) => def.id));
   }
 
   /**
@@ -798,10 +809,10 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
    * Sequential with a gap because Kite historical allows 3 requests a second,
    * and three books firing together would trip it.
    */
-  private async refreshPanes(ids: ChartBookId[]): Promise<void> {
+  private async refreshPanes(ids: TrendBookId[]): Promise<void> {
     if (!ids.length) return;
     if (this.inFlight) {
-      if (ids.length === CHART_BOOKS.length) {
+      if (ids.length === TREND_BOOKS.length) {
         this.pendingAll = true;
       }
       return;
@@ -820,8 +831,8 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
       // One book failing on auth could be a fluke; all of them is the session.
       // Only a full sweep can say that, so a single-book refresh may clear the
       // banner but never raise it.
-      if (ids.length === CHART_BOOKS.length) {
-        this.sessionExpired.set(authFailures === CHART_BOOKS.length);
+      if (ids.length === TREND_BOOKS.length) {
+        this.sessionExpired.set(authFailures === TREND_BOOKS.length);
       } else if (!authFailures) {
         this.sessionExpired.set(false);
       }
@@ -836,13 +847,13 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
   }
 
   /** Resolves false when the book failed because Kite rejected the session. */
-  private async refreshBook(id: ChartBookId): Promise<boolean> {
+  private async refreshBook(id: TrendBookId): Promise<boolean> {
     const day = this.testDate();
     const ltf = this.ltf();
     const htf = this.htf();
     try {
       const asOf = chartCandleAsOf(day);
-      const instrument = await this.data.resolveInstrument(id, asOf);
+      const instrument = await this.data.resolveTrendInstrument(id, asOf);
       const candles = await this.data.loadCandles({
         token: instrument.token,
         interval: ltf,
@@ -884,7 +895,7 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
         loading: false,
         updatedAt: new Date().toLocaleTimeString('en-IN', { hour12: false }),
       });
-      this.announce(id, smc, false);
+      if (isTradableChartBook(id)) this.announce(id, smc, false);
       return true;
     } catch (error) {
       if (this.superseded(ltf, htf, day)) {
@@ -915,7 +926,7 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
    * than losing the chart.
    */
   private async ensureHtf(
-    id: ChartBookId,
+    id: TrendBookId,
     token: number,
     ltf: ChartInterval,
     htf: ChartInterval,
@@ -946,7 +957,7 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
   }
 
   private analyze(
-    id: ChartBookId,
+    id: TrendBookId,
     candles: Candle[],
     htf: HtfCache | null,
     asOf: Date,
@@ -954,7 +965,7 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
     const ltf = this.ltf();
     const htfInterval = this.htf();
     return analyzeSmc({
-      market: id,
+      market: id === 'sensex' ? 'nifty' : id,
       candles,
       intervalMinutes: chartIntervalMinutes(ltf),
       htf: htf ? { candles: htf.candles, minutes: chartIntervalMinutes(htf.interval) } : null,
@@ -976,7 +987,7 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
     );
     // New parameters mean a different history; it is a baseline, not news.
     for (const pane of this.panes()) {
-      if (pane.smc) this.announce(pane.def.id, pane.smc, true);
+      if (pane.smc && isTradableChartBook(pane.def.id)) this.announce(pane.def.id, pane.smc, true);
     }
   }
 
@@ -1049,7 +1060,7 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
 
   // ── Manual ATM orders ───────────────────────────────────────────────────
 
-  private paneById(id: ChartBookId): ChartPane | undefined {
+  private paneById(id: TrendBookId): ChartPane | undefined {
     return this.panes().find((pane) => pane.def.id === id);
   }
 
@@ -1076,6 +1087,7 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
     const now = new Date(this.clock());
     const trends: Partial<Record<ChartBookId, 'bullish' | 'bearish' | 'sideways' | null>> = {};
     for (const pane of this.panes()) {
+      if (!isTradableChartBook(pane.def.id)) continue;
       trends[pane.def.id] = pane.smc?.snapshot.htfTrend ?? pane.smc?.snapshot.trend ?? null;
     }
     return protectStatusLine({
@@ -1345,10 +1357,11 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
   }
 
   protected statusOf(pane: ChartPane): MarketStatus {
-    return this.marketStatus()[pane.def.id];
+    if (isTradableChartBook(pane.def.id)) return this.marketStatus()[pane.def.id];
+    return marketStatusAt(pane.session, new Date(this.clock()));
   }
 
-  private patch(id: ChartBookId, patch: Partial<ChartPane>): void {
+  private patch(id: TrendBookId, patch: Partial<ChartPane>): void {
     this.panes.update((list) =>
       list.map((pane) => (pane.def.id === id ? { ...pane, ...patch } : pane)),
     );

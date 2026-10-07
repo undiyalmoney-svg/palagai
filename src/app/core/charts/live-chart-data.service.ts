@@ -16,7 +16,11 @@ import { KiteApiService } from '../kite/kite-api.service';
 import { KiteSessionService } from '../kite/kite-session.service';
 import { InstrumentStoreService } from '../services/instrument-store.service';
 import { resolveCrudeOilMiniFuturesToken } from '../utils/instrument-resolver.util';
-import { BANK_NIFTY_INSTRUMENT, NIFTY_50_INSTRUMENT } from '../constants/instruments.const';
+import {
+  BANK_NIFTY_INSTRUMENT,
+  NIFTY_50_INSTRUMENT,
+  SENSEX_INSTRUMENT,
+} from '../constants/instruments.const';
 import { assertKiteResponseSuccess, extractKiteApiError } from '../utils/kite-error.util';
 import { aggregateCandles } from './candle-aggregate.util';
 import {
@@ -44,6 +48,33 @@ export const CHART_BOOKS: readonly ChartBookDef[] = [
   { id: 'bank', label: 'Bank Nifty', exchange: 'NSE', decimals: 2 },
   { id: 'crude', label: 'Crude Oil Mini', exchange: 'MCX', decimals: 0 },
 ] as const;
+
+/** Charts trend cards. Sensex is display-only and is not a tradable book. */
+export type TrendBookId = ChartBookId | 'sensex';
+
+export function isTradableChartBook(id: TrendBookId): id is ChartBookId {
+  return id !== 'sensex';
+}
+
+export interface TrendBookDef {
+  id: TrendBookId;
+  label: string;
+  exchange: 'NSE' | 'MCX' | 'BSE';
+  decimals: number;
+}
+
+const chartBook = (id: ChartBookId): TrendBookDef => {
+  const book = CHART_BOOKS.find((row) => row.id === id);
+  if (!book) throw new Error(`Missing chart book ${id}`);
+  return book;
+};
+
+export const TREND_BOOKS: readonly TrendBookDef[] = [
+  chartBook('nifty'),
+  chartBook('bank'),
+  { id: 'sensex', label: 'Sensex', exchange: 'BSE', decimals: 2 },
+  chartBook('crude'),
+];
 
 export interface ResolvedChartInstrument {
   token: number;
@@ -102,6 +133,18 @@ export class LiveChartDataService {
       symbol: contract.tradingSymbol,
       exchange: contract.exchange,
     };
+  }
+
+  /** Same as {@link resolveInstrument}, plus the Sensex index for the trend cards. */
+  async resolveTrendInstrument(book: TrendBookId, asOf?: Date): Promise<ResolvedChartInstrument> {
+    if (book === 'sensex') {
+      return {
+        token: SENSEX_INSTRUMENT.instrumentToken,
+        symbol: SENSEX_INSTRUMENT.tradingSymbol,
+        exchange: SENSEX_INSTRUMENT.exchange,
+      };
+    }
+    return this.resolveInstrument(book, asOf);
   }
 
   async loadCandles(params: {

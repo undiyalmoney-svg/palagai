@@ -22,6 +22,15 @@ export const BANK_NIFTY_INSTRUMENT: TesterInstrument = {
   exchange: 'NSE',
 };
 
+/** BSE Sensex index. Trend display only — not an options book. */
+export const SENSEX_INSTRUMENT: TesterInstrument = {
+  id: 'sensex',
+  instrumentToken: 265,
+  tradingSymbol: 'SENSEX',
+  name: 'Sensex',
+  exchange: 'BSE',
+};
+
 /** Kept for session/helpers; not shown as an active tester tab. */
 export const CRUDE_OIL_INSTRUMENT: TesterInstrument = {
   id: 'crude-oil',

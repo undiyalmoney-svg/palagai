@@ -6,11 +6,28 @@
     </p>
   }
 
+  <div class="trend-tools">
+    <button
+      type="button"
+      class="trend-refresh"
+      data-testid="trend-refresh"
+      (click)="refreshAll()"
+      [disabled]="refreshing()"
+    >
+      {{ refreshing() ? 'Refreshing' : 'Refresh' }}
+    </button>
+    <p class="trend-hint">Auto refresh every 15 secs</p>
+  </div>
+
   <div class="trend-grid">
     @for (pane of panes(); track pane.def.id) {
       <article class="trend-card" [attr.data-lamp]="lamp(pane)" [attr.data-testid]="'trend-' + pane.def.id">
+        <span class="trend-dot" aria-hidden="true"></span>
         <h2>{{ pane.def.label }}</h2>
         <p class="trend-word">{{ lampLabel(pane) }}</p>
+        @if (pane.smc) {
+          <p class="trend-signal">{{ signalLabel(pane) }}</p>
+        }
         @if (pane.error && !sessionExpired()) {
           <p class="trend-error">{{ pane.error }}</p>
         }

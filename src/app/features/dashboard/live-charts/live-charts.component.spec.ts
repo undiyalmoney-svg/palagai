@@ -29,13 +29,32 @@ describe('LiveChartsComponent trends', () => {
     fixture = TestBed.createComponent(LiveChartsComponent);
   });
 
-  it('shows only a traffic light for Nifty, Bank Nifty and Crude', () => {
+  it('shows Sensex with a continue or wait line, a corner dot and a 15s refresh', () => {
     const panes = fixture.componentInstance['panes']();
     const byId = Object.fromEntries(panes.map((pane) => [pane.def.id, pane]));
-    byId['nifty'] = { ...byId['nifty'], loading: false, smc: { snapshot: { trend: 'bullish' } } as never };
-    byId['bank'] = { ...byId['bank'], loading: false, smc: { snapshot: { trend: 'bearish' } } as never };
-    byId['crude'] = { ...byId['crude'], loading: false, smc: { snapshot: { trend: 'sideways' } } as never };
-    fixture.componentInstance['panes'].set([byId['nifty'], byId['bank'], byId['crude']]);
+    byId['nifty'] = {
+      ...byId['nifty'],
+      loading: false,
+      smc: { snapshot: { trend: 'bullish', ltfTrend: 'bullish', htfTrend: 'bullish', lastChoch: null } } as never,
+    };
+    byId['bank'] = {
+      ...byId['bank'],
+      loading: false,
+      smc: {
+        snapshot: { trend: 'bearish', ltfTrend: 'bullish', htfTrend: 'bearish', lastChoch: 'Bullish' },
+      } as never,
+    };
+    byId['sensex'] = {
+      ...byId['sensex'],
+      loading: false,
+      smc: { snapshot: { trend: 'bullish', ltfTrend: 'bullish', htfTrend: 'bullish', lastChoch: null } } as never,
+    };
+    byId['crude'] = {
+      ...byId['crude'],
+      loading: false,
+      smc: { snapshot: { trend: 'sideways', ltfTrend: 'sideways', htfTrend: null, lastChoch: null } } as never,
+    };
+    fixture.componentInstance['panes'].set([byId['nifty'], byId['bank'], byId['sensex'], byId['crude']]);
     fixture.detectChanges();
 
     const text = fixture.nativeElement.textContent as string;
@@ -43,8 +62,13 @@ describe('LiveChartsComponent trends', () => {
     expect(text).toContain('Uptrend');
     expect(text).toContain('Bank Nifty');
     expect(text).toContain('Downtrend');
+    expect(text).toContain('Sensex');
     expect(text).toContain('Crude Oil Mini');
     expect(text).toContain('Sideways');
+    expect(text).toContain('Trend will continue');
+    expect(text).toContain('Wait, it may change');
+    expect(text).toContain('Auto refresh every 15 secs');
+    expect(text).toContain('Refresh');
     expect(text).not.toContain('Protect');
     expect(text).not.toContain('Buy');
     expect(text).not.toContain('Sell');
@@ -52,8 +76,18 @@ describe('LiveChartsComponent trends', () => {
     const root = fixture.nativeElement as HTMLElement;
     expect(root.querySelector('[data-testid="trend-nifty"]')?.getAttribute('data-lamp')).toBe('up');
     expect(root.querySelector('[data-testid="trend-bank"]')?.getAttribute('data-lamp')).toBe('down');
+    expect(root.querySelector('[data-testid="trend-sensex"]')?.getAttribute('data-lamp')).toBe('up');
     expect(root.querySelector('[data-testid="trend-crude"]')?.getAttribute('data-lamp')).toBe('side');
+    expect(root.querySelectorAll('.trend-dot').length).toBe(4);
+    expect(root.querySelector('[data-testid="trend-refresh"]')).toBeTruthy();
     expect(root.querySelector('.lamp')).toBeNull();
     expect(root.querySelector('canvas')).toBeNull();
+
+    const nifty = root.querySelector('[data-testid="trend-nifty"]')?.textContent ?? '';
+    const bank = root.querySelector('[data-testid="trend-bank"]')?.textContent ?? '';
+    const crude = root.querySelector('[data-testid="trend-crude"]')?.textContent ?? '';
+    expect(nifty).toContain('Trend will continue');
+    expect(bank).toContain('Wait, it may change');
+    expect(crude).toContain('Wait, it may change');
   });
 });

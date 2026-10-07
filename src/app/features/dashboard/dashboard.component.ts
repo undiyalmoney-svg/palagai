@@ -110,7 +110,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     },
     '/dashboard/charts': {
       title: 'Charts',
-      subtitle: 'Uptrend, downtrend or sideways on Nifty 50, Bank Nifty and Crude.',
+      subtitle: 'Uptrend, downtrend or sideways on Nifty 50, Bank Nifty, Sensex and Crude.',
     },
     '/dashboard/order-test': {
       title: 'Order Test',
