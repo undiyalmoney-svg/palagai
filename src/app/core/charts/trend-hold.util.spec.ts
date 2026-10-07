@@ -1,24 +1,29 @@
 import { describe, expect, it } from 'vitest';
-import { SmcStructureEvent, SmcTrend } from './smc/smc.types';
+import { SmcTrend } from './smc/smc.types';
 import { trendContinue } from './trend-hold.util';
 
-function stretch(parts: Array<[SmcTrend, number]>, htf: SmcTrend | null = 'bullish') {
+function stretch(parts: Array<[SmcTrend, number]>, htf: SmcTrend | null | 'same' = 'same') {
   const trendAt: SmcTrend[] = [];
   for (const [trend, count] of parts) {
     for (let i = 0; i < count; i += 1) trendAt.push(trend);
   }
   const trend = parts[parts.length - 1]?.[0] ?? 'sideways';
+  const htfTrend = htf === 'same' ? (trend === 'sideways' ? null : trend) : htf;
+  const htfTrendAt =
+    htf === 'same'
+      ? trendAt.map((bar) => (bar === 'sideways' ? null : bar))
+      : trendAt.map(() => htfTrend);
   return {
     snapshot: {
       trend,
       ltfTrend: trend,
-      htfTrend: htf,
+      htfTrend,
       lastChoch: null,
     },
     trendAt,
-    htfTrendAt: trendAt.map(() => htf),
-    structure: [] as SmcStructureEvent[],
-    htfAvailable: htf != null,
+    htfTrendAt,
+    structure: [],
+    htfAvailable: htfTrend != null,
   };
 }
 
@@ -67,6 +72,14 @@ describe('trendContinue', () => {
     expect(trendContinue(twoHours as never, 1, 5)).toEqual({ call: 'continue', minutes: 120 });
   });
 
+  it('still names the minutes when the downtrend is the only run on the chart', () => {
+    const down = stretch([['bearish', 73]]);
+    down.trendAt = Array.from({ length: 73 }, (_, i) => (i % 7 === 0 ? 'sideways' : 'bearish')) as never;
+    down.htfTrendAt = down.trendAt.map((bar) => (bar === 'sideways' ? null : bar)) as never;
+    down.snapshot.ltfTrend = 'sideways' as never;
+    expect(trendContinue(down as never, 1, 5)).toEqual({ call: 'continue', minutes: 70 });
+  });
+
   it('does not claim more than 2 hours', () => {
     const long = stretch([
       ['bullish', 200],
@@ -78,16 +91,7 @@ describe('trendContinue', () => {
     expect(trendContinue(long as never, 1, 5)).toEqual({ call: 'continue', minutes: 120 });
   });
 
-  it('waits when the usual run is almost over or this run just started', () => {
-    const late = stretch([
-      ['bullish', 30],
-      ['sideways', 5],
-      ['bullish', 40],
-      ['sideways', 5],
-      ['bullish', 30],
-    ]);
-    expect(trendContinue(late as never, 1, 5)).toEqual({ call: 'wait' });
-
+  it('waits when this run has not held for 15 minutes yet', () => {
     const fresh = stretch([
       ['bullish', 80],
       ['sideways', 5],
@@ -98,40 +102,18 @@ describe('trendContinue', () => {
     expect(trendContinue(fresh as never, 1, 5)).toEqual({ call: 'wait' });
   });
 
-  it('waits when the timeframes split or the higher timeframe is missing', () => {
-    const row = stretch([
-      ['bullish', 40],
-      ['sideways', 5],
-      ['bullish', 60],
-      ['sideways', 5],
-      ['bullish', 20],
-    ]);
-    row.snapshot.ltfTrend = 'bearish' as never;
+  it('waits when the lower timeframe has turned against the card for 15 minutes', () => {
+    const row = stretch([['bearish', 80]]);
+    row.trendAt = Array.from({ length: 80 }, (_, i) => (i < 65 ? 'bearish' : 'bullish')) as never;
+    row.snapshot.ltfTrend = 'bullish' as never;
     expect(trendContinue(row as never, 1, 5)).toEqual({ call: 'wait' });
-
-    const noHtf = stretch(
-      [
-        ['bullish', 40],
-        ['sideways', 5],
-        ['bullish', 60],
-        ['sideways', 5],
-        ['bullish', 20],
-      ],
-      null,
-    );
-    expect(trendContinue(noHtf as never, 1, 5)).toEqual({ call: 'wait' });
   });
 
-  it('waits on a break against the current run', () => {
-    const row = stretch([
-      ['bullish', 40],
-      ['sideways', 5],
-      ['bullish', 60],
-      ['sideways', 5],
-      ['bullish', 20],
-    ]);
-    row.structure = [{ index: row.trendAt.length - 5, dir: 'bear', kind: 'CHoCH' } as SmcStructureEvent];
-    expect(trendContinue(row as never, 1, 5)).toEqual({ call: 'wait' });
+  it('keeps the downtrend when only the latest minute has bounced', () => {
+    const row = stretch([['bearish', 40]]);
+    row.trendAt = Array.from({ length: 40 }, (_, i) => (i === 39 ? 'bullish' : 'bearish')) as never;
+    row.snapshot.ltfTrend = 'bullish' as never;
+    expect(trendContinue(row as never, 1, 5)).toEqual({ call: 'continue', minutes: 40 });
   });
 
   it('counts 15-minute bars in minutes', () => {

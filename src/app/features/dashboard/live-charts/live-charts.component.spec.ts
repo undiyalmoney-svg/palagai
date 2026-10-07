@@ -41,7 +41,7 @@ describe('LiveChartsComponent trends', () => {
       return {
         snapshot: { trend, ltfTrend: trend, htfTrend: trend === 'sideways' ? null : trend, lastChoch: null },
         trendAt,
-        htfTrendAt: trendAt.map(() => (trend === 'sideways' ? null : trend)),
+        htfTrendAt: trendAt.map((bar) => (bar === 'sideways' ? null : bar)),
         structure: [] as unknown[],
         htfAvailable: trend !== 'sideways',
       };
@@ -57,17 +57,21 @@ describe('LiveChartsComponent trends', () => {
         ['bullish', 20],
       ]) as never,
     };
+    const bankBook = stretch([
+      ['bearish', 40],
+      ['sideways', 5],
+      ['bearish', 60],
+      ['sideways', 5],
+      ['bearish', 20],
+    ]);
+    for (let i = bankBook.trendAt.length - 15; i < bankBook.trendAt.length; i += 1) {
+      bankBook.trendAt[i] = 'bullish';
+    }
     byId['bank'] = {
       ...byId['bank'],
       loading: false,
       smc: {
-        ...stretch([
-          ['bearish', 40],
-          ['sideways', 5],
-          ['bearish', 60],
-          ['sideways', 5],
-          ['bearish', 20],
-        ]),
+        ...bankBook,
         snapshot: { trend: 'bearish', ltfTrend: 'bullish', htfTrend: 'bearish', lastChoch: 'Bullish' },
       } as never,
     };

@@ -383,8 +383,8 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Minutes left are the usual length of this trend minus how long it has
-   * already run. Each card gets its own number.
+   * Minutes follow the trend printed on the card. A one-minute bounce does
+   * not replace that with a wait.
    */
   protected signalLabel(pane: ChartPane): string {
     const call = trendContinue(
