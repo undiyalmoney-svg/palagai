@@ -32,28 +32,24 @@ describe('LiveChartsComponent trends', () => {
   it('shows Sensex with a continue or wait line, a corner dot and a 15s refresh', () => {
     const panes = fixture.componentInstance['panes']();
     const byId = Object.fromEntries(panes.map((pane) => [pane.def.id, pane]));
-    byId['nifty'] = {
-      ...byId['nifty'],
-      loading: false,
-      smc: { snapshot: { trend: 'bullish', ltfTrend: 'bullish', htfTrend: 'bullish', lastChoch: null } } as never,
-    };
+    const held = (trend: 'bullish' | 'bearish' | 'sideways') => ({
+      snapshot: { trend, ltfTrend: trend, htfTrend: trend === 'sideways' ? null : trend, lastChoch: null },
+      trendAt: Array.from({ length: 45 }, () => trend),
+      htfTrendAt: Array.from({ length: 45 }, () => (trend === 'sideways' ? null : trend)),
+      structure: [] as unknown[],
+      htfAvailable: trend !== 'sideways',
+    });
+    byId['nifty'] = { ...byId['nifty'], loading: false, smc: held('bullish') as never };
     byId['bank'] = {
       ...byId['bank'],
       loading: false,
       smc: {
+        ...held('bearish'),
         snapshot: { trend: 'bearish', ltfTrend: 'bullish', htfTrend: 'bearish', lastChoch: 'Bullish' },
       } as never,
     };
-    byId['sensex'] = {
-      ...byId['sensex'],
-      loading: false,
-      smc: { snapshot: { trend: 'bullish', ltfTrend: 'bullish', htfTrend: 'bullish', lastChoch: null } } as never,
-    };
-    byId['crude'] = {
-      ...byId['crude'],
-      loading: false,
-      smc: { snapshot: { trend: 'sideways', ltfTrend: 'sideways', htfTrend: null, lastChoch: null } } as never,
-    };
+    byId['sensex'] = { ...byId['sensex'], loading: false, smc: held('bullish') as never };
+    byId['crude'] = { ...byId['crude'], loading: false, smc: held('sideways') as never };
     fixture.componentInstance['panes'].set([byId['nifty'], byId['bank'], byId['sensex'], byId['crude']]);
     fixture.detectChanges();
 
@@ -65,7 +61,7 @@ describe('LiveChartsComponent trends', () => {
     expect(text).toContain('Sensex');
     expect(text).toContain('Crude Oil Mini');
     expect(text).toContain('Sideways');
-    expect(text).toContain('Trend will continue');
+    expect(text).toContain('Trend will continue for 30 to 45 min');
     expect(text).toContain('Wait, it may change');
     expect(text).toContain('Auto refresh every 15 secs');
     expect(text).toContain('Refresh');
@@ -86,7 +82,7 @@ describe('LiveChartsComponent trends', () => {
     const nifty = root.querySelector('[data-testid="trend-nifty"]')?.textContent ?? '';
     const bank = root.querySelector('[data-testid="trend-bank"]')?.textContent ?? '';
     const crude = root.querySelector('[data-testid="trend-crude"]')?.textContent ?? '';
-    expect(nifty).toContain('Trend will continue');
+    expect(nifty).toContain('Trend will continue for 30 to 45 min');
     expect(bank).toContain('Wait, it may change');
     expect(crude).toContain('Wait, it may change');
   });

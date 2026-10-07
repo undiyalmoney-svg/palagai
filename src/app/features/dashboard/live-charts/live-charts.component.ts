@@ -51,6 +51,7 @@ import {
   chartIntervalMinutes,
 } from '../../../core/charts/chart-intervals.util';
 import { chartCandleAsOf, isLiveChartDay, istToday } from '../../../core/charts/chart-day.util';
+import { trendHoldCall } from '../../../core/charts/trend-hold.util';
 import { ChartQuote, chartQuote } from '../../../core/charts/chart-quote.util';
 import { analyzeSmc } from '../../../core/charts/smc/smc-analyze';
 import { SmcAlertTracker } from '../../../core/charts/smc/smc-alerts';
@@ -382,21 +383,18 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Short read of whether the printed trend still agrees with itself.
-   * Agreement means continue. Sideways, a split between timeframes, or a
-   * change-of-character against the trend means wait.
+   * Continuation is the next 30 to 45 minutes. It is shown only after that
+   * trend has already held for 45 minutes on both timeframes.
    */
   protected signalLabel(pane: ChartPane): string {
-    const snap = pane.smc?.snapshot;
-    if (!snap) return pane.error ? 'Unavailable' : 'Reading';
-    const trend = snap.trend;
-    if (trend !== 'bullish' && trend !== 'bearish') return 'Wait, it may change';
-    if (snap.htfTrend && snap.ltfTrend && snap.htfTrend !== snap.ltfTrend) {
-      return 'Wait, it may change';
-    }
-    if (trend === 'bullish' && snap.lastChoch === 'Bearish') return 'Wait, it may change';
-    if (trend === 'bearish' && snap.lastChoch === 'Bullish') return 'Wait, it may change';
-    return 'Trend will continue';
+    const call = trendHoldCall(
+      pane.smc,
+      chartIntervalMinutes(this.ltf()),
+      chartIntervalMinutes(this.htf()),
+    );
+    if (call === 'reading') return pane.error ? 'Unavailable' : 'Reading';
+    if (call === 'continue') return 'Trend will continue for 30 to 45 min';
+    return 'Wait, it may change';
   }
 
   ngOnInit(): void {
