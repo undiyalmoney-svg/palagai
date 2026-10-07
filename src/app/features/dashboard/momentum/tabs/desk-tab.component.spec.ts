@@ -32,7 +32,7 @@ describe('DeskTabComponent suggestions', () => {
       sellToday: [{ symbol: 'RECLTD', qty: 1, suggestedSell: 297, whenLabel: 'Sell today', analysis: '3M -16.7%, 6M -8.0% · score 41' }],
       sellTomorrow: [{ symbol: 'IDEA', qty: 10, suggestedSell: 12, whenLabel: 'Sell tomorrow', analysis: '3M -4.0% · score 30' }],
       buy: [],
-      hold: [],
+      hold: [{ symbol: 'TCS', action: 'HOLD', qty: 0, priceRef: 4100, analysis: '3M +10.0%, 6M +20.0% · score 80' }],
       sell: [],
     } as unknown as DeskScan;
     fixture.componentInstance['scan'].set(scan);
@@ -40,12 +40,16 @@ describe('DeskTabComponent suggestions', () => {
     fixture.detectChanges();
     const root = fixture.nativeElement as HTMLElement;
     const text = root.textContent as string;
-    expect(root.querySelectorAll('article.signal').length).toBe(3);
+    expect(root.querySelectorAll('article.signal').length).toBe(4);
     expect(text).toContain('Buy tomorrow');
     expect(text).toContain('NYKAA');
     expect(text).toContain('14 shares');
     expect(text).toContain('Qty from');
     expect(text).toContain('3M +8.3%');
+    expect(text).toContain('Hold');
+    expect(text).toContain('TCS');
+    expect(text).toContain('Use my fund');
+    expect(text).toContain('Custom fund');
     expect(text).toContain('Sell today');
     expect(text).toContain('3M -16.7%');
     expect(text).toContain('RECLTD');
