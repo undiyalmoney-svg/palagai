@@ -26,6 +26,15 @@
     },
     "logLevel": "debug"
   },
+  "/api/research": {
+    "target": "http://168.144.28.89:3000",
+    "secure": false,
+    "changeOrigin": true,
+    "pathRewrite": {
+      "^/api/research": "/research"
+    },
+    "logLevel": "debug"
+  },
   "/api/pnl": {
     "target": "http://168.144.28.89:3000",
     "secure": false,

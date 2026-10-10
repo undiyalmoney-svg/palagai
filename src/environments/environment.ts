@@ -8,6 +8,8 @@ export const environment = {
   orderApiBaseUrl: '/api/order-kite',
   /** Momentum Portfolio Manager + broker session — local proxy / prod SSR → droplet /momentum. */
   momentumApiBaseUrl: '/api/momentum',
+  /** Intraday paper research — local proxy / prod SSR → droplet /research. */
+  researchApiBaseUrl: '/api/research',
   /** Manual daily P/L — local proxy / prod SSR → droplet /pnl. */
   pnlApiBaseUrl: '/api/pnl',
   /** Default lots multiplier across desks (exchange lot × this). */

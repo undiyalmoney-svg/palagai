@@ -1,0 +1,347 @@
+<div class="mp-page">
+  <div class="mp-tabs" role="tablist">
+    @for (item of sections; track item.id) {
+      <button type="button" class="mp-tab" [class.active]="section() === item.id" (click)="show(item.id)">
+        {{ item.label }}
+      </button>
+    }
+  </div>
+
+  @if (error()) {
+    <div class="mp-banner" data-tone="down">{{ error() }}</div>
+  }
+  @if (notice()) {
+    <div class="mp-banner" data-tone="info">{{ notice() }}</div>
+  }
+
+  @if (status(); as view) {
+    <div class="mp-banner" data-tone="warn">
+      Paper only. {{ view.disclaimer }}
+      Combined equity is the sum of independent strategy accounts. {{ view.combined.note }}
+    </div>
+    @if (view.dataMode !== 'live') {
+      <div class="mp-banner" data-tone="info">
+        Waiting for market data. {{ view.feed.message }}
+      </div>
+    }
+
+    @if (section() === 'overview') {
+      <div class="mp-stats">
+        <div class="mp-stat"><span class="mp-stat-label">Status</span><span class="mp-stat-value">{{ view.experiment.status }}</span></div>
+        <div class="mp-stat"><span class="mp-stat-label">Trading days</span><span class="mp-stat-value">{{ view.experiment.tradingDays }}</span></div>
+        <div class="mp-stat"><span class="mp-stat-label">Virtual capital</span><span class="mp-stat-value">{{ inr(capital()) }}</span></div>
+        <div class="mp-stat"><span class="mp-stat-label">Current equity</span><span class="mp-stat-value">{{ inr(view.combined.equity) }}</span></div>
+        <div class="mp-stat"><span class="mp-stat-label">Available cash</span><span class="mp-stat-value">{{ inr(view.combined.cash) }}</span></div>
+        <div class="mp-stat"><span class="mp-stat-label">Realized P&L</span><span class="mp-stat-value" [class]="pnlClass(view.combined.realized)">{{ inr(view.combined.realized) }}</span></div>
+        <div class="mp-stat"><span class="mp-stat-label">Unrealized P&L</span><span class="mp-stat-value" [class]="pnlClass(view.combined.unrealized)">{{ inr(view.combined.unrealized) }}</span></div>
+        <div class="mp-stat"><span class="mp-stat-label">Net P&L</span><span class="mp-stat-value" [class]="pnlClass(view.combined.netPnl)">{{ inr(view.combined.netPnl) }}</span></div>
+        <div class="mp-stat"><span class="mp-stat-label">Today vs open</span><span class="mp-stat-value" [class]="pnlClass(dayChange())">{{ inr(dayChange()) }}</span></div>
+        <div class="mp-stat"><span class="mp-stat-label">Feed</span><span class="mp-stat-value">{{ view.feed.connected ? 'Connected' : 'Waiting' }}</span><span class="mp-stat-hint">{{ view.feed.lastTickAt || 'No tick yet' }}</span></div>
+      </div>
+
+      <div class="mp-card">
+        <div class="mp-card-head"><h2>Readiness</h2><span class="mp-badge" [attr.data-tone]="ready() ? 'up' : 'warn'">{{ ready() ? 'Ready' : 'Not ready' }}</span></div>
+        <ul class="mp-stack">
+          @for (check of checks(); track check.id) {
+            <li>{{ check.ok ? 'Pass' : 'Needs setup' }} — {{ check.message }}</li>
+          }
+        </ul>
+        <p class="mp-sub">The 10-week experiment starts only after these checks pass and you type the confirmation phrase.</p>
+      </div>
+
+      <div class="mp-card">
+        <div class="mp-card-head"><h2>Accounts</h2></div>
+        <div class="mp-table-wrap">
+          <table class="mp-table">
+            <thead>
+              <tr><th>Strategy</th><th>Version</th><th class="num">Equity</th><th class="num">Cash</th><th class="num">Realized</th><th class="num">Open</th></tr>
+            </thead>
+            <tbody>
+              @for (account of view.accounts; track account.accountId) {
+                <tr>
+                  <td>{{ account.strategyId }}</td>
+                  <td>v{{ account.strategyVersion }}</td>
+                  <td class="num">{{ inr(account.currentEquity) }}</td>
+                  <td class="num">{{ inr(account.cashBalance) }}</td>
+                  <td class="num" [class]="pnlClass(account.realizedPnl)">{{ inr(account.realizedPnl) }}</td>
+                  <td class="num">{{ account.openPositions }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="mp-card">
+        <div class="mp-card-head"><h2>Recent events</h2></div>
+        @if (!events().length) {
+          <p class="mp-sub">No system events yet.</p>
+        } @else {
+          <ul class="mp-stack">
+            @for (event of events(); track event.timestamp + event.eventType) {
+              <li><span class="mp-mono">{{ event.timestamp }}</span> {{ event.eventType }} — {{ event.message }}</li>
+            }
+          </ul>
+        }
+      </div>
+    }
+
+    @if (section() === 'picker') {
+      <div class="mp-card">
+        <div class="mp-card-head">
+          <h2>Intraday stock picker</h2>
+          <button type="button" class="ui-btn ui-btn-secondary mp-btn-sm" (click)="applyFilters()">Refresh</button>
+        </div>
+        @if (!candidates().length) {
+          <p>No qualifying trade.</p>
+        } @else {
+          <div class="mp-table-wrap">
+            <table class="mp-table">
+              <thead>
+                <tr>
+                  <th>Symbol</th><th>Strategy</th><th>Direction</th><th class="num">Reference</th><th class="num">Stop</th><th class="num">Target</th><th class="num">Score</th><th>Status</th><th>Reason</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (row of candidates(); track row.signalId) {
+                  <tr>
+                    <td>{{ row.symbol }}</td>
+                    <td>{{ row.strategyId }}</td>
+                    <td>{{ row.direction }}</td>
+                    <td class="num">{{ row.referencePrice | number:'1.2-2' }}</td>
+                    <td class="num">{{ row.stopPrice | number:'1.2-2' }}</td>
+                    <td class="num">{{ row.targetPrice | number:'1.2-2' }}</td>
+                    <td class="num">{{ row.rankingScore | number:'1.1-1' }}</td>
+                    <td>{{ row.accepted ? 'Accepted' : 'Rejected' }}</td>
+                    <td>{{ row.rejectionReason || row.metadata?.reason || '' }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+        <p class="mp-sub">The score is setup quality plus reward/risk. It is not a probability of profit.</p>
+      </div>
+    }
+
+    @if (section() === 'positions') {
+      <div class="mp-card">
+        <div class="mp-card-head"><h2>Active paper positions</h2></div>
+        @if (!positions().length) {
+          <p class="mp-sub">No open paper positions.</p>
+        } @else {
+          <div class="mp-table-wrap">
+            <table class="mp-table">
+              <thead>
+                <tr><th>Symbol</th><th>Strategy</th><th>Direction</th><th class="num">Entry</th><th class="num">Last</th><th class="num">Stop</th><th class="num">Target</th><th class="num">Qty</th><th>Status</th></tr>
+              </thead>
+              <tbody>
+                @for (row of positions(); track row.tradeId) {
+                  <tr>
+                    <td>{{ row.symbol }}</td>
+                    <td>{{ row.strategyId }}</td>
+                    <td>{{ row.direction }}</td>
+                    <td class="num">{{ row.actualSimulatedEntryPrice | number:'1.2-2' }}</td>
+                    <td class="num">{{ row.lastPrice ?? '—' }}</td>
+                    <td class="num">{{ row.stopPrice | number:'1.2-2' }}</td>
+                    <td class="num">{{ row.targetPrice | number:'1.2-2' }}</td>
+                    <td class="num">{{ row.quantity }}</td>
+                    <td>{{ row.status }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </div>
+    }
+
+    @if (section() === 'comparison') {
+      <div class="mp-card">
+        <div class="mp-card-head"><h2>Strategy comparison</h2></div>
+        @if (!strategyRows().length) {
+          <p class="mp-sub">No closed-trade statistics yet.</p>
+        } @else {
+          <div class="mp-table-wrap">
+            <table class="mp-table">
+              <thead>
+                <tr>
+                  <th>Strategy</th><th class="num">Start</th><th class="num">Equity</th><th class="num">Net P&L</th><th class="num">Return</th><th class="num">Trades</th><th class="num">Win rate</th><th class="num">Avg win</th><th class="num">Avg loss</th><th class="num">Expectancy</th><th class="num">Profit factor</th><th class="num">Max DD</th><th class="num">Hold</th><th class="num">Costs</th><th>Curve</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (row of strategyRows(); track row.id) {
+                  <tr>
+                    <td>{{ row.id }}</td>
+                    <td class="num">{{ inr(row.stats.initialCapital) }}</td>
+                    <td class="num">{{ inr(row.stats.currentEquity) }}</td>
+                    <td class="num" [class]="pnlClass(row.stats.netPnl)">{{ inr(row.stats.netPnl) }}</td>
+                    <td class="num">{{ points(row.stats.returnPct) }}</td>
+                    <td class="num">{{ row.stats.closed }}</td>
+                    <td class="num">{{ rate(row.stats.winRate) }}</td>
+                    <td class="num">{{ inr(row.stats.avgWin) }}</td>
+                    <td class="num">{{ inr(row.stats.avgLoss) }}</td>
+                    <td class="num">{{ inr(row.stats.expectancy) }}</td>
+                    <td class="num">{{ row.stats.profitFactor == null ? '—' : (row.stats.profitFactor | number:'1.2-2') }}</td>
+                    <td class="num">{{ inr(row.stats.maxDrawdown) }}</td>
+                    <td class="num">{{ hold(row.stats.avgHoldingMs) }}</td>
+                    <td class="num">{{ inr(row.stats.fees) }}</td>
+                    <td>{{ row.stats.equityCurveSource }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+        @if (summary(); as stats) {
+          <p class="mp-sub">{{ stats.disclaimer }} Profit factor is gross wins divided by the absolute value of gross losses, and is blank when there are no losing trades. Win rate and expectancy use closed trades only.</p>
+        }
+      </div>
+    }
+
+    @if (section() === 'ledger') {
+      <div class="mp-card">
+        <div class="mp-card-head">
+          <h2>Trade ledger</h2>
+          <div class="mp-row">
+            <button type="button" class="ui-btn ui-btn-secondary mp-btn-sm" (click)="download('csv')">CSV</button>
+            <button type="button" class="ui-btn ui-btn-secondary mp-btn-sm" (click)="download('xlsx')">Excel</button>
+          </div>
+        </div>
+        <div class="mp-row">
+          <input class="ui-input" type="date" [(ngModel)]="from" aria-label="From date" />
+          <input class="ui-input" type="date" [(ngModel)]="to" aria-label="To date" />
+          <input class="ui-input" [(ngModel)]="symbol" placeholder="Symbol" aria-label="Symbol" />
+          <input class="ui-input" [(ngModel)]="strategyId" placeholder="Strategy" aria-label="Strategy" />
+          <select class="ui-select" [(ngModel)]="direction" aria-label="Direction">
+            <option value="">Any direction</option>
+            <option value="LONG">Long</option>
+            <option value="SHORT">Short</option>
+          </select>
+          <select class="ui-select" [(ngModel)]="tradeStatus" aria-label="Status">
+            <option value="">Any status</option>
+            <option value="OPEN">Open</option>
+            <option value="CLOSED">Closed</option>
+          </select>
+          <button type="button" class="ui-btn ui-btn-primary mp-btn-sm" (click)="applyFilters()">Apply</button>
+        </div>
+        <p class="mp-sub">{{ tradeTotal() }} matching trades.</p>
+        @if (!trades().length) {
+          <p class="mp-sub">No trades in this range.</p>
+        } @else {
+          <div class="mp-table-wrap">
+            <table class="mp-table">
+              <thead>
+                <tr><th>Date</th><th>Strategy</th><th>Symbol</th><th>Side</th><th class="num">Qty</th><th class="num">Entry</th><th class="num">Exit</th><th>Reason</th><th class="num">Gross</th><th class="num">Fees</th><th class="num">Net</th><th>Status</th></tr>
+              </thead>
+              <tbody>
+                @for (row of trades(); track row.tradeId) {
+                  <tr>
+                    <td>{{ row.tradingDate }}</td>
+                    <td>{{ row.strategyId }}</td>
+                    <td>{{ row.symbol }}</td>
+                    <td>{{ row.direction }}</td>
+                    <td class="num">{{ row.quantity }}</td>
+                    <td class="num">{{ row.actualSimulatedEntryPrice | number:'1.2-2' }}</td>
+                    <td class="num">{{ row.actualSimulatedExitPrice ?? '—' }}</td>
+                    <td>{{ row.exitReason || '' }}</td>
+                    <td class="num">{{ inr(row.grossPnl) }}</td>
+                    <td class="num">{{ inr(row.fees) }}</td>
+                    <td class="num" [class]="pnlClass(row.netPnl)">{{ inr(row.netPnl) }}</td>
+                    <td>{{ row.status }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </div>
+    }
+
+    @if (section() === 'weekly') {
+      <div class="mp-card">
+        <div class="mp-card-head">
+          <h2>Weekly review</h2>
+          <button type="button" class="ui-btn ui-btn-secondary mp-btn-sm" (click)="download('xlsx')">Download Excel</button>
+        </div>
+        @if (!weeks().length) {
+          <p class="mp-sub">No daily summaries yet. They are written after the session square-off.</p>
+        } @else {
+          <div class="mp-table-wrap">
+            <table class="mp-table">
+              <thead><tr><th>Week</th><th class="num">Net P&L</th><th class="num">Trades</th><th class="num">Max drawdown</th></tr></thead>
+              <tbody>
+                @for (week of weeks(); track week.week) {
+                  <tr>
+                    <td>{{ week.week }}</td>
+                    <td class="num" [class]="pnlClass(week.netPnl)">{{ inr(week.netPnl) }}</td>
+                    <td class="num">{{ week.trades }}</td>
+                    <td class="num">{{ inr(week.maxDrawdown) }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+        <p class="mp-sub">A strong week is not a reason to replace the baseline. Optimization stores a new disabled version and leaves version 1 running.</p>
+      </div>
+    }
+
+    @if (section() === 'settings') {
+      <div class="mp-grid">
+        <div class="mp-card mp-col-6">
+          <div class="mp-card-head"><h2>Experiment</h2></div>
+          <p class="mp-sub">Type START PAPER EXPERIMENT to begin. This cannot place a real order.</p>
+          <label class="ui-label" for="confirm">Confirmation</label>
+          <input id="confirm" class="ui-input" [(ngModel)]="confirmPhrase" autocomplete="off" />
+          <div class="mp-row" style="margin-top: 0.8rem">
+            <button type="button" class="ui-btn ui-btn-primary" [disabled]="busy() || !ready()" (click)="start()">Start paper experiment</button>
+            <button type="button" class="ui-btn ui-btn-secondary" [disabled]="busy()" (click)="stop()">Stop</button>
+          </div>
+        </div>
+        <div class="mp-card mp-col-6">
+          <div class="mp-card-head"><h2>Risk and costs</h2></div>
+          <div class="mp-stack">
+            <label class="ui-label">Risk per trade %<input class="ui-input" type="number" step="0.1" [(ngModel)]="riskPct" /></label>
+            <label class="ui-label">Daily loss limit %<input class="ui-input" type="number" step="0.1" [(ngModel)]="dailyLossPct" /></label>
+            <label class="ui-label">Max new trades / day<input class="ui-input" type="number" [(ngModel)]="maxTrades" /></label>
+            <label class="ui-label">Max open positions<input class="ui-input" type="number" [(ngModel)]="maxPositions" /></label>
+            <label class="ui-label">Max notional %<input class="ui-input" type="number" [(ngModel)]="notionalPct" /></label>
+            <label class="ui-label">Minimum reward/risk<input class="ui-input" type="number" step="0.1" [(ngModel)]="minRewardRisk" /></label>
+            <label class="ui-label">Slippage (bps)<input class="ui-input" type="number" [(ngModel)]="slippageBps" /></label>
+            <label class="ui-label">Opening range (minutes)<input class="ui-input" type="number" [(ngModel)]="openingRangeMinutes" /></label>
+            <button type="button" class="ui-btn ui-btn-primary" [disabled]="busy()" (click)="saveConfig()">Save parameters</button>
+          </div>
+          <p class="mp-sub">Starting virtual capital stays ₹20,000 per strategy. Saving parameters does not delete history.</p>
+        </div>
+        <div class="mp-card mp-col-12">
+          <div class="mp-card-head"><h2>Strategies</h2></div>
+          <div class="mp-table-wrap">
+            <table class="mp-table">
+              <thead><tr><th>Id</th><th>Name</th><th>Version</th><th>Enabled</th><th>Notes</th><th></th></tr></thead>
+              <tbody>
+                @for (strategy of strategies(); track strategy.strategyId + strategy.version) {
+                  <tr>
+                    <td>{{ strategy.strategyId }}</td>
+                    <td>{{ strategy.name }}</td>
+                    <td>v{{ strategy.version }}</td>
+                    <td>{{ strategy.enabled ? 'On' : 'Off' }}</td>
+                    <td>{{ strategy.optimizationNotes || '' }}</td>
+                    <td>
+                      <button type="button" class="ui-btn ui-btn-secondary mp-btn-sm" (click)="toggle(strategy)">{{ strategy.enabled ? 'Disable' : 'Enable' }}</button>
+                      @if (strategy.version === 1) {
+                        <button type="button" class="ui-btn ui-btn-ghost mp-btn-sm" [disabled]="busy()" (click)="optimize(strategy.strategyId)">Store candidate</button>
+                      }
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    }
+  } @else if (!error()) {
+    <p class="mp-sub">Loading research status…</p>
+  }
+</div>

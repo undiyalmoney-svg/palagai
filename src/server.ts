@@ -412,6 +412,8 @@ async function proxyOrderBackendJson(
     upstreamPath = pathOnly.replace(/^\/api\/auth/, '/auth');
   } else if (pathOnly.startsWith('/api/momentum')) {
     upstreamPath = pathOnly.replace(/^\/api\/momentum/, '/momentum');
+  } else if (pathOnly.startsWith('/api/research')) {
+    upstreamPath = pathOnly.replace(/^\/api\/research/, '/research');
   } else if (pathOnly.startsWith('/api/pnl')) {
     upstreamPath = pathOnly.replace(/^\/api\/pnl/, '/pnl');
   } else {
@@ -486,6 +488,51 @@ momentumApiRouter.use((req, res) => {
   void proxyOrderBackendJson('/momentum', 'momentum', req, res);
 });
 app.use('/api/momentum', momentumApiRouter);
+
+async function proxyOrderBackendBinary(
+  upstreamPathPrefix: string,
+  logLabel: string,
+  req: express.Request,
+  res: express.Response,
+): Promise<void> {
+  const original = String(req.originalUrl || req.url || '/');
+  const qIndex = original.indexOf('?');
+  const pathOnly = qIndex >= 0 ? original.slice(0, qIndex) : original;
+  const query = qIndex >= 0 ? original.slice(qIndex) : '';
+  const upstreamPath = pathOnly.replace(/^\/api\/research/, '/research');
+  const targetUrl = `${ORDER_BACKEND_BASE}${upstreamPath}${query}`;
+  const headers: Record<string, string> = {};
+  if (typeof req.headers.authorization === 'string') {
+    headers['Authorization'] = req.headers.authorization;
+  }
+  try {
+    const upstream = await fetch(targetUrl, { method: 'GET', headers, signal: AbortSignal.timeout(55_000) });
+    const buf = Buffer.from(await upstream.arrayBuffer());
+    const type = upstream.headers.get('content-type') || 'application/octet-stream';
+    const disposition = upstream.headers.get('content-disposition');
+    res.status(upstream.status);
+    res.setHeader('Content-Type', type);
+    if (disposition) res.setHeader('Content-Disposition', disposition);
+    res.send(buf);
+  } catch (err) {
+    console.error(`[${logLabel} proxy]`, err);
+    res.status(502).json({
+      status: 'error',
+      message: `Failed to reach order backend at ${ORDER_BACKEND_BASE}${upstreamPathPrefix}`,
+    });
+  }
+}
+
+const researchApiRouter = express.Router();
+researchApiRouter.use(express.json());
+researchApiRouter.use((req, res) => {
+  if (String(req.originalUrl || req.url || '').includes('export.xlsx')) {
+    void proxyOrderBackendBinary('/research', 'research', req, res);
+    return;
+  }
+  void proxyOrderBackendJson('/research', 'research', req, res);
+});
+app.use('/api/research', researchApiRouter);
 
 const pnlApiRouter = express.Router();
 pnlApiRouter.use(express.json());

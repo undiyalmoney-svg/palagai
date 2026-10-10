@@ -84,6 +84,12 @@ export const routes: Routes = [
           import('./features/dashboard/momentum/momentum.routes').then((m) => m.MOMENTUM_ROUTES),
       },
       {
+        path: 'research',
+        canActivate: [moduleGuard('research')],
+        loadComponent: () =>
+          import('./features/dashboard/research/research-page.component').then((m) => m.ResearchPageComponent),
+      },
+      {
         path: 'charts',
         canActivate: [moduleGuard('auto')],
         component: LiveChartsComponent,

@@ -67,7 +67,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   protected readonly clockLabel = signal('');
   protected readonly pageTitle = signal('Palagai');
-  protected readonly pageSubtitle = signal('Momentum Portfolio Manager, Charts, Token, and Test.');
+  protected readonly pageSubtitle = signal('Momentum, Research, Charts, Token, and Test.');
   protected readonly sidebarOpen = signal(true);
   protected readonly profileOpen = signal(false);
 
@@ -79,6 +79,13 @@ export class DashboardComponent implements OnInit, OnDestroy {
       icon: 'pie-chart',
       module: 'momentum',
       exact: false,
+    },
+    {
+      label: 'Research',
+      shortLabel: 'Research',
+      route: '/dashboard/research',
+      icon: 'activity',
+      module: 'research',
     },
     {
       label: 'Charts',
@@ -107,6 +114,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
     '/dashboard/momentum': {
       title: 'Momentum',
       subtitle: 'Buy tomorrow. Sell today or sell tomorrow.',
+    },
+    '/dashboard/research': {
+      title: 'Research',
+      subtitle: '10-week intraday paper experiment. No real orders.',
     },
     '/dashboard/charts': {
       title: 'Charts',

@@ -5,7 +5,7 @@ import { firstValueFrom } from 'rxjs';
 import { SiteModule, SiteUser } from '../../core/auth/auth.constants';
 import { UiDialogService } from '../../shared/ui/dialog/ui-dialog.service';
 
-const CUSTOMER_MODS: SiteModule[] = ['trade', 'crude', 'auto', 'momentum', 'token', 'test', 'strat'];
+const CUSTOMER_MODS: SiteModule[] = ['trade', 'crude', 'auto', 'momentum', 'research', 'token', 'test', 'strat'];
 
 @Component({
   selector: 'app-admin-page',
@@ -67,6 +67,7 @@ export class AdminPageComponent implements OnInit {
       crude: 'Crude',
       auto: 'Auto',
       momentum: 'Momentum',
+      research: 'Research',
       token: 'Token',
       test: 'Test',
       strat: 'Strategy',
