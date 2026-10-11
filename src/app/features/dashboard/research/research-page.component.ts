@@ -1,6 +1,7 @@
 import { DecimalPipe } from '@angular/common';
 import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { KiteSessionService } from '../../../core/kite/kite-session.service';
 import { ResearchApiService, TradeQuery } from './research-api.service';
 import {
   ReadinessCheck,
@@ -24,6 +25,7 @@ type Section = 'overview' | 'picker' | 'positions' | 'comparison' | 'ledger' | '
 })
 export class ResearchPageComponent implements OnInit, OnDestroy {
   private readonly api = inject(ResearchApiService);
+  private readonly kite = inject(KiteSessionService);
   private timer: ReturnType<typeof setInterval> | null = null;
 
   protected readonly sections: Array<{ id: Section; label: string }> = [
@@ -132,6 +134,30 @@ export class ResearchPageComponent implements OnInit, OnDestroy {
 
   protected async applyFilters(): Promise<void> {
     await this.refreshSection().catch((err) => this.error.set(this.messageOf(err)));
+  }
+
+  protected tokenReady(): boolean {
+    return Boolean(this.kite.getAuthorizationHeader());
+  }
+
+  protected async startToday(): Promise<void> {
+    const authorization = this.kite.getAuthorizationHeader();
+    if (!authorization) {
+      this.error.set('Open Get Token and connect Kite. Start today uses that session. It does not place a real order.');
+      return;
+    }
+    this.busy.set(true);
+    this.notice.set('');
+    this.error.set('');
+    try {
+      const out = await this.api.startDay(authorization);
+      this.notice.set(`Today is running on the server (${out.day}). Yesterday’s capital carries forward. ${out.preparation?.message || ''}`);
+      await this.refresh();
+    } catch (err) {
+      this.error.set(this.messageOf(err));
+    } finally {
+      this.busy.set(false);
+    }
   }
 
   protected async start(): Promise<void> {

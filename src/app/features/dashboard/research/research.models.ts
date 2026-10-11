@@ -55,6 +55,9 @@ export interface ResearchStatus {
   };
   feed: ResearchFeed;
   paperOnly: boolean;
+  capitalPolicy?: string;
+  capitalNote?: string;
+  selection?: { kind: string; universeDate: string; count: number; expiry: string; rule: string };
   dataMode: string;
   disclaimer: string;
 }

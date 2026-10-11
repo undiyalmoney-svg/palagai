@@ -70,6 +70,16 @@ export class ResearchApiService {
     return firstValueFrom(this.http.post(`${this.base}/start`, { confirm, mode: 'PAPER' }));
   }
 
+  startDay(authorization: string): Promise<{ day: string; capitalPolicy: string; preparation?: { message?: string } }> {
+    return firstValueFrom(
+      this.http.post<{ day: string; capitalPolicy: string; preparation?: { message?: string } }>(
+        `${this.base}/day/start`,
+        {},
+        { headers: { 'X-Kite-Authorization': authorization } },
+      ),
+    );
+  }
+
   stop(): Promise<unknown> {
     return firstValueFrom(this.http.post(`${this.base}/stop`, {}));
   }

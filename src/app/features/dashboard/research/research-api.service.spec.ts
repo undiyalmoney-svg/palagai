@@ -46,6 +46,17 @@ describe('ResearchApiService', () => {
     await pending;
     http.verify();
   });
+
+  it('sends the saved Kite session when the day is started', async () => {
+    const { api, http } = setup();
+    const pending = api.startDay('token key:secret');
+    const req = http.expectOne('/api/research/day/start');
+    expect(req.request.method).toBe('POST');
+    expect(req.request.headers.get('X-Kite-Authorization')).toBe('token key:secret');
+    req.flush({ status: 'ok', day: '2026-10-13', capitalPolicy: 'carry-forward', paperOnly: true });
+    await pending;
+    http.verify();
+  });
 });
 
 describe('ResearchPageComponent', () => {
@@ -90,6 +101,7 @@ describe('ResearchPageComponent', () => {
     fixture.detectChanges();
     const text = fixture.nativeElement.textContent as string;
     expect(text).toContain('Paper only');
+    expect(text).toContain('Start today');
     expect(text).toContain('Waiting for market data');
     expect(text).toContain('draft');
     fixture.destroy();

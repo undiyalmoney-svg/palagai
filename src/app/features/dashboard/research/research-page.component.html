@@ -26,6 +26,26 @@
     }
 
     @if (section() === 'overview') {
+      <div class="mp-card">
+        <div class="mp-card-head">
+          <div>
+            <h2>Start today</h2>
+            <p class="mp-sub">One press prepares the session and leaves the server running after you close this page. If the server itself restarts, press it again so the token is loaded. Each strategy keeps yesterday’s ending capital. A strategy that loses starts smaller tomorrow. A strategy that gains starts larger. Nothing is put back to ₹20,000.</p>
+          </div>
+          <button type="button" class="ui-btn ui-btn-primary" [disabled]="busy()" (click)="startToday()">Start today</button>
+        </div>
+        @if (!tokenReady()) {
+          <p class="mp-sub">Kite is not connected in this browser. <a href="/dashboard/get-token">Open Get Token</a>, then come back and press Start today.</p>
+        } @else {
+          <p class="mp-sub">Your saved Kite token will be used for prices only. This button cannot send a real order.</p>
+        }
+        <p class="mp-sub">{{ view.capitalNote }}</p>
+        <p class="mp-sub"><strong>Names.</strong> {{ view.selection?.rule }} {{ view.selection?.expiry }}</p>
+        <div class="mp-row">
+          <button type="button" class="ui-btn ui-btn-secondary mp-btn-sm" (click)="download('xlsx')">Download Excel day book</button>
+        </div>
+      </div>
+
       <div class="mp-stats">
         <div class="mp-stat"><span class="mp-stat-label">Status</span><span class="mp-stat-value">{{ view.experiment.status }}</span></div>
         <div class="mp-stat"><span class="mp-stat-label">Trading days</span><span class="mp-stat-value">{{ view.experiment.tradingDays }}</span></div>
