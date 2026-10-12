@@ -1,0 +1,175 @@
+<div class="mp-page">
+  @if (error()) {
+    <div class="mp-banner" data-tone="down">{{ error() }}</div>
+  }
+  @if (notice()) {
+    <div class="mp-banner" data-tone="info">{{ notice() }}</div>
+  }
+
+  @if (buddy(); as view) {
+    <div class="mp-card">
+      <div class="mp-card-head">
+        <div>
+          <h2>SL Buddy</h2>
+          <p class="mp-sub">
+            The server watches your Kite orders. When a Nifty 50, Bank Nifty, Crude oil or Sensex fill is live, it rests a sell stop for the same qty. It runs only after you start it, and it stops when you stop it.
+          </p>
+        </div>
+        <span class="mp-badge" [attr.data-tone]="view.watching ? 'up' : 'warn'">
+          {{ view.watching ? 'Watching' : 'Stopped' }}
+        </span>
+      </div>
+
+      <div class="mp-row">
+        @if (view.watching) {
+          <button type="button" class="ui-btn ui-btn-secondary" [disabled]="busy()" (click)="stop()">
+            Stop watching
+          </button>
+        } @else {
+          <button type="button" class="ui-btn ui-btn-primary" [disabled]="busy()" (click)="watch()">
+            Watch my orders
+          </button>
+        }
+      </div>
+
+      @if (!tokenReady()) {
+        <p class="mp-sub">Kite is not connected in this browser. <a routerLink="/dashboard/get-token">Open Get Token</a>, then press Watch my orders.</p>
+      } @else if (view.watching) {
+        <p class="mp-sub">{{ view.lastMessage || 'Watching on the server. You can close this tab.' }}</p>
+      } @else {
+        <p class="mp-sub">Not watching. Pending, live and SL lists still refresh from Kite. No stop is placed until you start.</p>
+      }
+
+      @if (view.lastError) {
+        <p class="mp-sub mp-down">{{ view.lastError }}</p>
+      }
+
+      @if (rules().length) {
+        <p class="mp-sub">
+          @for (rule of rules(); track rule.book; let last = $last) {
+            {{ rule.rule }}@if (!last) { · }
+          }
+        </p>
+      }
+    </div>
+
+    <div class="mp-card">
+      <div class="mp-card-head">
+        <h2>Pending orders</h2>
+        <span class="mp-muted">{{ view.pending.length }}</span>
+      </div>
+      @if (view.pending.length) {
+        <div class="mp-table-wrap">
+          <table class="mp-table">
+            <thead>
+              <tr>
+                <th>Book</th>
+                <th>Instrument</th>
+                <th class="num">Qty</th>
+                <th class="num">Price</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (row of view.pending; track row.orderId || row.instrument) {
+                <tr>
+                  <td>{{ row.bookLabel }}</td>
+                  <td class="mp-sym">{{ row.instrument }}</td>
+                  <td class="num">{{ row.qty | number: '1.0-0' }}</td>
+                  <td class="num">{{ row.price != null ? (row.price | number: '1.2-2') : '—' }}</td>
+                  <td>{{ row.status }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      } @else {
+        <p class="mp-empty">No pending index orders.</p>
+      }
+    </div>
+
+    <div class="mp-card">
+      <div class="mp-card-head">
+        <h2>Live orders</h2>
+        <span class="mp-muted">{{ view.live.length }}</span>
+      </div>
+      @if (view.live.length) {
+        <div class="mp-table-wrap">
+          <table class="mp-table">
+            <thead>
+              <tr>
+                <th>Book</th>
+                <th>Instrument</th>
+                <th class="num">Qty</th>
+                <th class="num">Entry</th>
+                <th class="num">SL</th>
+                <th class="num">Covered</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (row of view.live; track row.instrument) {
+                <tr>
+                  <td>{{ row.bookLabel }}</td>
+                  <td class="mp-sym">{{ row.instrument }}</td>
+                  <td class="num">{{ row.qty | number: '1.0-0' }}</td>
+                  <td class="num">{{ row.entry != null ? (row.entry | number: '1.2-2') : '—' }}</td>
+                  <td class="num">{{ row.stop != null ? (row.stop | number: '1.2-2') : '—' }}</td>
+                  <td class="num">{{ row.slQty | number: '1.0-0' }} / {{ row.qty | number: '1.0-0' }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      } @else {
+        <p class="mp-empty">No live index positions.</p>
+      }
+    </div>
+
+    <div class="mp-card">
+      <div class="mp-card-head">
+        <h2>SL</h2>
+        <span class="mp-muted">{{ view.sl.length }}</span>
+      </div>
+      @if (view.sl.length) {
+        <div class="mp-table-wrap">
+          <table class="mp-table">
+            <thead>
+              <tr>
+                <th>Book</th>
+                <th>Instrument</th>
+                <th class="num">Qty</th>
+                <th class="num">Trigger</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (row of view.sl; track row.orderId || row.instrument) {
+                <tr>
+                  <td>{{ row.bookLabel }}</td>
+                  <td class="mp-sym">{{ row.instrument }}</td>
+                  <td class="num">{{ row.qty | number: '1.0-0' }}</td>
+                  <td class="num">{{ row.trigger != null ? (row.trigger | number: '1.2-2') : '—' }}</td>
+                  <td>{{ row.status }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      } @else {
+        <p class="mp-empty">No resting stop-loss orders.</p>
+      }
+    </div>
+  } @else {
+    <div class="mp-card">
+      <div class="mp-card-head">
+        <div>
+          <h2>SL Buddy</h2>
+          <p class="mp-sub">Loading orders from the server.</p>
+        </div>
+      </div>
+      <button type="button" class="ui-btn ui-btn-primary" [disabled]="busy()" (click)="watch()">
+        Watch my orders
+      </button>
+    </div>
+  }
+</div>

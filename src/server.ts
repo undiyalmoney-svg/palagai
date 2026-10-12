@@ -414,6 +414,8 @@ async function proxyOrderBackendJson(
     upstreamPath = pathOnly.replace(/^\/api\/momentum/, '/momentum');
   } else if (pathOnly.startsWith('/api/research')) {
     upstreamPath = pathOnly.replace(/^\/api\/research/, '/research');
+  } else if (pathOnly.startsWith('/api/sl-buddy')) {
+    upstreamPath = pathOnly.replace(/^\/api\/sl-buddy/, '/sl-buddy');
   } else if (pathOnly.startsWith('/api/pnl')) {
     upstreamPath = pathOnly.replace(/^\/api\/pnl/, '/pnl');
   } else {
@@ -533,6 +535,13 @@ researchApiRouter.use((req, res) => {
   void proxyOrderBackendJson('/research', 'research', req, res);
 });
 app.use('/api/research', researchApiRouter);
+
+const slBuddyApiRouter = express.Router();
+slBuddyApiRouter.use(express.json());
+slBuddyApiRouter.use((req, res) => {
+  void proxyOrderBackendJson('/sl-buddy', 'sl-buddy', req, res);
+});
+app.use('/api/sl-buddy', slBuddyApiRouter);
 
 const pnlApiRouter = express.Router();
 pnlApiRouter.use(express.json());

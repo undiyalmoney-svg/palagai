@@ -13,7 +13,8 @@ export const authTokenInterceptor: HttpInterceptorFn = (req, next) => {
   const needsSite =
     url.includes('/api/auth/me') ||
     url.includes('/api/momentum') ||
-    url.includes('/api/research');
+    url.includes('/api/research') ||
+    url.includes('/api/sl-buddy');
 
   if (needsAdmin) {
     const t = auth.getAdminToken();

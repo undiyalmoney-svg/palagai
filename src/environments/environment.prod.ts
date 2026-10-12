@@ -7,10 +7,11 @@ export const environment = {
   orderApiBaseUrl: '/api/order-kite',
   momentumApiBaseUrl: '/api/momentum',
   researchApiBaseUrl: '/api/research',
+  slBuddyApiBaseUrl: '/api/sl-buddy',
   pnlApiBaseUrl: '/api/pnl',
   defaultLots: 1,
   allowLiveMoney: true,
   orderEgressIp: '168.144.28.89',
   appVersion: '1.3.124',
-  appBuild: '2026.10.05-vercel-desk-build',
+  appBuild: '2026.10.12-sl-buddy',
 };

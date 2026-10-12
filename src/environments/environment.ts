@@ -10,6 +10,7 @@ export const environment = {
   momentumApiBaseUrl: '/api/momentum',
   /** Intraday paper research — local proxy / prod SSR → droplet /research. */
   researchApiBaseUrl: '/api/research',
+  slBuddyApiBaseUrl: '/api/sl-buddy',
   /** Manual daily P/L — local proxy / prod SSR → droplet /pnl. */
   pnlApiBaseUrl: '/api/pnl',
   /** Default lots multiplier across desks (exchange lot × this). */

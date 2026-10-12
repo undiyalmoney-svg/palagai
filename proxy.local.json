@@ -23,6 +23,22 @@
       "^/api/momentum": "/momentum"
     }
   },
+  "/api/research": {
+    "target": "http://127.0.0.1:3000",
+    "secure": false,
+    "changeOrigin": true,
+    "pathRewrite": {
+      "^/api/research": "/research"
+    }
+  },
+  "/api/sl-buddy": {
+    "target": "http://127.0.0.1:3000",
+    "secure": false,
+    "changeOrigin": true,
+    "pathRewrite": {
+      "^/api/sl-buddy": "/sl-buddy"
+    }
+  },
   "/api/pnl": {
     "target": "http://168.144.28.89:3000",
     "secure": false,

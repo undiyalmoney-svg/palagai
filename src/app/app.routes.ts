@@ -95,6 +95,12 @@ export const routes: Routes = [
         component: LiveChartsComponent,
       },
       {
+        path: 'sl-buddy',
+        canActivate: [moduleGuard('auto')],
+        loadComponent: () =>
+          import('./features/dashboard/sl-buddy/sl-buddy-page.component').then((m) => m.SlBuddyPageComponent),
+      },
+      {
         path: 'order-test',
         canActivate: [moduleGuard('test')],
         component: OrderTestComponent,

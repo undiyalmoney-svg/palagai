@@ -67,7 +67,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   protected readonly clockLabel = signal('');
   protected readonly pageTitle = signal('Palagai');
-  protected readonly pageSubtitle = signal('Momentum, Research, Charts, Token, and Test.');
+  protected readonly pageSubtitle = signal('Momentum, Research, Charts, SL Buddy, Token, and Test.');
   protected readonly sidebarOpen = signal(true);
   protected readonly profileOpen = signal(false);
 
@@ -92,6 +92,13 @@ export class DashboardComponent implements OnInit, OnDestroy {
       shortLabel: 'Charts',
       route: '/dashboard/charts',
       icon: 'candles',
+      module: 'auto',
+    },
+    {
+      label: 'SL Buddy',
+      shortLabel: 'SL',
+      route: '/dashboard/sl-buddy',
+      icon: 'shield',
       module: 'auto',
     },
     {
@@ -122,6 +129,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
     '/dashboard/charts': {
       title: 'Charts',
       subtitle: 'Uptrend, downtrend or sideways on Nifty 50, Bank Nifty, Sensex and Crude.',
+    },
+    '/dashboard/sl-buddy': {
+      title: 'SL Buddy',
+      subtitle: 'Watch your orders. The server rests a matching-qty stop after a fill.',
     },
     '/dashboard/order-test': {
       title: 'Order Test',
