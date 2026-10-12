@@ -2,6 +2,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { describe, expect, it } from 'vitest';
+import { KiteSessionService } from '../../../core/kite/kite-session.service';
 import { ResearchApiService } from './research-api.service';
 import { ResearchPageComponent } from './research-page.component';
 
@@ -15,6 +16,35 @@ describe('ResearchApiService', () => {
       http: TestBed.inject(HttpTestingController),
     };
   }
+
+  it('sends the saved Kite session when loading research status', async () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        ResearchApiService,
+        { provide: KiteSessionService, useValue: { getAuthorizationHeader: () => 'token key:secret' } },
+      ],
+    });
+    const api = TestBed.inject(ResearchApiService);
+    const http = TestBed.inject(HttpTestingController);
+    const pending = api.status();
+    const req = http.expectOne('/api/research/status');
+    expect(req.request.headers.get('X-Kite-Authorization')).toBe('token key:secret');
+    req.flush({
+      status: 'ok',
+      experiment: { status: 'running', configuration: {}, tradingDays: 1 },
+      accounts: [],
+      combined: { equity: 0, cash: 0, realized: 0, unrealized: 0, netPnl: 0, note: '' },
+      feed: { configured: true, connected: true, stale: false, lastTickAt: null, mode: 'live', message: 'live' },
+      paperOnly: true,
+      dataMode: 'live',
+      disclaimer: '',
+    });
+    await pending;
+    http.verify();
+  });
 
   it('loads experiment status from the research API', async () => {
     const { api, http } = setup();

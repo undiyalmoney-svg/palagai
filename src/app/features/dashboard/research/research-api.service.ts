@@ -2,6 +2,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { environment } from '../../../../environments/environment';
+import { KiteSessionService } from '../../../core/kite/kite-session.service';
 import {
   ReadinessCheck,
   ResearchCandidate,
@@ -27,6 +28,7 @@ export interface TradeQuery {
 @Injectable({ providedIn: 'root' })
 export class ResearchApiService {
   private readonly http = inject(HttpClient);
+  private readonly kite = inject(KiteSessionService);
   private readonly base =
     (environment as { researchApiBaseUrl?: string }).researchApiBaseUrl || '/api/research';
 
@@ -114,8 +116,15 @@ export class ResearchApiService {
     );
   }
 
+  private kiteHeader(): Record<string, string> {
+    const kite = this.kite.getAuthorizationHeader();
+    return kite ? { 'X-Kite-Authorization': kite } : {};
+  }
+
   private get<T>(path: string, q: TradeQuery = {}): Promise<T> {
-    return firstValueFrom(this.http.get<T>(`${this.base}${path}`, { params: this.params(q) }));
+    return firstValueFrom(
+      this.http.get<T>(`${this.base}${path}`, { params: this.params(q), headers: this.kiteHeader() }),
+    );
   }
 
   private params(q: TradeQuery): HttpParams {
