@@ -30,7 +30,7 @@ export class ResearchPageComponent implements OnInit, OnDestroy {
 
   protected readonly sections: Array<{ id: Section; label: string }> = [
     { id: 'overview', label: 'Overview' },
-    { id: 'picker', label: 'Stock picker' },
+    { id: 'picker', label: 'Book picker' },
     { id: 'positions', label: 'Positions' },
     { id: 'comparison', label: 'Comparison' },
     { id: 'ledger', label: 'Ledger' },
@@ -61,12 +61,12 @@ export class ResearchPageComponent implements OnInit, OnDestroy {
   protected strategyId = '';
   protected direction = '';
   protected tradeStatus = '';
-  protected riskPct = 0.5;
-  protected dailyLossPct = 2;
-  protected maxTrades = 5;
-  protected maxPositions = 3;
+  protected riskPct = 2;
+  protected dailyLossPct = 15;
+  protected maxTrades = 20;
+  protected maxPositions = 4;
   protected notionalPct = 95;
-  protected minRewardRisk = 1.5;
+  protected minRewardRisk = 1;
   protected slippageBps = 5;
   protected openingRangeMinutes = 15;
   private configLoaded = false;

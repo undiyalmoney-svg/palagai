@@ -30,7 +30,7 @@
         <div class="mp-card-head">
           <div>
             <h2>Start today</h2>
-            <p class="mp-sub">One press prepares the session and leaves the server running after you close this page. The Kite token is saved on the server, so a restart keeps prices flowing. Each strategy keeps yesterday’s ending capital. A strategy that loses starts smaller tomorrow. A strategy that gains starts larger. Nothing is put back to ₹20,000.</p>
+            <p class="mp-sub">One press prepares the session and leaves the server running after you close this page. The Kite token is saved on the server, so a restart keeps prices flowing. Research paper-trades Nifty 50, Bank Nifty, Sensex and Crude oil — one lot each. Each strategy keeps yesterday’s ending capital. Nothing is put back to ₹20,000.</p>
           </div>
           <button type="button" class="ui-btn ui-btn-primary" [disabled]="busy()" (click)="startToday()">Start today</button>
         </div>
@@ -109,7 +109,7 @@
     @if (section() === 'picker') {
       <div class="mp-card">
         <div class="mp-card-head">
-          <h2>Intraday stock picker</h2>
+          <h2>Intraday book picker</h2>
           <button type="button" class="ui-btn ui-btn-secondary mp-btn-sm" (click)="applyFilters()">Refresh</button>
         </div>
         @if (!candidates().length) {
@@ -332,7 +332,7 @@
             <label class="ui-label">Opening range (minutes)<input class="ui-input" type="number" [(ngModel)]="openingRangeMinutes" /></label>
             <button type="button" class="ui-btn ui-btn-primary" [disabled]="busy()" (click)="saveConfig()">Save parameters</button>
           </div>
-          <p class="mp-sub">Starting virtual capital stays ₹20,000 per strategy. Saving parameters does not delete history.</p>
+          <p class="mp-sub">These numbers were the old 50-share study caps. The four index books use one paper lot and are not blocked by daily-loss, trade-count, or sector limits. Starting virtual capital stays ₹20,000 per strategy. Saving parameters does not delete history.</p>
         </div>
         <div class="mp-card mp-col-12">
           <div class="mp-card-head"><h2>Strategies</h2></div>

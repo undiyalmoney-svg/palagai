@@ -124,7 +124,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     },
     '/dashboard/research': {
       title: 'Research',
-      subtitle: '10-week intraday paper experiment. No real orders.',
+      subtitle: 'Paper trades on Nifty 50, Bank Nifty, Sensex and Crude oil. No real orders.',
     },
     '/dashboard/charts': {
       title: 'Charts',
