@@ -47,6 +47,14 @@
       "^/api/heatmap": "/heatmap"
     }
   },
+  "/api/market-desk": {
+    "target": "http://127.0.0.1:3000",
+    "secure": false,
+    "changeOrigin": true,
+    "pathRewrite": {
+      "^/api/market-desk": "/market-desk"
+    }
+  },
   "/api/pnl": {
     "target": "http://168.144.28.89:3000",
     "secure": false,

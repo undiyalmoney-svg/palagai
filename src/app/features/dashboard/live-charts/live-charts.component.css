@@ -5,6 +5,11 @@
   padding: 0.5rem 0 2rem;
 }
 
+.trend-tools,
+.trend-grid {
+  position: relative;
+}
+
 .trend-banner {
   margin: 0;
   padding: 0.75rem 1rem;
@@ -60,9 +65,10 @@
   align-items: flex-start;
   gap: 0.35rem;
   padding: 1.15rem 1.1rem;
-  border: 2px solid #16a34a;
-  border-radius: 14px;
-  background: #fff;
+  border: 1px solid rgba(22, 163, 74, 0.28);
+  border-radius: 18px;
+  background: linear-gradient(180deg, #ffffff, #f4fbf6);
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
 }
 
 .trend-dot {

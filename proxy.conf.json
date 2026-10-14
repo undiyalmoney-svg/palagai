@@ -53,6 +53,15 @@
     },
     "logLevel": "debug"
   },
+  "/api/market-desk": {
+    "target": "http://168.144.28.89:3000",
+    "secure": false,
+    "changeOrigin": true,
+    "pathRewrite": {
+      "^/api/market-desk": "/market-desk"
+    },
+    "logLevel": "debug"
+  },
   "/api/pnl": {
     "target": "http://168.144.28.89:3000",
     "secure": false,

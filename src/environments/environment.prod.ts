@@ -9,10 +9,11 @@ export const environment = {
   researchApiBaseUrl: '/api/research',
   slBuddyApiBaseUrl: '/api/sl-buddy',
   heatmapApiBaseUrl: '/api/heatmap',
+  marketDeskApiBaseUrl: '/api/market-desk',
   pnlApiBaseUrl: '/api/pnl',
   defaultLots: 1,
   allowLiveMoney: true,
   orderEgressIp: '168.144.28.89',
-  appVersion: '1.3.125',
-  appBuild: '2026.10.14-heatmap-indices',
+  appVersion: '1.3.126',
+  appBuild: '2026.10.14-market-desk',
 };

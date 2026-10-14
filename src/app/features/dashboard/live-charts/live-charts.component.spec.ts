@@ -8,6 +8,7 @@ import { KiteFundsService } from '../../../core/services/kite-funds.service';
 import { ChartsProtectApiService } from '../../../core/charts/charts-protect-api.service';
 import { CapitalPreferenceService } from '../../../core/services/capital-preference.service';
 import { UiDialogService } from '../../../shared/ui/dialog/ui-dialog.service';
+import { MarketDeskApiService } from '../../../core/market-desk/market-desk-api.service';
 
 describe('LiveChartsComponent trends', () => {
   let fixture: ComponentFixture<LiveChartsComponent>;
@@ -24,6 +25,13 @@ describe('LiveChartsComponent trends', () => {
         { provide: ChartsProtectApiService, useValue: {} },
         { provide: CapitalPreferenceService, useValue: {} },
         { provide: UiDialogService, useValue: {} },
+        {
+          provide: MarketDeskApiService,
+          useValue: {
+            snapshot: () => Promise.resolve(null),
+            candles: () => Promise.resolve({ candles: [] }),
+          },
+        },
       ],
     }).compileComponents();
     fixture = TestBed.createComponent(LiveChartsComponent);

@@ -122,6 +122,7 @@ import { formatUnknownError } from '../../../core/utils/kite-error.util';
 import { isKiteAuthError } from '../../../core/utils/kite-auth-error.util';
 import { MarketStatus, istClockParts, marketStatusAt } from '../../../core/utils/market-status.util';
 import { InstrumentSessionConfig, resolveSessionConfig } from '../../../core/config/session.config';
+import { MarketHeatBoardComponent } from './market-heat-board.component';
 
 /** Higher-timeframe candles kept beside a book so the trend filter costs one fetch per bar. */
 interface HtfCache {
@@ -210,7 +211,7 @@ const NUMERIC_FIELDS: readonly NumericField[] = [
 @Component({
   selector: 'app-live-charts',
   standalone: true,
-  imports: [RouterLink],
+  imports: [RouterLink, MarketHeatBoardComponent],
   templateUrl: './live-charts.component.html',
   styleUrl: './live-charts.component.css',
 })

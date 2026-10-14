@@ -1,0 +1,86 @@
+.desk-chart-empty {
+  margin: 0;
+  padding: 2rem 1rem;
+  color: #8b93a7;
+  text-align: center;
+}
+
+.desk-chart {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.desk-chart svg {
+  width: 100%;
+  height: 280px;
+  background: #0b1020;
+  border-radius: 14px;
+}
+
+.desk-chart .wick,
+.desk-chart .body {
+  stroke-linecap: round;
+}
+
+.desk-chart .up .wick,
+.desk-chart .up .body {
+  stroke: #3dffb0;
+  fill: #3dffb0;
+}
+
+.desk-chart .down .wick,
+.desk-chart .down .body {
+  stroke: #ff5d73;
+  fill: #ff5d73;
+}
+
+.desk-chart .wick {
+  stroke-width: 0.18;
+}
+
+.desk-chart .vol {
+  fill: rgba(255, 255, 255, 0.12);
+}
+
+.desk-chart .ema.fast {
+  fill: none;
+  stroke: #7dd3fc;
+  stroke-width: 0.28;
+}
+
+.desk-chart .ema.slow {
+  fill: none;
+  stroke: #c4b5fd;
+  stroke-width: 0.28;
+}
+
+.desk-chart .vwap {
+  stroke: #fbbf24;
+  stroke-width: 0.22;
+  stroke-dasharray: 1 0.8;
+}
+
+.desk-chart .sr.res {
+  stroke: #fb7185;
+  stroke-width: 0.18;
+  stroke-dasharray: 0.8 0.6;
+}
+
+.desk-chart .sr.sup {
+  stroke: #34d399;
+  stroke-width: 0.18;
+  stroke-dasharray: 0.8 0.6;
+}
+
+.desk-chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  font-size: 0.78rem;
+  color: #c5cbe0;
+}
+
+.desk-chart-legend .bo {
+  color: #fbbf24;
+  font-weight: 700;
+}

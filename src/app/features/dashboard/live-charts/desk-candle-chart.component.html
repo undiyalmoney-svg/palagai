@@ -1,0 +1,66 @@
+@if (!view.length) {
+  <p class="desk-chart-empty">{{ emptyMessage }}</p>
+} @else {
+  <div class="desk-chart">
+    <svg viewBox="0 0 100 56" preserveAspectRatio="none" role="img" aria-label="Candlestick chart">
+      @if (overlay?.resistance; as res) {
+        <line class="sr res" x1="8" x2="92" [attr.y1]="yOf(res)" [attr.y2]="yOf(res)" />
+      }
+      @if (overlay?.support; as sup) {
+        <line class="sr sup" x1="8" x2="92" [attr.y1]="yOf(sup)" [attr.y2]="yOf(sup)" />
+      }
+      @if (overlay?.vwap; as vw) {
+        <line class="vwap" x1="8" x2="92" [attr.y1]="yOf(vw)" [attr.y2]="yOf(vw)" />
+      }
+      <path class="ema fast" [attr.d]="linePoints('emaFast')" />
+      <path class="ema slow" [attr.d]="linePoints('emaSlow')" />
+      @for (bar of view; track bar.date; let i = $index) {
+        <g
+          (mouseenter)="hover = bar"
+          (mouseleave)="hover = null"
+          [class.up]="bar.close >= bar.open"
+          [class.down]="bar.close < bar.open"
+        >
+          <line
+            class="wick"
+            [attr.x1]="barX(i) + barW() / 2"
+            [attr.x2]="barX(i) + barW() / 2"
+            [attr.y1]="yOf(bar.high)"
+            [attr.y2]="yOf(bar.low)"
+          />
+          <rect
+            class="body"
+            [attr.x]="barX(i)"
+            [attr.y]="bodyY(bar)"
+            [attr.width]="barW()"
+            [attr.height]="bodyH(bar)"
+          />
+          <rect
+            class="vol"
+            [attr.x]="barX(i)"
+            [attr.y]="54 - volH(bar)"
+            [attr.width]="barW()"
+            [attr.height]="volH(bar)"
+          />
+        </g>
+      }
+    </svg>
+    <div class="desk-chart-legend">
+      @if (hover; as bar) {
+        <span>{{ bar.date.slice(11, 16) || bar.date.slice(0, 10) }}</span>
+        <span>O {{ fmt(bar.open) }}</span>
+        <span>H {{ fmt(bar.high) }}</span>
+        <span>L {{ fmt(bar.low) }}</span>
+        <span>C {{ fmt(bar.close) }}</span>
+      } @else {
+        <span>20 EMA {{ fmt(overlay?.emaFast) }}</span>
+        <span>50 EMA {{ fmt(overlay?.emaSlow) }}</span>
+        <span>VWAP {{ fmt(overlay?.vwap) }}</span>
+        <span>ADX {{ fmt(overlay?.adx, 1) }}</span>
+        @if (overlay?.breakout?.status && overlay?.breakout?.status !== 'none') {
+          <span class="bo">{{ overlay?.breakout?.status }} {{ overlay?.breakout?.direction }}</span>
+        }
+      }
+    </div>
+  </div>
+}

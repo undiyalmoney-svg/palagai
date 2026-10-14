@@ -1,0 +1,195 @@
+<section class="desk" data-testid="market-heat-board" [attr.data-demo]="snap()?.demo ? 'true' : 'false'">
+  <header class="desk-hero">
+    <div>
+      <p class="desk-kicker">Private · Charts</p>
+      <h1>Indian Market Heat Map</h1>
+      <p class="desk-sub">Trend, breakouts and breadth for Nifty 50, Bank Nifty and Sensex. Rule-based, not a tip.</p>
+    </div>
+    <div class="desk-actions">
+      <button type="button" class="desk-btn" (click)="refresh()" [disabled]="loading()">
+        {{ loading() ? 'Updating' : 'Refresh desk' }}
+      </button>
+      <button type="button" class="desk-btn ghost" (click)="showSettings.set(!showSettings())">Settings</button>
+    </div>
+  </header>
+
+  <div class="desk-hud">
+    <span class="pill" [attr.data-on]="snap()?.session?.open ? '1' : '0'">{{ snap()?.session?.label || 'Session' }}</span>
+    <span class="pill">{{ clock() }}</span>
+    <span class="pill">Updated {{ fmtIst(snap()?.session?.lastUpdateAt) }} IST</span>
+    <span class="pill" [attr.data-live]="snap()?.session?.connection === 'live' ? '1' : '0'">
+      {{ snap()?.session?.connection || 'offline' }}
+    </span>
+    <span class="pill" [attr.data-fresh]="snap()?.session?.freshness || 'missing'">
+      {{ freshnessLabel(snap()?.session?.freshness || 'missing') }}
+    </span>
+    <span class="pill">15m analysis</span>
+    <span class="pill muted">Tick {{ fmtIst(snap()?.session?.lastTickAt) }}</span>
+    <span class="pill muted">Closed bar {{ fmtIst(snap()?.session?.lastConfirmedCandleAt, false) }}</span>
+  </div>
+
+  @if (snap()?.demo) {
+    <p class="desk-banner demo" role="status">{{ snap()?.session?.message }}</p>
+  }
+  @if (snap()?.needsReauth) {
+    <p class="desk-banner reauth" role="alert">
+      Kite session expired.
+      <a routerLink="/dashboard/get-token">Get Token</a>
+    </p>
+  }
+  @if (error()) {
+    <p class="desk-banner reauth" role="alert">{{ error() }}</p>
+  }
+  @if (snap()?.warning && !snap()?.demo) {
+    <p class="desk-banner">{{ snap()?.warning }}</p>
+  }
+
+  <div class="index-grid">
+    @for (card of snap()?.indices || []; track card.id) {
+      <article class="index-card" [attr.data-bias]="card.bias" (click)="openChart(card.id)">
+        <div class="index-top">
+          <h2>{{ card.name }}</h2>
+          <span class="bias" [attr.data-bias]="card.bias">{{ card.biasLabel }}</span>
+        </div>
+        <p class="index-px">
+          {{ card.ltp | number: '1.2-2' }}
+          <span [class]="tone(card.changePct)">{{ fmtPct(card.changePct) }}</span>
+        </p>
+        <p class="index-chg">{{ card.change | number: '1.2-2' }} pts</p>
+        <dl class="index-meta">
+          <div><dt>Score</dt><dd>{{ card.score ?? '—' }}</dd></div>
+          <div><dt>Strength</dt><dd>{{ card.strengthLabel }}</dd></div>
+          <div><dt>15m</dt><dd>{{ brLabel(card.breakout15) }}</dd></div>
+          <div><dt>1h</dt><dd>{{ brLabel(card.breakout60) }}</dd></div>
+        </dl>
+        <p class="index-agree">{{ agreeLabel(card) }} · {{ card.confirmed ? 'Confirmed' : 'Provisional' }}</p>
+      </article>
+    }
+  </div>
+
+  @if (snap()?.breadth; as b) {
+    <section class="breadth">
+      <div class="stat"><strong>{{ b.advances }}</strong><span>Advancing</span></div>
+      <div class="stat"><strong>{{ b.declines }}</strong><span>Declining</span></div>
+      <div class="stat"><strong>{{ b.unchanged }}</strong><span>Unchanged</span></div>
+      <div class="stat"><strong>{{ b.adRatioLabel }}</strong><span>A/D</span></div>
+      <div class="stat"><strong>{{ b.pctAboveEma20 == null ? '—' : b.pctAboveEma20 + '%' }}</strong><span>Above 20 EMA</span></div>
+      <div class="stat"><strong>{{ b.pctAboveEma50 == null ? '—' : b.pctAboveEma50 + '%' }}</strong><span>Above 50 EMA</span></div>
+      <div class="stat wide">
+        <span>Strongest {{ b.strongest[0]?.symbol || '—' }} · Weakest {{ b.weakest[0]?.symbol || '—' }}</span>
+        @if (b.divergence) {
+          <em>{{ b.divergence }}</em>
+        }
+      </div>
+    </section>
+  }
+
+  <div class="desk-tools">
+    <input
+      type="search"
+      class="desk-search"
+      placeholder="Search symbol"
+      [value]="query()"
+      (input)="query.set($any($event.target).value)"
+    />
+    <button type="button" class="chip" [class.on]="sortPct()" (click)="sortPct.set(!sortPct())">Sort % change</button>
+    <button type="button" class="chip" [class.on]="filter() === 'bullish'" (click)="setFilter('bullish')">Bullish</button>
+    <button type="button" class="chip" [class.on]="filter() === 'bearish'" (click)="setFilter('bearish')">Bearish</button>
+    <button type="button" class="chip" [class.on]="filter() === 'sideways'" (click)="setFilter('sideways')">Sideways</button>
+    <button type="button" class="chip" [class.on]="filter() === 'break15'" (click)="setFilter('break15')">15m breakout</button>
+    <button type="button" class="chip" [class.on]="filter() === 'break60'" (click)="setFilter('break60')">1h breakout</button>
+    <button type="button" class="chip" [class.on]="filter() === 'agree'" (click)="setFilter('agree')">Both agree</button>
+  </div>
+
+  <div class="tile-grid">
+    @for (row of tiles(); track row.symbol) {
+      <button type="button" class="tile" [attr.data-tone]="tone(row.changePct)" (click)="openChart(row.symbol)">
+        <span class="tile-sym">{{ row.symbol }}</span>
+        <span class="tile-pct">{{ fmtPct(row.changePct) }}</span>
+        @if (row.ltp != null) {
+          <span class="tile-px">{{ row.ltp | number: '1.2-2' }}</span>
+        }
+        <span class="bias mini" [attr.data-bias]="row.bias">{{ row.biasLabel }}</span>
+        <span class="tile-meta">{{ row.strength }} · 15m {{ row.m15Trend }} · 1h {{ row.h1Trend }}</span>
+        @if (row.breakout15.status !== 'none' && row.breakout15.status !== 'insufficient') {
+          <span class="tile-bo">{{ brLabel(row.breakout15) }}</span>
+        }
+      </button>
+    }
+  </div>
+
+  <div class="desk-split">
+    <section class="panel">
+      <h3>Potential setups</h3>
+      <p class="note">Read-only levels from the breakout rules. Not an order. No claimed win-rate.</p>
+      @for (s of snap()?.setups || []; track s.symbol + s.timeframe) {
+        <article class="setup">
+          <header>
+            <strong>{{ s.symbol }}</strong>
+            <span>{{ s.direction }} · {{ s.timeframe }} · {{ s.status }}</span>
+          </header>
+          <p>Level {{ s.level | number: '1.2-2' }} · zone {{ s.entry | number: '1.2-2' }} · stop {{ s.stop | number: '1.2-2' }} · target {{ s.target | number: '1.2-2' }} · R:R {{ s.rr }}</p>
+          <p>{{ s.reason }}</p>
+          <p class="inv">Invalid if {{ s.invalidation }}</p>
+        </article>
+      } @empty {
+        <p class="muted">No qualifying setups on completed candles.</p>
+      }
+    </section>
+
+    <section class="panel">
+      <h3>Alerts</h3>
+      <p class="note">Private to this dashboard. Provisional vs confirmed is labelled.</p>
+      @for (a of feed(); track a.symbol + a.type + a.message) {
+        <p class="alert-row" [attr.data-prov]="a.provisional ? '1' : '0'">
+          <strong>{{ a.provisional ? 'Provisional' : 'Confirmed' }}</strong>
+          {{ a.message }}
+        </p>
+      } @empty {
+        <p class="muted">No alerts yet this session.</p>
+      }
+    </section>
+  </div>
+
+  @if (showSettings()) {
+    <section class="panel settings">
+      <h3>Desk settings</h3>
+      <div class="set-grid">
+        <label>EMA fast <input type="number" [value]="settings().emaFast" (change)="patchSetting('emaFast', +$any($event.target).value)" /></label>
+        <label>EMA slow <input type="number" [value]="settings().emaSlow" (change)="patchSetting('emaSlow', +$any($event.target).value)" /></label>
+        <label>ADX period <input type="number" [value]="settings().adxPeriod" (change)="patchSetting('adxPeriod', +$any($event.target).value)" /></label>
+        <label>ADX weak <input type="number" [value]="settings().adxWeak" (change)="patchSetting('adxWeak', +$any($event.target).value)" /></label>
+        <label>ADX strong <input type="number" [value]="settings().adxStrong" (change)="patchSetting('adxStrong', +$any($event.target).value)" /></label>
+        <label>S/R lookback <input type="number" [value]="settings().srLookback" (change)="patchSetting('srLookback', +$any($event.target).value)" /></label>
+        <label>Breakout buffer % <input type="number" step="0.01" [value]="settings().breakoutBufferPct" (change)="patchSetting('breakoutBufferPct', +$any($event.target).value)" /></label>
+        <label>UI refresh ms <input type="number" [value]="settings().uiRefreshMs" (change)="patchSetting('uiRefreshMs', +$any($event.target).value)" /></label>
+        <label>Alert cooldown ms <input type="number" [value]="settings().alertCooldownMs" (change)="patchSetting('alertCooldownMs', +$any($event.target).value)" /></label>
+        <label class="check"><input type="checkbox" [checked]="settings().volumeFilter" (change)="patchSetting('volumeFilter', $any($event.target).checked)" /> Volume filter</label>
+        <label class="check"><input type="checkbox" [checked]="settings().retestRequired" (change)="patchSetting('retestRequired', $any($event.target).checked)" /> Retest confirmation</label>
+      </div>
+    </section>
+  }
+
+  @if (selected(); as sym) {
+    <section class="panel chart-panel">
+      <header class="chart-head">
+        <h3>{{ sym }}</h3>
+        <div class="ivs">
+          <button type="button" class="chip" [class.on]="chartIv() === '5minute'" (click)="setInterval('5minute')">5m</button>
+          <button type="button" class="chip" [class.on]="chartIv() === '15minute'" (click)="setInterval('15minute')">15m</button>
+          <button type="button" class="chip" [class.on]="chartIv() === '60minute'" (click)="setInterval('60minute')">1h</button>
+          <button type="button" class="chip" [class.on]="chartIv() === 'day'" (click)="setInterval('day')">Daily</button>
+        </div>
+        <button type="button" class="desk-btn ghost" (click)="closeChart()">Close</button>
+      </header>
+      @if (chart()?.message) {
+        <p class="muted">{{ chart()?.message }}</p>
+      }
+      <app-desk-candle-chart
+        [candles]="chart()?.candles || []"
+        [overlay]="chart()?.overlay || null"
+        [emptyMessage]="chartLoading() ? 'Loading candles…' : (chart()?.message || 'No historical candles.')"
+      />
+    </section>
+  }
+</section>

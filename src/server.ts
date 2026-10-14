@@ -418,6 +418,8 @@ async function proxyOrderBackendJson(
     upstreamPath = pathOnly.replace(/^\/api\/sl-buddy/, '/sl-buddy');
   } else if (pathOnly.startsWith('/api/heatmap')) {
     upstreamPath = pathOnly.replace(/^\/api\/heatmap/, '/heatmap');
+  } else if (pathOnly.startsWith('/api/market-desk')) {
+    upstreamPath = pathOnly.replace(/^\/api\/market-desk/, '/market-desk');
   } else if (pathOnly.startsWith('/api/pnl')) {
     upstreamPath = pathOnly.replace(/^\/api\/pnl/, '/pnl');
   } else {
@@ -551,6 +553,13 @@ heatmapApiRouter.use((req, res) => {
   void proxyOrderBackendJson('/heatmap', 'heatmap', req, res);
 });
 app.use('/api/heatmap', heatmapApiRouter);
+
+const marketDeskApiRouter = express.Router();
+marketDeskApiRouter.use(express.json());
+marketDeskApiRouter.use((req, res) => {
+  void proxyOrderBackendJson('/market-desk', 'market-desk', req, res);
+});
+app.use('/api/market-desk', marketDeskApiRouter);
 
 const pnlApiRouter = express.Router();
 pnlApiRouter.use(express.json());

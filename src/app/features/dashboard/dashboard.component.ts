@@ -88,13 +88,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
       module: 'research',
     },
     {
-      label: 'Heatmap',
-      shortLabel: 'Heatmap',
-      route: '/heatmap',
-      icon: 'trending-up',
-      module: null,
-    },
-    {
       label: 'Charts',
       shortLabel: 'Charts',
       route: '/dashboard/charts',
@@ -135,7 +128,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     },
     '/dashboard/charts': {
       title: 'Charts',
-      subtitle: 'Uptrend, downtrend or sideways on Nifty 50, Bank Nifty, Sensex and Crude.',
+      subtitle: 'Indian Market Heat Map — Nifty 50, Bank Nifty, Sensex and private trend cards.',
     },
     '/dashboard/sl-buddy': {
       title: 'SL Buddy',
