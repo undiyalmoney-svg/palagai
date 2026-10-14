@@ -49,6 +49,8 @@ describe('market-desk fallback', () => {
     expect(snap.private).toBe(true);
     expect(snap.demo).toBe(false);
     expect(snap.indices[0].ltp).toBe(22640);
+    expect(snap.indices.map((i) => i.id)).toContain('CRUDEOILM');
+    expect(snap.indices.find((i) => i.id === 'CRUDEOILM')?.name).toBe('Crude Oil Mini');
     expect(snap.indices[0].bias).toBe('mild-bear');
     expect(snap.indices[0].biasLabel).toBe('Mild bearish bias');
     expect(snap.indices[0].dayTrend).toBe('bearish');

@@ -10,8 +10,8 @@ export const environment = {
   defaultLots: 1,
   allowLiveMoney: true,
   orderEgressIp: '168.144.28.89',
-  appVersion: '1.3.128',
-  appBuild: '2026.10.14-heat-board-white',
+  appVersion: '1.3.129',
+  appBuild: '2026.10.14-heat-crude-start',
   /**
    * Optional local-only session bootstrap. Fill via Get Token — do not commit real tokens.
    */

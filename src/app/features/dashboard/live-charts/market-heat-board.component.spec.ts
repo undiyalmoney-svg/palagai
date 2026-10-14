@@ -61,6 +61,26 @@ function snap(): MarketDeskSnapshot {
         h1Trend: 'mixed',
         dayTrend: 'mixed',
       },
+      {
+        id: 'CRUDEOILM',
+        name: 'Crude Oil Mini',
+        symbol: 'CRUDEOILM',
+        ltp: 5452,
+        change: 30,
+        changePct: 0.55,
+        bias: 'mild-bull',
+        biasLabel: 'Mild bullish bias',
+        confirmed: false,
+        score: 2,
+        strength: 'moderate',
+        strengthLabel: 'Moderate',
+        breakout15: { status: 'none', direction: null, level: null, close: null, closeTime: null, support: null, resistance: null },
+        breakout60: { status: 'none', direction: null, level: null, close: null, closeTime: null, support: null, resistance: null },
+        agreement: 'mixed',
+        m15Trend: 'mixed',
+        h1Trend: 'mixed',
+        dayTrend: 'bullish',
+      },
     ],
     stocks: [
       {
@@ -119,6 +139,9 @@ describe('MarketHeatBoardComponent', () => {
     expect(text).toContain('Indian Market Heat Map');
     expect(text).toContain('DEMO MODE');
     expect(text).toContain('NIFTY 50');
+    expect(text).toContain('Crude Oil Mini');
+    expect(text).toContain('Start');
+    expect(text).toContain('Stop');
     expect(text).toContain('Mild bearish bias');
     expect(text).toContain('Nifty 50 stocks');
     expect(text).toContain('HDFCBANK');
@@ -131,6 +154,26 @@ describe('MarketHeatBoardComponent', () => {
     expect(fixture.nativeElement.querySelector('canvas')).toBeNull();
     expect(text).not.toContain('Buy');
     expect(text).not.toContain('Sell');
+    expect(fixture.nativeElement.querySelector('[data-testid="desk-start"]')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('[data-testid="crude-stop"]')).toBeTruthy();
+  });
+
+  it('stops live updates from the white Start/Stop controls', async () => {
+    await TestBed.configureTestingModule({
+      imports: [MarketHeatBoardComponent],
+      providers: [
+        provideRouter([]),
+        { provide: PLATFORM_ID, useValue: 'server' },
+        { provide: MarketDeskApiService, useValue: { snapshot: () => Promise.resolve(snap()), candles: () => Promise.resolve({ candles: [] }) } },
+      ],
+    }).compileComponents();
+    const fixture: ComponentFixture<MarketHeatBoardComponent> = TestBed.createComponent(MarketHeatBoardComponent);
+    fixture.componentInstance['snap'].set(snap());
+    fixture.detectChanges();
+    fixture.componentInstance['stopDesk']();
+    fixture.detectChanges();
+    expect(fixture.componentInstance['running']()).toBe(false);
+    expect(fixture.nativeElement.textContent).toContain('Stopped');
   });
 
   it('shows an empty Nifty 50 board instead of a blank grid', async () => {

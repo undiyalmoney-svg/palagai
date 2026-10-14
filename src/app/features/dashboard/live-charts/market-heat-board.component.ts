@@ -30,6 +30,7 @@ type DeskFilter =
 
 const SETTINGS_KEY = 'palagai.market-desk.settings';
 const ALERT_KEY = 'palagai.market-desk.alerts';
+const RUNNING_KEY = 'palagai.market-desk.running';
 
 @Component({
   selector: 'app-market-heat-board',
@@ -58,6 +59,7 @@ export class MarketHeatBoardComponent implements OnInit {
   protected readonly chart = signal<MarketDeskCandles | null>(null);
   protected readonly chartLoading = signal(false);
   protected readonly feed = signal<MarketDeskAlert[]>([]);
+  protected readonly running = signal(this.loadRunning());
 
   protected readonly tiles = computed(() => {
     const snap = this.snap();
@@ -90,8 +92,10 @@ export class MarketHeatBoardComponent implements OnInit {
     if (!this.isBrowser) return;
     this.tickClock();
     this.clockTimer = setInterval(() => this.tickClock(), 1000);
-    void this.refresh();
-    this.armPoll();
+    if (this.running()) {
+      void this.refresh();
+      this.armPoll();
+    }
     this.destroyRef.onDestroy(() => {
       if (this.poll) clearInterval(this.poll);
       if (this.clockTimer) clearInterval(this.clockTimer);
@@ -111,6 +115,26 @@ export class MarketHeatBoardComponent implements OnInit {
       this.error.set(msg);
     } finally {
       this.loading.set(false);
+    }
+  }
+
+  protected startDesk(): void {
+    if (this.running()) {
+      void this.refresh();
+      return;
+    }
+    this.running.set(true);
+    this.saveRunning(true);
+    this.armPoll();
+    void this.refresh();
+  }
+
+  protected stopDesk(): void {
+    this.running.set(false);
+    this.saveRunning(false);
+    if (this.poll) {
+      clearInterval(this.poll);
+      this.poll = null;
     }
   }
 
@@ -227,7 +251,28 @@ export class MarketHeatBoardComponent implements OnInit {
     }
   }
 
+  private loadRunning(): boolean {
+    if (!this.isBrowser) return true;
+    try {
+      const raw = localStorage.getItem(RUNNING_KEY);
+      if (raw == null) return true;
+      return raw !== '0' && raw !== 'false';
+    } catch {
+      return true;
+    }
+  }
+
+  private saveRunning(on: boolean): void {
+    if (!this.isBrowser) return;
+    try {
+      localStorage.setItem(RUNNING_KEY, on ? '1' : '0');
+    } catch {
+      // ignore
+    }
+  }
+
   private armPoll(): void {
+    if (!this.running()) return;
     if (this.poll) clearInterval(this.poll);
     const ms = Math.max(1000, this.settings().uiRefreshMs || 5000);
     this.poll = setInterval(() => {

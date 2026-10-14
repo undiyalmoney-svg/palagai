@@ -6,7 +6,26 @@
       <p class="desk-sub">Nifty 50 colour is today’s %. UP / DOWN / SIDE is the trend. 15m and 1h are labelled WAIT until Kite candles land.</p>
     </div>
     <div class="desk-actions">
-      <button type="button" class="desk-btn" (click)="refresh()" [disabled]="loading()">
+      <button
+        type="button"
+        class="desk-btn white"
+        data-testid="desk-start"
+        [class.on]="running()"
+        (click)="startDesk()"
+        [disabled]="running() && loading()"
+      >
+        Start
+      </button>
+      <button
+        type="button"
+        class="desk-btn white"
+        data-testid="desk-stop"
+        [class.on]="!running()"
+        (click)="stopDesk()"
+      >
+        Stop
+      </button>
+      <button type="button" class="desk-btn" (click)="refresh()" [disabled]="loading() || !running()">
         {{ loading() ? 'Updating' : 'Refresh desk' }}
       </button>
       <button type="button" class="desk-btn ghost" (click)="showSettings.set(!showSettings())">Settings</button>
@@ -14,7 +33,7 @@
   </header>
 
   <div class="desk-hud">
-    <span class="pill" [attr.data-on]="snap()?.session?.open ? '1' : '0'">{{ snap()?.session?.label || 'Session' }}</span>
+    <span class="pill" [attr.data-on]="running() ? '1' : '0'">{{ running() ? (snap()?.session?.label || 'Live') : 'Stopped' }}</span>
     <span class="pill">{{ clock() }}</span>
     <span class="pill">Updated {{ fmtIst(snap()?.session?.lastUpdateAt) }} IST</span>
     <span class="pill" [attr.data-live]="snap()?.session?.connection === 'live' ? '1' : '0'">
@@ -45,7 +64,12 @@
 
   <div class="index-grid">
     @for (card of snap()?.indices || []; track card.id) {
-      <article class="index-card" [attr.data-lamp]="lamp(card.bias)" (click)="openChart(card.id)">
+      <article
+        class="index-card"
+        [attr.data-lamp]="lamp(card.bias)"
+        [attr.data-book]="card.id === 'CRUDEOILM' ? 'crude' : 'cash'"
+        (click)="openChart(card.id)"
+      >
         <span class="index-dot" aria-hidden="true"></span>
         <div class="index-top">
           <h2>{{ card.name }}</h2>
@@ -63,6 +87,12 @@
           <span class="sig" [attr.data-lamp]="tfLamp(card.dayTrend)"><em>Day</em>{{ tfLabel(card.dayTrend) }}</span>
           <span class="sig"><em>Score</em>{{ card.score ?? '—' }}</span>
         </div>
+        @if (card.id === 'CRUDEOILM') {
+          <div class="card-run" (click)="$event.stopPropagation()">
+            <button type="button" class="desk-btn white" data-testid="crude-start" [class.on]="running()" (click)="startDesk()">Start</button>
+            <button type="button" class="desk-btn white" data-testid="crude-stop" [class.on]="!running()" (click)="stopDesk()">Stop</button>
+          </div>
+        }
       </article>
     }
   </div>

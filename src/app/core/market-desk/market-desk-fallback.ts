@@ -293,6 +293,7 @@ export function deskSnapshotFromPublicHeatmaps(
     indexCard(nifty, 'NIFTY 50', 'NIFTY50'),
     indexCard(bank, 'NIFTY BANK', 'BANKNIFTY'),
     indexCard(sensex, 'SENSEX', 'SENSEX'),
+    indexCard(null, 'Crude Oil Mini', 'CRUDEOILM'),
   ];
   const live = (nifty.companies || []).map(stockTile);
   const stocks = live.length ? live : NIFTY50_SYMBOLS.map(placeholderTile);
