@@ -81,4 +81,88 @@ describe('MarketDeskApiService', () => {
     expect(body.demo).toBe(false);
     http.verify();
   });
+
+  it('falls back to live public heatmap quotes when /market-desk is 404', async () => {
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        MarketDeskApiService,
+        { provide: KiteSessionService, useValue: { getAuthorizationHeader: () => 'token key:secret' } },
+      ],
+    });
+    const api = TestBed.inject(MarketDeskApiService);
+    const http = TestBed.inject(HttpTestingController);
+    const pending = api.snapshot();
+    http.expectOne((r) => r.url === '/api/market-desk').flush(
+      { status: 'error', message: 'Route not found: GET /market-desk' },
+      { status: 404, statusText: 'Not Found' },
+    );
+    await Promise.resolve();
+    const nifty = http.expectOne('/api/heatmap?index=NIFTY50');
+    nifty.flush({
+      public: true,
+      index: { id: 'NIFTY50', name: 'NIFTY 50', ltp: 22640, change: -90, changePct: -0.4 },
+      session: { ok: true, source: 'yahoo' },
+      buckets: [],
+      trends: [],
+      advances: 1,
+      declines: 0,
+      unchanged: 0,
+      trendCounts: {},
+      companies: [
+        {
+          symbol: 'INFY',
+          name: 'Infosys',
+          sector: 'IT',
+          mcapRank: 4,
+          ltp: 1500,
+          change: 10,
+          changePct: 0.7,
+          high52: 1600,
+          low52: 1200,
+          ema20: 1480,
+          ema50: 1400,
+          adx: 22,
+          trend: 'up',
+          trendLabel: 'Up',
+          score: 1,
+          bucket: '1-to--1',
+        },
+      ],
+      lastUpdatedAt: '2026-10-14T09:00:00Z',
+    });
+    http.expectOne('/api/heatmap?index=BANKNIFTY').flush({
+      public: true,
+      index: { id: 'BANKNIFTY', name: 'NIFTY BANK', ltp: 55100, change: 80, changePct: 0.15 },
+      session: { ok: true },
+      buckets: [],
+      trends: [],
+      advances: 0,
+      declines: 0,
+      unchanged: 0,
+      trendCounts: {},
+      companies: [],
+      lastUpdatedAt: '2026-10-14T09:00:00Z',
+    });
+    http.expectOne('/api/heatmap?index=SENSEX').flush({
+      public: true,
+      index: { id: 'SENSEX', name: 'SENSEX', ltp: 74200, change: -40, changePct: -0.05 },
+      session: { ok: true },
+      buckets: [],
+      trends: [],
+      advances: 0,
+      declines: 0,
+      unchanged: 0,
+      trendCounts: {},
+      companies: [],
+      lastUpdatedAt: '2026-10-14T09:00:00Z',
+    });
+    const body = await pending;
+    expect(body.indices[0].ltp).toBe(22640);
+    expect(body.stocks[0].symbol).toBe('INFY');
+    expect(body.stocks[0].biasLabel).toBe('Mild bullish bias');
+    expect(body.warning).toMatch(/droplet/);
+    http.verify();
+  });
 });

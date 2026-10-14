@@ -20,6 +20,7 @@ import { createHash } from 'node:crypto';
 import express from 'express';
 import { gunzipSync, gzipSync } from 'node:zlib';
 import { join } from 'node:path';
+import { deskSnapshotFromPublicHeatmaps } from './app/core/market-desk/market-desk-fallback';
 
 /** Minimal CSV split that respects double-quoted fields (names with commas). */
 function splitCsvLine(line: string): string[] {
@@ -474,6 +475,43 @@ async function proxyOrderBackendJson(
       responseBody = JSON.parse(responseText);
     } catch {
       // keep text
+    }
+    if (
+      upstream.status === 404 &&
+      req.method === 'GET' &&
+      pathOnly.startsWith('/api/market-desk')
+    ) {
+      try {
+        if (pathOnly.startsWith('/api/market-desk/candles') || pathOnly.startsWith('/api/market-desk/backtest')) {
+          res.status(200).send({
+            status: 'ok',
+            candles: [],
+            result: null,
+            message:
+              'Historical desk data needs /market-desk on the trading server. Pull Order-API on the droplet and restart trading-backend.',
+          });
+          return;
+        }
+        const load = async (index: string) => {
+          const r = await fetch(`${ORDER_BACKEND_BASE}/heatmap?index=${encodeURIComponent(index)}`, {
+            signal: AbortSignal.timeout(20_000),
+          });
+          if (!r.ok) throw new Error(`heatmap ${index} HTTP ${r.status}`);
+          return r.json();
+        };
+        const [nifty, bank, sensex] = await Promise.all([
+          load('NIFTY50'),
+          load('BANKNIFTY'),
+          load('SENSEX'),
+        ]);
+        res.status(200).send({
+          status: 'ok',
+          ...deskSnapshotFromPublicHeatmaps(nifty, bank, sensex),
+        });
+        return;
+      } catch (fallbackErr) {
+        console.error('[market-desk fallback]', fallbackErr);
+      }
     }
     res.status(upstream.status).send(responseBody);
   } catch (err) {
