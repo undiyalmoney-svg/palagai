@@ -3,7 +3,7 @@
  * Shown in Trade Desk “What the app trades on” card and Autobot hero.
  * Autobot also prefers Order-API /live appBuild when the server reports it.
  */
-export const APP_VERSION = '1.3.126';
+export const APP_VERSION = '1.3.127';
 /** Short build tag — private Indian Market Heat Map on Charts. */
 export const APP_BUILD = '2026.10.14-market-desk-404';
 export const APP_BUILD_LABEL = `v${APP_VERSION} · ${APP_BUILD}`;
