@@ -61,6 +61,8 @@ describe('heatmap util', () => {
     ]);
     expect(found.up.map((r) => r.symbol)).toEqual(['TCS']);
     expect(found.down.map((r) => r.symbol)).toEqual(['HDFCLIFE']);
+    expect(found.upTotal).toBe(1);
+    expect(found.downTotal).toBe(1);
   });
 
   it('formats percents with a sign', () => {

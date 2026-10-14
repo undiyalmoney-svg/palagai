@@ -10,7 +10,7 @@ export class HeatmapApiService {
   private readonly base =
     (environment as { heatmapApiBaseUrl?: string }).heatmapApiBaseUrl || '/api/heatmap';
 
-  snapshot(): Promise<HeatmapSnapshot> {
-    return firstValueFrom(this.http.get<HeatmapSnapshot>(this.base));
+  snapshot(index = 'NIFTY50'): Promise<HeatmapSnapshot> {
+    return firstValueFrom(this.http.get<HeatmapSnapshot>(this.base, { params: { index } }));
   }
 }

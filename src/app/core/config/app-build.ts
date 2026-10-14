@@ -5,5 +5,5 @@
  */
 export const APP_VERSION = '1.3.125';
 /** Short build tag — public Nifty 50 heatmap + strong trend finder. */
-export const APP_BUILD = '2026.10.14-public-heatmap';
+export const APP_BUILD = '2026.10.14-heatmap-indices';
 export const APP_BUILD_LABEL = `v${APP_VERSION} · ${APP_BUILD}`;

@@ -54,10 +54,17 @@ function valueFor(row: HeatmapCompany, col: HeatmapTableCol): string | number {
   return row.low52 ?? Number.NaN;
 }
 
-export function strongTrends(rows: HeatmapCompany[]): { up: HeatmapCompany[]; down: HeatmapCompany[] } {
+export function strongTrends(
+  rows: HeatmapCompany[],
+  limit = 8,
+): { up: HeatmapCompany[]; down: HeatmapCompany[]; upTotal: number; downTotal: number } {
+  const up = rows.filter((r) => r.trend === 'strong-up').sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+  const down = rows.filter((r) => r.trend === 'strong-down').sort((a, b) => (a.score ?? 0) - (b.score ?? 0));
   return {
-    up: rows.filter((r) => r.trend === 'strong-up').sort((a, b) => (b.score ?? 0) - (a.score ?? 0)),
-    down: rows.filter((r) => r.trend === 'strong-down').sort((a, b) => (a.score ?? 0) - (b.score ?? 0)),
+    up: up.slice(0, limit),
+    down: down.slice(0, limit),
+    upTotal: up.length,
+    downTotal: down.length,
   };
 }
 

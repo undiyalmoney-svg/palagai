@@ -87,16 +87,21 @@
   background: #fff;
 }
 
-.hm-select {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-weight: 700;
-  color: var(--pg-ink);
+.hm-select-wrap {
+  display: block;
+  min-width: 0;
 }
 
-.hm-caret {
-  color: var(--pg-muted);
+.hm-select {
+  display: block;
+  width: 100%;
+  font-weight: 700;
+  color: var(--pg-ink);
+  font-family: inherit;
+  appearance: none;
+  background: #fff url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8'><path fill='%2364748b' d='M0 0l6 8 6-8z'/></svg>") no-repeat right 0.85rem center;
+  padding-right: 2rem;
+  cursor: pointer;
 }
 
 .hm-index {
@@ -147,9 +152,15 @@
 
 .hm-finder h2,
 .hm-table-wrap h2 {
-  margin: 0 0 0.55rem;
+  margin: 0 0 0.35rem;
   font-size: 1.05rem;
   letter-spacing: -0.03em;
+}
+
+.hm-finder-note {
+  margin: 0 0 0.55rem;
+  font-size: 0.78rem;
+  color: var(--pg-muted);
 }
 
 .hm-finder-grid {
@@ -197,6 +208,14 @@
 .hm-mini.down {
   background: #ffe4e8;
   color: #be123c;
+}
+
+.hm-mini.more {
+  appearance: none;
+  border: 0;
+  cursor: pointer;
+  background: #f1f5f9;
+  color: #334155;
 }
 
 .hm-modes {

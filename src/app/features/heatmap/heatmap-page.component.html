@@ -5,7 +5,7 @@
     </a>
     <div class="hm-title">
       <h1>Index Heatmap</h1>
-      <p>Free trend finder · Nifty 50</p>
+      <p>Free trend finder · Nifty 50, Bank Nifty, Sensex</p>
     </div>
     @if (signedIn()) {
       <a class="hm-link" routerLink="/dashboard">Desk</a>
@@ -17,10 +17,13 @@
   <section class="hm-filter">
     <span class="hm-label">Filter</span>
     <div class="hm-filter-row">
-      <button type="button" class="hm-select" disabled>
-        NIFTY 50
-        <span class="hm-caret" aria-hidden="true">▾</span>
-      </button>
+      <label class="hm-select-wrap">
+        <select class="hm-select" [value]="indexId()" (change)="setIndex($any($event.target).value)">
+          @for (ix of indexOptions(); track ix.id) {
+            <option [value]="ix.id">{{ ix.name }}</option>
+          }
+        </select>
+      </label>
       @if (snap(); as s) {
         <div class="hm-index" [attr.data-tone]="indexTone()">
           @if (s.index.ltp != null) {
@@ -45,26 +48,37 @@
   }
 
   @if (finder(); as find) {
-    @if (find.up.length || find.down.length) {
+    @if (find.upTotal || find.downTotal) {
       <section class="hm-finder" aria-label="Strong trends">
         <h2>Strong trends</h2>
+        <p class="hm-finder-note">Daily EMA20 / EMA50 stack — not just today’s percent.</p>
         <div class="hm-finder-grid">
-          @if (find.up.length) {
+          @if (find.upTotal) {
             <div>
-              <p class="hm-finder-label up">Strong up</p>
+              <p class="hm-finder-label up">Strong up · {{ find.upTotal }}</p>
               <div class="hm-finder-chips">
                 @for (row of find.up; track row.symbol) {
                   <span class="hm-mini up">{{ row.symbol }} {{ formatPct(row.changePct) }}</span>
                 }
+                @if (find.upTotal > find.up.length) {
+                  <button type="button" class="hm-mini more" (click)="toggleTrend('strong-up')">
+                    +{{ find.upTotal - find.up.length }} more
+                  </button>
+                }
               </div>
             </div>
           }
-          @if (find.down.length) {
+          @if (find.downTotal) {
             <div>
-              <p class="hm-finder-label down">Strong down</p>
+              <p class="hm-finder-label down">Strong down · {{ find.downTotal }}</p>
               <div class="hm-finder-chips">
                 @for (row of find.down; track row.symbol) {
                   <span class="hm-mini down">{{ row.symbol }} {{ formatPct(row.changePct) }}</span>
+                }
+                @if (find.downTotal > find.down.length) {
+                  <button type="button" class="hm-mini more" (click)="toggleTrend('strong-down')">
+                    +{{ find.downTotal - find.down.length }} more
+                  </button>
                 }
               </div>
             </div>
@@ -130,7 +144,7 @@
   }
 
   @if (snap(); as s) {
-    <p class="hm-updated">Last updated at {{ formatIstTime(s.lastUpdatedAt) }}</p>
+    <p class="hm-updated">Last updated at {{ formatIstTime(s.lastUpdatedAt) }} · {{ sourceLabel() }}</p>
 
     <section class="hm-table-wrap">
       <h2>Companies under {{ s.index.name }}</h2>

@@ -14,5 +14,5 @@ export const environment = {
   allowLiveMoney: true,
   orderEgressIp: '168.144.28.89',
   appVersion: '1.3.125',
-  appBuild: '2026.10.14-public-heatmap',
+  appBuild: '2026.10.14-heatmap-indices',
 };

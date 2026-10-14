@@ -93,13 +93,27 @@ describe('HeatmapApiService', () => {
     const api = TestBed.inject(HeatmapApiService);
     const http = TestBed.inject(HttpTestingController);
     const pending = api.snapshot();
-    const req = http.expectOne('/api/heatmap');
+    const req = http.expectOne('/api/heatmap?index=NIFTY50');
     expect(req.request.method).toBe('GET');
     expect(req.request.headers.has('Authorization')).toBe(false);
     req.flush({ status: 'ok', ...snapshot() });
     const body = await pending;
     expect(body.public).toBe(true);
     expect(body.companies).toHaveLength(3);
+    http.verify();
+  });
+
+  it('asks the API for Bank Nifty when that index is selected', async () => {
+    TestBed.configureTestingModule({
+      providers: [provideHttpClient(), provideHttpClientTesting(), HeatmapApiService],
+    });
+    const api = TestBed.inject(HeatmapApiService);
+    const http = TestBed.inject(HttpTestingController);
+    const pending = api.snapshot('BANKNIFTY');
+    const req = http.expectOne('/api/heatmap?index=BANKNIFTY');
+    req.flush({ status: 'ok', ...snapshot(), index: { id: 'BANKNIFTY', name: 'NIFTY BANK', ltp: 55204, change: -284, changePct: -0.51 } });
+    const body = await pending;
+    expect(body.index.name).toBe('NIFTY BANK');
     http.verify();
   });
 });
@@ -113,7 +127,7 @@ describe('HeatmapPageComponent', () => {
     const fixture = TestBed.createComponent(HeatmapPageComponent);
     const http = TestBed.inject(HttpTestingController);
     fixture.detectChanges();
-    http.expectOne('/api/heatmap').flush({ status: 'ok', ...snapshot() });
+    http.expectOne((r) => r.url.startsWith('/api/heatmap')).flush({ status: 'ok', ...snapshot() });
     await fixture.whenStable();
     fixture.detectChanges();
     const el: HTMLElement = fixture.nativeElement;

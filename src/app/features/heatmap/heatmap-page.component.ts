@@ -8,6 +8,7 @@ import {
   HeatmapBucketId,
   HeatmapCompany,
   HeatmapSortMode,
+  HeatmapIndexOption,
   HeatmapSnapshot,
   HeatmapTableCol,
   HeatmapTrendId,
@@ -43,6 +44,12 @@ export class HeatmapPageComponent implements OnDestroy {
   protected readonly tableCol = signal<HeatmapTableCol>('ltp');
   protected readonly tableDir = signal<'asc' | 'desc'>('desc');
   protected readonly signedIn = signal(false);
+  protected readonly indexId = signal('NIFTY50');
+  private readonly fallbackIndices: HeatmapIndexOption[] = [
+    { id: 'NIFTY50', name: 'NIFTY 50' },
+    { id: 'BANKNIFTY', name: 'NIFTY BANK' },
+    { id: 'SENSEX', name: 'SENSEX' },
+  ];
 
   protected readonly formatPx = formatPx;
   protected readonly formatPct = formatPct;
@@ -56,6 +63,15 @@ export class HeatmapPageComponent implements OnDestroy {
     sortTable(this.companies(), this.tableCol(), this.tableDir()),
   );
   protected readonly finder = computed(() => strongTrends(this.companies()));
+  protected readonly indexOptions = computed(
+    () => (this.snap()?.indices?.length ? this.snap()!.indices! : this.fallbackIndices),
+  );
+  protected readonly sourceLabel = computed(() => {
+    const src = this.snap()?.session?.source || '';
+    if (src.includes('groww') || src.includes('yahoo')) return 'Public feed (Yahoo / Groww)';
+    if (src === 'kite') return 'Kite fallback · rate-limited';
+    return src ? src : 'Public feed';
+  });
   protected readonly indexTone = computed(() => {
     const pct = this.snap()?.index.changePct;
     if (!Number.isFinite(pct as number)) return 'flat';
@@ -75,6 +91,16 @@ export class HeatmapPageComponent implements OnDestroy {
 
   protected setLayout(mode: HeatmapSortMode): void {
     this.layout.set(mode);
+  }
+
+  protected setIndex(id: string): void {
+    const next = String(id || 'NIFTY50');
+    if (this.indexId() === next) return;
+    this.indexId.set(next);
+    this.bucket.set(null);
+    this.trend.set(null);
+    this.loading.set(true);
+    void this.refresh();
   }
 
   protected toggleBucket(id: HeatmapBucketId): void {
@@ -100,7 +126,7 @@ export class HeatmapPageComponent implements OnDestroy {
 
   private async refresh(): Promise<void> {
     try {
-      const next = await this.api.snapshot();
+      const next = await this.api.snapshot(this.indexId());
       this.snap.set(next);
       this.error.set('');
     } catch (err) {

@@ -41,11 +41,17 @@ export interface HeatmapIndex {
   changePct: number | null;
 }
 
+export interface HeatmapIndexOption {
+  id: string;
+  name: string;
+}
+
 export interface HeatmapSnapshot {
   status?: string;
   public: boolean;
+  indices?: HeatmapIndexOption[];
   index: HeatmapIndex;
-  session: { ok: boolean; dailiesReady?: boolean; message?: string };
+  session: { ok: boolean; dailiesReady?: boolean; source?: string; message?: string };
   buckets: HeatmapBucket[];
   trends: HeatmapTrendMeta[];
   advances: number;
