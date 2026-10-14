@@ -53,8 +53,67 @@ function biasFromPublic(trend: HeatmapTrendId | undefined): {
   }
 }
 
+/** Public heatmap has no 15m/1h. Day bias is today's % so index cards are not blank WAIT. */
+function dayFromPct(pct: number | null | undefined): {
+  bias: MarketBias;
+  biasLabel: string;
+  dayTrend: string;
+  confirmed: boolean;
+  score: number | null;
+  strength: string;
+  strengthLabel: string;
+} {
+  if (!Number.isFinite(pct)) {
+    return {
+      bias: 'insufficient',
+      biasLabel: 'Waiting for quotes',
+      dayTrend: 'insufficient',
+      confirmed: false,
+      score: null,
+      strength: 'insufficient',
+      strengthLabel: 'Waiting',
+    };
+  }
+  const n = pct as number;
+  const mag = Math.abs(n);
+  const strength = mag >= 1 ? 'strong' : mag >= 0.3 ? 'moderate' : 'weak';
+  const strengthLabel = mag >= 1 ? 'Strong day move' : mag >= 0.3 ? 'Moderate' : 'Quiet day';
+  if (n > 0.15) {
+    return {
+      bias: n >= 1 ? 'bullish' : 'mild-bull',
+      biasLabel: n >= 1 ? 'Bullish' : 'Mild bullish bias',
+      dayTrend: 'bullish',
+      confirmed: false,
+      score: n >= 1 ? 2 : 1,
+      strength,
+      strengthLabel,
+    };
+  }
+  if (n < -0.15) {
+    return {
+      bias: n <= -1 ? 'bearish' : 'mild-bear',
+      biasLabel: n <= -1 ? 'Bearish' : 'Mild bearish bias',
+      dayTrend: 'bearish',
+      confirmed: false,
+      score: n <= -1 ? -2 : -1,
+      strength,
+      strengthLabel,
+    };
+  }
+  return {
+    bias: 'sideways',
+    biasLabel: 'Sideways',
+    dayTrend: 'sideways',
+    confirmed: false,
+    score: 0,
+    strength,
+    strengthLabel,
+  };
+}
+
 function indexCard(snap: HeatmapSnapshot | null, fallbackName: string, id: string): MarketIndexCard {
   const idx = snap?.index;
+  const pack = dayFromPct(idx?.changePct);
   return {
     id,
     name: idx?.name || fallbackName,
@@ -62,18 +121,94 @@ function indexCard(snap: HeatmapSnapshot | null, fallbackName: string, id: strin
     ltp: idx?.ltp ?? null,
     change: idx?.change ?? null,
     changePct: idx?.changePct ?? null,
-    bias: 'insufficient',
-    biasLabel: 'Insufficient data',
-    confirmed: false,
-    score: null,
-    strength: 'insufficient',
-    strengthLabel: 'Insufficient data',
+    bias: pack.bias,
+    biasLabel: pack.biasLabel,
+    confirmed: pack.confirmed,
+    score: pack.score,
+    strength: pack.strength,
+    strengthLabel: pack.strengthLabel,
     breakout15: { ...NONE, interval: '15minute' },
     breakout60: { ...NONE, interval: '60minute' },
     agreement: 'insufficient',
     m15Trend: 'insufficient',
     h1Trend: 'insufficient',
-    dayTrend: 'insufficient',
+    dayTrend: pack.dayTrend,
+  };
+}
+
+/** Same Nifty 50 names as Order-API heatmap/universe.js — shown if the public feed returns no companies. */
+const NIFTY50_SYMBOLS = [
+  'RELIANCE',
+  'ONGC',
+  'COALINDIA',
+  'NTPC',
+  'POWERGRID',
+  'TCS',
+  'INFY',
+  'HCLTECH',
+  'WIPRO',
+  'TECHM',
+  'HDFCBANK',
+  'ICICIBANK',
+  'SBIN',
+  'KOTAKBANK',
+  'AXISBANK',
+  'INDUSINDBK',
+  'BAJFINANCE',
+  'BAJAJFINSV',
+  'HDFCLIFE',
+  'SBILIFE',
+  'MARUTI',
+  'M&M',
+  'BAJAJ-AUTO',
+  'EICHERMOT',
+  'SUNPHARMA',
+  'DRREDDY',
+  'CIPLA',
+  'APOLLOHOSP',
+  'HINDUNILVR',
+  'ITC',
+  'NESTLEIND',
+  'BRITANNIA',
+  'TATACONSUM',
+  'TATASTEEL',
+  'JSWSTEEL',
+  'HINDALCO',
+  'LT',
+  'ADANIPORTS',
+  'ULTRACEMCO',
+  'GRASIM',
+  'ASIANPAINT',
+  'TITAN',
+  'BHARTIARTL',
+  'JIOFIN',
+  'ETERNAL',
+  'SHRIRAMFIN',
+  'TRENT',
+  'ADANIENT',
+  'BEL',
+  'HEROMOTOCO',
+];
+
+function placeholderTile(symbol: string): MarketStockTile {
+  return {
+    symbol,
+    name: symbol,
+    sector: '',
+    ltp: null,
+    changePct: null,
+    bias: 'insufficient',
+    biasLabel: 'Waiting for quotes',
+    confirmed: false,
+    score: null,
+    strength: 'insufficient',
+    m15Trend: 'insufficient',
+    h1Trend: 'insufficient',
+    breakout15: { ...NONE, interval: '15minute' },
+    breakout60: { ...NONE, interval: '60minute' },
+    breakoutAgree: false,
+    aboveEma20: null,
+    aboveEma50: null,
   };
 }
 
@@ -159,7 +294,8 @@ export function deskSnapshotFromPublicHeatmaps(
     indexCard(bank, 'NIFTY BANK', 'BANKNIFTY'),
     indexCard(sensex, 'SENSEX', 'SENSEX'),
   ];
-  const stocks = (nifty.companies || []).map(stockTile);
+  const live = (nifty.companies || []).map(stockTile);
+  const stocks = live.length ? live : NIFTY50_SYMBOLS.map(placeholderTile);
   return {
     private: true,
     demo: false,

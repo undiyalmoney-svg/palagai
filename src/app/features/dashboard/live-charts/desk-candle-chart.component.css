@@ -1,7 +1,7 @@
 .desk-chart-empty {
   margin: 0;
   padding: 2rem 1rem;
-  color: #8b93a7;
+  color: #667085;
   text-align: center;
 }
 
@@ -13,7 +13,8 @@
 .desk-chart svg {
   width: 100%;
   height: 280px;
-  background: #0b1020;
+  background: #fff;
+  border: 1px solid rgba(22, 163, 74, 0.28);
   border-radius: 14px;
 }
 
@@ -24,14 +25,14 @@
 
 .desk-chart .up .wick,
 .desk-chart .up .body {
-  stroke: #3dffb0;
-  fill: #3dffb0;
+  stroke: #16a34a;
+  fill: #16a34a;
 }
 
 .desk-chart .down .wick,
 .desk-chart .down .body {
-  stroke: #ff5d73;
-  fill: #ff5d73;
+  stroke: #dc2626;
+  fill: #dc2626;
 }
 
 .desk-chart .wick {
@@ -39,35 +40,35 @@
 }
 
 .desk-chart .vol {
-  fill: rgba(255, 255, 255, 0.12);
+  fill: rgba(15, 23, 42, 0.12);
 }
 
 .desk-chart .ema.fast {
   fill: none;
-  stroke: #7dd3fc;
+  stroke: #166534;
   stroke-width: 0.28;
 }
 
 .desk-chart .ema.slow {
   fill: none;
-  stroke: #c4b5fd;
+  stroke: #0f172a;
   stroke-width: 0.28;
 }
 
 .desk-chart .vwap {
-  stroke: #fbbf24;
+  stroke: #d97706;
   stroke-width: 0.22;
   stroke-dasharray: 1 0.8;
 }
 
 .desk-chart .sr.res {
-  stroke: #fb7185;
+  stroke: #dc2626;
   stroke-width: 0.18;
   stroke-dasharray: 0.8 0.6;
 }
 
 .desk-chart .sr.sup {
-  stroke: #34d399;
+  stroke: #16a34a;
   stroke-width: 0.18;
   stroke-dasharray: 0.8 0.6;
 }
@@ -77,10 +78,10 @@
   flex-wrap: wrap;
   gap: 0.65rem;
   font-size: 0.78rem;
-  color: #c5cbe0;
+  color: #667085;
 }
 
 .desk-chart-legend .bo {
-  color: #fbbf24;
+  color: #b45309;
   font-weight: 700;
 }

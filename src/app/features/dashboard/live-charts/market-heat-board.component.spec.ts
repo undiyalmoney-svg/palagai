@@ -120,10 +120,34 @@ describe('MarketHeatBoardComponent', () => {
     expect(text).toContain('DEMO MODE');
     expect(text).toContain('NIFTY 50');
     expect(text).toContain('Mild bearish bias');
+    expect(text).toContain('Nifty 50 stocks');
     expect(text).toContain('HDFCBANK');
     expect(text).toContain('Bullish');
+    expect(text).toContain('UP');
+    expect(text).toContain('DOWN');
+    expect(text).toContain('15m UP');
+    expect(text).toContain('1h UP');
+    expect(fixture.nativeElement.querySelectorAll('[data-testid="desk-stock-grid"] .tile').length).toBe(1);
     expect(fixture.nativeElement.querySelector('canvas')).toBeNull();
     expect(text).not.toContain('Buy');
     expect(text).not.toContain('Sell');
+  });
+
+  it('shows an empty Nifty 50 board instead of a blank grid', async () => {
+    await TestBed.configureTestingModule({
+      imports: [MarketHeatBoardComponent],
+      providers: [
+        provideRouter([]),
+        { provide: PLATFORM_ID, useValue: 'server' },
+        { provide: MarketDeskApiService, useValue: { snapshot: () => Promise.resolve(null), candles: () => Promise.resolve({ candles: [] }) } },
+      ],
+    }).compileComponents();
+    const fixture: ComponentFixture<MarketHeatBoardComponent> = TestBed.createComponent(MarketHeatBoardComponent);
+    fixture.componentInstance['snap'].set({ ...snap(), stocks: [] });
+    fixture.detectChanges();
+    const text = fixture.nativeElement.textContent as string;
+    expect(text).toContain('Nifty 50 stocks');
+    expect(text).toContain('Waiting for Nifty 50 quotes');
+    expect(fixture.nativeElement.querySelectorAll('.tile').length).toBe(0);
   });
 });

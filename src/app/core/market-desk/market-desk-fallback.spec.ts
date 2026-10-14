@@ -49,11 +49,24 @@ describe('market-desk fallback', () => {
     expect(snap.private).toBe(true);
     expect(snap.demo).toBe(false);
     expect(snap.indices[0].ltp).toBe(22640);
+    expect(snap.indices[0].bias).toBe('mild-bear');
+    expect(snap.indices[0].biasLabel).toBe('Mild bearish bias');
+    expect(snap.indices[0].dayTrend).toBe('bearish');
     expect(snap.indices[0].breakout15.status).toBe('insufficient');
     expect(snap.stocks[0].symbol).toBe('HDFCBANK');
     expect(snap.stocks[0].bias).toBe('bullish');
     expect(snap.stocks[0].changePct).toBe(1.2);
     expect(snap.warning).toMatch(/droplet/);
+  });
+
+  it('still lists Nifty 50 names when the public feed returns no companies', () => {
+    const nifty = hm({ index: { id: 'NIFTY50', name: 'NIFTY 50', ltp: 22640, change: -90, changePct: -0.4 } });
+    const bank = hm({ index: { id: 'BANKNIFTY', name: 'NIFTY BANK', ltp: 55100, change: 100, changePct: 0.2 } });
+    const sensex = hm({ index: { id: 'SENSEX', name: 'SENSEX', ltp: 74200, change: -50, changePct: -0.1 } });
+    const snap = deskSnapshotFromPublicHeatmaps(nifty, bank, sensex);
+    expect(snap.stocks).toHaveLength(50);
+    expect(snap.stocks.map((s) => s.symbol)).toContain('HDFCBANK');
+    expect(snap.stocks[0].biasLabel).toBe('Waiting for quotes');
   });
 
   it('treats a 404 market-desk response as a missing route', () => {

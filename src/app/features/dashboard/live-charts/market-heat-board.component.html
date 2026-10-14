@@ -3,7 +3,7 @@
     <div>
       <p class="desk-kicker">Private · Charts</p>
       <h1>Indian Market Heat Map</h1>
-      <p class="desk-sub">Trend, breakouts and breadth for Nifty 50, Bank Nifty and Sensex. Rule-based, not a tip.</p>
+      <p class="desk-sub">Nifty 50 colour is today’s %. UP / DOWN / SIDE is the trend. 15m and 1h are labelled WAIT until Kite candles land.</p>
     </div>
     <div class="desk-actions">
       <button type="button" class="desk-btn" (click)="refresh()" [disabled]="loading()">
@@ -23,7 +23,6 @@
     <span class="pill" [attr.data-fresh]="snap()?.session?.freshness || 'missing'">
       {{ freshnessLabel(snap()?.session?.freshness || 'missing') }}
     </span>
-    <span class="pill">15m analysis</span>
     <span class="pill muted">Tick {{ fmtIst(snap()?.session?.lastTickAt) }}</span>
     <span class="pill muted">Closed bar {{ fmtIst(snap()?.session?.lastConfirmedCandleAt, false) }}</span>
   </div>
@@ -37,7 +36,7 @@
       <a routerLink="/dashboard/get-token">Get Token</a>
     </p>
   }
-  @if (error()) {
+  @if (error() && !snap()) {
     <p class="desk-banner reauth" role="alert">{{ error() }}</p>
   }
   @if (snap()?.warning && !snap()?.demo) {
@@ -46,23 +45,24 @@
 
   <div class="index-grid">
     @for (card of snap()?.indices || []; track card.id) {
-      <article class="index-card" [attr.data-bias]="card.bias" (click)="openChart(card.id)">
+      <article class="index-card" [attr.data-lamp]="lamp(card.bias)" (click)="openChart(card.id)">
+        <span class="index-dot" aria-hidden="true"></span>
         <div class="index-top">
           <h2>{{ card.name }}</h2>
           <span class="bias" [attr.data-bias]="card.bias">{{ card.biasLabel }}</span>
         </div>
+        <p class="trend-word" [attr.data-lamp]="lamp(card.bias)">{{ lampLabel(card.bias) }}</p>
         <p class="index-px">
           {{ card.ltp | number: '1.2-2' }}
-          <span [class]="tone(card.changePct)">{{ fmtPct(card.changePct) }}</span>
+          <span class="pct" [attr.data-dir]="pctDir(card.changePct)">{{ fmtPct(card.changePct) }}</span>
         </p>
-        <p class="index-chg">{{ card.change | number: '1.2-2' }} pts</p>
-        <dl class="index-meta">
-          <div><dt>Score</dt><dd>{{ card.score ?? '—' }}</dd></div>
-          <div><dt>Strength</dt><dd>{{ card.strengthLabel }}</dd></div>
-          <div><dt>15m</dt><dd>{{ brLabel(card.breakout15) }}</dd></div>
-          <div><dt>1h</dt><dd>{{ brLabel(card.breakout60) }}</dd></div>
-        </dl>
-        <p class="index-agree">{{ agreeLabel(card) }} · {{ card.confirmed ? 'Confirmed' : 'Provisional' }}</p>
+        <p class="index-chg">{{ card.change | number: '1.2-2' }} pts · {{ card.confirmed ? 'Confirmed' : 'Provisional' }}</p>
+        <div class="sig-row">
+          <span class="sig" [attr.data-lamp]="tfLamp(card.m15Trend)"><em>15m</em>{{ tfLabel(card.m15Trend) }}</span>
+          <span class="sig" [attr.data-lamp]="tfLamp(card.h1Trend)"><em>1h</em>{{ tfLabel(card.h1Trend) }}</span>
+          <span class="sig" [attr.data-lamp]="tfLamp(card.dayTrend)"><em>Day</em>{{ tfLabel(card.dayTrend) }}</span>
+          <span class="sig"><em>Score</em>{{ card.score ?? '—' }}</span>
+        </div>
       </article>
     }
   </div>
@@ -84,6 +84,11 @@
     </section>
   }
 
+  <div class="stock-head">
+    <h2>Nifty 50 stocks</h2>
+    <p>{{ tiles().length }} of {{ stockCount() }} shown · green up, red down · trend badge is not the same as %</p>
+  </div>
+
   <div class="desk-tools">
     <input
       type="search"
@@ -101,20 +106,28 @@
     <button type="button" class="chip" [class.on]="filter() === 'agree'" (click)="setFilter('agree')">Both agree</button>
   </div>
 
-  <div class="tile-grid">
-    @for (row of tiles(); track row.symbol) {
-      <button type="button" class="tile" [attr.data-tone]="tone(row.changePct)" (click)="openChart(row.symbol)">
-        <span class="tile-sym">{{ row.symbol }}</span>
-        <span class="tile-pct">{{ fmtPct(row.changePct) }}</span>
-        @if (row.ltp != null) {
-          <span class="tile-px">{{ row.ltp | number: '1.2-2' }}</span>
-        }
-        <span class="bias mini" [attr.data-bias]="row.bias">{{ row.biasLabel }}</span>
-        <span class="tile-meta">{{ row.strength }} · 15m {{ row.m15Trend }} · 1h {{ row.h1Trend }}</span>
-        @if (row.breakout15.status !== 'none' && row.breakout15.status !== 'insufficient') {
-          <span class="tile-bo">{{ brLabel(row.breakout15) }}</span>
-        }
-      </button>
+  <div class="tile-grid" data-testid="desk-stock-grid">
+    @if (loading() && !snap()) {
+      <p class="tile-empty">Loading Nifty 50 stocks…</p>
+    } @else if (!stockCount()) {
+      <p class="tile-empty">{{ emptyCopy() }}</p>
+    } @else if (!tiles().length) {
+      <p class="tile-empty">No stocks match this filter. Clear search or filters to see all {{ stockCount() }} names.</p>
+    } @else {
+      @for (row of tiles(); track row.symbol) {
+        <button type="button" class="tile" [attr.data-bucket]="bucket(row.changePct)" (click)="openChart(row.symbol)">
+          <span class="tile-sym">{{ row.symbol }}</span>
+          <span class="tile-pct">{{ fmtPct(row.changePct) }}</span>
+          @if (row.ltp != null) {
+            <span class="tile-px">{{ row.ltp | number: '1.2-2' }}</span>
+          }
+          <span class="tile-trend" [attr.data-lamp]="lamp(row.bias)">{{ lampLabel(row.bias) }} · {{ row.biasLabel }}</span>
+          <span class="tile-tfs">
+            <span [attr.data-lamp]="tfLamp(row.m15Trend)">15m {{ tfLabel(row.m15Trend) }}</span>
+            <span [attr.data-lamp]="tfLamp(row.h1Trend)">1h {{ tfLabel(row.h1Trend) }}</span>
+          </span>
+        </button>
+      }
     }
   </div>
 

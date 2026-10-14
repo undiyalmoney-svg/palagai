@@ -16,7 +16,6 @@ import {
   MarketDeskCandles,
   MarketDeskSettings,
   MarketDeskSnapshot,
-  MarketIndexCard,
 } from '../../../core/market-desk/market-desk.models';
 import { DeskCandleChartComponent } from './desk-candle-chart.component';
 
@@ -50,7 +49,7 @@ export class MarketHeatBoardComponent implements OnInit {
   protected readonly loading = signal(false);
   protected readonly clock = signal('');
   protected readonly query = signal('');
-  protected readonly sortPct = signal(false);
+  protected readonly sortPct = signal(true);
   protected readonly filter = signal<DeskFilter>('all');
   protected readonly showSettings = signal(false);
   protected readonly settings = signal<MarketDeskSettings>(this.loadSettings());
@@ -74,10 +73,14 @@ export class MarketHeatBoardComponent implements OnInit {
     if (f === 'break60') rows = rows.filter((r) => r.breakout60?.status === 'confirmed' || r.breakout60?.status === 'potential');
     if (f === 'agree') rows = rows.filter((r) => r.breakoutAgree);
     if (this.sortPct()) {
-      rows.sort((a, b) => (b.changePct ?? -999) - (a.changePct ?? -999));
+      rows.sort((a, b) => (b.changePct ?? -999) - (a.changePct ?? -999) || a.symbol.localeCompare(b.symbol));
+    } else {
+      rows.sort((a, b) => a.symbol.localeCompare(b.symbol));
     }
     return rows;
   });
+
+  protected readonly stockCount = computed(() => this.snap()?.stocks?.length || 0);
 
   private poll: ReturnType<typeof setInterval> | null = null;
   private clockTimer: ReturnType<typeof setInterval> | null = null;
@@ -138,12 +141,49 @@ export class MarketHeatBoardComponent implements OnInit {
     void this.refresh();
   }
 
-  protected tone(pct: number | null | undefined): string {
+  protected lamp(bias: string | null | undefined): 'up' | 'down' | 'side' | 'wait' {
+    if (bias === 'bullish' || bias === 'mild-bull') return 'up';
+    if (bias === 'bearish' || bias === 'mild-bear') return 'down';
+    if (bias === 'sideways' || bias === 'mixed') return 'side';
+    return 'wait';
+  }
+
+  protected lampLabel(bias: string | null | undefined): string {
+    const lamp = this.lamp(bias);
+    if (lamp === 'up') return 'UP';
+    if (lamp === 'down') return 'DOWN';
+    if (lamp === 'side') return bias === 'mixed' ? 'MIXED' : 'SIDE';
+    return 'WAIT';
+  }
+
+  protected tfLamp(trend: string | null | undefined): 'up' | 'down' | 'side' | 'wait' {
+    if (trend === 'bullish') return 'up';
+    if (trend === 'bearish') return 'down';
+    if (trend === 'sideways' || trend === 'mixed') return 'side';
+    return 'wait';
+  }
+
+  protected tfLabel(trend: string | null | undefined): string {
+    const lamp = this.tfLamp(trend);
+    if (lamp === 'up') return 'UP';
+    if (lamp === 'down') return 'DOWN';
+    if (lamp === 'side') return trend === 'mixed' ? 'MIX' : 'SIDE';
+    return 'WAIT';
+  }
+
+  protected bucket(pct: number | null | undefined): string {
     if (!Number.isFinite(pct)) return 'na';
     const n = pct as number;
-    if (Math.abs(n) < 0.08) return 'flat';
-    const mag = Math.abs(n) >= 3 ? '3' : Math.abs(n) >= 1 ? '2' : '1';
-    return `${n > 0 ? 'up' : 'down'}${mag}`;
+    if (n >= 3) return 'above-3';
+    if (n >= 1) return '3-to-1';
+    if (n > -1) return '1-to--1';
+    if (n > -3) return '-1-to--3';
+    return 'below--3';
+  }
+
+  protected pctDir(pct: number | null | undefined): 'up' | 'down' | 'flat' {
+    if (!Number.isFinite(pct) || Math.abs(pct as number) < 0.05) return 'flat';
+    return (pct as number) > 0 ? 'up' : 'down';
   }
 
   protected fmtPct(n: number | null | undefined): string {
@@ -152,27 +192,9 @@ export class MarketHeatBoardComponent implements OnInit {
     return `${v > 0 ? '+' : ''}${v.toFixed(2)}%`;
   }
 
-  protected brLabel(row: { status?: string; direction?: string | null }): string {
-    if (!row?.status || row.status === 'none') return 'No breakout';
-    if (row.status === 'insufficient') return 'Insufficient data';
-    const dir = row.direction === 'bull' ? 'bullish' : row.direction === 'bear' ? 'bearish' : '';
-    if (row.status === 'potential') return `Potential ${dir}`.trim();
-    if (row.status === 'confirmed') return `Confirmed ${dir}`.trim();
-    if (row.status === 'retest') return 'Retest in progress';
-    if (row.status === 'failed') return 'Failed breakout';
-    return row.status;
-  }
-
-  protected agreeLabel(card: MarketIndexCard): string {
-    const d = card.dayTrend || 'insufficient';
-    const h = card.h1Trend || 'insufficient';
-    const m = card.m15Trend || 'insufficient';
-    if (d === 'insufficient' && h === 'insufficient') return 'Insufficient data';
-    if (h === 'bullish' && m === 'bullish' && (d === 'bullish' || d === 'insufficient')) return 'Daily / 1h / 15m bullish';
-    if (h === 'bearish' && m === 'bearish' && (d === 'bearish' || d === 'insufficient')) return 'Daily / 1h / 15m bearish';
-    if (h === 'bullish' && m === 'bearish') return 'Hourly bullish but 15-minute bearish';
-    if (h === 'bearish' && m === 'bullish') return 'Hourly bearish but 15-minute bullish';
-    return `${d} · ${h} · ${m}`;
+  protected emptyCopy(): string {
+    if (this.error()) return 'Stock quotes did not load. Refresh the desk.';
+    return 'Waiting for Nifty 50 quotes…';
   }
 
   protected freshnessLabel(s: string): string {
