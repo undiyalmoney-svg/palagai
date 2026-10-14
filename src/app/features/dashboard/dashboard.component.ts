@@ -88,6 +88,13 @@ export class DashboardComponent implements OnInit, OnDestroy {
       module: 'research',
     },
     {
+      label: 'Heatmap',
+      shortLabel: 'Heatmap',
+      route: '/heatmap',
+      icon: 'trending-up',
+      module: null,
+    },
+    {
       label: 'Charts',
       shortLabel: 'Charts',
       route: '/dashboard/charts',

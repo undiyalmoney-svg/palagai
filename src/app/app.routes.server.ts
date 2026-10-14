@@ -7,6 +7,7 @@ import { RenderMode, ServerRoute } from '@angular/ssr';
 export const serverRoutes: ServerRoute[] = [
   { path: '', renderMode: RenderMode.Client },
   { path: 'login', renderMode: RenderMode.Client },
+  { path: 'heatmap', renderMode: RenderMode.Client },
   { path: 'kite-callback', renderMode: RenderMode.Client },
   { path: 'dashboard/get-token', renderMode: RenderMode.Client },
   { path: 'admin/login', renderMode: RenderMode.Client },

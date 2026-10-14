@@ -11,6 +11,7 @@ export const environment = {
   /** Intraday paper research — local proxy / prod SSR → droplet /research. */
   researchApiBaseUrl: '/api/research',
   slBuddyApiBaseUrl: '/api/sl-buddy',
+  heatmapApiBaseUrl: '/api/heatmap',
   /** Manual daily P/L — local proxy / prod SSR → droplet /pnl. */
   pnlApiBaseUrl: '/api/pnl',
   /** Default lots multiplier across desks (exchange lot × this). */
@@ -19,6 +20,6 @@ export const environment = {
   /** DigitalOcean order-backend static egress IP (whitelist in Kite). */
   orderEgressIp: '168.144.28.89',
   /** Must match src/app/core/config/app-build.ts — shown in UI. */
-  appVersion: '1.3.124',
-  appBuild: '2026.08.11-standdown-scale-lots',
+  appVersion: '1.3.125',
+  appBuild: '2026.10.14-public-heatmap',
 };

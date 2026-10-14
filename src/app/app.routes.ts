@@ -47,6 +47,11 @@ export const routes: Routes = [
     component: LoginComponent,
   },
   {
+    path: 'heatmap',
+    loadComponent: () =>
+      import('./features/heatmap/heatmap-page.component').then((m) => m.HeatmapPageComponent),
+  },
+  {
     path: 'admin/login',
     component: AdminLoginComponent,
   },

@@ -39,6 +39,14 @@
       "^/api/sl-buddy": "/sl-buddy"
     }
   },
+  "/api/heatmap": {
+    "target": "http://127.0.0.1:3000",
+    "secure": false,
+    "changeOrigin": true,
+    "pathRewrite": {
+      "^/api/heatmap": "/heatmap"
+    }
+  },
   "/api/pnl": {
     "target": "http://168.144.28.89:3000",
     "secure": false,

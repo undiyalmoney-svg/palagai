@@ -155,6 +155,20 @@
   stroke: #ffffff !important;
 }
 
+.heatmap-link {
+  display: block;
+  margin-top: 1.15rem;
+  text-align: center;
+  font-size: 0.88rem;
+  font-weight: 650;
+  color: var(--pg-info);
+  text-decoration: none;
+}
+
+.heatmap-link:hover {
+  text-decoration: underline;
+}
+
 @media (max-width: 480px) {
   .login-card {
     padding: 1.65rem 1.25rem;

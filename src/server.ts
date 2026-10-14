@@ -416,6 +416,8 @@ async function proxyOrderBackendJson(
     upstreamPath = pathOnly.replace(/^\/api\/research/, '/research');
   } else if (pathOnly.startsWith('/api/sl-buddy')) {
     upstreamPath = pathOnly.replace(/^\/api\/sl-buddy/, '/sl-buddy');
+  } else if (pathOnly.startsWith('/api/heatmap')) {
+    upstreamPath = pathOnly.replace(/^\/api\/heatmap/, '/heatmap');
   } else if (pathOnly.startsWith('/api/pnl')) {
     upstreamPath = pathOnly.replace(/^\/api\/pnl/, '/pnl');
   } else {
@@ -542,6 +544,13 @@ slBuddyApiRouter.use((req, res) => {
   void proxyOrderBackendJson('/sl-buddy', 'sl-buddy', req, res);
 });
 app.use('/api/sl-buddy', slBuddyApiRouter);
+
+const heatmapApiRouter = express.Router();
+heatmapApiRouter.use(express.json());
+heatmapApiRouter.use((req, res) => {
+  void proxyOrderBackendJson('/heatmap', 'heatmap', req, res);
+});
+app.use('/api/heatmap', heatmapApiRouter);
 
 const pnlApiRouter = express.Router();
 pnlApiRouter.use(express.json());
