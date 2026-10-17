@@ -66,6 +66,24 @@ export class KiteFundsService {
     }
   }
 
+  async pushPublicToken(): Promise<{ ok: boolean; message: string }> {
+    const data = this.kiteSession.getSession()?.data;
+    if (!data?.api_key || !data.access_token) {
+      return { ok: false, message: 'Connect Kite first, then push for public view.' };
+    }
+    try {
+      const res = await firstValueFrom(
+        this.http.post<{ message?: string }>(`/api/auth/public-token`, {
+          apiKey: data.api_key,
+          accessToken: data.access_token,
+        }),
+      );
+      return { ok: true, message: res.message || 'Public Charts now uses this Kite session.' };
+    } catch (err) {
+      return { ok: false, message: this.fmtErr(err) };
+    }
+  }
+
   async pushToken(): Promise<boolean> {
     const data = this.kiteSession.getSession()?.data;
     if (!data?.api_key || !data.access_token) return false;

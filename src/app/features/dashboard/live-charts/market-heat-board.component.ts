@@ -9,6 +9,7 @@ import {
   signal,
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { AuthService } from '../../../core/auth/auth.service';
 import { MarketDeskApiService } from '../../../core/market-desk/market-desk-api.service';
 import {
   BehaviourFlow,
@@ -45,6 +46,7 @@ const RUNNING_KEY = 'palagai.market-desk.running';
 })
 export class MarketHeatBoardComponent implements OnInit {
   private readonly api = inject(MarketDeskApiService);
+  private readonly auth = inject(AuthService, { optional: true });
   private readonly destroyRef = inject(DestroyRef);
   private readonly platformId = inject(PLATFORM_ID);
   private readonly isBrowser = isPlatformBrowser(this.platformId);
@@ -67,6 +69,7 @@ export class MarketHeatBoardComponent implements OnInit {
     { id: '60minute' as const, label: '1h' },
     { id: 'day' as const, label: 'Daily' },
   ];
+  protected readonly chartSymbol = signal<string | null>(null);
   protected readonly chart = signal<MarketDeskCandles | null>(null);
   protected readonly chartLoading = signal(false);
   protected readonly feed = signal<MarketDeskAlert[]>([]);
@@ -119,6 +122,15 @@ export class MarketHeatBoardComponent implements OnInit {
     return [t.m5, t.m15, t.h1, t.day];
   });
 
+  protected readonly marketClosed = computed(() => {
+    const s = this.snap()?.session;
+    if (!s) return false;
+    const crude = this.selected() === 'CRUDEOILM';
+    if (crude) return s.crudeOpen === false || (s.crudeOpen == null && !s.open);
+    if (s.cashOpen != null) return !s.cashOpen;
+    return s.open === false || s.status === 'closed' || s.status === 'holiday';
+  });
+
   private poll: ReturnType<typeof setInterval> | null = null;
   private clockTimer: ReturnType<typeof setInterval> | null = null;
   private lastRender = 0;
@@ -145,13 +157,17 @@ export class MarketHeatBoardComponent implements OnInit {
       this.error.set(null);
       this.mergeAlerts(snap.alerts || []);
       if (!this.selected() && snap.indices[0]) this.selected.set(snap.indices[0].id);
-      void this.loadChart();
+      if (this.chartSymbol()) void this.loadChart();
     } catch (err) {
       const msg = err && typeof err === 'object' && 'message' in err ? String((err as Error).message) : 'Market desk is unavailable.';
       this.error.set(msg);
     } finally {
       this.loading.set(false);
     }
+  }
+
+  protected isPublic(): boolean {
+    return this.auth?.isPublic() === true;
   }
 
   protected startDesk(): void {
@@ -180,11 +196,23 @@ export class MarketHeatBoardComponent implements OnInit {
 
   protected select(id: string): void {
     this.selected.set(id);
-    void this.loadChart();
   }
 
   protected openChart(symbol: string): void {
-    this.select(symbol);
+    this.chartSymbol.set(symbol);
+    void this.loadChart();
+  }
+
+  protected sessionLabel(): string {
+    if (!this.running()) return 'Stopped';
+    if (this.marketClosed()) return 'Market is closed';
+    return this.snap()?.session?.label || 'Session open';
+  }
+
+  protected closedHint(): string {
+    return this.selected() === 'CRUDEOILM'
+      ? 'Crude Oil Mini trades 09:00–23:30 IST on weekdays.'
+      : 'Cash indices trade 09:15–15:30 IST on weekdays.';
   }
 
   protected setPrimary(iv: '5minute' | '15minute' | '60minute' | 'day'): void {
@@ -249,6 +277,7 @@ export class MarketHeatBoardComponent implements OnInit {
   }
 
   protected closeChart(): void {
+    this.chartSymbol.set(null);
     this.chart.set(null);
   }
 
@@ -334,7 +363,7 @@ export class MarketHeatBoardComponent implements OnInit {
   }
 
   private async loadChart(): Promise<void> {
-    const symbol = this.selected();
+    const symbol = this.chartSymbol();
     if (!symbol) return;
     this.chartLoading.set(true);
     try {

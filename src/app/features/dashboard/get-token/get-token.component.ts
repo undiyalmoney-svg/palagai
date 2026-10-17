@@ -78,6 +78,8 @@ export class GetTokenComponent {
   protected readonly copyMessage = signal('');
   protected readonly selectedCopyId = signal('redirect-prod');
   protected readonly assignedApiKey = signal('');
+  protected readonly publicPushBusy = signal(false);
+  protected readonly publicPushMessage = signal('');
 
   private readonly allCopyOptions: CopyOption[] = [
     {
@@ -644,6 +646,14 @@ export class GetTokenComponent {
       return true;
     }
     return sessionDate.toDateString() === new Date().toDateString();
+  }
+
+  protected async pushPublicView(): Promise<void> {
+    this.publicPushBusy.set(true);
+    this.publicPushMessage.set('');
+    const out = await this.kiteFunds.pushPublicToken();
+    this.publicPushMessage.set(out.message);
+    this.publicPushBusy.set(false);
   }
 
   private async pushTokenToLiveServer(): Promise<void> {

@@ -130,6 +130,23 @@
           <pre class="result-output inline">{{ formatSessionTime(session) }}</pre>
         </div>
       </div>
+
+      @if (isOwner()) {
+        <button
+          mat-flat-button
+          color="primary"
+          type="button"
+          class="action-button"
+          data-testid="push-public-token"
+          (click)="pushPublicView()"
+          [disabled]="publicPushBusy()"
+        >
+          {{ publicPushBusy() ? 'Pushing…' : 'Push token for public view' }}
+        </button>
+        @if (publicPushMessage()) {
+          <p class="step-description">{{ publicPushMessage() }}</p>
+        }
+      }
     </article>
   }
 

@@ -1,10 +1,3 @@
 <section class="trend-page" data-testid="chart-trends">
   <app-market-heat-board />
-
-  @if (sessionExpired()) {
-    <p class="trend-banner" role="alert">
-      Kite token expired.
-      <a routerLink="/dashboard/get-token">Get Token</a>
-    </p>
-  }
 </section>

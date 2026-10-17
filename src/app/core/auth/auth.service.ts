@@ -42,13 +42,19 @@ export class AuthService {
 
   isCustomer(): boolean {
     const u = this.user();
-    return !!u && u.role !== 'owner';
+    return !!u && u.role !== 'owner' && !this.isPublic();
+  }
+
+  isPublic(): boolean {
+    const u = this.user();
+    return !!u && (u.role === 'public' || u.username === 'Public');
   }
 
   hasModule(mod: SiteModule): boolean {
     const u = this.user();
     if (!u) return false;
     if (u.role === 'owner') return true;
+    if (this.isPublic()) return mod === 'auto';
     return (u.modules || []).includes(mod);
   }
 

@@ -2,9 +2,14 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { PLATFORM_ID } from '@angular/core';
 import { provideRouter } from '@angular/router';
 import { describe, expect, it } from 'vitest';
+import { AuthService } from '../../../core/auth/auth.service';
 import { MarketDeskApiService } from '../../../core/market-desk/market-desk-api.service';
 import { MarketDeskSnapshot } from '../../../core/market-desk/market-desk.models';
 import { MarketHeatBoardComponent } from './market-heat-board.component';
+
+function authStub(isPublic = false) {
+  return { provide: AuthService, useValue: { isPublic: () => isPublic } };
+}
 
 function snap(): MarketDeskSnapshot {
   return {
@@ -31,6 +36,8 @@ function snap(): MarketDeskSnapshot {
       status: 'open',
       label: 'Session open',
       open: true,
+      cashOpen: true,
+      crudeOpen: true,
       day: '2026-10-17',
       istNow: '14:02:11 IST',
       lastUpdateAt: '2026-10-17T08:32:00Z',
@@ -130,6 +137,7 @@ describe('MarketHeatBoardComponent', () => {
       providers: [
         provideRouter([]),
         { provide: PLATFORM_ID, useValue: 'server' },
+        authStub(),
         { provide: MarketDeskApiService, useValue: { snapshot: () => Promise.resolve(snap()), candles: () => Promise.resolve({ candles: [] }) } },
       ],
     }).compileComponents();
@@ -137,27 +145,40 @@ describe('MarketHeatBoardComponent', () => {
     fixture.componentInstance['snap'].set(snap());
     fixture.detectChanges();
     const text = fixture.nativeElement.textContent as string;
-    expect(text).toContain('Market Intelligence');
     expect(text).toContain('DEMO MODE');
-    expect(text).toContain('NIFTY 50');
+    expect(text).toContain('Nifty 50');
     expect(text).toContain('Crude Oil Mini');
     expect(text).toContain('Start');
     expect(text).toContain('Stop');
-    expect(text).toContain('Mild bearish bias');
     expect(text).toContain('Why this reading');
     expect(text).toContain('Nifty 50 stocks');
     expect(text).toContain('HDFCBANK');
-    expect(text).toContain('Bullish');
     expect(text).toContain('BEARISH');
-    expect(text).toContain('Mild bullish bias');
-    expect(text).toContain('15m MIX');
-    expect(text).toContain('Day UP');
     expect(fixture.nativeElement.querySelectorAll('[data-testid="desk-stock-grid"] .tile').length).toBe(1);
     expect(fixture.nativeElement.querySelector('canvas')).toBeTruthy();
     expect(text).not.toContain('Buy');
     expect(text).not.toContain('Sell');
     expect(fixture.nativeElement.querySelector('[data-testid="desk-start"]')).toBeTruthy();
-    expect(fixture.nativeElement.querySelector('[data-testid="crude-stop"]')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('[data-testid="crude-stop"]')).toBeNull();
+    expect(fixture.nativeElement.querySelectorAll('.toolbar .btn.white').length).toBe(2);
+  });
+
+  it('hides Start/Stop for a public viewer', async () => {
+    await TestBed.configureTestingModule({
+      imports: [MarketHeatBoardComponent],
+      providers: [
+        provideRouter([]),
+        { provide: PLATFORM_ID, useValue: 'server' },
+        authStub(true),
+        { provide: MarketDeskApiService, useValue: { snapshot: () => Promise.resolve(snap()), candles: () => Promise.resolve({ candles: [] }) } },
+      ],
+    }).compileComponents();
+    const fixture: ComponentFixture<MarketHeatBoardComponent> = TestBed.createComponent(MarketHeatBoardComponent);
+    fixture.componentInstance['snap'].set(snap());
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('[data-testid="desk-start"]')).toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-testid="desk-stop"]')).toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-testid="market-heat-board"]')?.getAttribute('data-public')).toBe('1');
   });
 
   it('stops live updates from the white Start/Stop controls', async () => {
@@ -166,6 +187,7 @@ describe('MarketHeatBoardComponent', () => {
       providers: [
         provideRouter([]),
         { provide: PLATFORM_ID, useValue: 'server' },
+        authStub(),
         { provide: MarketDeskApiService, useValue: { snapshot: () => Promise.resolve(snap()), candles: () => Promise.resolve({ candles: [] }) } },
       ],
     }).compileComponents();
@@ -184,6 +206,7 @@ describe('MarketHeatBoardComponent', () => {
       providers: [
         provideRouter([]),
         { provide: PLATFORM_ID, useValue: 'server' },
+        authStub(),
         { provide: MarketDeskApiService, useValue: { snapshot: () => Promise.resolve(null), candles: () => Promise.resolve({ candles: [] }) } },
       ],
     }).compileComponents();
@@ -194,5 +217,24 @@ describe('MarketHeatBoardComponent', () => {
     expect(text).toContain('Nifty 50 stocks');
     expect(text).toContain('Waiting for Nifty 50 quotes');
     expect(fixture.nativeElement.querySelectorAll('.tile').length).toBe(0);
+  });
+
+  it('shows Market is closed when the cash session is shut', async () => {
+    await TestBed.configureTestingModule({
+      imports: [MarketHeatBoardComponent],
+      providers: [
+        provideRouter([]),
+        { provide: PLATFORM_ID, useValue: 'server' },
+        authStub(),
+        { provide: MarketDeskApiService, useValue: { snapshot: () => Promise.resolve(snap()), candles: () => Promise.resolve({ candles: [] }) } },
+      ],
+    }).compileComponents();
+    const fixture: ComponentFixture<MarketHeatBoardComponent> = TestBed.createComponent(MarketHeatBoardComponent);
+    const closed = snap();
+    closed.session = { ...closed.session, open: false, status: 'closed', label: 'Weekend', cashOpen: false, crudeOpen: false };
+    fixture.componentInstance['snap'].set(closed);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Market is closed');
+    expect(fixture.nativeElement.querySelector('[data-testid="market-closed"]')).toBeTruthy();
   });
 });

@@ -33,7 +33,6 @@ import {
   signal,
 } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
-import { RouterLink } from '@angular/router';
 import { Candle } from '../../../core/models/candle.model';
 import {
   CHART_BOOKS,
@@ -211,7 +210,7 @@ const NUMERIC_FIELDS: readonly NumericField[] = [
 @Component({
   selector: 'app-live-charts',
   standalone: true,
-  imports: [RouterLink, MarketHeatBoardComponent],
+  imports: [MarketHeatBoardComponent],
   templateUrl: './live-charts.component.html',
   styleUrl: './live-charts.component.css',
 })
@@ -438,38 +437,7 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
-    if (!this.isBrowser) {
-      return;
-    }
-    // One load regardless of the clock: a shut market should still show the
-    // session that just ended rather than an empty frame.
-    void this.kiteFunds.refresh();
-    void this.refreshAll();
-    void this.refreshLiveTrades();
-    if (this.protectOn()) void this.syncProtectToDroplet(true);
-    if (this.isBrowser) {
-      document.addEventListener('visibilitychange', this.onVisibility);
-    }
-    this.timer = setInterval(() => {
-      this.clock.set(Date.now());
-      this.rollProtectDay();
-      if (!this.autoRefresh()) return;
-      // Protect must keep polling in a background tab — that is how 0.5R
-      // entries fire without someone staring at the chart. Hidden skip stays
-      // only when Protect is off (display-only).
-      if (typeof document !== 'undefined' && document.hidden && !this.protectOn()) return;
-      const due = this.duePanes();
-      if (due.length) {
-        void this.refreshPanes(due);
-      }
-      if (this.liveDay()) {
-        void this.refreshLiveTrades();
-      }
-      if (this.protectOn() && Date.now() - this.lastDropletPoll >= DROPLET_POLL_MS) {
-        this.lastDropletPoll = Date.now();
-        void this.refreshProtectDroplet();
-      }
-    }, TICK_MS);
+    // The intelligence board owns polling. Do not start the old SMC/Protect loop.
   }
 
   ngOnDestroy(): void {

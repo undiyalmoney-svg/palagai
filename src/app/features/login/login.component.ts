@@ -40,7 +40,9 @@ export class LoginComponent {
   protected readonly existingLabel = computed(() => {
     const u = this.existingUser();
     if (!u) return '';
-    return u.role === 'owner' ? `Devil (${u.username})` : `Customer (${u.username})`;
+    if (u.role === 'owner') return `Devil (${u.username})`;
+    if (u.role === 'public' || u.username === 'Public') return `Public (${u.username})`;
+    return `Customer (${u.username})`;
   });
 
   protected readonly loginForm = this.formBuilder.nonNullable.group({
@@ -69,6 +71,12 @@ export class LoginComponent {
       return;
     }
     void this.router.navigateByUrl(firstDashboardPath(this.authService));
+  }
+
+  protected usePublicLogin(): void {
+    this.loginForm.patchValue({ username: 'Public', password: 'PublicView1789' });
+    this.errorMessage.set('');
+    void this.onSubmit();
   }
 
   protected switchUser(): void {

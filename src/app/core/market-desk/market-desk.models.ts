@@ -136,6 +136,8 @@ export interface MarketDeskSession {
   status: string;
   label: string;
   open: boolean;
+  cashOpen?: boolean;
+  crudeOpen?: boolean;
   day: string;
   istNow: string;
   lastUpdateAt: string;

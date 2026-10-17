@@ -15,7 +15,7 @@ export interface SiteUser {
   username: string;
   /** Present on admin user list only (for edit/display) */
   password?: string;
-  role: 'owner' | 'friend' | string;
+  role: 'owner' | 'friend' | 'public' | string;
   modules: SiteModule[];
   blocked?: boolean;
   kiteApiKey?: string;

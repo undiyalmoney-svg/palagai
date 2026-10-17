@@ -128,7 +128,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     },
     '/dashboard/charts': {
       title: 'Charts',
-      subtitle: 'AI market intelligence — Nifty 50, Bank Nifty, Sensex and Crude Oil Mini.',
+      subtitle: 'Nifty 50, Bank Nifty, Sensex and Crude Oil Mini.',
     },
     '/dashboard/sl-buddy': {
       title: 'SL Buddy',
@@ -153,8 +153,13 @@ export class DashboardComponent implements OnInit, OnDestroy {
   };
 
   protected readonly navItems = computed(() =>
-    this.allNav.filter((item) => item.module == null || this.authService.hasModule(item.module)),
+    this.allNav.filter((item) => {
+      if (this.authService.isPublic()) return item.route === '/dashboard/charts';
+      return item.module == null || this.authService.hasModule(item.module);
+    }),
   );
+
+  protected readonly hideFunds = computed(() => this.authService.isPublic());
 
   /** Bottom tab bar on phone/tablet — Token stays in the side menu only. */
   protected readonly mobileTabItems = computed(() =>
@@ -164,7 +169,9 @@ export class DashboardComponent implements OnInit, OnDestroy {
   protected readonly username = computed(() => {
     const u = this.authService.currentUser();
     if (!u) return 'User';
-    return u.role === 'owner' ? `Devil · ${u.username}` : u.username;
+    if (u.role === 'owner') return `Devil · ${u.username}`;
+    if (u.role === 'public' || u.username === 'Public') return 'Public';
+    return u.username;
   });
 
   protected readonly adminNotice = computed(() =>
@@ -246,7 +253,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     // Get Token / mid-OAuth: never bounce to login (consume race used to trip this).
     if (onGetToken || pendingKite) {
       await this.authService.refreshMe();
-      void this.kiteFunds.refresh();
+      if (!this.authService.isPublic()) void this.kiteFunds.refresh();
       if (pendingKite && !onGetToken) {
         void this.router.navigateByUrl('/dashboard/get-token');
       }
@@ -258,7 +265,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
       void this.router.navigateByUrl('/login');
       return;
     }
-    void this.kiteFunds.refresh();
+    if (!this.authService.isPublic()) void this.kiteFunds.refresh();
     const url = this.router.url.replace(/\?.*$/, '');
     if (url === '/dashboard' || url === '/dashboard/') {
       const { firstDashboardPath } = await import('../../core/auth/auth.guard');

@@ -28,6 +28,7 @@ export function firstDashboardPathFor(hasModule: (mod: SiteModule) => boolean): 
 
 /** First desk the user is allowed to open. */
 export function firstDashboardPath(auth: AuthService): string {
+  if (auth.isPublic()) return '/dashboard/charts';
   return firstDashboardPathFor((mod) => auth.hasModule(mod));
 }
 
@@ -94,6 +95,16 @@ export const authGuard: CanActivateFn = (route, state) => {
   if (authService.isAuthenticated() || !!authService.getToken()) {
     authService.ensureHydratedFromStorage();
     if (authService.isAuthenticated()) {
+      const path = state.url.split('?')[0] || '';
+      if (
+        authService.isPublic() &&
+        path.startsWith('/dashboard') &&
+        !path.includes('/dashboard/charts') &&
+        path !== '/dashboard' &&
+        path !== '/dashboard/'
+      ) {
+        return router.parseUrl('/dashboard/charts');
+      }
       return true;
     }
   }
@@ -178,6 +189,9 @@ export const moduleGuard = (mod: SiteModule): CanActivateFn => {
       } else {
         return router.createUrlTree(['/login']);
       }
+    }
+    if (auth.isPublic() && !state.url.includes('/dashboard/charts')) {
+      return router.parseUrl('/dashboard/charts');
     }
     if (auth.hasModule(mod)) {
       return true;

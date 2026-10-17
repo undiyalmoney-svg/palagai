@@ -8,6 +8,7 @@ import { KiteFundsService } from '../../../core/services/kite-funds.service';
 import { ChartsProtectApiService } from '../../../core/charts/charts-protect-api.service';
 import { CapitalPreferenceService } from '../../../core/services/capital-preference.service';
 import { UiDialogService } from '../../../shared/ui/dialog/ui-dialog.service';
+import { AuthService } from '../../../core/auth/auth.service';
 import { MarketDeskApiService } from '../../../core/market-desk/market-desk-api.service';
 
 describe('LiveChartsComponent intelligence tab', () => {
@@ -25,6 +26,7 @@ describe('LiveChartsComponent intelligence tab', () => {
         { provide: ChartsProtectApiService, useValue: {} },
         { provide: CapitalPreferenceService, useValue: {} },
         { provide: UiDialogService, useValue: {} },
+        { provide: AuthService, useValue: { isPublic: () => false } },
         {
           provide: MarketDeskApiService,
           useValue: {
@@ -42,7 +44,7 @@ describe('LiveChartsComponent intelligence tab', () => {
     const root = fixture.nativeElement as HTMLElement;
     expect(root.querySelector('[data-testid="market-heat-board"]')).toBeTruthy();
     expect(root.querySelector('[data-testid="chart-trends"]')).toBeTruthy();
-    expect(root.textContent).toContain('Market Intelligence');
+    expect(root.querySelector('[data-testid="desk-start"]')).toBeTruthy();
     expect(root.textContent).not.toContain('Buy');
     expect(root.textContent).not.toContain('Sell');
     expect(root.textContent).not.toContain('Protect');
