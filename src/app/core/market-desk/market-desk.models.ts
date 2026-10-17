@@ -29,6 +29,7 @@ export interface MarketDeskSettings {
   cooldownBars: number;
   uiRefreshMs: number;
   alertCooldownMs: number;
+  primaryTimeframe: '5minute' | '15minute' | '60minute' | 'day';
 }
 
 export interface MarketBreakout {
@@ -82,6 +83,7 @@ export interface MarketIndexCard {
   h1Trend: string;
   dayTrend: string;
   setup?: MarketSetup | null;
+  behaviour?: MarketBehaviour | null;
 }
 
 export interface MarketStockTile {
@@ -145,6 +147,117 @@ export interface MarketDeskSession {
   message?: string | null;
 }
 
+export type BehaviourFlow = 'bull' | 'bear' | 'side' | 'fade' | 'reversal' | 'failed' | 'wait';
+
+export interface MarketBehaviourTf {
+  interval?: string;
+  key?: string;
+  label: string;
+  trend: string;
+  direction: string;
+  rsi?: number | null;
+  adx?: number | null;
+  atr?: number | null;
+  strength?: string;
+  strengthLabel?: string;
+  structure?: string;
+  bos?: string | null;
+  choch?: string | null;
+  momentum?: string;
+  volatility?: string;
+  forming?: boolean;
+  provisional?: boolean;
+  missing?: boolean;
+}
+
+export interface MarketBehaviour {
+  instrument: string;
+  name?: string;
+  ltp: number | null;
+  change: number | null;
+  changePct: number | null;
+  classification: string;
+  classificationLabel: string;
+  direction: string;
+  nodeLabel: string;
+  flow: BehaviourFlow;
+  trendStrength: string;
+  trendStrengthLabel: string;
+  evidenceStrength: string;
+  evidenceStrengthLabel: string;
+  confirmed: boolean;
+  provisional: boolean;
+  primaryTimeframe: string;
+  timeframes: {
+    m5: MarketBehaviourTf;
+    m15: MarketBehaviourTf;
+    h1: MarketBehaviourTf;
+    day: MarketBehaviourTf;
+  };
+  alignment: {
+    status: string;
+    label: string;
+    bulls: number;
+    bears: number;
+    sides: number;
+    available: number;
+    conflicts: string[];
+  };
+  structure: {
+    label?: string;
+    hh?: boolean;
+    hl?: boolean;
+    lh?: boolean;
+    ll?: boolean;
+    bos?: string | null;
+    choch?: string | null;
+    lastHigh?: number | null;
+    lastLow?: number | null;
+    developing?: boolean;
+  } | null;
+  range: {
+    kind: string;
+    high: number;
+    low: number;
+    mid: number;
+    width: number;
+    widthAtr: number | null;
+    testsHigh: number;
+    testsLow: number;
+    position: number;
+  } | null;
+  breakout: { status: string; direction: string | null; level: number | null };
+  reversal: { status: string; side: string | null; timeframe: string | null };
+  momentum: { state: string; label: string };
+  volatility: { state: string; label: string };
+  transition: { stage: number; label: string; confirmed: string[]; required: string[] };
+  explanation: {
+    behaviour: string;
+    higherTf: string;
+    intraday: string;
+    momentum: string;
+    structure: string;
+    breakout: string;
+    reversal: string;
+    supporting: string[];
+    conflicting: string[];
+    confirmation: string;
+    invalidation: string;
+  };
+  levels: { support: number | null; resistance: number | null; invalidation: string };
+  timeline: {
+    instrument: string;
+    timestamp: string;
+    timeframe: string;
+    type: string;
+    level: number | null;
+    evidence: string;
+    status: string;
+  }[];
+  lastUpdateAt: string;
+  sample: boolean;
+}
+
 export interface MarketDeskSnapshot {
   private: true;
   demo: boolean;
@@ -205,4 +318,5 @@ export const DEFAULT_DESK_SETTINGS: MarketDeskSettings = {
   cooldownBars: 4,
   uiRefreshMs: 5_000,
   alertCooldownMs: 120_000,
+  primaryTimeframe: '15minute',
 };

@@ -11,13 +11,17 @@ import {
 import { RouterLink } from '@angular/router';
 import { MarketDeskApiService } from '../../../core/market-desk/market-desk-api.service';
 import {
+  BehaviourFlow,
   DEFAULT_DESK_SETTINGS,
+  MarketBehaviour,
   MarketDeskAlert,
   MarketDeskCandles,
   MarketDeskSettings,
   MarketDeskSnapshot,
+  MarketIndexCard,
 } from '../../../core/market-desk/market-desk.models';
 import { DeskCandleChartComponent } from './desk-candle-chart.component';
+import { NeuralFlowComponent } from './neural-flow.component';
 
 type DeskFilter =
   | 'all'
@@ -35,7 +39,7 @@ const RUNNING_KEY = 'palagai.market-desk.running';
 @Component({
   selector: 'app-market-heat-board',
   standalone: true,
-  imports: [DecimalPipe, RouterLink, DeskCandleChartComponent],
+  imports: [DecimalPipe, RouterLink, DeskCandleChartComponent, NeuralFlowComponent],
   templateUrl: './market-heat-board.component.html',
   styleUrl: './market-heat-board.component.css',
 })
@@ -54,8 +58,15 @@ export class MarketHeatBoardComponent implements OnInit {
   protected readonly filter = signal<DeskFilter>('all');
   protected readonly showSettings = signal(false);
   protected readonly settings = signal<MarketDeskSettings>(this.loadSettings());
-  protected readonly selected = signal<string | null>(null);
+  protected readonly selected = signal<string>('NIFTY50');
+  protected readonly primary = signal<'5minute' | '15minute' | '60minute' | 'day'>(this.loadSettings().primaryTimeframe);
   protected readonly chartIv = signal<'5minute' | '15minute' | '60minute' | 'day'>('15minute');
+  protected readonly timeframes = [
+    { id: '5minute' as const, label: '5m' },
+    { id: '15minute' as const, label: '15m' },
+    { id: '60minute' as const, label: '1h' },
+    { id: 'day' as const, label: 'Daily' },
+  ];
   protected readonly chart = signal<MarketDeskCandles | null>(null);
   protected readonly chartLoading = signal(false);
   protected readonly feed = signal<MarketDeskAlert[]>([]);
@@ -83,6 +94,30 @@ export class MarketHeatBoardComponent implements OnInit {
   });
 
   protected readonly stockCount = computed(() => this.snap()?.stocks?.length || 0);
+  protected readonly showStocks = signal(true);
+
+  protected readonly activeCard = computed(() => {
+    const snap = this.snap();
+    const id = this.selected();
+    return snap?.indices.find((c) => c.id === id) || snap?.indices[0] || null;
+  });
+
+  protected readonly active = computed(() => {
+    const card = this.activeCard();
+    return card ? this.cardBehaviour(card) : null;
+  });
+
+  protected readonly activePrice = computed(() => this.activeCard() || this.active());
+
+  protected readonly flow = computed<BehaviourFlow>(() => this.active()?.flow || 'wait');
+
+  protected readonly timeline = computed(() => this.active()?.timeline || []);
+
+  protected readonly tfRows = computed(() => {
+    const t = this.active()?.timeframes;
+    if (!t) return [];
+    return [t.m5, t.m15, t.h1, t.day];
+  });
 
   private poll: ReturnType<typeof setInterval> | null = null;
   private clockTimer: ReturnType<typeof setInterval> | null = null;
@@ -109,7 +144,8 @@ export class MarketHeatBoardComponent implements OnInit {
       this.snap.set(snap);
       this.error.set(null);
       this.mergeAlerts(snap.alerts || []);
-      if (this.selected()) void this.loadChart();
+      if (!this.selected() && snap.indices[0]) this.selected.set(snap.indices[0].id);
+      void this.loadChart();
     } catch (err) {
       const msg = err && typeof err === 'object' && 'message' in err ? String((err as Error).message) : 'Market desk is unavailable.';
       this.error.set(msg);
@@ -142,9 +178,69 @@ export class MarketHeatBoardComponent implements OnInit {
     this.filter.set(this.filter() === id ? 'all' : id);
   }
 
-  protected openChart(symbol: string): void {
-    this.selected.set(symbol);
+  protected select(id: string): void {
+    this.selected.set(id);
     void this.loadChart();
+  }
+
+  protected openChart(symbol: string): void {
+    this.select(symbol);
+  }
+
+  protected setPrimary(iv: '5minute' | '15minute' | '60minute' | 'day'): void {
+    this.primary.set(iv);
+    this.patchSetting('primaryTimeframe', iv);
+  }
+
+  protected nodeCopy(): string {
+    const b = this.active();
+    if (!b) return 'Market flow visualization';
+    return `${b.name || b.instrument} ${b.nodeLabel}`;
+  }
+
+  protected shortName(card: MarketIndexCard): string {
+    if (card.id === 'NIFTY50') return 'Nifty 50';
+    if (card.id === 'BANKNIFTY') return 'Bank Nifty';
+    if (card.id === 'SENSEX') return 'Sensex';
+    if (card.id === 'CRUDEOILM') return 'Crude Oil Mini';
+    return card.name;
+  }
+
+  protected cardBehaviour(card: MarketIndexCard): MarketBehaviour {
+    if (card.behaviour) return card.behaviour;
+    return fallbackBehaviour(card);
+  }
+
+  protected cardFlow(card: MarketIndexCard): BehaviourFlow {
+    return this.cardBehaviour(card).flow;
+  }
+
+  protected absChange(card: MarketIndexCard): string {
+    if (!Number.isFinite(card.change)) return '—';
+    const n = card.change as number;
+    return `${n > 0 ? '+' : ''}${n.toFixed(2)}`;
+  }
+
+  protected fmtPx(n: number | null | undefined): string {
+    if (!Number.isFinite(n)) return '—';
+    return (n as number).toFixed(2);
+  }
+
+  protected eventLabel(type: string): string {
+    return type.replace(/-/g, ' ');
+  }
+
+  protected tfShort(iv: string): string {
+    if (iv === '5minute') return '5 minutes';
+    if (iv === '15minute') return '15 minutes';
+    if (iv === '60minute') return '1 hour';
+    if (iv === 'day') return 'Daily';
+    return iv;
+  }
+
+  protected toggleStocks(ev: Event): void {
+    ev.preventDefault();
+    this.showStocks.set(!this.showStocks());
   }
 
   protected setInterval(iv: '5minute' | '15minute' | '60minute' | 'day'): void {
@@ -153,7 +249,6 @@ export class MarketHeatBoardComponent implements OnInit {
   }
 
   protected closeChart(): void {
-    this.selected.set(null);
     this.chart.set(null);
   }
 
@@ -330,4 +425,69 @@ export class MarketHeatBoardComponent implements OnInit {
       // ignore
     }
   }
+}
+
+function fallbackBehaviour(card: MarketIndexCard): MarketBehaviour {
+  const bull = card.bias === 'bullish' || card.bias === 'mild-bull';
+  const bear = card.bias === 'bearish' || card.bias === 'mild-bear';
+  const dir = bull ? 'bullish' : bear ? 'bearish' : card.bias === 'sideways' ? 'sideways' : 'insufficient';
+  const flow: BehaviourFlow = bull ? 'bull' : bear ? 'bear' : dir === 'sideways' ? 'side' : 'wait';
+  const tf = (key: string, label: string, direction: string, missing = false): MarketBehaviour['timeframes']['m15'] => ({
+    key,
+    label,
+    trend: direction,
+    direction,
+    missing,
+    provisional: true,
+  });
+  return {
+    instrument: card.id,
+    name: card.name,
+    ltp: card.ltp,
+    change: card.change,
+    changePct: card.changePct,
+    classification: dir === 'insufficient' ? 'insufficient' : dir === 'sideways' ? 'sideways' : dir === 'bullish' ? 'uptrend' : 'downtrend',
+    classificationLabel: card.biasLabel || 'Waiting for candles',
+    direction: dir,
+    nodeLabel: bull ? 'BULLISH' : bear ? 'BEARISH' : dir === 'sideways' ? 'SIDEWAYS' : 'WAIT',
+    flow,
+    trendStrength: card.strength,
+    trendStrengthLabel: card.strengthLabel,
+    evidenceStrength: 'low',
+    evidenceStrengthLabel: 'Low — waiting for the behaviour engine',
+    confirmed: card.confirmed,
+    provisional: !card.confirmed,
+    primaryTimeframe: '15minute',
+    timeframes: {
+      m5: tf('m5', '5-minute', 'insufficient', true),
+      m15: tf('m15', '15-minute', card.m15Trend || 'insufficient', card.m15Trend === 'insufficient'),
+      h1: tf('h1', '1-hour', card.h1Trend || 'insufficient', card.h1Trend === 'insufficient'),
+      day: tf('day', 'Daily', card.dayTrend || dir, false),
+    },
+    alignment: { status: card.agreement, label: card.agreement, bulls: 0, bears: 0, sides: 0, available: 0, conflicts: [] },
+    structure: null,
+    range: null,
+    breakout: { status: 'none', direction: null, level: null },
+    reversal: { status: 'none', side: null, timeframe: null },
+    momentum: { state: 'insufficient', label: 'Insufficient evidence' },
+    volatility: { state: 'insufficient', label: 'Insufficient evidence' },
+    transition: { stage: 0, label: 'No transition in progress', confirmed: [], required: [] },
+    explanation: {
+      behaviour: card.biasLabel,
+      higherTf: card.dayTrend,
+      intraday: card.m15Trend,
+      momentum: 'Insufficient evidence',
+      structure: 'Unclear',
+      breakout: 'No confirmed breakout',
+      reversal: 'Not confirmed',
+      supporting: ['Day move is shown until Kite candles arrive.'],
+      conflicting: ['15-minute and 1-hour behaviour is unavailable.'],
+      confirmation: 'Completed 15-minute and 1-hour candles.',
+      invalidation: 'Treat this as a quote-only placeholder.',
+    },
+    levels: { support: null, resistance: null, invalidation: 'Waiting for candles.' },
+    timeline: [],
+    lastUpdateAt: new Date().toISOString(),
+    sample: true,
+  };
 }

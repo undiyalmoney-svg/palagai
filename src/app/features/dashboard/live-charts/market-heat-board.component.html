@@ -1,100 +1,220 @@
-<section class="desk" data-testid="market-heat-board" [attr.data-demo]="snap()?.demo ? 'true' : 'false'">
-  <header class="desk-hero">
-    <div>
-      <p class="desk-kicker">Private · Charts</p>
-      <h1>Indian Market Heat Map</h1>
-      <p class="desk-sub">Nifty 50 colour is today’s %. UP / DOWN / SIDE is the trend. 15m and 1h are labelled WAIT until Kite candles land.</p>
+<section class="intel" data-testid="market-heat-board" [attr.data-demo]="snap()?.demo ? 'true' : 'false'" [attr.data-flow]="flow()">
+  <header class="intel-bar">
+    <div class="brand">
+      <img src="/palagai-logo.png" alt="" width="28" height="28" />
+      <div>
+        <p class="kicker">Market Intelligence</p>
+        <h1>Charts</h1>
+      </div>
     </div>
-    <div class="desk-actions">
-      <button
-        type="button"
-        class="desk-btn white"
-        data-testid="desk-start"
-        [class.on]="running()"
-        (click)="startDesk()"
-        [disabled]="running() && loading()"
-      >
+    <nav class="bar-markets" aria-label="Markets">
+      @for (card of snap()?.indices || []; track card.id) {
+        <button
+          type="button"
+          class="bar-chip"
+          [class.on]="selected() === card.id"
+          [attr.data-dir]="pctDir(card.changePct)"
+          (click)="select(card.id)"
+        >
+          <span>{{ shortName(card) }}</span>
+          <em [attr.data-dir]="pctDir(card.changePct)">{{ fmtPct(card.changePct) }}</em>
+        </button>
+      }
+    </nav>
+    <div class="bar-meta">
+      <span class="pill" [attr.data-on]="running() ? '1' : '0'" data-testid="desk-status">
+        {{ running() ? (snap()?.session?.label || 'Live') : 'Stopped' }}
+      </span>
+      <span class="pill" [attr.data-live]="snap()?.session?.connection === 'live' ? '1' : '0'">
+        {{ snap()?.session?.connection || 'offline' }}
+      </span>
+      <span class="pill muted">{{ clock() }}</span>
+      <span class="pill muted">Updated {{ fmtIst(snap()?.session?.lastUpdateAt) }}</span>
+    </div>
+    <div class="bar-actions">
+      <button type="button" class="btn white" data-testid="desk-start" [class.on]="running()" (click)="startDesk()" [disabled]="running() && loading()">
         Start
       </button>
-      <button
-        type="button"
-        class="desk-btn white"
-        data-testid="desk-stop"
-        [class.on]="!running()"
-        (click)="stopDesk()"
-      >
-        Stop
-      </button>
-      <button type="button" class="desk-btn" (click)="refresh()" [disabled]="loading() || !running()">
-        {{ loading() ? 'Updating' : 'Refresh desk' }}
-      </button>
-      <button type="button" class="desk-btn ghost" (click)="showSettings.set(!showSettings())">Settings</button>
+      <button type="button" class="btn white" data-testid="desk-stop" [class.on]="!running()" (click)="stopDesk()">Stop</button>
+      <button type="button" class="btn ghost" (click)="showSettings.set(!showSettings())">Settings</button>
     </div>
   </header>
 
-  <div class="desk-hud">
-    <span class="pill" [attr.data-on]="running() ? '1' : '0'">{{ running() ? (snap()?.session?.label || 'Live') : 'Stopped' }}</span>
-    <span class="pill">{{ clock() }}</span>
-    <span class="pill">Updated {{ fmtIst(snap()?.session?.lastUpdateAt) }} IST</span>
-    <span class="pill" [attr.data-live]="snap()?.session?.connection === 'live' ? '1' : '0'">
-      {{ snap()?.session?.connection || 'offline' }}
-    </span>
-    <span class="pill" [attr.data-fresh]="snap()?.session?.freshness || 'missing'">
-      {{ freshnessLabel(snap()?.session?.freshness || 'missing') }}
-    </span>
-    <span class="pill muted">Tick {{ fmtIst(snap()?.session?.lastTickAt) }}</span>
-    <span class="pill muted">Closed bar {{ fmtIst(snap()?.session?.lastConfirmedCandleAt, false) }}</span>
-  </div>
-
   @if (snap()?.demo) {
-    <p class="desk-banner demo" role="status">{{ snap()?.session?.message }}</p>
+    <p class="banner demo" role="status">{{ snap()?.session?.message }}</p>
   }
   @if (snap()?.needsReauth) {
-    <p class="desk-banner reauth" role="alert">
+    <p class="banner alert" role="alert">
       Kite session expired.
       <a routerLink="/dashboard/get-token">Get Token</a>
     </p>
   }
   @if (error() && !snap()) {
-    <p class="desk-banner reauth" role="alert">{{ error() }}</p>
+    <p class="banner alert" role="alert">{{ error() }}</p>
   }
   @if (snap()?.warning && !snap()?.demo) {
-    <p class="desk-banner">{{ snap()?.warning }}</p>
+    <p class="banner">{{ snap()?.warning }}</p>
   }
 
-  <div class="index-grid">
-    @for (card of snap()?.indices || []; track card.id) {
-      <article
-        class="index-card"
-        [attr.data-lamp]="lamp(card.bias)"
-        [attr.data-book]="card.id === 'CRUDEOILM' ? 'crude' : 'cash'"
-        (click)="openChart(card.id)"
-      >
-        <span class="index-dot" aria-hidden="true"></span>
-        <div class="index-top">
-          <h2>{{ card.name }}</h2>
-          <span class="bias" [attr.data-bias]="card.bias">{{ card.biasLabel }}</span>
-        </div>
-        <p class="trend-word" [attr.data-lamp]="lamp(card.bias)">{{ lampLabel(card.bias) }}</p>
-        <p class="index-px">
-          {{ card.ltp | number: '1.2-2' }}
-          <span class="pct" [attr.data-dir]="pctDir(card.changePct)">{{ fmtPct(card.changePct) }}</span>
+  <div class="stage">
+    <app-neural-flow [state]="flow()" [strength]="active()?.trendStrength || 'moderate'" [paused]="!running()" [label]="nodeCopy()" />
+    <div class="hub" [attr.data-flow]="flow()">
+      <p class="hub-name">{{ active()?.name || 'Select a market' }}</p>
+      <p class="hub-node">{{ active()?.nodeLabel || 'WAIT' }}</p>
+      <p class="hub-meta">
+        {{ active()?.trendStrengthLabel || '—' }}
+        ·
+        {{ tfShort(primary()) }}
+        ·
+        {{ active()?.confirmed ? 'Confirmed' : 'Provisional' }}
+      </p>
+      @if (activePrice(); as px) {
+        <p class="hub-px">
+          {{ px.ltp | number: '1.2-2' }}
+          <span [attr.data-dir]="pctDir(px.changePct)">{{ fmtPct(px.changePct) }}</span>
         </p>
-        <p class="index-chg">{{ card.change | number: '1.2-2' }} pts · {{ card.confirmed ? 'Confirmed' : 'Provisional' }}</p>
-        <div class="sig-row">
-          <span class="sig" [attr.data-lamp]="tfLamp(card.m15Trend)"><em>15m</em>{{ tfLabel(card.m15Trend) }}</span>
-          <span class="sig" [attr.data-lamp]="tfLamp(card.h1Trend)"><em>1h</em>{{ tfLabel(card.h1Trend) }}</span>
-          <span class="sig" [attr.data-lamp]="tfLamp(card.dayTrend)"><em>Day</em>{{ tfLabel(card.dayTrend) }}</span>
-          <span class="sig"><em>Score</em>{{ card.score ?? '—' }}</span>
-        </div>
-        @if (card.id === 'CRUDEOILM') {
-          <div class="card-run" (click)="$event.stopPropagation()">
-            <button type="button" class="desk-btn white" data-testid="crude-start" [class.on]="running()" (click)="startDesk()">Start</button>
-            <button type="button" class="desk-btn white" data-testid="crude-stop" [class.on]="!running()" (click)="stopDesk()">Stop</button>
-          </div>
-        }
-      </article>
+      }
+    </div>
+
+    <div class="float-row" data-testid="intel-cards">
+      @for (card of snap()?.indices || []; track card.id) {
+        <button
+          type="button"
+          class="float-card"
+          [class.on]="selected() === card.id"
+          [attr.data-flow]="cardFlow(card)"
+          [attr.data-book]="card.id === 'CRUDEOILM' ? 'crude' : 'cash'"
+          [attr.data-testid]="'intel-' + card.id"
+          (click)="select(card.id)"
+        >
+          <span class="dot" aria-hidden="true"></span>
+          <header>
+            <strong>{{ card.name }}</strong>
+            <em>{{ cardBehaviour(card).classificationLabel }}</em>
+          </header>
+          <p class="px">
+            {{ card.ltp | number: '1.2-2' }}
+            <span [attr.data-dir]="pctDir(card.changePct)">{{ absChange(card) }} · {{ fmtPct(card.changePct) }}</span>
+          </p>
+          <p class="meta">
+            {{ cardBehaviour(card).trendStrengthLabel }}
+            ·
+            {{ cardBehaviour(card).evidenceStrengthLabel }}
+          </p>
+          <p class="tfs">
+            <span [attr.data-lamp]="tfLamp(cardBehaviour(card).timeframes.m15.direction)">15m {{ tfLabel(cardBehaviour(card).timeframes.m15.direction) }}</span>
+            <span [attr.data-lamp]="tfLamp(cardBehaviour(card).timeframes.h1.direction)">1h {{ tfLabel(cardBehaviour(card).timeframes.h1.direction) }}</span>
+            <span [attr.data-lamp]="tfLamp(cardBehaviour(card).timeframes.day.direction)">Day {{ tfLabel(cardBehaviour(card).timeframes.day.direction) }}</span>
+          </p>
+          @if (cardBehaviour(card).reversal.status !== 'none') {
+            <p class="watch">Reversal {{ cardBehaviour(card).reversal.status }}</p>
+          }
+          @if (card.id === 'CRUDEOILM') {
+            <div class="card-run" (click)="$event.stopPropagation()">
+              <button type="button" class="btn white mini" data-testid="crude-start" [class.on]="running()" (click)="startDesk()">Start</button>
+              <button type="button" class="btn white mini" data-testid="crude-stop" [class.on]="!running()" (click)="stopDesk()">Stop</button>
+            </div>
+          }
+        </button>
+      }
+    </div>
+  </div>
+
+  <div class="tf-row">
+    <p>Primary timeframe</p>
+    @for (iv of timeframes; track iv.id) {
+      <button type="button" class="chip" [class.on]="primary() === iv.id" (click)="setPrimary(iv.id)">{{ iv.label }}</button>
     }
+    <span class="align" [attr.data-align]="active()?.alignment?.status">{{ active()?.alignment?.label || 'Waiting for candles' }}</span>
+  </div>
+
+  <div class="panels">
+    <section class="panel explain">
+      <h2>Why this reading</h2>
+      @if (active(); as b) {
+        <dl>
+          <div><dt>Current behaviour</dt><dd>{{ b.explanation.behaviour }}</dd></div>
+          <div><dt>Higher timeframe</dt><dd>{{ b.explanation.higherTf }}</dd></div>
+          <div><dt>Intraday</dt><dd>{{ b.explanation.intraday }}</dd></div>
+          <div><dt>Momentum</dt><dd>{{ b.explanation.momentum }}</dd></div>
+          <div><dt>Structure</dt><dd>{{ b.explanation.structure }}</dd></div>
+          <div><dt>Breakout</dt><dd>{{ b.explanation.breakout }}</dd></div>
+          <div><dt>Reversal</dt><dd>{{ b.explanation.reversal }}</dd></div>
+        </dl>
+        <div class="ev">
+          <h3>Supporting</h3>
+          <ul>
+            @for (line of b.explanation.supporting; track line) {
+              <li>{{ line }}</li>
+            }
+          </ul>
+        </div>
+        <div class="ev contra">
+          <h3>Conflicting</h3>
+          <ul>
+            @for (line of b.explanation.conflicting; track line) {
+              <li>{{ line }}</li>
+            } @empty {
+              <li>No strong conflicting evidence on completed candles.</li>
+            }
+          </ul>
+        </div>
+        <p class="rule"><strong>Confirm</strong> {{ b.explanation.confirmation }}</p>
+        <p class="rule inv"><strong>Invalidate</strong> {{ b.explanation.invalidation }}</p>
+        <p class="strength">Evidence strength: {{ b.evidenceStrengthLabel }}</p>
+        @if (b.sample) {
+          <p class="sample">Sample data — not a live classification.</p>
+        }
+      } @else {
+        <p class="muted">Start the desk to classify Nifty 50, Bank Nifty, Sensex and Crude Oil Mini.</p>
+      }
+    </section>
+
+    <section class="panel levels">
+      <h2>Levels &amp; timeframes</h2>
+      <div class="lvl">
+        <span>Support <strong>{{ fmtPx(active()?.levels?.support) }}</strong></span>
+        <span>Resistance <strong>{{ fmtPx(active()?.levels?.resistance) }}</strong></span>
+      </div>
+      @if (active()?.range; as range) {
+        <p class="range">
+          Range {{ range.low | number: '1.2-2' }} – {{ range.high | number: '1.2-2' }}
+          · mid {{ range.mid | number: '1.2-2' }}
+          · tests {{ range.testsLow }}/{{ range.testsHigh }}
+          · {{ range.kind }}
+        </p>
+      }
+      <div class="tf-grid">
+        @for (row of tfRows(); track row.key) {
+          <article [attr.data-lamp]="tfLamp(row.direction)">
+            <h3>{{ row.label }}</h3>
+            <p>{{ row.direction }}</p>
+            <small>{{ row.missing ? 'Waiting for candles' : (row.provisional ? 'Provisional' : 'Completed') }}</small>
+          </article>
+        }
+      </div>
+      @if (active()?.transition; as tr) {
+        <p class="stage">Stage {{ tr.stage }} · {{ tr.label }}</p>
+        @if (tr.required.length) {
+          <p class="muted">Still needed: {{ tr.required.join(' ') }}</p>
+        }
+      }
+    </section>
+
+    <section class="panel timeline">
+      <h2>Behaviour timeline</h2>
+      @for (ev of timeline(); track ev.timestamp + ev.type + ev.instrument) {
+        <article class="event" [attr.data-status]="ev.status">
+          <header>
+            <strong>{{ eventLabel(ev.type) }}</strong>
+            <span>{{ ev.timeframe }} · {{ ev.status }}</span>
+          </header>
+          <p>{{ ev.evidence }}@if (ev.level != null) { · {{ ev.level | number: '1.2-2' }} }</p>
+        </article>
+      } @empty {
+        <p class="muted">No structural events on completed candles yet.</p>
+      }
+    </section>
   </div>
 
   @if (snap()?.breadth; as b) {
@@ -110,89 +230,46 @@
         @if (b.divergence) {
           <em>{{ b.divergence }}</em>
         }
+        @if (!stockCount() && !b.advances && !b.declines) {
+          <em>Breadth needs Nifty 50 constituent quotes. Index price alone is not used.</em>
+        }
       </div>
     </section>
   }
 
-  <div class="stock-head">
-    <h2>Nifty 50 stocks</h2>
-    <p>{{ tiles().length }} of {{ stockCount() }} shown · green up, red down · trend badge is not the same as %</p>
-  </div>
-
-  <div class="desk-tools">
-    <input
-      type="search"
-      class="desk-search"
-      placeholder="Search symbol"
-      [value]="query()"
-      (input)="query.set($any($event.target).value)"
-    />
-    <button type="button" class="chip" [class.on]="sortPct()" (click)="sortPct.set(!sortPct())">Sort % change</button>
-    <button type="button" class="chip" [class.on]="filter() === 'bullish'" (click)="setFilter('bullish')">Bullish</button>
-    <button type="button" class="chip" [class.on]="filter() === 'bearish'" (click)="setFilter('bearish')">Bearish</button>
-    <button type="button" class="chip" [class.on]="filter() === 'sideways'" (click)="setFilter('sideways')">Sideways</button>
-    <button type="button" class="chip" [class.on]="filter() === 'break15'" (click)="setFilter('break15')">15m breakout</button>
-    <button type="button" class="chip" [class.on]="filter() === 'break60'" (click)="setFilter('break60')">1h breakout</button>
-    <button type="button" class="chip" [class.on]="filter() === 'agree'" (click)="setFilter('agree')">Both agree</button>
-  </div>
-
-  <div class="tile-grid" data-testid="desk-stock-grid">
-    @if (loading() && !snap()) {
-      <p class="tile-empty">Loading Nifty 50 stocks…</p>
-    } @else if (!stockCount()) {
-      <p class="tile-empty">{{ emptyCopy() }}</p>
-    } @else if (!tiles().length) {
-      <p class="tile-empty">No stocks match this filter. Clear search or filters to see all {{ stockCount() }} names.</p>
-    } @else {
-      @for (row of tiles(); track row.symbol) {
-        <button type="button" class="tile" [attr.data-bucket]="bucket(row.changePct)" (click)="openChart(row.symbol)">
-          <span class="tile-sym">{{ row.symbol }}</span>
-          <span class="tile-pct">{{ fmtPct(row.changePct) }}</span>
-          @if (row.ltp != null) {
-            <span class="tile-px">{{ row.ltp | number: '1.2-2' }}</span>
-          }
-          <span class="tile-trend" [attr.data-lamp]="lamp(row.bias)">{{ lampLabel(row.bias) }} · {{ row.biasLabel }}</span>
-          <span class="tile-tfs">
-            <span [attr.data-lamp]="tfLamp(row.m15Trend)">15m {{ tfLabel(row.m15Trend) }}</span>
-            <span [attr.data-lamp]="tfLamp(row.h1Trend)">1h {{ tfLabel(row.h1Trend) }}</span>
-          </span>
-        </button>
+  <details class="fold" [open]="showStocks()">
+    <summary (click)="toggleStocks($event)">
+      <h2>Nifty 50 stocks</h2>
+      <span>{{ tiles().length }} of {{ stockCount() }} shown</span>
+    </summary>
+    <div class="desk-tools">
+      <input type="search" class="search" placeholder="Search symbol" [value]="query()" (input)="query.set($any($event.target).value)" />
+      <button type="button" class="chip" [class.on]="sortPct()" (click)="sortPct.set(!sortPct())">Sort % change</button>
+      <button type="button" class="chip" [class.on]="filter() === 'bullish'" (click)="setFilter('bullish')">Bullish</button>
+      <button type="button" class="chip" [class.on]="filter() === 'bearish'" (click)="setFilter('bearish')">Bearish</button>
+      <button type="button" class="chip" [class.on]="filter() === 'sideways'" (click)="setFilter('sideways')">Sideways</button>
+    </div>
+    <div class="tile-grid" data-testid="desk-stock-grid">
+      @if (loading() && !snap()) {
+        <p class="tile-empty">Loading Nifty 50 stocks…</p>
+      } @else if (!stockCount()) {
+        <p class="tile-empty">{{ emptyCopy() }}</p>
+      } @else if (!tiles().length) {
+        <p class="tile-empty">No stocks match this filter. Clear search or filters to see all {{ stockCount() }} names.</p>
+      } @else {
+        @for (row of tiles(); track row.symbol) {
+          <button type="button" class="tile" [attr.data-bucket]="bucket(row.changePct)" (click)="openChart(row.symbol)">
+            <span class="tile-sym">{{ row.symbol }}</span>
+            <span class="tile-pct">{{ fmtPct(row.changePct) }}</span>
+            @if (row.ltp != null) {
+              <span class="tile-px">{{ row.ltp | number: '1.2-2' }}</span>
+            }
+            <span class="tile-trend" [attr.data-lamp]="lamp(row.bias)">{{ lampLabel(row.bias) }} · {{ row.biasLabel }}</span>
+          </button>
+        }
       }
-    }
-  </div>
-
-  <div class="desk-split">
-    <section class="panel">
-      <h3>Potential setups</h3>
-      <p class="note">Read-only levels from the breakout rules. Not an order. No claimed win-rate.</p>
-      @for (s of snap()?.setups || []; track s.symbol + s.timeframe) {
-        <article class="setup">
-          <header>
-            <strong>{{ s.symbol }}</strong>
-            <span>{{ s.direction }} · {{ s.timeframe }} · {{ s.status }}</span>
-          </header>
-          <p>Level {{ s.level | number: '1.2-2' }} · zone {{ s.entry | number: '1.2-2' }} · stop {{ s.stop | number: '1.2-2' }} · target {{ s.target | number: '1.2-2' }} · R:R {{ s.rr }}</p>
-          <p>{{ s.reason }}</p>
-          <p class="inv">Invalid if {{ s.invalidation }}</p>
-        </article>
-      } @empty {
-        <p class="muted">No qualifying setups on completed candles.</p>
-      }
-    </section>
-
-    <section class="panel">
-      <h3>Alerts</h3>
-      <p class="note">Private to this dashboard. Provisional vs confirmed is labelled.</p>
-      @for (a of feed(); track a.symbol + a.type + a.message) {
-        <p class="alert-row" [attr.data-prov]="a.provisional ? '1' : '0'">
-          <strong>{{ a.provisional ? 'Provisional' : 'Confirmed' }}</strong>
-          {{ a.message }}
-        </p>
-      } @empty {
-        <p class="muted">No alerts yet this session.</p>
-      }
-    </section>
-  </div>
+    </div>
+  </details>
 
   @if (showSettings()) {
     <section class="panel settings">
@@ -200,15 +277,10 @@
       <div class="set-grid">
         <label>EMA fast <input type="number" [value]="settings().emaFast" (change)="patchSetting('emaFast', +$any($event.target).value)" /></label>
         <label>EMA slow <input type="number" [value]="settings().emaSlow" (change)="patchSetting('emaSlow', +$any($event.target).value)" /></label>
-        <label>ADX period <input type="number" [value]="settings().adxPeriod" (change)="patchSetting('adxPeriod', +$any($event.target).value)" /></label>
         <label>ADX weak <input type="number" [value]="settings().adxWeak" (change)="patchSetting('adxWeak', +$any($event.target).value)" /></label>
         <label>ADX strong <input type="number" [value]="settings().adxStrong" (change)="patchSetting('adxStrong', +$any($event.target).value)" /></label>
         <label>S/R lookback <input type="number" [value]="settings().srLookback" (change)="patchSetting('srLookback', +$any($event.target).value)" /></label>
-        <label>Breakout buffer % <input type="number" step="0.01" [value]="settings().breakoutBufferPct" (change)="patchSetting('breakoutBufferPct', +$any($event.target).value)" /></label>
         <label>UI refresh ms <input type="number" [value]="settings().uiRefreshMs" (change)="patchSetting('uiRefreshMs', +$any($event.target).value)" /></label>
-        <label>Alert cooldown ms <input type="number" [value]="settings().alertCooldownMs" (change)="patchSetting('alertCooldownMs', +$any($event.target).value)" /></label>
-        <label class="check"><input type="checkbox" [checked]="settings().volumeFilter" (change)="patchSetting('volumeFilter', $any($event.target).checked)" /> Volume filter</label>
-        <label class="check"><input type="checkbox" [checked]="settings().retestRequired" (change)="patchSetting('retestRequired', $any($event.target).checked)" /> Retest confirmation</label>
       </div>
     </section>
   }
@@ -216,14 +288,13 @@
   @if (selected(); as sym) {
     <section class="panel chart-panel">
       <header class="chart-head">
-        <h3>{{ sym }}</h3>
+        <h3>{{ sym }} candles</h3>
         <div class="ivs">
           <button type="button" class="chip" [class.on]="chartIv() === '5minute'" (click)="setInterval('5minute')">5m</button>
           <button type="button" class="chip" [class.on]="chartIv() === '15minute'" (click)="setInterval('15minute')">15m</button>
           <button type="button" class="chip" [class.on]="chartIv() === '60minute'" (click)="setInterval('60minute')">1h</button>
           <button type="button" class="chip" [class.on]="chartIv() === 'day'" (click)="setInterval('day')">Daily</button>
         </div>
-        <button type="button" class="desk-btn ghost" (click)="closeChart()">Close</button>
       </header>
       @if (chart()?.message) {
         <p class="muted">{{ chart()?.message }}</p>

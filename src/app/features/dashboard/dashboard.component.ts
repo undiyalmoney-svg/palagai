@@ -128,7 +128,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     },
     '/dashboard/charts': {
       title: 'Charts',
-      subtitle: 'Indian Market Heat Map — Nifty 50, Bank Nifty, Sensex and private trend cards.',
+      subtitle: 'AI market intelligence — Nifty 50, Bank Nifty, Sensex and Crude Oil Mini.',
     },
     '/dashboard/sl-buddy': {
       title: 'SL Buddy',

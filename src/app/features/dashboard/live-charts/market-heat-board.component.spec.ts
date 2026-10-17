@@ -25,14 +25,15 @@ function snap(): MarketDeskSnapshot {
       cooldownBars: 4,
       uiRefreshMs: 5000,
       alertCooldownMs: 120000,
+      primaryTimeframe: '15minute',
     },
     session: {
       status: 'open',
       label: 'Session open',
       open: true,
-      day: '2026-10-14',
+      day: '2026-10-17',
       istNow: '14:02:11 IST',
-      lastUpdateAt: '2026-10-14T08:32:00Z',
+      lastUpdateAt: '2026-10-17T08:32:00Z',
       lastTickAt: null,
       lastConfirmedCandleAt: null,
       connection: 'demo',
@@ -123,7 +124,7 @@ function snap(): MarketDeskSnapshot {
 }
 
 describe('MarketHeatBoardComponent', () => {
-  it('renders the private heat map title, demo banner and a Nifty card', async () => {
+  it('renders the intelligence board, demo banner and market cards', async () => {
     await TestBed.configureTestingModule({
       imports: [MarketHeatBoardComponent],
       providers: [
@@ -136,22 +137,23 @@ describe('MarketHeatBoardComponent', () => {
     fixture.componentInstance['snap'].set(snap());
     fixture.detectChanges();
     const text = fixture.nativeElement.textContent as string;
-    expect(text).toContain('Indian Market Heat Map');
+    expect(text).toContain('Market Intelligence');
     expect(text).toContain('DEMO MODE');
     expect(text).toContain('NIFTY 50');
     expect(text).toContain('Crude Oil Mini');
     expect(text).toContain('Start');
     expect(text).toContain('Stop');
     expect(text).toContain('Mild bearish bias');
+    expect(text).toContain('Why this reading');
     expect(text).toContain('Nifty 50 stocks');
     expect(text).toContain('HDFCBANK');
     expect(text).toContain('Bullish');
-    expect(text).toContain('UP');
-    expect(text).toContain('DOWN');
-    expect(text).toContain('15m UP');
-    expect(text).toContain('1h UP');
+    expect(text).toContain('BEARISH');
+    expect(text).toContain('Mild bullish bias');
+    expect(text).toContain('15m MIX');
+    expect(text).toContain('Day UP');
     expect(fixture.nativeElement.querySelectorAll('[data-testid="desk-stock-grid"] .tile').length).toBe(1);
-    expect(fixture.nativeElement.querySelector('canvas')).toBeNull();
+    expect(fixture.nativeElement.querySelector('canvas')).toBeTruthy();
     expect(text).not.toContain('Buy');
     expect(text).not.toContain('Sell');
     expect(fixture.nativeElement.querySelector('[data-testid="desk-start"]')).toBeTruthy();

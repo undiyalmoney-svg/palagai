@@ -25,6 +25,7 @@ function snapshot(): MarketDeskSnapshot {
       cooldownBars: 4,
       uiRefreshMs: 5000,
       alertCooldownMs: 120000,
+      primaryTimeframe: '15minute',
     },
     session: {
       status: 'open',
