@@ -31,6 +31,20 @@ export interface BacktestStockRow {
   winRate: number;
 }
 
+export interface BacktestCross {
+  symbol: string;
+  day: string;
+  side: 'L' | 'S' | string;
+  t: string;
+  close: number;
+  orh: number;
+  orl: number;
+  orWPct: number;
+  volume?: number;
+  qualified: boolean;
+  taken: boolean;
+}
+
 export interface BacktestSummary {
   trades: number;
   wins: number;
@@ -46,6 +60,8 @@ export interface BacktestSummary {
   equityCurve: Array<{ day: string; equity: number }>;
   stocks: BacktestStockRow[];
   days: number;
+  orbCrossed?: number;
+  orbCrossedTaken?: number;
 }
 
 export interface BacktestResult {
@@ -64,6 +80,7 @@ export interface BacktestResult {
   rawTrades: number;
   summary: BacktestSummary;
   trades: BacktestTrade[];
+  crosses?: BacktestCross[];
   universe?: {
     requested: number;
     resolved: number;

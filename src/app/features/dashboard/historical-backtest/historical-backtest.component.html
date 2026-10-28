@@ -109,6 +109,11 @@
         <span class="mp-stat-value">{{ inr(view.summary.capitalUtilized) }}</span>
         <span class="mp-stat-hint">{{ pct(view.summary.capitalUtilizedPct) }} of {{ inr(view.config.capital) }}</span>
       </div>
+      <div class="mp-stat">
+        <span class="mp-stat-label">ORB crossed</span>
+        <span class="mp-stat-value">{{ view.summary.orbCrossed || 0 }}</span>
+        <span class="mp-stat-hint">{{ view.summary.orbCrossedTaken || 0 }} taken in the desk</span>
+      </div>
     </div>
 
     <div class="mp-card">
@@ -147,7 +152,68 @@
             <option value="loss">Losses</option>
           </select>
         </label>
+        <label class="mp-field">
+          ORB list
+          <select class="ui-select" [(ngModel)]="takenFilter">
+            <option value="all">All crossed</option>
+            <option value="taken">Taken in desk</option>
+            <option value="skipped">Crossed, not taken</option>
+          </select>
+        </label>
       </div>
+    </div>
+
+    <div class="mp-card" data-testid="orb-crossed">
+      <div class="mp-card-head">
+        <div>
+          <h2>ORB crossed</h2>
+          <p class="mp-sub">First 5-minute close through ORH/ORL in 09:50–14:30. Includes names the desk skipped (max stocks, cooldown, volume, EMA).</p>
+        </div>
+        <span class="mp-badge" data-tone="info">{{ filteredCrosses().length }} names</span>
+      </div>
+      @if (!filteredCrosses().length) {
+        <p class="mp-empty">No opening-range close-throughs match the filter.</p>
+      } @else {
+        <div class="hb-chips">
+          @for (c of filteredCrosses(); track trackCross($index, c)) {
+            <span class="mp-badge" [attr.data-tone]="c.taken ? 'up' : (c.side === 'L' ? 'info' : 'down')">
+              {{ c.symbol }} · {{ c.side === 'L' ? 'Long' : 'Short' }} {{ c.t }}
+            </span>
+          }
+        </div>
+        <div class="mp-table-wrap">
+          <table class="mp-table">
+            <thead>
+              <tr>
+                <th>Day</th>
+                <th>Symbol</th>
+                <th>Side</th>
+                <th>Time</th>
+                <th class="num">ORH</th>
+                <th class="num">ORL</th>
+                <th class="num">Close</th>
+                <th class="num">OR %</th>
+                <th>Desk</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (c of filteredCrosses(); track trackCross($index, c)) {
+                <tr>
+                  <td>{{ c.day }}</td>
+                  <td class="mp-sym">{{ c.symbol }}</td>
+                  <td>{{ c.side === 'L' ? 'Long' : 'Short' }}</td>
+                  <td>{{ c.t }}</td>
+                  <td class="num">{{ c.orh | number: '1.2-2' }}</td>
+                  <td class="num">{{ c.orl | number: '1.2-2' }}</td>
+                  <td class="num">{{ c.close | number: '1.2-2' }}</td>
+                  <td class="num">{{ c.orWPct | number: '1.2-2' }}</td>
+                  <td>{{ c.taken ? 'Taken' : (c.qualified ? 'Qualified, not taken' : 'Crossed only') }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
     </div>
 
     <div class="mp-card">

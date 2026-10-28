@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { HistoricalBacktestApiService } from './historical-backtest-api.service';
 import {
+  BacktestCross,
   BacktestJob,
   BacktestResult,
   BacktestStockRow,
@@ -14,6 +15,7 @@ import { inr, lastCompletedSession, pct } from './historical-backtest.util';
 type RangeMode = 'day' | 'range';
 type SideFilter = 'all' | 'L' | 'S';
 type ResultFilter = 'all' | 'win' | 'loss';
+type TakenFilter = 'all' | 'taken' | 'skipped';
 
 @Component({
   selector: 'app-historical-backtest',
@@ -42,6 +44,7 @@ export class HistoricalBacktestComponent implements OnDestroy {
   protected symbolFilter = '';
   protected sideFilter: SideFilter = 'all';
   protected resultFilter: ResultFilter = 'all';
+  protected takenFilter: TakenFilter = 'all';
 
   protected readonly inr = inr;
   protected readonly pct = pct;
@@ -87,6 +90,18 @@ export class HistoricalBacktestComponent implements OnDestroy {
     const q = this.symbolFilter.trim().toUpperCase();
     if (!q) return stocks;
     return stocks.filter((s) => s.symbol.includes(q));
+  }
+
+  protected filteredCrosses(): BacktestCross[] {
+    const rows = this.result()?.crosses || [];
+    const q = this.symbolFilter.trim().toUpperCase();
+    return rows.filter((c) => {
+      if (q && !c.symbol.includes(q)) return false;
+      if (this.sideFilter !== 'all' && c.side !== this.sideFilter) return false;
+      if (this.takenFilter === 'taken' && !c.taken) return false;
+      if (this.takenFilter === 'skipped' && c.taken) return false;
+      return true;
+    });
   }
 
   protected readonly curvePoints = computed(() => {
@@ -209,5 +224,9 @@ export class HistoricalBacktestComponent implements OnDestroy {
 
   protected trackTrade(_i: number, t: BacktestTrade): string {
     return `${t.day}-${t.symbol}-${t.entryT}-${t.exitT}`;
+  }
+
+  protected trackCross(_i: number, c: BacktestCross): string {
+    return `${c.day}-${c.symbol}-${c.t}-${c.side}`;
   }
 }
