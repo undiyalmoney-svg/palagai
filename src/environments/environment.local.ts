@@ -11,8 +11,8 @@ export const environment = {
   defaultLots: 1,
   allowLiveMoney: true,
   orderEgressIp: '168.144.28.89',
-  appVersion: '1.3.133',
-  appBuild: '2026.10.28-orb-crossed',
+  appVersion: '1.3.134',
+  appBuild: '2026.10.28-orb-rules',
   /**
    * Optional local-only session bootstrap. Fill via Get Token — do not commit real tokens.
    */

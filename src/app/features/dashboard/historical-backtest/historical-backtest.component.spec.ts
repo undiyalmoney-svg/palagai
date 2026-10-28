@@ -32,6 +32,10 @@ describe('HistoricalBacktestComponent', () => {
     expect(text).toMatch(/Nifty 500/i);
     expect(text).toMatch(/Starting capital/i);
     expect(text).toMatch(/Max stocks/);
+    expect(text).toMatch(/Entry and exit/i);
+    expect(text).toMatch(/closes through ORH/i);
+    expect(text).toMatch(/Stop is 1R/i);
+    expect(text).toMatch(/Time exit is the 14:50 close/i);
   });
 
   it('lists ORB-crossed names from the result', () => {

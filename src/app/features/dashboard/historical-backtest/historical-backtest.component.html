@@ -61,6 +61,44 @@
     </p>
   </div>
 
+  <div class="mp-card" data-testid="orb-rules">
+    <div class="mp-card-head">
+      <div>
+        <h2>Entry and exit</h2>
+        <p class="mp-sub">Same stock ORB script. Target R is the only setting you change here. Times are IST, 5-minute bars.</p>
+      </div>
+    </div>
+    <div class="hb-rules">
+      <div>
+        <h3>Entry</h3>
+        <ul class="mp-stack">
+          <li>Opening range is 09:15–09:45 high / low (ORH / ORL).</li>
+          <li>Long: a 09:50–14:30 bar closes through ORH (close &gt; ORH and open ≤ ORH).</li>
+          <li>Short: that bar closes through ORL (close &lt; ORL and open ≥ ORL).</li>
+          <li>Fill is the close plus 0.05% slippage. Risk is ~0.75% of starting capital (₹300 on ₹40,000). Notional cap is 5× capital.</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Exit (first hit; same-bar stop before target)</h3>
+        <ul class="mp-stack">
+          <li>Stop is 1R. Target is Target R × R (default 2). Time exit is the 14:50 close.</li>
+          <li>R = clamp(opening-range width × 0.5, 0.30%, 0.60%) of price.</li>
+          <li>Why column: SL, TARGET, or TIME. Approximate Zerodha MIS charges. No live orders.</li>
+        </ul>
+      </div>
+      <div>
+        <h3>When a cross is not a desk trade</h3>
+        <ul class="mp-stack">
+          <li>Open gap &gt; 2%, or OR width outside 0.20%–3.00% of prior close.</li>
+          <li>Breakout volume &lt; 1.2× OR average, or close-break &lt; 0.04% past ORH/ORL.</li>
+          <li>Close not on the EMA20 side (long needs close &gt; EMA20).</li>
+          <li>Nifty 50 below VWAP blocks longs (and above VWAP blocks shorts) when those candles load.</li>
+          <li>Desk cap (max stocks / day, default 3) and 15-minute cooldown after an exit.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
   @if (error()) {
     <div class="mp-banner" data-tone="down" data-testid="backtest-error">{{ error() }}</div>
   }
