@@ -6,27 +6,27 @@ import { AuthService } from './auth.service';
 describe('firstDashboardPathFor', () => {
   const has = (...mods: SiteModule[]) => (m: SiteModule) => mods.includes(m);
 
-  it('opens Momentum when that module is granted', () => {
-    expect(firstDashboardPathFor(has('momentum', 'auto', 'token'))).toBe('/dashboard/momentum');
+  it('opens Token when that module is granted', () => {
+    expect(firstDashboardPathFor(has('token', 'backtest', 'test'))).toBe('/dashboard/get-token');
   });
 
-  it('falls through to Charts when Momentum is not granted', () => {
-    expect(firstDashboardPathFor(has('auto', 'token'))).toBe('/dashboard/charts');
+  it('falls through to Historical Backtest when Token is not granted', () => {
+    expect(firstDashboardPathFor(has('backtest', 'test'))).toBe('/dashboard/historical-backtest');
   });
 
   it('lands on Home when no desk module is granted', () => {
     expect(firstDashboardPathFor(has())).toBe('/dashboard/home');
   });
 
-  it('opens Charts when only auto is granted', () => {
-    expect(firstDashboardPathFor(has('auto'))).toBe('/dashboard/charts');
+  it('opens Test when only test is granted', () => {
+    expect(firstDashboardPathFor(has('test'))).toBe('/dashboard/order-test');
   });
 
-  it('opens Charts for a public viewer even if other modules exist on the token', () => {
+  it('sends a public viewer to login', () => {
     const auth = {
       isPublic: () => true,
       hasModule: () => true,
     } as Pick<AuthService, 'isPublic' | 'hasModule'>;
-    expect(firstDashboardPath(auth as AuthService)).toBe('/dashboard/charts');
+    expect(firstDashboardPath(auth as AuthService)).toBe('/login');
   });
 });

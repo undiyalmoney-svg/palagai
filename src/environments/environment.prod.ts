@@ -10,10 +10,11 @@ export const environment = {
   slBuddyApiBaseUrl: '/api/sl-buddy',
   heatmapApiBaseUrl: '/api/heatmap',
   marketDeskApiBaseUrl: '/api/market-desk',
+  orbBacktestApiBaseUrl: '/api/orb-backtest',
   pnlApiBaseUrl: '/api/pnl',
   defaultLots: 1,
   allowLiveMoney: true,
   orderEgressIp: '168.144.28.89',
-  appVersion: '1.3.131',
-  appBuild: '2026.10.17-public-charts',
+  appVersion: '1.3.132',
+  appBuild: '2026.10.28-desk-restructure',
 };

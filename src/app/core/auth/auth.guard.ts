@@ -10,9 +10,8 @@ import {
 } from '../kite/kite-request-token.util';
 
 const MODULE_HOME: Array<{ module: SiteModule; path: string }> = [
-  { module: 'momentum', path: '/dashboard/momentum' },
-  { module: 'auto', path: '/dashboard/charts' },
   { module: 'token', path: '/dashboard/get-token' },
+  { module: 'backtest', path: '/dashboard/historical-backtest' },
   { module: 'test', path: '/dashboard/order-test' },
 ];
 
@@ -28,7 +27,7 @@ export function firstDashboardPathFor(hasModule: (mod: SiteModule) => boolean): 
 
 /** First desk the user is allowed to open. */
 export function firstDashboardPath(auth: AuthService): string {
-  if (auth.isPublic()) return '/dashboard/charts';
+  if (auth.isPublic()) return '/login';
   return firstDashboardPathFor((mod) => auth.hasModule(mod));
 }
 
@@ -95,15 +94,9 @@ export const authGuard: CanActivateFn = (route, state) => {
   if (authService.isAuthenticated() || !!authService.getToken()) {
     authService.ensureHydratedFromStorage();
     if (authService.isAuthenticated()) {
-      const path = state.url.split('?')[0] || '';
-      if (
-        authService.isPublic() &&
-        path.startsWith('/dashboard') &&
-        !path.includes('/dashboard/charts') &&
-        path !== '/dashboard' &&
-        path !== '/dashboard/'
-      ) {
-        return router.parseUrl('/dashboard/charts');
+      if (authService.isPublic()) {
+        authService.logout();
+        return router.createUrlTree(['/login']);
       }
       return true;
     }
@@ -128,6 +121,11 @@ export const guestGuard: CanActivateFn = (route) => {
     return router.parseUrl(
       `/kite-callback?request_token=${encodeURIComponent(queryToken)}`,
     );
+  }
+
+  if (auth.isPublic()) {
+    auth.logout();
+    return true;
   }
 
   // If Devil/customer is signed in and Kite just returned, don't trap on login.
@@ -190,8 +188,9 @@ export const moduleGuard = (mod: SiteModule): CanActivateFn => {
         return router.createUrlTree(['/login']);
       }
     }
-    if (auth.isPublic() && !state.url.includes('/dashboard/charts')) {
-      return router.parseUrl('/dashboard/charts');
+    if (auth.isPublic()) {
+      auth.logout();
+      return router.createUrlTree(['/login']);
     }
     if (auth.hasModule(mod)) {
       return true;

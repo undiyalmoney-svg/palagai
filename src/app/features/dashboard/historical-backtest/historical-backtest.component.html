@@ -1,0 +1,244 @@
+<div class="mp-page hb-page">
+  <div class="mp-banner" data-tone="warn" data-testid="simulated-banner">
+    Simulated historical ORB book on Kite 5-minute candles. No live orders are placed.
+  </div>
+
+  <div class="mp-card">
+    <div class="mp-card-head">
+      <div>
+        <h2>Nifty 500 opening-range book</h2>
+        <p class="mp-sub">
+          Opening range 09:15–09:45 IST. Entry is a 5-minute close through the range between 09:50 and 14:30.
+          Stop is 1R. Target is configurable. Time exit 14:50. Uses the same ORB rules as the existing stock script — no extra filters.
+        </p>
+      </div>
+      <span class="mp-badge" data-tone="info">Nifty 500 · Kite history</span>
+    </div>
+
+    <div class="mp-row hb-modes" role="tablist">
+      <button type="button" class="mp-tab" [class.active]="rangeMode() === 'day'" (click)="setMode('day')">One day</button>
+      <button type="button" class="mp-tab" [class.active]="rangeMode() === 'range'" (click)="setMode('range')">Date range</button>
+    </div>
+
+    <div class="mp-form">
+      @if (rangeMode() === 'day') {
+        <label class="mp-field">
+          Trading day
+          <input class="ui-input" type="date" [(ngModel)]="date" [disabled]="busy()" />
+        </label>
+      } @else {
+        <label class="mp-field">
+          From
+          <input class="ui-input" type="date" [(ngModel)]="from" [disabled]="busy()" />
+        </label>
+        <label class="mp-field">
+          To
+          <input class="ui-input" type="date" [(ngModel)]="to" [disabled]="busy()" />
+        </label>
+      }
+      <label class="mp-field">
+        Starting capital (₹)
+        <input class="ui-input" type="number" min="1000" step="1000" [(ngModel)]="capital" [disabled]="busy()" />
+      </label>
+      <label class="mp-field">
+        Max stocks / day
+        <input class="ui-input" type="number" min="1" max="50" [(ngModel)]="maxStocksPerDay" [disabled]="busy()" />
+      </label>
+      <label class="mp-field">
+        Target (R)
+        <input class="ui-input" type="number" min="0.5" max="10" step="0.5" [(ngModel)]="targetR" [disabled]="busy()" />
+      </label>
+      <div class="mp-field">
+        <span>&nbsp;</span>
+        <button type="button" class="ui-btn ui-btn-primary" [disabled]="busy()" (click)="run()">
+          {{ busy() ? 'Running…' : 'Run backtest' }}
+        </button>
+      </div>
+    </div>
+    <p class="mp-sub">
+      Connect Kite on <a routerLink="/dashboard/get-token">Token</a> first. A full Nifty 500 5-minute pull can take a few minutes.
+      Keep the range to 60 calendar days. History is never invented — missing candles are listed, not filled.
+    </p>
+  </div>
+
+  @if (error()) {
+    <div class="mp-banner" data-tone="down" data-testid="backtest-error">{{ error() }}</div>
+  }
+
+  @if (busy() || job()?.status === 'running') {
+    <div class="mp-card" data-testid="backtest-loading">
+      <div class="mp-card-head">
+        <h2>Loading Kite history</h2>
+        <span class="mp-badge" data-tone="warn">{{ progressPct() }}%</span>
+      </div>
+      <p class="mp-sub">{{ progressLabel() }}</p>
+      <div class="mp-bar" data-tone="info"><span [style.width.%]="progressPct()"></span></div>
+    </div>
+  }
+
+  @if (result(); as view) {
+    <div class="mp-banner" [attr.data-tone]="view.liveOrders ? 'down' : 'up'">
+      {{ view.liveOrders ? 'Live orders would have been sent.' : 'Simulated book. Live orders: no.' }}
+      {{ view.note }}
+    </div>
+
+    <div class="mp-stats">
+      <div class="mp-stat">
+        <span class="mp-stat-label">Net P/L</span>
+        <span class="mp-stat-value" [class]="pnlClass(view.summary.netPnl)">{{ inr(view.summary.netPnl) }}</span>
+      </div>
+      <div class="mp-stat">
+        <span class="mp-stat-label">Return</span>
+        <span class="mp-stat-value" [class]="pnlClass(view.summary.netPnl)">{{ pct(view.summary.returnPct) }}</span>
+      </div>
+      <div class="mp-stat">
+        <span class="mp-stat-label">Win rate</span>
+        <span class="mp-stat-value">{{ pct(view.summary.winRate) }}</span>
+      </div>
+      <div class="mp-stat">
+        <span class="mp-stat-label">Max drawdown</span>
+        <span class="mp-stat-value mp-down">{{ inr(view.summary.maxDrawdown) }}</span>
+      </div>
+      <div class="mp-stat">
+        <span class="mp-stat-label">Trades</span>
+        <span class="mp-stat-value">{{ view.summary.trades }}</span>
+        <span class="mp-stat-hint">{{ view.summary.wins }} wins · {{ view.summary.losses }} losses</span>
+      </div>
+      <div class="mp-stat">
+        <span class="mp-stat-label">Capital used</span>
+        <span class="mp-stat-value">{{ inr(view.summary.capitalUtilized) }}</span>
+        <span class="mp-stat-hint">{{ pct(view.summary.capitalUtilizedPct) }} of {{ inr(view.config.capital) }}</span>
+      </div>
+    </div>
+
+    <div class="mp-card">
+      <div class="mp-card-head"><h2>Equity</h2></div>
+      @if (curvePoints()) {
+        <svg class="hb-curve" viewBox="0 0 100 40" preserveAspectRatio="none" aria-hidden="true">
+          <polyline [attr.points]="curvePoints()" fill="none" stroke="currentColor" stroke-width="1.4" />
+        </svg>
+      } @else {
+        <p class="mp-empty">No equity path yet.</p>
+      }
+    </div>
+
+    <div class="mp-card">
+      <div class="mp-card-head">
+        <h2>Filters</h2>
+      </div>
+      <div class="mp-form">
+        <label class="mp-field">
+          Symbol
+          <input class="ui-input" type="search" [(ngModel)]="symbolFilter" placeholder="RELIANCE" />
+        </label>
+        <label class="mp-field">
+          Side
+          <select class="ui-select" [(ngModel)]="sideFilter">
+            <option value="all">All</option>
+            <option value="L">Long</option>
+            <option value="S">Short</option>
+          </select>
+        </label>
+        <label class="mp-field">
+          Result
+          <select class="ui-select" [(ngModel)]="resultFilter">
+            <option value="all">All</option>
+            <option value="win">Wins</option>
+            <option value="loss">Losses</option>
+          </select>
+        </label>
+      </div>
+    </div>
+
+    <div class="mp-card">
+      <div class="mp-card-head"><h2>Stock-wise</h2></div>
+      @if (!filteredStocks().length) {
+        <p class="mp-empty">No names match the filter.</p>
+      } @else {
+        <div class="hb-stocks">
+          @for (row of filteredStocks(); track row.symbol) {
+            <div class="hb-stock">
+              <div class="hb-stock-meta">
+                <strong>{{ row.symbol }}</strong>
+                <span [class]="pnlClass(row.netRs)">{{ inr(row.netRs) }}</span>
+              </div>
+              <div class="mp-bar" [attr.data-tone]="row.netRs >= 0 ? 'up' : 'down'">
+                <span [style.width.%]="stockWidth(row)"></span>
+              </div>
+              <p class="mp-stat-hint">{{ row.trades }} trades · win {{ pct(row.winRate) }}</p>
+            </div>
+          }
+        </div>
+      }
+    </div>
+
+    <div class="mp-card">
+      <div class="mp-card-head"><h2>Trades</h2></div>
+      @if (!filteredTrades().length) {
+        <p class="mp-empty" data-testid="backtest-empty">No ORB trades in this range with the current settings.</p>
+      } @else {
+        <div class="mp-table-wrap">
+          <table class="mp-table">
+            <thead>
+              <tr>
+                <th>Day</th>
+                <th>Symbol</th>
+                <th>Side</th>
+                <th>In</th>
+                <th>Out</th>
+                <th>Why</th>
+                <th class="num">Qty</th>
+                <th class="num">Entry</th>
+                <th class="num">Stop</th>
+                <th class="num">Target</th>
+                <th class="num">Exit</th>
+                <th class="num">Net</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (t of filteredTrades(); track trackTrade($index, t)) {
+                <tr>
+                  <td>{{ t.day }}</td>
+                  <td class="mp-sym">{{ t.symbol }}</td>
+                  <td>{{ t.side === 'L' ? 'Long' : 'Short' }}</td>
+                  <td>{{ t.entryT }}</td>
+                  <td>{{ t.exitT }}</td>
+                  <td>{{ t.exitReason }}</td>
+                  <td class="num">{{ t.qty }}</td>
+                  <td class="num">{{ t.entryPx | number: '1.2-2' }}</td>
+                  <td class="num">{{ t.stopPx | number: '1.2-2' }}</td>
+                  <td class="num">{{ t.tgtPx | number: '1.2-2' }}</td>
+                  <td class="num">{{ t.exitPx | number: '1.2-2' }}</td>
+                  <td class="num" [class]="pnlClass(t.netRs)">{{ inr(t.netRs) }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </div>
+
+    @if (view.warnings?.length) {
+      <div class="mp-card">
+        <div class="mp-card-head"><h2>Notes</h2></div>
+        <ul class="mp-stack">
+          @for (w of view.warnings; track w) {
+            <li>{{ w }}</li>
+          }
+        </ul>
+      </div>
+    }
+    @if (view.universe; as u) {
+      <p class="mp-sub">
+        Universe {{ u.withBars }}/{{ u.requested }} names with candles.
+        @if (u.missing.length) {
+          Missing tokens: {{ u.missing.slice(0, 8).join(', ') }}{{ u.missing.length > 8 ? '…' : '' }}.
+        }
+      </p>
+    }
+  } @else if (!busy() && !error()) {
+    <div class="mp-empty" data-testid="backtest-idle">
+      Pick a day or range and run. Results stay on this page until you run again.
+    </div>
+  }
+</div>

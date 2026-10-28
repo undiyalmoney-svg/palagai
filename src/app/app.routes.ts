@@ -13,7 +13,6 @@ import { DashboardComponent } from './features/dashboard/dashboard.component';
 import { DashboardHomeComponent } from './features/dashboard/dashboard-home.component';
 import { OrderTestComponent } from './features/dashboard/order-test/order-test.component';
 import { GetTokenComponent } from './features/dashboard/get-token/get-token.component';
-import { LiveChartsComponent } from './features/dashboard/live-charts/live-charts.component';
 import { SettingsComponent } from './features/dashboard/settings/settings.component';
 import { PnlRecordsComponent } from './features/dashboard/pnl-records/pnl-records.component';
 import { VaultPageComponent } from './features/dashboard/vault/vault-page.component';
@@ -48,8 +47,8 @@ export const routes: Routes = [
   },
   {
     path: 'heatmap',
-    loadComponent: () =>
-      import('./features/heatmap/heatmap-page.component').then((m) => m.HeatmapPageComponent),
+    redirectTo: 'login',
+    pathMatch: 'full',
   },
   {
     path: 'admin/login',
@@ -83,28 +82,17 @@ export const routes: Routes = [
         component: DashboardHomeComponent,
       },
       {
-        path: 'momentum',
-        canActivate: [moduleGuard('momentum')],
-        loadChildren: () =>
-          import('./features/dashboard/momentum/momentum.routes').then((m) => m.MOMENTUM_ROUTES),
-      },
-      {
-        path: 'research',
-        canActivate: [moduleGuard('research')],
+        path: 'historical-backtest',
+        canActivate: [moduleGuard('backtest')],
         loadComponent: () =>
-          import('./features/dashboard/research/research-page.component').then((m) => m.ResearchPageComponent),
+          import('./features/dashboard/historical-backtest/historical-backtest.component').then(
+            (m) => m.HistoricalBacktestComponent,
+          ),
       },
-      {
-        path: 'charts',
-        canActivate: [moduleGuard('auto')],
-        component: LiveChartsComponent,
-      },
-      {
-        path: 'sl-buddy',
-        canActivate: [moduleGuard('auto')],
-        loadComponent: () =>
-          import('./features/dashboard/sl-buddy/sl-buddy-page.component').then((m) => m.SlBuddyPageComponent),
-      },
+      { path: 'momentum', redirectTo: 'get-token', pathMatch: 'prefix' },
+      { path: 'research', redirectTo: 'get-token', pathMatch: 'full' },
+      { path: 'charts', redirectTo: 'get-token', pathMatch: 'full' },
+      { path: 'sl-buddy', redirectTo: 'get-token', pathMatch: 'full' },
       {
         path: 'order-test',
         canActivate: [moduleGuard('test')],

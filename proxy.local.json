@@ -55,6 +55,14 @@
       "^/api/market-desk": "/market-desk"
     }
   },
+  "/api/orb-backtest": {
+    "target": "http://127.0.0.1:3000",
+    "secure": false,
+    "changeOrigin": true,
+    "pathRewrite": {
+      "^/api/orb-backtest": "/orb-backtest"
+    }
+  },
   "/api/pnl": {
     "target": "http://168.144.28.89:3000",
     "secure": false,

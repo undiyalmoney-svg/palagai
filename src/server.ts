@@ -421,6 +421,8 @@ async function proxyOrderBackendJson(
     upstreamPath = pathOnly.replace(/^\/api\/heatmap/, '/heatmap');
   } else if (pathOnly.startsWith('/api/market-desk')) {
     upstreamPath = pathOnly.replace(/^\/api\/market-desk/, '/market-desk');
+  } else if (pathOnly.startsWith('/api/orb-backtest')) {
+    upstreamPath = pathOnly.replace(/^\/api\/orb-backtest/, '/orb-backtest');
   } else if (pathOnly.startsWith('/api/pnl')) {
     upstreamPath = pathOnly.replace(/^\/api\/pnl/, '/pnl');
   } else {
@@ -598,6 +600,13 @@ marketDeskApiRouter.use((req, res) => {
   void proxyOrderBackendJson('/market-desk', 'market-desk', req, res);
 });
 app.use('/api/market-desk', marketDeskApiRouter);
+
+const orbBacktestApiRouter = express.Router();
+orbBacktestApiRouter.use(express.json());
+orbBacktestApiRouter.use((req, res) => {
+  void proxyOrderBackendJson('/orb-backtest', 'orb-backtest', req, res);
+});
+app.use('/api/orb-backtest', orbBacktestApiRouter);
 
 const pnlApiRouter = express.Router();
 pnlApiRouter.use(express.json());

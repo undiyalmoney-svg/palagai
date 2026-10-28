@@ -70,6 +70,7 @@ export class AdminPageComponent implements OnInit {
       research: 'Research',
       token: 'Token',
       test: 'Test',
+      backtest: 'Backtest',
       strat: 'Strategy',
       pnl: 'P/L',
       vault: 'Vault',

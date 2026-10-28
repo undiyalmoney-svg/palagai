@@ -6,6 +6,7 @@ export type SiteModule =
   | 'research'
   | 'token'
   | 'test'
+  | 'backtest'
   | 'strat'
   | 'pnl'
   | 'vault';

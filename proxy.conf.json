@@ -62,6 +62,15 @@
     },
     "logLevel": "debug"
   },
+  "/api/orb-backtest": {
+    "target": "http://168.144.28.89:3000",
+    "secure": false,
+    "changeOrigin": true,
+    "pathRewrite": {
+      "^/api/orb-backtest": "/orb-backtest"
+    },
+    "logLevel": "debug"
+  },
   "/api/pnl": {
     "target": "http://168.144.28.89:3000",
     "secure": false,

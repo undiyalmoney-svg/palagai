@@ -67,39 +67,24 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   protected readonly clockLabel = signal('');
   protected readonly pageTitle = signal('Palagai');
-  protected readonly pageSubtitle = signal('Momentum, Research, Charts, SL Buddy, Token, and Test.');
+  protected readonly pageSubtitle = signal('Token, Historical Backtest, and Test.');
   protected readonly sidebarOpen = signal(true);
   protected readonly profileOpen = signal(false);
 
   private readonly allNav: NavItem[] = [
     {
-      label: 'Momentum',
-      shortLabel: 'Momentum',
-      route: '/dashboard/momentum',
-      icon: 'pie-chart',
-      module: 'momentum',
-      exact: false,
+      label: 'Token',
+      shortLabel: 'Token',
+      route: '/dashboard/get-token',
+      icon: 'key',
+      module: 'token',
     },
     {
-      label: 'Research',
-      shortLabel: 'Research',
-      route: '/dashboard/research',
-      icon: 'activity',
-      module: 'research',
-    },
-    {
-      label: 'Charts',
-      shortLabel: 'Charts',
-      route: '/dashboard/charts',
-      icon: 'candles',
-      module: 'auto',
-    },
-    {
-      label: 'SL Buddy',
-      shortLabel: 'SL',
-      route: '/dashboard/sl-buddy',
-      icon: 'shield',
-      module: 'auto',
+      label: 'Historical Backtest',
+      shortLabel: 'Backtest',
+      route: '/dashboard/historical-backtest',
+      icon: 'trending-up',
+      module: 'backtest',
     },
     {
       label: 'Test',
@@ -108,32 +93,9 @@ export class DashboardComponent implements OnInit, OnDestroy {
       icon: 'flask',
       module: 'test',
     },
-    {
-      label: 'Token',
-      shortLabel: 'Token',
-      route: '/dashboard/get-token',
-      icon: 'key',
-      module: 'token',
-    },
   ];
 
   private readonly titles: Record<string, { title: string; subtitle: string }> = {
-    '/dashboard/momentum': {
-      title: 'Momentum',
-      subtitle: 'Buy tomorrow. Sell today or sell tomorrow.',
-    },
-    '/dashboard/research': {
-      title: 'Research',
-      subtitle: 'Paper trades on Nifty 50, Bank Nifty, Sensex and Crude oil. No real orders.',
-    },
-    '/dashboard/charts': {
-      title: 'Charts',
-      subtitle: 'Nifty 50, Bank Nifty, Sensex and Crude Oil Mini.',
-    },
-    '/dashboard/sl-buddy': {
-      title: 'SL Buddy',
-      subtitle: 'Watch your orders. The server rests a matching-qty stop after a fill.',
-    },
     '/dashboard/order-test': {
       title: 'Order Test',
       subtitle: 'Safe order probes against your connected Kite session.',
@@ -141,6 +103,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
     '/dashboard/get-token': {
       title: 'Get Token',
       subtitle: 'Connect Kite, copy redirect URLs, and refresh access tokens.',
+    },
+    '/dashboard/historical-backtest': {
+      title: 'Historical Backtest',
+      subtitle: 'Simulated Nifty 500 ORB book on Kite 5-minute history. No live orders.',
     },
     '/dashboard/settings': {
       title: 'Settings',
@@ -153,18 +119,13 @@ export class DashboardComponent implements OnInit, OnDestroy {
   };
 
   protected readonly navItems = computed(() =>
-    this.allNav.filter((item) => {
-      if (this.authService.isPublic()) return item.route === '/dashboard/charts';
-      return item.module == null || this.authService.hasModule(item.module);
-    }),
+    this.allNav.filter((item) => item.module == null || this.authService.hasModule(item.module)),
   );
 
   protected readonly hideFunds = computed(() => this.authService.isPublic());
 
-  /** Bottom tab bar on phone/tablet — Token stays in the side menu only. */
-  protected readonly mobileTabItems = computed(() =>
-    this.navItems().filter((item) => item.route !== '/dashboard/get-token'),
-  );
+  /** Bottom tab bar on phone — Token, Historical Backtest, Test. */
+  protected readonly mobileTabItems = computed(() => this.navItems());
 
   protected readonly username = computed(() => {
     const u = this.authService.currentUser();
