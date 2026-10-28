@@ -135,9 +135,11 @@ export class HistoricalBacktestComponent implements OnDestroy {
           ? 'Fetching and caching Kite 5-minute candles'
           : p.phase === 'simulate'
             ? 'Simulating strategy candidates'
-            : p.phase === 'done'
-              ? 'Done'
-              : 'Queued';
+            : p.phase === 'sensitivity'
+              ? 'Capital and cost sensitivity'
+              : p.phase === 'done'
+                ? 'Done'
+                : 'Queued';
     const sym = p.symbol ? ` · ${p.symbol}` : '';
     return `${phase} ${p.done}/${p.total}${sym}`;
   });
@@ -454,7 +456,7 @@ export class HistoricalBacktestComponent implements OnDestroy {
 
   private pollDiscover(id: string): void {
     this.clearDiscoverPoll();
-    const wait = this.discoverPollFailures ? Math.min(8000, 1500 * this.discoverPollFailures) : 1500;
+    const wait = this.discoverPollFailures ? Math.min(12000, 1500 * this.discoverPollFailures) : 1500;
     this.discoverPollTimer = setTimeout(async () => {
       try {
         const job = await this.api.discoverJob(id);
@@ -474,8 +476,8 @@ export class HistoricalBacktestComponent implements OnDestroy {
         this.pollDiscover(id);
       } catch (err) {
         this.discoverPollFailures += 1;
-        if (this.discoverPollFailures < 6) {
-          this.discoverError.set('Waiting for the discovery server… retrying.');
+        if (this.discoverPollFailures < 80) {
+          this.discoverError.set('Waiting for the discovery server… retrying. The search keeps running; numbers stay blank until it finishes.');
           this.pollDiscover(id);
           return;
         }
