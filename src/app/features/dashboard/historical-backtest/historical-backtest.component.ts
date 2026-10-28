@@ -7,6 +7,7 @@ import {
   BacktestCross,
   BacktestJob,
   BacktestResult,
+  BacktestSnapshot,
   BacktestStockRow,
   BacktestTrade,
 } from './historical-backtest.models';
@@ -35,7 +36,6 @@ export class HistoricalBacktestComponent implements OnDestroy {
   protected to = lastCompletedSession();
   protected capital = 40000;
   protected maxStocksPerDay = 3;
-  protected targetR = 2;
 
   protected readonly busy = signal(false);
   protected readonly error = signal('');
@@ -91,6 +91,11 @@ export class HistoricalBacktestComponent implements OnDestroy {
     const q = this.symbolFilter.trim().toUpperCase();
     if (!q) return stocks;
     return stocks.filter((s) => s.symbol.includes(q));
+  }
+
+  protected snapshots(): BacktestSnapshot[] {
+    const view = this.result();
+    return view?.summary.snapshots || view?.snapshots || [];
   }
 
   protected filteredCrosses(): BacktestCross[] {
@@ -164,7 +169,6 @@ export class HistoricalBacktestComponent implements OnDestroy {
         to,
         capital: Number(this.capital) || 40000,
         maxStocksPerDay: Number(this.maxStocksPerDay) || 3,
-        targetR: Number(this.targetR) || 2,
       });
       this.job.set(started);
       if (started.id) {

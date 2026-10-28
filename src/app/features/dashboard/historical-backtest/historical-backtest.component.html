@@ -1,15 +1,15 @@
 <div class="mp-page hb-page">
   <div class="mp-banner" data-tone="warn" data-testid="simulated-banner">
-    Simulated historical ORB book on Kite 5-minute candles. No live orders are placed.
+    Simulated historical first-15 book on Kite 5-minute candles. No live orders are placed.
   </div>
 
   <div class="mp-card">
     <div class="mp-card-head">
       <div>
-        <h2>Nifty 500 opening-range book</h2>
+        <h2>Nifty 500 first-15 book</h2>
         <p class="mp-sub">
-          Opening range 09:15–09:45 IST. Entry is a 5-minute close through the range between 09:50 and 14:30.
-          Stop is 1R. Target is configurable. Time exit 14:50. Uses the same ORB rules as the existing stock script — no extra filters.
+          Mark the first 15-minute high / low (09:15–09:30). A later 15-minute candle must fully close beyond that range.
+          Then 5-minute two-low (or two-high) entry. Stop is the signal candle. No automatic target — 30-minute marks and EOD.
         </p>
       </div>
       <span class="mp-badge" data-tone="info">Nifty 500 · Kite history</span>
@@ -44,10 +44,6 @@
         Max stocks / day
         <input class="ui-input" type="number" min="1" max="50" [(ngModel)]="maxStocksPerDay" [disabled]="busy()" />
       </label>
-      <label class="mp-field">
-        Target (R)
-        <input class="ui-input" type="number" min="0.5" max="10" step="0.5" [(ngModel)]="targetR" [disabled]="busy()" />
-      </label>
       <div class="mp-field">
         <span>&nbsp;</span>
         <button type="button" class="ui-btn ui-btn-primary" [disabled]="busy()" (click)="run()">
@@ -65,35 +61,32 @@
     <div class="mp-card-head">
       <div>
         <h2>Entry and exit</h2>
-        <p class="mp-sub">Same stock ORB script. Target R is the only setting you change here. Times are IST, 5-minute bars.</p>
+        <p class="mp-sub">Your rule. Times are IST. 15-minute range from 5-minute Kite candles. No live orders.</p>
       </div>
     </div>
     <div class="hb-rules">
       <div>
-        <h3>Entry</h3>
+        <h3>First 15 minutes</h3>
         <ul class="mp-stack">
-          <li>Opening range is 09:15–09:45 high / low (ORH / ORL).</li>
-          <li>Long: a 09:50–14:30 bar closes through ORH (close &gt; ORH and open ≤ ORH).</li>
-          <li>Short: that bar closes through ORL (close &lt; ORL and open ≥ ORL).</li>
-          <li>Fill is the close plus 0.05% slippage. Risk is ~0.75% of starting capital (₹300 on ₹40,000). Notional cap is 5× capital.</li>
+          <li>Mark 09:15–09:30 high and low.</li>
+          <li>A later 15-minute candle must <strong>fully close</strong> above that high or below that low.</li>
+          <li>A wick through the level without a close beyond it does not count.</li>
         </ul>
       </div>
       <div>
-        <h3>Exit (first hit; same-bar stop before target)</h3>
+        <h3>Then 5-minute entry</h3>
         <ul class="mp-stack">
-          <li>Stop is 1R. Target is Target R × R (default 2). Time exit is the 14:50 close.</li>
-          <li>R = clamp(opening-range width × 0.5, 0.30%, 0.60%) of price.</li>
-          <li>Why column: SL, TARGET, or TIME. Approximate Zerodha MIS charges. No live orders.</li>
+          <li>Uptrend: after two red 5-minute candles (two lows), the next green candle’s high is entry and its low is SL.</li>
+          <li>Downtrend: after two green 5-minute candles, the next red candle’s low is entry and its high is SL.</li>
+          <li>Buy/sell stop fills on a later 5-minute bar. Risk is that candle’s range. Notional cap 5× capital.</li>
         </ul>
       </div>
       <div>
-        <h3>When a cross is not a desk trade</h3>
+        <h3>Exit and print</h3>
         <ul class="mp-stack">
-          <li>Open gap &gt; 2%, or OR width outside 0.20%–3.00% of prior close.</li>
-          <li>Breakout volume &lt; 1.2× OR average, or close-break &lt; 0.04% past ORH/ORL.</li>
-          <li>Close not on the EMA20 side (long needs close &gt; EMA20).</li>
-          <li>Nifty 50 below VWAP blocks longs (and above VWAP blocks shorts) when those candles load.</li>
-          <li>Desk cap (max stocks / day, default 3) and 15-minute cooldown after an exit.</li>
+          <li>No automatic target — you decide from the 30-minute marks.</li>
+          <li>SL hit closes the whole trade. Leftover positions exit at the 15:15 close (EOD).</li>
+          <li>Max amount went is the best rupee move after fill, even if SL later takes it.</li>
         </ul>
       </div>
     </div>
@@ -148,10 +141,59 @@
         <span class="mp-stat-hint">{{ pct(view.summary.capitalUtilizedPct) }} of {{ inr(view.config.capital) }}</span>
       </div>
       <div class="mp-stat">
-        <span class="mp-stat-label">ORB crossed</span>
+        <span class="mp-stat-label">15m crossed</span>
         <span class="mp-stat-value">{{ view.summary.orbCrossed || 0 }}</span>
         <span class="mp-stat-hint">{{ view.summary.orbCrossedTaken || 0 }} taken in the desk</span>
       </div>
+      <div class="mp-stat">
+        <span class="mp-stat-label">SL hit</span>
+        <span class="mp-stat-value">{{ view.summary.slHits || 0 }}</span>
+        <span class="mp-stat-hint">{{ view.summary.eodExits || 0 }} held to EOD</span>
+      </div>
+      <div class="mp-stat">
+        <span class="mp-stat-label">Max went</span>
+        <span class="mp-stat-value mp-up">{{ inr(view.summary.maxWentRs || 0) }}</span>
+        <span class="mp-stat-hint">Best open move on any trade</span>
+      </div>
+    </div>
+
+    <div class="mp-card" data-testid="orb-snapshots">
+      <div class="mp-card-head">
+        <div>
+          <h2>Every 30 minutes + EOD</h2>
+          <p class="mp-sub">Mark-to-market of the desk. Use this to choose a target later. Last row is EOD (15:15 close).</p>
+        </div>
+      </div>
+      @if (!snapshots().length) {
+        <p class="mp-empty">No 30-minute marks yet.</p>
+      } @else {
+        <div class="mp-table-wrap">
+          <table class="mp-table">
+            <thead>
+              <tr>
+                <th>Day</th>
+                <th>Time</th>
+                <th class="num">Net</th>
+                <th class="num">Open</th>
+                <th class="num">SL hits</th>
+                <th class="num">Max went</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (s of snapshots(); track s.day + s.t) {
+                <tr>
+                  <td>{{ s.day }}</td>
+                  <td>{{ s.label }}</td>
+                  <td class="num" [class]="pnlClass(s.netRs)">{{ inr(s.netRs) }}</td>
+                  <td class="num">{{ s.open }}</td>
+                  <td class="num">{{ s.slHits }}</td>
+                  <td class="num">{{ inr(s.maxWentRs) }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
     </div>
 
     <div class="mp-card">
@@ -191,7 +233,7 @@
           </select>
         </label>
         <label class="mp-field">
-          ORB list
+          15m list
           <select class="ui-select" [(ngModel)]="takenFilter">
             <option value="all">All crossed</option>
             <option value="taken">Taken in desk</option>
@@ -204,8 +246,8 @@
     <div class="mp-card" data-testid="orb-crossed">
       <div class="mp-card-head">
         <div>
-          <h2>ORB crossed</h2>
-          <p class="mp-sub">First 5-minute close through ORH/ORL in 09:50–14:30. Includes names the desk skipped (max stocks, cooldown, volume, EMA).</p>
+          <h2>15-minute crossed</h2>
+          <p class="mp-sub">Names whose 15-minute candle fully closed beyond the first 15-minute high or low. Includes names that never printed the 5-minute two-low entry or missed the desk cap.</p>
         </div>
         <span class="mp-badge" data-tone="info">{{ filteredCrosses().length }} names</span>
       </div>
@@ -279,7 +321,7 @@
     <div class="mp-card">
       <div class="mp-card-head"><h2>Trades</h2></div>
       @if (!filteredTrades().length) {
-        <p class="mp-empty" data-testid="backtest-empty">No ORB trades in this range with the current settings.</p>
+        <p class="mp-empty" data-testid="backtest-empty">No first-15 trades in this range with the current settings.</p>
       } @else {
         <div class="mp-table-wrap">
           <table class="mp-table">
@@ -294,7 +336,7 @@
                 <th class="num">Qty</th>
                 <th class="num">Entry</th>
                 <th class="num">Stop</th>
-                <th class="num">Target</th>
+                <th class="num">Max went</th>
                 <th class="num">Exit</th>
                 <th class="num">Net</th>
               </tr>
@@ -311,7 +353,7 @@
                   <td class="num">{{ t.qty }}</td>
                   <td class="num">{{ t.entryPx | number: '1.2-2' }}</td>
                   <td class="num">{{ t.stopPx | number: '1.2-2' }}</td>
-                  <td class="num">{{ t.tgtPx | number: '1.2-2' }}</td>
+                  <td class="num">{{ inr(t.maxWentRs || 0) }}</td>
                   <td class="num">{{ t.exitPx | number: '1.2-2' }}</td>
                   <td class="num" [class]="pnlClass(t.netRs)">{{ inr(t.netRs) }}</td>
                 </tr>

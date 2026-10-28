@@ -27,15 +27,16 @@ describe('HistoricalBacktestComponent', () => {
 
   it('states that the book is simulated and never live', () => {
     const text = fixture.nativeElement.textContent as string;
-    expect(text).toMatch(/Simulated historical ORB book/i);
+    expect(text).toMatch(/Simulated historical first-15 book/i);
     expect(text).toMatch(/No live orders are placed/i);
     expect(text).toMatch(/Nifty 500/i);
     expect(text).toMatch(/Starting capital/i);
     expect(text).toMatch(/Max stocks/);
     expect(text).toMatch(/Entry and exit/i);
-    expect(text).toMatch(/closes through ORH/i);
-    expect(text).toMatch(/Stop is 1R/i);
-    expect(text).toMatch(/Time exit is the 14:50 close/i);
+    expect(text).toMatch(/fully close/i);
+    expect(text).toMatch(/two red 5-minute candles/i);
+    expect(text).toMatch(/15:15 close/i);
+    expect(text).toMatch(/Max amount went/i);
   });
 
   it('lists ORB-crossed names from the result', () => {
@@ -45,11 +46,9 @@ describe('HistoricalBacktestComponent', () => {
       config: {
         capital: 40000,
         maxStocksPerDay: 3,
-        targetR: 2,
-        orEnd: '09:45',
-        entryStart: '09:50',
+        orEnd: '09:30',
         entryEnd: '14:30',
-        timeExit: '14:50',
+        timeExit: '15:15',
       },
       assumptions: [],
       rawTrades: 0,
@@ -70,6 +69,31 @@ describe('HistoricalBacktestComponent', () => {
         days: 1,
         orbCrossed: 1,
         orbCrossedTaken: 0,
+        slHits: 0,
+        eodExits: 0,
+        maxWentRs: 120,
+        snapshots: [
+          {
+            day: '2026-10-16',
+            t: '10:30',
+            label: '10:30',
+            netRs: 40,
+            slHits: 0,
+            open: 1,
+            taken: 1,
+            maxWentRs: 80,
+          },
+          {
+            day: '2026-10-16',
+            t: '15:15',
+            label: 'EOD',
+            netRs: 90,
+            slHits: 0,
+            open: 0,
+            taken: 1,
+            maxWentRs: 120,
+          },
+        ],
       },
       trades: [],
       crosses: [
@@ -89,8 +113,11 @@ describe('HistoricalBacktestComponent', () => {
     });
     fixture.detectChanges();
     const text = fixture.nativeElement.textContent as string;
-    expect(text).toMatch(/ORB crossed/i);
+    expect(text).toMatch(/15-minute crossed/i);
     expect(text).toMatch(/RELIANCE/);
     expect(text).toMatch(/Crossed only/);
+    expect(text).toMatch(/Every 30 minutes/i);
+    expect(text).toMatch(/EOD/);
+    expect(text).toMatch(/Max went/i);
   });
 });

@@ -17,7 +17,6 @@ export class HistoricalBacktestApiService {
     to: string;
     capital: number;
     maxStocksPerDay: number;
-    targetR: number;
   }): Promise<BacktestJob> {
     return firstValueFrom(
       this.http.post<BacktestJob>(`${this.base}/run`, body, { headers: this.headers() }),

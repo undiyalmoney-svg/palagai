@@ -5,6 +5,13 @@ export interface BacktestProgress {
   symbol: string | null;
 }
 
+export interface BacktestMark {
+  t: string;
+  px: number;
+  mtmRs: number;
+  label?: string;
+}
+
 export interface BacktestTrade {
   symbol: string;
   day: string;
@@ -21,6 +28,10 @@ export interface BacktestTrade {
   chargesRs: number;
   netRs: number;
   notionalRs: number;
+  maxWentRs?: number;
+  maxWentPx?: number;
+  signalT?: string;
+  marks?: BacktestMark[];
 }
 
 export interface BacktestStockRow {
@@ -29,6 +40,8 @@ export interface BacktestStockRow {
   wins: number;
   netRs: number;
   winRate: number;
+  slHits?: number;
+  maxWentRs?: number;
 }
 
 export interface BacktestCross {
@@ -43,6 +56,25 @@ export interface BacktestCross {
   volume?: number;
   qualified: boolean;
   taken: boolean;
+}
+
+export interface BacktestSnapshot {
+  day: string;
+  t: string;
+  label: string;
+  netRs: number;
+  slHits: number;
+  open: number;
+  taken: number;
+  maxWentRs: number;
+}
+
+export interface BacktestEodRow {
+  day: string;
+  netRs: number;
+  trades: number;
+  slHits: number;
+  maxWentRs: number;
 }
 
 export interface BacktestSummary {
@@ -62,6 +94,11 @@ export interface BacktestSummary {
   days: number;
   orbCrossed?: number;
   orbCrossedTaken?: number;
+  slHits?: number;
+  eodExits?: number;
+  maxWentRs?: number;
+  snapshots?: BacktestSnapshot[];
+  eod?: BacktestEodRow[];
 }
 
 export interface BacktestResult {
@@ -70,9 +107,9 @@ export interface BacktestResult {
   config: {
     capital: number;
     maxStocksPerDay: number;
-    targetR: number;
+    targetR?: number;
     orEnd: string;
-    entryStart: string;
+    entryStart?: string;
     entryEnd: string;
     timeExit: string;
   };
@@ -81,6 +118,7 @@ export interface BacktestResult {
   summary: BacktestSummary;
   trades: BacktestTrade[];
   crosses?: BacktestCross[];
+  snapshots?: BacktestSnapshot[];
   universe?: {
     requested: number;
     resolved: number;
