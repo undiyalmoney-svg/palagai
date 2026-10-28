@@ -37,3 +37,17 @@ export function pct(value: number | null | undefined): string {
   const n = Number(value) || 0;
   return `${(n * 100).toFixed(2)}%`;
 }
+
+/** Calendar days before an ISO date (YYYY-MM-DD), used for discovery range defaults. */
+export function daysBefore(iso: string, days: number): string {
+  const [y, m, d] = String(iso || '')
+    .split('-')
+    .map((p) => Number(p));
+  if (!y || !m || !d) return iso;
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() - Math.max(0, days));
+  const yy = dt.getUTCFullYear();
+  const mm = String(dt.getUTCMonth() + 1).padStart(2, '0');
+  const dd = String(dt.getUTCDate()).padStart(2, '0');
+  return `${yy}-${mm}-${dd}`;
+}

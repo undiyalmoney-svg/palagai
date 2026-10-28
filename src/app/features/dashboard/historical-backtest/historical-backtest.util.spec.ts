@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { lastCompletedSession, pct } from './historical-backtest.util';
+import { daysBefore, lastCompletedSession, pct } from './historical-backtest.util';
 
 describe('lastCompletedSession', () => {
   it('skips weekends and does not return today', () => {
@@ -11,5 +11,9 @@ describe('lastCompletedSession', () => {
 
   it('formats return percent from a fraction', () => {
     expect(pct(0.125)).toBe('12.50%');
+  });
+
+  it('steps calendar days backward for discovery defaults', () => {
+    expect(daysBefore('2026-10-27', 35)).toBe('2026-09-22');
   });
 });

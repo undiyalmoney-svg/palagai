@@ -3,7 +3,13 @@ import { Injectable, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 import { KiteSessionService } from '../../../core/kite/kite-session.service';
-import { BacktestJob } from './historical-backtest.models';
+import {
+  BacktestJob,
+  DiscoverCandidateDetail,
+  DiscoverExperimentRow,
+  DiscoverJob,
+  DiscoverSpace,
+} from './historical-backtest.models';
 
 @Injectable({ providedIn: 'root' })
 export class HistoricalBacktestApiService {
@@ -36,6 +42,48 @@ export class HistoricalBacktestApiService {
       this.http.get<{ count: number; symbols: string[] }>(`${this.base}/universe`, {
         headers: this.headers(),
       }),
+    );
+  }
+
+  startDiscover(body: {
+    from: string;
+    to: string;
+    capital: number;
+    budget: number;
+  }): Promise<DiscoverJob> {
+    return firstValueFrom(
+      this.http.post<DiscoverJob>(`${this.base}/discover`, body, { headers: this.headers() }),
+    );
+  }
+
+  discoverJob(id: string): Promise<DiscoverJob> {
+    return firstValueFrom(
+      this.http.get<DiscoverJob>(`${this.base}/discover/${encodeURIComponent(id)}`, {
+        headers: this.headers(),
+      }),
+    );
+  }
+
+  discoverSpace(): Promise<DiscoverSpace> {
+    return firstValueFrom(
+      this.http.get<DiscoverSpace>(`${this.base}/discover/space`, { headers: this.headers() }),
+    );
+  }
+
+  listDiscoveries(): Promise<{ experiments: DiscoverExperimentRow[] }> {
+    return firstValueFrom(
+      this.http.get<{ experiments: DiscoverExperimentRow[] }>(`${this.base}/discover`, {
+        headers: this.headers(),
+      }),
+    );
+  }
+
+  discoverCandidate(jobId: string, candidateId: string): Promise<DiscoverCandidateDetail> {
+    return firstValueFrom(
+      this.http.get<DiscoverCandidateDetail>(
+        `${this.base}/discover/${encodeURIComponent(jobId)}/candidates/${encodeURIComponent(candidateId)}`,
+        { headers: this.headers() },
+      ),
     );
   }
 

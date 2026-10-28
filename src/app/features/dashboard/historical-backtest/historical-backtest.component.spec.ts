@@ -3,6 +3,7 @@ import { provideRouter } from '@angular/router';
 import { describe, expect, it } from 'vitest';
 import { HistoricalBacktestApiService } from './historical-backtest-api.service';
 import { HistoricalBacktestComponent } from './historical-backtest.component';
+import { DiscoverResult } from './historical-backtest.models';
 
 describe('HistoricalBacktestComponent', () => {
   let fixture: ComponentFixture<HistoricalBacktestComponent>;
@@ -17,6 +18,17 @@ describe('HistoricalBacktestComponent', () => {
           useValue: {
             start: () => Promise.resolve({ id: 'job-1', status: 'running' }),
             job: () => new Promise(() => undefined),
+            startDiscover: () => Promise.resolve({ id: 'disc-1', status: 'running' }),
+            discoverJob: () => new Promise(() => undefined),
+            discoverSpace: () =>
+              Promise.resolve({
+                liveOrders: false,
+                count: 12,
+                baselineId: 'baseline-first15-twored-sl-eod-ms3-risk',
+                candidates: [],
+              }),
+            listDiscoveries: () => Promise.resolve({ experiments: [] }),
+            discoverCandidate: () => Promise.resolve({ simulated: true, liveOrders: false, candidate: {}, trades: [] }),
           },
         },
       ],
@@ -119,5 +131,191 @@ describe('HistoricalBacktestComponent', () => {
     expect(text).toMatch(/Every 30 minutes/i);
     expect(text).toMatch(/EOD/);
     expect(text).toMatch(/Max went/i);
+  });
+
+  it('keeps automated discovery off the main nav and idle until a job finishes', async () => {
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('[data-testid="discover-tab"]')?.textContent).toMatch(/Automated discovery/i);
+    expect(el.textContent).not.toMatch(/Best validated candidate/i);
+    (el.querySelector('[data-testid="discover-tab"]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    const text = el.textContent as string;
+    expect(text).toMatch(/Automated ORB strategy discovery/i);
+    expect(text).toMatch(/No performance numbers are shown until a completed research job exists/i);
+    expect(text).not.toMatch(/Best validated candidate/i);
+    expect(text).not.toMatch(/₹40,000/);
+    expect(el.querySelector('[data-testid="discover-idle"]')).toBeTruthy();
+  });
+
+  it('states that no robust strategy was found instead of labelling a loser profitable', async () => {
+    const cmp = fixture.componentInstance;
+    await cmp['setPage']('discover');
+    cmp['discoverResult'].set({
+      simulated: true,
+      liveOrders: false,
+      capital: 40000,
+      candidatesEvaluated: 12,
+      minTrades: 8,
+      noRobust: 'No sufficiently robust profitable strategy found in this search.',
+      recommended: null,
+      rankings: { bestBalancedRobust: null, highestNet: 'loser-1' },
+      leaderboard: [
+        {
+          rank: 1,
+          id: 'loser-1',
+          name: 'Last entry 11:00',
+          entryRule: 'first-15',
+          cutoff: '11:00',
+          exitRule: 'EOD',
+          stopLoss: 'signal low',
+          target: 'None',
+          stockCount: 3,
+          sizing: 'risk',
+          netPnl: -1200,
+          returnPct: -0.03,
+          maxDrawdown: 1800,
+          profitFactor: 0.4,
+          expectancy: -40,
+          trades: 10,
+          weeks: 2,
+          profitableWeekPct: 0,
+          validationStatus: 'oos_reported',
+          profitable: false,
+          oosNet: -1200,
+        },
+      ],
+      dailyWinners: [
+        {
+          day: '2026-10-16',
+          bestId: 'loser-1',
+          bestName: 'Last entry 11:00',
+          netPnl: -80,
+          trades: 1,
+          stocks: ['AAA'],
+          entries: [{ symbol: 'AAA', side: 'L', in: '10:05', out: '15:15', qty: 10, netRs: -80 }],
+          runnerUpId: null,
+          runnerUpNet: 0,
+          gap: 0,
+          prospectiveId: null,
+          prospectiveNet: null,
+          selection: 'retrospective',
+          note: 'Best configuration for this day is chosen after seeing the day’s simulated P/L. It was not knowable before the open.',
+        },
+      ],
+      weeklyWinners: [],
+      assumptions: ['Simulated MIS research. No live orders are placed.'],
+    } as DiscoverResult);
+    fixture.detectChanges();
+    const text = fixture.nativeElement.textContent as string;
+    expect(text).toMatch(/No sufficiently robust profitable strategy found in this search/);
+    expect(text).not.toMatch(/Best validated candidate/i);
+    expect(text).toMatch(/Not profitable/);
+    expect(text).toMatch(/Retrospective/);
+    expect(text).toMatch(/not knowable before the open/i);
+    expect(text).toMatch(/Live orders: no/i);
+  });
+
+  it('shows the validated candidate first when the engine recommends one', async () => {
+    const cmp = fixture.componentInstance;
+    await cmp['setPage']('discover');
+    cmp['discoverResult'].set({
+      simulated: true,
+      liveOrders: false,
+      capital: 40000,
+      candidatesEvaluated: 12,
+      minTrades: 4,
+      noRobust: null,
+      recommended: {
+        id: 'baseline-first15-twored-sl-eod-ms3-risk',
+        name: 'Original first-15 two-low SL/EOD',
+        rules: {
+          entry: 'Mark 09:15–09:30 high/low. A later 15-minute candle must fully close beyond that range.',
+          cutoff: 'No new entries after 14:30 IST',
+          exit: 'Stop is the signal-candle low. Leftover positions exit at 15:15 IST (EOD).',
+          stopLoss: 'Signal-candle low (long) or high (short)',
+          target: 'None — decide from 30-minute marks / EOD',
+          stockCount: '3 names / day, first eligible by entry time',
+          sizing: 'Risk-based: ~0.75% of capital per signal-candle range',
+        },
+        config: { maxStocksPerDay: 3, sizing: 'risk' },
+        oos: {
+          netPnl: 2400,
+          returnPct: 0.06,
+          maxDrawdown: 400,
+          profitFactor: 1.8,
+          expectancy: 80,
+          trades: 12,
+          weeks: 3,
+          profitableWeekPct: 0.66,
+          capitalUtilized: 18000,
+        },
+        why: ['Chosen on training days, compared on validation, reported on out-of-sample.'],
+        risks: ['Past simulated P/L is not a live-trading guarantee.'],
+        trades: [
+          {
+            symbol: 'AAA',
+            day: '2026-10-16',
+            side: 'L',
+            entryT: '10:05',
+            exitT: '15:15',
+            exitReason: 'EOD',
+            entryPx: 103,
+            exitPx: 104.7,
+            stopPx: 101.85,
+            qty: 40,
+            grossRs: 68,
+            chargesRs: 8,
+            netRs: 60,
+            notionalRs: 4120,
+          },
+        ],
+        stocks: [{ symbol: 'AAA', trades: 4, netRs: 2400 }],
+        equityCurve: [
+          { day: 'start', equity: 40000 },
+          { day: '2026-10-16', equity: 42400 },
+        ],
+      },
+      rankings: { bestBalancedRobust: 'baseline-first15-twored-sl-eod-ms3-risk' },
+      leaderboard: [
+        {
+          rank: 1,
+          id: 'baseline-first15-twored-sl-eod-ms3-risk',
+          name: 'Original first-15 two-low SL/EOD',
+          isBaseline: true,
+          experimental: false,
+          entryRule: 'first-15 two-low',
+          cutoff: '14:30',
+          exitRule: 'EOD 15:15',
+          stopLoss: 'signal low',
+          target: 'None',
+          stockCount: 3,
+          sizing: 'risk',
+          netPnl: 2400,
+          returnPct: 0.06,
+          maxDrawdown: 400,
+          profitFactor: 1.8,
+          expectancy: 80,
+          trades: 12,
+          weeks: 3,
+          profitableWeekPct: 0.66,
+          validationStatus: 'oos_positive',
+          profitable: true,
+          oosNet: 2400,
+        },
+      ],
+      dailyWinners: [],
+      weeklyWinners: [],
+      capitalSensitivity: [{ capital: 40000, netPnl: 2400, returnPct: 0.06, maxDrawdown: 400, trades: 12, capitalUtilized: 18000 }],
+      costSensitivity: [{ slippage: 0.0005, netPnl: 2400, trades: 12, maxDrawdown: 400 }],
+    } as DiscoverResult);
+    fixture.detectChanges();
+    const text = fixture.nativeElement.textContent as string;
+    expect(text).toMatch(/Best validated candidate/i);
+    expect(text).toMatch(/Original first-15 two-low SL\/EOD/);
+    expect(text).toMatch(/fully close beyond that range/);
+    expect(text).toMatch(/Capital sensitivity/i);
+    expect(text).toMatch(/Cutoff and exit lab/i);
   });
 });
