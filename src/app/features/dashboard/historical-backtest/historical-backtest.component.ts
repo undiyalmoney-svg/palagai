@@ -27,6 +27,7 @@ type TakenFilter = 'all' | 'taken' | 'skipped';
 export class HistoricalBacktestComponent implements OnDestroy {
   private readonly api = inject(HistoricalBacktestApiService);
   private pollTimer: ReturnType<typeof setTimeout> | null = null;
+  private pollFailures = 0;
 
   protected readonly rangeMode = signal<RangeMode>('day');
   protected date = lastCompletedSession();
@@ -151,6 +152,7 @@ export class HistoricalBacktestComponent implements OnDestroy {
     const from = this.rangeMode() === 'day' ? this.date : this.from;
     const to = this.rangeMode() === 'day' ? this.date : this.to;
     this.busy.set(true);
+    this.pollFailures = 0;
     this.result.set(null);
     this.job.set({
       status: 'running',
@@ -180,16 +182,16 @@ export class HistoricalBacktestComponent implements OnDestroy {
 
   private poll(id: string): void {
     this.clearPoll();
+    const wait = this.pollFailures ? Math.min(8000, 1500 * this.pollFailures) : 1500;
     this.pollTimer = setTimeout(async () => {
       try {
         const job = await this.api.job(id);
+        this.pollFailures = 0;
         this.job.set(job);
         if (job.status === 'done') {
           this.result.set(job.result || null);
           this.busy.set(false);
-          if (!job.result?.summary.trades) {
-            this.error.set('');
-          }
+          this.error.set('');
           return;
         }
         if (job.status === 'error') {
@@ -199,10 +201,16 @@ export class HistoricalBacktestComponent implements OnDestroy {
         }
         this.poll(id);
       } catch (err) {
+        this.pollFailures += 1;
+        if (this.pollFailures < 6) {
+          this.error.set('Waiting for the backtest server… retrying.');
+          this.poll(id);
+          return;
+        }
         this.busy.set(false);
         this.error.set(this.fmtErr(err));
       }
-    }, 1500);
+    }, wait);
   }
 
   private clearPoll(): void {
