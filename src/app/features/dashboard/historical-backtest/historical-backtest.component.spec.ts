@@ -85,6 +85,7 @@ describe('HistoricalBacktestComponent', () => {
     const text = fixture.nativeElement.textContent as string;
     expect(text).toMatch(/Simulated prior-day break book/i);
     expect(text).toMatch(/No live orders are placed/i);
+    expect(text).toMatch(/compulsory 1R take-profit as live/i);
     expect(text).toMatch(/Nifty 500/i);
     expect(text).toMatch(/Starting capital/i);
     expect(text).toMatch(/follow the 09:45 crowd/i);
@@ -103,6 +104,7 @@ describe('HistoricalBacktestComponent', () => {
     expect(cmp['autoNames']()).toBe(2);
     const text = fixture.nativeElement.textContent as string;
     expect(text).toMatch(/Best two names/i);
+    expect(text).toMatch(/same 1R exit as live/i);
     expect(text).not.toMatch(/₹2,000 each, max 8/i);
   });
 

@@ -106,7 +106,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     },
     '/dashboard/historical-backtest': {
       title: 'Historical Backtest',
-      subtitle: 'Simulated prior-day follow book, plus Live today sized from Kite cash. No live orders.',
+      subtitle: 'Simulated prior-day follow book with the same 2-name 1R scan as live. Live today sizes from Kite cash.',
     },
     '/dashboard/settings': {
       title: 'Settings',
