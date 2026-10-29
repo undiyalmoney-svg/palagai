@@ -40,6 +40,43 @@ export interface BacktestTrade {
   marks?: BacktestMark[];
 }
 
+export interface LiveMoneyFill {
+  instrument: string;
+  side: 'L' | 'S' | string;
+  qty: number;
+  entry: number | null;
+  stop: number | null;
+  target: number | null;
+  signalT?: string | null;
+}
+
+export interface LiveMoneyStatus {
+  enabled: boolean;
+  liveOrders: boolean;
+  date: string;
+  crowd: string | null;
+  capital: number;
+  fundsRs: number;
+  doneToday: boolean;
+  fills: LiveMoneyFill[];
+  scan?: { phase: string; done: number; total: number; symbol: string | null };
+  lastTick: string | null;
+  lastError: string | null;
+  lastMessage: string | null;
+  sessionOk: boolean;
+  dropletWatching?: boolean;
+  dropletPlacing?: boolean;
+  guaranteed: boolean;
+}
+
+export interface LiveMoneyResponse {
+  status: string;
+  liveOrders: boolean;
+  money: LiveMoneyStatus;
+  phrase?: string;
+  message?: string;
+}
+
 export interface PromisedLock {
   targetR: number;
   fundsRs: number;

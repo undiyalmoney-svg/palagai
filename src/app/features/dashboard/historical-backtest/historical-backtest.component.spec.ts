@@ -8,10 +8,50 @@ describe('HistoricalBacktestComponent', () => {
   let fixture: ComponentFixture<HistoricalBacktestComponent>;
   const startMock = vi.fn(() => Promise.resolve({ id: 'job-1', status: 'running' }));
   const startLiveMock = vi.fn(() => Promise.resolve({ id: 'live-1', status: 'running', liveOrders: false }));
+  const idleMoney = {
+    enabled: false,
+    liveOrders: false,
+    date: '2026-10-29',
+    crowd: null as string | null,
+    capital: 0,
+    fundsRs: 0,
+    doneToday: false,
+    fills: [] as unknown[],
+    lastTick: null as string | null,
+    lastError: null as string | null,
+    lastMessage: null as string | null,
+    sessionOk: false,
+    guaranteed: false,
+  };
+  let moneyState = { ...idleMoney };
+  const liveMoneyStatusMock = vi.fn(() =>
+    Promise.resolve({ status: 'ok', liveOrders: moneyState.enabled, money: { ...moneyState } }),
+  );
+  const startLiveMoneyMock = vi.fn(() => {
+    moneyState = {
+      ...idleMoney,
+      enabled: true,
+      liveOrders: true,
+      capital: 670,
+      fundsRs: 670,
+      lastMessage:
+        'Live money armed. Scanning every Nifty 500 closed 5-minute bar from 09:45 to 14:30 — not a 09:50 one-shot.',
+      sessionOk: true,
+    };
+    return Promise.resolve({ status: 'ok', liveOrders: true, money: { ...moneyState } });
+  });
+  const stopLiveMoneyMock = vi.fn(() => {
+    moneyState = { ...idleMoney, lastMessage: 'Live money stopped. Flat.' };
+    return Promise.resolve({ status: 'ok', liveOrders: false, money: { ...moneyState } });
+  });
 
   beforeEach(async () => {
     startMock.mockClear();
     startLiveMock.mockClear();
+    liveMoneyStatusMock.mockClear();
+    startLiveMoneyMock.mockClear();
+    stopLiveMoneyMock.mockClear();
+    moneyState = { ...idleMoney };
     await TestBed.configureTestingModule({
       imports: [HistoricalBacktestComponent],
       providers: [
@@ -21,6 +61,9 @@ describe('HistoricalBacktestComponent', () => {
           useValue: {
             start: startMock,
             startLiveToday: startLiveMock,
+            liveMoneyStatus: liveMoneyStatusMock,
+            startLiveMoney: startLiveMoneyMock,
+            stopLiveMoney: stopLiveMoneyMock,
             job: () => new Promise(() => undefined),
             startDiscover: () => Promise.resolve({ id: 'disc-1', status: 'running' }),
             discoverJob: () => new Promise(() => undefined),
@@ -82,11 +125,32 @@ describe('HistoricalBacktestComponent', () => {
     expect(text).toMatch(/not a guaranteed profit/i);
     expect(text).toMatch(/Load live today/i);
     expect(text).toMatch(/size the 1R book from Kite cash/i);
+    expect(text).toMatch(/Start live money/i);
+    expect(text).toMatch(/Stop flatten/i);
+    expect(text).toMatch(/09:45 to 14:30/i);
     expect(text).not.toMatch(/Starting capital/i);
     expect(text).not.toMatch(/Enter capital and run/i);
     await cmp['run']();
     expect(startLiveMock).toHaveBeenCalledTimes(1);
     expect(startMock).not.toHaveBeenCalled();
+  });
+
+  it('arms real-money scanning only after START LIVE MONEY', async () => {
+    const cmp = fixture.componentInstance;
+    cmp['livePhrase'] = 'START LIVE MONEY';
+    cmp['setMode']('live');
+    fixture.detectChanges();
+    expect(cmp['livePhraseOk']()).toBe(true);
+    const startBtn = fixture.nativeElement.querySelector('[data-testid="start-live-money"]') as HTMLButtonElement;
+    expect(startBtn.disabled).toBe(false);
+    await cmp['startLiveMoney']();
+    expect(startLiveMoneyMock).toHaveBeenCalledWith('START LIVE MONEY');
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    const text = fixture.nativeElement.textContent as string;
+    expect(text).toMatch(/Real money is on/i);
+    expect(text).toMatch(/not a 09:50 one-shot/i);
   });
 
   it('lists prior-day breaks from the result', () => {

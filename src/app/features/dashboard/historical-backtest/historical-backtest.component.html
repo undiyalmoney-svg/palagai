@@ -1,8 +1,14 @@
 <div class="mp-page hb-page">
   <div class="mp-banner" data-tone="warn" data-testid="simulated-banner">
     @if (rangeMode() === 'live') {
-      Live today uses your Kite cash, one name, and a 1R take-profit. Same prior-day follow engine as the backtest. No live
-      orders. The lock is the exit if the trade reaches 1R — not a guaranteed profit.
+      @if (liveMoney()?.enabled) {
+        Real money is on. Scanning every closed 5-minute bar from 09:45 to 14:30 — not a 09:50 one-shot. Auto SL-M at the
+        prior-day level. Auto flatten at 1R or 15:15. Not a guaranteed profit.
+      } @else {
+        Live today uses your Kite cash, one name, and a 1R take-profit. Same prior-day follow engine as the backtest. Start
+        live money to place real NSE MIS orders. Scanning keeps going until 14:30. The lock is the exit if the trade reaches
+        1R — not a guaranteed profit.
+      }
     } @else {
       Simulated prior-day break book on Kite 5-minute candles. Follow the 09:45 crowd. No live orders are placed.
     }
@@ -15,7 +21,8 @@
         <p class="mp-sub">
           After 09:45, take a 5-minute full close beyond yesterday’s high or low — only the 09:45 majority side.
           @if (rangeMode() === 'live') {
-            Live today sizes from Kite equity cash, not the backtest capital box.
+            Live today sizes from Kite equity cash, not the backtest capital box. The worker keeps scanning eligible names
+            after 09:50.
           } @else {
             Capital picks how many names auto-trade. Simulated only.
           }
@@ -37,8 +44,8 @@
         <div class="mp-field hb-live-note">
           <span>Kite cash</span>
           <p class="mp-sub" data-testid="live-cash-note">
-            Reads equity cash from Kite. One name. Exit at 1R if it gets there, else stop or 15:15. A ₹1,00,000 backtest is
-            not this book.
+            Reads equity cash from Kite. One name. Scans every closed 5-minute bar from 09:45 to 14:30. Auto SL-M, then auto
+            exit at 1R or 15:15. A ₹1,00,000 backtest is not this book.
           </p>
         </div>
       } @else {
@@ -85,6 +92,104 @@
       possible. @if (rangeMode() !== 'live') { Keep the range to 60 calendar days. } History is never invented.
     </p>
   </div>
+
+  @if (rangeMode() === 'live') {
+    <div class="mp-card" data-testid="live-money-card">
+      <div class="mp-card-head">
+        <div>
+          <h2>Live money</h2>
+          <p class="mp-sub">
+            Places real Kite MIS. Type START LIVE MONEY to arm. Stop flatten cancels the SL-M, then market-exits anything
+            still open.
+          </p>
+        </div>
+        <span class="mp-badge" [attr.data-tone]="liveMoney()?.enabled ? 'down' : 'info'">
+          {{ liveMoney()?.enabled ? 'Real money on' : 'Armed off' }}
+        </span>
+      </div>
+      <div class="mp-form">
+        <label class="mp-field">
+          Confirm
+          <input
+            class="ui-input"
+            type="text"
+            [(ngModel)]="livePhrase"
+            placeholder="START LIVE MONEY"
+            [disabled]="liveMoneyBusy() || !!liveMoney()?.enabled"
+            data-testid="live-money-phrase"
+          />
+        </label>
+        <div class="mp-field">
+          <span>&nbsp;</span>
+          <button
+            type="button"
+            class="ui-btn ui-btn-primary"
+            [disabled]="liveMoneyBusy() || !!liveMoney()?.enabled || !livePhraseOk()"
+            (click)="startLiveMoney()"
+            data-testid="start-live-money"
+          >
+            {{ liveMoneyBusy() && !liveMoney()?.enabled ? 'Starting…' : 'Start live money' }}
+          </button>
+        </div>
+        <div class="mp-field">
+          <span>&nbsp;</span>
+          <button
+            type="button"
+            class="ui-btn"
+            [disabled]="liveMoneyBusy() || !(liveMoney()?.enabled || liveMoney()?.fills?.length)"
+            (click)="stopLiveMoney()"
+            data-testid="stop-live-money"
+          >
+            Stop flatten
+          </button>
+        </div>
+      </div>
+      @if (liveMoney(); as money) {
+        <p class="mp-sub" data-testid="live-money-status">
+          {{ money.lastMessage || 'Idle until Start live money.' }}
+          @if (money.crowd) {
+            Crowd {{ money.crowd }}.
+          }
+          @if (money.scan?.phase === 'candles' || money.scan?.phase === 'watching') {
+            {{ money.scan?.done }}/{{ money.scan?.total }} names.
+          }
+        </p>
+        @if (money.lastError) {
+          <p class="mp-sub mp-down">{{ money.lastError }}</p>
+        }
+        @if (money.fills.length) {
+          <div class="mp-table-wrap">
+            <table class="mp-table">
+              <thead>
+                <tr>
+                  <th>Symbol</th>
+                  <th>Side</th>
+                  <th>In</th>
+                  <th class="num">Qty</th>
+                  <th class="num">Entry</th>
+                  <th class="num">SL-M</th>
+                  <th class="num">1R</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (f of money.fills; track f.instrument) {
+                  <tr>
+                    <td class="mp-sym">{{ f.instrument }}</td>
+                    <td>{{ f.side === 'S' ? 'Short' : 'Long' }}</td>
+                    <td>{{ f.signalT || '—' }}</td>
+                    <td class="num">{{ f.qty }}</td>
+                    <td class="num">{{ f.entry | number: '1.2-2' }}</td>
+                    <td class="num">{{ f.stop | number: '1.2-2' }}</td>
+                    <td class="num">{{ f.target | number: '1.2-2' }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      }
+    </div>
+  }
 
   @if (error()) {
     <div class="mp-banner" data-tone="down" data-testid="backtest-error">{{ error() }}</div>
@@ -414,7 +519,8 @@
   } @else if (!busy() && !error()) {
     <div class="mp-empty" data-testid="backtest-idle">
       @if (rangeMode() === 'live') {
-        Load live today to size the 1R book from Kite cash. No live orders. Results stay on this page until you load again.
+        Load live today to size the 1R book from Kite cash. Start live money to place real MIS with auto SL and auto exit.
+        Scanning does not stop at 09:50.
       } @else {
         Enter capital and run. Name count is chosen automatically. Results stay on this page until you run again.
       }

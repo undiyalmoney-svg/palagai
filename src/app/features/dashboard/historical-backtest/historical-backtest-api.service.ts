@@ -5,6 +5,7 @@ import { environment } from '../../../../environments/environment';
 import { KiteSessionService } from '../../../core/kite/kite-session.service';
 import {
   BacktestJob,
+  LiveMoneyResponse,
   DiscoverCandidateDetail,
   DiscoverExperimentRow,
   DiscoverJob,
@@ -24,6 +25,28 @@ export class HistoricalBacktestApiService {
   startLiveToday(): Promise<BacktestJob> {
     return firstValueFrom(
       this.http.post<BacktestJob>(`${this.base}/live-today`, {}, { headers: this.headers() }),
+    );
+  }
+
+  liveMoneyStatus(): Promise<LiveMoneyResponse> {
+    return firstValueFrom(
+      this.http.get<LiveMoneyResponse>(`${this.base}/live-today/status`, { headers: this.headers() }),
+    );
+  }
+
+  startLiveMoney(phrase: string): Promise<LiveMoneyResponse> {
+    return firstValueFrom(
+      this.http.post<LiveMoneyResponse>(
+        `${this.base}/live-today/start`,
+        { phrase },
+        { headers: this.headers() },
+      ),
+    );
+  }
+
+  stopLiveMoney(): Promise<LiveMoneyResponse> {
+    return firstValueFrom(
+      this.http.post<LiveMoneyResponse>(`${this.base}/live-today/stop`, {}, { headers: this.headers() }),
     );
   }
 

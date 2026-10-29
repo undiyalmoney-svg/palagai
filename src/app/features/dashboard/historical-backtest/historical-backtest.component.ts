@@ -7,6 +7,7 @@ import {
   BacktestCross,
   BacktestJob,
   BacktestResult,
+  LiveMoneyStatus,
   BacktestSnapshot,
   BacktestStockRow,
   BacktestTrade,
@@ -58,6 +59,7 @@ export class HistoricalBacktestComponent implements OnDestroy {
   private pollTimer: ReturnType<typeof setTimeout> | null = null;
   private discoverPollTimer: ReturnType<typeof setTimeout> | null = null;
   private profitPollTimer: ReturnType<typeof setTimeout> | null = null;
+  private moneyPollTimer: ReturnType<typeof setTimeout> | null = null;
   private pollFailures = 0;
   private discoverPollFailures = 0;
   private profitPollFailures = 0;
@@ -82,6 +84,10 @@ export class HistoricalBacktestComponent implements OnDestroy {
   protected profitTo = lastCompletedSession();
   protected profitCapital = 10000;
   protected profitBudget = 20;
+
+  protected livePhrase = '';
+  protected readonly liveMoney = signal<LiveMoneyStatus | null>(null);
+  protected readonly liveMoneyBusy = signal(false);
 
   protected readonly busy = signal(false);
   protected readonly error = signal('');
@@ -280,6 +286,7 @@ export class HistoricalBacktestComponent implements OnDestroy {
     this.clearPoll();
     this.clearDiscoverPoll();
     this.clearProfitPoll();
+    this.clearMoneyPoll();
   }
 
   protected setMode(mode: RangeMode): void {
@@ -288,6 +295,12 @@ export class HistoricalBacktestComponent implements OnDestroy {
       this.from = this.date;
       this.to = this.date;
     }
+    if (mode === 'live') this.pollLiveMoney();
+    else this.clearMoneyPoll();
+  }
+
+  protected livePhraseOk(): boolean {
+    return this.livePhrase.trim() === 'START LIVE MONEY';
   }
 
   protected applyDesk(preset: DeskPreset): void {
@@ -439,6 +452,33 @@ export class HistoricalBacktestComponent implements OnDestroy {
       this.busy.set(false);
       this.job.set(null);
       this.error.set(this.fmtErr(err));
+    }
+  }
+
+  protected async startLiveMoney(): Promise<void> {
+    this.error.set('');
+    this.liveMoneyBusy.set(true);
+    try {
+      const res = await this.api.startLiveMoney(this.livePhrase.trim());
+      this.liveMoney.set(res.money);
+      this.pollLiveMoney();
+    } catch (err) {
+      this.error.set(this.fmtErr(err));
+    } finally {
+      this.liveMoneyBusy.set(false);
+    }
+  }
+
+  protected async stopLiveMoney(): Promise<void> {
+    this.error.set('');
+    this.liveMoneyBusy.set(true);
+    try {
+      const res = await this.api.stopLiveMoney();
+      this.liveMoney.set(res.money);
+    } catch (err) {
+      this.error.set(this.fmtErr(err));
+    } finally {
+      this.liveMoneyBusy.set(false);
     }
   }
 
@@ -712,6 +752,30 @@ export class HistoricalBacktestComponent implements OnDestroy {
     if (this.profitPollTimer) {
       clearTimeout(this.profitPollTimer);
       this.profitPollTimer = null;
+    }
+  }
+
+  private pollLiveMoney(): void {
+    this.clearMoneyPoll();
+    void this.refreshLiveMoney();
+    this.moneyPollTimer = setTimeout(() => {
+      if (this.rangeMode() === 'live') this.pollLiveMoney();
+    }, 3000);
+  }
+
+  private async refreshLiveMoney(): Promise<void> {
+    try {
+      const res = await this.api.liveMoneyStatus();
+      this.liveMoney.set(res.money);
+    } catch {
+      /* droplet status is optional until Start */
+    }
+  }
+
+  private clearMoneyPoll(): void {
+    if (this.moneyPollTimer) {
+      clearTimeout(this.moneyPollTimer);
+      this.moneyPollTimer = null;
     }
   }
 
