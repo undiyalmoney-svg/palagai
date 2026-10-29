@@ -25,6 +25,7 @@ describe('firstDashboardPathFor', () => {
   it('keeps a Historical Backtest deep link and rejects off-desk URLs', () => {
     expect(safeDashboardReturn('/dashboard/historical-backtest')).toBe('/dashboard/historical-backtest');
     expect(safeDashboardReturn('/dashboard/historical-backtest?x=1')).toBe('/dashboard/historical-backtest');
+    expect(safeDashboardReturn('/dashboard')).toBeNull();
     expect(safeDashboardReturn('https://evil.example/dashboard')).toBeNull();
     expect(safeDashboardReturn('//evil.example')).toBeNull();
     expect(safeDashboardReturn('/login')).toBeNull();

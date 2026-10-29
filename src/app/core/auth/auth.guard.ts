@@ -15,12 +15,12 @@ const MODULE_HOME: Array<{ module: SiteModule; path: string }> = [
   { module: 'test', path: '/dashboard/order-test' },
 ];
 
-/** Keep login bounce on the desk the user asked for. Reject anything outside /dashboard. */
+/** Keep login bounce on the desk the user asked for. Reject anything outside /dashboard/. */
 export function safeDashboardReturn(url: string | null | undefined): string | null {
-  const raw = String(url || '').trim();
-  if (!raw.startsWith('/dashboard')) return null;
-  if (raw.startsWith('//') || /:\/\//.test(raw)) return null;
-  return raw.split('?')[0];
+  const path = String(url || '').trim().split('?')[0] || '';
+  if (!path.startsWith('/dashboard/')) return null;
+  if (path.startsWith('//') || path.includes('://') || path.includes('\\')) return null;
+  return path;
 }
 
 function loginTree(router: Router, returnUrl?: string): UrlTree {
@@ -150,6 +150,17 @@ export const guestGuard: CanActivateFn = (route) => {
     (hasPendingKiteOAuth() || !!peekKiteRequestToken())
   ) {
     return router.parseUrl('/dashboard/get-token');
+  }
+
+  // Full-page Historical Backtest click SSR-bounces here; localStorage still has the session.
+  if (auth.isAuthenticated() || !!auth.getToken()) {
+    auth.ensureHydratedFromStorage();
+    if (auth.isAuthenticated() && !auth.isPublic()) {
+      const dest = safeDashboardReturn(route.queryParamMap.get('returnUrl'));
+      if (dest) {
+        return router.parseUrl(dest);
+      }
+    }
   }
   return true;
 };

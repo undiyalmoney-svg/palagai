@@ -54,6 +54,7 @@ export class LoginComponent {
     // Browser-only: SSR ngOnInit cannot read localStorage / navigate reliably.
     afterNextRender(() => {
       this.resumeKiteIfPossible();
+      this.resumeDeskIfPossible();
     });
   }
 
@@ -65,9 +66,31 @@ export class LoginComponent {
     }
   }
 
+  /** Full-page desk clicks SSR-bounce to /login; localStorage still has the session. */
+  private resumeDeskIfPossible(): void {
+    this.authService.ensureHydratedFromStorage();
+    if (!this.authService.isAuthenticated() || this.authService.isPublic()) return;
+    if (peekKiteRequestToken()) {
+      void this.router.navigateByUrl('/dashboard/get-token');
+      return;
+    }
+    const dest = this.afterLoginPath();
+    if (dest === firstDashboardPath(this.authService) && !safeDashboardReturn(this.returnUrl())) {
+      return;
+    }
+    void this.router.navigateByUrl(dest);
+  }
+
+  private returnUrl(): string | null {
+    return (
+      this.route.snapshot.queryParamMap.get('returnUrl') ||
+      (typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('returnUrl'))
+    );
+  }
+
   private afterLoginPath(): string {
     if (peekKiteRequestToken()) return '/dashboard/get-token';
-    const next = safeDashboardReturn(this.route.snapshot.queryParamMap.get('returnUrl'));
+    const next = safeDashboardReturn(this.returnUrl());
     if (next) return next;
     return firstDashboardPath(this.authService);
   }
