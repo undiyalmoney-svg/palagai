@@ -52,7 +52,7 @@ describe('HistoricalBacktestApiService', () => {
       id: 'live-1',
       status: 'running',
       liveOrders: false,
-      input: { liveToday: true, preset: 'pdh-follow-live-lock', capital: 0, targetR: 1, maxStocksPerDay: 1 },
+      input: { liveToday: true, preset: 'pdh-follow-live-lock', capital: 0, targetR: 1, maxStocksPerDay: 2 },
     });
     await expect(pending).resolves.toMatchObject({ id: 'live-1', liveOrders: false });
     http.verify();

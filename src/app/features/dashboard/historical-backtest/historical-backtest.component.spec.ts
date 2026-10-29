@@ -122,6 +122,8 @@ describe('HistoricalBacktestComponent', () => {
     fixture.detectChanges();
     const text = fixture.nativeElement.textContent as string;
     expect(text).toMatch(/Live today uses your Kite cash/i);
+    expect(text).toMatch(/best two names/i);
+    expect(text).toMatch(/compulsory 1R/i);
     expect(text).toMatch(/not a guaranteed profit/i);
     expect(text).toMatch(/Load live today/i);
     expect(text).toMatch(/size the 1R book from Kite cash/i);
@@ -129,7 +131,7 @@ describe('HistoricalBacktestComponent', () => {
     expect(text).toMatch(/Stop flatten/i);
     expect(text).toMatch(/09:45 to 14:30/i);
     expect(text).not.toMatch(/Starting capital/i);
-    expect(text).toMatch(/Place real Kite MIS with auto SL-M/i);
+    expect(text).toMatch(/Place real Kite MIS on the best two names/i);
     expect(text).toMatch(/Tick the box to arm/i);
     expect(text).not.toMatch(/Enter capital and run/i);
     await cmp['run']();
@@ -267,7 +269,7 @@ describe('HistoricalBacktestComponent', () => {
       family: 'pdh_break',
       config: {
         capital: 670,
-        maxStocksPerDay: 1,
+        maxStocksPerDay: 2,
         entryEnd: '14:30',
         timeExit: '15:15',
         crowdFilter: 'follow',
@@ -280,7 +282,7 @@ describe('HistoricalBacktestComponent', () => {
         targetR: 1,
         fundsRs: 670,
         capitalRs: 670,
-        names: 1,
+        names: 2,
         promisedRs: 5,
         lockedRs: 0,
         openRs: 1.2,

@@ -58,6 +58,7 @@ export interface LiveMoneyStatus {
   capital: number;
   fundsRs: number;
   doneToday: boolean;
+  takenToday?: string[];
   fills: LiveMoneyFill[];
   scan?: { phase: string; done: number; total: number; symbol: string | null };
   lastTick: string | null;

@@ -5,9 +5,9 @@
         Real money is on. Scanning every closed 5-minute bar from 09:45 to 14:30 — not a 09:50 one-shot. Auto SL-M at the
         prior-day level. Auto flatten at 1R or 15:15. Not a guaranteed profit.
       } @else {
-        Live today uses your Kite cash, one name, and a 1R take-profit. Same prior-day follow engine as the backtest. Start
-        live money to place real NSE MIS orders. Scanning keeps going until 14:30. The lock is the exit if the trade reaches
-        1R — not a guaranteed profit.
+        Live today uses your Kite cash, the best two names, and a compulsory 1R take-profit. Same prior-day follow engine as
+        the backtest. Start live money to place real NSE MIS orders. Scanning keeps going until 14:30. The lock is the exit
+        if the trade reaches 1R — not a guaranteed profit.
       }
     } @else {
       Simulated prior-day break book on Kite 5-minute candles. Follow the 09:45 crowd. No live orders are placed.
@@ -44,8 +44,8 @@
         <div class="mp-field hb-live-note">
           <span>Kite cash</span>
           <p class="mp-sub" data-testid="live-cash-note">
-            Reads equity cash from Kite. One name. Scans every closed 5-minute bar from 09:45 to 14:30. Auto SL-M, then auto
-            exit at 1R or 15:15. A ₹1,00,000 backtest is not this book.
+            Reads equity cash from Kite. Best two names. Compulsory 1R take-profit. Scans every closed 5-minute bar from
+            09:45 to 14:30. Auto SL-M, then auto exit at 1R or 15:15. A ₹1,00,000 backtest is not this book.
           </p>
         </div>
       } @else {
@@ -115,7 +115,7 @@
             [disabled]="liveMoneyBusy() || !!liveMoney()?.enabled"
             data-testid="live-money-confirm"
           />
-          Place real Kite MIS with auto SL-M and auto flatten at 1R or 15:15
+          Place real Kite MIS on the best two names, with auto SL-M and compulsory 1R / 15:15 flatten
         </label>
         <div class="mp-field">
           <span>&nbsp;</span>
