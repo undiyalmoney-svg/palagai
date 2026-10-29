@@ -81,7 +81,9 @@ describe('HistoricalBacktestComponent', () => {
     expect(text).toMatch(/Live today uses your Kite cash/i);
     expect(text).toMatch(/not a guaranteed profit/i);
     expect(text).toMatch(/Load live today/i);
+    expect(text).toMatch(/size the 1R book from Kite cash/i);
     expect(text).not.toMatch(/Starting capital/i);
+    expect(text).not.toMatch(/Enter capital and run/i);
     await cmp['run']();
     expect(startLiveMock).toHaveBeenCalledTimes(1);
     expect(startMock).not.toHaveBeenCalled();
