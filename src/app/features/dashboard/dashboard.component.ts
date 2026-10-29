@@ -60,6 +60,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   /** Route progress bar (0–100) */
   protected readonly navLoading  = signal(false);
   protected readonly navProgress = signal(0);
+  protected readonly navError    = signal('');
 
   /** Network status */
   protected readonly online      = signal(true);
@@ -169,12 +170,22 @@ export class DashboardComponent implements OnInit, OnDestroy {
         this.progressTimer = setTimeout(() => {
           if (this.navLoading()) this.navProgress.set(72);
         }, 130);
-      } else if (
-        event instanceof NavigationEnd ||
-        event instanceof NavigationCancel ||
-        event instanceof NavigationError
-      ) {
+      } else if (event instanceof NavigationEnd) {
+        this.navError.set('');
         this.navProgress.set(100);
+        this.progressTimer = setTimeout(() => {
+          this.navLoading.set(false);
+          this.navProgress.set(0);
+        }, 360);
+      } else if (event instanceof NavigationCancel) {
+        this.navProgress.set(100);
+        this.progressTimer = setTimeout(() => {
+          this.navLoading.set(false);
+          this.navProgress.set(0);
+        }, 360);
+      } else if (event instanceof NavigationError) {
+        this.navProgress.set(100);
+        this.navError.set(this.fmtNavError(event));
         this.progressTimer = setTimeout(() => {
           this.navLoading.set(false);
           this.navProgress.set(0);
@@ -246,12 +257,19 @@ export class DashboardComponent implements OnInit, OnDestroy {
   }
 
   protected go(route: string, event?: Event): void {
+    // One navigator: block native href (SSR has no localStorage → /login)
+    // and stop RouterLink from starting a second navigation that cancels this one.
     event?.preventDefault();
+    event?.stopImmediatePropagation();
+    this.navError.set('');
+    const current = this.router.url.replace(/\?.*$/, '');
+    if (current === route) return;
     void this.router.navigateByUrl(route);
   }
 
   protected goHome(event?: Event): void {
     event?.preventDefault();
+    event?.stopImmediatePropagation();
     void import('../../core/auth/auth.guard').then(({ firstDashboardPath }) => {
       void this.router.navigateByUrl(firstDashboardPath(this.authService));
     });
@@ -294,6 +312,20 @@ export class DashboardComponent implements OnInit, OnDestroy {
       Object.entries(this.titles).find(([key]) => path.startsWith(key))?.[1];
     this.pageTitle.set(hit?.title ?? 'Palagai');
     this.pageSubtitle.set(hit?.subtitle ?? '');
+  }
+
+  private fmtNavError(event: NavigationError): string {
+    const raw = event.error;
+    const msg =
+      raw instanceof Error
+        ? raw.message
+        : typeof raw === 'string'
+          ? raw
+          : 'Could not open that desk.';
+    if (/historical-backtest|chunk|loading chunk|failed to fetch/i.test(`${event.url} ${msg}`)) {
+      return 'Could not open Historical Backtest. Retry, or hard-refresh the tab.';
+    }
+    return msg || 'Could not open that desk.';
   }
 
   private tickClock(): void {

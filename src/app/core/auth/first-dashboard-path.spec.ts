@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { SiteModule } from './auth.constants';
-import { firstDashboardPath, firstDashboardPathFor } from './auth.guard';
+import {
+  firstDashboardPath,
+  firstDashboardPathFor,
+  safeDashboardReturnUrl,
+} from './auth.guard';
 import { AuthService } from './auth.service';
 
 describe('firstDashboardPathFor', () => {
@@ -28,5 +32,23 @@ describe('firstDashboardPathFor', () => {
       hasModule: () => true,
     } as Pick<AuthService, 'isPublic' | 'hasModule'>;
     expect(firstDashboardPath(auth as AuthService)).toBe('/login');
+  });
+});
+
+describe('safeDashboardReturnUrl', () => {
+  it('keeps Historical Backtest after a login bounce', () => {
+    expect(safeDashboardReturnUrl('/dashboard/historical-backtest')).toBe(
+      '/dashboard/historical-backtest',
+    );
+    expect(safeDashboardReturnUrl('/dashboard/historical-backtest?x=1')).toBe(
+      '/dashboard/historical-backtest',
+    );
+  });
+
+  it('rejects open redirects and non-desk paths', () => {
+    expect(safeDashboardReturnUrl('/login')).toBeNull();
+    expect(safeDashboardReturnUrl('https://evil.example/dashboard/historical-backtest')).toBeNull();
+    expect(safeDashboardReturnUrl('//evil.example')).toBeNull();
+    expect(safeDashboardReturnUrl('')).toBeNull();
   });
 });

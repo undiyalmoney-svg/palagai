@@ -1,6 +1,6 @@
 import { Component, afterNextRender, computed, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -11,7 +11,7 @@ import {
   captureKiteRequestTokenFromLocation,
   peekKiteRequestToken,
 } from '../../core/kite/kite-request-token.util';
-import { firstDashboardPath } from '../../core/auth/auth.guard';
+import { firstDashboardPath, safeDashboardReturnUrl } from '../../core/auth/auth.guard';
 
 @Component({
   selector: 'app-login',
@@ -30,6 +30,7 @@ import { firstDashboardPath } from '../../core/auth/auth.guard';
 export class LoginComponent {
   private readonly authService = inject(AuthService);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
   private readonly formBuilder = inject(FormBuilder);
 
   protected readonly isLoading = signal(false);
@@ -53,6 +54,7 @@ export class LoginComponent {
     // Browser-only: SSR ngOnInit cannot read localStorage / navigate reliably.
     afterNextRender(() => {
       this.resumeKiteIfPossible();
+      this.resumeDeskIfPossible();
     });
   }
 
@@ -64,12 +66,37 @@ export class LoginComponent {
     }
   }
 
-  protected continueAsExisting(): void {
+  /** Full-page desk clicks SSR-bounce to /login; localStorage still has the session. */
+  private resumeDeskIfPossible(): void {
+    this.authService.ensureHydratedFromStorage();
+    if (!this.authService.isAuthenticated() || this.authService.isPublic()) return;
     if (peekKiteRequestToken()) {
       void this.router.navigateByUrl('/dashboard/get-token');
       return;
     }
-    void this.router.navigateByUrl(firstDashboardPath(this.authService));
+    const dest = this.nextAfterAuth();
+    if (dest === firstDashboardPath(this.authService) && !safeDashboardReturnUrl(this.returnUrl())) {
+      return;
+    }
+    void this.router.navigateByUrl(dest);
+  }
+
+  private returnUrl(): string | null {
+    return (
+      this.route.snapshot.queryParamMap.get('returnUrl') ||
+      new URLSearchParams(
+        typeof window === 'undefined' ? '' : window.location.search,
+      ).get('returnUrl')
+    );
+  }
+
+  private nextAfterAuth(): string {
+    if (peekKiteRequestToken()) return '/dashboard/get-token';
+    return safeDashboardReturnUrl(this.returnUrl()) || firstDashboardPath(this.authService);
+  }
+
+  protected continueAsExisting(): void {
+    void this.router.navigateByUrl(this.nextAfterAuth());
   }
 
   protected switchUser(): void {
@@ -98,11 +125,7 @@ export class LoginComponent {
 
     if (result.ok) {
       await this.authService.refreshMe();
-      let next = [firstDashboardPath(this.authService)];
-      if (peekKiteRequestToken()) {
-        next = ['/dashboard/get-token'];
-      }
-      await this.router.navigate(next);
+      await this.router.navigateByUrl(this.nextAfterAuth());
     } else {
       this.errorMessage.set(result.message);
     }

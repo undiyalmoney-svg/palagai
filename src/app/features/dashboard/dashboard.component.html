@@ -26,10 +26,10 @@
       @for (item of navItems(); track item.route) {
         <a
           class="nav-link"
-          [href]="item.route"
           [routerLink]="item.route"
           routerLinkActive="active"
           [routerLinkActiveOptions]="{ exact: item.exact !== false }"
+          [attr.data-testid]="'nav-' + item.module"
           (click)="go(item.route, $event)"
         >
           <app-pg-icon [name]="item.icon" [size]="18" />
@@ -109,6 +109,13 @@
       </div>
     </header>
 
+    @if (navError()) {
+      <div class="net-banner net-offline" role="alert" data-testid="nav-error">
+        <span class="net-icon" aria-hidden="true">⚠</span>
+        <span class="net-msg">{{ navError() }}</span>
+      </div>
+    }
+
     <!-- Network status banners -->
     @if (!online()) {
       <div class="net-banner net-offline" role="alert">
@@ -147,10 +154,10 @@
     @for (item of mobileTabItems(); track item.route) {
       <a
         class="tab-item"
-        [href]="item.route"
         [routerLink]="item.route"
         routerLinkActive="active"
         [routerLinkActiveOptions]="{ exact: item.exact !== false }"
+        [attr.data-testid]="'tab-' + item.module"
         (click)="go(item.route, $event)"
       >
         <app-pg-icon [name]="item.icon" [size]="18" />
