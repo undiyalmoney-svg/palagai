@@ -21,7 +21,7 @@ import {
 } from './historical-backtest.models';
 import { daysBefore, inr, lastCompletedSession, pct } from './historical-backtest.util';
 
-type RangeMode = 'day' | 'range';
+type RangeMode = 'day' | 'range' | 'live';
 type SideFilter = 'all' | 'L' | 'S';
 type ResultFilter = 'all' | 'win' | 'loss';
 type TakenFilter = 'all' | 'taken' | 'skipped';
@@ -131,12 +131,16 @@ export class HistoricalBacktestComponent implements OnDestroy {
     const p = job?.progress;
     if (!p) return '';
     const phase =
-      p.phase === 'instruments'
+      p.phase === 'funds'
+        ? 'Reading Kite equity cash'
+        : p.phase === 'instruments'
         ? 'Resolving Nifty 500 tokens'
         : p.phase === 'candles'
           ? 'Fetching Kite 5-minute candles in batches of 10'
           : p.phase === 'simulate'
-            ? 'Simulating the ORB book'
+            ? this.rangeMode() === 'live'
+              ? 'Marking the live 1R book to the last 5-minute close'
+              : 'Simulating the ORB book'
             : p.phase === 'done'
               ? 'Done'
               : 'Queued';
@@ -365,7 +369,24 @@ export class HistoricalBacktestComponent implements OnDestroy {
     return Math.max(4, Math.round((Math.abs(net) / max) * 100));
   }
 
+  protected promisedLock() {
+    return this.result()?.promised || null;
+  }
+
+  protected lockState(): string {
+    const lock = this.promisedLock();
+    if (!lock) return '';
+    if (lock.lockedRs) return 'Locked at 1R';
+    if (lock.stoppedRs) return 'Stopped';
+    if (lock.openRs || lock.promisedRs) return 'Open — 1R not reached';
+    return 'Waiting for a prior-day break';
+  }
+
   protected async run(): Promise<void> {
+    if (this.rangeMode() === 'live') {
+      await this.runLive();
+      return;
+    }
     this.error.set('');
     const from = this.rangeMode() === 'day' ? this.date : this.from;
     const to = this.rangeMode() === 'day' ? this.date : this.to;
@@ -382,6 +403,31 @@ export class HistoricalBacktestComponent implements OnDestroy {
         to,
         capital: Number(this.capital) || 10000,
       });
+      this.job.set(started);
+      if (started.id) {
+        this.poll(started.id);
+      } else if (started.result) {
+        this.result.set(started.result);
+        this.busy.set(false);
+      }
+    } catch (err) {
+      this.busy.set(false);
+      this.job.set(null);
+      this.error.set(this.fmtErr(err));
+    }
+  }
+
+  protected async runLive(): Promise<void> {
+    this.error.set('');
+    this.busy.set(true);
+    this.pollFailures = 0;
+    this.result.set(null);
+    this.job.set({
+      status: 'running',
+      progress: { phase: 'queued', done: 0, total: 500, symbol: null },
+    });
+    try {
+      const started = await this.api.startLiveToday();
       this.job.set(started);
       if (started.id) {
         this.poll(started.id);

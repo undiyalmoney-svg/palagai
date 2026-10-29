@@ -106,7 +106,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     },
     '/dashboard/historical-backtest': {
       title: 'Historical Backtest',
-      subtitle: 'Simulated Nifty 500 ORB book and automated strategy discovery. No live orders.',
+      subtitle: 'Simulated prior-day follow book, plus Live today sized from Kite cash. No live orders.',
     },
     '/dashboard/settings': {
       title: 'Settings',

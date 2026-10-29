@@ -41,6 +41,23 @@ describe('HistoricalBacktestApiService', () => {
     http.verify();
   });
 
+  it('posts live today without a typed capital and never marks it live', async () => {
+    const { api, http } = setup();
+    const pending = api.startLiveToday();
+    const req = http.expectOne('/api/orb-backtest/live-today');
+    expect(req.request.method).toBe('POST');
+    expect(req.request.headers.get('X-Kite-Authorization')).toBe('token key:secret');
+    expect(req.request.body).toEqual({});
+    req.flush({
+      id: 'live-1',
+      status: 'running',
+      liveOrders: false,
+      input: { liveToday: true, preset: 'pdh-follow-live-lock', capital: 0, targetR: 1, maxStocksPerDay: 1 },
+    });
+    await expect(pending).resolves.toMatchObject({ id: 'live-1', liveOrders: false });
+    http.verify();
+  });
+
   it('posts a daily-profit search and never marks it live', async () => {
     const { api, http } = setup();
     const pending = api.startDailyProfit({

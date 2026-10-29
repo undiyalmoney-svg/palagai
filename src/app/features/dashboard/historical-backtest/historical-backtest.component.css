@@ -7,6 +7,10 @@
   gap: 0.25rem;
 }
 
+.hb-live-note {
+  grid-column: 1 / -1;
+}
+
 .hb-subhead {
   margin: 1.1rem 0 0.4rem;
   font-size: 0.92rem;

@@ -35,7 +35,24 @@ export interface BacktestTrade {
   maxWentRs?: number;
   maxWentPx?: number;
   signalT?: string;
+  riskRs?: number;
+  promisedRs?: number;
   marks?: BacktestMark[];
+}
+
+export interface PromisedLock {
+  targetR: number;
+  fundsRs: number;
+  capitalRs: number;
+  names: number;
+  promisedRs: number;
+  lockedRs: number;
+  openRs: number;
+  stoppedRs: number;
+  actualRs: number;
+  riskRs: number;
+  liveOrders: boolean;
+  guaranteed: boolean;
 }
 
 export interface BacktestStockRow {
@@ -132,6 +149,7 @@ export interface BacktestResult {
   snapshots?: BacktestSnapshot[];
   dailyBooks?: DailyBook[];
   lastBook?: DailyBook | null;
+  promised?: PromisedLock | null;
   family?: string;
   universe?: {
     requested: number;
@@ -153,8 +171,11 @@ export interface BacktestJob {
   input?: {
     from?: string;
     to?: string;
+    liveToday?: boolean;
     preset?: string;
     capital?: number;
+    fundsRs?: number | null;
+    targetR?: number | null;
     maxStocksPerDay?: number;
     rankBy?: string;
     crowdFilter?: string | null;
@@ -440,11 +461,13 @@ export interface DailyBookStock {
   exitReason: string;
   entryPx: number;
   stopPx?: number;
+  tgtPx?: number;
   qty: number;
   allocatedRs: number;
   netRs: number;
   chargesRs: number;
   riskRs?: number;
+  promisedRs?: number;
 }
 
 export interface DailyBook {

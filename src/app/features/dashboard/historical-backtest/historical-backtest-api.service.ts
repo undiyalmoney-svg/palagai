@@ -21,6 +21,12 @@ export class HistoricalBacktestApiService {
   private readonly dailyProfitBase =
     (environment as { dailyProfitApiBaseUrl?: string }).dailyProfitApiBaseUrl || '/api/daily-profit';
 
+  startLiveToday(): Promise<BacktestJob> {
+    return firstValueFrom(
+      this.http.post<BacktestJob>(`${this.base}/live-today`, {}, { headers: this.headers() }),
+    );
+  }
+
   start(body: {
     from: string;
     to: string;

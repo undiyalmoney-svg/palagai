@@ -1,6 +1,11 @@
 <div class="mp-page hb-page">
   <div class="mp-banner" data-tone="warn" data-testid="simulated-banner">
-    Simulated prior-day break book on Kite 5-minute candles. Follow the 09:45 crowd. No live orders are placed.
+    @if (rangeMode() === 'live') {
+      Live today uses your Kite cash, one name, and a 1R take-profit. Same prior-day follow engine as the backtest. No live
+      orders. The lock is the exit if the trade reaches 1R — not a guaranteed profit.
+    } @else {
+      Simulated prior-day break book on Kite 5-minute candles. Follow the 09:45 crowd. No live orders are placed.
+    }
   </div>
 
   <div class="mp-card">
@@ -9,7 +14,11 @@
         <h2>Prior-day break · follow 09:45</h2>
         <p class="mp-sub">
           After 09:45, take a 5-minute full close beyond yesterday’s high or low — only the 09:45 majority side.
-          Capital picks how many names auto-trade. Simulated only.
+          @if (rangeMode() === 'live') {
+            Live today sizes from Kite equity cash, not the backtest capital box.
+          } @else {
+            Capital picks how many names auto-trade. Simulated only.
+          }
         </p>
       </div>
       <span class="mp-badge" data-tone="info">Nifty 500 · research</span>
@@ -18,49 +27,62 @@
     <div class="mp-row hb-modes" role="tablist">
       <button type="button" class="mp-tab" [class.active]="rangeMode() === 'day'" (click)="setMode('day')">One day</button>
       <button type="button" class="mp-tab" [class.active]="rangeMode() === 'range'" (click)="setMode('range')">Date range</button>
+      <button type="button" class="mp-tab" [class.active]="rangeMode() === 'live'" (click)="setMode('live')" data-testid="live-today-tab">
+        Live today
+      </button>
     </div>
 
     <div class="mp-form">
-      @if (rangeMode() === 'day') {
-        <label class="mp-field">
-          Trading day
-          <input class="ui-input" type="date" [(ngModel)]="date" [disabled]="anyBusy()" />
-        </label>
+      @if (rangeMode() === 'live') {
+        <div class="mp-field hb-live-note">
+          <span>Kite cash</span>
+          <p class="mp-sub" data-testid="live-cash-note">
+            Reads equity cash from Kite. One name. Exit at 1R if it gets there, else stop or 15:15. A ₹1,00,000 backtest is
+            not this book.
+          </p>
+        </div>
       } @else {
+        @if (rangeMode() === 'day') {
+          <label class="mp-field">
+            Trading day
+            <input class="ui-input" type="date" [(ngModel)]="date" [disabled]="anyBusy()" />
+          </label>
+        } @else {
+          <label class="mp-field">
+            From
+            <input class="ui-input" type="date" [(ngModel)]="from" [disabled]="anyBusy()" />
+          </label>
+          <label class="mp-field">
+            To
+            <input class="ui-input" type="date" [(ngModel)]="to" [disabled]="anyBusy()" />
+          </label>
+        }
         <label class="mp-field">
-          From
-          <input class="ui-input" type="date" [(ngModel)]="from" [disabled]="anyBusy()" />
-        </label>
-        <label class="mp-field">
-          To
-          <input class="ui-input" type="date" [(ngModel)]="to" [disabled]="anyBusy()" />
+          Starting capital (₹)
+          <input
+            class="ui-input"
+            type="number"
+            min="1000"
+            step="1000"
+            [(ngModel)]="capital"
+            [disabled]="anyBusy()"
+            data-testid="capital-input"
+          />
+          <small data-testid="auto-names">
+            Auto-trades {{ autoNames() }} name{{ autoNames() === 1 ? '' : 's' }} (₹2,000 each, max 8).
+          </small>
         </label>
       }
-      <label class="mp-field">
-        Starting capital (₹)
-        <input
-          class="ui-input"
-          type="number"
-          min="1000"
-          step="1000"
-          [(ngModel)]="capital"
-          [disabled]="anyBusy()"
-          data-testid="capital-input"
-        />
-        <small data-testid="auto-names">
-          Auto-trades {{ autoNames() }} name{{ autoNames() === 1 ? '' : 's' }} (₹2,000 each, max 8).
-        </small>
-      </label>
       <div class="mp-field">
         <span>&nbsp;</span>
-        <button type="button" class="ui-btn ui-btn-primary" [disabled]="anyBusy()" (click)="run()">
-          {{ busy() ? 'Running…' : 'Run backtest' }}
+        <button type="button" class="ui-btn ui-btn-primary" [disabled]="anyBusy()" (click)="run()" data-testid="run-desk">
+          {{ busy() ? 'Running…' : rangeMode() === 'live' ? 'Load live today' : 'Run backtest' }}
         </button>
       </div>
     </div>
     <p class="mp-sub">
       Connect Kite on <a routerLink="/dashboard/get-token">Token</a> first. Candles load in batches of 10 from cache when
-      possible. Keep the range to 60 calendar days. History is never invented.
+      possible. @if (rangeMode() !== 'live') { Keep the range to 60 calendar days. } History is never invented.
     </p>
   </div>
 
@@ -84,6 +106,31 @@
       {{ view.liveOrders ? 'Live orders would have been sent.' : 'Simulated book. Live orders: no.' }}
       {{ view.note }}
     </div>
+
+    @if (view.promised; as lock) {
+      <div class="mp-stats" data-testid="promised-lock">
+        <div class="mp-stat">
+          <span class="mp-stat-label">Kite funds</span>
+          <span class="mp-stat-value">{{ inr(lock.fundsRs) }}</span>
+          <span class="mp-stat-hint">{{ lock.names }} name · live cash</span>
+        </div>
+        <div class="mp-stat">
+          <span class="mp-stat-label">Promised lock (1R)</span>
+          <span class="mp-stat-value mp-up">{{ inr(lock.promisedRs) }}</span>
+          <span class="mp-stat-hint">Take-profit if the trade gets there. Not a guarantee.</span>
+        </div>
+        <div class="mp-stat">
+          <span class="mp-stat-label">Actual / open</span>
+          <span class="mp-stat-value" [class]="pnlClass(lock.actualRs)">{{ inr(lock.actualRs) }}</span>
+          <span class="mp-stat-hint">{{ lockState() }}</span>
+        </div>
+        <div class="mp-stat">
+          <span class="mp-stat-label">Stop risk</span>
+          <span class="mp-stat-value mp-down">{{ inr(lock.riskRs) }}</span>
+          <span class="mp-stat-hint">Locked {{ inr(lock.lockedRs) }} · stopped {{ inr(lock.stoppedRs) }}</span>
+        </div>
+      </div>
+    }
 
     <div class="mp-stats">
       <div class="mp-stat">

@@ -7,9 +7,11 @@ import { HistoricalBacktestComponent } from './historical-backtest.component';
 describe('HistoricalBacktestComponent', () => {
   let fixture: ComponentFixture<HistoricalBacktestComponent>;
   const startMock = vi.fn(() => Promise.resolve({ id: 'job-1', status: 'running' }));
+  const startLiveMock = vi.fn(() => Promise.resolve({ id: 'live-1', status: 'running', liveOrders: false }));
 
   beforeEach(async () => {
     startMock.mockClear();
+    startLiveMock.mockClear();
     await TestBed.configureTestingModule({
       imports: [HistoricalBacktestComponent],
       providers: [
@@ -18,6 +20,7 @@ describe('HistoricalBacktestComponent', () => {
           provide: HistoricalBacktestApiService,
           useValue: {
             start: startMock,
+            startLiveToday: startLiveMock,
             job: () => new Promise(() => undefined),
             startDiscover: () => Promise.resolve({ id: 'disc-1', status: 'running' }),
             discoverJob: () => new Promise(() => undefined),
@@ -68,6 +71,20 @@ describe('HistoricalBacktestComponent', () => {
       to: expect.any(String),
       capital: 10000,
     });
+  });
+
+  it('loads live today from Kite cash with a 1R lock and never posts the backtest capital', async () => {
+    const cmp = fixture.componentInstance;
+    cmp['setMode']('live');
+    fixture.detectChanges();
+    const text = fixture.nativeElement.textContent as string;
+    expect(text).toMatch(/Live today uses your Kite cash/i);
+    expect(text).toMatch(/not a guaranteed profit/i);
+    expect(text).toMatch(/Load live today/i);
+    expect(text).not.toMatch(/Starting capital/i);
+    await cmp['run']();
+    expect(startLiveMock).toHaveBeenCalledTimes(1);
+    expect(startMock).not.toHaveBeenCalled();
   });
 
   it('lists prior-day breaks from the result', () => {
@@ -173,5 +190,65 @@ describe('HistoricalBacktestComponent', () => {
     expect(text).toMatch(/Auto-traded/);
     expect(text).toMatch(/Last session book/i);
     expect(text).toMatch(/Live orders: no/i);
+  });
+
+  it('prints the 1R promised lock against actual open P/L', () => {
+    fixture.componentInstance['result'].set({
+      simulated: true,
+      liveOrders: false,
+      family: 'pdh_break',
+      config: {
+        capital: 670,
+        maxStocksPerDay: 1,
+        entryEnd: '14:30',
+        timeExit: '15:15',
+        crowdFilter: 'follow',
+        rankBy: 'stopPct',
+        targetR: 1,
+      },
+      assumptions: [],
+      rawTrades: 1,
+      promised: {
+        targetR: 1,
+        fundsRs: 670,
+        capitalRs: 670,
+        names: 1,
+        promisedRs: 5,
+        lockedRs: 0,
+        openRs: 1.2,
+        stoppedRs: 0,
+        actualRs: 1.2,
+        riskRs: 5,
+        liveOrders: false,
+        guaranteed: false,
+      },
+      summary: {
+        trades: 1,
+        wins: 1,
+        losses: 0,
+        winRate: 1,
+        netPnl: 1.2,
+        returnPct: 0.0018,
+        maxDrawdown: 0,
+        capitalUtilized: 400,
+        capitalUtilizedPct: 0.6,
+        avgWin: 1.2,
+        avgLoss: 0,
+        equityCurve: [],
+        stocks: [],
+        days: 1,
+        orbCrossed: 1,
+        orbCrossedTaken: 1,
+        slHits: 0,
+        eodExits: 0,
+      },
+      trades: [],
+    });
+    fixture.detectChanges();
+    const text = fixture.nativeElement.textContent as string;
+    expect(text).toMatch(/Promised lock \(1R\)/i);
+    expect(text).toMatch(/Not a guarantee/i);
+    expect(text).toMatch(/Kite funds/i);
+    expect(text).toMatch(/Open — 1R not reached/);
   });
 });
