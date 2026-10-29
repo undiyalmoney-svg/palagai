@@ -113,8 +113,8 @@ describe('HistoricalBacktestComponent', () => {
     cmp['capital'] = 10000;
     await cmp['run']();
     expect(startMock).toHaveBeenCalledWith({
-      from: expect.any(String),
-      to: expect.any(String),
+      from: cmp['date'],
+      to: cmp['date'],
       capital: 10000,
     });
   });

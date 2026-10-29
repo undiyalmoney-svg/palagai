@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { SiteModule } from './auth.constants';
-import { firstDashboardPath, firstDashboardPathFor } from './auth.guard';
+import { firstDashboardPath, firstDashboardPathFor, safeDashboardReturn } from './auth.guard';
 import { AuthService } from './auth.service';
 
 describe('firstDashboardPathFor', () => {
@@ -20,6 +20,14 @@ describe('firstDashboardPathFor', () => {
 
   it('opens Test when only test is granted', () => {
     expect(firstDashboardPathFor(has('test'))).toBe('/dashboard/order-test');
+  });
+
+  it('keeps a Historical Backtest deep link and rejects off-desk URLs', () => {
+    expect(safeDashboardReturn('/dashboard/historical-backtest')).toBe('/dashboard/historical-backtest');
+    expect(safeDashboardReturn('/dashboard/historical-backtest?x=1')).toBe('/dashboard/historical-backtest');
+    expect(safeDashboardReturn('https://evil.example/dashboard')).toBeNull();
+    expect(safeDashboardReturn('//evil.example')).toBeNull();
+    expect(safeDashboardReturn('/login')).toBeNull();
   });
 
   it('sends a public viewer to login', () => {

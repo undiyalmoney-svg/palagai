@@ -15,6 +15,22 @@ const MODULE_HOME: Array<{ module: SiteModule; path: string }> = [
   { module: 'test', path: '/dashboard/order-test' },
 ];
 
+/** Keep login bounce on the desk the user asked for. Reject anything outside /dashboard. */
+export function safeDashboardReturn(url: string | null | undefined): string | null {
+  const raw = String(url || '').trim();
+  if (!raw.startsWith('/dashboard')) return null;
+  if (raw.startsWith('//') || /:\/\//.test(raw)) return null;
+  return raw.split('?')[0];
+}
+
+function loginTree(router: Router, returnUrl?: string): UrlTree {
+  const next = safeDashboardReturn(returnUrl);
+  if (next) {
+    return router.createUrlTree(['/login'], { queryParams: { returnUrl: next } });
+  }
+  return router.createUrlTree(['/login']);
+}
+
 /** First desk the user is allowed to open. */
 export function firstDashboardPathFor(hasModule: (mod: SiteModule) => boolean): string {
   for (const row of MODULE_HOME) {
@@ -96,7 +112,7 @@ export const authGuard: CanActivateFn = (route, state) => {
     if (authService.isAuthenticated()) {
       if (authService.isPublic()) {
         authService.logout();
-        return router.createUrlTree(['/login']);
+        return loginTree(router);
       }
       return true;
     }
@@ -106,7 +122,7 @@ export const authGuard: CanActivateFn = (route, state) => {
     return router.parseUrl('/dashboard/get-token');
   }
 
-  return router.createUrlTree(['/login']);
+  return loginTree(router, state.url);
 };
 
 export const guestGuard: CanActivateFn = (route) => {
@@ -146,7 +162,7 @@ export const dashboardIndexGuard: CanActivateFn = () => {
     return router.parseUrl('/dashboard/get-token');
   }
   if (!auth.isAuthenticated() && !auth.getToken()) {
-    return router.createUrlTree(['/login']);
+    return loginTree(router);
   }
   auth.ensureHydratedFromStorage();
   return router.parseUrl(firstDashboardPath(auth));
@@ -185,12 +201,12 @@ export const moduleGuard = (mod: SiteModule): CanActivateFn => {
       } else if (hasPendingKiteOAuth(state.url) || !!peekKiteRequestToken()) {
         return router.parseUrl('/dashboard/get-token');
       } else {
-        return router.createUrlTree(['/login']);
+        return loginTree(router, state.url);
       }
     }
     if (auth.isPublic()) {
       auth.logout();
-      return router.createUrlTree(['/login']);
+      return loginTree(router);
     }
     if (auth.hasModule(mod)) {
       return true;

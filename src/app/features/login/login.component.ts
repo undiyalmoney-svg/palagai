@@ -1,6 +1,6 @@
 import { Component, afterNextRender, computed, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -11,7 +11,7 @@ import {
   captureKiteRequestTokenFromLocation,
   peekKiteRequestToken,
 } from '../../core/kite/kite-request-token.util';
-import { firstDashboardPath } from '../../core/auth/auth.guard';
+import { firstDashboardPath, safeDashboardReturn } from '../../core/auth/auth.guard';
 
 @Component({
   selector: 'app-login',
@@ -30,6 +30,7 @@ import { firstDashboardPath } from '../../core/auth/auth.guard';
 export class LoginComponent {
   private readonly authService = inject(AuthService);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
   private readonly formBuilder = inject(FormBuilder);
 
   protected readonly isLoading = signal(false);
@@ -64,12 +65,15 @@ export class LoginComponent {
     }
   }
 
+  private afterLoginPath(): string {
+    if (peekKiteRequestToken()) return '/dashboard/get-token';
+    const next = safeDashboardReturn(this.route.snapshot.queryParamMap.get('returnUrl'));
+    if (next) return next;
+    return firstDashboardPath(this.authService);
+  }
+
   protected continueAsExisting(): void {
-    if (peekKiteRequestToken()) {
-      void this.router.navigateByUrl('/dashboard/get-token');
-      return;
-    }
-    void this.router.navigateByUrl(firstDashboardPath(this.authService));
+    void this.router.navigateByUrl(this.afterLoginPath());
   }
 
   protected switchUser(): void {
@@ -98,11 +102,7 @@ export class LoginComponent {
 
     if (result.ok) {
       await this.authService.refreshMe();
-      let next = [firstDashboardPath(this.authService)];
-      if (peekKiteRequestToken()) {
-        next = ['/dashboard/get-token'];
-      }
-      await this.router.navigate(next);
+      await this.router.navigateByUrl(this.afterLoginPath());
     } else {
       this.errorMessage.set(result.message);
     }

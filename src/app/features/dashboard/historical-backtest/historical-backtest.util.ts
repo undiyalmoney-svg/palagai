@@ -1,27 +1,42 @@
-/** Last completed IST weekday (skips today so Kite 5-minute history is a full session). */
-export function lastCompletedSession(now = new Date()): string {
-  for (let i = 1; i <= 10; i += 1) {
-    const d = new Date(now.getTime() - i * 86400000);
-    const parts = new Intl.DateTimeFormat('en-US', {
-      timeZone: 'Asia/Kolkata',
-      weekday: 'short',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    }).formatToParts(d);
-    const bag: Record<string, string> = {};
-    for (const p of parts) {
-      if (p.type !== 'literal') bag[p.type] = p.value;
-    }
-    if (bag['weekday'] === 'Sat' || bag['weekday'] === 'Sun') continue;
-    return `${bag['year']}-${bag['month']}-${bag['day']}`;
-  }
-  return new Intl.DateTimeFormat('en-CA', {
+function istParts(now: Date): Record<string, string> {
+  const parts = new Intl.DateTimeFormat('en-US', {
     timeZone: 'Asia/Kolkata',
+    weekday: 'short',
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
-  }).format(now);
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(now);
+  const bag: Record<string, string> = {};
+  for (const p of parts) {
+    if (p.type !== 'literal') bag[p.type] = p.value;
+  }
+  return bag;
+}
+
+function isoFromBag(bag: Record<string, string>): string {
+  return `${bag['year']}-${bag['month']}-${bag['day']}`;
+}
+
+/** Last completed IST weekday. After 15:30 IST that is today; before the close it is the previous weekday. */
+export function lastCompletedSession(now = new Date()): string {
+  const today = istParts(now);
+  const weekday = today['weekday'];
+  const hour = Number(today['hour']);
+  const minute = Number(today['minute']);
+  const closed = hour * 60 + minute >= 15 * 60 + 30;
+  if (weekday !== 'Sat' && weekday !== 'Sun' && closed) {
+    return isoFromBag(today);
+  }
+  for (let i = 1; i <= 10; i += 1) {
+    const d = new Date(now.getTime() - i * 86400000);
+    const bag = istParts(d);
+    if (bag['weekday'] === 'Sat' || bag['weekday'] === 'Sun') continue;
+    return isoFromBag(bag);
+  }
+  return isoFromBag(today);
 }
 
 export function inr(value: number | null | undefined): string {

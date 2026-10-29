@@ -656,8 +656,10 @@ export class HistoricalBacktestComponent implements OnDestroy {
         this.poll(id);
       } catch (err) {
         this.pollFailures += 1;
-        if (this.pollFailures < 6) {
-          this.error.set('Waiting for the backtest server… retrying.');
+        if (this.pollFailures < 80) {
+          this.error.set(
+            'Waiting for the backtest server… retrying. One day keeps running; numbers stay blank until it finishes.',
+          );
           this.poll(id);
           return;
         }

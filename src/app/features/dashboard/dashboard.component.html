@@ -30,7 +30,6 @@
           [routerLink]="item.route"
           routerLinkActive="active"
           [routerLinkActiveOptions]="{ exact: item.exact !== false }"
-          (click)="go(item.route, $event)"
         >
           <app-pg-icon [name]="item.icon" [size]="18" />
           <span>{{ item.label }}</span>
@@ -151,7 +150,6 @@
         [routerLink]="item.route"
         routerLinkActive="active"
         [routerLinkActiveOptions]="{ exact: item.exact !== false }"
-        (click)="go(item.route, $event)"
       >
         <app-pg-icon [name]="item.icon" [size]="18" />
         <span class="tab-label">{{ item.shortLabel }}</span>

@@ -12,6 +12,7 @@ import { LoginComponent } from './features/login/login.component';
 import { DashboardComponent } from './features/dashboard/dashboard.component';
 import { DashboardHomeComponent } from './features/dashboard/dashboard-home.component';
 import { OrderTestComponent } from './features/dashboard/order-test/order-test.component';
+import { HistoricalBacktestComponent } from './features/dashboard/historical-backtest/historical-backtest.component';
 import { GetTokenComponent } from './features/dashboard/get-token/get-token.component';
 import { SettingsComponent } from './features/dashboard/settings/settings.component';
 import { PnlRecordsComponent } from './features/dashboard/pnl-records/pnl-records.component';
@@ -84,10 +85,7 @@ export const routes: Routes = [
       {
         path: 'historical-backtest',
         canActivate: [moduleGuard('backtest')],
-        loadComponent: () =>
-          import('./features/dashboard/historical-backtest/historical-backtest.component').then(
-            (m) => m.HistoricalBacktestComponent,
-          ),
+        component: HistoricalBacktestComponent,
       },
       { path: 'momentum', redirectTo: 'get-token', pathMatch: 'prefix' },
       { path: 'research', redirectTo: 'get-token', pathMatch: 'full' },

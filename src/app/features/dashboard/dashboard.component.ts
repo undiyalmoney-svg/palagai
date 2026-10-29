@@ -245,11 +245,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
     }
   }
 
-  protected go(route: string, event?: Event): void {
-    event?.preventDefault();
-    void this.router.navigateByUrl(route);
-  }
-
   protected goHome(event?: Event): void {
     event?.preventDefault();
     void import('../../core/auth/auth.guard').then(({ firstDashboardPath }) => {
