@@ -16,6 +16,15 @@
     >
       Automated discovery
     </button>
+    <button
+      type="button"
+      class="mp-tab"
+      data-testid="profit-tab"
+      [class.active]="pageTab() === 'profit'"
+      (click)="setPage('profit')"
+    >
+      Daily profit
+    </button>
   </div>
 
   @if (pageTab() === 'book') {
@@ -450,7 +459,7 @@
         Pick a day or range and run. Results stay on this page until you run again.
       </div>
     }
-  } @else {
+  } @else if (pageTab() === 'discover') {
     <div class="mp-card">
       <div class="mp-card-head">
         <div>
@@ -1143,6 +1152,290 @@
     } @else if (!discoverBusy() && !discoverError()) {
       <div class="mp-empty" data-testid="discover-idle">
         Choose a date range and run discovery. No performance numbers are shown until a completed research job exists.
+      </div>
+    }
+  } @else {
+    <div class="mp-card">
+      <div class="mp-card-head">
+        <div>
+          <h2>Daily profit portfolio discovery</h2>
+          <p class="mp-sub">
+            Searches several entry families — first-15 ORB, first-30 break, gaps, VWAP, prior-day levels, morning thrust,
+            open fade, EMA cross — and different portfolio sizes. Combined book P/L after costs. Training chooses,
+            validation compares, unseen days report. Simulated only. Daily profit is not guaranteed.
+          </p>
+        </div>
+        <span class="mp-badge" data-tone="info">Nifty 500 · research</span>
+      </div>
+      <div class="mp-form">
+        <label class="mp-field">
+          From
+          <input class="ui-input" type="date" [(ngModel)]="profitFrom" [disabled]="anyBusy()" />
+        </label>
+        <label class="mp-field">
+          To
+          <input class="ui-input" type="date" [(ngModel)]="profitTo" [disabled]="anyBusy()" />
+        </label>
+        <label class="mp-field">
+          Starting capital (₹)
+          <input class="ui-input" type="number" min="1000" step="1000" [(ngModel)]="profitCapital" [disabled]="anyBusy()" />
+        </label>
+        <label class="mp-field">
+          Methods to test
+          <input class="ui-input" type="number" min="10" max="40" [(ngModel)]="profitBudget" [disabled]="anyBusy()" />
+        </label>
+        <div class="mp-field">
+          <span>&nbsp;</span>
+          <button type="button" class="ui-btn ui-btn-primary" [disabled]="anyBusy()" (click)="runProfit()">
+            {{ profitBusy() ? 'Searching…' : 'Search daily-profit methods' }}
+          </button>
+        </div>
+      </div>
+      <p class="mp-sub">
+        Connect Kite on <a routerLink="/dashboard/get-token">Token</a> first. Cached 5-minute history is reused. Range up to
+        180 calendar days. Name count is searched (1 / 3 / 5 / 8), not fixed.
+        @if (profitFamilies().length) {
+          Families in this build: {{ profitFamilies().join(', ') }}.
+        }
+      </p>
+    </div>
+
+    @if (profitError()) {
+      <div class="mp-banner" data-tone="down" data-testid="profit-error">{{ profitError() }}</div>
+    }
+
+    @if (profitBusy() || profitJob()?.status === 'running') {
+      <div class="mp-card" data-testid="profit-loading">
+        <div class="mp-card-head">
+          <h2>Searching methods</h2>
+          <span class="mp-badge" data-tone="warn">{{ profitProgressPct() }}%</span>
+        </div>
+        <p class="mp-sub">{{ profitProgressLabel() }}</p>
+        <div class="mp-bar" data-tone="info"><span [style.width.%]="profitProgressPct()"></span></div>
+      </div>
+    }
+
+    @if (profitResult(); as view) {
+      <div class="mp-banner" data-tone="up">Simulated book. Live orders: no. {{ view.note }}</div>
+
+      @if (view.noRobust && !view.recommended) {
+        <div class="mp-banner" data-tone="warn" data-testid="profit-no-robust">{{ view.noRobust }}</div>
+      }
+
+      @if (view.recommended; as rec) {
+        <div class="mp-card" data-testid="profit-recommended">
+          <div class="mp-card-head">
+            <div>
+              <h2>Recommended method</h2>
+              <p class="mp-sub">{{ rec.name }} · {{ rec.family }}</p>
+            </div>
+          </div>
+          <div class="hb-discover-rules">
+            <p>{{ rec.rules.entry }}</p>
+            <p>{{ rec.rules.stockCount }}</p>
+            <p>{{ rec.rules.exit }}</p>
+            <p>{{ rec.rules.sizing }}</p>
+          </div>
+          <div class="mp-stats">
+            <div class="mp-stat">
+              <span class="mp-stat-label">OOS net</span>
+              <span class="mp-stat-value" [class]="pnlClass(rec.oos.netPnl)">{{ inr(rec.oos.netPnl) }}</span>
+            </div>
+            <div class="mp-stat">
+              <span class="mp-stat-label">Green days</span>
+              <span class="mp-stat-value">{{ pct(rec.oos.profitableDayPct || 0) }}</span>
+            </div>
+            <div class="mp-stat">
+              <span class="mp-stat-label">Max drawdown</span>
+              <span class="mp-stat-value mp-down">{{ inr(rec.oos.maxDrawdown) }}</span>
+            </div>
+            <div class="mp-stat">
+              <span class="mp-stat-label">Profit factor</span>
+              <span class="mp-stat-value">{{ rec.oos.profitFactor | number: '1.2-2' }}</span>
+            </div>
+          </div>
+          @if (rec.why?.length) {
+            <ul class="mp-stack">
+              @for (w of rec.why; track w) {
+                <li>{{ w }}</li>
+              }
+            </ul>
+          }
+        </div>
+      }
+
+      @if (view.lastBook; as book) {
+        <div class="mp-card" data-testid="profit-last-book">
+          <div class="mp-card-head">
+            <div>
+              <h2>Daily portfolio · {{ book.day }}</h2>
+              <p class="mp-sub">
+                Capital {{ inr(book.capital) }}. Combined net {{ inr(book.netPnl) }} after {{ inr(book.costs) }} costs.
+                {{ book.winners }} winners · {{ book.losers }} losers. Estimates, not guarantees.
+              </p>
+            </div>
+          </div>
+          @if (!book.stocks.length) {
+            <p class="mp-empty">No name qualified on this session.</p>
+          } @else {
+            <div class="mp-table-wrap">
+              <table class="mp-table">
+                <thead>
+                  <tr>
+                    <th>Symbol</th>
+                    <th>Side</th>
+                    <th>Why it qualifies</th>
+                    <th>In</th>
+                    <th>Stop</th>
+                    <th class="num">Qty</th>
+                    <th class="num">Allocated</th>
+                    <th class="num">Risk</th>
+                    <th class="num">Net</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (s of book.stocks; track s.symbol + s.entryT) {
+                    <tr>
+                      <td class="mp-sym">{{ s.symbol }}</td>
+                      <td>{{ s.side === 'L' ? 'Long' : 'Short' }}</td>
+                      <td>{{ s.reason }}</td>
+                      <td>{{ s.entryT }}</td>
+                      <td>{{ s.stopPx | number: '1.2-2' }}</td>
+                      <td class="num">{{ s.qty }}</td>
+                      <td class="num">{{ inr(s.allocatedRs) }}</td>
+                      <td class="num">{{ inr(s.riskRs || 0) }}</td>
+                      <td class="num" [class]="pnlClass(s.netRs)">{{ inr(s.netRs) }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+          <p class="mp-sub">{{ book.note }}</p>
+        </div>
+      }
+
+      @if (view.dailyBooks?.length) {
+        <div class="mp-card">
+          <div class="mp-card-head">
+            <h2>Daily combined P/L</h2>
+            <p class="mp-sub">One row per session for the recommended method. Retrospective fills, prospective name selection.</p>
+          </div>
+          <div class="mp-table-wrap">
+            <table class="mp-table">
+              <thead>
+                <tr>
+                  <th>Day</th>
+                  <th class="num">Names</th>
+                  <th class="num">W / L</th>
+                  <th class="num">Allocated</th>
+                  <th class="num">Costs</th>
+                  <th class="num">Net</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (b of view.dailyBooks; track b.day) {
+                  <tr>
+                    <td>{{ b.day }}</td>
+                    <td class="num">{{ b.trades }}</td>
+                    <td class="num">{{ b.winners }} / {{ b.losers }}</td>
+                    <td class="num">{{ inr(b.allocatedRs) }}</td>
+                    <td class="num">{{ inr(b.costs) }}</td>
+                    <td class="num" [class]="pnlClass(b.netPnl)">{{ inr(b.netPnl) }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+      }
+
+      @if (view.weekly?.length) {
+        <div class="mp-card">
+          <div class="mp-card-head"><h2>Weekly summary</h2></div>
+          <div class="mp-table-wrap">
+            <table class="mp-table">
+              <thead>
+                <tr>
+                  <th>Week</th>
+                  <th class="num">Days</th>
+                  <th class="num">Win days</th>
+                  <th class="num">Lose days</th>
+                  <th class="num">Net</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (w of view.weekly; track w.week) {
+                  <tr>
+                    <td>{{ w.week }}</td>
+                    <td class="num">{{ w.days.length }}</td>
+                    <td class="num">{{ w.winDays }}</td>
+                    <td class="num">{{ w.loseDays }}</td>
+                    <td class="num" [class]="pnlClass(w.netPnl)">{{ inr(w.netPnl) }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+      }
+
+      <div class="mp-card">
+        <div class="mp-card-head">
+          <h2>Ranked methods</h2>
+          <p class="mp-sub">Out-of-sample combined book. Win rate alone does not rank a method.</p>
+        </div>
+        <div class="mp-table-wrap">
+          <table class="mp-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Method</th>
+                <th>Family</th>
+                <th class="num">OOS net</th>
+                <th class="num">Green days</th>
+                <th class="num">Max DD</th>
+                <th class="num">PF</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (row of view.leaderboard; track row.id) {
+                <tr>
+                  <td>{{ row.rank }}</td>
+                  <td>{{ row.name }}</td>
+                  <td>{{ row.family }}</td>
+                  <td class="num" [class]="pnlClass(row.netPnl)">{{ inr(row.netPnl) }}</td>
+                  <td class="num">{{ pct(row.profitableDayPct || 0) }}</td>
+                  <td class="num mp-down">{{ inr(row.maxDrawdown) }}</td>
+                  <td class="num">{{ row.profitFactor | number: '1.2-2' }}</td>
+                  <td>{{ statusLabel(row.validationStatus) }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      @if (view.coverage; as cov) {
+        <p class="mp-sub">
+          Tested {{ cov.from }} → {{ cov.to }}. {{ cov.withBars }}/{{ cov.requested }} names with candles
+          ({{ cov.cacheHits || 0 }} cache hits). {{ view.days?.length || 0 }} sessions.
+        </p>
+      }
+      @if (view.assumptions?.length) {
+        <div class="mp-card">
+          <div class="mp-card-head"><h2>Assumptions</h2></div>
+          <ul class="mp-stack">
+            @for (a of view.assumptions; track a) {
+              <li>{{ a }}</li>
+            }
+          </ul>
+        </div>
+      }
+    } @else if (!profitBusy() && !profitError()) {
+      <div class="mp-empty" data-testid="profit-idle">
+        Choose a date range and search. No daily-profit numbers are shown until a completed research job exists.
       </div>
     }
   }

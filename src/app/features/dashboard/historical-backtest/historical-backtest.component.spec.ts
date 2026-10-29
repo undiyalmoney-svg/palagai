@@ -31,6 +31,9 @@ describe('HistoricalBacktestComponent', () => {
               }),
             listDiscoveries: () => Promise.resolve({ experiments: [] }),
             discoverCandidate: () => Promise.resolve({ simulated: true, liveOrders: false, candidate: {}, trades: [] }),
+            startDailyProfit: () => Promise.resolve({ id: 'profit-1', status: 'running' }),
+            dailyProfitJob: () => new Promise(() => undefined),
+            dailyProfitSpace: () => Promise.resolve({ liveOrders: false, count: 20, families: ['or30_break', 'gap_continue'] }),
           },
         },
       ],
@@ -54,6 +57,20 @@ describe('HistoricalBacktestComponent', () => {
     expect(text).toMatch(/₹10k winner desk/i);
     expect(text).toMatch(/skip 09:45 short-crowd/i);
     expect(text).toMatch(/5 widest signal-candle stops/i);
+    expect(text).toMatch(/Daily profit/i);
+  });
+
+  it('keeps daily profit idle until a research job finishes', async () => {
+    const el = fixture.nativeElement as HTMLElement;
+    (el.querySelector('[data-testid="profit-tab"]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    const text = el.textContent as string;
+    expect(text).toMatch(/Daily profit portfolio discovery/i);
+    expect(text).toMatch(/not guaranteed/i);
+    expect(text).toMatch(/No daily-profit numbers are shown until a completed research job exists/i);
+    expect(el.querySelector('[data-testid="profit-idle"]')).toBeTruthy();
   });
 
   it('posts the ₹10k winner desk when Run backtest is clicked', async () => {

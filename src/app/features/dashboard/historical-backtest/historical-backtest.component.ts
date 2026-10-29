@@ -16,6 +16,8 @@ import {
   DiscoverLeaderRow,
   DiscoverResult,
   DiscoverSpace,
+  DailyProfitJob,
+  DailyProfitResult,
 } from './historical-backtest.models';
 import { daysBefore, inr, lastCompletedSession, pct } from './historical-backtest.util';
 
@@ -23,7 +25,7 @@ type RangeMode = 'day' | 'range';
 type SideFilter = 'all' | 'L' | 'S';
 type ResultFilter = 'all' | 'win' | 'loss';
 type TakenFilter = 'all' | 'taken' | 'skipped';
-type PageTab = 'book' | 'discover';
+type PageTab = 'book' | 'discover' | 'profit';
 type DeskPreset = 'winner' | 'original';
 type RankBy = 'stopPct' | 'time' | 'orWidth';
 type CrowdFilter = 'skipShort' | 'follow' | 'skipLong' | '';
@@ -55,8 +57,10 @@ export class HistoricalBacktestComponent implements OnDestroy {
   private readonly api = inject(HistoricalBacktestApiService);
   private pollTimer: ReturnType<typeof setTimeout> | null = null;
   private discoverPollTimer: ReturnType<typeof setTimeout> | null = null;
+  private profitPollTimer: ReturnType<typeof setTimeout> | null = null;
   private pollFailures = 0;
   private discoverPollFailures = 0;
+  private profitPollFailures = 0;
 
   protected readonly pageTab = signal<PageTab>('book');
   protected readonly rangeMode = signal<RangeMode>('day');
@@ -74,6 +78,11 @@ export class HistoricalBacktestComponent implements OnDestroy {
   protected discoverCapital = 40000;
   protected discoverBudget = 24;
 
+  protected profitFrom = daysBefore(lastCompletedSession(), 45);
+  protected profitTo = lastCompletedSession();
+  protected profitCapital = 10000;
+  protected profitBudget = 20;
+
   protected readonly busy = signal(false);
   protected readonly error = signal('');
   protected readonly job = signal<BacktestJob | null>(null);
@@ -87,6 +96,12 @@ export class HistoricalBacktestComponent implements OnDestroy {
   protected readonly experiments = signal<DiscoverExperimentRow[]>([]);
   protected readonly inspect = signal<DiscoverCandidateDetail | null>(null);
   protected readonly inspectBusy = signal(false);
+
+  protected readonly profitBusy = signal(false);
+  protected readonly profitError = signal('');
+  protected readonly profitJob = signal<DailyProfitJob | null>(null);
+  protected readonly profitResult = signal<DailyProfitResult | null>(null);
+  protected readonly profitFamilies = signal<string[]>([]);
   protected readonly sortKey = signal<BoardSortKey>('rank');
   protected readonly sortDir = signal<1 | -1>(1);
 
@@ -98,7 +113,7 @@ export class HistoricalBacktestComponent implements OnDestroy {
   protected readonly inr = inr;
   protected readonly pct = pct;
 
-  protected readonly anyBusy = computed(() => this.busy() || this.discoverBusy());
+  protected readonly anyBusy = computed(() => this.busy() || this.discoverBusy() || this.profitBusy());
 
   protected readonly progressPct = computed(() => {
     const p = this.job()?.progress;
@@ -146,6 +161,30 @@ export class HistoricalBacktestComponent implements OnDestroy {
               : p.phase === 'done'
                 ? 'Done'
                 : 'Queued';
+    const sym = p.symbol ? ` · ${p.symbol}` : '';
+    return `${phase} ${p.done}/${p.total}${sym}`;
+  });
+
+  protected readonly profitProgressPct = computed(() => {
+    const p = this.profitJob()?.progress;
+    if (!p || !p.total) return 0;
+    return Math.min(100, Math.round((p.done / p.total) * 100));
+  });
+
+  protected readonly profitProgressLabel = computed(() => {
+    const job = this.profitJob();
+    const p = job?.progress;
+    if (!p) return '';
+    const phase =
+      p.phase === 'instruments'
+        ? 'Resolving Nifty 500 tokens'
+        : p.phase === 'candles'
+          ? 'Fetching and caching Kite 5-minute candles'
+          : p.phase === 'simulate'
+            ? 'Testing entry families and portfolio sizes'
+            : p.phase === 'done'
+              ? 'Done'
+              : 'Queued';
     const sym = p.symbol ? ` · ${p.symbol}` : '';
     return `${phase} ${p.done}/${p.total}${sym}`;
   });
@@ -225,6 +264,7 @@ export class HistoricalBacktestComponent implements OnDestroy {
   ngOnDestroy(): void {
     this.clearPoll();
     this.clearDiscoverPoll();
+    this.clearProfitPoll();
   }
 
   protected setMode(mode: RangeMode): void {
@@ -270,6 +310,14 @@ export class HistoricalBacktestComponent implements OnDestroy {
 
   protected async setPage(tab: PageTab): Promise<void> {
     this.pageTab.set(tab);
+    if (tab === 'profit' && !this.profitFamilies().length) {
+      try {
+        const space = await this.api.dailyProfitSpace();
+        this.profitFamilies.set(space.families || []);
+      } catch {
+        /* space is optional until a run */
+      }
+    }
     if (tab !== 'discover') return;
     if (!this.space()) {
       try {
@@ -370,6 +418,37 @@ export class HistoricalBacktestComponent implements OnDestroy {
       this.discoverBusy.set(false);
       this.discoverJob.set(null);
       this.discoverError.set(this.fmtErr(err));
+    }
+  }
+
+  protected async runProfit(): Promise<void> {
+    this.profitError.set('');
+    this.profitBusy.set(true);
+    this.profitPollFailures = 0;
+    this.profitResult.set(null);
+    this.profitJob.set({
+      status: 'running',
+      liveOrders: false,
+      progress: { phase: 'queued', done: 0, total: 500, symbol: null },
+    });
+    try {
+      const started = await this.api.startDailyProfit({
+        from: this.profitFrom,
+        to: this.profitTo,
+        capital: Number(this.profitCapital) || 10000,
+        budget: Number(this.profitBudget) || 20,
+      });
+      this.profitJob.set(started);
+      if (started.id) {
+        this.pollProfit(started.id);
+      } else if (started.result) {
+        this.profitResult.set(started.result);
+        this.profitBusy.set(false);
+      }
+    } catch (err) {
+      this.profitBusy.set(false);
+      this.profitJob.set(null);
+      this.profitError.set(this.fmtErr(err));
     }
   }
 
@@ -540,6 +619,46 @@ export class HistoricalBacktestComponent implements OnDestroy {
     if (this.discoverPollTimer) {
       clearTimeout(this.discoverPollTimer);
       this.discoverPollTimer = null;
+    }
+  }
+
+  private pollProfit(id: string): void {
+    this.clearProfitPoll();
+    const wait = this.profitPollFailures ? Math.min(12000, 1500 * this.profitPollFailures) : 1500;
+    this.profitPollTimer = setTimeout(async () => {
+      try {
+        const job = await this.api.dailyProfitJob(id);
+        this.profitPollFailures = 0;
+        this.profitJob.set(job);
+        if (job.status === 'done') {
+          this.profitResult.set(job.result || null);
+          this.profitBusy.set(false);
+          this.profitError.set('');
+          return;
+        }
+        if (job.status === 'error') {
+          this.profitBusy.set(false);
+          this.profitError.set(job.error || 'Daily profit search failed.');
+          return;
+        }
+        this.pollProfit(id);
+      } catch (err) {
+        this.profitPollFailures += 1;
+        if (this.profitPollFailures < 80) {
+          this.profitError.set('Waiting for the research server… retrying. The search keeps running.');
+          this.pollProfit(id);
+          return;
+        }
+        this.profitBusy.set(false);
+        this.profitError.set(this.fmtErr(err));
+      }
+    }, wait);
+  }
+
+  private clearProfitPoll(): void {
+    if (this.profitPollTimer) {
+      clearTimeout(this.profitPollTimer);
+      this.profitPollTimer = null;
     }
   }
 

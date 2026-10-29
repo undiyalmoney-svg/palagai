@@ -71,6 +71,15 @@
     },
     "logLevel": "debug"
   },
+  "/api/daily-profit": {
+    "target": "http://168.144.28.89:3000",
+    "secure": false,
+    "changeOrigin": true,
+    "pathRewrite": {
+      "^/api/daily-profit": "/daily-profit"
+    },
+    "logLevel": "debug"
+  },
   "/api/pnl": {
     "target": "http://168.144.28.89:3000",
     "secure": false,

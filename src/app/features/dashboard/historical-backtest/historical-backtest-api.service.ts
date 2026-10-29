@@ -9,6 +9,7 @@ import {
   DiscoverExperimentRow,
   DiscoverJob,
   DiscoverSpace,
+  DailyProfitJob,
 } from './historical-backtest.models';
 
 @Injectable({ providedIn: 'root' })
@@ -17,6 +18,8 @@ export class HistoricalBacktestApiService {
   private readonly kite = inject(KiteSessionService);
   private readonly base =
     (environment as { orbBacktestApiBaseUrl?: string }).orbBacktestApiBaseUrl || '/api/orb-backtest';
+  private readonly dailyProfitBase =
+    (environment as { dailyProfitApiBaseUrl?: string }).dailyProfitApiBaseUrl || '/api/daily-profit';
 
   start(body: {
     from: string;
@@ -87,6 +90,33 @@ export class HistoricalBacktestApiService {
         `${this.base}/discover/${encodeURIComponent(jobId)}/candidates/${encodeURIComponent(candidateId)}`,
         { headers: this.headers() },
       ),
+    );
+  }
+
+  startDailyProfit(body: {
+    from: string;
+    to: string;
+    capital: number;
+    budget: number;
+  }): Promise<DailyProfitJob> {
+    return firstValueFrom(
+      this.http.post<DailyProfitJob>(`${this.dailyProfitBase}/run`, body, { headers: this.headers() }),
+    );
+  }
+
+  dailyProfitJob(id: string): Promise<DailyProfitJob> {
+    return firstValueFrom(
+      this.http.get<DailyProfitJob>(`${this.dailyProfitBase}/jobs/${encodeURIComponent(id)}`, {
+        headers: this.headers(),
+      }),
+    );
+  }
+
+  dailyProfitSpace(): Promise<{ liveOrders: boolean; count: number; families: string[] }> {
+    return firstValueFrom(
+      this.http.get<{ liveOrders: boolean; count: number; families: string[] }>(`${this.dailyProfitBase}/space`, {
+        headers: this.headers(),
+      }),
     );
   }
 

@@ -423,6 +423,8 @@ async function proxyOrderBackendJson(
     upstreamPath = pathOnly.replace(/^\/api\/market-desk/, '/market-desk');
   } else if (pathOnly.startsWith('/api/orb-backtest')) {
     upstreamPath = pathOnly.replace(/^\/api\/orb-backtest/, '/orb-backtest');
+  } else if (pathOnly.startsWith('/api/daily-profit')) {
+    upstreamPath = pathOnly.replace(/^\/api\/daily-profit/, '/daily-profit');
   } else if (pathOnly.startsWith('/api/pnl')) {
     upstreamPath = pathOnly.replace(/^\/api\/pnl/, '/pnl');
   } else {
@@ -607,6 +609,13 @@ orbBacktestApiRouter.use((req, res) => {
   void proxyOrderBackendJson('/orb-backtest', 'orb-backtest', req, res);
 });
 app.use('/api/orb-backtest', orbBacktestApiRouter);
+
+const dailyProfitApiRouter = express.Router();
+dailyProfitApiRouter.use(express.json());
+dailyProfitApiRouter.use((req, res) => {
+  void proxyOrderBackendJson('/daily-profit', 'daily-profit', req, res);
+});
+app.use('/api/daily-profit', dailyProfitApiRouter);
 
 const pnlApiRouter = express.Router();
 pnlApiRouter.use(express.json());

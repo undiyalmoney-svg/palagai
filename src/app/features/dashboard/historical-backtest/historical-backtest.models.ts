@@ -302,6 +302,7 @@ export interface DiscoverCoverage {
 export interface DiscoverRecommended {
   id: string;
   name: string;
+  family?: string;
   rules: DiscoverRules;
   config?: Record<string, unknown>;
   oos: DiscoverMetrics;
@@ -419,4 +420,73 @@ export interface DiscoverCandidateDetail {
   liveOrders: boolean;
   candidate: DiscoverLeaderRow;
   trades: BacktestTrade[];
+}
+
+export interface DailyBookStock {
+  symbol: string;
+  side: string;
+  reason?: string;
+  entryT: string;
+  exitT: string;
+  exitReason: string;
+  entryPx: number;
+  stopPx?: number;
+  qty: number;
+  allocatedRs: number;
+  netRs: number;
+  chargesRs: number;
+  riskRs?: number;
+}
+
+export interface DailyBook {
+  day: string;
+  capital: number;
+  stocks: DailyBookStock[];
+  trades: number;
+  winners: number;
+  losers: number;
+  grossPnl: number;
+  costs: number;
+  netPnl: number;
+  allocatedRs: number;
+  note?: string;
+}
+
+export interface DailyProfitResult {
+  simulated: boolean;
+  liveOrders: boolean;
+  capital: number;
+  days?: string[];
+  split?: { train: string[]; validation: string[]; oos: string[]; mode: string; note: string };
+  coverage?: DiscoverCoverage;
+  candidatesEvaluated: number;
+  minTrades?: number;
+  noRobust?: string | null;
+  recommended?: (DiscoverRecommended & { dailyBooks?: DailyBook[]; lastBook?: DailyBook | null }) | null;
+  lastBook?: DailyBook | null;
+  dailyBooks?: DailyBook[];
+  rankings?: DiscoverResult['rankings'];
+  leaderboard: DiscoverLeaderRow[];
+  weekly?: Array<{ week: string; days: string[]; netPnl: number; trades: number; winDays: number; loseDays: number }>;
+  assumptions?: string[];
+  warnings?: string[];
+  note?: string;
+  engineVersion?: string;
+}
+
+export interface DailyProfitJob {
+  status: string;
+  id?: string;
+  simulated?: boolean;
+  liveOrders?: boolean;
+  kind?: string;
+  progress?: BacktestProgress;
+  error?: string | null;
+  coverage?: DiscoverCoverage | null;
+  warnings?: string[];
+  result?: DailyProfitResult | null;
+  engineVersion?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  input?: { from: string; to: string; capital: number; budget: number };
 }

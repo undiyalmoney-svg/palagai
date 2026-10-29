@@ -49,6 +49,28 @@ describe('HistoricalBacktestApiService', () => {
     http.verify();
   });
 
+  it('posts a daily-profit search and never marks it live', async () => {
+    const { api, http } = setup();
+    const pending = api.startDailyProfit({
+      from: '2026-09-01',
+      to: '2026-10-27',
+      capital: 10000,
+      budget: 20,
+    });
+    const req = http.expectOne('/api/daily-profit/run');
+    expect(req.request.method).toBe('POST');
+    expect(req.request.headers.get('X-Kite-Authorization')).toBe('token key:secret');
+    expect(req.request.body).toEqual({
+      from: '2026-09-01',
+      to: '2026-10-27',
+      capital: 10000,
+      budget: 20,
+    });
+    req.flush({ id: 'profit-1', status: 'running', liveOrders: false });
+    await expect(pending).resolves.toMatchObject({ id: 'profit-1', liveOrders: false });
+    http.verify();
+  });
+
   it('posts a discovery job and polls it with the Kite session header', async () => {
     const { api, http } = setup();
     const pending = api.startDiscover({
