@@ -85,7 +85,7 @@ export class HistoricalBacktestComponent implements OnDestroy {
   protected profitCapital = 10000;
   protected profitBudget = 20;
 
-  protected livePhrase = '';
+  protected liveConfirm = false;
   protected readonly liveMoney = signal<LiveMoneyStatus | null>(null);
   protected readonly liveMoneyBusy = signal(false);
 
@@ -299,8 +299,8 @@ export class HistoricalBacktestComponent implements OnDestroy {
     else this.clearMoneyPoll();
   }
 
-  protected livePhraseOk(): boolean {
-    return this.livePhrase.trim() === 'START LIVE MONEY';
+  protected liveConfirmOk(): boolean {
+    return this.liveConfirm === true;
   }
 
   protected applyDesk(preset: DeskPreset): void {
@@ -459,7 +459,7 @@ export class HistoricalBacktestComponent implements OnDestroy {
     this.error.set('');
     this.liveMoneyBusy.set(true);
     try {
-      const res = await this.api.startLiveMoney(this.livePhrase.trim());
+      const res = await this.api.startLiveMoney();
       this.liveMoney.set(res.money);
       this.pollLiveMoney();
     } catch (err) {

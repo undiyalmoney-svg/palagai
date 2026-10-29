@@ -73,7 +73,6 @@ export interface LiveMoneyResponse {
   status: string;
   liveOrders: boolean;
   money: LiveMoneyStatus;
-  phrase?: string;
   message?: string;
 }
 

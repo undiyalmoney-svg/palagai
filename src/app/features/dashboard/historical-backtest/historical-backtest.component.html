@@ -99,8 +99,8 @@
         <div>
           <h2>Live money</h2>
           <p class="mp-sub">
-            Places real Kite MIS. Type START LIVE MONEY to arm. Stop flatten cancels the SL-M, then market-exits anything
-            still open.
+            Places real Kite MIS. Tick the box to arm. Stop flatten cancels the SL-M, then market-exits anything still
+            open.
           </p>
         </div>
         <span class="mp-badge" [attr.data-tone]="liveMoney()?.enabled ? 'down' : 'info'">
@@ -108,23 +108,21 @@
         </span>
       </div>
       <div class="mp-form">
-        <label class="mp-field">
-          Confirm
+        <label class="ui-check hb-live-confirm">
           <input
-            class="ui-input"
-            type="text"
-            [(ngModel)]="livePhrase"
-            placeholder="START LIVE MONEY"
+            type="checkbox"
+            [(ngModel)]="liveConfirm"
             [disabled]="liveMoneyBusy() || !!liveMoney()?.enabled"
-            data-testid="live-money-phrase"
+            data-testid="live-money-confirm"
           />
+          Place real Kite MIS with auto SL-M and auto flatten at 1R or 15:15
         </label>
         <div class="mp-field">
           <span>&nbsp;</span>
           <button
             type="button"
             class="ui-btn ui-btn-primary"
-            [disabled]="liveMoneyBusy() || !!liveMoney()?.enabled || !livePhraseOk()"
+            [disabled]="liveMoneyBusy() || !!liveMoney()?.enabled || !liveConfirmOk()"
             (click)="startLiveMoney()"
             data-testid="start-live-money"
           >

@@ -58,13 +58,13 @@ describe('HistoricalBacktestApiService', () => {
     http.verify();
   });
 
-  it('starts live money with the confirm phrase and stops flatten', async () => {
+  it('starts live money with the confirm checkbox and stops flatten', async () => {
     const { api, http } = setup();
-    const pending = api.startLiveMoney('START LIVE MONEY');
+    const pending = api.startLiveMoney();
     const req = http.expectOne('/api/orb-backtest/live-today/start');
     expect(req.request.method).toBe('POST');
     expect(req.request.headers.get('X-Kite-Authorization')).toBe('token key:secret');
-    expect(req.request.body).toEqual({ phrase: 'START LIVE MONEY' });
+    expect(req.request.body).toEqual({ confirm: true });
     req.flush({
       status: 'ok',
       liveOrders: true,
@@ -81,8 +81,8 @@ describe('HistoricalBacktestApiService', () => {
     const status = api.liveMoneyStatus();
     const statusReq = http.expectOne('/api/orb-backtest/live-today/status');
     expect(statusReq.request.method).toBe('GET');
-    statusReq.flush({ status: 'ok', liveOrders: false, money: { enabled: false }, phrase: 'START LIVE MONEY' });
-    await expect(status).resolves.toMatchObject({ phrase: 'START LIVE MONEY' });
+    statusReq.flush({ status: 'ok', liveOrders: false, money: { enabled: false } });
+    await expect(status).resolves.toMatchObject({ liveOrders: false });
     http.verify();
   });
 

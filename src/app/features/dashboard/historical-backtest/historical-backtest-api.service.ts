@@ -34,11 +34,11 @@ export class HistoricalBacktestApiService {
     );
   }
 
-  startLiveMoney(phrase: string): Promise<LiveMoneyResponse> {
+  startLiveMoney(): Promise<LiveMoneyResponse> {
     return firstValueFrom(
       this.http.post<LiveMoneyResponse>(
         `${this.base}/live-today/start`,
-        { phrase },
+        { confirm: true },
         { headers: this.headers() },
       ),
     );

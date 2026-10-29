@@ -129,22 +129,24 @@ describe('HistoricalBacktestComponent', () => {
     expect(text).toMatch(/Stop flatten/i);
     expect(text).toMatch(/09:45 to 14:30/i);
     expect(text).not.toMatch(/Starting capital/i);
+    expect(text).toMatch(/Place real Kite MIS with auto SL-M/i);
+    expect(text).toMatch(/Tick the box to arm/i);
     expect(text).not.toMatch(/Enter capital and run/i);
     await cmp['run']();
     expect(startLiveMock).toHaveBeenCalledTimes(1);
     expect(startMock).not.toHaveBeenCalled();
   });
 
-  it('arms real-money scanning only after START LIVE MONEY', async () => {
+  it('arms real-money scanning only after the confirm checkbox', async () => {
     const cmp = fixture.componentInstance;
-    cmp['livePhrase'] = 'START LIVE MONEY';
+    cmp['liveConfirm'] = true;
     cmp['setMode']('live');
     fixture.detectChanges();
-    expect(cmp['livePhraseOk']()).toBe(true);
+    expect(cmp['liveConfirmOk']()).toBe(true);
     const startBtn = fixture.nativeElement.querySelector('[data-testid="start-live-money"]') as HTMLButtonElement;
     expect(startBtn.disabled).toBe(false);
     await cmp['startLiveMoney']();
-    expect(startLiveMoneyMock).toHaveBeenCalledWith('START LIVE MONEY');
+    expect(startLiveMoneyMock).toHaveBeenCalledTimes(1);
     fixture.detectChanges();
     await fixture.whenStable();
     fixture.detectChanges();

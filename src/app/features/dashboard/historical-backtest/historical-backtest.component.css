@@ -11,6 +11,12 @@
   grid-column: 1 / -1;
 }
 
+.hb-live-confirm {
+  grid-column: 1 / -1;
+  align-self: center;
+  padding: 0.35rem 0 0.15rem;
+}
+
 .hb-subhead {
   margin: 1.1rem 0 0.4rem;
   font-size: 0.92rem;
