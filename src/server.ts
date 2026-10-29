@@ -450,14 +450,16 @@ async function proxyOrderBackendJson(
     headers['X-Kite-Authorisation'] = req.headers['x-kite-authorisation'];
   }
 
-  const longMomentum =
+  const longResearch =
     pathOnly.includes('/desk/paper') ||
     pathOnly.includes('/desk/scan') ||
-    pathOnly.includes('/backtests');
+    pathOnly.includes('/backtests') ||
+    pathOnly.includes('/api/daily-profit') ||
+    pathOnly.includes('/api/orb-backtest');
   const init: RequestInit = {
     method: req.method,
     headers,
-    signal: AbortSignal.timeout(longMomentum ? 180_000 : 55_000),
+    signal: AbortSignal.timeout(longResearch ? 180_000 : 55_000),
   };
 
   if (req.method !== 'GET' && req.method !== 'HEAD' && req.method !== 'DELETE') {

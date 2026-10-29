@@ -11,10 +11,11 @@ export const environment = {
   heatmapApiBaseUrl: '/api/heatmap',
   marketDeskApiBaseUrl: '/api/market-desk',
   orbBacktestApiBaseUrl: '/api/orb-backtest',
+  dailyProfitApiBaseUrl: '/api/daily-profit',
   pnlApiBaseUrl: '/api/pnl',
   defaultLots: 1,
   allowLiveMoney: true,
   orderEgressIp: '168.144.28.89',
-  appVersion: '1.3.138',
-  appBuild: '2026.10.28-discover',
+  appVersion: '1.3.139',
+  appBuild: '2026.10.29-profit-batches',
 };

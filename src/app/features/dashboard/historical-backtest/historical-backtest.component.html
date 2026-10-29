@@ -1192,8 +1192,9 @@
         </div>
       </div>
       <p class="mp-sub">
-        Connect Kite on <a routerLink="/dashboard/get-token">Token</a> first. Cached 5-minute history is reused. Range up to
-        180 calendar days. Name count is searched (1 / 3 / 5 / 8), not fixed.
+        Connect Kite on <a routerLink="/dashboard/get-token">Token</a> first. Candles load in batches of 10 so the page
+        stays alive. Cached 5-minute history is reused, including a wider pull that already covers the range. Range up
+        to 180 calendar days. Name count is searched (1 / 3 / 5 / 8), not fixed.
         @if (profitFamilies().length) {
           Families in this build: {{ profitFamilies().join(', ') }}.
         }

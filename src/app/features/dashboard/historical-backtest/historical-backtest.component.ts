@@ -161,8 +161,10 @@ export class HistoricalBacktestComponent implements OnDestroy {
               : p.phase === 'done'
                 ? 'Done'
                 : 'Queued';
+    const batch = p.phase === 'candles' && p.batch && p.batches ? ` · batch ${p.batch}/${p.batches}` : '';
+    const cache = p.phase === 'candles' && p.cacheHits != null ? ` · cache ${p.cacheHits}` : '';
     const sym = p.symbol ? ` · ${p.symbol}` : '';
-    return `${phase} ${p.done}/${p.total}${sym}`;
+    return `${phase}${batch} ${p.done}/${p.total}${cache}${sym}`;
   });
 
   protected readonly profitProgressPct = computed(() => {
@@ -179,14 +181,16 @@ export class HistoricalBacktestComponent implements OnDestroy {
       p.phase === 'instruments'
         ? 'Resolving Nifty 500 tokens'
         : p.phase === 'candles'
-          ? 'Fetching and caching Kite 5-minute candles'
+          ? 'Fetching and caching Kite 5-minute candles in batches of 10'
           : p.phase === 'simulate'
             ? 'Testing entry families and portfolio sizes'
             : p.phase === 'done'
               ? 'Done'
               : 'Queued';
+    const batch = p.phase === 'candles' && p.batch && p.batches ? ` · batch ${p.batch}/${p.batches}` : '';
+    const cache = p.phase === 'candles' && p.cacheHits != null ? ` · cache ${p.cacheHits}` : '';
     const sym = p.symbol ? ` · ${p.symbol}` : '';
-    return `${phase} ${p.done}/${p.total}${sym}`;
+    return `${phase}${batch} ${p.done}/${p.total}${cache}${sym}`;
   });
 
   protected filteredTrades(): BacktestTrade[] {

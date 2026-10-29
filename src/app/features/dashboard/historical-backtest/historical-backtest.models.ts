@@ -3,6 +3,10 @@ export interface BacktestProgress {
   done: number;
   total: number;
   symbol: string | null;
+  batch?: number;
+  batches?: number;
+  batchSize?: number;
+  cacheHits?: number;
 }
 
 export interface BacktestMark {

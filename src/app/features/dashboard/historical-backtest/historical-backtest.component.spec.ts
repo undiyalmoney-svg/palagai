@@ -60,6 +60,34 @@ describe('HistoricalBacktestComponent', () => {
     expect(text).toMatch(/Daily profit/i);
   });
 
+  it('shows Daily profit candle progress as batches of 10', async () => {
+    const cmp = fixture.componentInstance;
+    await cmp['setPage']('profit');
+    cmp['profitBusy'].set(true);
+    cmp['profitJob'].set({
+      status: 'running',
+      simulated: true,
+      liveOrders: false,
+      progress: {
+        phase: 'candles',
+        done: 20,
+        total: 500,
+        symbol: 'RELIANCE',
+        batch: 3,
+        batches: 50,
+        batchSize: 10,
+        cacheHits: 18,
+      },
+    });
+    fixture.detectChanges();
+    const text = fixture.nativeElement.textContent as string;
+    expect(text).toMatch(/batches of 10/i);
+    expect(text).toMatch(/batch 3\/50/i);
+    expect(text).toMatch(/cache 18/);
+    expect(text).toMatch(/RELIANCE/);
+    expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid="profit-loading"]')).toBeTruthy();
+  });
+
   it('keeps daily profit idle until a research job finishes', async () => {
     const el = fixture.nativeElement as HTMLElement;
     (el.querySelector('[data-testid="profit-tab"]') as HTMLButtonElement).click();
