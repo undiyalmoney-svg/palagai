@@ -42,8 +42,7 @@ describe('HistoricalBacktestComponent', () => {
     expect(text).toMatch(/Nifty 500/i);
     expect(text).toMatch(/Starting capital/i);
     expect(text).toMatch(/follow the 09:45 crowd/i);
-    expect(text).toMatch(/fully close/i);
-    expect(text).toMatch(/15:15 close/i);
+    expect(text).not.toMatch(/Entry and exit/i);
     expect(text).not.toMatch(/Daily profit/i);
     expect(text).not.toMatch(/Automated discovery/i);
     expect(text).not.toMatch(/₹10k winner desk/i);
