@@ -104,7 +104,7 @@ describe('HistoricalBacktestComponent', () => {
     expect(cmp['autoNames']()).toBe(2);
     const text = fixture.nativeElement.textContent as string;
     expect(text).toMatch(/Best two names/i);
-    expect(text).toMatch(/same 1R exit as live/i);
+    expect(text).toMatch(/same scan and 1R exit as live/i);
     expect(text).not.toMatch(/₹2,000 each, max 8/i);
   });
 
@@ -117,6 +117,21 @@ describe('HistoricalBacktestComponent', () => {
       to: cmp['date'],
       capital: 10000,
     });
+  });
+
+  it('date range posts the same desk as One day, only the window changes', async () => {
+    const cmp = fixture.componentInstance;
+    cmp['setMode']('range');
+    cmp['from'] = '2026-10-16';
+    cmp['to'] = '2026-10-16';
+    cmp['capital'] = 10000;
+    await cmp['run']();
+    expect(startMock).toHaveBeenCalledWith({
+      from: '2026-10-16',
+      to: '2026-10-16',
+      capital: 10000,
+    });
+    expect(startLiveMock).not.toHaveBeenCalled();
   });
 
   it('loads live today from Kite cash with a 1R lock and never posts the backtest capital', async () => {
