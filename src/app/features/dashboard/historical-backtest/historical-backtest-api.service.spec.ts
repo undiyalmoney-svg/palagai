@@ -21,16 +21,12 @@ describe('HistoricalBacktestApiService', () => {
     };
   }
 
-  it('posts the ₹10k winner desk on a single-book run', async () => {
+  it('posts capital for the prior-day follow book and never marks it live', async () => {
     const { api, http } = setup();
     const pending = api.start({
       from: '2026-10-16',
       to: '2026-10-16',
       capital: 10000,
-      maxStocksPerDay: 5,
-      rankBy: 'stopPct',
-      crowdFilter: 'skipShort',
-      preset: 'winner',
     });
     const req = http.expectOne('/api/orb-backtest/run');
     expect(req.request.method).toBe('POST');
@@ -39,12 +35,8 @@ describe('HistoricalBacktestApiService', () => {
       from: '2026-10-16',
       to: '2026-10-16',
       capital: 10000,
-      maxStocksPerDay: 5,
-      rankBy: 'stopPct',
-      crowdFilter: 'skipShort',
-      preset: 'winner',
     });
-    req.flush({ id: 'job-1', status: 'running', liveOrders: false, input: { preset: 'winner', capital: 10000 } });
+    req.flush({ id: 'job-1', status: 'running', liveOrders: false, input: { preset: 'pdh-follow', capital: 10000 } });
     await expect(pending).resolves.toMatchObject({ id: 'job-1', liveOrders: false });
     http.verify();
   });

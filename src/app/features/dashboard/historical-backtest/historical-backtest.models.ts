@@ -111,8 +111,10 @@ export interface BacktestResult {
   config: {
     capital: number;
     maxStocksPerDay: number;
+    family?: string;
+    preset?: string;
     targetR?: number | null;
-    orEnd: string;
+    orEnd?: string;
     entryStart?: string;
     entryEnd: string;
     timeExit: string;
@@ -128,6 +130,9 @@ export interface BacktestResult {
   trades: BacktestTrade[];
   crosses?: BacktestCross[];
   snapshots?: BacktestSnapshot[];
+  dailyBooks?: DailyBook[];
+  lastBook?: DailyBook | null;
+  family?: string;
   universe?: {
     requested: number;
     resolved: number;

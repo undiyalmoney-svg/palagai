@@ -71,7 +71,7 @@ export class HistoricalBacktestComponent implements OnDestroy {
   protected capital = 10000;
   protected maxStocksPerDay = 5;
   protected rankBy: RankBy = 'stopPct';
-  protected crowdFilter: CrowdFilter = 'skipShort';
+  protected crowdFilter: CrowdFilter = 'follow';
 
   protected discoverFrom = daysBefore(lastCompletedSession(), 35);
   protected discoverTo = lastCompletedSession();
@@ -115,6 +115,11 @@ export class HistoricalBacktestComponent implements OnDestroy {
 
   protected readonly anyBusy = computed(() => this.busy() || this.discoverBusy() || this.profitBusy());
 
+  protected autoNames(): number {
+    const cap = Math.max(1000, Number(this.capital) || 10000);
+    return Math.min(8, Math.max(1, Math.floor(cap / 2000) || 1));
+  }
+
   protected readonly progressPct = computed(() => {
     const p = this.job()?.progress;
     if (!p || !p.total) return 0;
@@ -129,14 +134,16 @@ export class HistoricalBacktestComponent implements OnDestroy {
       p.phase === 'instruments'
         ? 'Resolving Nifty 500 tokens'
         : p.phase === 'candles'
-          ? 'Fetching Kite 5-minute candles'
+          ? 'Fetching Kite 5-minute candles in batches of 10'
           : p.phase === 'simulate'
             ? 'Simulating the ORB book'
             : p.phase === 'done'
               ? 'Done'
               : 'Queued';
+    const batch = p.phase === 'candles' && p.batch && p.batches ? ` · batch ${p.batch}/${p.batches}` : '';
+    const cache = p.phase === 'candles' && p.cacheHits != null ? ` · cache ${p.cacheHits}` : '';
     const sym = p.symbol ? ` · ${p.symbol}` : '';
-    return `${phase} ${p.done}/${p.total}${sym}`;
+    return `${phase}${batch} ${p.done}/${p.total}${cache}${sym}`;
   });
 
   protected readonly discoverProgressPct = computed(() => {
@@ -285,7 +292,7 @@ export class HistoricalBacktestComponent implements OnDestroy {
       this.capital = 10000;
       this.maxStocksPerDay = 5;
       this.rankBy = 'stopPct';
-      this.crowdFilter = 'skipShort';
+      this.crowdFilter = 'follow';
       return;
     }
     this.capital = 40000;
@@ -373,11 +380,7 @@ export class HistoricalBacktestComponent implements OnDestroy {
       const started = await this.api.start({
         from,
         to,
-        capital: Number(this.capital) || (this.deskPreset === 'winner' ? 10000 : 40000),
-        maxStocksPerDay: Number(this.maxStocksPerDay) || (this.deskPreset === 'winner' ? 5 : 3),
-        rankBy: this.rankBy,
-        crowdFilter: this.crowdFilter || null,
-        preset: this.deskPreset === 'winner' ? 'winner' : undefined,
+        capital: Number(this.capital) || 10000,
       });
       this.job.set(started);
       if (started.id) {

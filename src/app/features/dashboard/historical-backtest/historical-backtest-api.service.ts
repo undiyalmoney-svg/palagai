@@ -25,7 +25,7 @@ export class HistoricalBacktestApiService {
     from: string;
     to: string;
     capital: number;
-    maxStocksPerDay: number;
+    maxStocksPerDay?: number;
     rankBy?: string;
     crowdFilter?: string | null;
     preset?: string;
