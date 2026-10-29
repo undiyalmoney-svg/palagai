@@ -94,15 +94,16 @@ describe('HistoricalBacktestComponent', () => {
     expect(text).not.toMatch(/₹10k winner desk/i);
   });
 
-  it('auto-picks 5 names on ₹10k and 8 names on ₹40k', () => {
+  it('keeps best two names on ₹10k and ₹40k', () => {
     const cmp = fixture.componentInstance;
     expect(cmp['capital']).toBe(10000);
-    expect(cmp['autoNames']()).toBe(5);
+    expect(cmp['autoNames']()).toBe(2);
     cmp['capital'] = 40000;
     fixture.detectChanges();
-    expect(cmp['autoNames']()).toBe(8);
+    expect(cmp['autoNames']()).toBe(2);
     const text = fixture.nativeElement.textContent as string;
-    expect(text).toMatch(/Auto-trades 8 names/i);
+    expect(text).toMatch(/Best two names/i);
+    expect(text).not.toMatch(/₹2,000 each, max 8/i);
   });
 
   it('posts only capital so the server auto-trades the prior-day follow book', async () => {

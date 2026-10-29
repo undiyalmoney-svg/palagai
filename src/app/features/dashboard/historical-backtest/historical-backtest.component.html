@@ -10,7 +10,8 @@
         if the trade reaches 1R — not a guaranteed profit.
       }
     } @else {
-      Simulated prior-day break book on Kite 5-minute candles. Follow the 09:45 crowd. No live orders are placed.
+      Simulated prior-day break book on Kite 5-minute candles. Follow the 09:45 crowd. Best two names. No live orders are
+      placed.
     }
   </div>
 
@@ -24,7 +25,7 @@
             Live today sizes from Kite equity cash, not the backtest capital box. The worker keeps scanning eligible names
             after 09:50.
           } @else {
-            Capital picks how many names auto-trade. Simulated only.
+            Best two names, same ranking as live. Capital sizes quantity. Simulated only.
           }
         </p>
       </div>
@@ -76,7 +77,7 @@
             data-testid="capital-input"
           />
           <small data-testid="auto-names">
-            Auto-trades {{ autoNames() }} name{{ autoNames() === 1 ? '' : 's' }} (₹2,000 each, max 8).
+            Best two names, ranked by widest stop. Capital only sizes quantity.
           </small>
         </label>
       }

@@ -122,8 +122,7 @@ export class HistoricalBacktestComponent implements OnDestroy {
   protected readonly anyBusy = computed(() => this.busy() || this.discoverBusy() || this.profitBusy());
 
   protected autoNames(): number {
-    const cap = Math.max(1000, Number(this.capital) || 10000);
-    return Math.min(8, Math.max(1, Math.floor(cap / 2000) || 1));
+    return 2;
   }
 
   protected readonly progressPct = computed(() => {
