@@ -107,11 +107,16 @@ export interface BacktestResult {
   config: {
     capital: number;
     maxStocksPerDay: number;
-    targetR?: number;
+    targetR?: number | null;
     orEnd: string;
     entryStart?: string;
     entryEnd: string;
     timeExit: string;
+    rankBy?: string;
+    crowdFilter?: string | null;
+    sizing?: string;
+    pullbacksNeeded?: number;
+    engineVersion?: string;
   };
   assumptions: string[];
   rawTrades: number;
@@ -136,6 +141,17 @@ export interface BacktestJob {
   id?: string;
   simulated?: boolean;
   liveOrders?: boolean;
+  input?: {
+    from?: string;
+    to?: string;
+    preset?: string;
+    capital?: number;
+    maxStocksPerDay?: number;
+    rankBy?: string;
+    crowdFilter?: string | null;
+    entryEnd?: string;
+    timeExit?: string;
+  };
   progress?: BacktestProgress;
   error?: string | null;
   warnings?: string[];

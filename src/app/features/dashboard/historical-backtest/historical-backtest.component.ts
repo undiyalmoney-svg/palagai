@@ -24,6 +24,9 @@ type SideFilter = 'all' | 'L' | 'S';
 type ResultFilter = 'all' | 'win' | 'loss';
 type TakenFilter = 'all' | 'taken' | 'skipped';
 type PageTab = 'book' | 'discover';
+type DeskPreset = 'winner' | 'original';
+type RankBy = 'stopPct' | 'time' | 'orWidth';
+type CrowdFilter = 'skipShort' | 'follow' | 'skipLong' | '';
 type BoardSortKey =
   | 'rank'
   | 'id'
@@ -60,8 +63,11 @@ export class HistoricalBacktestComponent implements OnDestroy {
   protected date = lastCompletedSession();
   protected from = lastCompletedSession();
   protected to = lastCompletedSession();
-  protected capital = 40000;
-  protected maxStocksPerDay = 3;
+  protected deskPreset: DeskPreset = 'winner';
+  protected capital = 10000;
+  protected maxStocksPerDay = 5;
+  protected rankBy: RankBy = 'stopPct';
+  protected crowdFilter: CrowdFilter = 'skipShort';
 
   protected discoverFrom = daysBefore(lastCompletedSession(), 35);
   protected discoverTo = lastCompletedSession();
@@ -229,6 +235,39 @@ export class HistoricalBacktestComponent implements OnDestroy {
     }
   }
 
+  protected applyDesk(preset: DeskPreset): void {
+    this.deskPreset = preset;
+    if (preset === 'winner') {
+      this.capital = 10000;
+      this.maxStocksPerDay = 5;
+      this.rankBy = 'stopPct';
+      this.crowdFilter = 'skipShort';
+      return;
+    }
+    this.capital = 40000;
+    this.maxStocksPerDay = 3;
+    this.rankBy = 'time';
+    this.crowdFilter = '';
+  }
+
+  protected rankLabel(rank: string | undefined | null): string {
+    if (rank === 'stopPct') return '5 widest signal-candle stops';
+    if (rank === 'orWidth') return 'widest opening range first';
+    return 'first eligible by entry time';
+  }
+
+  protected crowdLabel(filter: string | undefined | null): string {
+    if (filter === 'skipShort') return 'skip 09:45 short-crowd (≤40% long)';
+    if (filter === 'skipLong') return 'skip 09:45 long-crowd (≥60% long)';
+    if (filter === 'follow') return 'follow 09:45 majority side';
+    return 'take every session';
+  }
+
+  protected deskLabel(): string {
+    if (this.deskPreset === 'winner') return '₹10k winner desk';
+    return 'Original 3-name ₹40k';
+  }
+
   protected async setPage(tab: PageTab): Promise<void> {
     this.pageTab.set(tab);
     if (tab !== 'discover') return;
@@ -282,8 +321,11 @@ export class HistoricalBacktestComponent implements OnDestroy {
       const started = await this.api.start({
         from,
         to,
-        capital: Number(this.capital) || 40000,
-        maxStocksPerDay: Number(this.maxStocksPerDay) || 3,
+        capital: Number(this.capital) || (this.deskPreset === 'winner' ? 10000 : 40000),
+        maxStocksPerDay: Number(this.maxStocksPerDay) || (this.deskPreset === 'winner' ? 5 : 3),
+        rankBy: this.rankBy,
+        crowdFilter: this.crowdFilter || null,
+        preset: this.deskPreset === 'winner' ? 'winner' : undefined,
       });
       this.job.set(started);
       if (started.id) {

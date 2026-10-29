@@ -1,14 +1,16 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { HistoricalBacktestApiService } from './historical-backtest-api.service';
 import { HistoricalBacktestComponent } from './historical-backtest.component';
 import { DiscoverResult } from './historical-backtest.models';
 
 describe('HistoricalBacktestComponent', () => {
   let fixture: ComponentFixture<HistoricalBacktestComponent>;
+  const startMock = vi.fn(() => Promise.resolve({ id: 'job-1', status: 'running' }));
 
   beforeEach(async () => {
+    startMock.mockClear();
     await TestBed.configureTestingModule({
       imports: [HistoricalBacktestComponent],
       providers: [
@@ -16,7 +18,7 @@ describe('HistoricalBacktestComponent', () => {
         {
           provide: HistoricalBacktestApiService,
           useValue: {
-            start: () => Promise.resolve({ id: 'job-1', status: 'running' }),
+            start: startMock,
             job: () => new Promise(() => undefined),
             startDiscover: () => Promise.resolve({ id: 'disc-1', status: 'running' }),
             discoverJob: () => new Promise(() => undefined),
@@ -49,6 +51,27 @@ describe('HistoricalBacktestComponent', () => {
     expect(text).toMatch(/two red 5-minute candles/i);
     expect(text).toMatch(/15:15 close/i);
     expect(text).toMatch(/Max amount went/i);
+    expect(text).toMatch(/₹10k winner desk/i);
+    expect(text).toMatch(/skip 09:45 short-crowd/i);
+    expect(text).toMatch(/5 widest signal-candle stops/i);
+  });
+
+  it('posts the ₹10k winner desk when Run backtest is clicked', async () => {
+    const cmp = fixture.componentInstance;
+    expect(cmp['capital']).toBe(10000);
+    expect(cmp['maxStocksPerDay']).toBe(5);
+    expect(cmp['rankBy']).toBe('stopPct');
+    expect(cmp['crowdFilter']).toBe('skipShort');
+    await cmp['run']();
+    expect(startMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        capital: 10000,
+        maxStocksPerDay: 5,
+        rankBy: 'stopPct',
+        crowdFilter: 'skipShort',
+        preset: 'winner',
+      }),
+    );
   });
 
   it('lists ORB-crossed names from the result', () => {

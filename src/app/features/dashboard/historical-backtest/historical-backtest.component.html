@@ -24,11 +24,20 @@
         <div>
           <h2>Nifty 500 first-15 book</h2>
           <p class="mp-sub">
-            Mark the first 15-minute high / low (09:15–09:30). A later 15-minute candle must fully close beyond that range.
-            Then 5-minute two-low (or two-high) entry. Stop is the signal candle. No automatic target — 30-minute marks and EOD.
+            Default is the ₹10k winner desk: skip a 09:45 short-crowd, take 5 widest signal-candle stops, two reverse 5-minute
+            candles, SL or 15:15. Simulated only — no live orders.
           </p>
         </div>
         <span class="mp-badge" data-tone="info">Nifty 500 · Kite history</span>
+      </div>
+
+      <div class="mp-row hb-modes" role="tablist" data-testid="hb-desk-preset">
+        <button type="button" class="mp-tab" [class.active]="deskPreset === 'winner'" (click)="applyDesk('winner')" [disabled]="anyBusy()">
+          ₹10k winner desk
+        </button>
+        <button type="button" class="mp-tab" [class.active]="deskPreset === 'original'" (click)="applyDesk('original')" [disabled]="anyBusy()">
+          Original 3-name ₹40k
+        </button>
       </div>
 
       <div class="mp-row hb-modes" role="tablist">
@@ -58,7 +67,32 @@
         </label>
         <label class="mp-field">
           Max stocks / day
-          <input class="ui-input" type="number" min="1" max="50" [(ngModel)]="maxStocksPerDay" [disabled]="anyBusy()" />
+          <input
+            class="ui-input"
+            type="number"
+            min="1"
+            [max]="deskPreset === 'winner' ? 8 : 50"
+            [(ngModel)]="maxStocksPerDay"
+            [disabled]="anyBusy()"
+          />
+          <small>{{ deskPreset === 'winner' ? 'Winner desk: 5 names. Do not exceed 8.' : 'Original book used 3 names.' }}</small>
+        </label>
+        <label class="mp-field">
+          Which names
+          <select class="ui-select" [(ngModel)]="rankBy" [disabled]="anyBusy()">
+            <option value="stopPct">5 widest signal-candle stops</option>
+            <option value="time">First eligible by time</option>
+            <option value="orWidth">Widest opening range</option>
+          </select>
+        </label>
+        <label class="mp-field">
+          09:45 crowd
+          <select class="ui-select" [(ngModel)]="crowdFilter" [disabled]="anyBusy()">
+            <option value="skipShort">Skip short-crowd (≤40% long)</option>
+            <option value="">Take every session</option>
+            <option value="follow">Follow majority side</option>
+            <option value="skipLong">Skip long-crowd (≥60% long)</option>
+          </select>
         </label>
         <div class="mp-field">
           <span>&nbsp;</span>
@@ -77,7 +111,7 @@
       <div class="mp-card-head">
         <div>
           <h2>Entry and exit</h2>
-          <p class="mp-sub">Your rule. Times are IST. 15-minute range from 5-minute Kite candles. No live orders.</p>
+          <p class="mp-sub">{{ deskLabel() }}. Times are IST. 15-minute range from 5-minute Kite candles. No live orders.</p>
         </div>
       </div>
       <div class="hb-rules">
@@ -94,7 +128,7 @@
           <ul class="mp-stack">
             <li>Uptrend: after two red 5-minute candles (two lows), the next green candle’s high is entry and its low is SL.</li>
             <li>Downtrend: after two green 5-minute candles, the next red candle’s low is entry and its high is SL.</li>
-            <li>Buy/sell stop fills on a later 5-minute bar. Risk is that candle’s range. Notional cap 5× capital.</li>
+            <li>Last new entry 14:30. Buy/sell stop fills on a later 5-minute bar. Risk ~0.75% of capital (~₹75 on ₹10k). Notional cap 5× capital.</li>
           </ul>
         </div>
         <div>
@@ -103,6 +137,14 @@
             <li>No automatic target — you decide from the 30-minute marks.</li>
             <li>SL hit closes the whole trade. Leftover positions exit at the 15:15 close (EOD).</li>
             <li>Max amount went is the best rupee move after fill, even if SL later takes it.</li>
+          </ul>
+        </div>
+        <div data-testid="winner-desk-rules">
+          <h3>Desk selection</h3>
+          <ul class="mp-stack">
+            <li>{{ crowdLabel(crowdFilter) }} — 09:45 full closes only, knowable before most entries.</li>
+            <li>Then take {{ rankLabel(rankBy) }}. Winner desk uses 5 names on ₹10k; research cap is 8.</li>
+            <li>Same first-15 two-low pattern. Scale quantity with capital, not the name count.</li>
           </ul>
         </div>
       </div>
@@ -170,6 +212,11 @@
           <span class="mp-stat-label">Max went</span>
           <span class="mp-stat-value mp-up">{{ inr(view.summary.maxWentRs || 0) }}</span>
           <span class="mp-stat-hint">Best open move on any trade</span>
+        </div>
+        <div class="mp-stat" data-testid="desk-used">
+          <span class="mp-stat-label">Desk used</span>
+          <span class="mp-stat-value">{{ inr(view.config.capital) }} · {{ view.config.maxStocksPerDay }} names</span>
+          <span class="mp-stat-hint">{{ crowdLabel(view.config.crowdFilter) }} · {{ rankLabel(view.config.rankBy) }}</span>
         </div>
       </div>
 

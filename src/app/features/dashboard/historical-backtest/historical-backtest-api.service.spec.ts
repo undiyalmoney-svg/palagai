@@ -21,6 +21,34 @@ describe('HistoricalBacktestApiService', () => {
     };
   }
 
+  it('posts the ₹10k winner desk on a single-book run', async () => {
+    const { api, http } = setup();
+    const pending = api.start({
+      from: '2026-10-16',
+      to: '2026-10-16',
+      capital: 10000,
+      maxStocksPerDay: 5,
+      rankBy: 'stopPct',
+      crowdFilter: 'skipShort',
+      preset: 'winner',
+    });
+    const req = http.expectOne('/api/orb-backtest/run');
+    expect(req.request.method).toBe('POST');
+    expect(req.request.headers.get('X-Kite-Authorization')).toBe('token key:secret');
+    expect(req.request.body).toEqual({
+      from: '2026-10-16',
+      to: '2026-10-16',
+      capital: 10000,
+      maxStocksPerDay: 5,
+      rankBy: 'stopPct',
+      crowdFilter: 'skipShort',
+      preset: 'winner',
+    });
+    req.flush({ id: 'job-1', status: 'running', liveOrders: false, input: { preset: 'winner', capital: 10000 } });
+    await expect(pending).resolves.toMatchObject({ id: 'job-1', liveOrders: false });
+    http.verify();
+  });
+
   it('posts a discovery job and polls it with the Kite session header', async () => {
     const { api, http } = setup();
     const pending = api.startDiscover({

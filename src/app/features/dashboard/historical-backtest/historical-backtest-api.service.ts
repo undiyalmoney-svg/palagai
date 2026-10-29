@@ -23,6 +23,9 @@ export class HistoricalBacktestApiService {
     to: string;
     capital: number;
     maxStocksPerDay: number;
+    rankBy?: string;
+    crowdFilter?: string | null;
+    preset?: string;
   }): Promise<BacktestJob> {
     return firstValueFrom(
       this.http.post<BacktestJob>(`${this.base}/run`, body, { headers: this.headers() }),
