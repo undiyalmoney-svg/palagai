@@ -5,6 +5,8 @@ import {
   hhmmToMin,
   pdhlDir,
   skipWildPrevDay,
+  weekMonday,
+  weekShouldStandDown,
 } from './crude-daily-green.dna';
 
 describe('Crude daily-green DNA', () => {
@@ -37,5 +39,15 @@ describe('Crude daily-green DNA', () => {
     expect(hhmmToMin(CRUDE_DAILY_GREEN.entryStart)).toBe(18 * 60 + 30);
     expect(hhmmToMin(CRUDE_DAILY_GREEN.entryEnd)).toBe(21 * 60);
     expect(hhmmToMin(CRUDE_DAILY_GREEN.flatten)).toBe(23 * 60 + 10);
+  });
+
+  it('banks the week at +80 pts and does not sit after a single red day', () => {
+    expect(CRUDE_DAILY_GREEN.weekLockPts).toBe(80);
+    expect(CRUDE_DAILY_GREEN.weekLossPts).toBe(0);
+    expect(CRUDE_DAILY_GREEN.sitAfterRedDay).toBe(false);
+    expect(weekShouldStandDown(79)).toBe(false);
+    expect(weekShouldStandDown(80)).toBe(true);
+    expect(weekShouldStandDown(-40)).toBe(false);
+    expect(weekMonday('2026-08-19')).toBe('2026-08-17');
   });
 });

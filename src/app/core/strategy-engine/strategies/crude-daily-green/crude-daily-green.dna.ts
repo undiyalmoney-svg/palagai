@@ -1,16 +1,17 @@
 /**
- * Crude Mini evening PDHL scalp, tuned to raise green days vs Daily Profit.
+ * Crude Mini evening PDHL scalp with a weekly stand-down.
  *
- * Same SL20/TP40 · confirm · max 2 as Daily Profit, plus skip when yesterday's
- * range is wider than 400 pts (chaotic sessions). First-win lock was tested and
- * *lowered* green days because a second fill is what turns a loser into a green day.
+ * Day DNA: SL20/TP40 · confirm · max 2 · skip yesterday range > 400 pts.
+ * Week DNA: after the week is +80 pts (~₹800 before the last ticket's charges),
+ * stop hunting. That banks a green week instead of giving it back.
  *
  * Sample (CRUDEOILM 5m 2026-05-21 → 2026-10-30, ₹50/RT, 1 lot ₹10/pt):
- *   baseline 65.8% green · ₹90/day
- *   this DNA 67.6% green · ₹99/day · OOS Sep–Oct 68.2%
- * Not every calendar day. Not a guaranteed profit.
+ *   no week cap  10/15 weeks green · ₹245/week · worst −₹500
+ *   week lock 80 11/15 weeks green · ₹355/week · worst −₹500
+ * Sitting out after a red day cut the worst week to −₹250 but made Sep–Oct unprofitable.
+ * Not every week. Not a guaranteed profit.
  */
-export const CRUDE_DAILY_GREEN_ID = 'daily-green-pd400';
+export const CRUDE_DAILY_GREEN_ID = 'weekly-green-l80';
 
 export const CRUDE_DAILY_GREEN = {
   profileId: CRUDE_DAILY_GREEN_ID,
@@ -26,6 +27,10 @@ export const CRUDE_DAILY_GREEN = {
   confirm: true,
   emaFilter: false,
   maxPrevDayRangePts: 400,
+  /** Gross points. Two 40-pt targets bank the week. */
+  weekLockPts: 80,
+  weekLossPts: 0,
+  sitAfterRedDay: false,
   rupeesPerPoint: 10,
   chargeRs: 50,
 } as const;
@@ -65,4 +70,27 @@ export function confirmDir(
 ): boolean {
   if (dir === 1) return nextClose > nextOpen && nextClose > signalClose;
   return nextClose < nextOpen && nextClose < signalClose;
+}
+
+/** Monday 00:00 IST week key from YYYY-MM-DD. */
+export function weekMonday(day: string): string {
+  const [y, m, d] = day.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, (m || 1) - 1, d || 1));
+  const wd = dt.getUTCDay(); // 0 Sun … 6 Sat
+  const back = wd === 0 ? 6 : wd - 1;
+  dt.setUTCDate(dt.getUTCDate() - back);
+  const yy = dt.getUTCFullYear();
+  const mm = String(dt.getUTCMonth() + 1).padStart(2, '0');
+  const dd = String(dt.getUTCDate()).padStart(2, '0');
+  return `${yy}-${mm}-${dd}`;
+}
+
+export function weekShouldStandDown(
+  weekNetPts: number,
+  lockPts = CRUDE_DAILY_GREEN.weekLockPts,
+  lossPts = CRUDE_DAILY_GREEN.weekLossPts,
+): boolean {
+  if (lockPts > 0 && weekNetPts >= lockPts) return true;
+  if (lossPts > 0 && weekNetPts <= -lossPts) return true;
+  return false;
 }
