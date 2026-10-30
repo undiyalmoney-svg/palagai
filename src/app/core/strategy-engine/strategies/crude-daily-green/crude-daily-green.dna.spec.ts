@@ -35,9 +35,9 @@ describe('Crude daily-green DNA', () => {
     expect(confirmDir(1, 5210, 5218, 5211)).toBe(false);
   });
 
-  it('uses the evening window and 23:10 flatten', () => {
-    expect(hhmmToMin(CRUDE_DAILY_GREEN.entryStart)).toBe(18 * 60 + 30);
-    expect(hhmmToMin(CRUDE_DAILY_GREEN.entryEnd)).toBe(21 * 60);
+  it('uses the all-session window and 23:10 flatten', () => {
+    expect(hhmmToMin(CRUDE_DAILY_GREEN.entryStart)).toBe(9 * 60);
+    expect(hhmmToMin(CRUDE_DAILY_GREEN.entryEnd)).toBe(23 * 60);
     expect(hhmmToMin(CRUDE_DAILY_GREEN.flatten)).toBe(23 * 60 + 10);
   });
 

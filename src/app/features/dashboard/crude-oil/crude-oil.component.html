@@ -1,0 +1,158 @@
+<div class="mp-page" data-testid="crude-oil-page">
+  <div class="mp-banner" [attr.data-tone]="liveMoney()?.enabled ? 'down' : 'warn'" data-testid="crude-banner">
+    @if (liveMoney()?.enabled) {
+      Real money is on. 1 lot CRUDEOILM futures, MCX MIS. Scanning closed 5-minute bars from 09:00 to 23:00 IST. Auto
+      SL-M 20 pts, take-profit 40 pts, flatten 23:10. On expiry day this desk already rolled to the next month. Not a
+      guaranteed profit.
+    } @else {
+      Live Crude Mini. 1 lot, ₹10 a point. Prior-day break with next-bar confirm, 09:00–23:00 IST — the window that
+      produced more entries than the old evening cut. Week lock +80 pts. Tick the box to place real MCX MIS. Does not
+      auto-start. Not a guaranteed profit.
+    }
+  </div>
+
+  <div class="mp-card">
+    <div class="mp-card-head">
+      <div>
+        <h2>Contract</h2>
+        <p class="mp-sub">
+          Always the next CRUDEOILM future. On expiry day the dying month is skipped so orders go to the following
+          contract.
+        </p>
+      </div>
+      <span class="mp-badge" [attr.data-tone]="liveMoney()?.contract?.expiryDay ? 'warn' : 'info'">
+        {{ liveMoney()?.contract?.expiryDay ? 'Expiry day · next month' : 'CRUDEOILM FUT' }}
+      </span>
+    </div>
+    @if (liveMoney()?.contract; as c) {
+      <div class="mp-stats">
+        <div class="mp-stat">
+          <span class="mp-stat-label">Trading</span>
+          <span class="mp-stat-value" data-testid="crude-symbol">{{ c.tradingSymbol }}</span>
+          <span class="mp-stat-hint">Expires {{ c.expiry || '—' }}</span>
+        </div>
+        <div class="mp-stat">
+          <span class="mp-stat-label">Lot</span>
+          <span class="mp-stat-value">{{ c.lotSize || 1 }}</span>
+          <span class="mp-stat-hint">₹{{ locked.rupeesPerPoint }}/pt · ₹{{ locked.chargeRs }}/RT</span>
+        </div>
+      </div>
+    } @else {
+      <p class="mp-sub" data-testid="crude-contract-empty">
+        Connect Kite on <a routerLink="/dashboard/get-token">Token</a> so this desk can read the MCX list and pick the
+        next month.
+      </p>
+    }
+  </div>
+
+  <div class="mp-card">
+    <div class="mp-card-head">
+      <div>
+        <h2>Rules</h2>
+        <p class="mp-sub">
+          Same DNA the weekly hunt locked. Morning fills were the extra entries; evening still trades.
+        </p>
+      </div>
+      <span class="mp-badge" data-tone="info">{{ engineVersion() || dna()?.profileId || locked.profileId }}</span>
+    </div>
+    <ul class="mp-list" data-testid="crude-rules">
+      <li>Entries {{ locked.entryStart }}–{{ locked.entryEnd }} IST · flatten {{ locked.flatten }}</li>
+      <li>SL {{ locked.stopPts }} pts · TP {{ locked.targetPts }} pts · max {{ locked.maxTrades }}/day</li>
+      <li>Day lock +{{ locked.dayLockPts }} · day loss −{{ locked.dayLossPts }} · week lock +{{ locked.weekLockPts }}</li>
+      <li>Skip yesterday if range &gt; {{ locked.maxPrevDayRangePts }} pts · next-bar confirm</li>
+    </ul>
+  </div>
+
+  <div class="mp-card" data-testid="live-money-card">
+    <div class="mp-card-head">
+      <div>
+        <h2>Live money</h2>
+        <p class="mp-sub">
+          Places real Kite MIS. Tick the box to arm. Stop flatten cancels the SL-M, then market-exits anything still
+          open. Idle until you start it — a deploy does not arm this.
+        </p>
+      </div>
+      <span class="mp-badge" [attr.data-tone]="liveMoney()?.enabled ? 'down' : 'info'">
+        {{ liveMoney()?.enabled ? 'Real money on' : 'Armed off' }}
+      </span>
+    </div>
+    <div class="mp-form">
+      <label class="ui-check">
+        <input
+          type="checkbox"
+          [(ngModel)]="liveConfirm"
+          [disabled]="liveMoneyBusy() || !!liveMoney()?.enabled"
+          data-testid="live-money-confirm"
+        />
+        Place real Kite MIS on 1 lot Crude Mini, with auto SL-M 20 pts and TP 40 / 23:10 flatten
+      </label>
+      <div class="mp-field">
+        <span>&nbsp;</span>
+        <button
+          type="button"
+          class="ui-btn ui-btn-primary"
+          [disabled]="liveMoneyBusy() || !!liveMoney()?.enabled || !liveConfirmOk()"
+          (click)="startLiveMoney()"
+          data-testid="start-live-money"
+        >
+          {{ liveMoneyBusy() && !liveMoney()?.enabled ? 'Starting…' : 'Start live money' }}
+        </button>
+      </div>
+      <div class="mp-field">
+        <span>&nbsp;</span>
+        <button
+          type="button"
+          class="ui-btn"
+          [disabled]="liveMoneyBusy() || !(liveMoney()?.enabled || liveMoney()?.fills?.length)"
+          (click)="stopLiveMoney()"
+          data-testid="stop-live-money"
+        >
+          Stop flatten
+        </button>
+      </div>
+    </div>
+    @if (error()) {
+      <p class="mp-sub mp-down">{{ error() }}</p>
+    }
+    @if (liveMoney(); as money) {
+      <p class="mp-sub" data-testid="live-money-status">
+        {{ money.lastMessage || 'Idle until Start live money.' }}
+        Week {{ money.weekNetPts | number : '1.0-0' }} pts · day {{ money.dayNetPts | number : '1.0-0' }} pts ·
+        {{ money.tradesToday }}/2 fills.
+      </p>
+      @if (money.lastError) {
+        <p class="mp-sub mp-down">{{ money.lastError }}</p>
+      }
+      @if (money.fills.length) {
+        <div class="mp-table-wrap">
+          <table class="mp-table">
+            <thead>
+              <tr>
+                <th>Symbol</th>
+                <th>Side</th>
+                <th>In</th>
+                <th class="num">Qty</th>
+                <th class="num">Entry</th>
+                <th class="num">SL-M</th>
+                <th class="num">TP</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (f of money.fills; track f.instrument) {
+                <tr>
+                  <td class="mp-sym">{{ f.instrument }}</td>
+                  <td>{{ f.side === 'S' ? 'Short' : 'Long' }}</td>
+                  <td>{{ f.signalT || '—' }}</td>
+                  <td class="num">{{ f.qty }}</td>
+                  <td class="num">{{ f.entry | number : '1.0-1' }}</td>
+                  <td class="num">{{ f.stop | number : '1.0-1' }}</td>
+                  <td class="num">{{ f.target | number : '1.0-1' }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    }
+  </div>
+</div>

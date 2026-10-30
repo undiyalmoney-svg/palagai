@@ -5,6 +5,7 @@ import {
   CRUDE_OIL_MINI_INSTRUMENT,
   NIFTY_50_INSTRUMENT,
 } from '../constants/instruments.const';
+import { crudeIstCalendarDay } from './crude-option.util';
 
 export function resolveCrudeOilFuturesToken(
   instruments: Instrument[],
@@ -64,12 +65,22 @@ export function resolveNatGasMiniFuturesToken(
  * Prefers next contract (expiry > today) so expiry day rolls like options;
  * falls back to same-day only if no later FUT exists.
  */
+function expiryCalendarDay(expiry: string | undefined): Date | null {
+  if (!expiry) return null;
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(expiry);
+  if (m) {
+    return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 0, 0, 0, 0);
+  }
+  const d = new Date(expiry);
+  return Number.isNaN(d.getTime()) ? null : crudeIstCalendarDay(d);
+}
+
 export function resolveMcxMiniFuturesToken(
   instruments: Instrument[],
   prefixes: string[],
   asOf?: Date,
 ): Instrument | undefined {
-  const today = startOfDay(asOf ?? new Date());
+  const today = crudeIstCalendarDay(asOf ?? new Date());
   const prefs = prefixes.map((p) => p.toUpperCase());
 
   const pool = instruments
@@ -82,19 +93,17 @@ export function resolveMcxMiniFuturesToken(
     .sort((left, right) => expiryTime(left) - expiryTime(right));
 
   const next = pool.find((item) => {
-    if (!item.expiry) {
-      return true;
-    }
-    return startOfDay(new Date(item.expiry)) > today;
+    const exp = expiryCalendarDay(item.expiry);
+    if (!exp) return true;
+    return exp.getTime() > today.getTime();
   });
   if (next) {
     return next;
   }
   return pool.find((item) => {
-    if (!item.expiry) {
-      return true;
-    }
-    return startOfDay(new Date(item.expiry)) >= today;
+    const exp = expiryCalendarDay(item.expiry);
+    if (!exp) return true;
+    return exp.getTime() >= today.getTime();
   });
 }
 

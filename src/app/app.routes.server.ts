@@ -10,6 +10,7 @@ export const serverRoutes: ServerRoute[] = [
   { path: 'kite-callback', renderMode: RenderMode.Client },
   { path: 'dashboard/get-token', renderMode: RenderMode.Client },
   { path: 'dashboard/historical-backtest', renderMode: RenderMode.Client },
+  { path: 'dashboard/crude-oil', renderMode: RenderMode.Client },
   { path: 'dashboard/order-test', renderMode: RenderMode.Client },
   { path: 'admin/login', renderMode: RenderMode.Client },
   {

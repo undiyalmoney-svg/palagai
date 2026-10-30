@@ -17,7 +17,8 @@ export const authTokenInterceptor: HttpInterceptorFn = (req, next) => {
     url.includes('/api/sl-buddy') ||
     url.includes('/api/market-desk') ||
     url.includes('/api/orb-backtest') ||
-    url.includes('/api/daily-profit');
+    url.includes('/api/daily-profit') ||
+    url.includes('/api/crude-live');
 
   if (needsAdmin) {
     const t = auth.getAdminToken();

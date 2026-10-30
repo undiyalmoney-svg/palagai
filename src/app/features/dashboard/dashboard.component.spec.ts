@@ -31,7 +31,7 @@ describe('DashboardComponent navigation', () => {
       id: '1',
       username: 'Devil',
       role: 'owner',
-      modules: ['token', 'backtest', 'test'],
+      modules: ['token', 'backtest', 'crude', 'test'],
     });
     await TestBed.configureTestingModule({
       imports: [DashboardComponent],
@@ -40,6 +40,7 @@ describe('DashboardComponent navigation', () => {
         provideRouter([
           { path: 'dashboard/get-token', component: DashboardComponent },
           { path: 'dashboard/historical-backtest', component: DashboardComponent },
+          { path: 'dashboard/crude-oil', component: DashboardComponent },
           { path: 'dashboard/order-test', component: DashboardComponent },
           { path: 'login', component: DashboardComponent },
         ]),
@@ -89,5 +90,16 @@ describe('DashboardComponent navigation', () => {
     fixture.componentInstance['go']('/dashboard/historical-backtest');
     await fixture.whenStable();
     expect(router.url).toBe('/dashboard/historical-backtest');
+  });
+
+  it('lists Crude Oil and navigates there from Token', async () => {
+    const el = fixture.nativeElement as HTMLElement;
+    const link = el.querySelector('[data-testid="nav-crude"]') as HTMLAnchorElement | null;
+    expect(link).toBeTruthy();
+    expect(link?.textContent).toMatch(/Crude Oil/i);
+
+    fixture.componentInstance['go']('/dashboard/crude-oil');
+    await fixture.whenStable();
+    expect(router.url).toBe('/dashboard/crude-oil');
   });
 });

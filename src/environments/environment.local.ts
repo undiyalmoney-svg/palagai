@@ -8,12 +8,13 @@ export const environment = {
   marketDeskApiBaseUrl: '/api/market-desk',
   orbBacktestApiBaseUrl: '/api/orb-backtest',
   dailyProfitApiBaseUrl: '/api/daily-profit',
+  crudeLiveApiBaseUrl: '/api/crude-live',
   pnlApiBaseUrl: '/api/pnl',
   defaultLots: 1,
   allowLiveMoney: true,
   orderEgressIp: '168.144.28.89',
-  appVersion: '1.3.149',
-  appBuild: '2026.10.29-live-parity',
+  appVersion: '1.3.151',
+  appBuild: '2026.10.30-crude-live',
   /**
    * Optional local-only session bootstrap. Fill via Get Token — do not commit real tokens.
    */

@@ -68,7 +68,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   protected readonly clockLabel = signal('');
   protected readonly pageTitle = signal('Palagai');
-  protected readonly pageSubtitle = signal('Token, Historical Backtest, and Test.');
+  protected readonly pageSubtitle = signal('Token, Historical Backtest, Crude Oil, and Test.');
   protected readonly sidebarOpen = signal(true);
   protected readonly profileOpen = signal(false);
 
@@ -86,6 +86,13 @@ export class DashboardComponent implements OnInit, OnDestroy {
       route: '/dashboard/historical-backtest',
       icon: 'trending-up',
       module: 'backtest',
+    },
+    {
+      label: 'Crude Oil',
+      shortLabel: 'Crude',
+      route: '/dashboard/crude-oil',
+      icon: 'activity',
+      module: 'crude',
     },
     {
       label: 'Test',
@@ -109,6 +116,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
       title: 'Historical Backtest',
       subtitle: 'Simulated prior-day follow book with the same 2-name 1R scan as live. Live today sizes from Kite cash.',
     },
+    '/dashboard/crude-oil': {
+      title: 'Crude Oil',
+      subtitle: 'Live Crude Mini. 1 lot CRUDEOILM futures, 09:00–23:00 IST. Rolls to the next month on expiry day.',
+    },
     '/dashboard/settings': {
       title: 'Settings',
       subtitle: 'Lots preference, instruments, and local data tools.',
@@ -125,7 +136,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   protected readonly hideFunds = computed(() => this.authService.isPublic());
 
-  /** Bottom tab bar on phone — Token, Historical Backtest, Test. */
+  /** Bottom tab bar on phone — Token, Historical Backtest, Crude Oil, Test. */
   protected readonly mobileTabItems = computed(() => this.navItems());
 
   protected readonly username = computed(() => {
@@ -320,6 +331,9 @@ export class DashboardComponent implements OnInit, OnDestroy {
           : 'Could not open that desk.';
     if (/historical-backtest|chunk|loading chunk|failed to fetch/i.test(`${event.url} ${msg}`)) {
       return 'Could not open Historical Backtest. Retry, or hard-refresh the tab.';
+    }
+    if (/crude-oil/i.test(`${event.url} ${msg}`)) {
+      return 'Could not open Crude Oil. Retry, or hard-refresh the tab.';
     }
     return msg || 'Could not open that desk.';
   }

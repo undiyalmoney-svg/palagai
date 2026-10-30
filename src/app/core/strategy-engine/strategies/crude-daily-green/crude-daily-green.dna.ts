@@ -1,22 +1,22 @@
 /**
- * Crude Mini evening PDHL scalp with a weekly stand-down.
+ * Crude Mini all-session PDHL scalp with a weekly stand-down.
  *
  * Day DNA: SL20/TP40 · confirm · max 2 · skip yesterday range > 400 pts.
+ * Window: 09:00–23:00 IST (more fills than the old 18:30–21:00 evening cut).
  * Week DNA: after the week is +80 pts (~₹800 before the last ticket's charges),
  * stop hunting. That banks a green week instead of giving it back.
  *
  * Sample (CRUDEOILM 5m 2026-05-21 → 2026-10-30, ₹50/RT, 1 lot ₹10/pt):
- *   no week cap  10/15 weeks green · ₹245/week · worst −₹500
- *   week lock 80 11/15 weeks green · ₹355/week · worst −₹500
- * Sitting out after a red day cut the worst week to −₹250 but made Sep–Oct unprofitable.
+ *   18:30–21:00 + week lock 80  52 fills · 73% green weeks · ₹355/week
+ *   09:00–23:00 + week lock 80  70 fills · 80% green weeks · ₹393/week · worst −₹400
  * Not every week. Not a guaranteed profit.
  */
 export const CRUDE_DAILY_GREEN_ID = 'weekly-green-l80';
 
 export const CRUDE_DAILY_GREEN = {
   profileId: CRUDE_DAILY_GREEN_ID,
-  entryStart: '18:30',
-  entryEnd: '21:00',
+  entryStart: '09:00',
+  entryEnd: '23:00',
   flatten: '23:10',
   stopPts: 20,
   targetPts: 40,

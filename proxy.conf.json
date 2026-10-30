@@ -80,6 +80,15 @@
     },
     "logLevel": "debug"
   },
+  "/api/crude-live": {
+    "target": "http://168.144.28.89:3000",
+    "secure": false,
+    "changeOrigin": true,
+    "pathRewrite": {
+      "^/api/crude-live": "/crude-live"
+    },
+    "logLevel": "debug"
+  },
   "/api/pnl": {
     "target": "http://168.144.28.89:3000",
     "secure": false,
