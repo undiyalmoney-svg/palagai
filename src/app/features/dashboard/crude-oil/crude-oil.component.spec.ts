@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { CrudeOilApiService } from './crude-oil-api.service';
 import { CrudeOilComponent } from './crude-oil.component';
 
@@ -35,7 +35,7 @@ describe('CrudeOilComponent', () => {
       liveOrders: moneyState.enabled,
       dna: {
         profileId: 'weekly-bank-sc8',
-        entryStart: '09:00',
+        entryStart: '10:00',
         entryEnd: '23:00',
         flatten: '23:10',
         stopPts: 20,
@@ -56,7 +56,7 @@ describe('CrudeOilComponent', () => {
       ...idleMoney,
       enabled: true,
       liveOrders: true,
-      lastMessage: 'Live Crude Mini armed. 1 lot CRUDEOILM FUT. Entries 09:00–23:00 IST.',
+      lastMessage: 'Live Crude Mini armed. 1 lot CRUDEOILM FUT. Entries 10:00–23:00 IST.',
       sessionOk: true,
     };
     return Promise.resolve({ status: 'ok', liveOrders: true, money: { ...moneyState } });
@@ -91,11 +91,11 @@ describe('CrudeOilComponent', () => {
     fixture.detectChanges();
   });
 
-  it('shows the next-month contract on expiry day and the all-session window', () => {
+  it('shows the next-month contract on expiry day and the 10:00–23:00 window', () => {
     const text = fixture.nativeElement.textContent as string;
     expect(text).toMatch(/CRUDEOILM26NOVFUT/);
     expect(text).toMatch(/Expiry day · next month/);
-    expect(text).toMatch(/09:00–23:00/);
+    expect(text).toMatch(/10:00–23:00/);
     expect(text).toMatch(/flatten 23:10/);
     expect(text).toMatch(/week lock \+40/);
     expect(text).toMatch(/Scratch 8/);

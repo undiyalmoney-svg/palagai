@@ -41,8 +41,8 @@ describe('Crude weekly-bank DNA', () => {
     expect(confirmDir(1, 5210, 5218, 5211)).toBe(false);
   });
 
-  it('uses the all-session window and 23:10 flatten', () => {
-    expect(hhmmToMin(CRUDE_DAILY_GREEN.entryStart)).toBe(9 * 60);
+  it('skips the 09:00 wash-out and flattens 23:10', () => {
+    expect(hhmmToMin(CRUDE_DAILY_GREEN.entryStart)).toBe(10 * 60);
     expect(hhmmToMin(CRUDE_DAILY_GREEN.entryEnd)).toBe(23 * 60);
     expect(hhmmToMin(CRUDE_DAILY_GREEN.flatten)).toBe(23 * 60 + 10);
   });

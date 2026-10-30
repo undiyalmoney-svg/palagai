@@ -85,6 +85,8 @@ def simulate(
     max_day: int,
     trail_arm: float,
     trail_give: float,
+    entry_s: int = ENTRY_S,
+    entry_e: int = ENTRY_E,
 ) -> list[dict]:
     o, h, l, c = mk["o"], mk["h"], mk["l"], mk["c"]
     days, mins, prev_hl = mk["days"], mk["mins"], mk["prev_hl"]
@@ -102,7 +104,8 @@ def simulate(
     def close_trade(day, wk, pts, reason):
         nonlocal day_net, week_net, trades_today, won, open_t
         rs = pts * RS - CHARGE
-        trades.append({"day": day, "week": wk, "pts": pts, "rs": rs, "reason": reason})
+        hour = open_t["hour"] if open_t else 0
+        trades.append({"day": day, "week": wk, "pts": pts, "rs": rs, "reason": reason, "hour": hour})
         day_net += pts
         week_net += pts
         trades_today += 1
@@ -199,10 +202,11 @@ def simulate(
                 "scratch": fill - d * scratch if scratch > 0 else None,
                 "bars": 0,
                 "mfe": 0.0,
+                "hour": int(mm) // 60,
             }
             continue
 
-        if not (ENTRY_S <= mm <= ENTRY_E):
+        if not (entry_s <= mm <= entry_e):
             continue
         levels = prev_hl.get(day)
         if not levels:

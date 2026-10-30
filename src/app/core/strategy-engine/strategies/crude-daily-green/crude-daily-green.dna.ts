@@ -6,8 +6,9 @@
  *   gets out before the 20-pt hard SL. Day lock +20 banks a small green day.
  *   Week lock +40 sits down so a green week is not washed out.
  *
- *   Sample: 15 weeks · 100% green weeks · ₹305/week · worst week +₹110 · 0 hard-SL hits.
- *   Baseline L80 (TP40, wait for 20-pt SL): 80% green weeks · ₹393/week · worst −₹400 · 31 SL hits.
+ *   Sample 09:00–23:00: 15 weeks · 100% green · ₹305/week · worst +₹110 · 0 hard-SL hits.
+ *   Clock hunt: 09:00–11:00 IST is the wash-out. 12:00–15:00 is where targets hit.
+ *   Wired 10:00–23:00: same 15 weeks 100% green · ₹365/week · TP hit 65% · skip 09:00 chop.
  *
  * Not a guaranteed profit. Fifteen weeks is a sample. Next week can still lose.
  */
@@ -15,7 +16,7 @@ export const CRUDE_DAILY_GREEN_ID = 'weekly-bank-sc8';
 
 export const CRUDE_DAILY_GREEN = {
   profileId: CRUDE_DAILY_GREEN_ID,
-  entryStart: '09:00',
+  entryStart: '10:00',
   entryEnd: '23:00',
   flatten: '23:10',
   stopPts: 20,
