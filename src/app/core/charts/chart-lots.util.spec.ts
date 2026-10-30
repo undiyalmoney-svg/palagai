@@ -27,10 +27,13 @@ describe('chart lots from funds', () => {
     expect(sizingCapitalFromFunds(-10, 40_000)).toBe(40_000);
   });
 
-  it('₹40,000 per index lot, Crude 3×, min 1 / 3, max 10 / 30', () => {
+  it('₹40,000 per index lot, Crude 3× from that band, 0 index / 1 Crude below ₹40k', () => {
     const cases: Array<[number, number, number]> = [
-      [0, 1, 3],
-      [39_999, 1, 3],
+      [0, 0, 0],
+      [7_999, 0, 0],
+      [8_000, 0, 1],
+      [14_000, 0, 1],
+      [39_999, 0, 1],
       [40_000, 1, 3],
       [79_999, 1, 3],
       [80_000, 2, 6],
@@ -41,9 +44,9 @@ describe('chart lots from funds', () => {
     for (const [capital, indexLots, crudeLots] of cases) {
       expect(lotsFromAvailableFunds(capital, 'index')).toBe(indexLots);
       expect(lotsFromAvailableFunds(capital, 'crude')).toBe(crudeLots);
-      expect(lotsForChartBook('nifty', capital, 10_000)).toBe(indexLots);
-      expect(lotsForChartBook('bank', capital, 10_000)).toBe(indexLots);
-      expect(lotsForChartBook('crude', capital, 10_000)).toBe(crudeLots);
+      expect(lotsForChartBook('nifty', capital, 0)).toBe(indexLots);
+      expect(lotsForChartBook('bank', capital, 0)).toBe(indexLots);
+      expect(lotsForChartBook('crude', capital, 0)).toBe(crudeLots);
     }
   });
 

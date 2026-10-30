@@ -18,11 +18,14 @@ describe('planLotsForCapital', () => {
     expect('enableCrude' in p).toBe(false);
   });
 
-  it('drops to a single book when capital is tight', () => {
+  it('stands down index books below ₹40k so ATM options cannot wash a small account', () => {
     const p = planLotsForCapital(20_000);
-    expect(p.estimatedPremiumRs).toBeLessThanOrEqual(p.premiumBudgetRs);
-    expect(p.enableNifty || p.enableBank).toBe(true);
-    expect(p.niftyLots + p.bankLots).toBeGreaterThanOrEqual(1);
+    expect(p.niftyLots).toBe(0);
+    expect(p.bankLots).toBe(0);
+    expect(p.enableNifty).toBe(false);
+    expect(p.enableBank).toBe(false);
+    expect(p.estimatedPremiumRs).toBe(0);
+    expect(p.note).toMatch(/Crude Mini futures/i);
   });
 
   it('scales lots when capital grows — ₹6L must not stay at N1/B2', () => {

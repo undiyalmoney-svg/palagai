@@ -100,6 +100,14 @@ describe('CrudeOilComponent', () => {
     expect(text).toMatch(/week lock \+80/);
     expect(text).toMatch(/Start live money/i);
     expect(text).toMatch(/Not a guaranteed profit/);
+    expect(text).toMatch(/₹14,000 capital/);
+    expect(text).toMatch(/Nifty 50/);
+    expect(text).toMatch(/Bank Nifty/);
+    expect(text).toMatch(/Sensex/);
+    expect(text).toMatch(/blocked/);
+    expect(text).toMatch(/Crude Mini futures ×1/);
+    expect(text).toMatch(/next listed future/i);
+    expect(text).toMatch(/never the dying week/i);
   });
 
   it('arms real-money scanning only after the confirm checkbox', async () => {

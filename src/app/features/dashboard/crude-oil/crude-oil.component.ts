@@ -2,6 +2,12 @@ import { DecimalPipe } from '@angular/common';
 import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
+import {
+  GUARD_BOOK_LABEL,
+  OWNER_CAPITAL_RS,
+  expiryRule,
+  guardCapital,
+} from '../../../core/paper-desk/capital-guard.util';
 import { CRUDE_DAILY_GREEN } from '../../../core/strategy-engine/strategies/crude-daily-green/crude-daily-green.dna';
 import { CrudeOilApiService } from './crude-oil-api.service';
 import { CrudeLiveDna, CrudeLiveMoney } from './crude-oil.models';
@@ -24,6 +30,12 @@ export class CrudeOilComponent implements OnInit, OnDestroy {
   protected readonly liveMoneyBusy = signal(false);
   protected readonly error = signal('');
   protected readonly locked = CRUDE_DAILY_GREEN;
+  protected readonly capital = guardCapital(OWNER_CAPITAL_RS);
+  protected readonly bookLabel = GUARD_BOOK_LABEL;
+  protected readonly expiryLines = (['nifty', 'bank', 'sensex', 'crude'] as const).map((book) => ({
+    book,
+    rule: expiryRule(book),
+  }));
 
   ngOnInit(): void {
     this.poll();

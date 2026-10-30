@@ -64,6 +64,24 @@ function clampLots(n: number): number {
   return Math.max(0, Math.min(MAX_LOTS_PER_BOOK, Math.floor(n)));
 }
 
+function emptyIndexPlan(capital: number, premiumBudgetRs: number, note: string): CapitalLotPlan {
+  return {
+    capitalRs: capital,
+    premiumBudgetRs,
+    niftyLots: 0,
+    bankLots: 0,
+    enableNifty: false,
+    enableBank: false,
+    estimatedPremiumRs: 0,
+    dailyTargetRs: 0,
+    tenDayGoalRs: 0,
+    dayProfitLockRs: 0,
+    riskLots: 0,
+    optionTrailArmRs: 0,
+    note,
+  };
+}
+
 /**
  * Pick lots for a capital base. Nifty+Bank only (Trade Desk has no Crude).
  * Scales both books together as capital grows — ₹6L must not stay stuck at N1/B2.
@@ -71,6 +89,15 @@ function clampLots(n: number): number {
 export function planLotsForCapital(capitalRs: number = DEFAULT_TRADING_CAPITAL_RS): CapitalLotPlan {
   const capital = Math.max(10_000, Math.floor(Number(capitalRs) || DEFAULT_TRADING_CAPITAL_RS));
   const premiumBudgetRs = Math.floor(capital * PREMIUM_BUDGET_FRAC);
+
+  if (capital < DEFAULT_TRADING_CAPITAL_RS) {
+    return emptyIndexPlan(
+      capital,
+      premiumBudgetRs,
+      `Capital ₹${capital.toLocaleString('en-IN')} is below ₹${DEFAULT_TRADING_CAPITAL_RS.toLocaleString('en-IN')}. ` +
+        `Index ATM CE/PE stands down. Crude Mini futures ×1 lives on the Crude Oil tab.`,
+    );
+  }
 
   const unitPair = ATM_PREMIUM_RS_PER_LOT.nifty + ATM_PREMIUM_RS_PER_LOT.bank;
   let niftyLots = 0;
@@ -95,9 +122,6 @@ export function planLotsForCapital(capitalRs: number = DEFAULT_TRADING_CAPITAL_R
     niftyLots = 1;
   } else if (premiumBudgetRs >= ATM_PREMIUM_RS_PER_LOT.bank) {
     bankLots = 1;
-  } else {
-    // Below one ATM lot proxy — still arm Nifty ×1 so the desk is not empty.
-    niftyLots = 1;
   }
 
   const estimatedPremiumRs = cost({ nifty: niftyLots, bank: bankLots });

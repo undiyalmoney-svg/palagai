@@ -1,5 +1,6 @@
 /**
  * Charts ATM sizing — ₹40,000 per index lot, Crude 3× that band.
+ * Below ₹40k index lots are 0 and Crude Mini is 1 futures lot, not 3.
  *
  * Actual Kite equity wins when it is a positive number. Otherwise the saved
  * capital preference is the fallback, so a dead funds

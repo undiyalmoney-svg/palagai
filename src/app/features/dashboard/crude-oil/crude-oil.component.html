@@ -5,10 +5,73 @@
       SL-M 20 pts, take-profit 40 pts, flatten 23:10. On expiry day this desk already rolled to the next month. Not a
       guaranteed profit.
     } @else {
-      Live Crude Mini. 1 lot, ₹10 a point. Prior-day break with next-bar confirm, 09:00–23:00 IST — the window that
-      produced more entries than the old evening cut. Week lock +80 pts. Tick the box to place real MCX MIS. Does not
-      auto-start. Not a guaranteed profit.
+      Live Crude Mini. 1 lot, ₹10 a point. ₹14,000 cannot buy ATM Nifty, Bank Nifty or Sensex without washing the
+      cash. Prior-day break with next-bar confirm, 09:00–23:00 IST. Week lock +80 pts. Tick the box to place real MCX
+      MIS. Does not auto-start. Not a guaranteed profit.
     }
+  </div>
+
+  <div class="mp-card" data-testid="capital-guard-card">
+    <div class="mp-card-head">
+      <div>
+        <h2>₹14,000 capital</h2>
+        <p class="mp-sub">
+          One book, one lot, hard day-loss ₹{{ capital.dayLossCapRs | number }}. ATM index options spend most of this
+          cash on a single premium. Option buying stays locked until ₹40,000. Not a guaranteed profit.
+        </p>
+      </div>
+      <span class="mp-badge" data-tone="warn">Live book · Crude Mini FUT ×1</span>
+    </div>
+    <div class="mp-stats">
+      <div class="mp-stat">
+        <span class="mp-stat-label">Cash</span>
+        <span class="mp-stat-value">₹{{ capital.capitalRs | number }}</span>
+        <span class="mp-stat-hint">Owner capital</span>
+      </div>
+      <div class="mp-stat">
+        <span class="mp-stat-label">Day loss cap</span>
+        <span class="mp-stat-value">₹{{ capital.dayLossCapRs | number }}</span>
+        <span class="mp-stat-hint">3% · matches 40-pt Crude stop</span>
+      </div>
+      <div class="mp-stat">
+        <span class="mp-stat-label">Premium budget</span>
+        <span class="mp-stat-value">₹{{ capital.premiumBudgetRs | number }}</span>
+        <span class="mp-stat-hint">25% — too small for one ATM index lot</span>
+      </div>
+    </div>
+    <div class="mp-table-wrap">
+      <table class="mp-table" data-testid="capital-books">
+        <thead>
+          <tr>
+            <th>Book</th>
+            <th>Product</th>
+            <th class="num">Lots</th>
+            <th class="num">1-stop</th>
+            <th>Rule</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (b of capital.books; track b.book) {
+            <tr>
+              <td class="mp-sym">{{ bookLabel[b.book] }}</td>
+              <td>
+                <span class="mp-badge" [attr.data-tone]="b.allowed ? 'up' : 'down'">
+                  {{ b.allowed ? b.product : 'blocked' }}
+                </span>
+              </td>
+              <td class="num">{{ b.lots }}</td>
+              <td class="num">₹{{ b.oneLossRs | number }} ({{ b.oneLossPct }}%)</td>
+              <td>{{ b.reason }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+    <ul class="mp-list" data-testid="expiry-rules">
+      @for (line of expiryLines; track line.book) {
+        <li>{{ line.rule }}</li>
+      }
+    </ul>
   </div>
 
   <div class="mp-card">

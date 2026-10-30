@@ -116,6 +116,7 @@ import {
   localChartTrade,
   mergeChartLiveTrades,
 } from '../../../core/charts/chart-live-trades';
+import { chartAtmRefuseReason } from '../../../core/paper-desk/capital-guard.util';
 import { RS_PER_LOT } from '../../../core/paper-desk/lots-from-funds';
 import { formatUnknownError } from '../../../core/utils/kite-error.util';
 import { isKiteAuthError } from '../../../core/utils/kite-auth-error.util';
@@ -1226,6 +1227,12 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
       return false;
     }
 
+    const atmRefuse = chartAtmRefuseReason(id, this.sizingCapitalRs());
+    if (atmRefuse) {
+      this.patch(id, { order: { ok: false, text: atmRefuse } });
+      return false;
+    }
+
     this.patch(id, { ordering: side, order: null });
     try {
       await this.kiteFunds.refresh();
@@ -1335,7 +1342,7 @@ export class LiveChartsComponent implements OnInit, OnDestroy {
     return sizingCapitalFromFunds(this.kiteFunds.equityAvailable(), this.capitalPref.get());
   }
 
-  /** Funds ladder: ₹40,000 per index lot, Crude 3× that band. */
+  /** Funds ladder: ₹40,000 per index lot. Below that, index ATM is 0 lots and Crude Mini is 1. */
   protected autoLotsFor(id: ChartBookId): number {
     return lotsForChartBook(id, this.kiteFunds.equityAvailable(), this.capitalPref.get());
   }
