@@ -3,7 +3,7 @@
  * Shown in Trade Desk “What the app trades on” card and Autobot hero.
  * Autobot also prefers Order-API /live appBuild when the server reports it.
  */
-export const APP_VERSION = '1.3.152';
-/** Short build tag — ₹14k capital guard, Crude Mini FUT ×1, no ATM index at this cash. */
-export const APP_BUILD = '2026.10.30-capital-14k';
+export const APP_VERSION = '1.3.153';
+/** Short build tag — weekly-bank Crude Mini: scratch 8, TP 30, week lock 40. */
+export const APP_BUILD = '2026.10.31-weekly-bank';
 export const APP_BUILD_LABEL = `v${APP_VERSION} · ${APP_BUILD}`;

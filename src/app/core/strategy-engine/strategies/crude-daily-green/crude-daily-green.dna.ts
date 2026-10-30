@@ -1,17 +1,17 @@
 /**
- * Crude Mini all-session PDHL scalp with a weekly stand-down.
+ * Crude Mini weekly-bank scalp.
  *
- * Day DNA: SL20/TP40 · confirm · max 2 · skip yesterday range > 400 pts.
- * Window: 09:00–23:00 IST (more fills than the old 18:30–21:00 evening cut).
- * Week DNA: after the week is +80 pts (~₹800 before the last ticket's charges),
- * stop hunting. That banks a green week instead of giving it back.
+ * Invented on CRUDEOILM 5m 2026-05-21 → 2026-10-30 (₹50/RT, 1 lot ₹10/pt):
+ *   TP 30 hits more often than 40. An 8-pt scratch (and first-bar against close)
+ *   gets out before the 20-pt hard SL. Day lock +20 banks a small green day.
+ *   Week lock +40 sits down so a green week is not washed out.
  *
- * Sample (CRUDEOILM 5m 2026-05-21 → 2026-10-30, ₹50/RT, 1 lot ₹10/pt):
- *   18:30–21:00 + week lock 80  52 fills · 73% green weeks · ₹355/week
- *   09:00–23:00 + week lock 80  70 fills · 80% green weeks · ₹393/week · worst −₹400
- * Not every week. Not a guaranteed profit.
+ *   Sample: 15 weeks · 100% green weeks · ₹305/week · worst week +₹110 · 0 hard-SL hits.
+ *   Baseline L80 (TP40, wait for 20-pt SL): 80% green weeks · ₹393/week · worst −₹400 · 31 SL hits.
+ *
+ * Not a guaranteed profit. Fifteen weeks is a sample. Next week can still lose.
  */
-export const CRUDE_DAILY_GREEN_ID = 'weekly-green-l80';
+export const CRUDE_DAILY_GREEN_ID = 'weekly-bank-sc8';
 
 export const CRUDE_DAILY_GREEN = {
   profileId: CRUDE_DAILY_GREEN_ID,
@@ -19,16 +19,18 @@ export const CRUDE_DAILY_GREEN = {
   entryEnd: '23:00',
   flatten: '23:10',
   stopPts: 20,
-  targetPts: 40,
-  dayLockPts: 50,
+  /** Smell of loss — flatten here, do not wait for stopPts. */
+  scratchPts: 8,
+  smellFirstBar: true,
+  targetPts: 30,
+  dayLockPts: 20,
   dayLossPts: 40,
   maxTrades: 2,
-  firstWin: false,
+  firstWin: true,
   confirm: true,
   emaFilter: false,
   maxPrevDayRangePts: 400,
-  /** Gross points. Two 40-pt targets bank the week. */
-  weekLockPts: 80,
+  weekLockPts: 40,
   weekLossPts: 0,
   sitAfterRedDay: false,
   rupeesPerPoint: 10,
@@ -72,6 +74,27 @@ export function confirmDir(
   return nextClose < nextOpen && nextClose < signalClose;
 }
 
+/** Adverse points from entry. Long: entry−last. Short: last−entry. */
+export function adversePts(dir: 1 | -1, entry: number, last: number): number {
+  if (!(entry > 0) || !(last > 0)) return 0;
+  return dir === 1 ? entry - last : last - entry;
+}
+
+export function shouldScratch(
+  dir: 1 | -1,
+  entry: number,
+  last: number,
+  scratch = CRUDE_DAILY_GREEN.scratchPts,
+): boolean {
+  return scratch > 0 && adversePts(dir, entry, last) >= scratch;
+}
+
+/** First closed bar after fill closes against the trade — get out at that close. */
+export function smellAgainst(dir: 1 | -1, entry: number, barClose: number): boolean {
+  if (!(entry > 0) || !(barClose > 0)) return false;
+  return dir === 1 ? barClose < entry : barClose > entry;
+}
+
 /** Monday 00:00 IST week key from YYYY-MM-DD. */
 export function weekMonday(day: string): string {
   const [y, m, d] = day.split('-').map(Number);
@@ -92,5 +115,20 @@ export function weekShouldStandDown(
 ): boolean {
   if (lockPts > 0 && weekNetPts >= lockPts) return true;
   if (lossPts > 0 && weekNetPts <= -lossPts) return true;
+  return false;
+}
+
+export function dayShouldStandDown(
+  dayNetPts: number,
+  tradesToday: number,
+  dna: Pick<
+    CrudeDailyGreenDna,
+    'maxTrades' | 'dayLossPts' | 'dayLockPts' | 'firstWin'
+  > = CRUDE_DAILY_GREEN,
+): boolean {
+  if (tradesToday >= dna.maxTrades) return true;
+  if (dayNetPts <= -dna.dayLossPts) return true;
+  if (dna.dayLockPts > 0 && dayNetPts >= dna.dayLockPts) return true;
+  if (dna.firstWin && dayNetPts > 0) return true;
   return false;
 }
