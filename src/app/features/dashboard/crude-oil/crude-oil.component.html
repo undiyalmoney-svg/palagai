@@ -2,11 +2,11 @@
   <div class="mp-banner" [attr.data-tone]="liveMoney()?.enabled ? 'down' : 'warn'" data-testid="crude-banner">
     @if (liveMoney()?.enabled) {
       Real money is on. 1 lot CRUDEOILM futures, MCX MIS. Scanning closed 5-minute bars from 10:00 to 23:00 IST. Scratch
-      8 pts if the trade smells wrong, take-profit 30 pts, hard SL-M 20 as floor, flatten 23:10. On expiry day this desk
-      already rolled to the next month. Not a guaranteed profit.
+      10 pts if the trade smells wrong, take-profit 25 pts (₹200 after charges), hard SL-M 20 as floor, flatten 23:10. On
+      expiry day this desk already rolled to the next month. Not a guaranteed profit.
     } @else {
       Live Crude Mini. 1 lot, ₹10 a point. ₹14,000 cannot buy ATM Nifty, Bank Nifty or Sensex without washing the
-      cash. Prior-day break with next-bar confirm, 10:00–23:00 IST. Scratch 8 pts · TP 30 · week lock +40. Tick the box
+      cash. PDHL, opening-range fade or trap, 10:00–23:00 IST. Scratch 10 pts · TP 25 (₹200) · sit first win. Tick the box
       to place real MCX MIS. Does not auto-start. Not a guaranteed profit.
     }
   </div>
@@ -113,8 +113,8 @@
       <div>
         <h2>Rules</h2>
         <p class="mp-sub">
-          Weekly-bank DNA. Smaller target so it actually hits. Scratch losers at 8 pts. Bank the day at +20 and the week
-          at +40 so winners are not washed out.
+          Daily-min DNA. TP 25 is ₹200 after charges on a clean ticket. PDHL plus fade/trap so red and sideways days
+          still get a shot. Sit at first win. Not a guaranteed ₹150–200.
         </p>
       </div>
       <span class="mp-badge" data-tone="info">{{ engineVersion() || dna()?.profileId || locked.profileId }}</span>
@@ -126,11 +126,10 @@
         {{ locked.maxTrades }}/day
       </li>
       <li>
-        Day lock +{{ locked.dayLockPts }} · first win · day loss −{{ locked.dayLossPts }} · week lock +{{
-          locked.weekLockPts
-        }}
+        Day lock +{{ locked.dayLockPts }} · first win · day loss −{{ locked.dayLossPts }} · week lock off so later days
+        still hunt
       </li>
-      <li>Skip yesterday if range &gt; {{ locked.maxPrevDayRangePts }} pts · next-bar confirm · first-bar smell exit</li>
+      <li>PDHL, 10:00–11:00 fade, or 6-bar trap · next-bar confirm · first-bar smell exit</li>
     </ul>
   </div>
 
@@ -155,7 +154,7 @@
           [disabled]="liveMoneyBusy() || !!liveMoney()?.enabled"
           data-testid="live-money-confirm"
         />
-        Place real Kite MIS on 1 lot Crude Mini, with scratch 8 / TP 30 / hard SL-M 20 and 23:10 flatten
+        Place real Kite MIS on 1 lot Crude Mini, with scratch 10 / TP 25 (₹200) / hard SL-M 20 and 23:10 flatten
       </label>
       <div class="mp-field">
         <span>&nbsp;</span>

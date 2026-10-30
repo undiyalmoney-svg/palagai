@@ -34,16 +34,16 @@ describe('CrudeOilComponent', () => {
       status: 'ok',
       liveOrders: moneyState.enabled,
       dna: {
-        profileId: 'weekly-bank-sc8',
+        profileId: 'daily-min-sc10',
         entryStart: '10:00',
         entryEnd: '23:00',
         flatten: '23:10',
         stopPts: 20,
-        targetPts: 30,
+        targetPts: 20,
         dayLockPts: 20,
         dayLossPts: 40,
         maxTrades: 2,
-        weekLockPts: 40,
+        weekLockPts: 0,
         rupeesPerPoint: 10,
         chargeRs: 50,
         qty: 1,
@@ -97,9 +97,10 @@ describe('CrudeOilComponent', () => {
     expect(text).toMatch(/Expiry day · next month/);
     expect(text).toMatch(/10:00–23:00/);
     expect(text).toMatch(/flatten 23:10/);
-    expect(text).toMatch(/week lock \+40/);
-    expect(text).toMatch(/Scratch 8/);
-    expect(text).toMatch(/TP 30/);
+    expect(text).toMatch(/week lock off/);
+    expect(text).toMatch(/Scratch 10/);
+    expect(text).toMatch(/TP 25/);
+    expect(text).toMatch(/₹200/);
     expect(text).toMatch(/Start live money/i);
     expect(text).toMatch(/Not a guaranteed profit/);
     expect(text).toMatch(/₹14,000 capital/);

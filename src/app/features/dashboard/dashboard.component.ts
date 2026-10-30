@@ -118,7 +118,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     },
     '/dashboard/crude-oil': {
       title: 'Crude Oil',
-      subtitle: 'Live Crude Mini. 1 lot CRUDEOILM futures, 10:00–23:00 IST. Rolls to the next month on expiry day.',
+      subtitle: 'Live Crude Mini. Aims for ₹200 a day (TP 25) on red, sideways, and green sessions. Not guaranteed.',
     },
     '/dashboard/settings': {
       title: 'Settings',

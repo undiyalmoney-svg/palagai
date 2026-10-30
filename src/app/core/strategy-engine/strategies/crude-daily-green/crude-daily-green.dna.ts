@@ -1,29 +1,30 @@
 /**
- * Crude Mini weekly-bank scalp.
+ * Crude Mini daily-min scalp.
  *
  * Invented on CRUDEOILM 5m 2026-05-21 → 2026-10-30 (₹50/RT, 1 lot ₹10/pt):
- *   TP 30 hits more often than 40. An 8-pt scratch (and first-bar against close)
- *   gets out before the 20-pt hard SL. Day lock +20 banks a small green day.
- *   Week lock +40 sits down so a green week is not washed out.
+ *   PDHL breakout alone pays ₹150 on 27% of full-session days and sits out
+ *   most red / sideways sessions. Adding 10:00–11:00 OR fade + 6-bar trap
+ *   lifts ₹150+ days to 43/74 (58%) — red 50%, sideways 64%, greenish 60%.
+ *   TP 25 = ₹200 after charges on a clean ticket. Scratch 10 (still before SL 20).
+ *   Sit at first win / +20. Week lock off so later days still hunt.
  *
- *   Sample 09:00–23:00: 15 weeks · 100% green · ₹305/week · worst +₹110 · 0 hard-SL hits.
- *   Clock hunt: 09:00–11:00 IST is the wash-out. 12:00–15:00 is where targets hit.
- *   Wired 10:00–23:00: same 15 weeks 100% green · ₹365/week · TP hit 65% · skip 09:00 chop.
- *
- * Not a guaranteed profit. Fifteen weeks is a sample. Next week can still lose.
+ *   Quiet/thin sessions still pay 0. Not a guaranteed ₹150–200. Worst tradable day −₹300.
  */
-export const CRUDE_DAILY_GREEN_ID = 'weekly-bank-sc8';
+export const CRUDE_DAILY_GREEN_ID = 'daily-min-sc10';
 
 export const CRUDE_DAILY_GREEN = {
   profileId: CRUDE_DAILY_GREEN_ID,
   entryStart: '10:00',
   entryEnd: '23:00',
   flatten: '23:10',
+  orStart: '10:00',
+  orEnd: '11:00',
   stopPts: 20,
-  /** Smell of loss — flatten here, do not wait for stopPts. */
-  scratchPts: 8,
+  /** Smell of loss — flatten here, do not wait for stopPts. 8-pt scratch on this mix printed a −₹610 week. */
+  scratchPts: 10,
   smellFirstBar: true,
-  targetPts: 30,
+  /** ₹200 after ₹50 RT on a clean 1-lot fill. */
+  targetPts: 25,
   dayLockPts: 20,
   dayLossPts: 40,
   maxTrades: 2,
@@ -31,9 +32,14 @@ export const CRUDE_DAILY_GREEN = {
   confirm: true,
   emaFilter: false,
   maxPrevDayRangePts: 400,
-  weekLockPts: 40,
+  /** Off — a green Monday must not block Tuesday’s ₹150 hunt. */
+  weekLockPts: 0,
   weekLossPts: 0,
   sitAfterRedDay: false,
+  trapPiercePts: 8,
+  trapLookback: 6,
+  orMinWidthPts: 12,
+  orMaxWidthPts: 220,
   rupeesPerPoint: 10,
   chargeRs: 50,
 } as const;
@@ -63,6 +69,65 @@ export function pdhlDir(close: number, open: number, pdh: number, pdl: number): 
   if (close > pdh && close > open) return 1;
   if (close < pdl && close < open) return -1;
   return 0;
+}
+
+/** Fade back into the 10:00–11:00 IST opening range after 11:00. */
+export function orbFadeDir(
+  close: number,
+  open: number,
+  high: number,
+  low: number,
+  orHigh: number,
+  orLow: number,
+  barMin: number,
+  orEndMin = hhmmToMin(CRUDE_DAILY_GREEN.orEnd),
+  minW = CRUDE_DAILY_GREEN.orMinWidthPts,
+  maxW = CRUDE_DAILY_GREEN.orMaxWidthPts,
+): 1 | -1 | 0 {
+  if (barMin <= orEndMin) return 0;
+  const width = orHigh - orLow;
+  if (!(width >= minW) || width > maxW) return 0;
+  if (high > orHigh && close < orHigh && close < open) return -1;
+  if (low < orLow && close > orLow && close > open) return 1;
+  return 0;
+}
+
+/** Pierce a 6-bar swing and close back through it — trap reversal. */
+export function trapDir(
+  close: number,
+  open: number,
+  high: number,
+  low: number,
+  swingHigh: number,
+  swingLow: number,
+  pierce = CRUDE_DAILY_GREEN.trapPiercePts,
+): 1 | -1 | 0 {
+  if (!(swingHigh > 0) || !(swingLow > 0)) return 0;
+  if (low < swingLow - pierce && close > swingLow && close > open) return 1;
+  if (high > swingHigh + pierce && close < swingHigh && close < open) return -1;
+  return 0;
+}
+
+/** PDHL first, then OR fade, then trap. Wild yesterday blocks PDHL only. */
+export function entryDir(
+  close: number,
+  open: number,
+  high: number,
+  low: number,
+  pdh: number,
+  pdl: number,
+  orHigh: number,
+  orLow: number,
+  swingHigh: number,
+  swingLow: number,
+  barMin: number,
+): 1 | -1 | 0 {
+  const pdhl = skipWildPrevDay(pdh, pdl) ? 0 : pdhlDir(close, open, pdh, pdl);
+  return (
+    pdhl ||
+    orbFadeDir(close, open, high, low, orHigh, orLow, barMin) ||
+    trapDir(close, open, high, low, swingHigh, swingLow)
+  );
 }
 
 export function confirmDir(
