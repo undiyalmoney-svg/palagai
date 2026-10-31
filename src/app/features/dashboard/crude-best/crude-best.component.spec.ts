@@ -116,6 +116,12 @@ describe('CrudeBestComponent', () => {
     expect(fixture.componentInstance['liveMoney']()?.guaranteed).toBe(false);
     expect(fixture.componentInstance['tape'].guaranteed).toBe(false);
     expect(fixture.componentInstance['tape'].everyDayGreen).toBe(false);
+    expect(text).toMatch(/Nifty, Bank Nifty, Sensex at ₹14,000/);
+    expect(text).toMatch(/Research only/);
+    expect(text).toMatch(/Not armed/);
+    expect(text).toMatch(/blocked/);
+    expect(fixture.componentInstance['indexHunt'].books.nifty.futAllowed).toBe(false);
+    expect(fixture.componentInstance['indexHunt'].books.bank.atmAllowed).toBe(false);
   });
 
   it('arms the shared 1-lot worker only after the confirm checkbox', async () => {

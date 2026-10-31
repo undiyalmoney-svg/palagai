@@ -3,6 +3,7 @@ import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { OWNER_CAPITAL_RS, guardCapital } from '../../../core/paper-desk/capital-guard.util';
+import { INDEX_14K_HUNT } from '../../../core/paper-desk/index-14k-hunt.fixture';
 import { CRUDE_DAILY_GREEN } from '../../../core/strategy-engine/strategies/crude-daily-green/crude-daily-green.dna';
 import { CRUDE_HISTORICAL_CANDLES } from '../../../core/strategy-engine/strategies/crude-daily-green/crude-historical-candles.fixture';
 import { CrudeOilApiService } from '../crude-oil/crude-oil-api.service';
@@ -29,6 +30,8 @@ export class CrudeBestComponent implements OnInit, OnDestroy {
   protected readonly capital = guardCapital(OWNER_CAPITAL_RS);
   protected readonly tape = CRUDE_HISTORICAL_CANDLES;
   protected readonly missDays = CRUDE_HISTORICAL_CANDLES.days.filter((d) => d.tone !== 'green');
+  protected readonly indexHunt = INDEX_14K_HUNT;
+  protected readonly indexBooks = (['nifty', 'bank', 'sensex'] as const).map((id) => INDEX_14K_HUNT.books[id]);
 
   ngOnInit(): void {
     this.poll();

@@ -61,6 +61,57 @@
     </ul>
   </div>
 
+  <div class="mp-card" data-testid="index-14k-hunt">
+    <div class="mp-card-head">
+      <div>
+        <h2>Nifty, Bank Nifty, Sensex at ₹14,000</h2>
+        <p class="mp-sub">
+          Same daily-min hunt on Yahoo 5-minute spot (5 Aug–30 Oct 2026). Futures margin is
+          ₹1.5L–₹2L. ATM CE/PE is ~₹8k–₹12k. Those stay blocked. Cheap OTM proxies that fit the
+          ₹{{ indexHunt.premiumBudgetRs | number }} premium budget and ₹{{ indexHunt.dayLossCapRs | number }}
+          day-loss were scored with a 0.2 delta — not live option prints. Not armed. Not a
+          guaranteed profit.
+        </p>
+      </div>
+      <span class="mp-badge" data-tone="warn">Research only</span>
+    </div>
+    <div class="mp-table-wrap">
+      <table class="mp-table" data-testid="index-14k-books">
+        <thead>
+          <tr>
+            <th>Book</th>
+            <th>FUT / ATM</th>
+            <th>Proxy that fits cash</th>
+            <th class="num">Sample</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (b of indexBooks; track b.label) {
+            <tr>
+              <td class="mp-sym">{{ b.label }}</td>
+              <td>blocked · margin ₹{{ b.futMarginRs | number }} · ATM ~₹{{ b.atmPremiumRs | number }}</td>
+              <td>
+                @if (b.champion; as c) {
+                  {{ c.mode }} {{ c.window }} · SL {{ c.sl }} / TP {{ c.tp }} · stop ₹{{ c.oneStopRs | number }}
+                } @else {
+                  none inside the ₹{{ indexHunt.dayLossCapRs | number }} stop
+                }
+              </td>
+              <td class="num">
+                @if (b.champion; as c) {
+                  {{ c.greenDays }}/{{ c.tradable }} green · worst ₹{{ c.worstDay | number }}
+                } @else {
+                  —
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+    <p class="mp-sub" data-testid="index-14k-honest">{{ indexHunt.honest }}</p>
+  </div>
+
   <div class="mp-card" data-testid="crude-best-historical">
     <div class="mp-card-head">
       <div>
