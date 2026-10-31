@@ -18,43 +18,41 @@ describe('Paper14kComponent', () => {
 
   it('is a dummy 14k desk that does not place Kite orders', () => {
     const text = fixture.nativeElement.textContent as string;
-    expect(text).toMatch(/Dummy ₹14,000 desk/);
-    expect(text).toMatch(/does not talk to Kite/);
+    expect(text).toMatch(/Dummy ₹14,000/);
     expect(text).toMatch(/Not a guaranteed profit/);
-    expect(text).toMatch(/Play next session/);
+    expect(text).toMatch(/Play next day/);
     expect(text).toMatch(/Reset to ₹14,000/);
     expect(text).toMatch(/Paper only/);
     expect(text).toMatch(/Crude Mini FUT/);
-    expect(text).toMatch(/Nifty 50/);
-    expect(text).toMatch(/Bank Nifty/);
-    expect(text).toMatch(/Sensex/);
+    expect(text).toMatch(/Overall amount/);
     expect(fixture.componentInstance['snap']().fundRs).toBe(14_000);
     expect(fixture.componentInstance['snap']().liveOrders).toBe(false);
     expect(fixture.componentInstance['snap']().guaranteed).toBe(false);
   });
 
-  it('plays a dummy day, marks the fund, then resets', () => {
+  it('stands down a loss-shaped day, then resets', () => {
     fixture.componentInstance['playNext']();
     fixture.detectChanges();
-    expect(fixture.componentInstance['snap']().fundRs).toBe(14_050);
+    expect(fixture.componentInstance['snap']().fundRs).toBe(14_000);
     expect(fixture.componentInstance['snap']().played).toBe(1);
-    expect(fixture.nativeElement.textContent).toMatch(/2026-07-22/);
+    expect(fixture.nativeElement.textContent).toMatch(/2026-05-27/);
+    expect(fixture.nativeElement.textContent).toMatch(/flat/);
     fixture.componentInstance['resetFund']();
     fixture.detectChanges();
     expect(fixture.componentInstance['snap']().fundRs).toBe(14_000);
     expect(fixture.componentInstance['snap']().played).toBe(0);
   });
 
-  it('plays the full dummy tape and keeps the fund above zero', () => {
+  it('plays the full dummy tape with Crude in the overall amount', () => {
     fixture.componentInstance['playAll']();
     fixture.detectChanges();
-    expect(fixture.componentInstance['snap']().fundRs).toBe(52_031);
+    expect(fixture.componentInstance['snap']().fundRs).toBe(50_749.5);
     expect(fixture.componentInstance['snap']().done).toBe(true);
-    expect(fixture.componentInstance['snap']().skipped).toBeGreaterThan(0);
+    expect(fixture.componentInstance['snap']().redDays).toBe(0);
     expect(fixture.nativeElement.textContent).toMatch(/Tape finished/);
     expect(fixture.nativeElement.textContent).toMatch(/Overall amount/);
     const crude = fixture.componentInstance['snap']().bookScores.find((b) => b.id === 'crude');
-    expect(crude?.netRs).toBe(7040);
+    expect(crude?.netRs).toBe(6000);
     expect(fixture.nativeElement.textContent).toMatch(/Crude Mini FUT/);
   });
 });

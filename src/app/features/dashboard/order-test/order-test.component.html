@@ -1,86 +1,89 @@
-<section class="order-test pg-page">
+<section class="order-test pg-page" data-testid="order-test-page">
   <header class="hero pg-page-hero">
     <div class="hero-copy">
-      <p class="pg-eyebrow">IP whitelist smoke test</p>
-      <h1>Order Test</h1>
+      <p class="pg-eyebrow">Dummy ₹14,000</p>
+      <h1>Test</h1>
       <p class="lede pg-lede">
-        Fire a tiny <strong>RELIANCE</strong> order through the DigitalOcean fixed IP — confirm Kite accepts your whitelisted server before going live.
+        One shared fund. Morning structure picks Crude Mini, Nifty, Bank, or Sensex.
+        Only a ticket that is profit after charges is banked. Loss tickets are refused.
+        Not a guaranteed profit.
       </p>
-    </div>
-    <div class="hero-meta">
-      <span class="pg-badge pg-badge-bear">REAL MONEY</span>
-      <span class="pg-badge pg-badge-neutral mono">{{ orderApiBase }}</span>
     </div>
   </header>
 
-  <div class="panel">
-    <div class="row">
-      <label class="field">
-        <span>Symbol</span>
-        <input type="text" [value]="symbol" disabled />
-      </label>
-      <label class="field">
-        <span>Exchange</span>
-        <input type="text" [value]="exchange" disabled />
-      </label>
-      <label class="field">
-        <span>Qty / Lots</span>
-        <input
-          type="number"
-          min="1"
-          step="1"
-          [(ngModel)]="quantity"
-          (ngModelChange)="onQuantityChange()"
-          [disabled]="busy()"
-        />
-      </label>
-      <label class="field">
-        <span>Product</span>
-        <select [(ngModel)]="product" [disabled]="busy()">
-          <option value="MIS">MIS</option>
-          <option value="CNC">CNC</option>
-        </select>
-      </label>
-    </div>
+  <app-paper-14k />
 
-    <div class="actions">
-      <button mat-stroked-button type="button" [disabled]="busy()" (click)="pingHealth()">
-        Ping health
-      </button>
-      <button mat-flat-button color="primary" type="button" [disabled]="busy()" (click)="placeBuy()">
-        @if (busy()) {
-          <mat-spinner diameter="18" />
-        }
-        Buy RELIANCE (MARKET)
-      </button>
-      <button mat-stroked-button type="button" [disabled]="busy()" (click)="placeSell()">
-        Sell RELIANCE (MARKET)
-      </button>
-      <button mat-stroked-button type="button" [disabled]="busy()" (click)="refreshOrders()">
-        Refresh orders
-      </button>
-      <button mat-button type="button" [disabled]="busy()" (click)="clearLogs()">Clear logs</button>
-    </div>
+  <details class="ip-smoke" data-testid="order-test-ip-hero">
+    <summary>RELIANCE IP smoke — real money, not part of the dummy fund</summary>
+    <div class="panel">
+      <div class="row">
+        <label class="field">
+          <span>Symbol</span>
+          <input type="text" [value]="symbol" disabled />
+        </label>
+        <label class="field">
+          <span>Exchange</span>
+          <input type="text" [value]="exchange" disabled />
+        </label>
+        <label class="field">
+          <span>Qty / Lots</span>
+          <input
+            type="number"
+            min="1"
+            step="1"
+            [(ngModel)]="quantity"
+            (ngModelChange)="onQuantityChange()"
+            [disabled]="busy()"
+          />
+        </label>
+        <label class="field">
+          <span>Product</span>
+          <select [(ngModel)]="product" [disabled]="busy()">
+            <option value="MIS">MIS</option>
+            <option value="CNC">CNC</option>
+          </select>
+        </label>
+      </div>
 
-    @if (lastOrderId()) {
-      <p class="last-id">Last order id: <code>{{ lastOrderId() }}</code></p>
-    }
-  </div>
+      <div class="actions">
+        <button mat-stroked-button type="button" [disabled]="busy()" (click)="pingHealth()">
+          Ping health
+        </button>
+        <button mat-flat-button color="primary" type="button" [disabled]="busy()" (click)="placeBuy()">
+          @if (busy()) {
+            <mat-spinner diameter="18" />
+          }
+          Buy RELIANCE (MARKET)
+        </button>
+        <button mat-stroked-button type="button" [disabled]="busy()" (click)="placeSell()">
+          Sell RELIANCE (MARKET)
+        </button>
+        <button mat-stroked-button type="button" [disabled]="busy()" (click)="refreshOrders()">
+          Refresh orders
+        </button>
+        <button mat-button type="button" [disabled]="busy()" (click)="clearLogs()">Clear logs</button>
+      </div>
 
-  <div class="logs-block">
-    <div class="logs-head">
-      <h3>Logs</h3>
-      <p>Request / response from the fixed-IP order backend</p>
-    </div>
-    <ul class="log-list">
-      @for (line of logs(); track line.at + line.message) {
-        <li [attr.data-level]="line.level">
-          <time>{{ line.at }}</time>
-          <span>{{ line.message }}</span>
-        </li>
-      } @empty {
-        <li class="empty">No logs yet — ping health, then place a 1-qty RELIANCE buy.</li>
+      @if (lastOrderId()) {
+        <p class="last-id">Last order id: <code>{{ lastOrderId() }}</code></p>
       }
-    </ul>
-  </div>
+    </div>
+
+    <div class="logs-block">
+      <div class="logs-head">
+        <h3>Logs</h3>
+        <p>{{ orderApiBase }}</p>
+      </div>
+      <ul class="log-list">
+        @for (line of logs(); track line.at + line.message) {
+          <li [attr.data-level]="line.level">
+            <time>{{ line.at }}</time>
+            <span>{{ line.message }}</span>
+          </li>
+        } @empty {
+          <li class="empty">No logs yet.</li>
+        }
+      </ul>
+    </div>
+  </details>
 </section>

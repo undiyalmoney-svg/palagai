@@ -2,6 +2,24 @@
   max-width: 1120px;
 }
 
+.order-test .ip-smoke {
+  margin-top: 1.5rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--pg-line, #d6ddd8);
+  border-radius: 10px;
+  background: var(--pg-bg-elevated, #fff);
+}
+
+.order-test .ip-smoke summary {
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: var(--pg-ink);
+}
+
+.order-test .ip-smoke[open] summary {
+  margin-bottom: 0.85rem;
+}
+
 .order-test .hero-copy h1 {
   margin: 0;
 }

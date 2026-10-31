@@ -131,8 +131,9 @@ export class DashboardComponent implements OnInit, OnDestroy {
       subtitle: 'Dummy ₹14,000. Same daily fills as live, no Kite orders. Capital is treated as real.',
     },
     '/dashboard/order-test': {
-      title: 'Order Test',
-      subtitle: 'Safe order probes against your connected Kite session.',
+      title: 'Test',
+      subtitle:
+        'Dummy ₹14,000. Structure picks the book. Only profit after charges. Crude is in the overall amount.',
     },
     '/dashboard/get-token': {
       title: 'Get Token',

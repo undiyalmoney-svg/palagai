@@ -3,7 +3,7 @@
  * Shown in Trade Desk “What the app trades on” card and Autobot hero.
  * Autobot also prefers Order-API /live appBuild when the server reports it.
  */
-export const APP_VERSION = '1.3.160';
-/** Short build tag — dummy ₹14k paper desk, Crude live unchanged. */
-export const APP_BUILD = '2026.10.31-paper-14k';
+export const APP_VERSION = '1.3.161';
+/** Short build tag — Test tab dummy fund includes Crude Mini. */
+export const APP_BUILD = '2026.10.31-test-crude';
 export const APP_BUILD_LABEL = `v${APP_VERSION} · ${APP_BUILD}`;

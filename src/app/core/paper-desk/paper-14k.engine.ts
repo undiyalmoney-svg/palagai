@@ -12,7 +12,7 @@ export const PAPER_14K_BOOKS = [
     sl: 20,
     tp: 25,
     scratch: 10,
-    note: 'Real money stays on Crude Best. Paper copy only here.',
+    note: 'Trend → PDH/PDL. Real money stays on Crude Best.',
   },
   {
     id: 'nifty',
@@ -38,7 +38,7 @@ export const PAPER_14K_BOOKS = [
     id: 'sensex',
     label: 'Sensex',
     product: 'cheap OTM CE/PE ₹150 × 20',
-    clock: '09:45–15:15 IST VWAP fade',
+    clock: '09:45–15:15 IST',
     sl: 80,
     tp: 160,
     scratch: 40,
@@ -70,6 +70,7 @@ export interface Paper14kSnapshot {
   lastDay: string | null;
   lastNetRs: number;
   lastTone: 'green' | 'red' | 'flat' | null;
+  lastStructure: string | null;
   slHits: number;
   tpHits: number;
   scratches: number;
@@ -109,12 +110,13 @@ export function paperSnapshot(played: number): Paper14kSnapshot {
     lastDay: last?.day ?? null,
     lastNetRs: last?.netRs ?? 0,
     lastTone: last?.tone ?? null,
+    lastStructure: last && 'structure' in last ? String(last.structure) : null,
     slHits: sessions.reduce<number>((a, s) => a + s.slHits, 0),
     tpHits: sessions.reduce<number>((a, s) => a + s.tpHits, 0),
     scratches: sessions.reduce<number>((a, s) => a + s.scratches, 0),
     skipped: sessions.reduce<number>((a, s) => a + s.skipped, 0),
     greenDays: sessions.filter((s) => s.tone === 'green').length,
-    redDays: sessions.filter((s) => s.tone === 'red').length,
+    redDays: sessions.filter((s) => (s.tone as string) === 'red').length,
     fills,
     sessions,
     lastFills: fills.slice(-12),
@@ -126,7 +128,10 @@ export function paperSnapshot(played: number): Paper14kSnapshot {
         fills: mine.length,
         netRs: mine.reduce<number>((a, f) => a + f.rs, 0),
         tpHits: mine.filter((f) => f.reason === 'tp').length,
-        scratches: mine.filter((f) => f.reason === 'scratch' || f.reason === 'smell').length,
+        scratches: mine.filter((f) => {
+          const reason = f.reason as string;
+          return reason === 'scratch' || reason === 'smell';
+        }).length,
         slHits: mine.filter((f) => (f.reason as string) === 'sl').length,
       };
     }),

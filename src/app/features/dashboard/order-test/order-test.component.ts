@@ -9,6 +9,7 @@ import { LotsPreferenceService } from '../../../core/services/lots-preference.se
 import { formatUnknownError } from '../../../core/utils/kite-error.util';
 import { environment } from '../../../../environments/environment';
 import { UiDialogService } from '../../../shared/ui/dialog/ui-dialog.service';
+import { Paper14kComponent } from '../paper-14k/paper-14k.component';
 
 interface LogLine {
   at: string;
@@ -19,7 +20,7 @@ interface LogLine {
 @Component({
   selector: 'app-order-test',
   standalone: true,
-  imports: [FormsModule, MatButtonModule, MatProgressSpinnerModule],
+  imports: [FormsModule, MatButtonModule, MatProgressSpinnerModule, Paper14kComponent],
   templateUrl: './order-test.component.html',
   styleUrl: './order-test.component.css',
 })
