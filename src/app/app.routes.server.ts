@@ -12,6 +12,7 @@ export const serverRoutes: ServerRoute[] = [
   { path: 'dashboard/historical-backtest', renderMode: RenderMode.Client },
   { path: 'dashboard/crude-best', renderMode: RenderMode.Client },
   { path: 'dashboard/crude-oil', renderMode: RenderMode.Client },
+  { path: 'dashboard/paper-14k', renderMode: RenderMode.Client },
   { path: 'dashboard/order-test', renderMode: RenderMode.Client },
   { path: 'admin/login', renderMode: RenderMode.Client },
   {

@@ -1,0 +1,243 @@
+<div class="mp-page" data-testid="paper-14k-page">
+  <div class="mp-banner" data-tone="info" data-testid="paper-14k-banner">
+    Dummy ₹{{ tape.startRs | number }} desk. Plays Crude Mini, Nifty, Bank Nifty and Sensex the same
+    way a live day would: reserve cash, take the fill, mark TP / scratch / SL, update the fund.
+    Day-loss ₹{{ tape.dayLossCapRs | number }}. Crude needs ₹{{ tape.crudeMinRs | number }} free.
+    Index premium ≤ ₹{{ tape.premiumBudgetRs | number }}. Fund never goes below 0. Crude
+    <strong>real</strong> money stays on
+    <a routerLink="/dashboard/crude-best">Crude Best</a>. This tab does not talk to Kite. Not a
+    guaranteed profit.
+  </div>
+
+  <div class="mp-card" data-testid="paper-books-card">
+    <div class="mp-card-head">
+      <div>
+        <h2>Books on this tape</h2>
+        <p class="mp-sub">
+          Best hunted books at ₹14,000. Shared dummy fund. Crude first, then Nifty, Bank, Sensex.
+          Day-loss or a thin cash pocket stands the rest of the day down.
+        </p>
+      </div>
+    </div>
+    <div class="mp-table-wrap">
+      <table class="mp-table" data-testid="paper-books">
+        <thead>
+          <tr>
+            <th>Book</th>
+            <th>Product</th>
+            <th>Clock</th>
+            <th>SL / scratch / TP</th>
+            <th>Live</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (b of books; track b.id) {
+            <tr>
+              <td class="mp-sym">{{ b.label }}</td>
+              <td>{{ b.product }}</td>
+              <td>{{ b.clock }}</td>
+              <td>{{ b.sl }} / {{ b.scratch }} / {{ b.tp }}</td>
+              <td>{{ b.note }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="mp-card" data-testid="paper-overall-card">
+    <div class="mp-card-head">
+      <div>
+        <h2>Overall amount</h2>
+        <p class="mp-sub">
+          Shared dummy fund. Crude Mini is on this tape first, then the three index books.
+          Sum of the four nets is the fund move.
+        </p>
+      </div>
+      <span class="mp-badge" [attr.data-tone]="snap().netRs >= 0 ? 'up' : 'down'">
+        Overall ₹{{ snap().netRs | number : '1.0-0' }}
+      </span>
+    </div>
+    <div class="mp-table-wrap">
+      <table class="mp-table" data-testid="paper-overall">
+        <thead>
+          <tr>
+            <th>Book</th>
+            <th class="num">Fills</th>
+            <th>TP / sc / SL</th>
+            <th class="num">Net ₹</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (b of snap().bookScores; track b.id) {
+            <tr>
+              <td class="mp-sym">{{ b.label }}</td>
+              <td class="num">{{ b.fills }}</td>
+              <td>{{ b.tpHits }} / {{ b.scratches }} / {{ b.slHits }}</td>
+              <td class="num" [class.mp-down]="b.netRs < 0" [class.mp-up]="b.netRs > 0">
+                {{ b.netRs | number : '1.0-0' }}
+              </td>
+            </tr>
+          }
+          <tr>
+            <td class="mp-sym">Overall</td>
+            <td class="num">{{ snap().fills.length }}</td>
+            <td>{{ snap().tpHits }} / {{ snap().scratches }} / {{ snap().slHits }}</td>
+            <td class="num" [class.mp-down]="snap().netRs < 0" [class.mp-up]="snap().netRs > 0">
+              {{ snap().netRs | number : '1.0-0' }}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="mp-card" data-testid="paper-fund-card">
+    <div class="mp-card-head">
+      <div>
+        <h2>Dummy fund</h2>
+        <p class="mp-sub">
+          Treated as real cash. {{ snap().played }} / {{ snap().total }} sessions played.
+          {{ snap().skipped }} tickets stood down at the day-loss cap.
+        </p>
+      </div>
+      <span class="mp-badge" [attr.data-tone]="snap().fundRs >= snap().startRs ? 'up' : 'down'">
+        {{ snap().liveOrders ? 'Live' : 'Paper only' }}
+      </span>
+    </div>
+    <div class="mp-stats">
+      <div class="mp-stat">
+        <span class="mp-stat-label">Fund now</span>
+        <span class="mp-stat-value" data-testid="paper-fund">₹{{ snap().fundRs | number : '1.0-0' }}</span>
+        <span class="mp-stat-hint">start ₹{{ snap().startRs | number }}</span>
+      </div>
+      <div class="mp-stat">
+        <span class="mp-stat-label">Net</span>
+        <span class="mp-stat-value" [class.mp-down]="snap().netRs < 0" [class.mp-up]="snap().netRs > 0">
+          ₹{{ snap().netRs | number : '1.0-0' }}
+        </span>
+        <span class="mp-stat-hint">peak ₹{{ snap().peakRs | number : '1.0-0' }}</span>
+      </div>
+      <div class="mp-stat">
+        <span class="mp-stat-label">TP / scratch / SL</span>
+        <span class="mp-stat-value">{{ snap().tpHits }} / {{ snap().scratches }} / {{ snap().slHits }}</span>
+        <span class="mp-stat-hint">{{ snap().greenDays }} green · {{ snap().redDays }} red</span>
+      </div>
+      <div class="mp-stat">
+        <span class="mp-stat-label">Last session</span>
+        <span class="mp-stat-value">{{ snap().lastDay || '—' }}</span>
+        <span class="mp-stat-hint">
+          @if (snap().lastDay) {
+            ₹{{ snap().lastNetRs | number : '1.0-0' }} · {{ snap().lastTone }}
+          } @else {
+            Idle — play the next dummy day
+          }
+        </span>
+      </div>
+    </div>
+    <div class="mp-form">
+      <div class="mp-field">
+        <span>&nbsp;</span>
+        <button
+          type="button"
+          class="ui-btn ui-btn-primary"
+          [disabled]="snap().done"
+          (click)="playNext()"
+          data-testid="play-next-day"
+        >
+          {{ snap().done ? 'Tape finished' : 'Play next session' }}
+        </button>
+      </div>
+      <div class="mp-field">
+        <span>&nbsp;</span>
+        <button type="button" class="ui-btn" [disabled]="snap().done" (click)="playAll()" data-testid="play-all-days">
+          Play all days
+        </button>
+      </div>
+      <div class="mp-field">
+        <span>&nbsp;</span>
+        <button type="button" class="ui-btn" [disabled]="snap().played === 0" (click)="resetFund()" data-testid="reset-paper-fund">
+          Reset to ₹14,000
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="mp-card">
+    <div class="mp-card-head">
+      <div>
+        <h2>Last dummy fills</h2>
+        <p class="mp-sub">Same marks as live: TP, scratch, SL, then the fund after the ticket.</p>
+      </div>
+    </div>
+    @if (!snap().lastFills.length) {
+      <p class="mp-sub" data-testid="paper-fills-empty">No fills yet. Play the next session.</p>
+    } @else {
+      <div class="mp-table-wrap">
+        <table class="mp-table" data-testid="paper-fills">
+          <thead>
+            <tr>
+              <th>Day</th>
+              <th>Book</th>
+              <th>Exit</th>
+              <th class="num">₹</th>
+              <th class="num">Fund</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (f of snap().lastFills; track f.day + f.book + f.reason + $index) {
+              <tr>
+                <td class="mp-sym">{{ f.day }}</td>
+                <td>{{ f.label }}</td>
+                <td>{{ f.reason }}</td>
+                <td class="num" [class.mp-down]="f.rs < 0" [class.mp-up]="f.rs > 0">
+                  {{ f.rs | number : '1.0-0' }}
+                </td>
+                <td class="num">{{ f.fundAfter | number : '1.0-0' }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </div>
+
+  <div class="mp-card">
+    <div class="mp-card-head">
+      <div>
+        <h2>Played sessions</h2>
+        <p class="mp-sub">{{ tape.honest }}</p>
+      </div>
+    </div>
+    @if (snap().sessions.length) {
+      <div class="mp-table-wrap">
+        <table class="mp-table" data-testid="paper-sessions">
+          <thead>
+            <tr>
+              <th>Day</th>
+              <th class="num">Net</th>
+              <th class="num">Fills</th>
+              <th class="num">Skip</th>
+              <th>TP / sc / SL</th>
+              <th class="num">Fund</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (s of snap().sessions; track s.day) {
+              <tr>
+                <td class="mp-sym">{{ s.day }}</td>
+                <td class="num" [class.mp-down]="s.netRs < 0" [class.mp-up]="s.netRs > 0">
+                  {{ s.netRs | number : '1.0-0' }}
+                </td>
+                <td class="num">{{ s.trades }}</td>
+                <td class="num">{{ s.skipped }}</td>
+                <td>{{ s.tpHits }} / {{ s.scratches }} / {{ s.slHits }}</td>
+                <td class="num">{{ s.fundEnd | number : '1.0-0' }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </div>
+</div>

@@ -11,6 +11,7 @@ import { KiteCallbackComponent } from './features/kite-callback/kite-callback.co
 import { LoginComponent } from './features/login/login.component';
 import { DashboardComponent } from './features/dashboard/dashboard.component';
 import { DashboardHomeComponent } from './features/dashboard/dashboard-home.component';
+import { Paper14kComponent } from './features/dashboard/paper-14k/paper-14k.component';
 import { OrderTestComponent } from './features/dashboard/order-test/order-test.component';
 import { HistoricalBacktestComponent } from './features/dashboard/historical-backtest/historical-backtest.component';
 import { GetTokenComponent } from './features/dashboard/get-token/get-token.component';
@@ -103,6 +104,11 @@ export const routes: Routes = [
       { path: 'research', redirectTo: 'get-token', pathMatch: 'full' },
       { path: 'charts', redirectTo: 'get-token', pathMatch: 'full' },
       { path: 'sl-buddy', redirectTo: 'get-token', pathMatch: 'full' },
+      {
+        path: 'paper-14k',
+        canActivate: [moduleGuard('test')],
+        component: Paper14kComponent,
+      },
       {
         path: 'order-test',
         canActivate: [moduleGuard('test')],

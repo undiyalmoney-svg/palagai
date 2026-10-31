@@ -70,7 +70,9 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   protected readonly clockLabel = signal('');
   protected readonly pageTitle = signal('Palagai');
-  protected readonly pageSubtitle = signal('Token, Crude Best, Historical Backtest, Crude Oil, and Test.');
+  protected readonly pageSubtitle = signal(
+    'Token, Crude Best, Historical Backtest, Crude Oil, Paper 14k, and Test.',
+  );
   protected readonly sidebarOpen = signal(true);
   protected readonly profileOpen = signal(false);
 
@@ -106,15 +108,28 @@ export class DashboardComponent implements OnInit, OnDestroy {
       testId: 'crude',
     },
     {
+      label: 'Paper 14k',
+      shortLabel: 'Paper',
+      route: '/dashboard/paper-14k',
+      icon: 'candles',
+      module: 'test',
+      testId: 'paper-14k',
+    },
+    {
       label: 'Test',
       shortLabel: 'Test',
       route: '/dashboard/order-test',
       icon: 'flask',
       module: 'test',
+      testId: 'test',
     },
   ];
 
   private readonly titles: Record<string, { title: string; subtitle: string }> = {
+    '/dashboard/paper-14k': {
+      title: 'Paper 14k',
+      subtitle: 'Dummy ₹14,000. Same daily fills as live, no Kite orders. Capital is treated as real.',
+    },
     '/dashboard/order-test': {
       title: 'Order Test',
       subtitle: 'Safe order probes against your connected Kite session.',
@@ -346,6 +361,9 @@ export class DashboardComponent implements OnInit, OnDestroy {
           : 'Could not open that desk.';
     if (/historical-backtest|chunk|loading chunk|failed to fetch/i.test(`${event.url} ${msg}`)) {
       return 'Could not open Historical Backtest. Retry, or hard-refresh the tab.';
+    }
+    if (/paper-14k/i.test(`${event.url} ${msg}`)) {
+      return 'Could not open Paper 14k. Retry, or hard-refresh the tab.';
     }
     if (/crude-best/i.test(`${event.url} ${msg}`)) {
       return 'Could not open Crude Best. Retry, or hard-refresh the tab.';
