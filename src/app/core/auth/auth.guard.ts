@@ -12,7 +12,7 @@ import {
 const MODULE_HOME: Array<{ module: SiteModule; path: string }> = [
   { module: 'token', path: '/dashboard/get-token' },
   { module: 'backtest', path: '/dashboard/historical-backtest' },
-  { module: 'crude', path: '/dashboard/crude-oil' },
+  { module: 'crude', path: '/dashboard/crude-best' },
   { module: 'test', path: '/dashboard/order-test' },
 ];
 

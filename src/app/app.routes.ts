@@ -14,6 +14,7 @@ import { DashboardHomeComponent } from './features/dashboard/dashboard-home.comp
 import { OrderTestComponent } from './features/dashboard/order-test/order-test.component';
 import { HistoricalBacktestComponent } from './features/dashboard/historical-backtest/historical-backtest.component';
 import { GetTokenComponent } from './features/dashboard/get-token/get-token.component';
+import { CrudeBestComponent } from './features/dashboard/crude-best/crude-best.component';
 import { CrudeOilComponent } from './features/dashboard/crude-oil/crude-oil.component';
 import { SettingsComponent } from './features/dashboard/settings/settings.component';
 import { PnlRecordsComponent } from './features/dashboard/pnl-records/pnl-records.component';
@@ -87,6 +88,11 @@ export const routes: Routes = [
         path: 'historical-backtest',
         canActivate: [moduleGuard('backtest')],
         component: HistoricalBacktestComponent,
+      },
+      {
+        path: 'crude-best',
+        canActivate: [moduleGuard('crude')],
+        component: CrudeBestComponent,
       },
       {
         path: 'crude-oil',

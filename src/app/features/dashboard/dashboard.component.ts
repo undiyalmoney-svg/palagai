@@ -32,6 +32,8 @@ interface NavItem {
   route: string;
   icon: string;
   module: SiteModule | null;
+  /** Unique nav/tab test id when two items share a module (e.g. both crude). */
+  testId?: string;
   /** false = stay highlighted for nested routes (default: exact match). */
   exact?: boolean;
 }
@@ -68,7 +70,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   protected readonly clockLabel = signal('');
   protected readonly pageTitle = signal('Palagai');
-  protected readonly pageSubtitle = signal('Token, Historical Backtest, Crude Oil, and Test.');
+  protected readonly pageSubtitle = signal('Token, Crude Best, Historical Backtest, Crude Oil, and Test.');
   protected readonly sidebarOpen = signal(true);
   protected readonly profileOpen = signal(false);
 
@@ -79,6 +81,14 @@ export class DashboardComponent implements OnInit, OnDestroy {
       route: '/dashboard/get-token',
       icon: 'key',
       module: 'token',
+    },
+    {
+      label: 'Crude Best',
+      shortLabel: 'Best',
+      route: '/dashboard/crude-best',
+      icon: 'shield',
+      module: 'crude',
+      testId: 'crude-best',
     },
     {
       label: 'Historical Backtest',
@@ -93,6 +103,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
       route: '/dashboard/crude-oil',
       icon: 'activity',
       module: 'crude',
+      testId: 'crude',
     },
     {
       label: 'Test',
@@ -116,6 +127,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
       title: 'Historical Backtest',
       subtitle: 'Simulated prior-day follow book with the same 2-name 1R scan as live. Live today sizes from Kite cash.',
     },
+    '/dashboard/crude-best': {
+      title: 'Crude Best',
+      subtitle: 'Token, then Start trading. System picks the next Crude Mini, 1 lot, SL-M, and TP. Not guaranteed.',
+    },
     '/dashboard/crude-oil': {
       title: 'Crude Oil',
       subtitle: 'Live Crude Mini. Aims for ₹200 a day (TP 25) on red, sideways, and green sessions. Not guaranteed.',
@@ -136,7 +151,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   protected readonly hideFunds = computed(() => this.authService.isPublic());
 
-  /** Bottom tab bar on phone — Token, Historical Backtest, Crude Oil, Test. */
+  /** Bottom tab bar on phone — Token, Crude Best, Historical Backtest, Crude Oil, Test. */
   protected readonly mobileTabItems = computed(() => this.navItems());
 
   protected readonly username = computed(() => {
@@ -331,6 +346,9 @@ export class DashboardComponent implements OnInit, OnDestroy {
           : 'Could not open that desk.';
     if (/historical-backtest|chunk|loading chunk|failed to fetch/i.test(`${event.url} ${msg}`)) {
       return 'Could not open Historical Backtest. Retry, or hard-refresh the tab.';
+    }
+    if (/crude-best/i.test(`${event.url} ${msg}`)) {
+      return 'Could not open Crude Best. Retry, or hard-refresh the tab.';
     }
     if (/crude-oil/i.test(`${event.url} ${msg}`)) {
       return 'Could not open Crude Oil. Retry, or hard-refresh the tab.';

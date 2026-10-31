@@ -29,7 +29,7 @@
           [routerLink]="item.route"
           routerLinkActive="active"
           [routerLinkActiveOptions]="{ exact: item.exact !== false }"
-          [attr.data-testid]="'nav-' + item.module"
+          [attr.data-testid]="'nav-' + (item.testId || item.module)"
           (click)="go(item.route, $event)"
         >
           <app-pg-icon [name]="item.icon" [size]="18" />
@@ -157,7 +157,7 @@
         [routerLink]="item.route"
         routerLinkActive="active"
         [routerLinkActiveOptions]="{ exact: item.exact !== false }"
-        [attr.data-testid]="'tab-' + item.module"
+        [attr.data-testid]="'tab-' + (item.testId || item.module)"
         (click)="go(item.route, $event)"
       >
         <app-pg-icon [name]="item.icon" [size]="18" />

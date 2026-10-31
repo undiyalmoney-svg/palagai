@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { serverRoutes } from './app.routes.server';
 import { routes } from './app.routes';
 import { HistoricalBacktestComponent } from './features/dashboard/historical-backtest/historical-backtest.component';
+import { CrudeBestComponent } from './features/dashboard/crude-best/crude-best.component';
 import { CrudeOilComponent } from './features/dashboard/crude-oil/crude-oil.component';
 import { OrderTestComponent } from './features/dashboard/order-test/order-test.component';
 
@@ -20,6 +21,11 @@ describe('dashboard desk routes', () => {
     expect(test?.component).toBe(OrderTestComponent);
     expect(test?.loadComponent).toBeUndefined();
 
+    const crudeBest = children.find((r) => r.path === 'crude-best');
+    expect(crudeBest?.component).toBe(CrudeBestComponent);
+    expect(crudeBest?.loadComponent).toBeUndefined();
+    expect(crudeBest?.canActivate?.length).toBe(1);
+
     const crude = children.find((r) => r.path === 'crude-oil');
     expect(crude?.component).toBe(CrudeOilComponent);
     expect(crude?.loadComponent).toBeUndefined();
@@ -31,6 +37,8 @@ describe('dashboard desk routes', () => {
     expect(hist?.renderMode).toBe(RenderMode.Client);
     const token = serverRoutes.find((r) => r.path === 'dashboard/get-token');
     expect(token?.renderMode).toBe(RenderMode.Client);
+    const crudeBest = serverRoutes.find((r) => r.path === 'dashboard/crude-best');
+    expect(crudeBest?.renderMode).toBe(RenderMode.Client);
     const crude = serverRoutes.find((r) => r.path === 'dashboard/crude-oil');
     expect(crude?.renderMode).toBe(RenderMode.Client);
   });

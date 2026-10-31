@@ -22,8 +22,8 @@ describe('firstDashboardPathFor', () => {
     expect(firstDashboardPathFor(has('test'))).toBe('/dashboard/order-test');
   });
 
-  it('opens Crude Oil when that module is granted without Token or Backtest', () => {
-    expect(firstDashboardPathFor(has('crude', 'test'))).toBe('/dashboard/crude-oil');
+  it('opens Crude Best when that module is granted without Token or Backtest', () => {
+    expect(firstDashboardPathFor(has('crude', 'test'))).toBe('/dashboard/crude-best');
   });
 
   it('keeps a Historical Backtest deep link and rejects off-desk URLs', () => {

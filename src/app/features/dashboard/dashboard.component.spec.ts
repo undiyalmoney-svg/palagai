@@ -40,6 +40,7 @@ describe('DashboardComponent navigation', () => {
         provideRouter([
           { path: 'dashboard/get-token', component: DashboardComponent },
           { path: 'dashboard/historical-backtest', component: DashboardComponent },
+          { path: 'dashboard/crude-best', component: DashboardComponent },
           { path: 'dashboard/crude-oil', component: DashboardComponent },
           { path: 'dashboard/order-test', component: DashboardComponent },
           { path: 'login', component: DashboardComponent },
@@ -101,5 +102,17 @@ describe('DashboardComponent navigation', () => {
     fixture.componentInstance['go']('/dashboard/crude-oil');
     await fixture.whenStable();
     expect(router.url).toBe('/dashboard/crude-oil');
+  });
+
+  it('lists Crude Best on its own tab and navigates there from Token', async () => {
+    const el = fixture.nativeElement as HTMLElement;
+    const link = el.querySelector('[data-testid="nav-crude-best"]') as HTMLAnchorElement | null;
+    expect(link).toBeTruthy();
+    expect(link?.textContent).toMatch(/Crude Best/i);
+    expect(el.querySelector('[data-testid="nav-crude"]')?.textContent).toMatch(/Crude Oil/i);
+
+    fixture.componentInstance['go']('/dashboard/crude-best');
+    await fixture.whenStable();
+    expect(router.url).toBe('/dashboard/crude-best');
   });
 });

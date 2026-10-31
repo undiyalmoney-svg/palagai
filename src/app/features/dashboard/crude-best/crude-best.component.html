@@ -1,0 +1,186 @@
+<div class="mp-page" data-testid="crude-best-page">
+  <div class="mp-banner" [attr.data-tone]="liveMoney()?.enabled ? 'down' : 'warn'" data-testid="crude-best-banner">
+    @if (liveMoney()?.enabled) {
+      Real money is on. Same 1-lot Crude Mini worker as the Crude Oil tab — two Starts cannot double the lot. Scanning
+      10:00–23:00 IST, scratch 10, TP 25 (₹200 after charges), SL-M 20, flatten 23:10. Not a guaranteed profit.
+    } @else {
+      Your job is Token, then Start trading — any time today. The desk picks the next CRUDEOILM future, keeps 1 lot,
+      places SL-M, and exits at TP. Same worker as Crude Oil. Does not auto-start. Not a guaranteed profit.
+    }
+  </div>
+
+  <div class="mp-card" data-testid="crude-best-job">
+    <div class="mp-card-head">
+      <div>
+        <h2>Your job</h2>
+        <p class="mp-sub">
+          Connect Kite once, then arm this desk. You can press Start trading at 09:30 or 21:00 — entries still wait
+          until 10:00 IST and flatten at 23:10.
+        </p>
+      </div>
+      <span class="mp-badge" data-tone="info">Owner start desk</span>
+    </div>
+    <ol class="mp-list" data-testid="crude-best-steps">
+      <li>
+        Get a Kite access token on
+        <a routerLink="/dashboard/get-token">Token</a>
+      </li>
+      <li>Tick the box below that you want real MCX MIS</li>
+      <li>Hit Start trading — any time on the day</li>
+    </ol>
+  </div>
+
+  <div class="mp-card" data-testid="crude-best-system">
+    <div class="mp-card-head">
+      <div>
+        <h2>System takes care</h2>
+        <p class="mp-sub">
+          Best Crude Mini book found for ₹14,000: daily-min PDHL + 10:00–11:00 fade + 6-bar trap. Sample hunt paid
+          ₹150+ on 43 of 74 full sessions — not every day, not a lock.
+        </p>
+      </div>
+      <span class="mp-badge" data-tone="info">{{ engineVersion() || dna()?.profileId || locked.profileId }}</span>
+    </div>
+    <ul class="mp-list" data-testid="crude-best-checklist">
+      <li>
+        Instrument — next listed CRUDEOILM FUT. Dying expiry is skipped so orders go to the following month.
+      </li>
+      <li>
+        Capital — 1 lot only (₹{{ locked.rupeesPerPoint }}/pt). ₹{{ capital.capitalRs | number }} cannot buy ATM Nifty,
+        Bank Nifty or Sensex. Hard day-loss ₹{{ capital.dayLossCapRs | number }}.
+      </li>
+      <li>
+        Stop — scratch {{ locked.scratchPts }} pts if the trade smells wrong, hard SL-M {{ locked.stopPts }} as floor,
+        sit after first win, stand down at −{{ locked.dayLossPts }} pts.
+      </li>
+      <li>
+        Exit — TP {{ locked.targetPts }} pts (₹200 after ₹{{ locked.chargeRs }} charges) · flatten
+        {{ locked.flatten }} IST · max {{ locked.maxTrades }} trades.
+      </li>
+    </ul>
+  </div>
+
+  <div class="mp-card">
+    <div class="mp-card-head">
+      <div>
+        <h2>Contract</h2>
+        <p class="mp-sub">Picked from the MCX list after Token is connected. You do not choose the month.</p>
+      </div>
+      <span class="mp-badge" [attr.data-tone]="liveMoney()?.contract?.expiryDay ? 'warn' : 'info'">
+        {{ liveMoney()?.contract?.expiryDay ? 'Expiry day · next month' : 'CRUDEOILM FUT' }}
+      </span>
+    </div>
+    @if (liveMoney()?.contract; as c) {
+      <div class="mp-stats">
+        <div class="mp-stat">
+          <span class="mp-stat-label">Trading</span>
+          <span class="mp-stat-value" data-testid="crude-best-symbol">{{ c.tradingSymbol }}</span>
+          <span class="mp-stat-hint">Expires {{ c.expiry || '—' }}</span>
+        </div>
+        <div class="mp-stat">
+          <span class="mp-stat-label">Lot</span>
+          <span class="mp-stat-value">{{ c.lotSize || 1 }}</span>
+          <span class="mp-stat-hint">₹{{ locked.rupeesPerPoint }}/pt · ₹{{ locked.chargeRs }}/RT</span>
+        </div>
+      </div>
+    } @else {
+      <p class="mp-sub" data-testid="crude-best-contract-empty">
+        Connect Kite on <a routerLink="/dashboard/get-token">Token</a> so this desk can read the MCX list and pick the
+        next month.
+      </p>
+    }
+  </div>
+
+  <div class="mp-card" data-testid="start-trading-card">
+    <div class="mp-card-head">
+      <div>
+        <h2>Start trading</h2>
+        <p class="mp-sub">
+          Places real Kite MIS on the same Crude Mini worker. Idle until you start — a deploy does not arm this.
+        </p>
+      </div>
+      <span class="mp-badge" [attr.data-tone]="liveMoney()?.enabled ? 'down' : 'info'">
+        {{ liveMoney()?.enabled ? 'Real money on' : 'Armed off' }}
+      </span>
+    </div>
+    <div class="mp-form">
+      <label class="ui-check">
+        <input
+          type="checkbox"
+          [(ngModel)]="liveConfirm"
+          [disabled]="liveMoneyBusy() || !!liveMoney()?.enabled"
+          data-testid="start-trading-confirm"
+        />
+        Place real Kite MIS on 1 lot Crude Mini. System picks the contract, adds SL-M {{ locked.stopPts }}, and exits
+        at TP {{ locked.targetPts }}.
+      </label>
+      <div class="mp-field">
+        <span>&nbsp;</span>
+        <button
+          type="button"
+          class="ui-btn ui-btn-primary"
+          [disabled]="liveMoneyBusy() || !!liveMoney()?.enabled || !liveConfirmOk()"
+          (click)="startLiveMoney()"
+          data-testid="start-trading"
+        >
+          {{ liveMoneyBusy() && !liveMoney()?.enabled ? 'Starting…' : 'Start trading' }}
+        </button>
+      </div>
+      <div class="mp-field">
+        <span>&nbsp;</span>
+        <button
+          type="button"
+          class="ui-btn"
+          [disabled]="liveMoneyBusy() || !(liveMoney()?.enabled || liveMoney()?.fills?.length)"
+          (click)="stopLiveMoney()"
+          data-testid="stop-trading"
+        >
+          Stop flatten
+        </button>
+      </div>
+    </div>
+    @if (error()) {
+      <p class="mp-sub mp-down">{{ error() }}</p>
+    }
+    @if (liveMoney(); as money) {
+      <p class="mp-sub" data-testid="start-trading-status">
+        {{ money.lastMessage || 'Idle until Start trading.' }}
+        Week {{ money.weekNetPts | number : '1.0-0' }} pts · day {{ money.dayNetPts | number : '1.0-0' }} pts ·
+        {{ money.tradesToday }}/2 fills.
+      </p>
+      @if (money.lastError) {
+        <p class="mp-sub mp-down">{{ money.lastError }}</p>
+      }
+      @if (money.fills.length) {
+        <div class="mp-table-wrap">
+          <table class="mp-table">
+            <thead>
+              <tr>
+                <th>Symbol</th>
+                <th>Side</th>
+                <th>In</th>
+                <th class="num">Qty</th>
+                <th class="num">Entry</th>
+                <th class="num">SL-M</th>
+                <th class="num">TP</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (f of money.fills; track f.instrument) {
+                <tr>
+                  <td class="mp-sym">{{ f.instrument }}</td>
+                  <td>{{ f.side === 'S' ? 'Short' : 'Long' }}</td>
+                  <td>{{ f.signalT || '—' }}</td>
+                  <td class="num">{{ f.qty }}</td>
+                  <td class="num">{{ f.entry | number : '1.0-1' }}</td>
+                  <td class="num">{{ f.stop | number : '1.0-1' }}</td>
+                  <td class="num">{{ f.target | number : '1.0-1' }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    }
+  </div>
+</div>
