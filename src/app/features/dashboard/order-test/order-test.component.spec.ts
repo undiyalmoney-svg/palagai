@@ -39,6 +39,8 @@ describe('OrderTestComponent', () => {
     expect(text).toMatch(/Sensex/);
     expect(text).toMatch(/Dummy ₹14,000/);
     expect(text).toMatch(/Not a guaranteed profit/);
+    expect(text).toMatch(/Why losers failed/);
+    expect(text).toMatch(/Wrong direction/);
     expect(fixture.nativeElement.querySelector('[data-testid="paper-overall"]')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('[data-testid="paper-14k-page"]')).toBeTruthy();
     expect(text).toMatch(/RELIANCE/);

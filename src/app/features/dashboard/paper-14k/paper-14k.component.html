@@ -6,6 +6,40 @@
     <a routerLink="/dashboard/crude-best">Crude Best</a>. Not a guaranteed profit.
   </div>
 
+  <div class="mp-card" data-testid="paper-reverse-card">
+    <div class="mp-card-head">
+      <div>
+        <h2>Why losers failed</h2>
+        <p class="mp-sub">{{ reverse.honest }}</p>
+      </div>
+    </div>
+    <div class="mp-stats">
+      <div class="mp-stat">
+        <span class="mp-stat-label">Wrong direction</span>
+        <span class="mp-stat-value" data-testid="reverse-wrong-dir">{{ reverse.autopsy.wrongDirection }}</span>
+        <span class="mp-stat-hint">flip would have banked after charges</span>
+      </div>
+      <div class="mp-stat">
+        <span class="mp-stat-label">Chop</span>
+        <span class="mp-stat-value">{{ reverse.autopsy.chopBothLose }}</span>
+        <span class="mp-stat-hint">both sides lose — no opposite</span>
+      </div>
+      <div class="mp-stat">
+        <span class="mp-stat-label">Already green</span>
+        <span class="mp-stat-value">{{ reverse.autopsy.origGreen }}</span>
+        <span class="mp-stat-hint">original side was the way</span>
+      </div>
+      <div class="mp-stat">
+        <span class="mp-stat-label">Live flip</span>
+        <span class="mp-stat-value">Off</span>
+        <span class="mp-stat-hint">
+          after {{ reverse.isUntil }} flip ₹{{ reverse.liveFlipOos.flipNetRs | number : '1.0-0' }}
+          vs orig ₹{{ reverse.liveFlipOos.origNetRs | number : '1.0-0' }}
+        </span>
+      </div>
+    </div>
+  </div>
+
   <div class="mp-card" data-testid="paper-fund-card">
     <div class="mp-card-head">
       <div>

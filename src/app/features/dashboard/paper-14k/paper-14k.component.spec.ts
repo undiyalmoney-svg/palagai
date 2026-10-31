@@ -25,6 +25,12 @@ describe('Paper14kComponent', () => {
     expect(text).toMatch(/Paper only/);
     expect(text).toMatch(/Crude Mini FUT/);
     expect(text).toMatch(/Overall amount/);
+    expect(text).toMatch(/Why losers failed/);
+    expect(text).toMatch(/Wrong direction/);
+    expect(text).toMatch(/Live flip/);
+    expect(fixture.nativeElement.querySelector('[data-testid="reverse-wrong-dir"]')?.textContent).toBe(
+      '34',
+    );
     expect(fixture.componentInstance['snap']().fundRs).toBe(14_000);
     expect(fixture.componentInstance['snap']().liveOrders).toBe(false);
     expect(fixture.componentInstance['snap']().guaranteed).toBe(false);
