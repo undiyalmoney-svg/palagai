@@ -108,8 +108,14 @@ describe('CrudeBestComponent', () => {
     expect(text).toMatch(/Not a guaranteed profit/);
     expect(text).toMatch(/guaranteed-profit test/);
     expect(text).toMatch(/0 passed/);
+    expect(text).toMatch(/Historical 5-minute candles/);
+    expect(text).toMatch(/does not create a guaranteed profit/);
+    expect(text).toMatch(/Every-day green: fail/);
+    expect(text).toMatch(/guaranteed: false/);
     expect(text).not.toMatch(/guaranteed:\s*true/i);
     expect(fixture.componentInstance['liveMoney']()?.guaranteed).toBe(false);
+    expect(fixture.componentInstance['tape'].guaranteed).toBe(false);
+    expect(fixture.componentInstance['tape'].everyDayGreen).toBe(false);
   });
 
   it('arms the shared 1-lot worker only after the confirm checkbox', async () => {

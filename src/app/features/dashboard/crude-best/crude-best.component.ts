@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { OWNER_CAPITAL_RS, guardCapital } from '../../../core/paper-desk/capital-guard.util';
 import { CRUDE_DAILY_GREEN } from '../../../core/strategy-engine/strategies/crude-daily-green/crude-daily-green.dna';
+import { CRUDE_HISTORICAL_CANDLES } from '../../../core/strategy-engine/strategies/crude-daily-green/crude-historical-candles.fixture';
 import { CrudeOilApiService } from '../crude-oil/crude-oil-api.service';
 import { CrudeLiveDna, CrudeLiveMoney } from '../crude-oil/crude-oil.models';
 
@@ -26,6 +27,8 @@ export class CrudeBestComponent implements OnInit, OnDestroy {
   protected readonly error = signal('');
   protected readonly locked = CRUDE_DAILY_GREEN;
   protected readonly capital = guardCapital(OWNER_CAPITAL_RS);
+  protected readonly tape = CRUDE_HISTORICAL_CANDLES;
+  protected readonly missDays = CRUDE_HISTORICAL_CANDLES.days.filter((d) => d.tone !== 'green');
 
   ngOnInit(): void {
     this.poll();

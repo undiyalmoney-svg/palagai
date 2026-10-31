@@ -15,6 +15,7 @@ import {
   weekShouldStandDown,
 } from './crude-daily-green.dna';
 import { CRUDE_GUARANTEED_HUNT } from './crude-guaranteed-hunt.fixture';
+import { CRUDE_HISTORICAL_CANDLES } from './crude-historical-candles.fixture';
 
 describe('Crude daily-min DNA', () => {
   it('aims for ₹200 after charges and scratches losers before the 20-pt hard SL', () => {
@@ -112,5 +113,20 @@ describe('guaranteed-profit hunt gate', () => {
     expect(CRUDE_GUARANTEED_HUNT.wired.worstDay).toBeLessThan(0);
     expect(CRUDE_DAILY_GREEN.profileId).toBe(CRUDE_GUARANTEED_HUNT.wired.profileId);
     expect(CRUDE_GUARANTEED_HUNT.honest).toMatch(/not a guaranteed profit/i);
+  });
+
+  it('replays historical 5-minute candles and still fails the every-day green gate', () => {
+    expect(CRUDE_HISTORICAL_CANDLES.profileId).toBe('daily-min-sc10');
+    expect(CRUDE_HISTORICAL_CANDLES.bars).toBe(13342);
+    expect(CRUDE_HISTORICAL_CANDLES.tradableDays).toBe(74);
+    expect(CRUDE_HISTORICAL_CANDLES.days.length).toBe(74);
+    expect(CRUDE_HISTORICAL_CANDLES.greenDays).toBe(58);
+    expect(CRUDE_HISTORICAL_CANDLES.redDays).toBe(9);
+    expect(CRUDE_HISTORICAL_CANDLES.flatDays).toBe(7);
+    expect(CRUDE_HISTORICAL_CANDLES.everyDayGreen).toBe(false);
+    expect(CRUDE_HISTORICAL_CANDLES.everyDay150).toBe(false);
+    expect(CRUDE_HISTORICAL_CANDLES.guaranteed).toBe(false);
+    expect(CRUDE_HISTORICAL_CANDLES.worstDayRs).toBeLessThan(0);
+    expect(CRUDE_HISTORICAL_CANDLES.days.filter((d) => d.tone === 'red').length).toBe(9);
   });
 });

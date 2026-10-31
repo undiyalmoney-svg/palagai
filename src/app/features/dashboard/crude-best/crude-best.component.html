@@ -61,6 +61,70 @@
     </ul>
   </div>
 
+  <div class="mp-card" data-testid="crude-best-historical">
+    <div class="mp-card-head">
+      <div>
+        <h2>Historical 5-minute candles</h2>
+        <p class="mp-sub">
+          Replay of {{ tape.profileId }} on {{ tape.bars | number }} MCX bars
+          ({{ tape.sample }}). {{ tape.tradableDays }} full sessions after dropping
+          {{ tape.thinDays }} stub days. The tape still has
+          {{ tape.redDays }} red and {{ tape.flatDays }} flat days — running candles
+          does not create a guaranteed profit.
+        </p>
+      </div>
+      <span class="mp-badge" data-tone="warn">Gate failed</span>
+    </div>
+    <div class="mp-stats">
+      <div class="mp-stat">
+        <span class="mp-stat-label">Green days</span>
+        <span class="mp-stat-value">{{ tape.greenDays }}/{{ tape.tradableDays }}</span>
+        <span class="mp-stat-hint">₹{{ tape.netRs | number }} net</span>
+      </div>
+      <div class="mp-stat">
+        <span class="mp-stat-label">₹150+ days</span>
+        <span class="mp-stat-value">{{ tape.hit150 }}/{{ tape.tradableDays }}</span>
+        <span class="mp-stat-hint">avg ₹{{ tape.avgDayRs | number : '1.0-0' }}</span>
+      </div>
+      <div class="mp-stat">
+        <span class="mp-stat-label">Worst day</span>
+        <span class="mp-stat-value mp-down">₹{{ tape.worstDayRs | number }}</span>
+        <span class="mp-stat-hint">best ₹{{ tape.bestDayRs | number }}</span>
+      </div>
+      <div class="mp-stat">
+        <span class="mp-stat-label">Green weeks</span>
+        <span class="mp-stat-value">{{ tape.greenWeeks }}/{{ tape.weeks }}</span>
+        <span class="mp-stat-hint">worst week ₹{{ tape.worstWeekRs | number }}</span>
+      </div>
+    </div>
+    <p class="mp-sub" data-testid="historical-gate">
+      Every-day green: {{ tape.everyDayGreen ? 'pass' : 'fail' }}. Every-day ₹150:
+      {{ tape.everyDay150 ? 'pass' : 'fail' }}. guaranteed: {{ tape.guaranteed }}.
+    </p>
+    <div class="mp-table-wrap">
+      <table class="mp-table" data-testid="historical-miss-days">
+        <thead>
+          <tr>
+            <th>Missed day</th>
+            <th>Kind</th>
+            <th class="num">₹</th>
+            <th>Exits</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (d of missDays; track d.day) {
+            <tr>
+              <td class="mp-sym">{{ d.day }}</td>
+              <td>{{ d.kind }} · {{ d.tone }}</td>
+              <td class="num" [class.mp-down]="d.rs < 0">{{ d.rs | number : '1.0-0' }}</td>
+              <td>{{ d.exits.length ? d.exits.join(', ') : 'no trade' }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </div>
+
   <div class="mp-card">
     <div class="mp-card-head">
       <div>
