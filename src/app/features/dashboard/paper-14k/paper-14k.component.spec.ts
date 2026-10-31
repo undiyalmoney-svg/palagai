@@ -31,6 +31,11 @@ describe('Paper14kComponent', () => {
     expect(text).toMatch(/The pattern/);
     expect(text).toMatch(/trend PDHL \+ against VWAP/);
     expect(text).toMatch(/Not armed on Crude Best/);
+    expect(text).toMatch(/2-year tape/);
+    expect(text).toMatch(/morning structure switch, do not flip/);
+    expect(text).toMatch(/not a salary/i);
+    expect(text).toMatch(/not a job/i);
+    expect(fixture.nativeElement.querySelector('[data-testid="paper-hist-card"]')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('[data-testid="reverse-wrong-dir"]')?.textContent).toBe(
       '34',
     );

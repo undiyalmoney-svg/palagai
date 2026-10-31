@@ -6,6 +6,66 @@
     <a routerLink="/dashboard/crude-best">Crude Best</a>. Not a guaranteed profit.
   </div>
 
+  <div class="mp-card" data-testid="paper-hist-card">
+    <div class="mp-card-head">
+      <div>
+        <h2>2-year tape</h2>
+        <p class="mp-sub">{{ hist.champion.name }}</p>
+      </div>
+      <span class="mp-badge" data-tone="info">not armed · not a job</span>
+    </div>
+    <div class="mp-stats">
+      <div class="mp-stat">
+        <span class="mp-stat-label">Against-VWAP flip</span>
+        <span class="mp-stat-value mp-down" data-testid="hist-flip-lift">
+          ₹{{ hist.lateLiftRs | number : '1.0-0' }}
+        </span>
+        <span class="mp-stat-hint">later half after ₹50 · flip died</span>
+      </div>
+      <div class="mp-stat">
+        <span class="mp-stat-label">Structure later half</span>
+        <span class="mp-stat-value mp-up" data-testid="hist-struct-net">
+          ₹{{ hist.structureLateNetRs | number : '1.0-0' }}
+        </span>
+        <span class="mp-stat-hint">
+          vs trend-only ₹{{ hist.pdhlLateNetRs | number : '1.0-0' }} · +₹{{ hist.champion.lateLiftRs | number : '1.0-0' }}
+        </span>
+      </div>
+      <div class="mp-stat">
+        <span class="mp-stat-label">Worst later week</span>
+        <span class="mp-stat-value mp-down">₹{{ hist.worstWeekRs | number : '1.0-0' }}</span>
+        <span class="mp-stat-hint">{{ hist.greenWeeks }} green · {{ hist.redWeeks }} red weeks</span>
+      </div>
+    </div>
+    <div class="mp-table-wrap">
+      <table class="mp-table" data-testid="hist-books">
+        <thead>
+          <tr>
+            <th>Book</th>
+            <th class="num">Days</th>
+            <th class="num">Struct ₹</th>
+            <th class="num">Flip ₹</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (b of hist.books; track b.name) {
+            <tr>
+              <td class="mp-sym">{{ histBookLabel(b.name) }}</td>
+              <td class="num">{{ b.days }}</td>
+              <td class="num" [class.mp-up]="b.structLate.net > 0" [class.mp-down]="b.structLate.net < 0">
+                {{ b.structLate.net | number : '1.0-0' }}
+              </td>
+              <td class="num" [class.mp-up]="b.lateOn.net > 0" [class.mp-down]="b.lateOn.net < 0">
+                {{ b.lateOn.net | number : '1.0-0' }}
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+    <p class="mp-sub" data-testid="hist-pattern-honest">{{ hist.honest }}</p>
+  </div>
+
   <div class="mp-card" data-testid="paper-reverse-card">
     <div class="mp-card-head">
       <div>
@@ -46,7 +106,7 @@
         <h2>The pattern</h2>
         <p class="mp-sub">{{ pattern.champion.means }}</p>
       </div>
-      <span class="mp-badge" data-tone="info">n={{ pattern.champion.n }} · not armed</span>
+      <span class="mp-badge" data-tone="info">n={{ pattern.champion.n }} · 2y killed flip</span>
     </div>
     <div class="mp-stats">
       <div class="mp-stat">
