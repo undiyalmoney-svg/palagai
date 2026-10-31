@@ -14,6 +14,7 @@ import {
   weekMonday,
   weekShouldStandDown,
 } from './crude-daily-green.dna';
+import { CRUDE_GUARANTEED_HUNT } from './crude-guaranteed-hunt.fixture';
 
 describe('Crude daily-min DNA', () => {
   it('aims for ₹200 after charges and scratches losers before the 20-pt hard SL', () => {
@@ -96,5 +97,20 @@ describe('Crude daily-min DNA', () => {
     expect(dayShouldStandDown(20, 1)).toBe(true);
     expect(dayShouldStandDown(5, 1)).toBe(true);
     expect(dayShouldStandDown(0, 2)).toBe(true);
+  });
+});
+
+describe('guaranteed-profit hunt gate', () => {
+  it('fails every book: no DNA greens every full session after charges', () => {
+    expect(CRUDE_GUARANTEED_HUNT.gateEveryTradableDayGreen).toBe(0);
+    expect(CRUDE_GUARANTEED_HUNT.gateEveryTradableDay150).toBe(0);
+    expect(CRUDE_GUARANTEED_HUNT.configs).toBeGreaterThanOrEqual(4000);
+    expect(CRUDE_GUARANTEED_HUNT.wired.redDays).toBeGreaterThan(0);
+    expect(CRUDE_GUARANTEED_HUNT.wired.flatDays).toBeGreaterThan(0);
+    expect(CRUDE_GUARANTEED_HUNT.wired.everyDayGreen).toBe(false);
+    expect(CRUDE_GUARANTEED_HUNT.wired.everyDay150).toBe(false);
+    expect(CRUDE_GUARANTEED_HUNT.wired.worstDay).toBeLessThan(0);
+    expect(CRUDE_DAILY_GREEN.profileId).toBe(CRUDE_GUARANTEED_HUNT.wired.profileId);
+    expect(CRUDE_GUARANTEED_HUNT.honest).toMatch(/not a guaranteed profit/i);
   });
 });

@@ -1,0 +1,111 @@
+{
+  "sample": "MCX CRUDEOILM 5m 2026-05-21 \u2192 2026-10-30",
+  "needRs": 150.0,
+  "configs": 4321,
+  "tradableKinds": {
+    "thin": 42,
+    "greenish": 30,
+    "quiet": 2,
+    "red": 14,
+    "sideways": 28
+  },
+  "gateEveryTradableDayGreen": {
+    "rule": "Every full-session day net > \u20b90 after charges. Flat fails. Red fails.",
+    "count": 0,
+    "books": []
+  },
+  "gateEveryTradableDay150": {
+    "rule": "Every full-session day net \u2265 \u20b9150 after charges. Flat fails. Red fails.",
+    "count": 0,
+    "books": []
+  },
+  "wired": {
+    "label": "wired_daily_min_sc10",
+    "greenDays": 58,
+    "redDays": 9,
+    "flatDays": 7,
+    "hit150": 43,
+    "tradable": 74,
+    "greenPct": 78.4,
+    "hit150Pct": 58.1,
+    "worstDay": -300.0,
+    "avgDay": 93.8,
+    "everyDayGreen": false,
+    "everyDay150": false
+  },
+  "nearest": [
+    {
+      "label": "all_three|tp25|sc12|dl0|m2|10-23",
+      "greenPct": 78.4,
+      "hit150Pct": 60.8,
+      "redDays": 9,
+      "flatDays": 7,
+      "worstDay": -340.0,
+      "avgDay": 90.4
+    },
+    {
+      "label": "all_three|tp25|sc12|dl15|m2|10-23",
+      "greenPct": 78.4,
+      "hit150Pct": 60.8,
+      "redDays": 9,
+      "flatDays": 7,
+      "worstDay": -340.0,
+      "avgDay": 90.4
+    },
+    {
+      "label": "all_three|tp25|sc12|dl20|m2|10-23",
+      "greenPct": 78.4,
+      "hit150Pct": 60.8,
+      "redDays": 9,
+      "flatDays": 7,
+      "worstDay": -340.0,
+      "avgDay": 90.4
+    },
+    {
+      "label": "all_three|tp25|sc12|dl25|m2|10-23",
+      "greenPct": 78.4,
+      "hit150Pct": 60.8,
+      "redDays": 9,
+      "flatDays": 7,
+      "worstDay": -340.0,
+      "avgDay": 90.4
+    },
+    {
+      "label": "wired_daily_min_sc10",
+      "greenPct": 78.4,
+      "hit150Pct": 58.1,
+      "redDays": 9,
+      "flatDays": 7,
+      "worstDay": -300.0,
+      "avgDay": 93.8
+    },
+    {
+      "label": "all_three|tp25|sc10|dl0|m2|10-23",
+      "greenPct": 78.4,
+      "hit150Pct": 58.1,
+      "redDays": 9,
+      "flatDays": 7,
+      "worstDay": -300.0,
+      "avgDay": 93.8
+    },
+    {
+      "label": "all_three|tp25|sc10|dl15|m2|10-23",
+      "greenPct": 78.4,
+      "hit150Pct": 58.1,
+      "redDays": 9,
+      "flatDays": 7,
+      "worstDay": -300.0,
+      "avgDay": 93.8
+    },
+    {
+      "label": "all_three|tp25|sc10|dl20|m2|10-23",
+      "greenPct": 78.4,
+      "hit150Pct": 58.1,
+      "redDays": 9,
+      "flatDays": 7,
+      "worstDay": -300.0,
+      "avgDay": 93.8
+    }
+  ],
+  "honest": "The guaranteed-profit test found zero books. A past sample cannot lock tomorrow. Crude Best stays on daily-min-sc10. Not a guaranteed profit."
+}

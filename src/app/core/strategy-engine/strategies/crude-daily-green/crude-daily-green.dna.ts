@@ -8,7 +8,8 @@
  *   TP 25 = ₹200 after charges on a clean ticket. Scratch 10 (still before SL 20).
  *   Sit at first win / +20. Week lock off so later days still hunt.
  *
- *   Quiet/thin sessions still pay 0. Not a guaranteed ₹150–200. Worst tradable day −₹300.
+ *   Quiet/thin sessions still pay 0. Guaranteed-profit gate (every full session
+ *   green after charges) failed 4,321 books — 0 passed. Worst tradable day −₹300.
  */
 export const CRUDE_DAILY_GREEN_ID = 'daily-min-sc10';
 

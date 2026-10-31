@@ -106,6 +106,8 @@ describe('CrudeBestComponent', () => {
     expect(text).toMatch(/CRUDEOILM26NOVFUT/);
     expect(text).toMatch(/Expiry day · next month/);
     expect(text).toMatch(/Not a guaranteed profit/);
+    expect(text).toMatch(/guaranteed-profit test/);
+    expect(text).toMatch(/0 passed/);
     expect(text).not.toMatch(/guaranteed:\s*true/i);
     expect(fixture.componentInstance['liveMoney']()?.guaranteed).toBe(false);
   });
