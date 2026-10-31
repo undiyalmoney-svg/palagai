@@ -2,6 +2,7 @@ import { DecimalPipe } from '@angular/common';
 import { Component, OnInit, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { PAPER_14K_BLOTTER } from '../../../core/paper-desk/paper-14k-blotter.fixture';
+import { PAPER_FAIL_PATTERN } from '../../../core/paper-desk/paper-fail-pattern.fixture';
 import { PAPER_REVERSE_FAIL } from '../../../core/paper-desk/paper-reverse-fail.fixture';
 import {
   PAPER_14K_BOOKS,
@@ -23,6 +24,7 @@ export class Paper14kComponent implements OnInit {
   protected readonly tape = PAPER_14K_BLOTTER;
   protected readonly books = PAPER_14K_BOOKS;
   protected readonly reverse = PAPER_REVERSE_FAIL;
+  protected readonly pattern = PAPER_FAIL_PATTERN;
   protected readonly snap = signal<Paper14kSnapshot>(paperSnapshot(0));
 
   ngOnInit(): void {

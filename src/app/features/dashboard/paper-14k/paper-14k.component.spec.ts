@@ -28,6 +28,9 @@ describe('Paper14kComponent', () => {
     expect(text).toMatch(/Why losers failed/);
     expect(text).toMatch(/Wrong direction/);
     expect(text).toMatch(/Live flip/);
+    expect(text).toMatch(/The pattern/);
+    expect(text).toMatch(/trend PDHL \+ against VWAP/);
+    expect(text).toMatch(/Not armed on Crude Best/);
     expect(fixture.nativeElement.querySelector('[data-testid="reverse-wrong-dir"]')?.textContent).toBe(
       '34',
     );

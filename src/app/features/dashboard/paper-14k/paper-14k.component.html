@@ -40,6 +40,39 @@
     </div>
   </div>
 
+  <div class="mp-card" data-testid="paper-pattern-card">
+    <div class="mp-card-head">
+      <div>
+        <h2>The pattern</h2>
+        <p class="mp-sub">{{ pattern.champion.means }}</p>
+      </div>
+      <span class="mp-badge" data-tone="info">n={{ pattern.champion.n }} · not armed</span>
+    </div>
+    <div class="mp-stats">
+      <div class="mp-stat">
+        <span class="mp-stat-label">Rule</span>
+        <span class="mp-stat-value" data-testid="fail-pattern-name">{{ pattern.champion.name }}</span>
+        <span class="mp-stat-hint">{{ pattern.champion.wrong }} of {{ pattern.champion.n }} were wrong direction</span>
+      </div>
+      <div class="mp-stat">
+        <span class="mp-stat-label">After 1 Sep</span>
+        <span class="mp-stat-value mp-up">+₹{{ pattern.champion.oosLiftRs | number : '1.0-0' }}</span>
+        <span class="mp-stat-hint">
+          flip ₹{{ pattern.champion.oosRuleNetRs | number : '1.0-0' }} vs orig
+          ₹{{ pattern.champion.oosOrigNetRs | number : '1.0-0' }}
+        </span>
+      </div>
+      <div class="mp-stat">
+        <span class="mp-stat-label">Wrong-dir shape</span>
+        <span class="mp-stat-value">{{ pattern.slices.wrongStructure.trend }} trend</span>
+        <span class="mp-stat-hint">
+          of {{ pattern.wrongDirection }} · {{ pattern.slices.wrongMode.pdhl }} were PDH/PDL
+        </span>
+      </div>
+    </div>
+    <p class="mp-sub" data-testid="fail-pattern-honest">{{ pattern.honest }}</p>
+  </div>
+
   <div class="mp-card" data-testid="paper-fund-card">
     <div class="mp-card-head">
       <div>
