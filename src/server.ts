@@ -115,6 +115,9 @@ function slimTradingInstrumentsCsv(csv: string): string {
         out.push(line);
       }
     }
+    if (exchange === 'BSE' && (sym === 'SENSEX' || name === 'SENSEX')) {
+      out.push(line);
+    }
   }
   return `${out.join('\n')}\n`;
 }

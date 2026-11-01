@@ -85,6 +85,15 @@ export class KiteApiService {
       .pipe(mergeMap((buffer) => from(this.decompressIfGzip(buffer))));
   }
 
+  /** Kite equity + commodity margins. */
+  getUserMargins(authorization: string): Observable<unknown> {
+    const headers = new HttpHeaders({
+      'X-Kite-Version': '3',
+      Authorization: authorization,
+    });
+    return this.http.get(`${this.kiteApiBaseUrl}/user/margins`, { headers });
+  }
+
   /** Kite quote — keys like NSE:NIFTY 50 or NFO:SYMBOL */
   getQuotes(authorization: string, instruments: string[]): Observable<unknown> {
     const params = new URLSearchParams();

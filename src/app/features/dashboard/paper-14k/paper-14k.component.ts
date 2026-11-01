@@ -1,11 +1,12 @@
 import { DecimalPipe } from '@angular/common';
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { PAPER_14K_BLOTTER } from '../../../core/paper-desk/paper-14k-blotter.fixture';
 import { PAPER_FAIL_PATTERN } from '../../../core/paper-desk/paper-fail-pattern.fixture';
 import { PAPER_HIST_PATTERN } from '../../../core/paper-desk/paper-hist-pattern.fixture';
 import { PAPER_MORE_DAILY } from '../../../core/paper-desk/paper-more-daily.fixture';
 import { PAPER_REVERSE_FAIL } from '../../../core/paper-desk/paper-reverse-fail.fixture';
+import { LiveAssumeService } from '../../../core/paper-desk/live-assume.service';
 import {
   PAPER_14K_BOOKS,
   Paper14kSnapshot,
@@ -29,6 +30,7 @@ export class Paper14kComponent implements OnInit {
   protected readonly pattern = PAPER_FAIL_PATTERN;
   protected readonly hist = PAPER_HIST_PATTERN;
   protected readonly more = PAPER_MORE_DAILY;
+  protected readonly assume = inject(LiveAssumeService);
 
   protected histBookLabel(name: string): string {
     switch (name) {
@@ -67,5 +69,13 @@ export class Paper14kComponent implements OnInit {
   protected resetFund(): void {
     resetPaperCursor();
     this.snap.set(paperSnapshot(0));
+  }
+
+  protected runLiveAssume(): void {
+    void this.assume.runFromKite();
+  }
+
+  protected assumeBooksFundEnd(): number {
+    return this.assume.result().books.reduce((s, b) => s + b.fundEnd, 0);
   }
 }

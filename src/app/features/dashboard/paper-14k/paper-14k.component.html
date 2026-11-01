@@ -6,6 +6,116 @@
     <a routerLink="/dashboard/crude-best">Crude Best</a>. Not a guaranteed profit.
   </div>
 
+  <div class="mp-card" data-testid="live-assume-card">
+    <div class="mp-card-head">
+      <div>
+        <h2>Live assumption</h2>
+        <p class="mp-sub">
+          ₹{{ assume.result().capitalEachRs | number }} on each book. Fetches Kite funds,
+          instruments, quotes, and 5m candles. Closes the ticket. No order is placed.
+        </p>
+      </div>
+      <span class="mp-badge" data-tone="info">assumption · not armed</span>
+    </div>
+    <div class="mp-stats">
+      <div class="mp-stat">
+        <span class="mp-stat-label">Closed net</span>
+        <span
+          class="mp-stat-value"
+          data-testid="live-assume-total"
+          [class.mp-up]="assume.result().totalRs > 0"
+          [class.mp-down]="assume.result().totalRs < 0"
+        >
+          ₹{{ assume.result().totalRs | number : '1.0-0' }}
+        </span>
+        <span class="mp-stat-hint">
+          {{ assume.result().green }} green · {{ assume.result().flat }} flat ·
+          {{ assume.result().red }} red
+        </span>
+      </div>
+      <div class="mp-stat">
+        <span class="mp-stat-label">Kite funds</span>
+        <span class="mp-stat-value" data-testid="live-assume-funds">
+          @if (assume.result().kiteFunds) {
+            ₹{{ assume.result().kiteFunds!.equityCash | number : '1.0-0' }}
+          } @else {
+            Connect Token
+          }
+        </span>
+        <span class="mp-stat-hint">
+          @if (assume.result().kiteFunds) {
+            equity · commodity ₹{{ assume.result().kiteFunds!.commodityCash | number : '1.0-0' }}
+          } @else {
+            source {{ assume.result().source }}
+          }
+        </span>
+      </div>
+      <div class="mp-stat">
+        <span class="mp-stat-label">Source</span>
+        <span class="mp-stat-value">{{ assume.result().source }}</span>
+        <span class="mp-stat-hint">{{ assume.result().asOf }}</span>
+      </div>
+    </div>
+    <div class="mp-table-wrap">
+      <table class="mp-table" data-testid="live-assume-books">
+        <thead>
+          <tr>
+            <th>Book</th>
+            <th>Session</th>
+            <th>How</th>
+            <th>Product</th>
+            <th class="num">₹</th>
+            <th class="num">Book fund</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (b of assume.result().books; track b.id) {
+            <tr>
+              <td class="mp-sym">{{ b.label }}</td>
+              <td>{{ b.sessionDay || '—' }} · {{ b.structure }}</td>
+              <td>{{ b.how }} / {{ b.reason }}</td>
+              <td>{{ b.product }}</td>
+              <td class="num" [class.mp-up]="b.rs > 0" [class.mp-down]="b.rs < 0">
+                {{ b.rs | number : '1.0-0' }}
+              </td>
+              <td class="num">{{ b.fundEnd | number : '1.0-0' }}</td>
+            </tr>
+          }
+          <tr>
+            <td class="mp-sym">Overall</td>
+            <td colspan="3">4 isolated ₹14,000 books · closed only</td>
+            <td class="num" [class.mp-up]="assume.result().totalRs > 0">
+              {{ assume.result().totalRs | number : '1.0-0' }}
+            </td>
+            <td class="num">
+              {{ assumeBooksFundEnd() | number : '1.0-0' }}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="mp-form">
+      <div class="mp-field">
+        <span>&nbsp;</span>
+        <button
+          type="button"
+          class="ui-btn ui-btn-primary"
+          [disabled]="assume.busy()"
+          (click)="runLiveAssume()"
+          data-testid="run-live-assume"
+        >
+          {{ assume.busy() ? 'Fetching Kite…' : 'Run live assumption' }}
+        </button>
+      </div>
+    </div>
+    @if (assume.error() || assume.result().kiteError) {
+      <p class="mp-sub" data-testid="live-assume-error">
+        {{ assume.error() || assume.result().kiteError }}
+      </p>
+    }
+    <p class="mp-sub" data-testid="live-assume-honest">{{ assume.result().honest }}</p>
+  </div>
+
   <div class="mp-card" data-testid="paper-hist-card">
     <div class="mp-card-head">
       <div>

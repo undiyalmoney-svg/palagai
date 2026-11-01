@@ -1,4 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideHttpClient } from '@angular/common/http';
 import { provideRouter } from '@angular/router';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Paper14kComponent } from './paper-14k.component';
@@ -10,7 +11,7 @@ describe('Paper14kComponent', () => {
     localStorage.clear();
     await TestBed.configureTestingModule({
       imports: [Paper14kComponent],
-      providers: [provideRouter([])],
+      providers: [provideHttpClient(), provideRouter([])],
     }).compileComponents();
     fixture = TestBed.createComponent(Paper14kComponent);
     fixture.detectChanges();
@@ -38,6 +39,16 @@ describe('Paper14kComponent', () => {
     expect(text).toMatch(/More daily profit/);
     expect(text).toMatch(/trend PDHL loser/);
     expect(text).toMatch(/Reverse recovered/);
+    expect(text).toMatch(/Live assumption/);
+    expect(text).toMatch(/Assumption only/);
+    expect(text).toMatch(/Run live assumption/);
+    expect(fixture.nativeElement.querySelector('[data-testid="live-assume-card"]')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('[data-testid="live-assume-total"]')?.textContent).toMatch(
+      /1,390/,
+    );
+    expect(fixture.nativeElement.querySelector('[data-testid="live-assume-funds"]')?.textContent).toMatch(
+      /Connect Token/,
+    );
     expect(fixture.nativeElement.querySelector('[data-testid="paper-hist-card"]')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('[data-testid="paper-more-daily-card"]')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('[data-testid="reverse-wrong-dir"]')?.textContent).toBe(
@@ -72,5 +83,17 @@ describe('Paper14kComponent', () => {
     const crude = fixture.componentInstance['snap']().bookScores.find((b) => b.id === 'crude');
     expect(crude?.netRs).toBe(13_200);
     expect(fixture.nativeElement.textContent).toMatch(/Crude Mini FUT/);
+  });
+
+  it('runs the live assumption from cache when Kite is not connected', async () => {
+    await fixture.componentInstance['runLiveAssume']();
+    fixture.detectChanges();
+    const text = fixture.nativeElement.textContent as string;
+    expect(text).toMatch(/Connect Kite on Token first/);
+    expect(text).toMatch(/1,390/);
+    expect(text).toMatch(/Assumption only/);
+    expect(fixture.componentInstance['assume'].result().liveOrders).toBe(false);
+    expect(fixture.componentInstance['assume'].result().source).toBe('cache');
+    expect(fixture.componentInstance['assumeBooksFundEnd']()).toBe(57_390);
   });
 });

@@ -46,6 +46,13 @@ describe('OrderTestComponent', () => {
     expect(text).toMatch(/2-year tape/);
     expect(text).toMatch(/morning structure switch/);
     expect(text).toMatch(/More daily profit/);
+    expect(text).toMatch(/Live assumption/);
+    expect(text).toMatch(/Assumption only/);
+    expect(text).toMatch(/No order is placed/);
+    expect(fixture.nativeElement.querySelector('[data-testid="live-assume-card"]')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('[data-testid="live-assume-total"]')?.textContent).toMatch(
+      /1,390/,
+    );
     expect(fixture.nativeElement.querySelector('[data-testid="paper-overall"]')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('[data-testid="paper-14k-page"]')).toBeTruthy();
     expect(text).toMatch(/RELIANCE/);
