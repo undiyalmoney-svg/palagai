@@ -42,7 +42,7 @@ describe('Paper 14k dummy desk', () => {
     expect(all.fills.every((f) => f.fundAfter >= 14_000)).toBe(true);
     const crude = all.bookScores.find((b) => b.id === 'crude');
     expect(crude?.fills).toBeGreaterThan(0);
-    expect(crude?.netRs).toBe(6000);
+    expect(crude?.netRs).toBe(13_200);
     expect(all.bookScores.reduce((a, b) => a + b.netRs, 0)).toBeCloseTo(all.netRs, 5);
     expect(all.bookScores.map((b) => b.id)).toEqual(['crude', 'nifty', 'bank', 'sensex']);
   });

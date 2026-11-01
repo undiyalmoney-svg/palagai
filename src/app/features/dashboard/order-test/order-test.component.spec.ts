@@ -45,6 +45,7 @@ describe('OrderTestComponent', () => {
     expect(text).toMatch(/against VWAP/);
     expect(text).toMatch(/2-year tape/);
     expect(text).toMatch(/morning structure switch/);
+    expect(text).toMatch(/More daily profit/);
     expect(fixture.nativeElement.querySelector('[data-testid="paper-overall"]')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('[data-testid="paper-14k-page"]')).toBeTruthy();
     expect(text).toMatch(/RELIANCE/);

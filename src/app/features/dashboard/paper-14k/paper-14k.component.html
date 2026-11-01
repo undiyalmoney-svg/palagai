@@ -1,7 +1,7 @@
 <div class="mp-page" data-testid="paper-14k-page">
   <div class="mp-banner" data-tone="info" data-testid="paper-14k-banner">
-    Dummy ₹{{ tape.startRs | number }}. Morning structure picks the book. Only a ticket that
-    stays green after ₹50 charges is banked. Scratch and SL are refused. Crude
+    Dummy ₹{{ tape.startRs | number }}. Structure first, then backup modes, then reverse a
+    loser if the other side stays green after ₹50. Scratch and SL are refused. Crude
     <strong>real</strong> money stays on
     <a routerLink="/dashboard/crude-best">Crude Best</a>. Not a guaranteed profit.
   </div>
@@ -64,6 +64,45 @@
       </table>
     </div>
     <p class="mp-sub" data-testid="hist-pattern-honest">{{ hist.honest }}</p>
+  </div>
+
+  <div class="mp-card" data-testid="paper-more-daily-card">
+    <div class="mp-card-head">
+      <div>
+        <h2>More daily profit</h2>
+        <p class="mp-sub">{{ more.champion.name }}</p>
+      </div>
+      <span class="mp-badge" data-tone="info">+{{ more.extraGreenDays }} green days · not armed</span>
+    </div>
+    <div class="mp-stats">
+      <div class="mp-stat">
+        <span class="mp-stat-label">Dummy now</span>
+        <span class="mp-stat-value mp-up" data-testid="more-daily-net">
+          ₹{{ more.richer.netRs | number : '1.0-0' }}
+        </span>
+        <span class="mp-stat-hint">
+          was ₹{{ more.current.netRs | number : '1.0-0' }} · {{ more.richer.greenDays }} green /
+          {{ more.richer.flatDays }} flat
+        </span>
+      </div>
+      <div class="mp-stat">
+        <span class="mp-stat-label">After 1 Sep</span>
+        <span class="mp-stat-value mp-up" data-testid="more-daily-late">
+          +₹{{ more.lateLiftRs | number : '1.0-0' }}
+        </span>
+        <span class="mp-stat-hint">
+          ₹{{ more.richer.lateNetRs | number : '1.0-0' }} vs ₹{{ more.current.lateNetRs | number : '1.0-0' }}
+        </span>
+      </div>
+      <div class="mp-stat">
+        <span class="mp-stat-label">Reverse recovered</span>
+        <span class="mp-stat-value" data-testid="more-daily-reverse">{{ more.autopsy.wrong_direction }}</span>
+        <span class="mp-stat-hint">
+          {{ more.autopsy.chop_both_lose }} still chop · both sides lose
+        </span>
+      </div>
+    </div>
+    <p class="mp-sub" data-testid="more-daily-honest">{{ more.honest }}</p>
   </div>
 
   <div class="mp-card" data-testid="paper-reverse-card">

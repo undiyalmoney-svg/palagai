@@ -4,6 +4,7 @@ import { RouterLink } from '@angular/router';
 import { PAPER_14K_BLOTTER } from '../../../core/paper-desk/paper-14k-blotter.fixture';
 import { PAPER_FAIL_PATTERN } from '../../../core/paper-desk/paper-fail-pattern.fixture';
 import { PAPER_HIST_PATTERN } from '../../../core/paper-desk/paper-hist-pattern.fixture';
+import { PAPER_MORE_DAILY } from '../../../core/paper-desk/paper-more-daily.fixture';
 import { PAPER_REVERSE_FAIL } from '../../../core/paper-desk/paper-reverse-fail.fixture';
 import {
   PAPER_14K_BOOKS,
@@ -27,6 +28,7 @@ export class Paper14kComponent implements OnInit {
   protected readonly reverse = PAPER_REVERSE_FAIL;
   protected readonly pattern = PAPER_FAIL_PATTERN;
   protected readonly hist = PAPER_HIST_PATTERN;
+  protected readonly more = PAPER_MORE_DAILY;
 
   protected histBookLabel(name: string): string {
     switch (name) {

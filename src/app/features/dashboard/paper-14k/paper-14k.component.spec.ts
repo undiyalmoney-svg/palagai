@@ -35,7 +35,11 @@ describe('Paper14kComponent', () => {
     expect(text).toMatch(/morning structure switch, do not flip/);
     expect(text).toMatch(/not a salary/i);
     expect(text).toMatch(/not a job/i);
+    expect(text).toMatch(/More daily profit/);
+    expect(text).toMatch(/trend PDHL loser/);
+    expect(text).toMatch(/Reverse recovered/);
     expect(fixture.nativeElement.querySelector('[data-testid="paper-hist-card"]')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('[data-testid="paper-more-daily-card"]')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('[data-testid="reverse-wrong-dir"]')?.textContent).toBe(
       '34',
     );
@@ -60,13 +64,13 @@ describe('Paper14kComponent', () => {
   it('plays the full dummy tape with Crude in the overall amount', () => {
     fixture.componentInstance['playAll']();
     fixture.detectChanges();
-    expect(fixture.componentInstance['snap']().fundRs).toBe(50_749.5);
+    expect(fixture.componentInstance['snap']().fundRs).toBe(102_916.3);
     expect(fixture.componentInstance['snap']().done).toBe(true);
     expect(fixture.componentInstance['snap']().redDays).toBe(0);
     expect(fixture.nativeElement.textContent).toMatch(/Tape finished/);
     expect(fixture.nativeElement.textContent).toMatch(/Overall amount/);
     const crude = fixture.componentInstance['snap']().bookScores.find((b) => b.id === 'crude');
-    expect(crude?.netRs).toBe(6000);
+    expect(crude?.netRs).toBe(13_200);
     expect(fixture.nativeElement.textContent).toMatch(/Crude Mini FUT/);
   });
 });
