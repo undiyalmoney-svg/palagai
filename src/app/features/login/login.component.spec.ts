@@ -9,19 +9,19 @@ import { LoginComponent } from './login.component';
 class StubPageComponent {}
 
 describe('LoginComponent desk resume', () => {
-  it('continues a signed-in owner to Historical Backtest when returnUrl is set', async () => {
+  it('continues a signed-in owner to the desk in returnUrl', async () => {
     const user = {
       id: '1',
       username: 'Devil',
       role: 'owner',
-      modules: ['token', 'backtest', 'test'],
+      modules: ['token', 'test'],
     };
     await TestBed.configureTestingModule({
       imports: [LoginComponent],
       providers: [
         provideRouter([
           { path: 'login', component: LoginComponent },
-          { path: 'dashboard/historical-backtest', component: StubPageComponent },
+          { path: 'dashboard/order-test', component: StubPageComponent },
           { path: 'dashboard/get-token', component: StubPageComponent },
         ]),
         {
@@ -41,11 +41,11 @@ describe('LoginComponent desk resume', () => {
     }).compileComponents();
 
     const router = TestBed.inject(Router);
-    await router.navigateByUrl('/login?returnUrl=%2Fdashboard%2Fhistorical-backtest');
+    await router.navigateByUrl('/login?returnUrl=%2Fdashboard%2Forder-test');
     const fixture: ComponentFixture<LoginComponent> = TestBed.createComponent(LoginComponent);
     fixture.detectChanges();
     fixture.componentInstance['resumeDeskIfPossible']();
     await fixture.whenStable();
-    expect(router.url).toBe('/dashboard/historical-backtest');
+    expect(router.url).toBe('/dashboard/order-test');
   });
 });

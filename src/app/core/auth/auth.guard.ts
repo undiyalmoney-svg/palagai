@@ -11,7 +11,6 @@ import {
 
 const MODULE_HOME: Array<{ module: SiteModule; path: string }> = [
   { module: 'token', path: '/dashboard/get-token' },
-  { module: 'backtest', path: '/dashboard/historical-backtest' },
   { module: 'crude', path: '/dashboard/crude-best' },
   { module: 'test', path: '/dashboard/order-test' },
 ];
@@ -153,7 +152,7 @@ export const guestGuard: CanActivateFn = (route) => {
     return router.parseUrl('/dashboard/get-token');
   }
 
-  // Full-page Historical Backtest click SSR-bounces here; localStorage still has the session.
+  // A full-page desk click can SSR-bounce here; localStorage still has the session.
   if (auth.isAuthenticated() || !!auth.getToken()) {
     auth.ensureHydratedFromStorage();
     if (auth.isAuthenticated() && !auth.isPublic()) {

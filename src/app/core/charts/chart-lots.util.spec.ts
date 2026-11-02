@@ -27,18 +27,19 @@ describe('chart lots from funds', () => {
     expect(sizingCapitalFromFunds(-10, 40_000)).toBe(40_000);
   });
 
-  it('₹40,000 per index lot, Crude 3× from that band, 0 FUT below ₹31k NRML', () => {
+  it('₹40,000 per index lot, Crude FUT capped by ₹31k NRML per lot and 3× the band', () => {
     const cases: Array<[number, number, number]> = [
       [0, 0, 0],
       [14_000, 0, 0],
       [30_999, 0, 0],
       [31_000, 0, 1],
       [39_999, 0, 1],
-      [40_000, 1, 3],
-      [79_999, 1, 3],
-      [80_000, 2, 6],
-      [120_000, 3, 9],
-      [200_000, 5, 15],
+      [40_000, 1, 1],
+      [50_000, 1, 1],
+      [79_999, 1, 2],
+      [80_000, 2, 2],
+      [120_000, 3, 3],
+      [200_000, 5, 6],
       [999_999, 10, 30],
     ];
     for (const [capital, indexLots, crudeLots] of cases) {
@@ -50,15 +51,15 @@ describe('chart lots from funds', () => {
     }
   });
 
-  it('sizes Nifty and Bank the same, and Crude three times that band', () => {
+  it('sizes Nifty and Bank the same, and Crude by margin not by band alone', () => {
     expect(lotsForChartBook('nifty', 80_000, 40_000)).toBe(2);
     expect(lotsForChartBook('bank', 80_000, 40_000)).toBe(2);
-    expect(lotsForChartBook('crude', 80_000, 40_000)).toBe(6);
+    expect(lotsForChartBook('crude', 80_000, 40_000)).toBe(2);
   });
 
   it('uses saved capital when the funds snapshot has not loaded', () => {
     expect(lotsForChartBook('nifty', null, 80_000)).toBe(2);
-    expect(lotsForChartBook('crude', null, 80_000)).toBe(6);
+    expect(lotsForChartBook('crude', null, 80_000)).toBe(2);
   });
 
   it('lets +/− move lots from the funds base, clamped 1…max', () => {

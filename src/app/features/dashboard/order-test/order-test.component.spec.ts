@@ -48,4 +48,19 @@ describe('OrderTestComponent', () => {
     expect(fixture.nativeElement.querySelector('[data-testid="paper-14k-page"]')).toBeTruthy();
     expect(text).toMatch(/RELIANCE/);
   });
+
+  it('shows the ₹50k capital plan with the equity and commodity split', () => {
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('[data-testid="capital-plan-card"]')).toBeTruthy();
+    expect(el.querySelector('[data-testid="capital-plan-equity"]')?.textContent).toMatch(/40,000/);
+    expect(el.querySelector('[data-testid="capital-plan-commodity"]')?.textContent).toMatch(/10,000/);
+    expect(el.querySelector('[data-testid="capital-plan-mode"]')?.textContent).toMatch(/all four together/);
+    expect(el.querySelector('[data-testid="capital-plan-worst"]')?.textContent).toMatch(/1,145/);
+
+    (el.querySelector('[data-testid="capital-plan-14000"]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(el.querySelector('[data-testid="capital-plan-commodity"]')?.textContent).toMatch(/₹0/);
+    expect(el.querySelector('[data-testid="capital-plan-mode"]')?.textContent).toMatch(/one book at a time/);
+    expect(el.querySelector('[data-testid="capital-plan-note"]')?.textContent).toMatch(/guaranteed/);
+  });
 });

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   OWNER_CAPITAL_RS,
+  atmLots,
+  atmMinCapitalRs,
   canBuyAtmOption,
   chartAtmRefuseReason,
   crudeFuturesLots,
@@ -49,7 +51,8 @@ describe('₹14k capital guard', () => {
     expect(oneStopOutRs('bank')).toBe(300);
     expect(oneStopOutRs('sensex')).toBe(320);
     expect(oneStopOutRs('crude')).toBe(200);
-    expect(oneStopOutRs('nifty', 40_000)).toBe(2_500);
+    expect(oneStopOutRs('nifty', 40_000)).toBe(325);
+    expect(oneStopOutRs('nifty', 84_000)).toBe(2_500);
     const g = guardCapital(14_000);
     expect(g.books.find((b) => b.book === 'nifty')?.oneLossPct).toBe(2.3);
     expect(g.books.find((b) => b.book === 'crude')?.oneLossPct).toBe(1.4);
@@ -68,12 +71,40 @@ describe('₹14k capital guard', () => {
     expect(p.enableBank).toBe(false);
   });
 
-  it('keeps Nifty+Bank ×1 at ₹40k so the bigger-capital desk is unchanged', () => {
+  it('keeps the 40k lot planner unchanged but blocks ATM until one stop fits the day cap', () => {
     expect(indexOptionLots(40_000)).toBe(1);
-    expect(canBuyAtmOption('nifty', 40_000)).toBe(true);
     const p = planLotsForCapital(40_000);
     expect(p.niftyLots).toBe(1);
     expect(p.bankLots).toBe(1);
+    expect(canBuyAtmOption('nifty', 40_000)).toBe(false);
+    expect(canBuyAtmOption('nifty', 83_000)).toBe(false);
+    expect(canBuyAtmOption('nifty', 84_000)).toBe(true);
+    expect(canBuyAtmOption('bank', 99_000)).toBe(false);
+    expect(canBuyAtmOption('bank', 100_000)).toBe(true);
+    expect(atmMinCapitalRs('nifty')).toBe(84_000);
+    expect(atmMinCapitalRs('bank')).toBe(100_000);
+    expect(atmMinCapitalRs('sensex')).toBeNull();
+    expect(atmLots('nifty', 84_000)).toBe(1);
+    expect(atmLots('bank', 100_000)).toBe(1);
+    expect(decideBook('nifty', 84_000).product).toBe('CEPE');
+    expect(decideBook('nifty', 84_000).reason).toMatch(/ATM CE\/PE ×1/);
+  });
+
+  it('at ₹50k no book risks more than the day cap and Crude FUT is not sized', () => {
+    const g = guardCapital(50_000);
+    expect(g.premiumBudgetRs).toBe(12_500);
+    expect(g.dayLossCapRs).toBe(1_500);
+    expect(canBuyAtmOption('nifty', 50_000)).toBe(false);
+    expect(canBuyAtmOption('bank', 50_000)).toBe(false);
+    expect(g.books.every((b) => b.product === 'CEPE')).toBe(true);
+    for (const b of g.books) expect(b.oneLossRs * b.lots).toBeLessThanOrEqual(g.dayLossCapRs);
+    expect(g.allOpenPremiumRs).toBe(10_750);
+    expect(g.allOpenWorstLossRs).toBe(1_145);
+    expect(g.allOpenWorstLossRs).toBeLessThanOrEqual(g.dayLossCapRs);
+    expect(g.note).toMatch(/ATM blocked/);
+    expect(g.note).not.toMatch(/stays FUT/);
+    expect(crudeFuturesLots(50_000)).toBe(1);
+    expect(lotsFromAvailableFunds(50_000, 'crude')).toBe(1);
   });
 
   it('rolls the dying contract on expiry day', () => {
@@ -89,8 +120,11 @@ describe('₹14k capital guard', () => {
     expect(chartAtmRefuseReason('bank', 14_000)).toMatch(/Bank Nifty/i);
     expect(chartAtmRefuseReason('crude', 14_000)).toMatch(/rejects 1 lot at ₹14,000/i);
     expect(chartAtmRefuseReason('sensex', 14_000)).toMatch(/Sensex ATM is blocked/i);
-    expect(chartAtmRefuseReason('nifty', 40_000)).toBeNull();
-    expect(chartAtmRefuseReason('bank', 40_000)).toBeNull();
+    expect(chartAtmRefuseReason('nifty', 50_000)).toMatch(/₹2,500 vs ₹1,500 day cap/);
+    expect(chartAtmRefuseReason('nifty', 50_000)).toMatch(/Need ≥₹84,000/);
+    expect(chartAtmRefuseReason('bank', 50_000)).toMatch(/Need ≥₹1,00,000/);
+    expect(chartAtmRefuseReason('nifty', 84_000)).toBeNull();
+    expect(chartAtmRefuseReason('bank', 100_000)).toBeNull();
     expect(chartAtmRefuseReason('crude', 40_000)).toBeNull();
   });
 });

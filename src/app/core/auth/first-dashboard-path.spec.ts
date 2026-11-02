@@ -10,8 +10,9 @@ describe('firstDashboardPathFor', () => {
     expect(firstDashboardPathFor(has('token', 'backtest', 'test'))).toBe('/dashboard/get-token');
   });
 
-  it('falls through to Historical Backtest when Token is not granted', () => {
-    expect(firstDashboardPathFor(has('backtest', 'test'))).toBe('/dashboard/historical-backtest');
+  it('skips the removed Backtest desk when Token is not granted', () => {
+    expect(firstDashboardPathFor(has('backtest', 'test'))).toBe('/dashboard/order-test');
+    expect(firstDashboardPathFor(has('backtest'))).toBe('/dashboard/home');
   });
 
   it('lands on Home when no desk module is granted', () => {
@@ -26,9 +27,9 @@ describe('firstDashboardPathFor', () => {
     expect(firstDashboardPathFor(has('crude', 'test'))).toBe('/dashboard/crude-best');
   });
 
-  it('keeps a Historical Backtest deep link and rejects off-desk URLs', () => {
-    expect(safeDashboardReturn('/dashboard/historical-backtest')).toBe('/dashboard/historical-backtest');
-    expect(safeDashboardReturn('/dashboard/historical-backtest?x=1')).toBe('/dashboard/historical-backtest');
+  it('keeps a desk deep link and rejects off-desk URLs', () => {
+    expect(safeDashboardReturn('/dashboard/order-test')).toBe('/dashboard/order-test');
+    expect(safeDashboardReturn('/dashboard/order-test?x=1')).toBe('/dashboard/order-test');
     expect(safeDashboardReturn('/dashboard')).toBeNull();
     expect(safeDashboardReturn('https://evil.example/dashboard')).toBeNull();
     expect(safeDashboardReturn('//evil.example')).toBeNull();

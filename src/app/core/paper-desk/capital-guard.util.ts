@@ -64,6 +64,8 @@ export interface BookDecision {
   /** One losing cheap-OTM stop, or ATM 25% premium stop above ₹40k. */
   oneLossRs: number;
   oneLossPct: number;
+  /** Option premium outlay for the allowed lots. 0 for FUT (margin) and blocked books. */
+  premiumRs: number;
 }
 
 export interface CapitalGuard {
@@ -72,8 +74,12 @@ export interface CapitalGuard {
   dayLossCapRs: number;
   books: BookDecision[];
   allowed: GuardBook[];
-  /** Crude Best live worker — still FUT until CE/PE is assigned. */
+  /** Crude is preferred, otherwise the first allowed book. Not a live-order assignment. */
   liveBook: GuardBook | null;
+  /** Premium if every allowed option book is open at once. */
+  allOpenPremiumRs: number;
+  /** Loss if every allowed option book stops out in the same day. */
+  allOpenWorstLossRs: number;
   note: string;
 }
 
@@ -94,20 +100,50 @@ export function canBuyCheapCepe(book: GuardBook, capitalRs: number): boolean {
   return cheapFits(book, c, premiumBudgetRs(c), dayLossCapRs(c));
 }
 
-/** 25% ATM premium stop above ₹40k. At ₹14k: cheap OTM one-stop. */
+/** 25% ATM premium stop where ATM is allowed; otherwise the cheap OTM one-stop. */
 export function oneStopOutRs(book: GuardBook, capitalRs: number = OWNER_CAPITAL_RS): number {
   if (canBuyAtmOption(book, capitalRs)) {
-    return Math.round(ATM_PREMIUM_PROXY_RS[book] * 0.25);
+    return atmStopRs(book);
   }
   return OPTION_14K_BOOKS[book].oneStopRs;
 }
 
+function atmStopRs(book: GuardBook): number {
+  return Math.round(ATM_PREMIUM_PROXY_RS[book] * 0.25);
+}
+
+/**
+ * Smallest cash where one ATM lot respects both the 25% premium budget and the
+ * 3% day-loss cap on a 25% premium stop. Only Nifty and Bank have an ATM book.
+ */
+export function atmMinCapitalRs(book: GuardBook): number | null {
+  if (book === 'sensex' || book === 'crude') return null;
+  const byBudget = ATM_PREMIUM_PROXY_RS[book] / MAX_PREMIUM_FRAC;
+  const byDayLoss = atmStopRs(book) / DAY_LOSS_FRAC;
+  const need = Math.ceil((Math.max(byBudget, byDayLoss) - 1e-6) / 1000) * 1000;
+  return Math.max(INDEX_MIN_CAPITAL_RS, need);
+}
+
 export function canBuyAtmOption(book: GuardBook, capitalRs: number): boolean {
-  if (book === 'sensex') return false;
-  if (book === 'crude') return false;
+  const min = atmMinCapitalRs(book);
+  if (min == null) return false;
   const c = cash(capitalRs);
-  if (c < INDEX_MIN_CAPITAL_RS) return false;
-  return ATM_PREMIUM_PROXY_RS[book] <= premiumBudgetRs(c);
+  if (c < min) return false;
+  return ATM_PREMIUM_PROXY_RS[book] <= premiumBudgetRs(c) && atmStopRs(book) <= dayLossCapRs(c);
+}
+
+/** ATM lots capped by cash band, premium budget, and the day-loss cap on stops. */
+export function atmLots(book: GuardBook, capitalRs: number): number {
+  if (!canBuyAtmOption(book, capitalRs)) return 0;
+  const c = cash(capitalRs);
+  return Math.max(
+    1,
+    Math.min(
+      indexOptionLots(c),
+      Math.floor(premiumBudgetRs(c) / ATM_PREMIUM_PROXY_RS[book]),
+      Math.floor(dayLossCapRs(c) / atmStopRs(book)),
+    ),
+  );
 }
 
 export function crudeFuturesLots(capitalRs: number): number {
@@ -119,13 +155,18 @@ export function indexOptionLots(capitalRs: number): number {
 }
 
 /**
- * Charts buy ATM CE/PE. Below ₹40k that path is refused on every book.
- * Cheap OTM CE/PE is the 14k plan on Test — not Charts ATM.
+ * Charts buy ATM CE/PE. Nifty and Bank ATM are refused until one 25% stop fits
+ * the 3% day cap. Crude and Sensex ATM are refused below ₹40k.
+ * Cheap OTM CE/PE is the small-cash plan on Test — not Charts ATM.
  */
 export function chartAtmRefuseReason(book: GuardBook, capitalRs: number): string | null {
   const c = cash(capitalRs);
-  if (c >= INDEX_MIN_CAPITAL_RS) return null;
   const cheap = OPTION_14K_BOOKS[book];
+  if (book === 'nifty' || book === 'bank') {
+    if (canBuyAtmOption(book, c)) return null;
+  } else if (c >= INDEX_MIN_CAPITAL_RS) {
+    return null;
+  }
   if (book === 'crude') {
     return (
       `₹${c.toLocaleString('en-IN')} cannot buy ATM options. Crude Mini FUT NRML is ~₹31,000 — Kite ` +
@@ -140,10 +181,12 @@ export function chartAtmRefuseReason(book: GuardBook, capitalRs: number): string
     );
   }
   const prem = ATM_PREMIUM_PROXY_RS[book];
+  const need = atmMinCapitalRs(book) ?? INDEX_MIN_CAPITAL_RS;
   return (
-    `${book === 'nifty' ? 'Nifty' : 'Bank Nifty'} ATM ~₹${prem.toLocaleString('en-IN')} / lot. ` +
-    `₹${c.toLocaleString('en-IN')} cannot buy that without washing the account. Cheap ${cheap.product} ` +
-    `is the 14k plan on Test. Need ≥₹${INDEX_MIN_CAPITAL_RS.toLocaleString('en-IN')} for ATM.`
+    `${book === 'nifty' ? 'Nifty' : 'Bank Nifty'} ATM ~₹${prem.toLocaleString('en-IN')} / lot, one 25% stop ` +
+    `₹${atmStopRs(book).toLocaleString('en-IN')} vs ₹${dayLossCapRs(c).toLocaleString('en-IN')} day cap at ` +
+    `₹${c.toLocaleString('en-IN')}. Cheap ${cheap.product} is the 14k plan on Test. ` +
+    `Need ≥₹${need.toLocaleString('en-IN')} for ATM.`
   );
 }
 
@@ -151,16 +194,17 @@ export function decideBook(book: GuardBook, capitalRs: number): BookDecision {
   const c = cash(capitalRs);
   const loss = oneStopOutRs(book, c);
   const pct = c > 0 ? Math.round((loss / c) * 1000) / 10 : 0;
-  const base = { book, oneLossRs: loss, oneLossPct: pct };
+  const base = { book, oneLossRs: loss, oneLossPct: pct, premiumRs: 0 };
   const cheap = OPTION_14K_BOOKS[book];
 
   if (canBuyAtmOption(book, c)) {
-    const lots = indexOptionLots(c);
+    const lots = atmLots(book, c);
     return {
       ...base,
       allowed: true,
       lots,
       product: 'CEPE',
+      premiumRs: ATM_PREMIUM_PROXY_RS[book] * lots,
       reason: `${book === 'nifty' ? 'Nifty' : 'Bank Nifty'} ATM CE/PE ×${lots}. Skip Tuesday/monthly expiry day — next contract only.`,
     };
   }
@@ -171,6 +215,7 @@ export function decideBook(book: GuardBook, capitalRs: number): BookDecision {
       allowed: true,
       lots: 1,
       product: 'CEPE',
+      premiumRs: cheap.openCostRs,
       reason:
         book === 'crude'
           ? `Crude Mini cheap CE/PE ×1 (~₹${cheap.openCostRs.toLocaleString('en-IN')} premium, ${cheap.slPrem}-pt premium stop ₹${cheap.oneStopRs}). Kite FUT NRML is ~₹31,000 — ₹14,000 is rejected. Skip expiry day. ATM still blocked.`
@@ -216,9 +261,14 @@ export function guardCapital(capitalRs: number = OWNER_CAPITAL_RS): CapitalGuard
   const dayLoss = dayLossCapRs(c);
   const budget = premiumBudgetRs(c);
   const live = books.find((b) => b.book === liveBook) || null;
-  const cheapCount = books.filter((b) => b.allowed && b.product === 'CEPE').length;
+  const optionBooks = books.filter((b) => b.allowed && b.product === 'CEPE');
+  const atmCount = optionBooks.filter((b) => canBuyAtmOption(b.book, c)).length;
+  const cheapCount = optionBooks.length - atmCount;
+  const allOpenPremiumRs = optionBooks.reduce((n, b) => n + b.premiumRs, 0);
+  const allOpenWorstLossRs = optionBooks.reduce((n, b) => n + b.oneLossRs * b.lots, 0);
+  const atmNote = atmCount ? `${atmCount} ATM` : 'ATM blocked';
   const note = live
-    ? `₹${c.toLocaleString('en-IN')} · motto CE/PE · ${cheapCount} cheap OTM book${cheapCount === 1 ? '' : 's'} · day loss cap ₹${dayLoss} · ATM blocked. Crude Best live stays FUT until assigned. Not a guaranteed profit.`
+    ? `₹${c.toLocaleString('en-IN')} · motto CE/PE · ${cheapCount} cheap OTM book${cheapCount === 1 ? '' : 's'} · ${atmNote} · day loss cap ₹${dayLoss.toLocaleString('en-IN')} · all open ₹${allOpenPremiumRs.toLocaleString('en-IN')} premium, worst ₹${allOpenWorstLossRs.toLocaleString('en-IN')}. Crude FUT needs ~₹31,000 commodity. Not a guaranteed profit.`
     : `₹${c.toLocaleString('en-IN')} · no book fits. Do not buy ATM index options.`;
   return {
     capitalRs: c,
@@ -227,6 +277,8 @@ export function guardCapital(capitalRs: number = OWNER_CAPITAL_RS): CapitalGuard
     books,
     allowed,
     liveBook,
+    allOpenPremiumRs,
+    allOpenWorstLossRs,
     note,
   };
 }

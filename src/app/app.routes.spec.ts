@@ -2,7 +2,6 @@ import { RenderMode } from '@angular/ssr';
 import { describe, expect, it } from 'vitest';
 import { serverRoutes } from './app.routes.server';
 import { routes } from './app.routes';
-import { HistoricalBacktestComponent } from './features/dashboard/historical-backtest/historical-backtest.component';
 import { CrudeBestComponent } from './features/dashboard/crude-best/crude-best.component';
 import { CrudeOilComponent } from './features/dashboard/crude-oil/crude-oil.component';
 import { Paper14kComponent } from './features/dashboard/paper-14k/paper-14k.component';
@@ -12,11 +11,10 @@ describe('dashboard desk routes', () => {
   const dashboard = routes.find((r) => r.path === 'dashboard');
   const children = dashboard?.children || [];
 
-  it('opens Historical Backtest eagerly like Token and Test', () => {
+  it('has no Historical Backtest desk; the old URL goes to Token', () => {
     const backtest = children.find((r) => r.path === 'historical-backtest');
-    expect(backtest?.component).toBe(HistoricalBacktestComponent);
-    expect(backtest?.loadComponent).toBeUndefined();
-    expect(backtest?.canActivate?.length).toBe(1);
+    expect(backtest?.component).toBeUndefined();
+    expect(backtest?.redirectTo).toBe('get-token');
 
     const paper = children.find((r) => r.path === 'paper-14k');
     expect(paper?.component).toBe(Paper14kComponent);
@@ -37,9 +35,8 @@ describe('dashboard desk routes', () => {
     expect(crude?.canActivate?.length).toBe(1);
   });
 
-  it('renders Historical Backtest on the client so SSR cannot bounce a signed-in session to login', () => {
-    const hist = serverRoutes.find((r) => r.path === 'dashboard/historical-backtest');
-    expect(hist?.renderMode).toBe(RenderMode.Client);
+  it('renders desks on the client so SSR cannot bounce a signed-in session to login', () => {
+    expect(serverRoutes.find((r) => r.path === 'dashboard/historical-backtest')).toBeUndefined();
     const token = serverRoutes.find((r) => r.path === 'dashboard/get-token');
     expect(token?.renderMode).toBe(RenderMode.Client);
     const crudeBest = serverRoutes.find((r) => r.path === 'dashboard/crude-best');

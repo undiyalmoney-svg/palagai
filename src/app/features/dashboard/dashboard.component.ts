@@ -71,7 +71,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   protected readonly clockLabel = signal('');
   protected readonly pageTitle = signal('Palagai');
   protected readonly pageSubtitle = signal(
-    'Token, Crude Best, Historical Backtest, Crude Oil, Paper 14k, and Test.',
+    'Token, Crude Best, Crude Oil, Paper 14k, and Test.',
   );
   protected readonly sidebarOpen = signal(true);
   protected readonly profileOpen = signal(false);
@@ -91,13 +91,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
       icon: 'shield',
       module: 'crude',
       testId: 'crude-best',
-    },
-    {
-      label: 'Historical Backtest',
-      shortLabel: 'Backtest',
-      route: '/dashboard/historical-backtest',
-      icon: 'trending-up',
-      module: 'backtest',
     },
     {
       label: 'Crude Oil',
@@ -138,10 +131,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
       title: 'Get Token',
       subtitle: 'Connect Kite, copy redirect URLs, and refresh access tokens.',
     },
-    '/dashboard/historical-backtest': {
-      title: 'Historical Backtest',
-      subtitle: 'Simulated prior-day follow book with the same 2-name 1R scan as live. Live today sizes from Kite cash.',
-    },
     '/dashboard/crude-best': {
       title: 'Crude Best',
       subtitle: 'Token, then Start trading. System picks the next Crude Mini, 1 lot, SL-M, and TP. Not guaranteed.',
@@ -166,7 +155,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   protected readonly hideFunds = computed(() => this.authService.isPublic());
 
-  /** Bottom tab bar on phone — Token, Crude Best, Historical Backtest, Crude Oil, Test. */
+  /** Bottom tab bar on phone — Token, Crude Best, Crude Oil, Paper 14k, Test. */
   protected readonly mobileTabItems = computed(() => this.navItems());
 
   protected readonly username = computed(() => {
@@ -359,9 +348,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
         : typeof raw === 'string'
           ? raw
           : 'Could not open that desk.';
-    if (/historical-backtest|chunk|loading chunk|failed to fetch/i.test(`${event.url} ${msg}`)) {
-      return 'Could not open Historical Backtest. Retry, or hard-refresh the tab.';
-    }
     if (/paper-14k/i.test(`${event.url} ${msg}`)) {
       return 'Could not open Paper 14k. Retry, or hard-refresh the tab.';
     }

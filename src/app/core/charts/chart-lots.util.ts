@@ -1,6 +1,7 @@
 /**
- * Charts ATM sizing — ₹40,000 per index lot, Crude 3× that band.
- * Below ₹40k index lots are 0 and Crude Mini is 1 futures lot, not 3.
+ * Charts ATM sizing — ₹40,000 per index lot, Crude up to 3× that band but
+ * never more futures lots than ₹31,000 NRML each can margin.
+ * Below ₹40k index lots are 0 and Crude Mini is 0–1 futures lots.
  *
  * Actual Kite equity wins when it is a positive number. Otherwise the saved
  * capital preference is the fallback, so a dead funds

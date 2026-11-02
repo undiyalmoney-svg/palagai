@@ -13,7 +13,6 @@ import { DashboardComponent } from './features/dashboard/dashboard.component';
 import { DashboardHomeComponent } from './features/dashboard/dashboard-home.component';
 import { Paper14kComponent } from './features/dashboard/paper-14k/paper-14k.component';
 import { OrderTestComponent } from './features/dashboard/order-test/order-test.component';
-import { HistoricalBacktestComponent } from './features/dashboard/historical-backtest/historical-backtest.component';
 import { GetTokenComponent } from './features/dashboard/get-token/get-token.component';
 import { CrudeBestComponent } from './features/dashboard/crude-best/crude-best.component';
 import { CrudeOilComponent } from './features/dashboard/crude-oil/crude-oil.component';
@@ -85,11 +84,7 @@ export const routes: Routes = [
         path: 'home',
         component: DashboardHomeComponent,
       },
-      {
-        path: 'historical-backtest',
-        canActivate: [moduleGuard('backtest')],
-        component: HistoricalBacktestComponent,
-      },
+      { path: 'historical-backtest', redirectTo: 'get-token', pathMatch: 'full' },
       {
         path: 'crude-best',
         canActivate: [moduleGuard('crude')],

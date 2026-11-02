@@ -39,7 +39,6 @@ describe('DashboardComponent navigation', () => {
         provideHttpClient(),
         provideRouter([
           { path: 'dashboard/get-token', component: DashboardComponent },
-          { path: 'dashboard/historical-backtest', component: DashboardComponent },
           { path: 'dashboard/crude-best', component: DashboardComponent },
           { path: 'dashboard/crude-oil', component: DashboardComponent },
           { path: 'dashboard/paper-14k', component: DashboardComponent },
@@ -83,15 +82,10 @@ describe('DashboardComponent navigation', () => {
     fixture.detectChanges();
   });
 
-  it('lists Historical Backtest and navigates there from Token', async () => {
+  it('has no Historical Backtest tab', () => {
     const el = fixture.nativeElement as HTMLElement;
-    const link = el.querySelector('[data-testid="nav-backtest"]') as HTMLAnchorElement | null;
-    expect(link).toBeTruthy();
-    expect(link?.textContent).toMatch(/Historical Backtest/i);
-
-    fixture.componentInstance['go']('/dashboard/historical-backtest');
-    await fixture.whenStable();
-    expect(router.url).toBe('/dashboard/historical-backtest');
+    expect(el.querySelector('[data-testid="nav-backtest"]')).toBeNull();
+    expect(el.textContent).not.toMatch(/Historical Backtest/i);
   });
 
   it('lists Crude Oil and navigates there from Token', async () => {

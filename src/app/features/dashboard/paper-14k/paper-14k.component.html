@@ -6,6 +6,117 @@
     <a routerLink="/dashboard/crude-best">Crude Best</a>.
   </div>
 
+  <div class="mp-card" data-testid="capital-plan-card">
+    <div class="mp-card-head">
+      <div>
+        <h2>Capital plan</h2>
+        <p class="mp-sub">
+          How to split one total across Kite equity and commodity for the four CE/PE books. Sizing guide only — the
+          paper books below still run ₹14,000 each. Premium ≤ 25% and day loss ≤ 3% per pocket.
+        </p>
+      </div>
+      <span class="mp-badge" [attr.data-tone]="plan().mode === 'all-open' ? 'up' : 'warn'" data-testid="capital-plan-mode">
+        @switch (plan().mode) {
+          @case ('all-open') { all four together }
+          @case ('one-at-a-time') { one book at a time }
+          @default { too small }
+        }
+      </span>
+    </div>
+
+    <div class="mp-form">
+      @for (n of planOptions; track n) {
+        <div class="mp-field">
+          <span>&nbsp;</span>
+          <button
+            type="button"
+            class="ui-btn"
+            [class.ui-btn-primary]="planCapital() === n"
+            (click)="pickPlan(n)"
+            [attr.data-testid]="'capital-plan-' + n"
+          >
+            ₹{{ n | number : '1.0-0' }}
+          </button>
+        </div>
+      }
+    </div>
+
+    <div class="mp-stats">
+      <div class="mp-stat">
+        <span class="mp-stat-label">Equity pocket</span>
+        <span class="mp-stat-value" data-testid="capital-plan-equity">₹{{ plan().equityRs | number : '1.0-0' }}</span>
+        <span class="mp-stat-hint">
+          Nifty, Bank, Sensex · premium ≤ ₹{{ plan().equityPremiumBudgetRs | number : '1.0-0' }} · day cap
+          ₹{{ plan().equityDayLossCapRs | number : '1.0-0' }}
+        </span>
+      </div>
+      <div class="mp-stat">
+        <span class="mp-stat-label">Commodity pocket</span>
+        <span class="mp-stat-value" data-testid="capital-plan-commodity">
+          ₹{{ plan().commodityRs | number : '1.0-0' }}
+        </span>
+        <span class="mp-stat-hint">
+          Crude Mini options · needs ≥₹{{ crudeMinCommodityRs | number : '1.0-0' }} · day cap
+          ₹{{ plan().commodityDayLossCapRs | number : '1.0-0' }}
+        </span>
+      </div>
+      <div class="mp-stat">
+        <span class="mp-stat-label">All open worst day</span>
+        <span class="mp-stat-value mp-down" data-testid="capital-plan-worst">
+          ₹{{ plan().allOpenWorstLossRs | number : '1.0-0' }}
+        </span>
+        <span class="mp-stat-hint">
+          {{ plan().allOpenWorstLossPct }}% of ₹{{ plan().capitalRs | number : '1.0-0' }} ·
+          ₹{{ plan().allOpenPremiumRs | number : '1.0-0' }} premium
+        </span>
+      </div>
+    </div>
+
+    <div class="mp-table-wrap">
+      <table class="mp-table" data-testid="capital-plan-books">
+        <thead>
+          <tr>
+            <th>Book</th>
+            <th>Pocket</th>
+            <th>Product</th>
+            <th class="num">Premium</th>
+            <th class="num">One stop</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (r of plan().rows; track r.book) {
+            <tr>
+              <td class="mp-sym">
+                {{ r.label }}
+                <div class="mp-sub">{{ r.reason }}</div>
+              </td>
+              <td>{{ r.pocket }}</td>
+              <td>
+                <span class="mp-badge" [attr.data-tone]="r.allowed ? 'up' : 'down'">{{ r.product }}</span>
+              </td>
+              <td class="num">{{ r.allowed ? (r.premiumRs | number : '1.0-0') : '—' }}</td>
+              <td class="num">{{ r.allowed ? (r.oneLossRs | number : '1.0-0') : '—' }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <p class="mp-sub" data-testid="capital-plan-note">{{ plan().note }}</p>
+    <p class="mp-sub">
+      ATM Nifty needs about ₹84,000 and Bank Nifty ₹1,00,000 so one 25% stop fits the 3% day cap. Index futures need
+      ₹1.7L–₹1.9L margin per lot and Crude Mini futures ~₹31,000 commodity — none are sized here.
+    </p>
+    @if (paper.session().kiteFunds; as f) {
+      <p class="mp-sub" data-testid="capital-plan-kite">
+        Kite now: equity ₹{{ f.equityCash | number : '1.0-0' }} · commodity ₹{{ f.commodityCash | number : '1.0-0' }}.
+        @if (plan().commodityRs > 0 && topUpRs() > 0) {
+          Move ₹{{ topUpRs() | number : '1.0-0' }} equity → commodity in Kite for the Crude book on this plan.
+        }
+      </p>
+    }
+  </div>
+
   <div class="mp-card" data-testid="live-paper-card">
     <div class="mp-card-head">
       <div>
