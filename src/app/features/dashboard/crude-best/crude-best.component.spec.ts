@@ -99,7 +99,7 @@ describe('CrudeBestComponent', () => {
     expect(text).toMatch(/any time on the day/i);
     expect(text).toMatch(/System takes care/);
     expect(text).toMatch(/next listed CRUDEOILM FUT/);
-    expect(text).toMatch(/1-lot FUT/);
+    expect(text).toMatch(/rejects 1 lot at ₹14,000/);
     expect(text).toMatch(/hard SL-M 20/);
     expect(text).toMatch(/TP 25/);
     expect(text).toMatch(/₹200/);
@@ -140,7 +140,7 @@ describe('CrudeBestComponent', () => {
     expect(startLiveMoneyMock).toHaveBeenCalledTimes(1);
     fixture.detectChanges();
     const text = fixture.nativeElement.textContent as string;
-    expect(text).toMatch(/Real money is on/);
-    expect(text).toMatch(/cannot double the lot/);
+    expect(text).toMatch(/rejecting 1 lot at ₹14,000/);
+    expect(text).toMatch(/NRML ~₹31,000/);
   });
 });

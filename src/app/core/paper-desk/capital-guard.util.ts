@@ -4,7 +4,7 @@
  * Motto: buy CE / PE. ₹14k cannot ATM-buy Nifty / Bank / Sensex / Crude
  * options without putting most of the account into one premium. Cheap
  * next-expiry OTM that fits the ₹3,500 budget and ₹420 day-loss is the
- * 14k plan. Crude Best live stays 1-lot FUT until that book is assigned.
+ * 14k plan. Crude Mini FUT is refused at this cash (Kite NRML ~₹31k).
  *
  * Not a guaranteed profit.
  */
@@ -128,8 +128,8 @@ export function chartAtmRefuseReason(book: GuardBook, capitalRs: number): string
   const cheap = OPTION_14K_BOOKS[book];
   if (book === 'crude') {
     return (
-      `₹${c.toLocaleString('en-IN')} cannot buy ATM options. Crude Mini futures ×1 is the live book ` +
-      `on the Crude Oil tab. Cheap ${cheap.product} is the 14k plan on Test. Charts ATM stands down ` +
+      `₹${c.toLocaleString('en-IN')} cannot buy ATM options. Crude Mini FUT NRML is ~₹31,000 — Kite ` +
+      `rejects 1 lot at ₹14,000. Cheap ${cheap.product} is the 14k plan on Test. Charts ATM stands down ` +
       `until ₹${INDEX_MIN_CAPITAL_RS.toLocaleString('en-IN')}.`
     );
   }
@@ -173,7 +173,7 @@ export function decideBook(book: GuardBook, capitalRs: number): BookDecision {
       product: 'CEPE',
       reason:
         book === 'crude'
-          ? `Crude Mini cheap CE/PE ×1 (~₹${cheap.openCostRs.toLocaleString('en-IN')} premium, ${cheap.slPrem}-pt premium stop ₹${cheap.oneStopRs}). Skip expiry day. ATM still blocked. Crude Best live stays 1-lot FUT until you assign this book.`
+          ? `Crude Mini cheap CE/PE ×1 (~₹${cheap.openCostRs.toLocaleString('en-IN')} premium, ${cheap.slPrem}-pt premium stop ₹${cheap.oneStopRs}). Kite FUT NRML is ~₹31,000 — ₹14,000 is rejected. Skip expiry day. ATM still blocked.`
           : `${GUARD_BOOK_LABEL[book]} cheap CE/PE ×1 (~₹${cheap.openCostRs.toLocaleString('en-IN')} premium, one-stop ₹${cheap.oneStopRs}). Skip expiry day. ATM still blocked at this cash.`,
     };
   }

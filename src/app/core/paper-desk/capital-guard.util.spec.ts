@@ -31,15 +31,16 @@ describe('₹14k capital guard', () => {
     expect(decideBook('crude', 14_000).reason).not.toMatch(/No option buying/);
   });
 
-  it('allows Crude cheap CE/PE at ₹14k and keeps the live worker on 1-lot FUT', () => {
+  it('allows Crude cheap CE/PE at ₹14k and refuses FUT — Kite needs ~₹31k', () => {
     const crude = decideBook('crude', 14_000);
     expect(crude.allowed).toBe(true);
     expect(crude.lots).toBe(1);
     expect(crude.product).toBe('CEPE');
-    expect(crude.reason).toMatch(/Crude Best live stays 1-lot FUT/i);
-    expect(crudeFuturesLots(14_000)).toBe(1);
+    expect(crude.reason).toMatch(/₹14,000 is rejected/i);
+    expect(crudeFuturesLots(14_000)).toBe(0);
     expect(lotsFromAvailableFunds(14_000, 'index')).toBe(0);
-    expect(lotsFromAvailableFunds(14_000, 'crude')).toBe(1);
+    expect(lotsFromAvailableFunds(14_000, 'crude')).toBe(0);
+    expect(lotsFromAvailableFunds(31_000, 'crude')).toBe(1);
     expect(guardCapital(14_000).liveBook).toBe('crude');
   });
 
@@ -86,7 +87,7 @@ describe('₹14k capital guard', () => {
     expect(chartAtmRefuseReason('nifty', 14_000)).toMatch(/Nifty/i);
     expect(chartAtmRefuseReason('nifty', 14_000)).toMatch(/14k plan on Test/i);
     expect(chartAtmRefuseReason('bank', 14_000)).toMatch(/Bank Nifty/i);
-    expect(chartAtmRefuseReason('crude', 14_000)).toMatch(/Crude Oil tab/i);
+    expect(chartAtmRefuseReason('crude', 14_000)).toMatch(/rejects 1 lot at ₹14,000/i);
     expect(chartAtmRefuseReason('sensex', 14_000)).toMatch(/Sensex ATM is blocked/i);
     expect(chartAtmRefuseReason('nifty', 40_000)).toBeNull();
     expect(chartAtmRefuseReason('bank', 40_000)).toBeNull();

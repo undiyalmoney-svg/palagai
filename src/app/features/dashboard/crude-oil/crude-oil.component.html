@@ -1,12 +1,11 @@
 <div class="mp-page" data-testid="crude-oil-page">
   <div class="mp-banner" [attr.data-tone]="liveMoney()?.enabled ? 'down' : 'warn'" data-testid="crude-banner">
     @if (liveMoney()?.enabled) {
-      Real money is on. 1 lot CRUDEOILM futures, MCX MIS. Scanning closed 5-minute bars from 10:00 to 23:00 IST. Scratch
-      10 pts if the trade smells wrong, take-profit 25 pts (₹200 after charges), hard SL-M 20 as floor, flatten 23:10. On
-      expiry day this desk already rolled to the next month. Not a guaranteed profit.
+      Real money worker is armed on CRUDEOILM FUT. Kite is rejecting 1 lot at ₹14,000 — today’s NRML is ~₹31,000.
+      Stop this desk so it stops sending doomed orders. Cheap CE/PE is the ₹14k plan on Test. Not a guaranteed profit.
     } @else {
-      Live Crude Mini is still 1-lot FUT until you assign CE/PE. Motto is buy CE/PE — cheap OTM on Crude, Nifty,
-      Bank Nifty and Sensex is the ₹14,000 plan on Test. ATM stays blocked. Tick the box to place real MCX MIS.
+      Do not arm Crude Mini FUT at ₹14,000. Kite NRML is ~₹31,000 and MIS already rejects at ₹14k free.
+      Motto is buy CE/PE — cheap OTM on Crude, Nifty, Bank Nifty and Sensex is the Test book. ATM stays blocked.
       Does not auto-start. Not a guaranteed profit.
     }
   </div>
@@ -17,11 +16,11 @@
         <h2>₹14,000 capital</h2>
         <p class="mp-sub">
           Motto: buy CE/PE. Cheap next-expiry OTM on all four books. Premium budget ₹{{ capital.premiumBudgetRs | number }},
-          hard day-loss ₹{{ capital.dayLossCapRs | number }}. ATM stays locked until ₹40,000. This live desk stays
-          1-lot FUT until you assign. Not a guaranteed profit.
+          hard day-loss ₹{{ capital.dayLossCapRs | number }}. ATM stays locked until ₹40,000. Crude Mini FUT needs
+          ~₹31,000 — ₹14,000 is rejected. Not a guaranteed profit.
         </p>
       </div>
-      <span class="mp-badge" data-tone="warn">Live money · FUT ×1 · Test buys CE/PE</span>
+      <span class="mp-badge" data-tone="warn">FUT blocked at ₹14k · Test buys CE/PE</span>
     </div>
     <div class="mp-stats">
       <div class="mp-stat">

@@ -109,6 +109,7 @@ describe('CrudeOilComponent', () => {
     expect(text).toMatch(/Sensex/);
     expect(text).toMatch(/cheap CE\/PE/i);
     expect(text).toMatch(/Test buys CE\/PE/);
+    expect(text).toMatch(/FUT blocked at ₹14k/);
     expect(text).not.toMatch(/No option buying at this cash/);
     expect(text).toMatch(/next listed expiry/i);
     expect(text).toMatch(/never the dying week/i);
@@ -129,7 +130,7 @@ describe('CrudeOilComponent', () => {
     expect(startLiveMoneyMock).toHaveBeenCalledTimes(1);
     fixture.detectChanges();
     const text = fixture.nativeElement.textContent as string;
-    expect(text).toMatch(/Real money is on/);
-    expect(text).toMatch(/rolled to the next month/);
+    expect(text).toMatch(/rejecting 1 lot at ₹14,000/);
+    expect(text).toMatch(/NRML is ~₹31,000/);
   });
 });

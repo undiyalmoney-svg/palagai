@@ -1,8 +1,8 @@
 <div class="mp-page" data-testid="crude-best-page">
   <div class="mp-banner" [attr.data-tone]="liveMoney()?.enabled ? 'down' : 'warn'" data-testid="crude-best-banner">
     @if (liveMoney()?.enabled) {
-      Real money is on. Same 1-lot Crude Mini worker as the Crude Oil tab — two Starts cannot double the lot. Scanning
-      10:00–23:00 IST, scratch 10, TP 25 (₹200 after charges), SL-M 20, flatten 23:10. Not a guaranteed profit.
+      Real money worker is armed on the same Crude Mini FUT book. Kite is rejecting 1 lot at ₹14,000 — NRML ~₹31,000.
+      Stop so it does not keep sending doomed orders. Cheap CE/PE is the 14k plan on Test. Not a guaranteed profit.
     } @else {
       Your job is Token, then Start trading — any time today. The desk picks the next CRUDEOILM future, keeps 1 lot,
       places SL-M, and exits at TP. Same worker as Crude Oil. Does not auto-start. Not a guaranteed profit.
@@ -47,9 +47,9 @@
         Instrument — next listed CRUDEOILM FUT. Dying expiry is skipped so orders go to the following month.
       </li>
       <li>
-        Capital — this live desk is 1-lot FUT (₹{{ locked.rupeesPerPoint }}/pt) until you assign CE/PE.
-        ₹{{ capital.capitalRs | number }} ATM is blocked. Cheap OTM CE/PE is the 14k plan on Test. Hard day-loss
-        ₹{{ capital.dayLossCapRs | number }}.
+        Capital — Crude Mini FUT needs ~₹31,000 NRML. Kite already rejects 1 lot at ₹14,000 free.
+        Do not arm this FUT worker on ₹{{ capital.capitalRs | number }}. Cheap OTM CE/PE is the 14k plan on Test.
+        Hard day-loss ₹{{ capital.dayLossCapRs | number }}.
       </li>
       <li>
         Stop — scratch {{ locked.scratchPts }} pts if the trade smells wrong, hard SL-M {{ locked.stopPts }} as floor,

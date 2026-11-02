@@ -27,12 +27,12 @@ describe('chart lots from funds', () => {
     expect(sizingCapitalFromFunds(-10, 40_000)).toBe(40_000);
   });
 
-  it('₹40,000 per index lot, Crude 3× from that band, 0 index / 1 Crude below ₹40k', () => {
+  it('₹40,000 per index lot, Crude 3× from that band, 0 FUT below ₹31k NRML', () => {
     const cases: Array<[number, number, number]> = [
       [0, 0, 0],
-      [7_999, 0, 0],
-      [8_000, 0, 1],
-      [14_000, 0, 1],
+      [14_000, 0, 0],
+      [30_999, 0, 0],
+      [31_000, 0, 1],
       [39_999, 0, 1],
       [40_000, 1, 3],
       [79_999, 1, 3],

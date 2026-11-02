@@ -3,7 +3,7 @@
  *
  * ATM index / Crude ATM still wash this cash. Cheap next-expiry OTM that
  * fits the ₹3,500 premium budget and ₹420 day-loss is the book.
- * Paper / Test trade these. Crude Best live stays 1-lot FUT until assigned.
+ * Paper / Test trade these. Crude Mini FUT is refused at ₹14k (Kite NRML ~₹31k).
  * Not a guaranteed profit.
  */
 import { LiveAssumeBookCfg } from './live-assume.engine';
@@ -233,4 +233,4 @@ export function canBuyCheapCepe(
 export const OPTION_14K_HONEST =
   'Motto: buy CE/PE. Cheap next-expiry OTM on Crude Mini, Nifty 50, Bank Nifty and Sensex. ' +
   'Premium ≤ ₹3,500 · day-loss ₹420 · 1 lot · skip expiry day. ATM still blocked. ' +
-  'Paper / Test only — no Kite order. Crude Best live stays 1-lot FUT until you assign. Not a guaranteed profit.';
+  'Paper / Test only — no Kite order. Crude Mini FUT is refused at ₹14k (NRML ~₹31k). Not a guaranteed profit.';
