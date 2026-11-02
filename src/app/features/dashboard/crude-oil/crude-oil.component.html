@@ -38,6 +38,18 @@
         <span class="mp-stat-value">₹{{ capital.premiumBudgetRs | number }}</span>
         <span class="mp-stat-hint">25% — cheap OTM CE/PE fits; ATM does not</span>
       </div>
+      @if (liveMoney()?.funds; as f) {
+        <div class="mp-stat" data-testid="kite-equity">
+          <span class="mp-stat-label">Kite equity</span>
+          <span class="mp-stat-value">₹{{ f.equityCash | number }}</span>
+          <span class="mp-stat-hint">NSE / BSE CE/PE</span>
+        </div>
+        <div class="mp-stat" data-testid="kite-commodity">
+          <span class="mp-stat-label">Kite commodity</span>
+          <span class="mp-stat-value">₹{{ f.commodityCash | number }}</span>
+          <span class="mp-stat-hint">{{ f.commodityCash > 0 ? 'MCX Crude Mini' : '₹0 — MCX cannot open' }}</span>
+        </div>
+      }
     </div>
     <div class="mp-table-wrap">
       <table class="mp-table" data-testid="capital-books">

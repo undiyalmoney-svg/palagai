@@ -50,6 +50,11 @@
         Capital — Crude Mini FUT needs ~₹31,000 NRML. Kite already rejects 1 lot at ₹14,000 free.
         Do not arm this FUT worker on ₹{{ capital.capitalRs | number }}. Cheap OTM CE/PE is the 14k plan on Test.
         Hard day-loss ₹{{ capital.dayLossCapRs | number }}.
+        @if (liveMoney()?.funds; as f) {
+          Live Kite: equity ₹{{ f.equityCash | number }} · commodity ₹{{ f.commodityCash | number }}{{
+            f.commodityCash > 0 ? '.' : ' — MCX cannot open until you transfer equity → commodity.'
+          }}
+        }
       </li>
       <li>
         Stop — scratch {{ locked.scratchPts }} pts if the trade smells wrong, hard SL-M {{ locked.stopPts }} as floor,

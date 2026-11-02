@@ -27,6 +27,7 @@ describe('CrudeBestComponent', () => {
     lastMessage: null as string | null,
     sessionOk: false,
     guaranteed: false,
+    funds: { equityCash: 14_085, commodityCash: 0 },
   };
   let moneyState = { ...idleMoney };
   const statusMock = vi.fn(() =>
@@ -121,6 +122,8 @@ describe('CrudeBestComponent', () => {
     expect(text).toMatch(/buy CE\/PE/);
     expect(text).toMatch(/14k plan on Test/);
     expect(text).toMatch(/blocked/);
+    expect(text).toMatch(/Live Kite: equity ₹14,085/);
+    expect(text).toMatch(/MCX cannot open/);
     expect(fixture.componentInstance['indexHunt'].books.nifty.futAllowed).toBe(false);
     expect(fixture.componentInstance['indexHunt'].books.bank.atmAllowed).toBe(false);
   });

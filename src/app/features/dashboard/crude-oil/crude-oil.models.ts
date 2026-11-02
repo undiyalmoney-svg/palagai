@@ -35,6 +35,14 @@ export interface CrudeLiveDna {
   qty: number;
 }
 
+export interface CrudeLiveFunds {
+  equityCash: number;
+  commodityCash: number;
+  equityNet?: number;
+  commodityNet?: number;
+  fetchedAt?: string | null;
+}
+
 export interface CrudeLiveMoney {
   enabled: boolean;
   liveOrders: boolean;
@@ -53,6 +61,7 @@ export interface CrudeLiveMoney {
   dropletWatching?: boolean;
   dropletPlacing?: boolean;
   guaranteed: boolean;
+  funds?: CrudeLiveFunds | null;
 }
 
 export interface CrudeLiveResponse {

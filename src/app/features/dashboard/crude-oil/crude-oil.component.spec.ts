@@ -27,6 +27,7 @@ describe('CrudeOilComponent', () => {
     lastMessage: null as string | null,
     sessionOk: false,
     guaranteed: false,
+    funds: { equityCash: 14_085, commodityCash: 0 },
   };
   let moneyState = { ...idleMoney };
   const statusMock = vi.fn(() =>
@@ -110,6 +111,9 @@ describe('CrudeOilComponent', () => {
     expect(text).toMatch(/cheap CE\/PE/i);
     expect(text).toMatch(/Test buys CE\/PE/);
     expect(text).toMatch(/FUT blocked at ₹14k/);
+    expect(text).toMatch(/Kite equity/);
+    expect(text).toMatch(/14,085/);
+    expect(text).toMatch(/MCX cannot open/);
     expect(text).not.toMatch(/No option buying at this cash/);
     expect(text).toMatch(/next listed expiry/i);
     expect(text).toMatch(/never the dying week/i);
