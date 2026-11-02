@@ -20,6 +20,7 @@ describe('Paper14kComponent', () => {
   it('is a live paper desk: Start, four isolated books, no Kite order', () => {
     const text = fixture.nativeElement.textContent as string;
     expect(text).toMatch(/Paper only/);
+    expect(text).toMatch(/buy CE\/PE/);
     expect(text).toMatch(/Hit Start/);
     expect(text).toMatch(/Crude Mini/);
     expect(text).toMatch(/Nifty 50/);

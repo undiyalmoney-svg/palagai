@@ -52,6 +52,20 @@ describe('slimTradingInstruments', () => {
         strike: 250,
       }),
       row({ tradingSymbol: 'USDINR26AUGFUT', exchange: 'CDS', instrumentType: 'FUT' }),
+      row({ tradingSymbol: 'SENSEX', exchange: 'BSE', instrumentType: 'IDX', name: 'SENSEX' }),
+      row({
+        tradingSymbol: 'SENSEX26NOV2082000CE',
+        name: 'SENSEX',
+        exchange: 'BFO',
+        instrumentType: 'CE',
+        strike: 82000,
+      }),
+      row({
+        tradingSymbol: 'SENSEX5026NOV8200CE',
+        name: 'SENSEX50',
+        exchange: 'BFO',
+        instrumentType: 'CE',
+      }),
     ]);
     expect(slim.map((i) => i.tradingSymbol)).toEqual([
       'NIFTY2580424800CE',
@@ -59,6 +73,8 @@ describe('slimTradingInstruments', () => {
       'CRUDEOILM26AUGFUT',
       'NATGASMINI26AUGFUT',
       'NATGASMINI26AUG250CE',
+      'SENSEX',
+      'SENSEX26NOV2082000CE',
     ]);
   });
 });

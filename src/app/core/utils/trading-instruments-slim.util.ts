@@ -45,6 +45,18 @@ export function slimTradingInstruments(list: Instrument[]): Instrument[] {
       }
       return sym === 'NIFTY 50' || sym === 'NIFTY BANK';
     }
+    if (exchange === 'BSE' && (sym === 'SENSEX' || name === 'SENSEX')) {
+      return true;
+    }
+    if (exchange === 'BFO' && (itype === 'CE' || itype === 'PE' || itype === 'FUT')) {
+      if (sym.startsWith('SENSEX50') || name === 'SENSEX50') {
+        return false;
+      }
+      if (sym.startsWith('BANKEX') || name === 'BANKEX') {
+        return false;
+      }
+      return sym.startsWith('SENSEX') || name === 'SENSEX';
+    }
     return false;
   });
 }

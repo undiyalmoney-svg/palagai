@@ -5,9 +5,9 @@
       10 pts if the trade smells wrong, take-profit 25 pts (₹200 after charges), hard SL-M 20 as floor, flatten 23:10. On
       expiry day this desk already rolled to the next month. Not a guaranteed profit.
     } @else {
-      Live Crude Mini. 1 lot, ₹10 a point. ₹14,000 cannot buy ATM Nifty, Bank Nifty or Sensex without washing the
-      cash. PDHL, opening-range fade or trap, 10:00–23:00 IST. Scratch 10 pts · TP 25 (₹200) · sit first win. Tick the box
-      to place real MCX MIS. Does not auto-start. Not a guaranteed profit.
+      Live Crude Mini is still 1-lot FUT until you assign CE/PE. Motto is buy CE/PE — cheap OTM on Crude, Nifty,
+      Bank Nifty and Sensex is the ₹14,000 plan on Test. ATM stays blocked. Tick the box to place real MCX MIS.
+      Does not auto-start. Not a guaranteed profit.
     }
   </div>
 
@@ -16,11 +16,12 @@
       <div>
         <h2>₹14,000 capital</h2>
         <p class="mp-sub">
-          One book, one lot, hard day-loss ₹{{ capital.dayLossCapRs | number }}. ATM index options spend most of this
-          cash on a single premium. Option buying stays locked until ₹40,000. Not a guaranteed profit.
+          Motto: buy CE/PE. Cheap next-expiry OTM on all four books. Premium budget ₹{{ capital.premiumBudgetRs | number }},
+          hard day-loss ₹{{ capital.dayLossCapRs | number }}. ATM stays locked until ₹40,000. This live desk stays
+          1-lot FUT until you assign. Not a guaranteed profit.
         </p>
       </div>
-      <span class="mp-badge" data-tone="warn">Live book · Crude Mini FUT ×1</span>
+      <span class="mp-badge" data-tone="warn">Live money · FUT ×1 · Test buys CE/PE</span>
     </div>
     <div class="mp-stats">
       <div class="mp-stat">
@@ -36,7 +37,7 @@
       <div class="mp-stat">
         <span class="mp-stat-label">Premium budget</span>
         <span class="mp-stat-value">₹{{ capital.premiumBudgetRs | number }}</span>
-        <span class="mp-stat-hint">25% — too small for one ATM index lot</span>
+        <span class="mp-stat-hint">25% — cheap OTM CE/PE fits; ATM does not</span>
       </div>
     </div>
     <div class="mp-table-wrap">

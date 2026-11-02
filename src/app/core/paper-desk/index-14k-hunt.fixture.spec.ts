@@ -13,9 +13,10 @@ describe('₹14k index hunt', () => {
     expect(INDEX_14K_HUNT.books.nifty.atmAllowed).toBe(false);
     expect(INDEX_14K_HUNT.books.bank.atmAllowed).toBe(false);
     expect(INDEX_14K_HUNT.books.sensex.atmAllowed).toBe(false);
-    expect(decideBook('nifty', 14_000).allowed).toBe(false);
-    expect(decideBook('bank', 14_000).allowed).toBe(false);
-    expect(decideBook('sensex', 14_000).allowed).toBe(false);
+    expect(decideBook('nifty', 14_000).allowed).toBe(true);
+    expect(decideBook('nifty', 14_000).product).toBe('CEPE');
+    expect(decideBook('bank', 14_000).allowed).toBe(true);
+    expect(decideBook('sensex', 14_000).allowed).toBe(true);
     expect(guardCapital(14_000).liveBook).toBe('crude');
   });
 

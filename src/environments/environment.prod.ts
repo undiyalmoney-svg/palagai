@@ -17,6 +17,6 @@ export const environment = {
   defaultLots: 1,
   allowLiveMoney: true,
   orderEgressIp: '168.144.28.89',
-  appVersion: '1.3.167',
-  appBuild: '2026.11.02-live-paper',
+  appVersion: '1.3.168',
+  appBuild: '2026.11.02-option-14k',
 };

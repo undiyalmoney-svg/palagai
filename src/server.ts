@@ -117,6 +117,18 @@ function slimTradingInstrumentsCsv(csv: string): string {
     }
     if (exchange === 'BSE' && (sym === 'SENSEX' || name === 'SENSEX')) {
       out.push(line);
+      continue;
+    }
+    if (exchange === 'BFO' && (itype === 'CE' || itype === 'PE' || itype === 'FUT')) {
+      if (sym.startsWith('SENSEX50') || name === 'SENSEX50') {
+        continue;
+      }
+      if (sym.startsWith('BANKEX') || name === 'BANKEX') {
+        continue;
+      }
+      if (sym.startsWith('SENSEX') || name === 'SENSEX') {
+        out.push(line);
+      }
     }
   }
   return `${out.join('\n')}\n`;

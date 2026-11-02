@@ -78,6 +78,8 @@ export interface LiveAssumeBookCfg {
   vwapMin: number;
   primary: Record<string, string>;
   backup: Record<string, readonly string[]>;
+  /** Long the option (CE or PE). SL/TP live on premium, not futures. */
+  buyOption?: boolean;
 }
 
 export const LIVE_ASSUME_BOOKS: LiveAssumeBookCfg[] = [

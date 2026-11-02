@@ -10,8 +10,8 @@ import { countIndexOptions } from '../utils/option-chain.util';
 
 const STORAGE_KEY = 'palagai_instruments';
 const META_KEY = 'palagai_instruments_meta';
-/** Must match when slimTradingInstruments keep-list changes (Nat Gas = 3 after server slim fix). */
-export const INSTRUMENT_SLIM_SCHEMA = 3;
+/** Must match when slimTradingInstruments keep-list changes (BFO Sensex CE/PE = 4). */
+export const INSTRUMENT_SLIM_SCHEMA = 4;
 
 @Injectable({ providedIn: 'root' })
 export class InstrumentStoreService {

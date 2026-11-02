@@ -107,9 +107,10 @@ describe('CrudeOilComponent', () => {
     expect(text).toMatch(/Nifty 50/);
     expect(text).toMatch(/Bank Nifty/);
     expect(text).toMatch(/Sensex/);
-    expect(text).toMatch(/blocked/);
-    expect(text).toMatch(/Crude Mini futures ×1/);
-    expect(text).toMatch(/next listed future/i);
+    expect(text).toMatch(/cheap CE\/PE/i);
+    expect(text).toMatch(/Test buys CE\/PE/);
+    expect(text).not.toMatch(/No option buying at this cash/);
+    expect(text).toMatch(/next listed expiry/i);
     expect(text).toMatch(/never the dying week/i);
   });
 

@@ -47,8 +47,9 @@
         Instrument — next listed CRUDEOILM FUT. Dying expiry is skipped so orders go to the following month.
       </li>
       <li>
-        Capital — 1 lot only (₹{{ locked.rupeesPerPoint }}/pt). ₹{{ capital.capitalRs | number }} cannot buy ATM Nifty,
-        Bank Nifty or Sensex. Hard day-loss ₹{{ capital.dayLossCapRs | number }}.
+        Capital — this live desk is 1-lot FUT (₹{{ locked.rupeesPerPoint }}/pt) until you assign CE/PE.
+        ₹{{ capital.capitalRs | number }} ATM is blocked. Cheap OTM CE/PE is the 14k plan on Test. Hard day-loss
+        ₹{{ capital.dayLossCapRs | number }}.
       </li>
       <li>
         Stop — scratch {{ locked.scratchPts }} pts if the trade smells wrong, hard SL-M {{ locked.stopPts }} as floor,
@@ -66,11 +67,10 @@
       <div>
         <h2>Nifty, Bank Nifty, Sensex at ₹14,000</h2>
         <p class="mp-sub">
-          Same daily-min hunt on Yahoo 5-minute spot (5 Aug–30 Oct 2026). Futures margin is
-          ₹1.5L–₹2L. ATM CE/PE is ~₹8k–₹12k. Those stay blocked. Cheap OTM proxies that fit the
+          Motto: buy CE/PE. Futures and ATM stay blocked at this cash. Cheap OTM that fits the
           ₹{{ indexHunt.premiumBudgetRs | number }} premium budget and ₹{{ indexHunt.dayLossCapRs | number }}
-          day-loss were scored with a 0.2 delta — not live option prints. Not armed. Not a
-          guaranteed profit.
+          day-loss is now the Test paper book on all four names, including Crude Mini. This live desk
+          is not assigned. Not a guaranteed profit.
         </p>
       </div>
       <span class="mp-badge" data-tone="warn">Research only</span>

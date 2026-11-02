@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   LIVE_PAPER_BOOKS,
   LIVE_PAPER_CAPITAL,
+  bindOptionFill,
   booksFundEnd,
   emptyBook,
   emptySession,
@@ -21,6 +22,9 @@ describe('Live paper desk', () => {
     expect(booksFundEnd(snap.books)).toBe(56_000);
     expect(snap.honest).toMatch(/Paper only/);
     expect(snap.honest).toMatch(/No Kite order/i);
+    expect(snap.honest).toMatch(/buy CE\/PE/);
+    expect(LIVE_PAPER_BOOKS.every((b) => b.buyOption)).toBe(true);
+    expect(LIVE_PAPER_BOOKS.map((b) => b.product).join(' ')).toMatch(/CE\/PE/);
   });
 
   it('marks live P/L and banks a target after charges', () => {
@@ -57,5 +61,59 @@ describe('Live paper desk', () => {
     expect(done.reason).toBe('scratch');
     expect(done.closedRs).toBe(-150);
     expect(done.side).toBe('flat');
+  });
+
+  it('treats a short-underlying PE as a long premium — up is profit', () => {
+    const cfg = LIVE_PAPER_BOOKS[0];
+    const book = emptyBook(cfg);
+    book.side = 'short';
+    book.entry = 150;
+    book.sl = 130;
+    book.tp = 175;
+    book.scratch = 140;
+    book.status = 'open';
+    book.optionType = 'PE';
+    const live = tickBook(book, cfg, [], 160, '2026-11-02', 12 * 60, 'CRUDEOILM26NOV5300PE');
+    expect(live.liveRs).toBe(50);
+    const done = tickBook(book, cfg, [], 175, '2026-11-02', 12 * 60, 'CRUDEOILM26NOV5300PE');
+    expect(done.reason).toBe('tp');
+    expect(done.closedRs).toBe(200);
+  });
+
+  it('binds a cheap CE fill onto premium SL/TP', () => {
+    const cfg = LIVE_PAPER_BOOKS[0];
+    const book = emptyBook(cfg);
+    book.side = 'long';
+    book.entry = 5400;
+    book.status = 'open';
+    const bound = bindOptionFill(book, cfg, 150, {
+      instrument: {
+        instrumentToken: 9,
+        exchangeToken: 0,
+        tradingSymbol: 'CRUDEOILM26NOV5500CE',
+        name: 'CRUDEOILM',
+        exchange: 'MCX',
+        segment: 'MCX-OPT',
+        instrumentType: 'CE',
+        expiry: '2026-11-17',
+        strike: 5500,
+        tickSize: 0.05,
+        lotSize: 10,
+        lastPrice: 150,
+      },
+      source: 'chain',
+      side: 'CE',
+      strike: 5500,
+      expiry: '2026-11-17',
+      lotSize: 10,
+      lastPrice: 150,
+      openCostRs: 1500,
+      fitsBudget: true,
+    });
+    expect(bound.entry).toBe(150);
+    expect(bound.sl).toBe(130);
+    expect(bound.tp).toBe(175);
+    expect(bound.optionType).toBe('CE');
+    expect(bound.instrument).toBe('CRUDEOILM26NOV5500CE');
   });
 });

@@ -1,6 +1,7 @@
 <div class="mp-page" data-testid="paper-14k-page">
   <div class="mp-banner" data-tone="info" data-testid="paper-14k-banner">
-    Paper only. ₹14,000 on each book. Watches live Kite, adds SL and target, shows P/L.
+    Motto: buy CE/PE. Paper only. ₹14,000 on each book — cheap next-expiry OTM on Crude Mini,
+    Nifty, Bank Nifty and Sensex. Watches live Kite, adds SL and target, shows P/L.
     No order is placed. Real Crude money stays on
     <a routerLink="/dashboard/crude-best">Crude Best</a>.
   </div>
@@ -10,7 +11,7 @@
       <div>
         <h2>Live paper</h2>
         <p class="mp-sub">
-          Crude Mini, Nifty 50, Bank Nifty, Sensex. Isolated ₹14,000 each. Hit Start.
+          Cheap CE/PE on Crude Mini, Nifty 50, Bank Nifty, Sensex. Isolated ₹14,000 each. Hit Start.
         </p>
       </div>
       <span class="mp-badge" [attr.data-tone]="paper.session().running ? 'down' : 'info'">
@@ -82,6 +83,12 @@
             <tr>
               <td class="mp-sym">
                 {{ b.label }}
+                <div class="mp-sub">
+                  {{ b.product }}
+                  @if (b.optionType) {
+                    · {{ b.optionType }} {{ b.instrument }}
+                  }
+                </div>
                 <div class="mp-sub">{{ b.structure }} · {{ b.mode || b.status }}</div>
               </td>
               <td class="num">{{ b.last != null ? (b.last | number : '1.0-2') : '—' }}</td>

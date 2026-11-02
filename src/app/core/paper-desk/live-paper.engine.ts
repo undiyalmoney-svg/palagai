@@ -1,7 +1,6 @@
-/** Live paper: isolated ₹14k books, Kite watch, no Kite order. */
+/** Live paper: isolated ₹14k books, Kite watch, no Kite order. Motto: buy CE/PE. */
 
 import {
-  LIVE_ASSUME_BOOKS,
   LIVE_ASSUME_CAPITAL,
   LIVE_ASSUME_CHARGE,
   LIVE_ASSUME_CRUDE_MIN,
@@ -12,8 +11,10 @@ import {
   bookSignal,
   morningStructure,
 } from './live-assume.engine';
+import { OPTION_14K_HONEST, OPTION_14K_LIST, option14kToPaperCfg } from './option-14k-plan';
+import { CheapOtmPick } from '../utils/pick-cheap-otm.util';
 
-export const LIVE_PAPER_BOOKS = LIVE_ASSUME_BOOKS;
+export const LIVE_PAPER_BOOKS: LiveAssumeBookCfg[] = OPTION_14K_LIST.map(option14kToPaperCfg);
 export const LIVE_PAPER_CAPITAL = LIVE_ASSUME_CAPITAL;
 export const LIVE_PAPER_CHARGE = LIVE_ASSUME_CHARGE;
 
@@ -56,6 +57,12 @@ export interface LivePaperBookState {
   lastBarMin: number;
   reason: string;
   fills: LivePaperFill[];
+  optionSymbol: string;
+  optionType: '' | 'CE' | 'PE';
+  strike: number | null;
+  expiry: string;
+  lot: number;
+  optionToken: number;
 }
 
 export interface LivePaperSession {
@@ -106,7 +113,42 @@ export function emptyBook(cfg: LiveAssumeBookCfg): LivePaperBookState {
     lastBarMin: -1,
     reason: '',
     fills: [],
+    optionSymbol: '',
+    optionType: '',
+    strike: null,
+    expiry: '',
+    lot: 0,
+    optionToken: 0,
   };
+}
+
+function isOptionBuy(cfg: LiveAssumeBookCfg): boolean {
+  return cfg.buyOption === true;
+}
+
+export function bindOptionFill(
+  book: LivePaperBookState,
+  cfg: LiveAssumeBookCfg,
+  prem: number,
+  pick: CheapOtmPick,
+): LivePaperBookState {
+  if (book.side === 'flat' || prem <= 0) return book;
+  const next: LivePaperBookState = { ...book, fills: [...book.fills] };
+  next.entry = prem;
+  next.sl = Math.max(0.05, prem - cfg.sl);
+  next.tp = prem + cfg.tp;
+  next.scratch = Math.max(0.05, prem - cfg.scratch);
+  next.instrument = pick.instrument.tradingSymbol;
+  next.optionSymbol = pick.instrument.tradingSymbol;
+  next.optionType = pick.side;
+  next.strike = pick.strike;
+  next.expiry = pick.expiry;
+  next.lot = pick.lotSize;
+  next.optionToken = pick.instrument.instrumentToken;
+  next.last = prem;
+  next.reason = `open ${pick.side} ${pick.instrument.tradingSymbol}`;
+  markLive(next, prem, cfg);
+  return next;
 }
 
 export function emptySession(day: string, asOf = new Date().toISOString()): LivePaperSession {
@@ -143,9 +185,9 @@ function markLive(book: LivePaperBookState, last: number | null, cfg: LiveAssume
     book.liveRs = 0;
     return;
   }
-  const dir = book.side === 'long' ? 1 : -1;
   const px = last ?? book.entry;
-  book.livePts = Math.round(dir * (px - book.entry) * 10) / 10;
+  const pts = isOptionBuy(cfg) ? px - book.entry : (book.side === 'long' ? 1 : -1) * (px - book.entry);
+  book.livePts = Math.round(pts * 10) / 10;
   book.liveRs = Math.round((book.livePts * cfg.rsPt - LIVE_PAPER_CHARGE) * 10) / 10;
 }
 
@@ -157,8 +199,9 @@ function closeAt(
   day: string,
 ): void {
   if (book.side === 'flat' || book.entry == null) return;
-  const dir = book.side === 'long' ? 1 : -1;
-  const pts = dir * (exitPx - book.entry);
+  const pts = isOptionBuy(cfg)
+    ? exitPx - book.entry
+    : (book.side === 'long' ? 1 : -1) * (exitPx - book.entry);
   const rs = Math.round((pts * cfg.rsPt - LIVE_PAPER_CHARGE) * 10) / 10;
   book.fills.push({
     day,
@@ -188,6 +231,12 @@ function closeAt(
   book.pendingDir = 0;
   book.pendingSig = 0;
   book.pendingMode = '';
+  book.optionSymbol = '';
+  book.optionType = '';
+  book.strike = null;
+  book.expiry = '';
+  book.lot = 0;
+  book.optionToken = 0;
 }
 
 function hitExit(
@@ -201,7 +250,7 @@ function hitExit(
   if (book.side === 'flat' || book.entry == null || book.sl == null || book.tp == null || book.scratch == null) {
     return false;
   }
-  const long = book.side === 'long';
+  const long = isOptionBuy(cfg) || book.side === 'long';
   if (long && low <= book.scratch) {
     closeAt(book, cfg, book.scratch, 'scratch', day);
     return true;
@@ -248,9 +297,15 @@ function openAt(book: LivePaperBookState, cfg: LiveAssumeBookCfg, dir: number, e
   const d = dir === 1 ? 1 : -1;
   book.side = d === 1 ? 'long' : 'short';
   book.entry = entry;
-  book.sl = entry - d * cfg.sl;
-  book.tp = entry + d * cfg.tp;
-  book.scratch = entry - d * cfg.scratch;
+  if (isOptionBuy(cfg)) {
+    book.sl = Math.max(0.05, entry - cfg.sl);
+    book.tp = entry + cfg.tp;
+    book.scratch = Math.max(0.05, entry - cfg.scratch);
+  } else {
+    book.sl = entry - d * cfg.sl;
+    book.tp = entry + d * cfg.tp;
+    book.scratch = entry - d * cfg.scratch;
+  }
   book.mode = mode;
   book.status = 'open';
   book.reason = 'open';
@@ -375,8 +430,8 @@ export function summarizePaper(
     closedRs,
     honest:
       `Paper only — no Kite order is placed. ₹${LIVE_PAPER_CAPITAL.toLocaleString('en-IN')} isolated on each book. ` +
-      `SL, target, and live P/L come from Kite 5m candles and last price. ${fundsLine}` +
-      'Index books are cheap OTM 0.2-delta proxies — ATM/FUT does not fit ₹14k. Not a guaranteed profit. Crude Best stays the real-money desk.',
+      `Motto: buy CE/PE. Cheap next-expiry OTM on all four. SL, target, and live P/L come from the option last. ${fundsLine}` +
+      `${OPTION_14K_HONEST}`,
   };
 }
 

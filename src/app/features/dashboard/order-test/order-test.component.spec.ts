@@ -33,6 +33,7 @@ describe('OrderTestComponent', () => {
   it('is a Start-only live paper desk for four isolated books', () => {
     const text = fixture.nativeElement.textContent as string;
     expect(text).toMatch(/Hit Start/);
+    expect(text).toMatch(/buy CE\/PE/);
     expect(text).toMatch(/Crude Mini/);
     expect(text).toMatch(/Nifty 50/);
     expect(text).toMatch(/Bank Nifty/);

@@ -99,7 +99,7 @@ describe('CrudeBestComponent', () => {
     expect(text).toMatch(/any time on the day/i);
     expect(text).toMatch(/System takes care/);
     expect(text).toMatch(/next listed CRUDEOILM FUT/);
-    expect(text).toMatch(/1 lot only/);
+    expect(text).toMatch(/1-lot FUT/);
     expect(text).toMatch(/hard SL-M 20/);
     expect(text).toMatch(/TP 25/);
     expect(text).toMatch(/₹200/);
@@ -118,7 +118,8 @@ describe('CrudeBestComponent', () => {
     expect(fixture.componentInstance['tape'].everyDayGreen).toBe(false);
     expect(text).toMatch(/Nifty, Bank Nifty, Sensex at ₹14,000/);
     expect(text).toMatch(/Research only/);
-    expect(text).toMatch(/Not armed/);
+    expect(text).toMatch(/buy CE\/PE/);
+    expect(text).toMatch(/14k plan on Test/);
     expect(text).toMatch(/blocked/);
     expect(fixture.componentInstance['indexHunt'].books.nifty.futAllowed).toBe(false);
     expect(fixture.componentInstance['indexHunt'].books.bank.atmAllowed).toBe(false);
