@@ -222,7 +222,7 @@ function prevHl(bars: LiveAssumeBar[], day: string): { hi: number; lo: number } 
   return { hi: Math.max(...prev.map((b) => b.high)), lo: Math.min(...prev.map((b) => b.low)) };
 }
 
-function signal(mode: string, bars: LiveAssumeBar[], i: number, cfg: LiveAssumeBookCfg): number {
+export function bookSignal(mode: string, bars: LiveAssumeBar[], i: number, cfg: LiveAssumeBookCfg): number {
   const b = bars[i];
   const up = b.close > b.open;
   const dn = b.close < b.open;
@@ -345,7 +345,7 @@ export function simulate(
       continue;
     }
     if (b.min < cfg.entryS || b.min > cfg.flat - 30) continue;
-    let d = signal(mode, bars, i, cfg);
+    let d = bookSignal(mode, bars, i, cfg);
     if (!d) continue;
     if (flip) d = -d;
     pending = { dir: d, sig: b.close };

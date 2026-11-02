@@ -128,12 +128,11 @@ export class DashboardComponent implements OnInit, OnDestroy {
   private readonly titles: Record<string, { title: string; subtitle: string }> = {
     '/dashboard/paper-14k': {
       title: 'Paper 14k',
-      subtitle: 'Dummy ₹14,000. Same daily fills as live, no Kite orders. Capital is treated as real.',
+      subtitle: 'Live paper. ₹14,000 each. Start watches Kite. No order is placed.',
     },
     '/dashboard/order-test': {
       title: 'Test',
-      subtitle:
-        'Dummy ₹14,000. Structure picks the book. Only profit after charges. Crude is in the overall amount.',
+      subtitle: 'Live paper. ₹14,000 each. Start watches Kite. SL, target, P/L. No order is placed.',
     },
     '/dashboard/get-token': {
       title: 'Get Token',

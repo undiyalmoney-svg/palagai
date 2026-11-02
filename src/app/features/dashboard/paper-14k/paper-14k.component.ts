@@ -1,20 +1,8 @@
 import { DecimalPipe } from '@angular/common';
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { PAPER_14K_BLOTTER } from '../../../core/paper-desk/paper-14k-blotter.fixture';
-import { PAPER_FAIL_PATTERN } from '../../../core/paper-desk/paper-fail-pattern.fixture';
-import { PAPER_HIST_PATTERN } from '../../../core/paper-desk/paper-hist-pattern.fixture';
-import { PAPER_MORE_DAILY } from '../../../core/paper-desk/paper-more-daily.fixture';
-import { PAPER_REVERSE_FAIL } from '../../../core/paper-desk/paper-reverse-fail.fixture';
-import { LiveAssumeService } from '../../../core/paper-desk/live-assume.service';
-import {
-  PAPER_14K_BOOKS,
-  Paper14kSnapshot,
-  paperSnapshot,
-  readPaperCursor,
-  resetPaperCursor,
-  writePaperCursor,
-} from '../../../core/paper-desk/paper-14k.engine';
+import { LivePaperService } from '../../../core/paper-desk/live-paper.service';
+import { allClosedFills, booksFundEnd } from '../../../core/paper-desk/live-paper.engine';
 
 @Component({
   selector: 'app-paper-14k',
@@ -23,59 +11,22 @@ import {
   templateUrl: './paper-14k.component.html',
   styleUrl: '../crude-oil/crude-oil.component.css',
 })
-export class Paper14kComponent implements OnInit {
-  protected readonly tape = PAPER_14K_BLOTTER;
-  protected readonly books = PAPER_14K_BOOKS;
-  protected readonly reverse = PAPER_REVERSE_FAIL;
-  protected readonly pattern = PAPER_FAIL_PATTERN;
-  protected readonly hist = PAPER_HIST_PATTERN;
-  protected readonly more = PAPER_MORE_DAILY;
-  protected readonly assume = inject(LiveAssumeService);
+export class Paper14kComponent {
+  protected readonly paper = inject(LivePaperService);
 
-  protected histBookLabel(name: string): string {
-    switch (name) {
-      case 'crude_mcx_5m':
-        return 'Crude Mini 5m';
-      case 'crude_cl_1h_proxy':
-        return 'Crude CL×85 1h';
-      case 'nifty_1h':
-        return 'Nifty 1h';
-      case 'bank_1h':
-        return 'Bank 1h';
-      case 'sensex_1h':
-        return 'Sensex 1h';
-      default:
-        return name;
-    }
+  protected startPaper(): void {
+    void this.paper.start();
   }
 
-  protected readonly snap = signal<Paper14kSnapshot>(paperSnapshot(0));
-
-  ngOnInit(): void {
-    this.snap.set(paperSnapshot(readPaperCursor()));
+  protected stopPaper(): void {
+    this.paper.stop();
   }
 
-  protected playNext(): void {
-    const next = Math.min(this.snap().played + 1, this.tape.sessions.length);
-    writePaperCursor(next);
-    this.snap.set(paperSnapshot(next));
+  protected booksFund(): number {
+    return booksFundEnd(this.paper.session().books);
   }
 
-  protected playAll(): void {
-    writePaperCursor(this.tape.sessions.length);
-    this.snap.set(paperSnapshot(this.tape.sessions.length));
-  }
-
-  protected resetFund(): void {
-    resetPaperCursor();
-    this.snap.set(paperSnapshot(0));
-  }
-
-  protected runLiveAssume(): void {
-    void this.assume.runFromKite();
-  }
-
-  protected assumeBooksFundEnd(): number {
-    return this.assume.result().books.reduce((s, b) => s + b.fundEnd, 0);
+  protected fills() {
+    return allClosedFills(this.paper.session().books);
   }
 }

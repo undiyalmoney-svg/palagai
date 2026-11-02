@@ -1,426 +1,184 @@
 <div class="mp-page" data-testid="paper-14k-page">
   <div class="mp-banner" data-tone="info" data-testid="paper-14k-banner">
-    Dummy ₹{{ tape.startRs | number }}. Structure first, then backup modes, then reverse a
-    loser if the other side stays green after ₹50. Scratch and SL are refused. Crude
-    <strong>real</strong> money stays on
-    <a routerLink="/dashboard/crude-best">Crude Best</a>. Not a guaranteed profit.
+    Paper only. ₹14,000 on each book. Watches live Kite, adds SL and target, shows P/L.
+    No order is placed. Real Crude money stays on
+    <a routerLink="/dashboard/crude-best">Crude Best</a>.
   </div>
 
-  <div class="mp-card" data-testid="live-assume-card">
+  <div class="mp-card" data-testid="live-paper-card">
     <div class="mp-card-head">
       <div>
-        <h2>Live assumption</h2>
+        <h2>Live paper</h2>
         <p class="mp-sub">
-          ₹{{ assume.result().capitalEachRs | number }} on each book. Fetches Kite funds,
-          instruments, quotes, and 5m candles. Closes the ticket. No order is placed.
+          Crude Mini, Nifty 50, Bank Nifty, Sensex. Isolated ₹14,000 each. Hit Start.
         </p>
       </div>
-      <span class="mp-badge" data-tone="info">assumption · not armed</span>
+      <span class="mp-badge" [attr.data-tone]="paper.session().running ? 'down' : 'info'">
+        {{ paper.session().running ? 'watching Kite' : 'paper · not armed' }}
+      </span>
     </div>
+
     <div class="mp-stats">
       <div class="mp-stat">
-        <span class="mp-stat-label">Closed net</span>
+        <span class="mp-stat-label">Live P/L</span>
         <span
           class="mp-stat-value"
-          data-testid="live-assume-total"
-          [class.mp-up]="assume.result().totalRs > 0"
-          [class.mp-down]="assume.result().totalRs < 0"
+          data-testid="live-paper-live"
+          [class.mp-up]="paper.session().liveRs > 0"
+          [class.mp-down]="paper.session().liveRs < 0"
         >
-          ₹{{ assume.result().totalRs | number : '1.0-0' }}
+          ₹{{ paper.session().liveRs | number : '1.0-0' }}
         </span>
-        <span class="mp-stat-hint">
-          {{ assume.result().green }} green · {{ assume.result().flat }} flat ·
-          {{ assume.result().red }} red
+        <span class="mp-stat-hint">open books after ₹50</span>
+      </div>
+      <div class="mp-stat">
+        <span class="mp-stat-label">Closed</span>
+        <span
+          class="mp-stat-value"
+          data-testid="live-paper-closed"
+          [class.mp-up]="paper.session().closedRs > 0"
+          [class.mp-down]="paper.session().closedRs < 0"
+        >
+          ₹{{ paper.session().closedRs | number : '1.0-0' }}
         </span>
+        <span class="mp-stat-hint">{{ paper.session().day }} · after charges</span>
       </div>
       <div class="mp-stat">
         <span class="mp-stat-label">Kite funds</span>
-        <span class="mp-stat-value" data-testid="live-assume-funds">
-          @if (assume.result().kiteFunds) {
-            ₹{{ assume.result().kiteFunds!.equityCash | number : '1.0-0' }}
+        <span class="mp-stat-value" data-testid="live-paper-funds">
+          @if (paper.session().kiteFunds) {
+            ₹{{ paper.session().kiteFunds!.equityCash | number : '1.0-0' }}
           } @else {
             Connect Token
           }
         </span>
         <span class="mp-stat-hint">
-          @if (assume.result().kiteFunds) {
-            equity · commodity ₹{{ assume.result().kiteFunds!.commodityCash | number : '1.0-0' }}
+          @if (paper.session().kiteFunds) {
+            equity · commodity ₹{{ paper.session().kiteFunds!.commodityCash | number : '1.0-0' }}
           } @else {
-            source {{ assume.result().source }}
+            needed to watch live
           }
         </span>
       </div>
-      <div class="mp-stat">
-        <span class="mp-stat-label">Source</span>
-        <span class="mp-stat-value">{{ assume.result().source }}</span>
-        <span class="mp-stat-hint">{{ assume.result().asOf }}</span>
-      </div>
     </div>
+
     <div class="mp-table-wrap">
-      <table class="mp-table" data-testid="live-assume-books">
+      <table class="mp-table" data-testid="live-paper-books">
         <thead>
           <tr>
             <th>Book</th>
-            <th>Session</th>
-            <th>How</th>
-            <th>Product</th>
-            <th class="num">₹</th>
-            <th class="num">Book fund</th>
+            <th class="num">Last</th>
+            <th>Side</th>
+            <th class="num">Entry</th>
+            <th class="num">SL</th>
+            <th class="num">TP</th>
+            <th class="num">Live ₹</th>
+            <th class="num">Closed ₹</th>
+            <th class="num">Fund</th>
           </tr>
         </thead>
         <tbody>
-          @for (b of assume.result().books; track b.id) {
+          @for (b of paper.session().books; track b.id) {
             <tr>
-              <td class="mp-sym">{{ b.label }}</td>
-              <td>{{ b.sessionDay || '—' }} · {{ b.structure }}</td>
-              <td>{{ b.how }} / {{ b.reason }}</td>
-              <td>{{ b.product }}</td>
-              <td class="num" [class.mp-up]="b.rs > 0" [class.mp-down]="b.rs < 0">
-                {{ b.rs | number : '1.0-0' }}
+              <td class="mp-sym">
+                {{ b.label }}
+                <div class="mp-sub">{{ b.structure }} · {{ b.mode || b.status }}</div>
               </td>
-              <td class="num">{{ b.fundEnd | number : '1.0-0' }}</td>
+              <td class="num">{{ b.last != null ? (b.last | number : '1.0-2') : '—' }}</td>
+              <td>{{ b.side }}</td>
+              <td class="num">{{ b.entry != null ? (b.entry | number : '1.0-2') : '—' }}</td>
+              <td class="num">{{ b.sl != null ? (b.sl | number : '1.0-2') : '—' }}</td>
+              <td class="num">{{ b.tp != null ? (b.tp | number : '1.0-2') : '—' }}</td>
+              <td class="num" [class.mp-up]="b.liveRs > 0" [class.mp-down]="b.liveRs < 0">
+                {{ b.side === 'flat' ? '—' : (b.liveRs | number : '1.0-0') }}
+              </td>
+              <td class="num" [class.mp-up]="b.closedRs > 0" [class.mp-down]="b.closedRs < 0">
+                {{ b.closedRs | number : '1.0-0' }}
+              </td>
+              <td class="num">{{ b.fund | number : '1.0-0' }}</td>
             </tr>
           }
           <tr>
             <td class="mp-sym">Overall</td>
-            <td colspan="3">4 isolated ₹14,000 books · closed only</td>
-            <td class="num" [class.mp-up]="assume.result().totalRs > 0">
-              {{ assume.result().totalRs | number : '1.0-0' }}
+            <td colspan="5">4 isolated ₹14,000 books · paper</td>
+            <td class="num" [class.mp-up]="paper.session().liveRs > 0" [class.mp-down]="paper.session().liveRs < 0">
+              {{ paper.session().liveRs | number : '1.0-0' }}
             </td>
-            <td class="num">
-              {{ assumeBooksFundEnd() | number : '1.0-0' }}
+            <td class="num" [class.mp-up]="paper.session().closedRs > 0" [class.mp-down]="paper.session().closedRs < 0">
+              {{ paper.session().closedRs | number : '1.0-0' }}
             </td>
+            <td class="num">{{ booksFund() | number : '1.0-0' }}</td>
           </tr>
         </tbody>
       </table>
     </div>
+
     <div class="mp-form">
       <div class="mp-field">
         <span>&nbsp;</span>
         <button
           type="button"
           class="ui-btn ui-btn-primary"
-          [disabled]="assume.busy()"
-          (click)="runLiveAssume()"
-          data-testid="run-live-assume"
+          [disabled]="paper.session().running"
+          (click)="startPaper()"
+          data-testid="start-live-paper"
         >
-          {{ assume.busy() ? 'Fetching Kite…' : 'Run live assumption' }}
+          {{ paper.busy() && !paper.session().running ? 'Starting…' : 'Start' }}
         </button>
       </div>
-    </div>
-    @if (assume.error() || assume.result().kiteError) {
-      <p class="mp-sub" data-testid="live-assume-error">
-        {{ assume.error() || assume.result().kiteError }}
-      </p>
-    }
-    <p class="mp-sub" data-testid="live-assume-honest">{{ assume.result().honest }}</p>
-  </div>
-
-  <div class="mp-card" data-testid="paper-hist-card">
-    <div class="mp-card-head">
-      <div>
-        <h2>2-year tape</h2>
-        <p class="mp-sub">{{ hist.champion.name }}</p>
-      </div>
-      <span class="mp-badge" data-tone="info">not armed · not a job</span>
-    </div>
-    <div class="mp-stats">
-      <div class="mp-stat">
-        <span class="mp-stat-label">Against-VWAP flip</span>
-        <span class="mp-stat-value mp-down" data-testid="hist-flip-lift">
-          ₹{{ hist.lateLiftRs | number : '1.0-0' }}
-        </span>
-        <span class="mp-stat-hint">later half after ₹50 · flip died</span>
-      </div>
-      <div class="mp-stat">
-        <span class="mp-stat-label">Structure later half</span>
-        <span class="mp-stat-value mp-up" data-testid="hist-struct-net">
-          ₹{{ hist.structureLateNetRs | number : '1.0-0' }}
-        </span>
-        <span class="mp-stat-hint">
-          vs trend-only ₹{{ hist.pdhlLateNetRs | number : '1.0-0' }} · +₹{{ hist.champion.lateLiftRs | number : '1.0-0' }}
-        </span>
-      </div>
-      <div class="mp-stat">
-        <span class="mp-stat-label">Worst later week</span>
-        <span class="mp-stat-value mp-down">₹{{ hist.worstWeekRs | number : '1.0-0' }}</span>
-        <span class="mp-stat-hint">{{ hist.greenWeeks }} green · {{ hist.redWeeks }} red weeks</span>
-      </div>
-    </div>
-    <div class="mp-table-wrap">
-      <table class="mp-table" data-testid="hist-books">
-        <thead>
-          <tr>
-            <th>Book</th>
-            <th class="num">Days</th>
-            <th class="num">Struct ₹</th>
-            <th class="num">Flip ₹</th>
-          </tr>
-        </thead>
-        <tbody>
-          @for (b of hist.books; track b.name) {
-            <tr>
-              <td class="mp-sym">{{ histBookLabel(b.name) }}</td>
-              <td class="num">{{ b.days }}</td>
-              <td class="num" [class.mp-up]="b.structLate.net > 0" [class.mp-down]="b.structLate.net < 0">
-                {{ b.structLate.net | number : '1.0-0' }}
-              </td>
-              <td class="num" [class.mp-up]="b.lateOn.net > 0" [class.mp-down]="b.lateOn.net < 0">
-                {{ b.lateOn.net | number : '1.0-0' }}
-              </td>
-            </tr>
-          }
-        </tbody>
-      </table>
-    </div>
-    <p class="mp-sub" data-testid="hist-pattern-honest">{{ hist.honest }}</p>
-  </div>
-
-  <div class="mp-card" data-testid="paper-more-daily-card">
-    <div class="mp-card-head">
-      <div>
-        <h2>More daily profit</h2>
-        <p class="mp-sub">{{ more.champion.name }}</p>
-      </div>
-      <span class="mp-badge" data-tone="info">+{{ more.extraGreenDays }} green days · not armed</span>
-    </div>
-    <div class="mp-stats">
-      <div class="mp-stat">
-        <span class="mp-stat-label">Dummy now</span>
-        <span class="mp-stat-value mp-up" data-testid="more-daily-net">
-          ₹{{ more.richer.netRs | number : '1.0-0' }}
-        </span>
-        <span class="mp-stat-hint">
-          was ₹{{ more.current.netRs | number : '1.0-0' }} · {{ more.richer.greenDays }} green /
-          {{ more.richer.flatDays }} flat
-        </span>
-      </div>
-      <div class="mp-stat">
-        <span class="mp-stat-label">After 1 Sep</span>
-        <span class="mp-stat-value mp-up" data-testid="more-daily-late">
-          +₹{{ more.lateLiftRs | number : '1.0-0' }}
-        </span>
-        <span class="mp-stat-hint">
-          ₹{{ more.richer.lateNetRs | number : '1.0-0' }} vs ₹{{ more.current.lateNetRs | number : '1.0-0' }}
-        </span>
-      </div>
-      <div class="mp-stat">
-        <span class="mp-stat-label">Reverse recovered</span>
-        <span class="mp-stat-value" data-testid="more-daily-reverse">{{ more.autopsy.wrong_direction }}</span>
-        <span class="mp-stat-hint">
-          {{ more.autopsy.chop_both_lose }} still chop · both sides lose
-        </span>
-      </div>
-    </div>
-    <p class="mp-sub" data-testid="more-daily-honest">{{ more.honest }}</p>
-  </div>
-
-  <div class="mp-card" data-testid="paper-reverse-card">
-    <div class="mp-card-head">
-      <div>
-        <h2>Why losers failed</h2>
-        <p class="mp-sub">{{ reverse.honest }}</p>
-      </div>
-    </div>
-    <div class="mp-stats">
-      <div class="mp-stat">
-        <span class="mp-stat-label">Wrong direction</span>
-        <span class="mp-stat-value" data-testid="reverse-wrong-dir">{{ reverse.autopsy.wrongDirection }}</span>
-        <span class="mp-stat-hint">flip would have banked after charges</span>
-      </div>
-      <div class="mp-stat">
-        <span class="mp-stat-label">Chop</span>
-        <span class="mp-stat-value">{{ reverse.autopsy.chopBothLose }}</span>
-        <span class="mp-stat-hint">both sides lose — no opposite</span>
-      </div>
-      <div class="mp-stat">
-        <span class="mp-stat-label">Already green</span>
-        <span class="mp-stat-value">{{ reverse.autopsy.origGreen }}</span>
-        <span class="mp-stat-hint">original side was the way</span>
-      </div>
-      <div class="mp-stat">
-        <span class="mp-stat-label">Live flip</span>
-        <span class="mp-stat-value">Off</span>
-        <span class="mp-stat-hint">
-          after {{ reverse.isUntil }} flip ₹{{ reverse.liveFlipOos.flipNetRs | number : '1.0-0' }}
-          vs orig ₹{{ reverse.liveFlipOos.origNetRs | number : '1.0-0' }}
-        </span>
-      </div>
-    </div>
-  </div>
-
-  <div class="mp-card" data-testid="paper-pattern-card">
-    <div class="mp-card-head">
-      <div>
-        <h2>The pattern</h2>
-        <p class="mp-sub">{{ pattern.champion.means }}</p>
-      </div>
-      <span class="mp-badge" data-tone="info">n={{ pattern.champion.n }} · 2y killed flip</span>
-    </div>
-    <div class="mp-stats">
-      <div class="mp-stat">
-        <span class="mp-stat-label">Rule</span>
-        <span class="mp-stat-value" data-testid="fail-pattern-name">{{ pattern.champion.name }}</span>
-        <span class="mp-stat-hint">{{ pattern.champion.wrong }} of {{ pattern.champion.n }} were wrong direction</span>
-      </div>
-      <div class="mp-stat">
-        <span class="mp-stat-label">After 1 Sep</span>
-        <span class="mp-stat-value mp-up">+₹{{ pattern.champion.oosLiftRs | number : '1.0-0' }}</span>
-        <span class="mp-stat-hint">
-          flip ₹{{ pattern.champion.oosRuleNetRs | number : '1.0-0' }} vs orig
-          ₹{{ pattern.champion.oosOrigNetRs | number : '1.0-0' }}
-        </span>
-      </div>
-      <div class="mp-stat">
-        <span class="mp-stat-label">Wrong-dir shape</span>
-        <span class="mp-stat-value">{{ pattern.slices.wrongStructure.trend }} trend</span>
-        <span class="mp-stat-hint">
-          of {{ pattern.wrongDirection }} · {{ pattern.slices.wrongMode.pdhl }} were PDH/PDL
-        </span>
-      </div>
-    </div>
-    <p class="mp-sub" data-testid="fail-pattern-honest">{{ pattern.honest }}</p>
-  </div>
-
-  <div class="mp-card" data-testid="paper-fund-card">
-    <div class="mp-card-head">
-      <div>
-        <h2>Dummy fund</h2>
-        <p class="mp-sub">
-          {{ snap().played }} / {{ snap().total }} days.
-          {{ snap().skipped }} tickets stood down (loss after charges).
-        </p>
-      </div>
-      <span class="mp-badge" data-tone="info">Paper only</span>
-    </div>
-    <div class="mp-stats">
-      <div class="mp-stat">
-        <span class="mp-stat-label">Fund now</span>
-        <span class="mp-stat-value" data-testid="paper-fund">₹{{ snap().fundRs | number : '1.0-0' }}</span>
-        <span class="mp-stat-hint">start ₹{{ snap().startRs | number }}</span>
-      </div>
-      <div class="mp-stat">
-        <span class="mp-stat-label">Overall</span>
-        <span
-          class="mp-stat-value"
-          data-testid="paper-overall-net"
-          [class.mp-down]="snap().netRs < 0"
-          [class.mp-up]="snap().netRs > 0"
-        >
-          ₹{{ snap().netRs | number : '1.0-0' }}
-        </span>
-        <span class="mp-stat-hint">{{ snap().greenDays }} green · {{ snap().redDays }} red · {{ snap().sessions.length - snap().greenDays - snap().redDays }} flat</span>
-      </div>
-      <div class="mp-stat">
-        <span class="mp-stat-label">Last day</span>
-        <span class="mp-stat-value">{{ snap().lastDay || '—' }}</span>
-        <span class="mp-stat-hint">
-          @if (snap().lastDay) {
-            ₹{{ snap().lastNetRs | number : '1.0-0' }} · {{ snap().lastTone }}
-          } @else {
-            Play the next dummy day
-          }
-        </span>
-      </div>
-    </div>
-    @if (snap().lastStructure) {
-      <p class="mp-sub" data-testid="paper-structure">Structure {{ snap().lastStructure }}</p>
-    }
-    <div class="mp-form">
       <div class="mp-field">
         <span>&nbsp;</span>
         <button
           type="button"
-          class="ui-btn ui-btn-primary"
-          [disabled]="snap().done"
-          (click)="playNext()"
-          data-testid="play-next-day"
+          class="ui-btn"
+          [disabled]="!paper.session().running"
+          (click)="stopPaper()"
+          data-testid="stop-live-paper"
         >
-          {{ snap().done ? 'Tape finished' : 'Play next day' }}
-        </button>
-      </div>
-      <div class="mp-field">
-        <span>&nbsp;</span>
-        <button type="button" class="ui-btn" [disabled]="snap().done" (click)="playAll()" data-testid="play-all-days">
-          Play all days
-        </button>
-      </div>
-      <div class="mp-field">
-        <span>&nbsp;</span>
-        <button type="button" class="ui-btn" [disabled]="snap().played === 0" (click)="resetFund()" data-testid="reset-paper-fund">
-          Reset to ₹14,000
+          Stop
         </button>
       </div>
     </div>
+
+    @if (paper.session().kiteError) {
+      <p class="mp-sub" data-testid="live-paper-error">{{ paper.session().kiteError }}</p>
+    }
+    <p class="mp-sub" data-testid="live-paper-honest">{{ paper.session().honest }}</p>
   </div>
 
-  <div class="mp-card" data-testid="paper-overall-card">
+  <div class="mp-card" data-testid="live-paper-fills">
     <div class="mp-card-head">
       <div>
-        <h2>Overall amount</h2>
-        <p class="mp-sub">Crude Mini plus the three index books. Sum is the fund move.</p>
+        <h2>Closed paper fills</h2>
+        <p class="mp-sub">SL, target, scratch, or flatten. After ₹50 charges.</p>
       </div>
     </div>
-    <div class="mp-table-wrap">
-      <table class="mp-table" data-testid="paper-overall">
-        <thead>
-          <tr>
-            <th>Book</th>
-            <th class="num">Fills</th>
-            <th class="num">Net ₹</th>
-          </tr>
-        </thead>
-        <tbody>
-          @for (b of snap().bookScores; track b.id) {
-            <tr>
-              <td class="mp-sym">{{ b.label }}</td>
-              <td class="num">{{ b.fills }}</td>
-              <td class="num" [class.mp-down]="b.netRs < 0" [class.mp-up]="b.netRs > 0">
-                {{ b.netRs | number : '1.0-0' }}
-              </td>
-            </tr>
-          }
-          <tr>
-            <td class="mp-sym">Overall</td>
-            <td class="num">{{ snap().fills.length }}</td>
-            <td class="num" [class.mp-down]="snap().netRs < 0" [class.mp-up]="snap().netRs > 0">
-              {{ snap().netRs | number : '1.0-0' }}
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
-
-  <div class="mp-card">
-    <div class="mp-card-head">
-      <div>
-        <h2>Last fills</h2>
-        <p class="mp-sub">Banked only when ₹ after charges is &gt; 0.</p>
-      </div>
-    </div>
-    @if (!snap().lastFills.length) {
-      <p class="mp-sub" data-testid="paper-fills-empty">No fills yet. A flat day stood down.</p>
+    @if (!fills().length) {
+      <p class="mp-sub" data-testid="live-paper-fills-empty">No paper fill yet. Hit Start and keep this tab open.</p>
     } @else {
       <div class="mp-table-wrap">
-        <table class="mp-table" data-testid="paper-fills">
+        <table class="mp-table">
           <thead>
             <tr>
-              <th>Day</th>
               <th>Book</th>
-              <th>Structure</th>
+              <th>Side</th>
+              <th class="num">Entry</th>
+              <th class="num">Exit</th>
+              <th>Why</th>
               <th class="num">₹</th>
-              <th class="num">Fund</th>
             </tr>
           </thead>
           <tbody>
-            @for (f of snap().lastFills; track f.day + f.book + f.reason + $index) {
+            @for (f of fills(); track f.day + f.book + f.reason + f.entry + $index) {
               <tr>
-                <td class="mp-sym">{{ f.day }}</td>
-                <td>{{ f.label }}</td>
-                <td>{{ f.structure }} / {{ f.mode }}</td>
-                <td class="num mp-up">{{ f.rs | number : '1.0-0' }}</td>
-                <td class="num">{{ f.fundAfter | number : '1.0-0' }}</td>
+                <td class="mp-sym">{{ f.label }}</td>
+                <td>{{ f.side }}</td>
+                <td class="num">{{ f.entry | number : '1.0-2' }}</td>
+                <td class="num">{{ f.exit | number : '1.0-2' }}</td>
+                <td>{{ f.reason }} / {{ f.mode }}</td>
+                <td class="num" [class.mp-up]="f.rs > 0" [class.mp-down]="f.rs < 0">
+                  {{ f.rs | number : '1.0-0' }}
+                </td>
               </tr>
             }
           </tbody>

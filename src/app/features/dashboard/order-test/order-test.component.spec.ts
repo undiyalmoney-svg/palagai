@@ -30,30 +30,20 @@ describe('OrderTestComponent', () => {
     fixture.detectChanges();
   });
 
-  it('puts Crude Mini on the Test tab so overall amount includes it', () => {
+  it('is a Start-only live paper desk for four isolated books', () => {
     const text = fixture.nativeElement.textContent as string;
-    expect(text).toMatch(/overall amount/i);
+    expect(text).toMatch(/Hit Start/);
     expect(text).toMatch(/Crude Mini/);
     expect(text).toMatch(/Nifty 50/);
     expect(text).toMatch(/Bank Nifty/);
     expect(text).toMatch(/Sensex/);
-    expect(text).toMatch(/Dummy ₹14,000/);
-    expect(text).toMatch(/Not a guaranteed profit/);
-    expect(text).toMatch(/Why losers failed/);
-    expect(text).toMatch(/Wrong direction/);
-    expect(text).toMatch(/The pattern/);
-    expect(text).toMatch(/against VWAP/);
-    expect(text).toMatch(/2-year tape/);
-    expect(text).toMatch(/morning structure switch/);
-    expect(text).toMatch(/More daily profit/);
-    expect(text).toMatch(/Live assumption/);
-    expect(text).toMatch(/Assumption only/);
     expect(text).toMatch(/No order is placed/);
-    expect(fixture.nativeElement.querySelector('[data-testid="live-assume-card"]')).toBeTruthy();
-    expect(fixture.nativeElement.querySelector('[data-testid="live-assume-total"]')?.textContent).toMatch(
-      /1,390/,
-    );
-    expect(fixture.nativeElement.querySelector('[data-testid="paper-overall"]')).toBeTruthy();
+    expect(text).not.toMatch(/2-year tape/);
+    expect(text).not.toMatch(/Why losers failed/);
+    expect(text).not.toMatch(/More daily profit/);
+    expect(text).not.toMatch(/Play next day/);
+    expect(fixture.nativeElement.querySelector('[data-testid="live-paper-card"]')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('[data-testid="start-live-paper"]')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('[data-testid="paper-14k-page"]')).toBeTruthy();
     expect(text).toMatch(/RELIANCE/);
   });

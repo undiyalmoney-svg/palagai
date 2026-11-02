@@ -17,83 +17,32 @@ describe('Paper14kComponent', () => {
     fixture.detectChanges();
   });
 
-  it('is a dummy 14k desk that does not place Kite orders', () => {
+  it('is a live paper desk: Start, four isolated books, no Kite order', () => {
     const text = fixture.nativeElement.textContent as string;
-    expect(text).toMatch(/Dummy ₹14,000/);
-    expect(text).toMatch(/Not a guaranteed profit/);
-    expect(text).toMatch(/Play next day/);
-    expect(text).toMatch(/Reset to ₹14,000/);
     expect(text).toMatch(/Paper only/);
-    expect(text).toMatch(/Crude Mini FUT/);
-    expect(text).toMatch(/Overall amount/);
-    expect(text).toMatch(/Why losers failed/);
-    expect(text).toMatch(/Wrong direction/);
-    expect(text).toMatch(/Live flip/);
-    expect(text).toMatch(/The pattern/);
-    expect(text).toMatch(/trend PDHL \+ against VWAP/);
-    expect(text).toMatch(/Not armed on Crude Best/);
-    expect(text).toMatch(/2-year tape/);
-    expect(text).toMatch(/morning structure switch, do not flip/);
-    expect(text).toMatch(/not a salary/i);
-    expect(text).toMatch(/not a job/i);
-    expect(text).toMatch(/More daily profit/);
-    expect(text).toMatch(/trend PDHL loser/);
-    expect(text).toMatch(/Reverse recovered/);
-    expect(text).toMatch(/Live assumption/);
-    expect(text).toMatch(/Assumption only/);
-    expect(text).toMatch(/Run live assumption/);
-    expect(fixture.nativeElement.querySelector('[data-testid="live-assume-card"]')).toBeTruthy();
-    expect(fixture.nativeElement.querySelector('[data-testid="live-assume-total"]')?.textContent).toMatch(
-      /1,390/,
-    );
-    expect(fixture.nativeElement.querySelector('[data-testid="live-assume-funds"]')?.textContent).toMatch(
-      /Connect Token/,
-    );
-    expect(fixture.nativeElement.querySelector('[data-testid="paper-hist-card"]')).toBeTruthy();
-    expect(fixture.nativeElement.querySelector('[data-testid="paper-more-daily-card"]')).toBeTruthy();
-    expect(fixture.nativeElement.querySelector('[data-testid="reverse-wrong-dir"]')?.textContent).toBe(
-      '34',
-    );
-    expect(fixture.componentInstance['snap']().fundRs).toBe(14_000);
-    expect(fixture.componentInstance['snap']().liveOrders).toBe(false);
-    expect(fixture.componentInstance['snap']().guaranteed).toBe(false);
+    expect(text).toMatch(/Hit Start/);
+    expect(text).toMatch(/Crude Mini/);
+    expect(text).toMatch(/Nifty 50/);
+    expect(text).toMatch(/Bank Nifty/);
+    expect(text).toMatch(/Sensex/);
+    expect(text).toMatch(/No order is placed/);
+    expect(text).not.toMatch(/Play next day/);
+    expect(text).not.toMatch(/2-year tape/);
+    expect(text).not.toMatch(/Why losers failed/);
+    expect(text).not.toMatch(/More daily profit/);
+    expect(text).not.toMatch(/Run live assumption/);
+    expect(fixture.nativeElement.querySelector('[data-testid="live-paper-card"]')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('[data-testid="start-live-paper"]')).toBeTruthy();
+    expect(fixture.componentInstance['paper'].session().liveOrders).toBe(false);
+    expect(fixture.componentInstance['paper'].session().guaranteed).toBe(false);
+    expect(fixture.componentInstance['booksFund']()).toBe(56_000);
   });
 
-  it('stands down a loss-shaped day, then resets', () => {
-    fixture.componentInstance['playNext']();
+  it('asks for Token when Start is hit without a Kite session', async () => {
+    await fixture.componentInstance['startPaper']();
     fixture.detectChanges();
-    expect(fixture.componentInstance['snap']().fundRs).toBe(14_000);
-    expect(fixture.componentInstance['snap']().played).toBe(1);
-    expect(fixture.nativeElement.textContent).toMatch(/2026-05-27/);
-    expect(fixture.nativeElement.textContent).toMatch(/flat/);
-    fixture.componentInstance['resetFund']();
-    fixture.detectChanges();
-    expect(fixture.componentInstance['snap']().fundRs).toBe(14_000);
-    expect(fixture.componentInstance['snap']().played).toBe(0);
-  });
-
-  it('plays the full dummy tape with Crude in the overall amount', () => {
-    fixture.componentInstance['playAll']();
-    fixture.detectChanges();
-    expect(fixture.componentInstance['snap']().fundRs).toBe(102_916.3);
-    expect(fixture.componentInstance['snap']().done).toBe(true);
-    expect(fixture.componentInstance['snap']().redDays).toBe(0);
-    expect(fixture.nativeElement.textContent).toMatch(/Tape finished/);
-    expect(fixture.nativeElement.textContent).toMatch(/Overall amount/);
-    const crude = fixture.componentInstance['snap']().bookScores.find((b) => b.id === 'crude');
-    expect(crude?.netRs).toBe(13_200);
-    expect(fixture.nativeElement.textContent).toMatch(/Crude Mini FUT/);
-  });
-
-  it('runs the live assumption from cache when Kite is not connected', async () => {
-    await fixture.componentInstance['runLiveAssume']();
-    fixture.detectChanges();
-    const text = fixture.nativeElement.textContent as string;
-    expect(text).toMatch(/Connect Kite on Token first/);
-    expect(text).toMatch(/1,390/);
-    expect(text).toMatch(/Assumption only/);
-    expect(fixture.componentInstance['assume'].result().liveOrders).toBe(false);
-    expect(fixture.componentInstance['assume'].result().source).toBe('cache');
-    expect(fixture.componentInstance['assumeBooksFundEnd']()).toBe(57_390);
+    expect(fixture.nativeElement.textContent).toMatch(/Connect Kite on Token first/);
+    expect(fixture.componentInstance['paper'].session().running).toBe(false);
+    expect(fixture.componentInstance['paper'].session().liveOrders).toBe(false);
   });
 });
