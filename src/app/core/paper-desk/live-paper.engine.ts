@@ -11,7 +11,7 @@ import {
   bookSignal,
   morningStructure,
 } from './live-assume.engine';
-import { OPTION_14K_HONEST, OPTION_14K_LIST, option14kToPaperCfg } from './option-14k-plan';
+import { OPTION_14K_BOOKS, OPTION_14K_HONEST, OPTION_14K_LIST, Option14kBookId, option14kToPaperCfg } from './option-14k-plan';
 import { CheapOtmPick } from '../utils/pick-cheap-otm.util';
 
 export const LIVE_PAPER_BOOKS: LiveAssumeBookCfg[] = OPTION_14K_LIST.map(option14kToPaperCfg);
@@ -31,6 +31,35 @@ export interface LivePaperFill {
   rs: number;
   reason: string;
   mode: string;
+  optionSymbol?: string;
+  optionType?: '' | 'CE' | 'PE';
+  strike?: number | null;
+  expiry?: string;
+  lot?: number;
+}
+
+export interface OptionPickView {
+  id: string;
+  optionType?: '' | 'CE' | 'PE';
+  strike?: number | null;
+  expiry?: string;
+  optionSymbol?: string;
+}
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+export function expiryShort(expiry: string | undefined): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(expiry || '');
+  if (!m) return '';
+  return `${Number(m[3])} ${MONTHS[Number(m[2]) - 1] ?? ''}`.trim();
+}
+
+/** "SENSEX 77000 CE · exp 6 Nov" — the contract the book bought. */
+export function optionPickLabel(pick: OptionPickView): string {
+  if (!pick.optionType || pick.strike == null) return pick.optionSymbol || '';
+  const name = OPTION_14K_BOOKS[pick.id as Option14kBookId]?.name ?? pick.id.toUpperCase();
+  const exp = expiryShort(pick.expiry);
+  return `${name} ${pick.strike} ${pick.optionType}${exp ? ` · exp ${exp}` : ''}`;
 }
 
 export interface LivePaperBookState {
@@ -216,6 +245,11 @@ function closeAt(
     rs,
     reason,
     mode: book.mode,
+    optionSymbol: book.optionSymbol,
+    optionType: book.optionType,
+    strike: book.strike,
+    expiry: book.expiry,
+    lot: book.lot,
   });
   book.closedRs = Math.round((book.closedRs + rs) * 10) / 10;
   book.fund = Math.round((LIVE_PAPER_CAPITAL + book.closedRs) * 10) / 10;

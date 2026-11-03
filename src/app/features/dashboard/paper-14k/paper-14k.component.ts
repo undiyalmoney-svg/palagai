@@ -2,7 +2,7 @@ import { DecimalPipe } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { LivePaperService } from '../../../core/paper-desk/live-paper.service';
-import { allClosedFills, booksFundEnd } from '../../../core/paper-desk/live-paper.engine';
+import { OptionPickView, allClosedFills, booksFundEnd, optionPickLabel } from '../../../core/paper-desk/live-paper.engine';
 import {
   CRUDE_OPTION_MIN_COMMODITY_RS,
   commodityTopUpRs,
@@ -41,6 +41,10 @@ export class Paper14kComponent {
 
   protected booksFund(): number {
     return booksFundEnd(this.paper.session().books);
+  }
+
+  protected pick(row: OptionPickView): string {
+    return optionPickLabel(row);
   }
 
   protected fills() {

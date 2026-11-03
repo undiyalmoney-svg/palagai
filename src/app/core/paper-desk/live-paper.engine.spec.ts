@@ -6,6 +6,7 @@ import {
   booksFundEnd,
   emptyBook,
   emptySession,
+  optionPickLabel,
   tickBook,
 } from './live-paper.engine';
 
@@ -115,5 +116,27 @@ describe('Live paper desk', () => {
     expect(bound.tp).toBe(175);
     expect(bound.optionType).toBe('CE');
     expect(bound.instrument).toBe('CRUDEOILM26NOV5500CE');
+  });
+  it('names the bought contract like SENSEX 77000 CE and keeps it on the closed fill', () => {
+    const cfg = LIVE_PAPER_BOOKS.find((b) => b.id === 'sensex')!;
+    const book = emptyBook(cfg);
+    book.side = 'long';
+    book.entry = 172.55;
+    book.sl = 156.55;
+    book.tp = 204.55;
+    book.scratch = 164.55;
+    book.status = 'open';
+    book.optionSymbol = 'SENSEX2661077000CE';
+    book.optionType = 'CE';
+    book.strike = 77000;
+    book.expiry = '2026-11-06';
+    book.lot = 20;
+    expect(optionPickLabel(book)).toBe('SENSEX 77000 CE · exp 6 Nov');
+    const done = tickBook(book, cfg, [], 204.55, '2026-11-03', 12 * 60, 'SENSEX2661077000CE');
+    expect(done.side).toBe('flat');
+    expect(done.fills[0].optionType).toBe('CE');
+    expect(done.fills[0].strike).toBe(77000);
+    expect(optionPickLabel({ id: 'sensex', ...done.fills[0] })).toBe('SENSEX 77000 CE · exp 6 Nov');
+    expect(optionPickLabel({ id: 'sensex' })).toBe('');
   });
 });

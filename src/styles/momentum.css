@@ -218,6 +218,7 @@
 .mp-table tbody tr.clickable:hover { background: #f8fafb; }
 .mp-table tr.detail td { background: #fbfcfd; padding: 1rem 1.2rem; }
 .mp-sym { font-weight: 700; letter-spacing: -0.01em; }
+.mp-pick { margin-top: 4px; font-size: 0.8125rem; font-weight: 700; color: #0f5132; }
 .mp-empty {
   padding: 2rem 1rem;
   text-align: center;

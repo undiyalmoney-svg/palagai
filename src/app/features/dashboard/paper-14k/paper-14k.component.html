@@ -196,10 +196,16 @@
                 {{ b.label }}
                 <div class="mp-sub">
                   {{ b.product }}
-                  @if (b.optionType) {
-                    · {{ b.optionType }} {{ b.instrument }}
-                  }
                 </div>
+                @if (b.optionType) {
+                  <div class="mp-pick" data-testid="live-paper-pick">
+                    {{ pick(b) }}
+                    @if (b.entry != null) {
+                      · entry ₹{{ b.entry | number : '1.0-2' }}
+                    }
+                    · {{ b.lot }} qty
+                  </div>
+                }
                 <div class="mp-sub">{{ b.structure }} · {{ b.mode || b.status }}</div>
               </td>
               <td class="num">{{ b.last != null ? (b.last | number : '1.0-2') : '—' }}</td>
@@ -279,6 +285,7 @@
           <thead>
             <tr>
               <th>Book</th>
+              <th>Contract</th>
               <th>Side</th>
               <th class="num">Entry</th>
               <th class="num">Exit</th>
@@ -290,6 +297,7 @@
             @for (f of fills(); track f.day + f.book + f.reason + f.entry + $index) {
               <tr>
                 <td class="mp-sym">{{ f.label }}</td>
+                <td data-testid="live-paper-fill-pick">{{ pick({ id: f.book, optionType: f.optionType, strike: f.strike, expiry: f.expiry, optionSymbol: f.optionSymbol }) || '—' }}</td>
                 <td>{{ f.side }}</td>
                 <td class="num">{{ f.entry | number : '1.0-2' }}</td>
                 <td class="num">{{ f.exit | number : '1.0-2' }}</td>
