@@ -3,6 +3,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideRouter } from '@angular/router';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { realisticFill } from '../../../core/paper-desk/execution-model.util';
+import { LivePaperService } from '../../../core/paper-desk/live-paper.service';
 import { PaperTrade } from '../../../core/paper-desk/paper-analytics.models';
 import { computeMetrics } from '../../../core/paper-desk/paper-analytics.util';
 import { PaperAnalyticsComponent } from './paper-analytics.component';
@@ -143,6 +144,44 @@ describe('PaperAnalyticsComponent', () => {
     expect(q('verdict')).toMatch(/not enough data/);
     expect(text()).toMatch(/no statistically validated edge/);
     expect(text()).toMatch(/modelled premiums/);
+  });
+
+  it('shows skipped signals instead of hiding a priced-out book', async () => {
+    await mount('signals');
+    expect(q('skipped-empty')).toMatch(/No skipped signals/);
+    const paper = (fixture.componentInstance as unknown as { paper: LivePaperService }).paper;
+    const cur = paper.session();
+    paper.session.set({
+      ...cur,
+      books: cur.books.map((b, i) =>
+        i === 0
+          ? {
+              ...b,
+              skips: [
+                {
+                  at: '2026-11-03T04:00:00.000Z',
+                  day: '2026-11-03',
+                  book: 'bank',
+                  side: 'CE',
+                  mode: 'pdhl',
+                  structure: 'trend',
+                  contract: 'BANKNIFTY 57000 CE',
+                  premium: 700,
+                  lot: 30,
+                  costRs: 21000,
+                  budgetRs: 3500,
+                  reason: 'premium-over-budget',
+                },
+              ],
+            }
+          : b,
+      ),
+    });
+    fixture.detectChanges();
+    const rows = fixture.nativeElement.querySelectorAll('[data-testid="skipped-row"]');
+    expect(rows.length).toBe(1);
+    expect(rows[0].textContent).toContain('21,000');
+    expect(rows[0].textContent).toContain('3,500');
   });
 
   it('lists the full trade history', async () => {

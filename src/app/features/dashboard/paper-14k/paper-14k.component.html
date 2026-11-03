@@ -225,6 +225,11 @@
                     </div>
                   }
                   <div class="mp-sub">{{ b.structure }} · {{ b.mode || b.status }}</div>
+                @if (b.skips?.length) {
+                  <div class="mp-sub mp-down" data-testid="book-skips">
+                    {{ b.skips!.length }} signal{{ b.skips!.length > 1 ? 's' : '' }} skipped today · {{ b.reason }}
+                  </div>
+                }
                 </td>
                 <td class="num">{{ b.last != null ? (b.last | number : '1.0-2') : '—' }}</td>
                 <td>{{ b.side }}</td>

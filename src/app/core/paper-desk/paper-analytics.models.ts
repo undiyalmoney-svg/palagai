@@ -135,3 +135,19 @@ export interface ReadinessResult {
   verdict: ReadinessVerdict;
   checks: GateCheck[];
 }
+
+/** A signal the desk saw and could not take. Kept visible so a quiet book is never mistaken for a quiet market. */
+export interface SkippedSignal {
+  at: string;
+  day: string;
+  book: string;
+  side: 'CE' | 'PE';
+  mode: string;
+  structure: string;
+  contract: string;
+  premium: number | null;
+  lot: number;
+  costRs: number | null;
+  budgetRs: number;
+  reason: 'premium-over-budget' | 'no-listed-contract';
+}

@@ -92,6 +92,36 @@
         }
       </section>
 
+      <section class="pa-card" data-testid="skipped-card">
+        <div class="pa-head">
+          <h2>Skipped signals</h2>
+          <span class="pa-badge" [class.warn]="skips().length > 0">{{ skips().length }} today</span>
+        </div>
+        <p class="pa-note">
+          The rules fired but the desk could not buy the option. A book that looks idle may simply be priced out: the cheap option it
+          picks must cost no more than ₹{{ 3500 | number : '1.0-0' }} (premium × lot). Nothing is bought at an assumed price.
+        </p>
+        @for (sk of skips().slice(0, 12); track sk.at + sk.book) {
+          <article class="pa-signal compact" data-testid="skipped-row">
+            <header>
+              <strong>{{ sk.book }}</strong>
+              <span class="pa-contract">{{ sk.side }} · {{ sk.mode }} · {{ sk.structure }}</span>
+              <span class="pa-note">{{ istTime(sk.at) }} IST</span>
+            </header>
+            @if (sk.reason === 'premium-over-budget') {
+              <p class="pa-note">
+                {{ sk.contract }}: ₹{{ sk.premium }} × {{ sk.lot }} = <b class="mp-down">₹{{ sk.costRs | number : '1.0-0' }}</b>
+                against a ₹{{ sk.budgetRs | number : '1.0-0' }} budget.
+              </p>
+            } @else {
+              <p class="pa-note">No listed contract found for {{ sk.contract }}; no trade was invented.</p>
+            }
+          </article>
+        } @empty {
+          <p class="pa-empty" data-testid="skipped-empty">No skipped signals today.</p>
+        }
+      </section>
+
       <section class="pa-card">
         <h2>Recent closed signals</h2>
         @if (!recentSignals().length) {

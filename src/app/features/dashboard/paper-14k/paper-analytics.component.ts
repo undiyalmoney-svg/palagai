@@ -160,6 +160,18 @@ export class PaperAnalyticsComponent {
       observedDays: this.ledger.state().observedDays.length,
     }),
   );
+  protected readonly skips = computed(() =>
+    this.paper
+      .session()
+      .books.flatMap((b) => b.skips ?? [])
+      .sort((a, b) => (a.at < b.at ? 1 : -1)),
+  );
+  protected readonly skipCounts = computed(() => {
+    const out = new Map<string, number>();
+    for (const sk of this.skips()) out.set(sk.book, (out.get(sk.book) ?? 0) + 1);
+    return [...out.entries()].map(([book, n]) => ({ book, n }));
+  });
+
   protected readonly hasActiveSignal = computed(() =>
     this.paper.session().books.some((b) => b.side !== 'flat' || !!b.pendingDir),
   );

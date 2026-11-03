@@ -9,6 +9,7 @@ import { LiveAssumeBar, LiveAssumeBookCfg } from './live-assume.engine';
 import { OPTION_14K_DAY_LOSS_RS, OPTION_14K_PREMIUM_BUDGET_RS } from './option-14k-plan';
 import { venueForBook } from './option-charges.util';
 import { PaperLedgerService } from './paper-ledger.service';
+import { SkippedSignal } from './paper-analytics.models';
 import { buildSignalCard } from './signal-card.util';
 import {
   LIVE_PAPER_BOOKS,
@@ -283,7 +284,22 @@ export class LivePaperService {
       }
     }
     const cost = prem * pick.lotSize;
-    if (cost > OPTION_14K_PREMIUM_BUDGET_RS) {
+    const listed = pick.instrument.instrumentToken > 0;
+    if (!listed || cost > OPTION_14K_PREMIUM_BUDGET_RS) {
+      const skip: SkippedSignal = {
+        at: new Date().toISOString(),
+        day: istDay(),
+        book: cfg.id,
+        side: pick.side,
+        mode: book.mode,
+        structure: book.structure,
+        contract: listed ? `${pick.instrument.tradingSymbol}` : `${pick.side} ${pick.strike} (not listed)`,
+        premium: listed ? Math.round(prem * 100) / 100 : null,
+        lot: pick.lotSize,
+        costRs: listed ? Math.round(cost) : null,
+        budgetRs: OPTION_14K_PREMIUM_BUDGET_RS,
+        reason: listed ? 'premium-over-budget' : 'no-listed-contract',
+      };
       return {
         ...book,
         side: 'flat',
@@ -292,9 +308,12 @@ export class LivePaperService {
         tp: null,
         scratch: null,
         status: 'watching',
-        reason: 'premium over budget',
+        reason: listed
+          ? `skipped: ${pick.side} ${pick.strike} costs ₹${skip.costRs} > ₹${OPTION_14K_PREMIUM_BUDGET_RS}`
+          : 'skipped: no listed contract',
         livePts: 0,
         liveRs: 0,
+        skips: [...(book.skips || []), skip].slice(-100),
       };
     }
     pick.lastPrice = prem;

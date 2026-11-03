@@ -13,7 +13,7 @@ import {
 } from './live-assume.engine';
 import { OPTION_14K_BOOKS, OPTION_14K_HONEST, OPTION_14K_LIST, Option14kBookId, option14kToPaperCfg } from './option-14k-plan';
 import { CheapOtmPick } from '../utils/pick-cheap-otm.util';
-import { SignalCard } from './paper-analytics.models';
+import { SignalCard, SkippedSignal } from './paper-analytics.models';
 
 export const LIVE_PAPER_BOOKS: LiveAssumeBookCfg[] = OPTION_14K_LIST.map(option14kToPaperCfg);
 export const LIVE_PAPER_CAPITAL = LIVE_ASSUME_CAPITAL;
@@ -107,6 +107,8 @@ export interface LivePaperBookState {
   signal?: SignalCard | null;
   /** Exchange timestamp of the latest underlying quote, as Kite reported it. */
   quoteAt?: string;
+  /** Signals the rules fired but the desk could not take (premium too high, no listed contract). */
+  skips?: SkippedSignal[];
 }
 
 export interface LivePaperSession {
