@@ -19,7 +19,7 @@ import {
   tickBook,
 } from './live-paper.engine';
 
-const STORAGE_KEY = 'palagai_live_paper_v2';
+const STORAGE_KEY = 'palagai_live_paper_v3';
 const TICK_MS = 8_000;
 
 @Injectable({ providedIn: 'root' })
@@ -175,10 +175,35 @@ export class LivePaperService {
         const optLast = prev.optionSymbol ? lastByKey(quotes, optionKey(prev)) : null;
         const lastForTick =
           prev.side !== 'flat' && prev.optionSymbol ? (optLast ?? prev.last) : underLast;
-        let next = tickBook(prev, cfg, bars, lastForTick, day, nowMin, prev.optionSymbol || inst?.tradingSymbol || cfg.label);
+        let optionBars: LiveAssumeBar[] = [];
+        if (prev.side !== 'flat' && prev.optionToken) {
+          const hist = (await firstValueFrom(
+            this.kiteApi.getHistoricalData({
+              instrumentToken: String(prev.optionToken),
+              interval: '5minute',
+              from: day,
+              to: day,
+              authorization: auth,
+            }),
+          ).catch(() => null)) as { data?: { candles?: unknown[][] } } | null;
+          optionBars = (hist?.data?.candles || []).map(kiteBar).filter((b) => b.day);
+        }
+        let next = tickBook(
+          prev,
+          cfg,
+          bars,
+          lastForTick,
+          day,
+          nowMin,
+          prev.optionSymbol || inst?.tradingSymbol || cfg.label,
+          optionBars,
+        );
         if (justOpened(prev, next)) {
           const spot = underLast ?? next.last ?? next.entry ?? 0;
           next = await this.bindCheap(auth, next, cfg, chain, spot, quotes);
+          if (next.side !== 'flat' && next.optionToken) {
+            next = { ...next, lastBarMin: nowMin - (nowMin % 5) };
+          }
         } else if (next.side !== 'flat' && next.optionSymbol && optLast != null) {
           next = { ...next, last: optLast };
         }

@@ -369,6 +369,7 @@ export function tickBook(
   day: string,
   nowMin: number,
   instrument: string,
+  optionBars: LiveAssumeBar[] = [],
 ): LivePaperBookState {
   const next: LivePaperBookState = {
     ...book,
@@ -381,7 +382,9 @@ export function tickBook(
   }
 
   if (next.side === 'long' || next.side === 'short') {
-    for (const bar of done) {
+    // SL / TP / scratch are premium levels. Index bars (e.g. 76,500) must never be tested against them.
+    const exitBars = isOptionBuy(cfg) ? completedBars(optionBars, day, nowMin) : done;
+    for (const bar of exitBars) {
       if (bar.day !== day || bar.min <= next.lastBarMin) continue;
       if (hitExit(next, bar.high, bar.low, bar.close, cfg, day)) {
         next.lastBarMin = bar.min;

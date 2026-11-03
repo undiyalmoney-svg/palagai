@@ -139,4 +139,32 @@ describe('Live paper desk', () => {
     expect(optionPickLabel({ id: 'sensex', ...done.fills[0] })).toBe('SENSEX 77000 CE · exp 6 Nov');
     expect(optionPickLabel({ id: 'sensex' })).toBe('');
   });
+  it('never exits an option on index bars: 76,500 index high is not a hit on a 205 premium target', () => {
+    const cfg = LIVE_PAPER_BOOKS.find((b) => b.id === 'sensex')!;
+    const book = emptyBook(cfg);
+    book.side = 'long';
+    book.entry = 172.55;
+    book.sl = 156.55;
+    book.tp = 204.55;
+    book.scratch = 164.55;
+    book.status = 'open';
+    book.lastBarMin = 12 * 60;
+    const indexBars = [
+      { day: '2026-11-03', min: 12 * 60 + 5, open: 76500, high: 76600, low: 76450, close: 76550 },
+    ];
+    const held = tickBook(book, cfg, indexBars, 170, '2026-11-03', 12 * 60 + 20, 'SENSEX');
+    expect(held.side).toBe('long');
+    expect(held.fills).toHaveLength(0);
+
+    const optionBars = [
+      { day: '2026-11-03', min: 12 * 60 + 5, open: 172, high: 175, low: 150, close: 152 },
+    ];
+    const stopped = tickBook(book, cfg, indexBars, 152, '2026-11-03', 12 * 60 + 20, 'SENSEX', optionBars);
+    expect(stopped.side).toBe('flat');
+    expect(stopped.fills[0].reason).toBe('scratch');
+
+    const target = [{ day: '2026-11-03', min: 12 * 60 + 5, open: 172, high: 206, low: 171, close: 205 }];
+    const won = tickBook(book, cfg, indexBars, 205, '2026-11-03', 12 * 60 + 20, 'SENSEX', target);
+    expect(won.fills[0].reason).toBe('tp');
+  });
 });
