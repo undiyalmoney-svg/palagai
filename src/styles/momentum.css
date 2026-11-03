@@ -336,3 +336,10 @@
   .mp-card { padding: 1rem; }
   .mp-kv { grid-template-columns: 1fr; }
 }
+
+.mp-views { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.mp-view {
+  border: 1px solid var(--pg-line); background: var(--pg-bg-elevated); color: var(--pg-ink);
+  border-radius: 999px; padding: 0.4rem 0.9rem; font-size: 0.82rem; font-weight: 650; cursor: pointer;
+}
+.mp-view.on { background: #0f172a; border-color: #0f172a; color: #fff; }

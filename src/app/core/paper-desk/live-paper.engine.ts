@@ -13,6 +13,7 @@ import {
 } from './live-assume.engine';
 import { OPTION_14K_BOOKS, OPTION_14K_HONEST, OPTION_14K_LIST, Option14kBookId, option14kToPaperCfg } from './option-14k-plan';
 import { CheapOtmPick } from '../utils/pick-cheap-otm.util';
+import { SignalCard } from './paper-analytics.models';
 
 export const LIVE_PAPER_BOOKS: LiveAssumeBookCfg[] = OPTION_14K_LIST.map(option14kToPaperCfg);
 export const LIVE_PAPER_CAPITAL = LIVE_ASSUME_CAPITAL;
@@ -36,6 +37,14 @@ export interface LivePaperFill {
   strike?: number | null;
   expiry?: string;
   lot?: number;
+  structure?: string;
+  entryBid?: number | null;
+  entryAsk?: number | null;
+  exitBid?: number | null;
+  exitAsk?: number | null;
+  entryAt?: string;
+  exitAt?: string;
+  signal?: SignalCard | null;
 }
 
 export interface OptionPickView {
@@ -92,6 +101,12 @@ export interface LivePaperBookState {
   expiry: string;
   lot: number;
   optionToken: number;
+  entryBid?: number | null;
+  entryAsk?: number | null;
+  entryAt?: string;
+  signal?: SignalCard | null;
+  /** Exchange timestamp of the latest underlying quote, as Kite reported it. */
+  quoteAt?: string;
 }
 
 export interface LivePaperSession {
@@ -250,6 +265,11 @@ function closeAt(
     strike: book.strike,
     expiry: book.expiry,
     lot: book.lot,
+    structure: book.structure,
+    entryBid: book.entryBid ?? null,
+    entryAsk: book.entryAsk ?? null,
+    entryAt: book.entryAt,
+    signal: book.signal ?? null,
   });
   book.closedRs = Math.round((book.closedRs + rs) * 10) / 10;
   book.fund = Math.round((LIVE_PAPER_CAPITAL + book.closedRs) * 10) / 10;
@@ -271,6 +291,10 @@ function closeAt(
   book.expiry = '';
   book.lot = 0;
   book.optionToken = 0;
+  book.entryBid = null;
+  book.entryAsk = null;
+  book.entryAt = '';
+  book.signal = null;
 }
 
 function hitExit(
@@ -280,32 +304,38 @@ function hitExit(
   close: number,
   cfg: LiveAssumeBookCfg,
   day: string,
+  open: number = close,
 ): boolean {
   if (book.side === 'flat' || book.entry == null || book.sl == null || book.tp == null || book.scratch == null) {
     return false;
   }
   const long = isOptionBuy(cfg) || book.side === 'long';
-  if (long && low <= book.scratch) {
+  if (long) {
+    // A stop is a market-style exit: if the price gapped through the level the fill is the open (or the last
+    // price on a tick check), never the better stop level. Targets fill at the target level, never better.
+    if (low <= book.scratch) {
+      closeAt(book, cfg, Math.min(book.scratch, open), 'scratch', day);
+      return true;
+    }
+    if (low <= book.sl) {
+      closeAt(book, cfg, Math.min(book.sl, open), 'sl', day);
+      return true;
+    }
+    if (high >= book.tp) {
+      closeAt(book, cfg, book.tp, 'tp', day);
+      return true;
+    }
+    return false;
+  }
+  if (high >= book.scratch) {
     closeAt(book, cfg, book.scratch, 'scratch', day);
     return true;
   }
-  if (!long && high >= book.scratch) {
-    closeAt(book, cfg, book.scratch, 'scratch', day);
-    return true;
-  }
-  if (long && low <= book.sl) {
+  if (high >= book.sl) {
     closeAt(book, cfg, book.sl, 'sl', day);
     return true;
   }
-  if (!long && high >= book.sl) {
-    closeAt(book, cfg, book.sl, 'sl', day);
-    return true;
-  }
-  if (long && high >= book.tp) {
-    closeAt(book, cfg, book.tp, 'tp', day);
-    return true;
-  }
-  if (!long && low <= book.tp) {
+  if (low <= book.tp) {
     closeAt(book, cfg, book.tp, 'tp', day);
     return true;
   }
@@ -386,7 +416,7 @@ export function tickBook(
     const exitBars = isOptionBuy(cfg) ? completedBars(optionBars, day, nowMin) : done;
     for (const bar of exitBars) {
       if (bar.day !== day || bar.min <= next.lastBarMin) continue;
-      if (hitExit(next, bar.high, bar.low, bar.close, cfg, day)) {
+      if (hitExit(next, bar.high, bar.low, bar.close, cfg, day, bar.open)) {
         next.lastBarMin = bar.min;
         break;
       }

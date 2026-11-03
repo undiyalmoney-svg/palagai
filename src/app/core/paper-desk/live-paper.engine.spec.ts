@@ -60,7 +60,8 @@ describe('Live paper desk', () => {
     book.status = 'open';
     const done = tickBook(book, cfg, [], 80, '2026-11-02', 12 * 60, 'CRUDEOILM');
     expect(done.reason).toBe('scratch');
-    expect(done.closedRs).toBe(-150);
+    expect(done.fills[0].exit).toBe(80);
+    expect(done.closedRs).toBe(-250);
     expect(done.side).toBe('flat');
   });
 
@@ -166,5 +167,29 @@ describe('Live paper desk', () => {
     const target = [{ day: '2026-11-03', min: 12 * 60 + 5, open: 172, high: 206, low: 171, close: 205 }];
     const won = tickBook(book, cfg, indexBars, 205, '2026-11-03', 12 * 60 + 20, 'SENSEX', target);
     expect(won.fills[0].reason).toBe('tp');
+  });
+
+  it('fills a stop at the gap open, not the better stop level, and a target at the target level', () => {
+    const cfg = LIVE_PAPER_BOOKS.find((b) => b.id === 'sensex')!;
+    const mk = () => {
+      const b = emptyBook(cfg);
+      b.side = 'long';
+      b.entry = 172.55;
+      b.sl = 156.55;
+      b.tp = 204.55;
+      b.scratch = 164.55;
+      b.status = 'open';
+      b.lastBarMin = 12 * 60;
+      return b;
+    };
+    const gapDown = [{ day: '2026-11-03', min: 12 * 60 + 5, open: 140, high: 150, low: 138, close: 145 }];
+    const gapped = tickBook(mk(), cfg, [], 145, '2026-11-03', 12 * 60 + 20, 'SENSEX', gapDown);
+    expect(gapped.fills[0].reason).toBe('scratch');
+    expect(gapped.fills[0].exit).toBe(140);
+
+    const gapUp = [{ day: '2026-11-03', min: 12 * 60 + 5, open: 230, high: 240, low: 229, close: 235 }];
+    const won = tickBook(mk(), cfg, [], 235, '2026-11-03', 12 * 60 + 20, 'SENSEX', gapUp);
+    expect(won.fills[0].reason).toBe('tp');
+    expect(won.fills[0].exit).toBe(204.55);
   });
 });

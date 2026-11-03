@@ -1,0 +1,490 @@
+<div class="pa" data-testid="paper-analytics">
+  <div class="pa-strip">
+    <span class="pa-sim" data-testid="sim-badge">Simulation · not broker-verified</span>
+    <span class="pa-asof" [class.pa-stale]="stale()" data-testid="data-asof">
+      @if (paper.session().running) {
+        Kite data as of {{ istTime(paper.session().asOf) }} IST
+        @if (stale()) { · stale }
+      } @else {
+        Desk stopped · last data {{ istTime(paper.session().asOf) }} IST
+      }
+    </span>
+  </div>
+
+  @if (view() !== 'validation' && view() !== 'signals') {
+    <div class="pa-filters">
+      <div class="pa-chips" role="group" aria-label="Date range">
+        @for (r of ranges; track r.id) {
+          <button type="button" class="pa-chip" [class.on]="range() === r.id" (click)="pick(r.id)" [attr.data-testid]="'range-' + r.id">
+            {{ r.label }}
+          </button>
+        }
+      </div>
+      @if (view() === 'performance') {
+        <div class="pa-chips" role="group" aria-label="P&L basis">
+          <button type="button" class="pa-chip" [class.on]="basis() === 'realistic'" (click)="basis.set('realistic')" data-testid="basis-realistic">
+            Execution-adjusted
+          </button>
+          <button type="button" class="pa-chip" [class.on]="basis() === 'paper'" (click)="basis.set('paper')" data-testid="basis-paper">
+            Paper engine
+          </button>
+        </div>
+      }
+    </div>
+  }
+
+  @switch (view()) {
+    @case ('signals') {
+      <section class="pa-card" data-testid="signals-view">
+        <h2>Live signals</h2>
+        <p class="pa-note">
+          AI confidence here is the share of the strategy's rule checks that agree for a signal. It is <strong>not</strong> a probability
+          of making a profit and is not calibrated against outcomes. Only the forward ledger measures how often signals win.
+        </p>
+        @for (b of paper.session().books; track b.id) {
+          @if (b.side !== 'flat') {
+            <article class="pa-signal" data-testid="signal-open">
+              <header>
+                <strong>{{ b.label }}</strong>
+                <span class="pa-contract">{{ b.optionType }} {{ b.strike }} · exp {{ b.expiry }}</span>
+                <span class="pa-badge est">open</span>
+              </header>
+              @if (b.signal) {
+                <div class="pa-kv">
+                  <div><span>AI confidence</span><b>{{ b.signal.ruleScore }}/100</b></div>
+                  <div><span>Entry</span><b>{{ b.signal.entry | number : '1.0-2' }}</b></div>
+                  <div><span>Stop-loss</span><b class="mp-down">{{ b.signal.sl | number : '1.0-2' }}</b></div>
+                  <div><span>Target</span><b class="mp-up">{{ b.signal.tp | number : '1.0-2' }}</b></div>
+                  <div><span>Risk (est.)</span><b>{{ inr(-b.signal.riskRs) }}</b></div>
+                  <div><span>Reward (est.)</span><b>{{ inr(b.signal.rewardRs) }}</b></div>
+                  <div><span>Reward / risk</span><b>{{ plain(b.signal.rewardRisk) }}</b></div>
+                  <div><span>Quote</span><b>{{ istTime(b.quoteAt) }}</b></div>
+                </div>
+                <ul class="pa-checks">
+                  @for (c of b.signal.checks; track c.label) {
+                    <li [class.fail]="!c.pass">{{ c.pass ? '✓' : '✗' }} {{ c.label }}</li>
+                  }
+                </ul>
+                <ul class="pa-reasons">
+                  @for (r of b.signal.reasons; track r) {
+                    <li>{{ r }}</li>
+                  }
+                </ul>
+              } @else {
+                <p class="pa-note">Open before the signal card was recorded (no reasons stored).</p>
+              }
+            </article>
+          } @else if (b.pendingDir) {
+            <article class="pa-signal pending" data-testid="signal-pending">
+              <header>
+                <strong>{{ b.label }}</strong>
+                <span class="pa-badge est">pending confirmation</span>
+              </header>
+              <p class="pa-note">
+                {{ b.pendingDir === 1 ? 'Bullish (CE)' : 'Bearish (PE)' }} · rule {{ b.pendingMode }} · structure {{ b.structure }}.
+                The next 5-minute candle must close beyond {{ b.pendingSig | number : '1.0-2' }}; entry, stop and target are set only when it does.
+              </p>
+            </article>
+          }
+        }
+        @if (!hasActiveSignal()) {
+          <p class="pa-empty" data-testid="signals-empty">No active signal. Every book is flat and waiting for its rules.</p>
+        }
+      </section>
+
+      <section class="pa-card">
+        <h2>Recent closed signals</h2>
+        @if (!recentSignals().length) {
+          <p class="pa-empty">No closed forward trade with a signal card yet.</p>
+        } @else {
+          @for (r of recentSignals(); track r.t.id) {
+            <article class="pa-signal compact">
+              <header>
+                <strong>{{ contract(r.t) }}</strong>
+                <span class="pa-badge" [class.up]="r.real.netRs > 0" [class.down]="r.real.netRs < 0">{{ inr(r.real.netRs) }}</span>
+                <span class="pa-note">{{ istStamp(r.t.exitAt) }} IST · {{ r.t.reason }}</span>
+              </header>
+              <div class="pa-kv">
+                <div><span>AI confidence</span><b>{{ r.t.signal?.ruleScore }}/100</b></div>
+                <div><span>Entry</span><b>{{ r.t.signal?.entry | number : '1.0-2' }}</b></div>
+                <div><span>Stop</span><b>{{ r.t.signal?.sl | number : '1.0-2' }}</b></div>
+                <div><span>Target</span><b>{{ r.t.signal?.tp | number : '1.0-2' }}</b></div>
+                <div><span>Risk / reward</span><b>{{ inr(-(r.t.signal?.riskRs ?? 0)) }} / {{ inr(r.t.signal?.rewardRs) }}</b></div>
+                <div><span>R:R</span><b>{{ plain(r.t.signal?.rewardRisk) }}</b></div>
+              </div>
+            </article>
+          }
+        }
+      </section>
+    }
+
+    @case ('performance') {
+      @if (!rows().length) {
+        <section class="pa-card" data-testid="perf-empty">
+          <h2>No forward paper trades in this range</h2>
+          <p class="pa-note">
+            Start the desk and keep the tab open. Every trade the rules take is stored here the moment it closes,
+            wins and losses alike. Earlier results were discarded because of an exit bug and are not shown.
+          </p>
+        </section>
+      }
+
+      <section class="pa-card" data-testid="kpi-card">
+        <div class="pa-head">
+          <h2>Performance</h2>
+          <span class="pa-badge est">{{ basis() === 'realistic' ? 'execution-adjusted' : 'paper engine' }}</span>
+        </div>
+        <div class="pa-kpis">
+          <div class="pa-kpi"><span>Total trades</span><b data-testid="kpi-trades">{{ metrics().trades }}</b></div>
+          <div class="pa-kpi"><span>Winning</span><b class="mp-up" data-testid="kpi-wins">{{ metrics().wins }}</b></div>
+          <div class="pa-kpi"><span>Losing</span><b class="mp-down" data-testid="kpi-losses">{{ metrics().losses }}</b></div>
+          <div class="pa-kpi"><span>Win rate</span><b data-testid="kpi-winrate">{{ metrics().winRatePct == null ? '—' : plain(metrics().winRatePct, 1) + '%' }}</b></div>
+          <div class="pa-kpi"><span>Gross profit</span><b class="mp-up">{{ inr(metrics().grossProfitRs) }}</b></div>
+          <div class="pa-kpi"><span>Gross loss</span><b class="mp-down">{{ inr(-metrics().grossLossRs) }}</b></div>
+          <div class="pa-kpi big"><span>Net P&amp;L after all charges</span><b [class]="tone(metrics().netRs)" data-testid="kpi-net">{{ inr(metrics().netRs) }}</b></div>
+          <div class="pa-kpi"><span>Avg profit / winner</span><b class="mp-up">{{ inr(metrics().avgWinRs) }}</b></div>
+          <div class="pa-kpi"><span>Avg loss / loser</span><b class="mp-down">{{ metrics().avgLossRs == null ? '—' : inr(-(metrics().avgLossRs ?? 0)) }}</b></div>
+          <div class="pa-kpi"><span>Risk / reward (payoff)</span><b>{{ plain(metrics().riskReward) }}</b></div>
+          <div class="pa-kpi"><span>Max drawdown</span><b class="mp-down">{{ metrics().maxDrawdownRs ? inr(-metrics().maxDrawdownRs) : '₹0' }}</b></div>
+          <div class="pa-kpi"><span>Profit factor</span><b>{{ plain(metrics().profitFactor) }}</b></div>
+          <div class="pa-kpi"><span>Max consecutive wins</span><b>{{ metrics().maxConsecWins }}</b></div>
+          <div class="pa-kpi"><span>Max consecutive losses</span><b>{{ metrics().maxConsecLosses }}</b></div>
+          <div class="pa-kpi"><span>Current streak</span><b>{{ streakLabel() }}</b></div>
+          <div class="pa-kpi"><span>Expectancy / trade</span><b [class]="tone(metrics().expectancyRs)">{{ inr(metrics().expectancyRs) }}</b></div>
+        </div>
+        <p class="pa-note">
+          Winners and losers are counted after charges. Flat trades ({{ metrics().flats }}) count as neither. Profit factor and
+          payoff show "—" until at least one winner and one loser exist.
+        </p>
+      </section>
+
+      <section class="pa-card" data-testid="equity-card">
+        <h2>Equity and drawdown</h2>
+        @if (curve().length) {
+          <svg class="pa-chart" [attr.viewBox]="'0 0 ' + chartW + ' ' + chartH" role="img" aria-label="Cumulative net P&L and drawdown">
+            <line [attr.x1]="10" [attr.x2]="chartW - 10" [attr.y1]="zeroY()" [attr.y2]="zeroY()" class="axis" />
+            <path [attr.d]="drawdownPath()" class="dd" />
+            <path [attr.d]="equityPath()" [class]="'eq ' + (metrics().netRs >= 0 ? 'up' : 'down')" />
+          </svg>
+          <p class="pa-note"><span class="key eq"></span> cumulative net P&amp;L <span class="key dd"></span> drawdown from peak · {{ curve().length }} trades · current drawdown {{ inr(-currentDrawdownRs()) }}</p>
+        } @else {
+          <p class="pa-empty">The curve appears after the first closed trade.</p>
+        }
+      </section>
+
+      <section class="pa-card" data-testid="period-card">
+        <div class="pa-head">
+          <h2>{{ period() === 'day' ? 'Daily' : period() === 'week' ? 'Weekly' : 'Monthly' }} P&amp;L</h2>
+          <div class="pa-chips">
+            @for (p of periods; track p.id) {
+              <button type="button" class="pa-chip" [class.on]="period() === p.id" (click)="period.set(p.id)" [attr.data-testid]="'period-' + p.id">{{ p.label }}</button>
+            }
+          </div>
+        </div>
+        @if (periodBars().length) {
+          <div class="pa-bars" role="img" aria-label="Net P&L by period">
+            @for (p of periodBars(); track p.key) {
+              <div class="pa-bar" [title]="p.key + ' ' + inr(p.netRs)">
+                <div class="pa-bar-fill" [class.up]="p.netRs > 0" [class.down]="p.netRs < 0" [style.height.px]="barHeight(p.netRs)"></div>
+              </div>
+            }
+          </div>
+        }
+        <div class="mp-table-wrap">
+          <table class="mp-table">
+            <thead><tr><th>Period</th><th class="num">Trades</th><th class="num">Wins</th><th class="num">Net ₹</th></tr></thead>
+            <tbody>
+              @for (p of periodRows(); track p.key) {
+                <tr>
+                  <td class="mp-sym">{{ p.key }}</td>
+                  <td class="num">{{ p.trades }}</td>
+                  <td class="num">{{ p.wins }}</td>
+                  <td class="num" [class]="tone(p.netRs)">{{ inr(p.netRs) }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        <div class="pa-actions"><button type="button" class="ui-btn" (click)="downloadDailyReport()" data-testid="download-daily">Download daily report (CSV)</button></div>
+      </section>
+
+      <section class="pa-card est-card" data-testid="expected-card">
+        <div class="pa-head">
+          <h2>Expected profit analysis</h2>
+          <span class="pa-badge est">estimate</span>
+        </div>
+        <p class="pa-note strong">
+          These are estimates from a small forward sample, not predictions and not guaranteed profits. They assume future days look like the days
+          recorded so far, and they use execution-adjusted P&amp;L only.
+        </p>
+        @if (okScenario(); as s) {
+          <div class="pa-kpis">
+            <div class="pa-kpi est"><span>Expected per trade</span><b>{{ inr(s.expectedPerTradeRs) }}</b><small>90% range {{ inr(s.perTradeCi90[0]) }} to {{ inr(s.perTradeCi90[1]) }}</small></div>
+            <div class="pa-kpi est"><span>Trades per day (observed)</span><b>{{ plain(s.tradesPerDay) }}</b></div>
+            <div class="pa-kpi est"><span>Expected per day</span><b>{{ inr(s.expectedPerDayRs) }}</b></div>
+          </div>
+          <h3>Next {{ s.horizonDays }} trading days, resampled from observed days</h3>
+          <div class="mp-table-wrap">
+            <table class="mp-table" data-testid="scenario-table">
+              <thead><tr><th>Scenario</th><th class="num">Net ₹</th><th>Meaning</th></tr></thead>
+              <tbody>
+                @for (r of s.rows; track r.label) {
+                  <tr class="est-row">
+                    <td class="mp-sym">{{ r.label === 'worst' ? 'Worst case' : r.label === 'base' ? 'Base case' : 'Best case' }}</td>
+                    <td class="num">{{ inr(r.rs) }}</td>
+                    <td>{{ r.label === 'worst' ? '5th percentile of ' + s.simulations + ' resamples' : r.label === 'base' ? 'median resample' : '95th percentile' }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        } @else {
+          <p class="pa-empty" data-testid="scenario-insufficient">
+            Projections are switched off: {{ scenarioReason() }} Showing a number from so few trades would be misleading.
+          </p>
+        }
+        <h3>Estimated trading costs per trade</h3>
+        <div class="pa-kpis">
+          <div class="pa-kpi est"><span>Charges (exact schedule)</span><b>{{ cost().avgCharges == null ? '—' : '₹' + plain(cost().avgCharges, 1) }}</b></div>
+          <div class="pa-kpi est"><span>Spread + slippage</span><b>{{ cost().avgSpread == null ? '—' : '₹' + plain(cost().avgSpread, 1) }}</b></div>
+          <div class="pa-kpi est"><span>Fills with observed bid/ask</span><b>{{ cost().quoted }} of {{ cost().n }}</b></div>
+        </div>
+      </section>
+
+      <section class="pa-card" data-testid="conditions-card">
+        <h2>Performance across market conditions</h2>
+        <p class="pa-note">Morning structure, instrument, option side and time of day, from the same trades as above.</p>
+        @for (grp of [
+          { title: 'Morning structure', rows: byStructure() },
+          { title: 'Instrument', rows: byBook() },
+          { title: 'Option side', rows: bySide() },
+          { title: 'Entry time', rows: bySession() }
+        ]; track grp.title) {
+          <h3>{{ grp.title }}</h3>
+          <div class="mp-table-wrap">
+            <table class="mp-table">
+              <thead><tr><th>Group</th><th class="num">Trades</th><th class="num">Win %</th><th class="num">Net ₹</th><th class="num">Per trade</th><th class="num">PF</th></tr></thead>
+              <tbody>
+                @for (g of grp.rows; track g.group) {
+                  <tr>
+                    <td class="mp-sym">{{ g.group }}</td>
+                    <td class="num">{{ g.trades }}</td>
+                    <td class="num">{{ g.winRatePct == null ? '—' : plain(g.winRatePct, 0) + '%' }}</td>
+                    <td class="num" [class]="tone(g.netRs)">{{ inr(g.netRs) }}</td>
+                    <td class="num" [class]="tone(g.expectancyRs)">{{ inr(g.expectancyRs) }}</td>
+                    <td class="num">{{ plain(g.profitFactor) }}</td>
+                  </tr>
+                } @empty {
+                  <tr><td colspan="6" class="pa-empty">No trades yet.</td></tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </section>
+
+      <section class="pa-card" data-testid="drawdown-card">
+        <h2>Drawdown analysis</h2>
+        <div class="pa-kpis">
+          <div class="pa-kpi"><span>Max drawdown</span><b class="mp-down">{{ metrics().maxDrawdownRs ? inr(-metrics().maxDrawdownRs) : '₹0' }}</b></div>
+          <div class="pa-kpi"><span>Current drawdown</span><b [class]="currentDrawdownRs() ? 'mp-down' : ''">{{ currentDrawdownRs() ? inr(-currentDrawdownRs()) : '₹0' }}</b></div>
+          <div class="pa-kpi"><span>Worst day</span><b [class]="tone(worstDay())">{{ inr(worstDay()) }}</b></div>
+          <div class="pa-kpi"><span>Best day</span><b [class]="tone(bestDay())">{{ inr(bestDay()) }}</b></div>
+          <div class="pa-kpi"><span>Worst trade</span><b [class]="tone(metrics().worstTradeRs)">{{ inr(metrics().worstTradeRs) }}</b></div>
+          <div class="pa-kpi"><span>Longest losing run</span><b>{{ metrics().maxConsecLosses }} trades</b></div>
+        </div>
+      </section>
+    }
+
+    @case ('compare') {
+      <section class="pa-card" data-testid="compare-card">
+        <div class="pa-head">
+          <h2>Paper vs live-equivalent</h2>
+          <span class="pa-badge warn">unverified simulation</span>
+        </div>
+        <p class="pa-note strong">
+          "Paper" fills at the last traded price and exact stop and target levels with a flat ₹50 charge. "Realistic" buys at the ask, sells stops at the
+          bid, gives targets one tick back, adds one tick of slippage per leg and uses the exact charge schedule. Neither number is a broker-verified result.
+        </p>
+        <div class="pa-kpis">
+          <div class="pa-kpi"><span>Existing Paper P&amp;L</span><b [class]="tone(cost().paperNet)" data-testid="cmp-paper">{{ inr(cost().paperNet) }}</b><small>theoretical</small></div>
+          <div class="pa-kpi"><span>Realistic execution-adjusted</span><b [class]="tone(cost().realNet)" data-testid="cmp-real">{{ inr(cost().realNet) }}</b><small>estimated executable</small></div>
+          <div class="pa-kpi est"><span>Estimated live costs</span><b>{{ inr(-(cost().charges + cost().spread)) }}</b><small>charges {{ inr(-cost().charges) }} · spread/slippage {{ inr(-cost().spread) }}</small></div>
+          <div class="pa-kpi"><span>Theoretical minus executable</span><b [class]="cost().difference > 0 ? 'mp-down' : ''" data-testid="cmp-diff">{{ inr(cost().difference) }}</b><small>profit the paper desk shows that live would not keep</small></div>
+        </div>
+        <ul class="pa-reasons">
+          <li>Paper charges assumed: {{ inr(-cost().paperCharges) }} ({{ cost().n }} trades × ₹50). Realistic charges: {{ inr(-cost().charges) }}.</li>
+          <li>Gross move before costs on realistic fills: {{ inr(cost().realGross) }}.</li>
+          <li>{{ cost().quoted }} trades used an observed bid/ask. {{ cost().modelled }} used a modelled 2% spread because no quote was recorded: those are unverified.</li>
+        </ul>
+      </section>
+
+      <section class="pa-card">
+        <h2>Trade by trade</h2>
+        <div class="mp-table-wrap">
+          <table class="mp-table" data-testid="compare-table">
+            <thead><tr><th>Contract</th><th class="num">Paper ₹</th><th class="num">Realistic ₹</th><th class="num">Gap ₹</th><th>Fill basis</th></tr></thead>
+            <tbody>
+              @for (r of tradeList(); track r.t.id) {
+                <tr>
+                  <td class="mp-sym">{{ contract(r.t) }}<div class="mp-sub">{{ istStamp(r.t.exitAt) }} IST · {{ r.t.reason }}</div></td>
+                  <td class="num" [class]="tone(r.t.paperNetRs)">{{ inr(r.t.paperNetRs) }}</td>
+                  <td class="num" [class]="tone(r.real.netRs)">{{ inr(r.real.netRs) }}</td>
+                  <td class="num">{{ inr(r.t.paperNetRs - r.real.netRs) }}</td>
+                  <td><span class="pa-badge" [class.est]="r.real.quality === 'quoted'" [class.warn]="r.real.quality === 'modelled'">{{ r.real.quality === 'quoted' ? 'quote-based' : 'modelled (unverified)' }}</span></td>
+                </tr>
+              } @empty {
+                <tr><td colspan="5" class="pa-empty">No closed forward trades in this range.</td></tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </section>
+    }
+
+    @case ('validation') {
+      <section class="pa-card" data-testid="gate-card">
+        <div class="pa-head">
+          <h2>Ready for live testing?</h2>
+          <span
+            class="pa-badge"
+            [class.warn]="readiness().verdict !== 'candidate'"
+            [class.est]="readiness().verdict === 'candidate'"
+            data-testid="verdict"
+          >
+            @switch (readiness().verdict) {
+              @case ('insufficient') { not enough data }
+              @case ('not-ready') { not ready }
+              @default { candidate for a small live test }
+            }
+          </span>
+        </div>
+        <p class="pa-note strong">
+          Gates use execution-adjusted forward-paper trades only. Passing every gate would mean "worth a small, capped live test", never that profit is
+          guaranteed. The offline study below found no statistically validated edge.
+        </p>
+        <div class="pa-progress">
+          <div><span>Forward trades {{ forwardTrades() }} / {{ gates.minTrades }}</span><div class="pa-track"><i [style.width.%]="progress(forwardTrades(), gates.minTrades)"></i></div></div>
+          <div><span>Observed days {{ forwardDays() }} / {{ gates.minDays }}</span><div class="pa-track"><i [style.width.%]="progress(forwardDays(), gates.minDays)"></i></div></div>
+        </div>
+        <ul class="pa-checks" data-testid="gate-list">
+          @for (c of readiness().checks; track c.label) {
+            <li [class.fail]="!c.pass">{{ c.pass ? '✓' : '✗' }} {{ c.label }} <em>{{ c.detail }}</em></li>
+          }
+        </ul>
+      </section>
+
+      <section class="pa-card" data-testid="research-card">
+        <div class="pa-head">
+          <h2>Historical backtest and out-of-sample test</h2>
+          <span class="pa-badge warn">modelled premiums · unverified</span>
+        </div>
+        <p class="pa-note">
+          Offline study of CE/PE buying rules on 3 years of index data. Option prices are Black-Scholes models with scenario spreads, not recorded
+          quotes. It does not test the exact Paper 14k rules. Source: {{ researchSource }}.
+        </p>
+        <ul class="pa-reasons">
+          <li>Train {{ researchSplit.train }}</li>
+          <li>Validation {{ researchSplit.validation }}</li>
+          <li>Unseen test {{ researchSplit.test }} ({{ researchSplit.embargo }})</li>
+        </ul>
+        <div class="mp-table-wrap">
+          <table class="mp-table">
+            <thead>
+              <tr><th>Bucket</th><th class="num">Net ₹/trade train / val / test</th><th class="num">Test 95% CI</th><th class="num">Win %</th><th class="num">PF</th><th class="num">₹/day</th><th class="num">p</th></tr>
+            </thead>
+            <tbody>
+              @for (b of research; track b.bucket) {
+                <tr>
+                  <td class="mp-sym">{{ b.bucket }}<div class="mp-sub">{{ b.pickedConfig }}</div></td>
+                  <td class="num">{{ b.netPerTradeRs }}</td>
+                  <td class="num">{{ b.testCi95 }}</td>
+                  <td class="num">{{ b.testWinPct }}</td>
+                  <td class="num">{{ b.testProfitFactor }}</td>
+                  <td class="num" [class]="tone(b.testRsPerDay)">{{ inr(b.testRsPerDay) }}</td>
+                  <td class="num">{{ b.pValue }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        <p class="pa-note">p is the selection-adjusted share of 40 direction-randomised re-runs that did at least as well. Small p alone is not proof with 9 comparisons.</p>
+        <ul class="pa-reasons">
+          @for (f of researchFindings; track f) {
+            <li>{{ f }}</li>
+          }
+        </ul>
+      </section>
+
+      <section class="pa-card" data-testid="leakage-card">
+        <h2>How look-ahead bias and leakage are prevented</h2>
+        <ul class="pa-reasons">
+          @for (l of leakage; track l) {
+            <li>{{ l }}</li>
+          }
+        </ul>
+        <h3>What is verified and what is not</h3>
+        <ul class="pa-reasons">
+          <li><b>Not verified:</b> every paper trade (no broker order exists), the offline backtest (modelled premiums), the projections (estimates).</li>
+          <li><b>Observed:</b> Kite last price, best bid and ask at entry and at exit detection, option 5-minute candles, exact charge schedule.</li>
+          <li>Forward testing is the only source of evidence here and starts from the fixed engine; the daily report in Performance exports it.</li>
+        </ul>
+      </section>
+    }
+
+    @case ('trades') {
+      <section class="pa-card" data-testid="history-card">
+        <h2>Trade history</h2>
+        <p class="pa-note">Every closed forward trade, newest first. Nothing is filtered, edited or removed. Tap a row for its signal card.</p>
+        <div class="mp-table-wrap">
+          <table class="mp-table" data-testid="history-table">
+            <thead><tr><th>Contract</th><th>Closed (IST)</th><th class="num">Entry</th><th class="num">Exit</th><th>Why</th><th class="num">Paper ₹</th><th class="num">Realistic ₹</th></tr></thead>
+            <tbody>
+              @for (r of tradeList(); track r.t.id) {
+                <tr class="clickable" (click)="select(r.t.id)">
+                  <td class="mp-sym">{{ contract(r.t) }}<div class="mp-sub">{{ r.t.structure }} · {{ r.t.mode }}</div></td>
+                  <td>{{ istStamp(r.t.exitAt) }}</td>
+                  <td class="num">{{ r.t.entry | number : '1.0-2' }}</td>
+                  <td class="num">{{ r.t.exit | number : '1.0-2' }}</td>
+                  <td>{{ r.t.reason }}</td>
+                  <td class="num" [class]="tone(r.t.paperNetRs)">{{ inr(r.t.paperNetRs) }}</td>
+                  <td class="num" [class]="tone(r.real.netRs)">{{ inr(r.real.netRs) }}</td>
+                </tr>
+              } @empty {
+                <tr><td colspan="7" class="pa-empty">No closed forward trades in this range.</td></tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        @if (selected(); as r) {
+          <article class="pa-signal" data-testid="trade-detail">
+            <header>
+              <strong>{{ contract(r.t) }}</strong>
+              <span class="pa-badge" [class.warn]="r.real.quality === 'modelled'" [class.est]="r.real.quality === 'quoted'">{{ r.real.quality === 'quoted' ? 'quote-based fill' : 'modelled fill (unverified)' }}</span>
+            </header>
+            <div class="pa-kv">
+              <div><span>Paper entry / exit</span><b>{{ r.t.entry | number : '1.0-2' }} / {{ r.t.exit | number : '1.0-2' }}</b></div>
+              <div><span>Realistic entry / exit</span><b>{{ r.real.entryFill | number : '1.0-2' }} / {{ r.real.exitFill | number : '1.0-2' }}</b></div>
+              <div><span>Bid / ask at entry</span><b>{{ r.t.entryBid ?? '—' }} / {{ r.t.entryAsk ?? '—' }}</b></div>
+              <div><span>Charges</span><b>{{ inr(-r.real.chargesRs) }}</b></div>
+              <div><span>Spread + slippage</span><b>{{ inr(-r.real.spreadSlipRs) }}</b></div>
+              <div><span>Quantity</span><b>{{ r.t.qty }}</b></div>
+            </div>
+            @if (r.t.signal; as sg) {
+              <p class="pa-note">AI confidence {{ sg.ruleScore }}/100 (rule agreement, not a win probability) · risk {{ inr(-sg.riskRs) }} · reward {{ inr(sg.rewardRs) }} · R:R {{ plain(sg.rewardRisk) }}</p>
+              <ul class="pa-reasons">
+                @for (rs of sg.reasons; track rs) {
+                  <li>{{ rs }}</li>
+                }
+              </ul>
+            }
+          </article>
+        }
+      </section>
+    }
+  }
+
+  <p class="pa-foot" data-testid="analytics-disclaimer">
+    Paper only. liveOrders stays disabled. Estimates are labelled and are not profits. Past paper results do not guarantee future results.
+  </p>
+</div>

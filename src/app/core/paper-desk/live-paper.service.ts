@@ -6,7 +6,10 @@ import { Instrument } from '../models/instrument.model';
 import { parseKiteInstrumentsCsv } from '../utils/csv.util';
 import { pickCheapOtm } from '../utils/pick-cheap-otm.util';
 import { LiveAssumeBar, LiveAssumeBookCfg } from './live-assume.engine';
-import { OPTION_14K_PREMIUM_BUDGET_RS } from './option-14k-plan';
+import { OPTION_14K_DAY_LOSS_RS, OPTION_14K_PREMIUM_BUDGET_RS } from './option-14k-plan';
+import { venueForBook } from './option-charges.util';
+import { PaperLedgerService } from './paper-ledger.service';
+import { buildSignalCard } from './signal-card.util';
 import {
   LIVE_PAPER_BOOKS,
   LivePaperBookState,
@@ -26,6 +29,7 @@ const TICK_MS = 8_000;
 export class LivePaperService {
   private readonly kiteApi = inject(KiteApiService);
   private readonly kite = inject(KiteSessionService);
+  private readonly ledger = inject(PaperLedgerService);
   private timer: ReturnType<typeof setInterval> | null = null;
   private ticking = false;
 
@@ -90,6 +94,7 @@ export class LivePaperService {
     });
     this.session.set(snap);
     persist(snap);
+    this.ledger.sync(snap.day, snap.books.flatMap((b) => b.fills));
   }
 
   private loop(): void {
@@ -149,7 +154,7 @@ export class LivePaperService {
         .map((b) => optionKey(b));
       const keys = [...new Set([...underKeys, ...openOptKeys])];
       const quotes = keys.length
-        ? ((await firstValueFrom(this.kiteApi.getQuotes(auth, keys))) as { data?: Record<string, { last_price?: number }> })
+        ? ((await firstValueFrom(this.kiteApi.getQuotes(auth, keys))) as { data?: Record<string, KiteQuote> })
             ?.data || {}
         : {};
       const from = shiftDay(day, -8);
@@ -200,14 +205,24 @@ export class LivePaperService {
         );
         if (justOpened(prev, next)) {
           const spot = underLast ?? next.last ?? next.entry ?? 0;
-          next = await this.bindCheap(auth, next, cfg, chain, spot, quotes);
+          next = await this.bindCheap(auth, next, cfg, chain, spot, quotes, nowMin);
           if (next.side !== 'flat' && next.optionToken) {
             next = { ...next, lastBarMin: nowMin - (nowMin % 5) };
           }
         } else if (next.side !== 'flat' && next.optionSymbol && optLast != null) {
           next = { ...next, last: optLast };
         }
-        books.push(next);
+        if (next.fills.length > prev.fills.length && prev.optionSymbol) {
+          const q = findQuote(quotes, optionKey(prev));
+          const { bid, ask } = bestBidAsk(q);
+          const stamp = new Date().toISOString();
+          const fills = next.fills.map((f, idx) =>
+            idx >= prev.fills.length ? { ...f, exitBid: bid, exitAsk: ask, exitAt: stamp } : f,
+          );
+          next = { ...next, fills };
+        }
+        const underQuote = findQuote(quotes, underKeyFor(cfg.id, inst?.tradingSymbol, inst?.exchange));
+        books.push({ ...next, quoteAt: quoteStamp(underQuote) || next.quoteAt || '' });
       }
       const snap = summarizePaper(books, {
         running: true,
@@ -220,6 +235,7 @@ export class LivePaperService {
       });
       this.session.set(snap);
       persist(snap);
+      this.ledger.sync(day, books.flatMap((b) => b.fills));
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Kite fetch failed';
       const cur = this.session();
@@ -238,7 +254,8 @@ export class LivePaperService {
     cfg: LiveAssumeBookCfg,
     chain: Instrument[],
     spot: number,
-    quotes: Record<string, { last_price?: number }>,
+    quotes: Record<string, KiteQuote>,
+    nowMin: number,
   ): Promise<LivePaperBookState> {
     const id = cfg.id as 'crude' | 'nifty' | 'bank' | 'sensex';
     const pick = pickCheapOtm({
@@ -250,14 +267,17 @@ export class LivePaperService {
       premiumBudgetRs: OPTION_14K_PREMIUM_BUDGET_RS,
     });
     let prem = pick.lastPrice;
+    let bid: number | null = null;
+    let ask: number | null = null;
     if (pick.instrument.instrumentToken > 0) {
       const key = `${pick.instrument.exchange}:${pick.instrument.tradingSymbol}`;
       try {
         const q = (await firstValueFrom(this.kiteApi.getQuotes(auth, [key]))) as {
-          data?: Record<string, { last_price?: number }>;
+          data?: Record<string, KiteQuote>;
         };
         const live = lastByKey(q?.data || {}, key) ?? lastByKey(quotes, key);
         if (live != null && live > 0) prem = live;
+        ({ bid, ask } = bestBidAsk(findQuote(q?.data || {}, key) ?? findQuote(quotes, key)));
       } catch {
         /* keep chain / target premium */
       }
@@ -280,7 +300,32 @@ export class LivePaperService {
     pick.lastPrice = prem;
     pick.openCostRs = Math.round(cost);
     pick.fitsBudget = true;
-    return bindOptionFill(book, cfg, prem, pick);
+    const bound = bindOptionFill(book, cfg, prem, pick);
+    const mid = bid != null && ask != null ? (bid + ask) / 2 : null;
+    const spreadPct = mid != null && mid > 0 ? (ask! - bid!) / mid : null;
+    const signal =
+      bound.entry != null && bound.sl != null && bound.tp != null
+        ? buildSignalCard({
+            book: cfg.id,
+            venue: venueForBook(cfg.id),
+            mode: bound.mode,
+            structure: bound.structure,
+            primaryRule: cfg.primary[bound.structure === 'wait' ? 'stand' : bound.structure] === bound.mode,
+            entry: bound.entry,
+            sl: bound.sl,
+            tp: bound.tp,
+            qty: pick.lotSize,
+            premiumCostRs: cost,
+            premiumBudgetRs: OPTION_14K_PREMIUM_BUDGET_RS,
+            spreadPct,
+            entryMinute: nowMin,
+            entryStartMin: cfg.entryS,
+            flatMin: cfg.flat,
+            dayClosedRs: book.closedRs,
+            dayLossCapRs: OPTION_14K_DAY_LOSS_RS,
+          })
+        : null;
+    return { ...bound, entryBid: bid, entryAsk: ask, entryAt: new Date().toISOString(), signal };
   }
 }
 
@@ -432,7 +477,46 @@ function optionKey(book: Pick<LivePaperBookState, 'optionSymbol' | 'id'>): strin
   return `${ex}:${book.optionSymbol}`;
 }
 
-function lastByKey(quotes: Record<string, { last_price?: number }>, key: string): number | null {
+interface KiteQuote {
+  last_price?: number;
+  timestamp?: string;
+  last_trade_time?: string;
+  depth?: {
+    buy?: { price?: number; quantity?: number }[];
+    sell?: { price?: number; quantity?: number }[];
+  };
+}
+
+function underKeyFor(id: string, symbol: string | undefined, exchange: string | undefined): string {
+  if (id === 'nifty') return 'NSE:NIFTY 50';
+  if (id === 'bank') return 'NSE:NIFTY BANK';
+  if (id === 'sensex') return 'BSE:SENSEX';
+  return `${exchange || 'MCX'}:${symbol || ''}`;
+}
+
+function findQuote(quotes: Record<string, KiteQuote>, key: string): KiteQuote | null {
+  const want = key.toUpperCase();
+  for (const [k, v] of Object.entries(quotes)) {
+    if (k.toUpperCase() === want) return v;
+  }
+  return null;
+}
+
+/** Best bid / ask from the quote depth. Null when the book is empty (e.g. after the close). */
+export function bestBidAsk(q: KiteQuote | null): { bid: number | null; ask: number | null } {
+  const bid = Number(q?.depth?.buy?.[0]?.price);
+  const ask = Number(q?.depth?.sell?.[0]?.price);
+  return {
+    bid: Number.isFinite(bid) && bid > 0 ? bid : null,
+    ask: Number.isFinite(ask) && ask > 0 ? ask : null,
+  };
+}
+
+function quoteStamp(q: KiteQuote | null): string {
+  return String(q?.timestamp || q?.last_trade_time || '');
+}
+
+function lastByKey(quotes: Record<string, KiteQuote>, key: string): number | null {
   const want = key.toUpperCase();
   for (const [k, v] of Object.entries(quotes)) {
     if (k.toUpperCase() === want || k.toUpperCase().endsWith(want.split(':')[1] || '')) {
@@ -444,7 +528,7 @@ function lastByKey(quotes: Record<string, { last_price?: number }>, key: string)
 }
 
 function lastPrice(
-  quotes: Record<string, { last_price?: number }>,
+  quotes: Record<string, KiteQuote>,
   id: string,
   symbol: string,
 ): number | null {

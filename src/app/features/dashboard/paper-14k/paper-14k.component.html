@@ -6,310 +6,329 @@
     <a routerLink="/dashboard/crude-best">Crude Best</a>.
   </div>
 
-  <div class="mp-card" data-testid="capital-plan-card">
-    <div class="mp-card-head">
-      <div>
-        <h2>Capital plan</h2>
-        <p class="mp-sub">
-          How to split one total across Kite equity and commodity for the four CE/PE books. Sizing guide only — the
-          paper books below still run ₹14,000 each. Premium ≤ 25% and day loss ≤ 3% per pocket.
-        </p>
-      </div>
-      <span class="mp-badge" [attr.data-tone]="plan().mode === 'all-open' ? 'up' : 'warn'" data-testid="capital-plan-mode">
-        @switch (plan().mode) {
-          @case ('all-open') { all four together }
-          @case ('one-at-a-time') { one book at a time }
-          @default { too small }
-        }
-      </span>
-    </div>
 
-    <div class="mp-form">
-      @for (n of planOptions; track n) {
-        <div class="mp-field">
-          <span>&nbsp;</span>
-          <button
-            type="button"
-            class="ui-btn"
-            [class.ui-btn-primary]="planCapital() === n"
-            (click)="pickPlan(n)"
-            [attr.data-testid]="'capital-plan-' + n"
-          >
-            ₹{{ n | number : '1.0-0' }}
-          </button>
+  <nav class="mp-views" aria-label="Paper 14k views" data-testid="paper-views">
+    @for (v of views; track v.id) {
+      <button
+        type="button"
+        class="mp-view"
+        [class.on]="view() === v.id"
+        (click)="view.set(v.id)"
+        [attr.data-testid]="'view-' + v.id"
+      >
+        {{ v.label }}
+      </button>
+    }
+  </nav>
+
+  @if (analyticsView(); as av) {
+    <app-paper-analytics [view]="av" />
+  } @else {
+    <div class="mp-card" data-testid="capital-plan-card">
+      <div class="mp-card-head">
+        <div>
+          <h2>Capital plan</h2>
+          <p class="mp-sub">
+            How to split one total across Kite equity and commodity for the four CE/PE books. Sizing guide only — the
+            paper books below still run ₹14,000 each. Premium ≤ 25% and day loss ≤ 3% per pocket.
+          </p>
         </div>
-      }
-    </div>
-
-    <div class="mp-stats">
-      <div class="mp-stat">
-        <span class="mp-stat-label">Equity pocket</span>
-        <span class="mp-stat-value" data-testid="capital-plan-equity">₹{{ plan().equityRs | number : '1.0-0' }}</span>
-        <span class="mp-stat-hint">
-          Nifty, Bank, Sensex · premium ≤ ₹{{ plan().equityPremiumBudgetRs | number : '1.0-0' }} · day cap
-          ₹{{ plan().equityDayLossCapRs | number : '1.0-0' }}
-        </span>
-      </div>
-      <div class="mp-stat">
-        <span class="mp-stat-label">Commodity pocket</span>
-        <span class="mp-stat-value" data-testid="capital-plan-commodity">
-          ₹{{ plan().commodityRs | number : '1.0-0' }}
-        </span>
-        <span class="mp-stat-hint">
-          Crude Mini options · needs ≥₹{{ crudeMinCommodityRs | number : '1.0-0' }} · day cap
-          ₹{{ plan().commodityDayLossCapRs | number : '1.0-0' }}
-        </span>
-      </div>
-      <div class="mp-stat">
-        <span class="mp-stat-label">All open worst day</span>
-        <span class="mp-stat-value mp-down" data-testid="capital-plan-worst">
-          ₹{{ plan().allOpenWorstLossRs | number : '1.0-0' }}
-        </span>
-        <span class="mp-stat-hint">
-          {{ plan().allOpenWorstLossPct }}% of ₹{{ plan().capitalRs | number : '1.0-0' }} ·
-          ₹{{ plan().allOpenPremiumRs | number : '1.0-0' }} premium
-        </span>
-      </div>
-    </div>
-
-    <div class="mp-table-wrap">
-      <table class="mp-table" data-testid="capital-plan-books">
-        <thead>
-          <tr>
-            <th>Book</th>
-            <th>Pocket</th>
-            <th>Product</th>
-            <th class="num">Premium</th>
-            <th class="num">One stop</th>
-          </tr>
-        </thead>
-        <tbody>
-          @for (r of plan().rows; track r.book) {
-            <tr>
-              <td class="mp-sym">
-                {{ r.label }}
-                <div class="mp-sub">{{ r.reason }}</div>
-              </td>
-              <td>{{ r.pocket }}</td>
-              <td>
-                <span class="mp-badge" [attr.data-tone]="r.allowed ? 'up' : 'down'">{{ r.product }}</span>
-              </td>
-              <td class="num">{{ r.allowed ? (r.premiumRs | number : '1.0-0') : '—' }}</td>
-              <td class="num">{{ r.allowed ? (r.oneLossRs | number : '1.0-0') : '—' }}</td>
-            </tr>
+        <span class="mp-badge" [attr.data-tone]="plan().mode === 'all-open' ? 'up' : 'warn'" data-testid="capital-plan-mode">
+          @switch (plan().mode) {
+            @case ('all-open') { all four together }
+            @case ('one-at-a-time') { one book at a time }
+            @default { too small }
           }
-        </tbody>
-      </table>
-    </div>
+        </span>
+      </div>
 
-    <p class="mp-sub" data-testid="capital-plan-note">{{ plan().note }}</p>
-    <p class="mp-sub">
-      ATM Nifty needs about ₹84,000 and Bank Nifty ₹1,00,000 so one 25% stop fits the 3% day cap. Index futures need
-      ₹1.7L–₹1.9L margin per lot and Crude Mini futures ~₹31,000 commodity — none are sized here.
-    </p>
-    @if (paper.session().kiteFunds; as f) {
-      <p class="mp-sub" data-testid="capital-plan-kite">
-        Kite now: equity ₹{{ f.equityCash | number : '1.0-0' }} · commodity ₹{{ f.commodityCash | number : '1.0-0' }}.
-        @if (plan().commodityRs > 0 && topUpRs() > 0) {
-          Move ₹{{ topUpRs() | number : '1.0-0' }} equity → commodity in Kite for the Crude book on this plan.
+      <div class="mp-form">
+        @for (n of planOptions; track n) {
+          <div class="mp-field">
+            <span>&nbsp;</span>
+            <button
+              type="button"
+              class="ui-btn"
+              [class.ui-btn-primary]="planCapital() === n"
+              (click)="pickPlan(n)"
+              [attr.data-testid]="'capital-plan-' + n"
+            >
+              ₹{{ n | number : '1.0-0' }}
+            </button>
+          </div>
         }
-      </p>
-    }
-  </div>
+      </div>
 
-  <div class="mp-card" data-testid="live-paper-card">
-    <div class="mp-card-head">
-      <div>
-        <h2>Live paper</h2>
-        <p class="mp-sub">
-          Cheap CE/PE on Crude Mini, Nifty 50, Bank Nifty, Sensex. Isolated ₹14,000 each. Hit Start.
-        </p>
+      <div class="mp-stats">
+        <div class="mp-stat">
+          <span class="mp-stat-label">Equity pocket</span>
+          <span class="mp-stat-value" data-testid="capital-plan-equity">₹{{ plan().equityRs | number : '1.0-0' }}</span>
+          <span class="mp-stat-hint">
+            Nifty, Bank, Sensex · premium ≤ ₹{{ plan().equityPremiumBudgetRs | number : '1.0-0' }} · day cap
+            ₹{{ plan().equityDayLossCapRs | number : '1.0-0' }}
+          </span>
+        </div>
+        <div class="mp-stat">
+          <span class="mp-stat-label">Commodity pocket</span>
+          <span class="mp-stat-value" data-testid="capital-plan-commodity">
+            ₹{{ plan().commodityRs | number : '1.0-0' }}
+          </span>
+          <span class="mp-stat-hint">
+            Crude Mini options · needs ≥₹{{ crudeMinCommodityRs | number : '1.0-0' }} · day cap
+            ₹{{ plan().commodityDayLossCapRs | number : '1.0-0' }}
+          </span>
+        </div>
+        <div class="mp-stat">
+          <span class="mp-stat-label">All open worst day</span>
+          <span class="mp-stat-value mp-down" data-testid="capital-plan-worst">
+            ₹{{ plan().allOpenWorstLossRs | number : '1.0-0' }}
+          </span>
+          <span class="mp-stat-hint">
+            {{ plan().allOpenWorstLossPct }}% of ₹{{ plan().capitalRs | number : '1.0-0' }} ·
+            ₹{{ plan().allOpenPremiumRs | number : '1.0-0' }} premium
+          </span>
+        </div>
       </div>
-      <span class="mp-badge" [attr.data-tone]="paper.session().running ? 'down' : 'info'">
-        {{ paper.session().running ? 'watching Kite' : 'paper · not armed' }}
-      </span>
-    </div>
 
-    <div class="mp-stats">
-      <div class="mp-stat">
-        <span class="mp-stat-label">Live P/L</span>
-        <span
-          class="mp-stat-value"
-          data-testid="live-paper-live"
-          [class.mp-up]="paper.session().liveRs > 0"
-          [class.mp-down]="paper.session().liveRs < 0"
-        >
-          ₹{{ paper.session().liveRs | number : '1.0-0' }}
-        </span>
-        <span class="mp-stat-hint">open books after ₹50</span>
-      </div>
-      <div class="mp-stat">
-        <span class="mp-stat-label">Closed</span>
-        <span
-          class="mp-stat-value"
-          data-testid="live-paper-closed"
-          [class.mp-up]="paper.session().closedRs > 0"
-          [class.mp-down]="paper.session().closedRs < 0"
-        >
-          ₹{{ paper.session().closedRs | number : '1.0-0' }}
-        </span>
-        <span class="mp-stat-hint">{{ paper.session().day }} · after charges</span>
-      </div>
-      <div class="mp-stat">
-        <span class="mp-stat-label">Kite funds</span>
-        <span class="mp-stat-value" data-testid="live-paper-funds">
-          @if (paper.session().kiteFunds) {
-            ₹{{ paper.session().kiteFunds!.equityCash | number : '1.0-0' }}
-          } @else {
-            Connect Token
-          }
-        </span>
-        <span class="mp-stat-hint">
-          @if (paper.session().kiteFunds) {
-            equity · commodity ₹{{ paper.session().kiteFunds!.commodityCash | number : '1.0-0' }}
-          } @else {
-            needed to watch live
-          }
-        </span>
-      </div>
-    </div>
-
-    <div class="mp-table-wrap">
-      <table class="mp-table" data-testid="live-paper-books">
-        <thead>
-          <tr>
-            <th>Book</th>
-            <th class="num">Last</th>
-            <th>Side</th>
-            <th class="num">Entry</th>
-            <th class="num">SL</th>
-            <th class="num">TP</th>
-            <th class="num">Live ₹</th>
-            <th class="num">Closed ₹</th>
-            <th class="num">Fund</th>
-          </tr>
-        </thead>
-        <tbody>
-          @for (b of paper.session().books; track b.id) {
-            <tr>
-              <td class="mp-sym">
-                {{ b.label }}
-                <div class="mp-sub">
-                  {{ b.product }}
-                </div>
-                @if (b.optionType) {
-                  <div class="mp-pick" data-testid="live-paper-pick">
-                    {{ pick(b) }}
-                    @if (b.entry != null) {
-                      · entry ₹{{ b.entry | number : '1.0-2' }}
-                    }
-                    · {{ b.lot }} qty
-                  </div>
-                }
-                <div class="mp-sub">{{ b.structure }} · {{ b.mode || b.status }}</div>
-              </td>
-              <td class="num">{{ b.last != null ? (b.last | number : '1.0-2') : '—' }}</td>
-              <td>{{ b.side }}</td>
-              <td class="num">{{ b.entry != null ? (b.entry | number : '1.0-2') : '—' }}</td>
-              <td class="num">{{ b.sl != null ? (b.sl | number : '1.0-2') : '—' }}</td>
-              <td class="num">{{ b.tp != null ? (b.tp | number : '1.0-2') : '—' }}</td>
-              <td class="num" [class.mp-up]="b.liveRs > 0" [class.mp-down]="b.liveRs < 0">
-                {{ b.side === 'flat' ? '—' : (b.liveRs | number : '1.0-0') }}
-              </td>
-              <td class="num" [class.mp-up]="b.closedRs > 0" [class.mp-down]="b.closedRs < 0">
-                {{ b.closedRs | number : '1.0-0' }}
-              </td>
-              <td class="num">{{ b.fund | number : '1.0-0' }}</td>
-            </tr>
-          }
-          <tr>
-            <td class="mp-sym">Overall</td>
-            <td colspan="5">4 isolated ₹14,000 books · paper</td>
-            <td class="num" [class.mp-up]="paper.session().liveRs > 0" [class.mp-down]="paper.session().liveRs < 0">
-              {{ paper.session().liveRs | number : '1.0-0' }}
-            </td>
-            <td class="num" [class.mp-up]="paper.session().closedRs > 0" [class.mp-down]="paper.session().closedRs < 0">
-              {{ paper.session().closedRs | number : '1.0-0' }}
-            </td>
-            <td class="num">{{ booksFund() | number : '1.0-0' }}</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-    <div class="mp-form">
-      <div class="mp-field">
-        <span>&nbsp;</span>
-        <button
-          type="button"
-          class="ui-btn ui-btn-primary"
-          [disabled]="paper.session().running"
-          (click)="startPaper()"
-          data-testid="start-live-paper"
-        >
-          {{ paper.busy() && !paper.session().running ? 'Starting…' : 'Start' }}
-        </button>
-      </div>
-      <div class="mp-field">
-        <span>&nbsp;</span>
-        <button
-          type="button"
-          class="ui-btn"
-          [disabled]="!paper.session().running"
-          (click)="stopPaper()"
-          data-testid="stop-live-paper"
-        >
-          Stop
-        </button>
-      </div>
-    </div>
-
-    @if (paper.session().kiteError) {
-      <p class="mp-sub" data-testid="live-paper-error">{{ paper.session().kiteError }}</p>
-    }
-    <p class="mp-sub" data-testid="live-paper-honest">{{ paper.session().honest }}</p>
-  </div>
-
-  <div class="mp-card" data-testid="live-paper-fills">
-    <div class="mp-card-head">
-      <div>
-        <h2>Closed paper fills</h2>
-        <p class="mp-sub">SL, target, scratch, or flatten. After ₹50 charges.</p>
-      </div>
-    </div>
-    @if (!fills().length) {
-      <p class="mp-sub" data-testid="live-paper-fills-empty">No paper fill yet. Hit Start and keep this tab open.</p>
-    } @else {
       <div class="mp-table-wrap">
-        <table class="mp-table">
+        <table class="mp-table" data-testid="capital-plan-books">
           <thead>
             <tr>
               <th>Book</th>
-              <th>Contract</th>
-              <th>Side</th>
-              <th class="num">Entry</th>
-              <th class="num">Exit</th>
-              <th>Why</th>
-              <th class="num">₹</th>
+              <th>Pocket</th>
+              <th>Product</th>
+              <th class="num">Premium</th>
+              <th class="num">One stop</th>
             </tr>
           </thead>
           <tbody>
-            @for (f of fills(); track f.day + f.book + f.reason + f.entry + $index) {
+            @for (r of plan().rows; track r.book) {
               <tr>
-                <td class="mp-sym">{{ f.label }}</td>
-                <td data-testid="live-paper-fill-pick">{{ pick({ id: f.book, optionType: f.optionType, strike: f.strike, expiry: f.expiry, optionSymbol: f.optionSymbol }) || '—' }}</td>
-                <td>{{ f.side }}</td>
-                <td class="num">{{ f.entry | number : '1.0-2' }}</td>
-                <td class="num">{{ f.exit | number : '1.0-2' }}</td>
-                <td>{{ f.reason }} / {{ f.mode }}</td>
-                <td class="num" [class.mp-up]="f.rs > 0" [class.mp-down]="f.rs < 0">
-                  {{ f.rs | number : '1.0-0' }}
+                <td class="mp-sym">
+                  {{ r.label }}
+                  <div class="mp-sub">{{ r.reason }}</div>
                 </td>
+                <td>{{ r.pocket }}</td>
+                <td>
+                  <span class="mp-badge" [attr.data-tone]="r.allowed ? 'up' : 'down'">{{ r.product }}</span>
+                </td>
+                <td class="num">{{ r.allowed ? (r.premiumRs | number : '1.0-0') : '—' }}</td>
+                <td class="num">{{ r.allowed ? (r.oneLossRs | number : '1.0-0') : '—' }}</td>
               </tr>
             }
           </tbody>
         </table>
       </div>
-    }
-  </div>
+
+      <p class="mp-sub" data-testid="capital-plan-note">{{ plan().note }}</p>
+      <p class="mp-sub">
+        ATM Nifty needs about ₹84,000 and Bank Nifty ₹1,00,000 so one 25% stop fits the 3% day cap. Index futures need
+        ₹1.7L–₹1.9L margin per lot and Crude Mini futures ~₹31,000 commodity — none are sized here.
+      </p>
+      @if (paper.session().kiteFunds; as f) {
+        <p class="mp-sub" data-testid="capital-plan-kite">
+          Kite now: equity ₹{{ f.equityCash | number : '1.0-0' }} · commodity ₹{{ f.commodityCash | number : '1.0-0' }}.
+          @if (plan().commodityRs > 0 && topUpRs() > 0) {
+            Move ₹{{ topUpRs() | number : '1.0-0' }} equity → commodity in Kite for the Crude book on this plan.
+          }
+        </p>
+      }
+    </div>
+
+    <div class="mp-card" data-testid="live-paper-card">
+      <div class="mp-card-head">
+        <div>
+          <h2>Live paper</h2>
+          <p class="mp-sub">
+            Cheap CE/PE on Crude Mini, Nifty 50, Bank Nifty, Sensex. Isolated ₹14,000 each. Hit Start.
+          </p>
+        </div>
+        <span class="mp-badge" [attr.data-tone]="paper.session().running ? 'down' : 'info'">
+          {{ paper.session().running ? 'watching Kite' : 'paper · not armed' }}
+        </span>
+      </div>
+
+      <div class="mp-stats">
+        <div class="mp-stat">
+          <span class="mp-stat-label">Live P/L</span>
+          <span
+            class="mp-stat-value"
+            data-testid="live-paper-live"
+            [class.mp-up]="paper.session().liveRs > 0"
+            [class.mp-down]="paper.session().liveRs < 0"
+          >
+            ₹{{ paper.session().liveRs | number : '1.0-0' }}
+          </span>
+          <span class="mp-stat-hint">open books after ₹50</span>
+        </div>
+        <div class="mp-stat">
+          <span class="mp-stat-label">Closed</span>
+          <span
+            class="mp-stat-value"
+            data-testid="live-paper-closed"
+            [class.mp-up]="paper.session().closedRs > 0"
+            [class.mp-down]="paper.session().closedRs < 0"
+          >
+            ₹{{ paper.session().closedRs | number : '1.0-0' }}
+          </span>
+          <span class="mp-stat-hint">{{ paper.session().day }} · after charges</span>
+        </div>
+        <div class="mp-stat">
+          <span class="mp-stat-label">Kite funds</span>
+          <span class="mp-stat-value" data-testid="live-paper-funds">
+            @if (paper.session().kiteFunds) {
+              ₹{{ paper.session().kiteFunds!.equityCash | number : '1.0-0' }}
+            } @else {
+              Connect Token
+            }
+          </span>
+          <span class="mp-stat-hint">
+            @if (paper.session().kiteFunds) {
+              equity · commodity ₹{{ paper.session().kiteFunds!.commodityCash | number : '1.0-0' }}
+            } @else {
+              needed to watch live
+            }
+          </span>
+        </div>
+      </div>
+
+      <div class="mp-table-wrap">
+        <table class="mp-table" data-testid="live-paper-books">
+          <thead>
+            <tr>
+              <th>Book</th>
+              <th class="num">Last</th>
+              <th>Side</th>
+              <th class="num">Entry</th>
+              <th class="num">SL</th>
+              <th class="num">TP</th>
+              <th class="num">Live ₹</th>
+              <th class="num">Closed ₹</th>
+              <th class="num">Fund</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (b of paper.session().books; track b.id) {
+              <tr>
+                <td class="mp-sym">
+                  {{ b.label }}
+                  <div class="mp-sub">
+                    {{ b.product }}
+                  </div>
+                  @if (b.optionType) {
+                    <div class="mp-pick" data-testid="live-paper-pick">
+                      {{ pick(b) }}
+                      @if (b.entry != null) {
+                        · entry ₹{{ b.entry | number : '1.0-2' }}
+                      }
+                      · {{ b.lot }} qty
+                    </div>
+                  }
+                  <div class="mp-sub">{{ b.structure }} · {{ b.mode || b.status }}</div>
+                </td>
+                <td class="num">{{ b.last != null ? (b.last | number : '1.0-2') : '—' }}</td>
+                <td>{{ b.side }}</td>
+                <td class="num">{{ b.entry != null ? (b.entry | number : '1.0-2') : '—' }}</td>
+                <td class="num">{{ b.sl != null ? (b.sl | number : '1.0-2') : '—' }}</td>
+                <td class="num">{{ b.tp != null ? (b.tp | number : '1.0-2') : '—' }}</td>
+                <td class="num" [class.mp-up]="b.liveRs > 0" [class.mp-down]="b.liveRs < 0">
+                  {{ b.side === 'flat' ? '—' : (b.liveRs | number : '1.0-0') }}
+                </td>
+                <td class="num" [class.mp-up]="b.closedRs > 0" [class.mp-down]="b.closedRs < 0">
+                  {{ b.closedRs | number : '1.0-0' }}
+                </td>
+                <td class="num">{{ b.fund | number : '1.0-0' }}</td>
+              </tr>
+            }
+            <tr>
+              <td class="mp-sym">Overall</td>
+              <td colspan="5">4 isolated ₹14,000 books · paper</td>
+              <td class="num" [class.mp-up]="paper.session().liveRs > 0" [class.mp-down]="paper.session().liveRs < 0">
+                {{ paper.session().liveRs | number : '1.0-0' }}
+              </td>
+              <td class="num" [class.mp-up]="paper.session().closedRs > 0" [class.mp-down]="paper.session().closedRs < 0">
+                {{ paper.session().closedRs | number : '1.0-0' }}
+              </td>
+              <td class="num">{{ booksFund() | number : '1.0-0' }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="mp-form">
+        <div class="mp-field">
+          <span>&nbsp;</span>
+          <button
+            type="button"
+            class="ui-btn ui-btn-primary"
+            [disabled]="paper.session().running"
+            (click)="startPaper()"
+            data-testid="start-live-paper"
+          >
+            {{ paper.busy() && !paper.session().running ? 'Starting…' : 'Start' }}
+          </button>
+        </div>
+        <div class="mp-field">
+          <span>&nbsp;</span>
+          <button
+            type="button"
+            class="ui-btn"
+            [disabled]="!paper.session().running"
+            (click)="stopPaper()"
+            data-testid="stop-live-paper"
+          >
+            Stop
+          </button>
+        </div>
+      </div>
+
+      @if (paper.session().kiteError) {
+        <p class="mp-sub" data-testid="live-paper-error">{{ paper.session().kiteError }}</p>
+      }
+      <p class="mp-sub" data-testid="live-paper-honest">{{ paper.session().honest }}</p>
+    </div>
+
+    <div class="mp-card" data-testid="live-paper-fills">
+      <div class="mp-card-head">
+        <div>
+          <h2>Closed paper fills</h2>
+          <p class="mp-sub">SL, target, scratch, or flatten. After ₹50 charges.</p>
+        </div>
+      </div>
+      @if (!fills().length) {
+        <p class="mp-sub" data-testid="live-paper-fills-empty">No paper fill yet. Hit Start and keep this tab open.</p>
+      } @else {
+        <div class="mp-table-wrap">
+          <table class="mp-table">
+            <thead>
+              <tr>
+                <th>Book</th>
+                <th>Contract</th>
+                <th>Side</th>
+                <th class="num">Entry</th>
+                <th class="num">Exit</th>
+                <th>Why</th>
+                <th class="num">₹</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (f of fills(); track f.day + f.book + f.reason + f.entry + $index) {
+                <tr>
+                  <td class="mp-sym">{{ f.label }}</td>
+                  <td data-testid="live-paper-fill-pick">{{ pick({ id: f.book, optionType: f.optionType, strike: f.strike, expiry: f.expiry, optionSymbol: f.optionSymbol }) || '—' }}</td>
+                  <td>{{ f.side }}</td>
+                  <td class="num">{{ f.entry | number : '1.0-2' }}</td>
+                  <td class="num">{{ f.exit | number : '1.0-2' }}</td>
+                  <td>{{ f.reason }} / {{ f.mode }}</td>
+                  <td class="num" [class.mp-up]="f.rs > 0" [class.mp-down]="f.rs < 0">
+                    {{ f.rs | number : '1.0-0' }}
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </div>
+  }
 </div>
