@@ -13,7 +13,7 @@ const base: SignalCardInput = {
   tp: 204.55,
   qty: 20,
   premiumCostRs: 3451,
-  premiumBudgetRs: 3500,
+  liveAsk: true,
   spreadPct: 0.01,
   entryMinute: 11 * 60,
   entryStartMin: 9 * 60 + 45,
@@ -45,6 +45,11 @@ describe('buildSignalCard', () => {
     expect(weak.ruleScore).toBeLessThan(100);
     expect(weak.checks.filter((k) => !k.pass).length).toBe(3);
     expect(weak.reasons.join(' ')).toMatch(/No bid\/ask was observed/);
+  });
+
+  it('does not fail the live-ask check just because 1 lot costs more than ₹3,500', () => {
+    const c = buildSignalCard({ ...base, premiumCostRs: 17417, liveAsk: true });
+    expect(c.checks.find((k) => k.label.startsWith('Live ask'))!.pass).toBe(true);
   });
 
   it('flags a poor reward to risk instead of hiding it', () => {

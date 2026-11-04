@@ -4,9 +4,10 @@ import { KiteApiService } from '../kite/kite-api.service';
 import { KiteSessionService } from '../kite/kite-session.service';
 import { Instrument } from '../models/instrument.model';
 import { parseKiteInstrumentsCsv } from '../utils/csv.util';
-import { pickCheapOtm } from '../utils/pick-cheap-otm.util';
+import { CheapOtmPick, pickCheapOtm } from '../utils/pick-cheap-otm.util';
 import { LiveAssumeBar, LiveAssumeBookCfg } from './live-assume.engine';
-import { OPTION_14K_DAY_LOSS_RS, OPTION_14K_PREMIUM_BUDGET_RS } from './option-14k-plan';
+import { liveBuyPrice, lotCostRs, neededLotQuote, replayBudgetSkips } from './live-fill.util';
+import { OPTION_14K_DAY_LOSS_RS } from './option-14k-plan';
 import { venueForBook } from './option-charges.util';
 import { PaperLedgerService } from './paper-ledger.service';
 import { SkippedSignal } from './paper-analytics.models';
@@ -132,7 +133,8 @@ export class LivePaperService {
     try {
       const day = istDay();
       const nowMin = istMinutes();
-      const cur = this.session().day === day ? this.session() : emptySession(day, new Date().toISOString());
+      const raw = this.session().day === day ? this.session() : emptySession(day, new Date().toISOString());
+      const cur = { ...raw, books: raw.books.map(replayBudgetSkips) };
       const [margins, csv] = await Promise.all([
         firstValueFrom(this.kiteApi.getUserMargins(auth)).catch(() => null),
         firstValueFrom(this.kiteApi.getInstrumentsCsv(auth)).catch(() => ''),
@@ -154,10 +156,32 @@ export class LivePaperService {
         .filter((b) => b.side !== 'flat' && b.optionSymbol)
         .map((b) => optionKey(b));
       const keys = [...new Set([...underKeys, ...openOptKeys])];
-      const quotes = keys.length
+      let quotes = keys.length
         ? ((await firstValueFrom(this.kiteApi.getQuotes(auth, keys))) as { data?: Record<string, KiteQuote> })
             ?.data || {}
         : {};
+      const asOf = new Date();
+      const cheapByBook = new Map<string, { ce: CheapOtmPick; pe: CheapOtmPick }>();
+      const cheapKeys: string[] = [];
+      for (const cfg of LIVE_PAPER_BOOKS) {
+        const inst =
+          cfg.id === 'crude' ? crude : cfg.id === 'nifty' ? nifty : cfg.id === 'bank' ? bank : sensex;
+        const spot = lastPrice(quotes, cfg.id, inst?.tradingSymbol || '') ?? 0;
+        const pair = cheapPair(chain, cfg.id as 'crude' | 'nifty' | 'bank' | 'sensex', spot, asOf);
+        cheapByBook.set(cfg.id, pair);
+        for (const pick of [pair.ce, pair.pe]) {
+          if (pick.instrument.instrumentToken > 0) {
+            cheapKeys.push(`${pick.instrument.exchange}:${pick.instrument.tradingSymbol}`);
+          }
+        }
+      }
+      const extraKeys = [...new Set(cheapKeys.filter((k) => !keys.includes(k)))];
+      if (extraKeys.length) {
+        const extra = ((await firstValueFrom(this.kiteApi.getQuotes(auth, extraKeys))) as {
+          data?: Record<string, KiteQuote>;
+        })?.data || {};
+        quotes = { ...quotes, ...extra };
+      }
       const from = shiftDay(day, -8);
       const books = [];
       for (const cfg of LIVE_PAPER_BOOKS) {
@@ -206,7 +230,8 @@ export class LivePaperService {
         );
         if (justOpened(prev, next)) {
           const spot = underLast ?? next.last ?? next.entry ?? 0;
-          next = await this.bindCheap(auth, next, cfg, chain, spot, quotes, nowMin);
+          const pair = cheapByBook.get(cfg.id);
+          next = this.bindCheap(next, cfg, chain, spot, quotes, nowMin, pair);
           if (next.side !== 'flat' && next.optionToken) {
             next = { ...next, lastBarMin: nowMin - (nowMin % 5) };
           }
@@ -223,7 +248,11 @@ export class LivePaperService {
           next = { ...next, fills };
         }
         const underQuote = findQuote(quotes, underKeyFor(cfg.id, inst?.tradingSymbol, inst?.exchange));
-        books.push({ ...next, quoteAt: quoteStamp(underQuote) || next.quoteAt || '' });
+        books.push({
+          ...next,
+          ...neededFields(cheapByBook.get(cfg.id), quotes),
+          quoteAt: quoteStamp(underQuote) || next.quoteAt || '',
+        });
       }
       const snap = summarizePaper(books, {
         running: true,
@@ -249,43 +278,33 @@ export class LivePaperService {
     }
   }
 
-  private async bindCheap(
-    auth: string,
+  private bindCheap(
     book: LivePaperBookState,
     cfg: LiveAssumeBookCfg,
     chain: Instrument[],
     spot: number,
     quotes: Record<string, KiteQuote>,
     nowMin: number,
-  ): Promise<LivePaperBookState> {
+    pair?: { ce: CheapOtmPick; pe: CheapOtmPick },
+  ): LivePaperBookState {
     const id = cfg.id as 'crude' | 'nifty' | 'bank' | 'sensex';
-    const pick = pickCheapOtm({
-      instruments: chain,
-      book: id,
-      direction: book.side === 'long' ? 'BUY' : 'SELL',
-      spot,
-      asOf: new Date(),
-      premiumBudgetRs: OPTION_14K_PREMIUM_BUDGET_RS,
-    });
-    let prem = pick.lastPrice;
-    let bid: number | null = null;
-    let ask: number | null = null;
-    if (pick.instrument.instrumentToken > 0) {
-      const key = `${pick.instrument.exchange}:${pick.instrument.tradingSymbol}`;
-      try {
-        const q = (await firstValueFrom(this.kiteApi.getQuotes(auth, [key]))) as {
-          data?: Record<string, KiteQuote>;
-        };
-        const live = lastByKey(q?.data || {}, key) ?? lastByKey(quotes, key);
-        if (live != null && live > 0) prem = live;
-        ({ bid, ask } = bestBidAsk(findQuote(q?.data || {}, key) ?? findQuote(quotes, key)));
-      } catch {
-        /* keep chain / target premium */
-      }
-    }
-    const cost = prem * pick.lotSize;
+    const pick =
+      (book.side === 'long' ? pair?.ce : pair?.pe) ||
+      pickCheapOtm({
+        instruments: chain,
+        book: id,
+        direction: book.side === 'long' ? 'BUY' : 'SELL',
+        spot,
+        asOf: new Date(),
+        premiumBudgetRs: 10_000_000,
+      });
     const listed = pick.instrument.instrumentToken > 0;
-    if (!listed || cost > OPTION_14K_PREMIUM_BUDGET_RS) {
+    const key = `${pick.instrument.exchange}:${pick.instrument.tradingSymbol}`;
+    const q = listed ? findQuote(quotes, key) : null;
+    const { bid, ask } = bestBidAsk(q);
+    const liveLast = listed ? lastByKey(quotes, key) : null;
+    const fill = liveBuyPrice(ask, liveLast);
+    if (!listed || fill.price == null) {
       const skip: SkippedSignal = {
         at: new Date().toISOString(),
         day: istDay(),
@@ -294,11 +313,11 @@ export class LivePaperService {
         mode: book.mode,
         structure: book.structure,
         contract: listed ? `${pick.instrument.tradingSymbol}` : `${pick.side} ${pick.strike} (not listed)`,
-        premium: listed ? Math.round(prem * 100) / 100 : null,
+        premium: null,
         lot: pick.lotSize,
-        costRs: listed ? Math.round(cost) : null,
-        budgetRs: OPTION_14K_PREMIUM_BUDGET_RS,
-        reason: listed ? 'premium-over-budget' : 'no-listed-contract',
+        costRs: null,
+        budgetRs: 0,
+        reason: listed ? 'no-live-quote' : 'no-listed-contract',
       };
       return {
         ...book,
@@ -308,16 +327,16 @@ export class LivePaperService {
         tp: null,
         scratch: null,
         status: 'watching',
-        reason: listed
-          ? `skipped: ${pick.side} ${pick.strike} costs ₹${skip.costRs} > ₹${OPTION_14K_PREMIUM_BUDGET_RS}`
-          : 'skipped: no listed contract',
+        reason: listed ? 'skipped: no live quote' : 'skipped: no listed contract',
         livePts: 0,
         liveRs: 0,
         skips: [...(book.skips || []), skip].slice(-100),
       };
     }
+    const prem = fill.price;
+    const cost = lotCostRs(prem, pick.lotSize);
     pick.lastPrice = prem;
-    pick.openCostRs = Math.round(cost);
+    pick.openCostRs = cost;
     pick.fitsBudget = true;
     const bound = bindOptionFill(book, cfg, prem, pick);
     const mid = bid != null && ask != null ? (bid + ask) / 2 : null;
@@ -335,7 +354,7 @@ export class LivePaperService {
             tp: bound.tp,
             qty: pick.lotSize,
             premiumCostRs: cost,
-            premiumBudgetRs: OPTION_14K_PREMIUM_BUDGET_RS,
+            liveAsk: fill.atAsk,
             spreadPct,
             entryMinute: nowMin,
             entryStartMin: cfg.entryS,
@@ -346,6 +365,62 @@ export class LivePaperService {
         : null;
     return { ...bound, entryBid: bid, entryAsk: ask, entryAt: new Date().toISOString(), signal };
   }
+}
+
+const NO_BUDGET_CAP = 10_000_000;
+
+function cheapPair(
+  chain: Instrument[],
+  book: 'crude' | 'nifty' | 'bank' | 'sensex',
+  spot: number,
+  asOf: Date,
+): { ce: CheapOtmPick; pe: CheapOtmPick } {
+  return {
+    ce: pickCheapOtm({
+      instruments: chain,
+      book,
+      direction: 'BUY',
+      spot,
+      asOf,
+      premiumBudgetRs: NO_BUDGET_CAP,
+    }),
+    pe: pickCheapOtm({
+      instruments: chain,
+      book,
+      direction: 'SELL',
+      spot,
+      asOf,
+      premiumBudgetRs: NO_BUDGET_CAP,
+    }),
+  };
+}
+
+function neededFields(
+  pair: { ce: CheapOtmPick; pe: CheapOtmPick } | undefined,
+  quotes: Record<string, KiteQuote>,
+): Pick<
+  LivePaperBookState,
+  'neededCeRs' | 'neededCe' | 'neededPeRs' | 'neededPe' | 'neededLot' | 'neededAtAsk'
+> {
+  if (!pair) {
+    return { neededCeRs: null, neededCe: '', neededPeRs: null, neededPe: '', neededLot: 0, neededAtAsk: false };
+  }
+  const quoteOf = (pick: CheapOtmPick) => {
+    if (pick.instrument.instrumentToken <= 0) return null;
+    const key = `${pick.instrument.exchange}:${pick.instrument.tradingSymbol}`;
+    const { ask } = bestBidAsk(findQuote(quotes, key));
+    return neededLotQuote(pick.instrument.tradingSymbol, pick.lotSize, ask, lastByKey(quotes, key));
+  };
+  const ce = quoteOf(pair.ce);
+  const pe = quoteOf(pair.pe);
+  return {
+    neededCe: ce?.contract || pair.ce.instrument.tradingSymbol || '',
+    neededCeRs: ce?.costRs ?? null,
+    neededPe: pe?.contract || pair.pe.instrument.tradingSymbol || '',
+    neededPeRs: pe?.costRs ?? null,
+    neededLot: ce?.lot || pe?.lot || pair.ce.lotSize || pair.pe.lotSize || 0,
+    neededAtAsk: !!(ce?.atAsk || pe?.atAsk),
+  };
 }
 
 function persist(snap: LivePaperSession): void {
@@ -382,6 +457,12 @@ function readStored(): LivePaperSession | null {
         expiry: b.expiry || '',
         lot: b.lot || 0,
         optionToken: b.optionToken || 0,
+        neededCeRs: b.neededCeRs ?? null,
+        neededCe: b.neededCe || '',
+        neededPeRs: b.neededPeRs ?? null,
+        neededPe: b.neededPe || '',
+        neededLot: b.neededLot || 0,
+        neededAtAsk: !!b.neededAtAsk,
       })),
     };
   } catch {

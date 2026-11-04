@@ -98,8 +98,8 @@
           <span class="pa-badge" [class.warn]="skips().length > 0">{{ skips().length }} today</span>
         </div>
         <p class="pa-note">
-          The rules fired but the desk could not buy the option. A book that looks idle may simply be priced out: the cheap option it
-          picks must cost no more than ₹{{ 3500 | number : '1.0-0' }} (premium × lot). Nothing is bought at an assumed price.
+          The desk now takes the listed option at the live ask and shows the 1-lot cash it needs. A skip here means there was no
+          listed contract or no live quote — never an invented price. Older "over budget" rows are from before that change.
         </p>
         @for (sk of skips().slice(0, 12); track sk.at + sk.book) {
           <article class="pa-signal compact" data-testid="skipped-row">
@@ -111,8 +111,10 @@
             @if (sk.reason === 'premium-over-budget') {
               <p class="pa-note">
                 {{ sk.contract }}: ₹{{ sk.premium }} × {{ sk.lot }} = <b class="mp-down">₹{{ sk.costRs | number : '1.0-0' }}</b>
-                against a ₹{{ sk.budgetRs | number : '1.0-0' }} budget.
+                against a ₹{{ sk.budgetRs | number : '1.0-0' }} budget (old cap — new ticks take this trade).
               </p>
+            } @else if (sk.reason === 'no-live-quote') {
+              <p class="pa-note">{{ sk.contract }} had no live ask or last; no trade was invented.</p>
             } @else {
               <p class="pa-note">No listed contract found for {{ sk.contract }}; no trade was invented.</p>
             }

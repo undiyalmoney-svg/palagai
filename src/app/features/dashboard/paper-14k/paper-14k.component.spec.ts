@@ -26,7 +26,8 @@ describe('Paper14kComponent', () => {
     expect(text).toMatch(/Nifty 50/);
     expect(text).toMatch(/Bank Nifty/);
     expect(text).toMatch(/Sensex/);
-    expect(text).toMatch(/No order is placed/);
+    expect(text).toMatch(/no Kite order/);
+    expect(text).toMatch(/Not a guaranteed profit/);
     expect(text).not.toMatch(/Play next day/);
     expect(text).not.toMatch(/2-year tape/);
     expect(text).not.toMatch(/Why losers failed/);

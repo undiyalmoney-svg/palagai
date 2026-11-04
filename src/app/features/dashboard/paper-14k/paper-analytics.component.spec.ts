@@ -210,4 +210,33 @@ describe('Paper14kComponent views', () => {
     expect(f.nativeElement.querySelector('[data-testid="live-paper-card"]')).toBeTruthy();
     expect(f.componentInstance['paper'].session().liveOrders).toBe(false);
   });
+
+  it('shows the live 1-lot cash each book needs and never claims profit is guaranteed', async () => {
+    localStorage.clear();
+    await TestBed.configureTestingModule({
+      imports: [Paper14kComponent],
+      providers: [provideHttpClient(), provideRouter([])],
+    }).compileComponents();
+    const f = TestBed.createComponent(Paper14kComponent);
+    const paper = f.componentInstance['paper'];
+    const cur = paper.session();
+    paper.session.set({
+      ...cur,
+      books: cur.books.map((b, i) =>
+        i === 0
+          ? { ...b, neededCe: 'BANKNIFTY26NOV56200CE', neededCeRs: 17417, neededPe: 'BANKNIFTY26NOV55800PE', neededPeRs: 12300, neededLot: 30, neededAtAsk: true }
+          : b,
+      ),
+    });
+    f.detectChanges();
+    const needed = f.nativeElement.querySelector('[data-testid="book-needed"]') as HTMLElement;
+    expect(needed.textContent).toContain('17,417');
+    expect(needed.textContent).toContain('12,300');
+    expect(needed.textContent).toContain('live ask');
+    expect((f.nativeElement.querySelector('[data-testid="paper-14k-banner"]') as HTMLElement).textContent).toMatch(
+      /Not a guaranteed profit/,
+    );
+    expect(paper.session().liveOrders).toBe(false);
+    expect(paper.session().guaranteed).toBe(false);
+  });
 });

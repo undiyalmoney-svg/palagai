@@ -1,8 +1,8 @@
 <div class="mp-page" data-testid="paper-14k-page">
   <div class="mp-banner" data-tone="info" data-testid="paper-14k-banner">
-    Motto: buy CE/PE. Paper only. ₹14,000 on each book — cheap next-expiry OTM on Crude Mini,
-    Nifty, Bank Nifty and Sensex. Watches live Kite, adds SL and target, shows P/L.
-    No order is placed. Real Crude money stays on
+    Motto: buy CE/PE. Paper only — no Kite order. Each book takes the live-quoted cheap OTM at the
+    ask, like a live buy, and shows the cash that 1 lot needs. That is the budget to copy the trade
+    in live. Not a guaranteed profit. Real Crude money stays on
     <a routerLink="/dashboard/crude-best">Crude Best</a>.
   </div>
 
@@ -140,7 +140,7 @@
         <div>
           <h2>Live paper</h2>
           <p class="mp-sub">
-            Cheap CE/PE on Crude Mini, Nifty 50, Bank Nifty, Sensex. Isolated ₹14,000 each. Hit Start.
+            Cheap CE/PE on Crude Mini, Nifty 50, Bank Nifty, Sensex. Takes 1 lot at the live ask. Hit Start.
           </p>
         </div>
         <span class="mp-badge" [attr.data-tone]="paper.session().running ? 'down' : 'info'">
@@ -224,6 +224,24 @@
                       · {{ b.lot }} qty
                     </div>
                   }
+                  @if (b.neededCeRs != null || b.neededPeRs != null) {
+                    <div class="mp-pick" data-testid="book-needed">
+                      1 lot needs
+                      @if (b.neededCeRs != null) {
+                        CE ₹{{ b.neededCeRs | number : '1.0-0' }}
+                      }
+                      @if (b.neededCeRs != null && b.neededPeRs != null) {
+                        ·
+                      }
+                      @if (b.neededPeRs != null) {
+                        PE ₹{{ b.neededPeRs | number : '1.0-0' }}
+                      }
+                      @if (b.neededLot) {
+                        · ×{{ b.neededLot }}
+                      }
+                      · {{ b.neededAtAsk ? 'live ask' : 'last' }}
+                    </div>
+                  }
                   <div class="mp-sub">{{ b.structure }} · {{ b.mode || b.status }}</div>
                 @if (b.skips?.length) {
                   <div class="mp-sub mp-down" data-testid="book-skips">
@@ -247,7 +265,7 @@
             }
             <tr>
               <td class="mp-sym">Overall</td>
-              <td colspan="5">4 isolated ₹14,000 books · paper</td>
+              <td colspan="5">4 books · 1 lot at the live ask · paper, not guaranteed</td>
               <td class="num" [class.mp-up]="paper.session().liveRs > 0" [class.mp-down]="paper.session().liveRs < 0">
                 {{ paper.session().liveRs | number : '1.0-0' }}
               </td>

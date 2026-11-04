@@ -38,7 +38,8 @@ export interface SignalCardInput {
   tp: number;
   qty: number;
   premiumCostRs: number;
-  premiumBudgetRs: number;
+  /** True when the fill used a live ask on a listed contract. */
+  liveAsk: boolean;
   /** Observed (ask - bid) / mid at entry, if a quote was available. */
   spreadPct: number | null;
   entryMinute: number;
@@ -61,7 +62,7 @@ export function buildSignalCard(i: SignalCardInput): SignalCard {
     { label: 'Primary rule for this structure', pass: i.primaryRule },
     { label: 'Confirmation candle agreed', pass: true },
     { label: 'Inside entry window', pass: i.entryMinute >= i.entryStartMin && i.entryMinute <= i.flatMin - 30 },
-    { label: 'Premium within budget', pass: i.premiumCostRs <= i.premiumBudgetRs },
+    { label: 'Live ask on a listed contract', pass: i.liveAsk && i.premiumCostRs > 0 },
     { label: 'Day-loss headroom left', pass: i.dayClosedRs > -i.dayLossCapRs / 2 },
     { label: 'Reward at least 1.5x risk', pass: rewardRisk != null && rewardRisk >= 1.5 },
     {

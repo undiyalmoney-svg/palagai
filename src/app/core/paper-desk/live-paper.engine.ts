@@ -5,7 +5,6 @@ import {
   LIVE_ASSUME_CHARGE,
   LIVE_ASSUME_CRUDE_MIN,
   LIVE_ASSUME_DAY_LOSS,
-  LIVE_ASSUME_PREMIUM_BUDGET,
   LiveAssumeBar,
   LiveAssumeBookCfg,
   bookSignal,
@@ -107,8 +106,16 @@ export interface LivePaperBookState {
   signal?: SignalCard | null;
   /** Exchange timestamp of the latest underlying quote, as Kite reported it. */
   quoteAt?: string;
-  /** Signals the rules fired but the desk could not take (premium too high, no listed contract). */
+  /** Signals the rules fired but the desk could not take (no listed contract / no live quote). */
   skips?: SkippedSignal[];
+  /** Live 1-lot cash needed to copy this book's cheap CE. */
+  neededCeRs?: number | null;
+  neededCe?: string;
+  /** Live 1-lot cash needed to copy this book's cheap PE. */
+  neededPeRs?: number | null;
+  neededPe?: string;
+  neededLot?: number;
+  neededAtAsk?: boolean;
 }
 
 export interface LivePaperSession {
@@ -165,6 +172,12 @@ export function emptyBook(cfg: LiveAssumeBookCfg): LivePaperBookState {
     expiry: '',
     lot: 0,
     optionToken: 0,
+    neededCeRs: null,
+    neededCe: '',
+    neededPeRs: null,
+    neededPe: '',
+    neededLot: 0,
+    neededAtAsk: false,
   };
 }
 
@@ -345,7 +358,6 @@ function hitExit(
 }
 
 function canOpen(book: LivePaperBookState, cfg: LiveAssumeBookCfg): string | null {
-  if (cfg.premiumRs > LIVE_ASSUME_PREMIUM_BUDGET) return 'premium over budget';
   if (cfg.id === 'crude' && LIVE_PAPER_CAPITAL < LIVE_ASSUME_CRUDE_MIN) return 'need ₹8,000 free for Crude';
   if (book.closedRs <= -LIVE_ASSUME_DAY_LOSS) return 'day-loss cap';
   if (book.fund <= 0) return 'fund empty';
@@ -498,8 +510,8 @@ export function summarizePaper(
     liveRs,
     closedRs,
     honest:
-      `Paper only — no Kite order is placed. ₹${LIVE_PAPER_CAPITAL.toLocaleString('en-IN')} isolated on each book. ` +
-      `Motto: buy CE/PE. Cheap next-expiry OTM on all four. SL, target, and live P/L come from the option last. ${fundsLine}` +
+      `Paper only — no Kite order is placed. Each book takes 1 lot at the live ask and shows that cash. ` +
+      `Motto: buy CE/PE. Cheap next-expiry OTM on all four. SL, target, and live P/L come from the option. ${fundsLine}` +
       `${OPTION_14K_HONEST}`,
   };
 }
