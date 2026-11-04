@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { bookSignal } from './live-assume.engine';
+import { bookSignal, momentumSignal } from './live-assume.engine';
 import { optionRoundTripCharges } from './option-charges.util';
 import {
   LIVE_PAPER_BOOKS,
   LIVE_PAPER_CAPITAL,
   LIVE_PAPER_COOLDOWN_MIN,
+  PAPER_TEST_HONEST,
   bindOptionFill,
   optionRangePts,
   optionStopPts,
@@ -170,7 +171,7 @@ describe('Live paper desk', () => {
   });
 
   it('blocks a confirmed entry during cooldown and after two losses', () => {
-    const cfg = LIVE_PAPER_BOOKS[0];
+    const cfg = { ...LIVE_PAPER_BOOKS[0], strategy: 'rules' as const };
     const bars = [{ day: '2026-11-04', min: 12 * 60, open: 5400, high: 5420, low: 5395, close: 5418 }];
     const pending = () => {
       const b = emptyBook(cfg);
@@ -292,5 +293,71 @@ describe('Live paper desk', () => {
     const restored = restoreDayStops(book, '2026-11-04');
     expect(restored.lossesToday).toBe(2);
     expect(restored.cooldownUntil).toBe(12 * 60 + 49 + 60);
+  });
+
+  const flatBars = (day: string, n: number, startMin: number, px = 100, rng = 2) =>
+    Array.from({ length: n }, (_, k) => ({ day, min: startMin + 5 * k, open: px, high: px + rng / 2, low: px - rng / 2, close: px }));
+
+  it('runs pre-registered momentum on Nifty and watches Sensex, Bank Nifty and Crude', () => {
+    const by = (id: string) => LIVE_PAPER_BOOKS.find((b) => b.id === id)!;
+    expect(by('nifty')).toMatchObject({ strategy: 'momentum', stopPct: 0.4, targetPct: 1, holdBars: 24, maxTradesPerDay: 3, atm: true });
+    expect(by('sensex').strategy).toBe('watch');
+    expect(by('bank').strategy).toBe('watch');
+    expect(by('crude').strategy).toBe('watch');
+    expect(PAPER_TEST_HONEST).toMatch(/not a guaranteed profit/);
+    expect(PAPER_TEST_HONEST).toMatch(/watch only/);
+  });
+
+  it('fires momentum only past 1.5×√6 × the 20-bar mean range, from the 7th bar of the day', () => {
+    const prev = flatBars('2026-11-03', 20, 13 * 60 + 35);
+    const today = flatBars('2026-11-04', 7, 9 * 60 + 15);
+    const bars = [...prev, ...today];
+    const i = bars.length - 1;
+    const thr = 1.5 * 2 * Math.sqrt(6);
+    bars[i] = { ...bars[i], close: 100 + thr + 0.1, high: 100 + thr + 0.2 };
+    expect(momentumSignal(bars, i)).toBe(1);
+    bars[i] = { ...bars[i], close: 100 - thr - 0.1, low: 100 - thr - 0.2, high: 101 };
+    expect(momentumSignal(bars, i)).toBe(-1);
+    bars[i] = { ...bars[i], close: 100 + thr - 0.5, low: 99 };
+    expect(momentumSignal(bars, i)).toBe(0);
+    const early = [...prev, ...today.slice(0, 6)];
+    early[early.length - 1] = { ...early[early.length - 1], close: 130, high: 131 };
+    expect(momentumSignal(early, early.length - 1)).toBe(0);
+  });
+
+  it('opens momentum on the signal bar, binds 40% / 100% premium levels and exits on time', () => {
+    const cfg = LIVE_PAPER_BOOKS.find((b) => b.id === 'nifty')!;
+    const bars = [...flatBars('2026-11-03', 20, 13 * 60 + 35, 24000), ...flatBars('2026-11-04', 7, 9 * 60 + 15, 24000)];
+    const last = bars.length - 1;
+    bars[last] = { ...bars[last], close: 24020, high: 24021 };
+    const book = { ...emptyBook(cfg), lastBarMin: 9 * 60 + 40 };
+    const opened = tickBook(book, cfg, bars, 24020, '2026-11-04', 9 * 60 + 51, 'NIFTY 50');
+    expect(opened.side).toBe('long');
+    expect(opened.mode).toBe('momentum');
+    expect(opened.entryMin).toBe(9 * 60 + 50);
+    const bound = bindOptionFill(opened, cfg, 100, { ...crudePick(), lotSize: 65 } as never);
+    expect(bound.sl).toBe(60);
+    expect(bound.tp).toBe(200);
+    const held = tickBook({ ...bound, lot: 65 }, cfg, [], 110, '2026-11-04', 9 * 60 + 50 + 115, 'NIFTY');
+    expect(held.side).toBe('long');
+    const timed = tickBook({ ...bound, lot: 65 }, cfg, [], 110, '2026-11-04', 9 * 60 + 50 + 120, 'NIFTY');
+    expect(timed.side).toBe('flat');
+    expect(timed.fills[0].reason).toBe('time');
+  });
+
+  it('caps momentum at 3 trades a day and never trades a watch-only book', () => {
+    const nifty = LIVE_PAPER_BOOKS.find((b) => b.id === 'nifty')!;
+    const bars = [...flatBars('2026-11-03', 20, 13 * 60 + 35, 24000), ...flatBars('2026-11-04', 7, 9 * 60 + 15, 24000)];
+    bars[bars.length - 1] = { ...bars[bars.length - 1], close: 24020, high: 24021 };
+    const f = { day: '2026-11-04', book: 'nifty', label: 'Nifty', side: 'long', entry: 1, exit: 1, sl: 1, tp: 1, pts: 0, rs: -1, reason: 'sl', mode: 'momentum' } as never;
+    const full = { ...emptyBook(nifty), lastBarMin: 9 * 60 + 40, fills: [f, f, f] };
+    const capped = tickBook(full, nifty, bars, 24020, '2026-11-04', 9 * 60 + 51, 'NIFTY 50');
+    expect(capped.side).toBe('flat');
+    expect(capped.reason).toBe('max 3 trades today');
+    const bank = LIVE_PAPER_BOOKS.find((b) => b.id === 'bank')!;
+    const pending = { ...emptyBook(bank), pendingDir: 1, pendingSig: 5410, pendingMode: 'pdhl', lastBarMin: 11 * 60 + 55 };
+    const watched = tickBook(pending, bank, [{ day: '2026-11-04', min: 12 * 60, open: 5400, high: 5420, low: 5395, close: 5418 }], 5418, '2026-11-04', 12 * 60 + 6, 'NIFTY BANK');
+    expect(watched.side).toBe('flat');
+    expect(watched.reason).toBe('watch only: no tested edge');
   });
 });

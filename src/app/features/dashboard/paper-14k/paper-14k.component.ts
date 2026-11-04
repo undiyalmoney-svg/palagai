@@ -3,7 +3,13 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { AnalyticsView, PaperAnalyticsComponent } from './paper-analytics.component';
 import { LivePaperService } from '../../../core/paper-desk/live-paper.service';
-import { OptionPickView, allClosedFills, booksFundEnd, optionPickLabel } from '../../../core/paper-desk/live-paper.engine';
+import {
+  LIVE_PAPER_BOOKS,
+  OptionPickView,
+  allClosedFills,
+  booksFundEnd,
+  optionPickLabel,
+} from '../../../core/paper-desk/live-paper.engine';
 import {
   CRUDE_OPTION_MIN_COMMODITY_RS,
   commodityTopUpRs,
@@ -57,6 +63,13 @@ export class Paper14kComponent {
 
   protected booksFund(): number {
     return booksFundEnd(this.paper.session().books);
+  }
+
+  protected strategyNote(id: string): string {
+    const cfg = LIVE_PAPER_BOOKS.find((b) => b.id === id);
+    if (cfg?.strategy === 'watch') return 'watch only — no tested edge';
+    if (cfg?.strategy === 'momentum') return 'momentum · ATM · stop 40% · target 100% · 2 h';
+    return '';
   }
 
   protected pick(row: OptionPickView): string {

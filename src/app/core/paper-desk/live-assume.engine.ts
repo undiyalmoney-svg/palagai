@@ -82,6 +82,40 @@ export interface LiveAssumeBookCfg {
   buyOption?: boolean;
   /** pdhl fires only on the bar that crosses the previous-day level, not on every green bar beyond it. */
   freshCross?: boolean;
+  /** 'watch' never opens a trade (no tested edge); 'momentum' is the pre-registered 6-bar thrust. */
+  strategy?: 'rules' | 'momentum' | 'watch';
+  /** Stop / target as fractions of the entry premium (overrides the point stops). */
+  stopPct?: number;
+  targetPct?: number;
+  /** Time exit, in 5-minute bars after the fill bar opens. */
+  holdBars?: number;
+  maxTradesPerDay?: number;
+  /** Bars a new signal must be after the previous one. */
+  minGapBars?: number;
+  /** Buy the ATM strike instead of the cheap OTM one. */
+  atm?: boolean;
+  /** Open on the signal bar itself, without waiting for a confirming bar. */
+  noConfirm?: boolean;
+  /** false disables the 2-loss stop, the cooldown and the one-stop day check. */
+  dayStops?: boolean;
+  /** Pick an expiry after tomorrow (skip 1 day or less left) instead of only skipping expiry day. */
+  expiryAfterTomorrow?: boolean;
+}
+
+/** 6-bar close-to-close move beyond 1.5× √6 × the mean range of the 20 bars before this one (same day, bar ≥ 6). */
+export function momentumSignal(bars: LiveAssumeBar[], i: number): number {
+  const b = bars[i];
+  if (i < 20) return 0;
+  let pos = 0;
+  for (let k = i - 1; k >= 0 && bars[k].day === b.day; k--) pos++;
+  if (pos < 6) return 0;
+  let sum = 0;
+  for (let k = i - 20; k < i; k++) sum += bars[k].high - bars[k].low;
+  const thr = 1.5 * (sum / 20) * Math.sqrt(6);
+  const r = b.close - bars[i - 6].close;
+  if (r > thr) return 1;
+  if (r < -thr) return -1;
+  return 0;
 }
 
 export const LIVE_ASSUME_BOOKS: LiveAssumeBookCfg[] = [
@@ -278,6 +312,7 @@ export function bookSignal(mode: string, bars: LiveAssumeBar[], i: number, cfg: 
     if (b.close < orb.lo && dn) return -1;
     return 0;
   };
+  if (mode === 'momentum') return momentumSignal(bars, i);
   if (mode === 'pdhl') return pdhl();
   if (mode === 'fade' || mode === 'orb_fade') return fade();
   if (mode === 'trap') return trap();

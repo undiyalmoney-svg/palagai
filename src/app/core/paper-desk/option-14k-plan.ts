@@ -215,6 +215,8 @@ export function option14kToPaperCfg(plan: Option14kBookPlan): LiveAssumeBookCfg 
     backup: plan.backup,
     buyOption: true,
     freshCross: true,
+    strategy: 'rules',
+    expiryAfterTomorrow: true,
   };
 }
 

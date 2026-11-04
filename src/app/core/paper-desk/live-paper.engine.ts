@@ -9,12 +9,49 @@ import {
   bookSignal,
   morningStructure,
 } from './live-assume.engine';
-import { OPTION_14K_BOOKS, OPTION_14K_HONEST, OPTION_14K_LIST, Option14kBookId, option14kToPaperCfg } from './option-14k-plan';
+import { OPTION_14K_BOOKS, OPTION_14K_LIST, Option14kBookId, option14kToPaperCfg } from './option-14k-plan';
 import { CheapOtmPick } from '../utils/pick-cheap-otm.util';
 import { optionRoundTripCharges, venueForBook } from './option-charges.util';
 import { SignalCard, SkippedSignal } from './paper-analytics.models';
 
-export const LIVE_PAPER_BOOKS: LiveAssumeBookCfg[] = OPTION_14K_LIST.map(option14kToPaperCfg);
+/**
+ * Pre-registered in OPTIONS-BUYING-RESEARCH.md (2026-11-02) and not tuned since: the only entry that beat random
+ * entries over 3 years. Nifty only: Sensex real premiums ran far below the model (MOMENTUM-CHECK-2026-11-04.md),
+ * and Bank Nifty and Crude had no tested edge, so those three watch.
+ */
+export const PAPER_MOMENTUM: Partial<LiveAssumeBookCfg> = {
+  strategy: 'momentum',
+  primary: { trend: 'momentum', range: 'momentum', quiet: 'momentum', stand: 'momentum' },
+  backup: {},
+  entryS: 9 * 60 + 45,
+  stopPct: 0.4,
+  targetPct: 1,
+  holdBars: 24,
+  maxTradesPerDay: 3,
+  minGapBars: 12,
+  atm: true,
+  noConfirm: true,
+  dayStops: false,
+  expiryAfterTomorrow: false,
+};
+export const PAPER_TEST_HONEST =
+  'Nifty 50: momentum — a 30-min move beyond 1.5× the normal bar range buys the ATM CE (up) or PE (down), ' +
+  'nearest expiry that is not today; stop 40% of premium, target 100%, out after 2 hours or 15:15; at most 3 trades a day. ' +
+  'Sensex, Bank Nifty and Crude Mini watch only: no edge held up on real premiums. Exact Zerodha charges. Momentum is the one ' +
+  'entry that beat random entries over 3 years of modelled premiums; it is not validated on live fills, loses on about 3 days ' +
+  'in 10, one stop is about ₹2,500–4,000 a lot, and it is not a guaranteed profit.';
+export const PAPER_WATCH: Partial<LiveAssumeBookCfg> = { strategy: 'watch' };
+const PAPER_STRATEGY: Record<string, Partial<LiveAssumeBookCfg>> = {
+  nifty: { ...PAPER_MOMENTUM, product: 'ATM CE/PE ×65' },
+  sensex: PAPER_WATCH,
+  bank: PAPER_WATCH,
+  crude: PAPER_WATCH,
+};
+
+export const LIVE_PAPER_BOOKS: LiveAssumeBookCfg[] = OPTION_14K_LIST.map((plan) => ({
+  ...option14kToPaperCfg(plan),
+  ...(PAPER_STRATEGY[plan.id] || {}),
+}));
 export const LIVE_PAPER_CAPITAL = LIVE_ASSUME_CAPITAL;
 export const LIVE_PAPER_CHARGE = LIVE_ASSUME_CHARGE;
 export const LIVE_PAPER_COOLDOWN_MIN = 60;
@@ -127,6 +164,10 @@ export interface LivePaperBookState {
   lossesToday?: number;
   /** IST minute before which no new entry is taken (set after a losing close). */
   cooldownUntil?: number;
+  /** IST minute the current trade's fill bar opened (drives the time exit). */
+  entryMin?: number | null;
+  /** IST minute of the last momentum signal bar (signals must be minGapBars apart). */
+  lastSignalMin?: number;
 }
 
 export interface LivePaperSession {
@@ -191,6 +232,8 @@ export function emptyBook(cfg: LiveAssumeBookCfg): LivePaperBookState {
     neededAtAsk: false,
     lossesToday: 0,
     cooldownUntil: -1,
+    entryMin: null,
+    lastSignalMin: -1,
   };
 }
 
@@ -227,7 +270,10 @@ export function bindOptionFill(
 ): LivePaperBookState {
   if (book.side === 'flat' || prem <= 0) return book;
   const next: LivePaperBookState = { ...book, fills: [...book.fills] };
-  const stop = optionStopPts(cfg, rangePts);
+  const stop =
+    cfg.stopPct != null && cfg.targetPct != null
+      ? { sl: prem * cfg.stopPct, tp: prem * cfg.targetPct }
+      : optionStopPts(cfg, rangePts);
   next.entry = prem;
   next.sl = Math.max(0.05, Math.round((prem - stop.sl) * 100) / 100);
   next.tp = Math.round((prem + stop.tp) * 100) / 100;
@@ -366,6 +412,7 @@ function closeAt(
   book.entryBid = null;
   book.entryAsk = null;
   book.entryAt = '';
+  book.entryMin = null;
   book.signal = null;
 }
 
@@ -415,9 +462,16 @@ function hitExit(
 }
 
 function canOpen(book: LivePaperBookState, cfg: LiveAssumeBookCfg, atMin: number): string | null {
+  if (cfg.strategy === 'watch') return 'watch only: no tested edge';
   if (cfg.id === 'crude' && LIVE_PAPER_CAPITAL < LIVE_ASSUME_CRUDE_MIN) return 'need ₹8,000 free for Crude';
-  if ((book.lossesToday || 0) >= LIVE_PAPER_MAX_LOSSES) return `day stop: ${LIVE_PAPER_MAX_LOSSES} losses`;
-  if (book.cooldownUntil != null && atMin < book.cooldownUntil) return 'cooldown after loss';
+  if (cfg.maxTradesPerDay != null) {
+    const modes = new Set(Object.values(cfg.primary));
+    if (book.fills.filter((f) => modes.has(f.mode)).length >= cfg.maxTradesPerDay) return `max ${cfg.maxTradesPerDay} trades today`;
+  }
+  if (cfg.dayStops !== false) {
+    if ((book.lossesToday || 0) >= LIVE_PAPER_MAX_LOSSES) return `day stop: ${LIVE_PAPER_MAX_LOSSES} losses`;
+    if (book.cooldownUntil != null && atMin < book.cooldownUntil) return 'cooldown after loss';
+  }
   if (book.fund <= 0) return 'fund empty';
   return null;
 }
@@ -452,6 +506,7 @@ function openAt(
   book.mode = mode;
   book.status = 'open';
   book.reason = 'open';
+  book.entryMin = atMin + 5;
   book.pendingDir = 0;
   book.pendingSig = 0;
   book.pendingMode = '';
@@ -505,6 +560,15 @@ export function tickBook(
     if ((next.side === 'long' || next.side === 'short') && nowMin >= cfg.flat && last != null) {
       closeAt(next, cfg, last, 'eod', day);
     }
+    if (
+      (next.side === 'long' || next.side === 'short') &&
+      cfg.holdBars != null &&
+      next.entryMin != null &&
+      nowMin >= next.entryMin + cfg.holdBars * 5 &&
+      last != null
+    ) {
+      closeAt(next, cfg, last, 'time', day);
+    }
     if ((next.side === 'long' || next.side === 'short') && last != null) {
       hitExit(next, last, last, last, cfg, day);
     }
@@ -547,6 +611,16 @@ export function tickBook(
       const st = next.structure === 'wait' ? 'stand' : next.structure;
       const hit = pickSignal(done, i, cfg, st);
       if (!hit.dir) continue;
+      if (cfg.minGapBars != null) {
+        if (next.lastSignalMin != null && next.lastSignalMin >= 0 && bar.min - next.lastSignalMin <= cfg.minGapBars * 5) continue;
+        next.lastSignalMin = bar.min;
+      }
+      if (cfg.noConfirm) {
+        next.mode = hit.mode;
+        openAt(next, cfg, hit.dir, bar.close, hit.mode, bar.min);
+        if (next.side !== 'flat') break;
+        continue;
+      }
       next.pendingDir = hit.dir;
       next.pendingSig = bar.close;
       next.pendingMode = hit.mode;
@@ -589,8 +663,7 @@ export function summarizePaper(
     closedRs,
     honest:
       `Paper only — no Kite order is placed. Each book takes 1 lot at the live ask and shows that cash. ` +
-      `Motto: buy CE/PE. Cheap next-expiry OTM on all four. SL, target, and live P/L come from the option. ${fundsLine}` +
-      `${OPTION_14K_HONEST}`,
+      `Motto: buy CE/PE. SL, target, and live P/L come from the option. ${fundsLine}${PAPER_TEST_HONEST}`,
   };
 }
 

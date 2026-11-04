@@ -139,13 +139,16 @@ export function pickCheapOtm(params: {
   spot: number;
   asOf: Date;
   premiumBudgetRs?: number;
+  /** Override the plan's OTM distance (0 = ATM). */
+  otmPts?: number;
 }): CheapOtmPick {
   const plan = OPTION_14K_BOOKS[params.book];
   const budget = params.premiumBudgetRs ?? OPTION_14K_PREMIUM_BUDGET_RS;
   const side: CheapOtmSide = params.direction === 'BUY' ? 'CE' : 'PE';
   const day = params.book === 'crude' ? crudeIstCalendarDay(params.asOf) : asOfDay(params.asOf);
   const atm = roundStrike(params.spot, plan.strikeStep);
-  const target = side === 'CE' ? atm + plan.otmPts : atm - plan.otmPts;
+  const otm = params.otmPts ?? plan.otmPts;
+  const target = side === 'CE' ? atm + otm : atm - otm;
   const want = roundStrike(target, plan.strikeStep);
 
   const pool = params.instruments

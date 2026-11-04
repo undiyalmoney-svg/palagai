@@ -170,7 +170,7 @@ export class LivePaperService {
         const inst =
           cfg.id === 'crude' ? crude : cfg.id === 'nifty' ? nifty : cfg.id === 'bank' ? bank : sensex;
         const spot = lastPrice(quotes, cfg.id, inst?.tradingSymbol || '') ?? 0;
-        const pair = cheapPair(chain, cfg.id as 'crude' | 'nifty' | 'bank' | 'sensex', spot, nextExpiryAsOf(asOf));
+        const pair = cheapPair(chain, cfg.id as 'crude' | 'nifty' | 'bank' | 'sensex', spot, pickAsOf(cfg, asOf), cfg.atm ? 0 : undefined);
         cheapByBook.set(cfg.id, pair);
         for (const pick of [pair.ce, pair.pe]) {
           if (pick.instrument.instrumentToken > 0) {
@@ -314,8 +314,9 @@ export class LivePaperService {
         book: id,
         direction: book.side === 'long' ? 'BUY' : 'SELL',
         spot,
-        asOf: nextExpiryAsOf(new Date()),
+        asOf: pickAsOf(cfg, new Date()),
         premiumBudgetRs: 10_000_000,
+        otmPts: cfg.atm ? 0 : undefined,
       });
     const listed = pick.instrument.instrumentToken > 0;
     const key = `${pick.instrument.exchange}:${pick.instrument.tradingSymbol}`;
@@ -361,7 +362,7 @@ export class LivePaperService {
     const riskRs =
       Math.round((stopPts * pick.lotSize + optionRoundTripCharges(prem, prem - stopPts, pick.lotSize, venueForBook(cfg.id))) * 10) / 10;
     // Worst-case day = two stops: take a new trade only while today's loss is within one stop.
-    if (book.closedRs < 0 && -book.closedRs > riskRs) {
+    if (cfg.dayStops !== false && book.closedRs < 0 && -book.closedRs > riskRs) {
       return flat(`day stop: today −₹${Math.abs(book.closedRs)} > one stop ₹${riskRs}`, {
         at: new Date().toISOString(),
         day: istDay(),
@@ -402,7 +403,7 @@ export class LivePaperService {
             entryStartMin: cfg.entryS,
             flatMin: cfg.flat,
             dayClosedRs: book.closedRs,
-            dayLossCapRs: 2 * riskRs,
+            dayLossCapRs: (cfg.dayStops === false ? cfg.maxTradesPerDay || 3 : 2) * riskRs,
           })
         : null;
     return { ...bound, entryBid: bid, entryAsk: ask, entryAt: new Date().toISOString(), signal };
@@ -416,11 +417,16 @@ export function nextExpiryAsOf(asOf: Date): Date {
   return new Date(asOf.getTime() + 24 * 60 * 60 * 1000);
 }
 
+function pickAsOf(cfg: LiveAssumeBookCfg, asOf: Date): Date {
+  return cfg.expiryAfterTomorrow === false ? asOf : nextExpiryAsOf(asOf);
+}
+
 function cheapPair(
   chain: Instrument[],
   book: 'crude' | 'nifty' | 'bank' | 'sensex',
   spot: number,
   asOf: Date,
+  otmPts?: number,
 ): { ce: CheapOtmPick; pe: CheapOtmPick } {
   return {
     ce: pickCheapOtm({
@@ -430,6 +436,7 @@ function cheapPair(
       spot,
       asOf,
       premiumBudgetRs: NO_BUDGET_CAP,
+      otmPts,
     }),
     pe: pickCheapOtm({
       instruments: chain,
@@ -438,6 +445,7 @@ function cheapPair(
       spot,
       asOf,
       premiumBudgetRs: NO_BUDGET_CAP,
+      otmPts,
     }),
   };
 }
@@ -512,6 +520,8 @@ function readStored(): LivePaperSession | null {
         neededAtAsk: !!b.neededAtAsk,
         lossesToday: b.lossesToday || 0,
         cooldownUntil: b.cooldownUntil ?? -1,
+        entryMin: b.entryMin ?? null,
+        lastSignalMin: b.lastSignalMin ?? -1,
       }, parsed.day)),
     };
   } catch {

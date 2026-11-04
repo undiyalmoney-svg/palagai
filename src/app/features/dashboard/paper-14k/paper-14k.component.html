@@ -215,6 +215,9 @@
                   <div class="mp-sub">
                     {{ b.product }}
                   </div>
+                  @if (strategyNote(b.id); as note) {
+                    <div class="mp-sub" data-testid="book-strategy">{{ note }}</div>
+                  }
                   @if (b.optionType) {
                     <div class="mp-pick" data-testid="live-paper-pick">
                       {{ pick(b) }}
