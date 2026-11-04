@@ -245,6 +245,20 @@ export function bindOptionFill(
   return next;
 }
 
+/** Re-derives today's loss count and cooldown from the fills, so a reload or an older saved state cannot reset them. */
+export function restoreDayStops(book: LivePaperBookState, day: string): LivePaperBookState {
+  const losers = book.fills.filter((f) => f.day === day && f.rs < 0);
+  const lastLossMin = losers.reduce((m, f) => {
+    const t = f.exitAt ? Date.parse(f.exitAt) : NaN;
+    return Number.isFinite(t) ? Math.max(m, istMinutes(new Date(t))) : m;
+  }, -1);
+  return {
+    ...book,
+    lossesToday: Math.max(book.lossesToday || 0, losers.length),
+    cooldownUntil: Math.max(book.cooldownUntil ?? -1, lastLossMin >= 0 ? lastLossMin + LIVE_PAPER_COOLDOWN_MIN : -1),
+  };
+}
+
 export function emptySession(day: string, asOf = new Date().toISOString()): LivePaperSession {
   const books = LIVE_PAPER_BOOKS.map((cfg) => emptyBook(cfg));
   return summarizePaper(books, {

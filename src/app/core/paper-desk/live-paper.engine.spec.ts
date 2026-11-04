@@ -8,6 +8,7 @@ import {
   bindOptionFill,
   optionRangePts,
   optionStopPts,
+  restoreDayStops,
   booksFundEnd,
   emptyBook,
   emptySession,
@@ -275,5 +276,21 @@ describe('Live paper desk', () => {
     const won = tickBook(mk(), cfg, [], 235, '2026-11-03', 12 * 60 + 20, 'SENSEX', gapUp);
     expect(won.fills[0].reason).toBe('tp');
     expect(won.fills[0].exit).toBe(204.55);
+  });
+
+  it('rebuilds today\'s loss count and cooldown from the saved fills', () => {
+    const cfg = LIVE_PAPER_BOOKS.find((b) => b.id === 'nifty')!;
+    const book = emptyBook(cfg);
+    const fill = (rs: number, exitAt: string, day = '2026-11-04') =>
+      ({ day, book: 'nifty', label: 'Nifty', side: 'long', entry: 90, exit: 88, sl: 85, tp: 100, pts: -2, rs, reason: 'scratch', mode: 'pdhl', exitAt }) as never;
+    book.fills = [
+      fill(-209, '2026-11-04T05:55:00.000Z'),
+      fill(600, '2026-11-04T06:57:00.000Z'),
+      fill(-222, '2026-11-04T07:19:00.000Z'),
+      fill(-300, '2026-11-03T07:19:00.000Z', '2026-11-03'),
+    ];
+    const restored = restoreDayStops(book, '2026-11-04');
+    expect(restored.lossesToday).toBe(2);
+    expect(restored.cooldownUntil).toBe(12 * 60 + 49 + 60);
   });
 });

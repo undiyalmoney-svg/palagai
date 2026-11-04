@@ -22,6 +22,7 @@ import {
   istMinutes,
   optionRangePts,
   optionStopPts,
+  restoreDayStops,
   summarizePaper,
   tickBook,
 } from './live-paper.engine';
@@ -495,7 +496,7 @@ function readStored(): LivePaperSession | null {
       guaranteed: false,
       armedOnCrudeBest: false,
       assumed: true,
-      books: parsed.books.map((b) => ({
+      books: parsed.books.map((b) => restoreDayStops({
         ...b,
         optionSymbol: b.optionSymbol || '',
         optionType: b.optionType || '',
@@ -511,7 +512,7 @@ function readStored(): LivePaperSession | null {
         neededAtAsk: !!b.neededAtAsk,
         lossesToday: b.lossesToday || 0,
         cooldownUntil: b.cooldownUntil ?? -1,
-      })),
+      }, parsed.day)),
     };
   } catch {
     return null;
