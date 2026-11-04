@@ -214,6 +214,7 @@ export function option14kToPaperCfg(plan: Option14kBookPlan): LiveAssumeBookCfg 
     primary: plan.primary,
     backup: plan.backup,
     buyOption: true,
+    freshCross: true,
   };
 }
 
@@ -232,5 +233,8 @@ export function canBuyCheapCepe(
 
 export const OPTION_14K_HONEST =
   'Motto: buy CE/PE. Cheap next-expiry OTM on Crude Mini, Nifty 50, Bank Nifty and Sensex. ' +
-  'Paper takes 1 lot at the live ask and shows the cash that lot needs. Day-loss ₹420 · skip expiry day. ATM still blocked. ' +
+  'Paper takes 1 lot at the live ask and shows the cash that lot needs. ATM still blocked. ' +
+  'Rules: fresh previous-day break only · stop 1.5× the option’s 5-min range, target 2× stop, no scratch · ' +
+  '60-min cooldown after a loss · stand down after 2 losses or once today’s loss exceeds one stop · ' +
+  'next expiry when 1 day or less is left · exact Zerodha charges. ' +
   'Paper / Test only — no Kite order. Not a guaranteed profit.';

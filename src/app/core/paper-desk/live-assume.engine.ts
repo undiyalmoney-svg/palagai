@@ -80,6 +80,8 @@ export interface LiveAssumeBookCfg {
   backup: Record<string, readonly string[]>;
   /** Long the option (CE or PE). SL/TP live on premium, not futures. */
   buyOption?: boolean;
+  /** pdhl fires only on the bar that crosses the previous-day level, not on every green bar beyond it. */
+  freshCross?: boolean;
 }
 
 export const LIVE_ASSUME_BOOKS: LiveAssumeBookCfg[] = [
@@ -231,8 +233,11 @@ export function bookSignal(mode: string, bars: LiveAssumeBar[], i: number, cfg: 
   const pdhl = () => {
     const lv = prevHl(bars, b.day);
     if (!lv || lv.hi - lv.lo > cfg.pdMax) return 0;
-    if (b.close > lv.hi && up) return 1;
-    if (b.close < lv.lo && dn) return -1;
+    const prior = i > 0 ? bars[i - 1] : null;
+    const crossedUp = !cfg.freshCross || (prior != null && prior.close <= lv.hi);
+    const crossedDn = !cfg.freshCross || (prior != null && prior.close >= lv.lo);
+    if (b.close > lv.hi && up && crossedUp) return 1;
+    if (b.close < lv.lo && dn && crossedDn) return -1;
     return 0;
   };
   const fade = () => {

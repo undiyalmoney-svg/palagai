@@ -1,8 +1,13 @@
 import { describe, expect, it } from 'vitest';
+import { bookSignal } from './live-assume.engine';
+import { optionRoundTripCharges } from './option-charges.util';
 import {
   LIVE_PAPER_BOOKS,
   LIVE_PAPER_CAPITAL,
+  LIVE_PAPER_COOLDOWN_MIN,
   bindOptionFill,
+  optionRangePts,
+  optionStopPts,
   booksFundEnd,
   emptyBook,
   emptySession,
@@ -28,7 +33,10 @@ describe('Live paper desk', () => {
     expect(LIVE_PAPER_BOOKS.map((b) => b.product).join(' ')).toMatch(/CE\/PE/);
   });
 
-  it('marks live P/L and banks a target after charges', () => {
+  const mcx = (buy: number, sell: number, qty = 10) =>
+    Math.round(((sell - buy) * qty - optionRoundTripCharges(buy, sell, qty, 'MCX')) * 10) / 10;
+
+  it('marks live P/L and banks a target after exact charges', () => {
     const cfg = LIVE_PAPER_BOOKS[0];
     const book = emptyBook(cfg);
     book.side = 'long';
@@ -39,17 +47,18 @@ describe('Live paper desk', () => {
     book.status = 'open';
     const live = tickBook(book, cfg, [], 110, '2026-11-02', 12 * 60, 'CRUDEOILM');
     expect(live.side).toBe('long');
-    expect(live.liveRs).toBe(50);
+    expect(live.liveRs).toBe(mcx(100, 110));
+    expect(live.liveRs).toBeLessThan(100 - 40);
     const done = tickBook(book, cfg, [], 125, '2026-11-02', 12 * 60, 'CRUDEOILM');
     expect(done.side).toBe('flat');
     expect(done.reason).toBe('tp');
-    expect(done.closedRs).toBe(200);
-    expect(done.fund).toBe(14_200);
+    expect(done.closedRs).toBe(mcx(100, 125));
+    expect(done.fund).toBe(Math.round((14_000 + mcx(100, 125)) * 10) / 10);
     expect(done.fills[0].sl).toBe(80);
     expect(done.fills[0].tp).toBe(125);
   });
 
-  it('shows a scratch as a closed loss so the strategy can be judged', () => {
+  it('shows a stop as a closed loss, checking the stop before any scratch', () => {
     const cfg = LIVE_PAPER_BOOKS[0];
     const book = emptyBook(cfg);
     book.side = 'long';
@@ -59,9 +68,9 @@ describe('Live paper desk', () => {
     book.scratch = 90;
     book.status = 'open';
     const done = tickBook(book, cfg, [], 80, '2026-11-02', 12 * 60, 'CRUDEOILM');
-    expect(done.reason).toBe('scratch');
+    expect(done.reason).toBe('sl');
     expect(done.fills[0].exit).toBe(80);
-    expect(done.closedRs).toBe(-250);
+    expect(done.closedRs).toBe(mcx(100, 80));
     expect(done.side).toBe('flat');
   });
 
@@ -76,19 +85,13 @@ describe('Live paper desk', () => {
     book.status = 'open';
     book.optionType = 'PE';
     const live = tickBook(book, cfg, [], 160, '2026-11-02', 12 * 60, 'CRUDEOILM26NOV5300PE');
-    expect(live.liveRs).toBe(50);
+    expect(live.liveRs).toBe(mcx(150, 160));
     const done = tickBook(book, cfg, [], 175, '2026-11-02', 12 * 60, 'CRUDEOILM26NOV5300PE');
     expect(done.reason).toBe('tp');
-    expect(done.closedRs).toBe(200);
+    expect(done.closedRs).toBe(mcx(150, 175));
   });
 
-  it('binds a cheap CE fill onto premium SL/TP', () => {
-    const cfg = LIVE_PAPER_BOOKS[0];
-    const book = emptyBook(cfg);
-    book.side = 'long';
-    book.entry = 5400;
-    book.status = 'open';
-    const bound = bindOptionFill(book, cfg, 150, {
+  const crudePick = () => ({
       instrument: {
         instrumentToken: 9,
         exchangeToken: 0,
@@ -112,11 +115,91 @@ describe('Live paper desk', () => {
       openCostRs: 1500,
       fitsBudget: true,
     });
+
+  it('binds a cheap CE fill onto premium SL/TP: target 2× stop, no separate scratch', () => {
+    const cfg = LIVE_PAPER_BOOKS[0];
+    const book = emptyBook(cfg);
+    book.side = 'long';
+    book.entry = 5400;
+    book.status = 'open';
+    const bound = bindOptionFill(book, cfg, 150, crudePick() as never);
     expect(bound.entry).toBe(150);
     expect(bound.sl).toBe(130);
-    expect(bound.tp).toBe(175);
+    expect(bound.tp).toBe(190);
+    expect(bound.scratch).toBe(bound.sl);
     expect(bound.optionType).toBe('CE');
     expect(bound.instrument).toBe('CRUDEOILM26NOV5500CE');
+  });
+
+  it('widens the stop to 1.5× the option 5-min range and keeps target at 2× stop', () => {
+    const cfg = LIVE_PAPER_BOOKS[0];
+    const bars = [10, 30, 20, 20, 25].map((r, k) => ({ day: '2026-11-04', min: 600 + 5 * k, open: 100, high: 100 + r, low: 100, close: 100 }));
+    expect(optionRangePts(bars)).toBe(20);
+    expect(optionRangePts(bars.slice(0, 2))).toBeNull();
+    expect(optionStopPts(cfg, 20)).toEqual({ sl: 30, tp: 60 });
+    expect(optionStopPts(cfg, 4)).toEqual({ sl: cfg.sl, tp: Math.max(cfg.tp, 2 * cfg.sl) });
+    const book = emptyBook(cfg);
+    book.side = 'long';
+    book.status = 'open';
+    const bound = bindOptionFill(book, cfg, 150, crudePick() as never, 20);
+    expect(bound.sl).toBe(120);
+    expect(bound.tp).toBe(210);
+  });
+
+  it('counts a losing close, starts a 60-min cooldown and does not re-open on the same tick', () => {
+    const cfg = LIVE_PAPER_BOOKS[0];
+    const book = emptyBook(cfg);
+    book.side = 'long';
+    book.entry = 100;
+    book.sl = 80;
+    book.tp = 125;
+    book.scratch = 80;
+    book.status = 'open';
+    book.lastBarMin = 11 * 60;
+    const bars = [
+      { day: '2026-11-04', min: 11 * 60 + 5, open: 5400, high: 5420, low: 5395, close: 5418 },
+      { day: '2026-11-04', min: 11 * 60 + 10, open: 5418, high: 5440, low: 5415, close: 5438 },
+    ];
+    const done = tickBook({ ...book, pendingDir: 0 }, cfg, bars, 79, '2026-11-04', 11 * 60 + 20, 'CRUDEOILM');
+    expect(done.side).toBe('flat');
+    expect(done.lossesToday).toBe(1);
+    expect(done.cooldownUntil).toBe(11 * 60 + 20 + LIVE_PAPER_COOLDOWN_MIN);
+    expect(done.lastBarMin).toBe(11 * 60 + 10);
+    expect(done.fills).toHaveLength(1);
+  });
+
+  it('blocks a confirmed entry during cooldown and after two losses', () => {
+    const cfg = LIVE_PAPER_BOOKS[0];
+    const bars = [{ day: '2026-11-04', min: 12 * 60, open: 5400, high: 5420, low: 5395, close: 5418 }];
+    const pending = () => {
+      const b = emptyBook(cfg);
+      b.pendingDir = 1;
+      b.pendingSig = 5410;
+      b.pendingMode = 'pdhl';
+      b.lastBarMin = 11 * 60 + 55;
+      return b;
+    };
+    const cooling = tickBook({ ...pending(), cooldownUntil: 12 * 60 + 30 }, cfg, bars, 5418, '2026-11-04', 12 * 60 + 6, 'CRUDEOILM');
+    expect(cooling.side).toBe('flat');
+    expect(cooling.reason).toBe('cooldown after loss');
+    const stopped = tickBook({ ...pending(), lossesToday: 2 }, cfg, bars, 5418, '2026-11-04', 12 * 60 + 6, 'CRUDEOILM');
+    expect(stopped.side).toBe('flat');
+    expect(stopped.reason).toMatch(/day stop/);
+    const free = tickBook({ ...pending(), cooldownUntil: 11 * 60 }, cfg, bars, 5418, '2026-11-04', 12 * 60 + 6, 'CRUDEOILM');
+    expect(free.side).toBe('long');
+  });
+
+  it('fires pdhl only on the bar that crosses the previous-day high', () => {
+    const cfg = { ...LIVE_PAPER_BOOKS[0], pdMax: 1e9 };
+    const bars = [
+      { day: '2026-11-03', min: 600, open: 100, high: 110, low: 95, close: 105 },
+      { day: '2026-11-04', min: 600, open: 106, high: 109, low: 105, close: 108 },
+      { day: '2026-11-04', min: 605, open: 108, high: 113, low: 107, close: 112 },
+      { day: '2026-11-04', min: 610, open: 112, high: 116, low: 111, close: 115 },
+    ];
+    expect(bookSignal('pdhl', bars, 2, cfg)).toBe(1);
+    expect(bookSignal('pdhl', bars, 3, cfg)).toBe(0);
+    expect(bookSignal('pdhl', bars, 3, { ...cfg, freshCross: false })).toBe(1);
   });
   it('names the bought contract like SENSEX 77000 CE and keeps it on the closed fill', () => {
     const cfg = LIVE_PAPER_BOOKS.find((b) => b.id === 'sensex')!;
@@ -162,7 +245,8 @@ describe('Live paper desk', () => {
     ];
     const stopped = tickBook(book, cfg, indexBars, 152, '2026-11-03', 12 * 60 + 20, 'SENSEX', optionBars);
     expect(stopped.side).toBe('flat');
-    expect(stopped.fills[0].reason).toBe('scratch');
+    expect(stopped.fills[0].reason).toBe('sl');
+    expect(stopped.fills[0].exit).toBe(156.55);
 
     const target = [{ day: '2026-11-03', min: 12 * 60 + 5, open: 172, high: 206, low: 171, close: 205 }];
     const won = tickBook(book, cfg, indexBars, 205, '2026-11-03', 12 * 60 + 20, 'SENSEX', target);
@@ -184,7 +268,7 @@ describe('Live paper desk', () => {
     };
     const gapDown = [{ day: '2026-11-03', min: 12 * 60 + 5, open: 140, high: 150, low: 138, close: 145 }];
     const gapped = tickBook(mk(), cfg, [], 145, '2026-11-03', 12 * 60 + 20, 'SENSEX', gapDown);
-    expect(gapped.fills[0].reason).toBe('scratch');
+    expect(gapped.fills[0].reason).toBe('sl');
     expect(gapped.fills[0].exit).toBe(140);
 
     const gapUp = [{ day: '2026-11-03', min: 12 * 60 + 5, open: 230, high: 240, low: 229, close: 235 }];

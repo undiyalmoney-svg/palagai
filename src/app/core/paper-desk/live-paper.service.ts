@@ -7,8 +7,7 @@ import { parseKiteInstrumentsCsv } from '../utils/csv.util';
 import { CheapOtmPick, pickCheapOtm } from '../utils/pick-cheap-otm.util';
 import { LiveAssumeBar, LiveAssumeBookCfg } from './live-assume.engine';
 import { liveBuyPrice, lotCostRs, neededLotQuote, replayBudgetSkips } from './live-fill.util';
-import { OPTION_14K_DAY_LOSS_RS } from './option-14k-plan';
-import { venueForBook } from './option-charges.util';
+import { optionRoundTripCharges, venueForBook } from './option-charges.util';
 import { PaperLedgerService } from './paper-ledger.service';
 import { SkippedSignal } from './paper-analytics.models';
 import { buildSignalCard } from './signal-card.util';
@@ -17,9 +16,12 @@ import {
   LivePaperBookState,
   LivePaperSession,
   bindOptionFill,
+  completedBars,
   emptySession,
   istDay,
   istMinutes,
+  optionRangePts,
+  optionStopPts,
   summarizePaper,
   tickBook,
 } from './live-paper.engine';
@@ -167,7 +169,7 @@ export class LivePaperService {
         const inst =
           cfg.id === 'crude' ? crude : cfg.id === 'nifty' ? nifty : cfg.id === 'bank' ? bank : sensex;
         const spot = lastPrice(quotes, cfg.id, inst?.tradingSymbol || '') ?? 0;
-        const pair = cheapPair(chain, cfg.id as 'crude' | 'nifty' | 'bank' | 'sensex', spot, asOf);
+        const pair = cheapPair(chain, cfg.id as 'crude' | 'nifty' | 'bank' | 'sensex', spot, nextExpiryAsOf(asOf));
         cheapByBook.set(cfg.id, pair);
         for (const pick of [pair.ce, pair.pe]) {
           if (pick.instrument.instrumentToken > 0) {
@@ -228,10 +230,10 @@ export class LivePaperService {
           prev.optionSymbol || inst?.tradingSymbol || cfg.label,
           optionBars,
         );
-        if (justOpened(prev, next)) {
+        if (needsOption(next)) {
           const spot = underLast ?? next.last ?? next.entry ?? 0;
           const pair = cheapByBook.get(cfg.id);
-          next = this.bindCheap(next, cfg, chain, spot, quotes, nowMin, pair);
+          next = await this.bindCheap(next, cfg, chain, spot, quotes, nowMin, auth, pair);
           if (next.side !== 'flat' && next.optionToken) {
             next = { ...next, lastBarMin: nowMin - (nowMin % 5) };
           }
@@ -278,15 +280,31 @@ export class LivePaperService {
     }
   }
 
-  private bindCheap(
+  private async optionRange(token: number, day: string, nowMin: number, auth: string): Promise<number | null> {
+    if (!(token > 0)) return null;
+    const hist = (await firstValueFrom(
+      this.kiteApi.getHistoricalData({
+        instrumentToken: String(token),
+        interval: '5minute',
+        from: shiftDay(day, -3),
+        to: day,
+        authorization: auth,
+      }),
+    ).catch(() => null)) as { data?: { candles?: unknown[][] } } | null;
+    const bars = (hist?.data?.candles || []).map(kiteBar).filter((b) => b.day);
+    return optionRangePts(completedBars(bars, day, nowMin));
+  }
+
+  private async bindCheap(
     book: LivePaperBookState,
     cfg: LiveAssumeBookCfg,
     chain: Instrument[],
     spot: number,
     quotes: Record<string, KiteQuote>,
     nowMin: number,
+    auth: string,
     pair?: { ce: CheapOtmPick; pe: CheapOtmPick },
-  ): LivePaperBookState {
+  ): Promise<LivePaperBookState> {
     const id = cfg.id as 'crude' | 'nifty' | 'bank' | 'sensex';
     const pick =
       (book.side === 'long' ? pair?.ce : pair?.pe) ||
@@ -295,7 +313,7 @@ export class LivePaperService {
         book: id,
         direction: book.side === 'long' ? 'BUY' : 'SELL',
         spot,
-        asOf: new Date(),
+        asOf: nextExpiryAsOf(new Date()),
         premiumBudgetRs: 10_000_000,
       });
     const listed = pick.instrument.instrumentToken > 0;
@@ -304,6 +322,19 @@ export class LivePaperService {
     const { bid, ask } = bestBidAsk(q);
     const liveLast = listed ? lastByKey(quotes, key) : null;
     const fill = liveBuyPrice(ask, liveLast);
+    const flat = (reason: string, skip: SkippedSignal): LivePaperBookState => ({
+      ...book,
+      side: 'flat',
+      entry: null,
+      sl: null,
+      tp: null,
+      scratch: null,
+      status: 'watching',
+      reason,
+      livePts: 0,
+      liveRs: 0,
+      skips: [...(book.skips || []), skip].slice(-100),
+    });
     if (!listed || fill.price == null) {
       const skip: SkippedSignal = {
         at: new Date().toISOString(),
@@ -319,26 +350,36 @@ export class LivePaperService {
         budgetRs: 0,
         reason: listed ? 'no-live-quote' : 'no-listed-contract',
       };
-      return {
-        ...book,
-        side: 'flat',
-        entry: null,
-        sl: null,
-        tp: null,
-        scratch: null,
-        status: 'watching',
-        reason: listed ? 'skipped: no live quote' : 'skipped: no listed contract',
-        livePts: 0,
-        liveRs: 0,
-        skips: [...(book.skips || []), skip].slice(-100),
-      };
+      return flat(listed ? 'skipped: no live quote' : 'skipped: no listed contract', skip);
     }
     const prem = fill.price;
     const cost = lotCostRs(prem, pick.lotSize);
+    const range = await this.optionRange(pick.instrument.instrumentToken, istDay(), nowMin, auth);
+    const stop = optionStopPts(cfg, range);
+    const stopPts = Math.min(stop.sl, prem - 0.05);
+    const riskRs =
+      Math.round((stopPts * pick.lotSize + optionRoundTripCharges(prem, prem - stopPts, pick.lotSize, venueForBook(cfg.id))) * 10) / 10;
+    // Worst-case day = two stops: take a new trade only while today's loss is within one stop.
+    if (book.closedRs < 0 && -book.closedRs > riskRs) {
+      return flat(`day stop: today −₹${Math.abs(book.closedRs)} > one stop ₹${riskRs}`, {
+        at: new Date().toISOString(),
+        day: istDay(),
+        book: cfg.id,
+        side: pick.side,
+        mode: book.mode,
+        structure: book.structure,
+        contract: pick.instrument.tradingSymbol,
+        premium: prem,
+        lot: pick.lotSize,
+        costRs: riskRs,
+        budgetRs: 0,
+        reason: 'day-stop',
+      });
+    }
     pick.lastPrice = prem;
     pick.openCostRs = cost;
     pick.fitsBudget = true;
-    const bound = bindOptionFill(book, cfg, prem, pick);
+    const bound = bindOptionFill(book, cfg, prem, pick, range);
     const mid = bid != null && ask != null ? (bid + ask) / 2 : null;
     const spreadPct = mid != null && mid > 0 ? (ask! - bid!) / mid : null;
     const signal =
@@ -360,7 +401,7 @@ export class LivePaperService {
             entryStartMin: cfg.entryS,
             flatMin: cfg.flat,
             dayClosedRs: book.closedRs,
-            dayLossCapRs: OPTION_14K_DAY_LOSS_RS,
+            dayLossCapRs: 2 * riskRs,
           })
         : null;
     return { ...bound, entryBid: bid, entryAsk: ask, entryAt: new Date().toISOString(), signal };
@@ -368,6 +409,11 @@ export class LivePaperService {
 }
 
 const NO_BUDGET_CAP = 10_000_000;
+
+/** Picking "after tomorrow" means a contract with 1 day or less left is never bought; the next expiry is. */
+export function nextExpiryAsOf(asOf: Date): Date {
+  return new Date(asOf.getTime() + 24 * 60 * 60 * 1000);
+}
 
 function cheapPair(
   chain: Instrument[],
@@ -463,6 +509,8 @@ function readStored(): LivePaperSession | null {
         neededPe: b.neededPe || '',
         neededLot: b.neededLot || 0,
         neededAtAsk: !!b.neededAtAsk,
+        lossesToday: b.lossesToday || 0,
+        cooldownUntil: b.cooldownUntil ?? -1,
       })),
     };
   } catch {
@@ -568,8 +616,9 @@ function kiteBar(row: unknown[]): LiveAssumeBar {
   };
 }
 
-function justOpened(prev: LivePaperBookState, next: LivePaperBookState): boolean {
-  return prev.side === 'flat' && next.side !== 'flat' && !next.optionSymbol;
+/** Any open book without a bound option gets one (or goes flat) — it must never run on futures/index prices. */
+export function needsOption(next: LivePaperBookState): boolean {
+  return next.side !== 'flat' && !next.optionSymbol;
 }
 
 function optionKey(book: Pick<LivePaperBookState, 'optionSymbol' | 'id'>): string {
