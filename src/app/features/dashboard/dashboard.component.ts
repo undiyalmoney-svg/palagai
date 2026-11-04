@@ -71,7 +71,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   protected readonly clockLabel = signal('');
   protected readonly pageTitle = signal('Palagai');
   protected readonly pageSubtitle = signal(
-    'Token, Crude Best, Crude Oil, Paper 14k, and Test.',
+    'Token, Crude Best, Crude Oil, Paper test, and Test.',
   );
   protected readonly sidebarOpen = signal(true);
   protected readonly profileOpen = signal(false);
@@ -101,7 +101,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
       testId: 'crude',
     },
     {
-      label: 'Paper 14k',
+      label: 'Paper test',
       shortLabel: 'Paper',
       route: '/dashboard/paper-14k',
       icon: 'candles',
@@ -120,8 +120,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   private readonly titles: Record<string, { title: string; subtitle: string }> = {
     '/dashboard/paper-14k': {
-      title: 'Paper 14k',
-      subtitle: 'Live paper. ₹14,000 each. Start watches Kite. No order is placed.',
+      title: 'Paper test',
+      subtitle: 'Live paper. 1 lot each at the live ask. Start watches Kite. No order is placed.',
     },
     '/dashboard/order-test': {
       title: 'Test',
@@ -155,7 +155,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   protected readonly hideFunds = computed(() => this.authService.isPublic());
 
-  /** Bottom tab bar on phone — Token, Crude Best, Crude Oil, Paper 14k, Test. */
+  /** Bottom tab bar on phone — Token, Crude Best, Crude Oil, Paper test, Test. */
   protected readonly mobileTabItems = computed(() => this.navItems());
 
   protected readonly username = computed(() => {
@@ -349,7 +349,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
           ? raw
           : 'Could not open that desk.';
     if (/paper-14k/i.test(`${event.url} ${msg}`)) {
-      return 'Could not open Paper 14k. Retry, or hard-refresh the tab.';
+      return 'Could not open Paper test. Retry, or hard-refresh the tab.';
     }
     if (/crude-best/i.test(`${event.url} ${msg}`)) {
       return 'Could not open Crude Best. Retry, or hard-refresh the tab.';

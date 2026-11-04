@@ -7,7 +7,7 @@
   </div>
 
 
-  <nav class="mp-views" aria-label="Paper 14k views" data-testid="paper-views">
+  <nav class="mp-views" aria-label="Paper test views" data-testid="paper-views">
     @for (v of views; track v.id) {
       <button
         type="button"
@@ -30,7 +30,7 @@
           <h2>Capital plan</h2>
           <p class="mp-sub">
             How to split one total across Kite equity and commodity for the four CE/PE books. Sizing guide only — the
-            paper books below still run ₹14,000 each. Premium ≤ 25% and day loss ≤ 3% per pocket.
+            paper books below run 1 lot each. Premium ≤ 25% and day loss ≤ 3% per pocket.
           </p>
         </div>
         <span class="mp-badge" [attr.data-tone]="plan().mode === 'all-open' ? 'up' : 'warn'" data-testid="capital-plan-mode">
@@ -159,7 +159,7 @@
           >
             ₹{{ paper.session().liveRs | number : '1.0-0' }}
           </span>
-          <span class="mp-stat-hint">open books after ₹50</span>
+          <span class="mp-stat-hint">open books after exact charges</span>
         </div>
         <div class="mp-stat">
           <span class="mp-stat-label">Closed</span>
@@ -315,7 +315,7 @@
       <div class="mp-card-head">
         <div>
           <h2>Closed paper fills</h2>
-          <p class="mp-sub">SL, target, scratch, or flatten. After ₹50 charges.</p>
+          <p class="mp-sub">SL, target, or flatten. After exact Zerodha charges.</p>
         </div>
       </div>
       @if (!fills().length) {

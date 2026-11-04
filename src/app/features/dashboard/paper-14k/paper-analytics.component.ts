@@ -186,7 +186,7 @@ export class PaperAnalyticsComponent {
     const paperNet = rs.reduce((s, r) => s + r.t.paperNetRs, 0);
     const realNet = rs.reduce((s, r) => s + r.real.netRs, 0);
     const realGross = rs.reduce((s, r) => s + r.real.grossRs, 0);
-    const paperCharges = n * 50;
+    const paperCharges = round2(rs.reduce((s, r) => s + (r.t.qty > 0 ? (r.t.exit - r.t.entry) * r.t.qty - r.t.paperNetRs : 50), 0));
     return {
       n,
       paperNet: round2(paperNet),

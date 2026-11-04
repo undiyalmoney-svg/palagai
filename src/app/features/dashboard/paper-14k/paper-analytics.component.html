@@ -113,6 +113,10 @@
                 {{ sk.contract }}: ₹{{ sk.premium }} × {{ sk.lot }} = <b class="mp-down">₹{{ sk.costRs | number : '1.0-0' }}</b>
                 against a ₹{{ sk.budgetRs | number : '1.0-0' }} budget (old cap — new ticks take this trade).
               </p>
+            } @else if (sk.reason === 'day-stop') {
+              <p class="pa-note">
+                {{ sk.contract }}: one more stop (₹{{ sk.costRs | number : '1.0-0' }}) would take today past two stops; stood down.
+              </p>
             } @else if (sk.reason === 'no-live-quote') {
               <p class="pa-note">{{ sk.contract }} had no live ask or last; no trade was invented.</p>
             } @else {
@@ -335,7 +339,7 @@
           <span class="pa-badge warn">unverified simulation</span>
         </div>
         <p class="pa-note strong">
-          "Paper" fills at the last traded price and exact stop and target levels with a flat ₹50 charge. "Realistic" buys at the ask, sells stops at the
+          "Paper" fills at the last traded price and exact stop and target levels after the exact Zerodha charges (fills before 4 Nov used a flat ₹50). "Realistic" buys at the ask, sells stops at the
           bid, gives targets one tick back, adds one tick of slippage per leg and uses the exact charge schedule. Neither number is a broker-verified result.
         </p>
         <div class="pa-kpis">
@@ -345,7 +349,7 @@
           <div class="pa-kpi"><span>Theoretical minus executable</span><b [class]="cost().difference > 0 ? 'mp-down' : ''" data-testid="cmp-diff">{{ inr(cost().difference) }}</b><small>profit the paper desk shows that live would not keep</small></div>
         </div>
         <ul class="pa-reasons">
-          <li>Paper charges assumed: {{ inr(-cost().paperCharges) }} ({{ cost().n }} trades × ₹50). Realistic charges: {{ inr(-cost().charges) }}.</li>
+          <li>Paper charges assumed: {{ inr(-cost().paperCharges) }} ({{ cost().n }} trades). Realistic charges: {{ inr(-cost().charges) }}.</li>
           <li>Gross move before costs on realistic fills: {{ inr(cost().realGross) }}.</li>
           <li>{{ cost().quoted }} trades used an observed bid/ask. {{ cost().modelled }} used a modelled 2% spread because no quote was recorded: those are unverified.</li>
         </ul>
@@ -413,7 +417,7 @@
         </div>
         <p class="pa-note">
           Offline study of CE/PE buying rules on 3 years of index data. Option prices are Black-Scholes models with scenario spreads, not recorded
-          quotes. It does not test the exact Paper 14k rules. Source: {{ researchSource }}.
+          quotes. It does not test the exact Paper test rules. Source: {{ researchSource }}.
         </p>
         <ul class="pa-reasons">
           <li>Train {{ researchSplit.train }}</li>

@@ -111,11 +111,11 @@ describe('DashboardComponent navigation', () => {
     expect(router.url).toBe('/dashboard/crude-best');
   });
 
-  it('lists Paper 14k on its own tab', async () => {
+  it('lists Paper test on its own tab', async () => {
     const el = fixture.nativeElement as HTMLElement;
     const link = el.querySelector('[data-testid="nav-paper-14k"]') as HTMLAnchorElement | null;
     expect(link).toBeTruthy();
-    expect(link?.textContent).toMatch(/Paper 14k/i);
+    expect(link?.textContent).toMatch(/Paper test/i);
     fixture.componentInstance['go']('/dashboard/paper-14k');
     await fixture.whenStable();
     expect(router.url).toBe('/dashboard/paper-14k');
