@@ -114,8 +114,12 @@ async function run() {
       let next = E.tickBook(book, cfg, b5.filter((b: any) => b.day < DAY || b.min + 5 <= now), lastTick, DAY, now, book.optionSymbol || id, optBars);
       const needs = NEW ? next.side !== 'flat' && !next.optionSymbol : book.side === 'flat' && next.side !== 'flat' && !next.optionSymbol;
       if (needs) {
-        const asOf = new Date(Date.parse(`${DAY}T00:00:00+05:30`) + now * 60_000 + (NEW ? 86_400_000 : 0));
-        const pick = pickCheapOtm({ instruments: chain, book: id, direction: next.side === 'long' ? 'BUY' : 'SELL', spot: underLast ?? next.entry!, asOf, premiumBudgetRs: 1e7 });
+        const skipMs = NEW && cfg.expiryAfterTomorrow !== false ? 86_400_000 : 0;
+        const asOf = new Date(Date.parse(`${DAY}T00:00:00+05:30`) + now * 60_000 + skipMs);
+        const pick = pickCheapOtm({
+          instruments: chain, book: id, direction: next.side === 'long' ? 'BUY' : 'SELL', spot: underLast ?? next.entry!, asOf,
+          premiumBudgetRs: 1e7, otmPts: cfg.atm ? 0 : undefined,
+        });
         const tok = pick.instrument.instrumentToken;
         if (!opt5[tok]) {
           opt5[tok] = (await candles(tok, '5minute', shift(DAY, -3), DAY)).map(bar);
@@ -137,7 +141,7 @@ async function run() {
             const stop = E.optionStopPts(cfg, range);
             const sl = Math.min(stop.sl, prem - 0.05);
             const risk = sl * pick.lotSize + optionRoundTripCharges(prem, prem - sl, pick.lotSize, venueForBook(id));
-            if (next.closedRs < 0 && -next.closedRs > risk) blocked = true;
+            if (cfg.dayStops !== false && next.closedRs < 0 && -next.closedRs > risk) blocked = true;
             if (process.env.MAXRISK && risk > Number(process.env.MAXRISK)) blocked = true;
           }
           if (blocked) next = flat('day-stop');
