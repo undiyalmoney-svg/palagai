@@ -45,6 +45,13 @@ export class LivePaperService {
     if (typeof localStorage === 'undefined') return;
     if (this.session().running) {
       this.loop();
+      void this.tick();
+    }
+    if (typeof document !== 'undefined') {
+      // Phones and background tabs pause timers; check Kite as soon as the tab is visible again.
+      document.addEventListener('visibilitychange', () => {
+        if (!document.hidden && this.session().running) void this.tick();
+      });
     }
   }
 

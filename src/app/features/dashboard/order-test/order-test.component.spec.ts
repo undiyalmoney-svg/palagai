@@ -49,18 +49,11 @@ describe('OrderTestComponent', () => {
     expect(text).toMatch(/RELIANCE/);
   });
 
-  it('shows the ₹50k capital plan with the equity and commodity split', () => {
+  it('leads with a Now card and never claims a guaranteed profit', () => {
     const el = fixture.nativeElement as HTMLElement;
-    expect(el.querySelector('[data-testid="capital-plan-card"]')).toBeTruthy();
-    expect(el.querySelector('[data-testid="capital-plan-equity"]')?.textContent).toMatch(/40,000/);
-    expect(el.querySelector('[data-testid="capital-plan-commodity"]')?.textContent).toMatch(/10,000/);
-    expect(el.querySelector('[data-testid="capital-plan-mode"]')?.textContent).toMatch(/all four together/);
-    expect(el.querySelector('[data-testid="capital-plan-worst"]')?.textContent).toMatch(/1,145/);
-
-    (el.querySelector('[data-testid="capital-plan-14000"]') as HTMLButtonElement).click();
-    fixture.detectChanges();
-    expect(el.querySelector('[data-testid="capital-plan-commodity"]')?.textContent).toMatch(/₹0/);
-    expect(el.querySelector('[data-testid="capital-plan-mode"]')?.textContent).toMatch(/one book at a time/);
-    expect(el.querySelector('[data-testid="capital-plan-note"]')?.textContent).toMatch(/guaranteed/);
+    expect(el.querySelector('[data-testid="paper-now"]')).toBeTruthy();
+    expect(el.querySelector('[data-testid="paper-now-badge"]')?.textContent).toMatch(/not watching/);
+    expect(el.querySelector('[data-testid="capital-plan-card"]')).toBeNull();
+    expect(el.textContent).toMatch(/Not a guaranteed profit/);
   });
 });

@@ -233,7 +233,7 @@ describe('Paper14kComponent views', () => {
     expect(needed.textContent).toContain('17,417');
     expect(needed.textContent).toContain('12,300');
     expect(needed.textContent).toContain('live ask');
-    expect((f.nativeElement.querySelector('[data-testid="paper-14k-banner"]') as HTMLElement).textContent).toMatch(
+    expect((f.nativeElement.querySelector('[data-testid="paper-now"]') as HTMLElement).textContent).toMatch(
       /Not a guaranteed profit/,
     );
     expect(paper.session().liveOrders).toBe(false);

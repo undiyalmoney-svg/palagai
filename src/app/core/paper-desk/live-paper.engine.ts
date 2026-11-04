@@ -7,6 +7,7 @@ import {
   LiveAssumeBar,
   LiveAssumeBookCfg,
   bookSignal,
+  momentumGauge,
   morningStructure,
 } from './live-assume.engine';
 import { OPTION_14K_BOOKS, OPTION_14K_LIST, Option14kBookId, option14kToPaperCfg } from './option-14k-plan';
@@ -55,6 +56,8 @@ export const LIVE_PAPER_BOOKS: LiveAssumeBookCfg[] = OPTION_14K_LIST.map((plan) 
 export const LIVE_PAPER_CAPITAL = LIVE_ASSUME_CAPITAL;
 export const LIVE_PAPER_CHARGE = LIVE_ASSUME_CHARGE;
 export const LIVE_PAPER_COOLDOWN_MIN = 60;
+/** A signal bar older than this (e.g. the tab slept) is not traded on catch-up. */
+export const LIVE_PAPER_MAX_SIGNAL_AGE_MIN = 10;
 export const LIVE_PAPER_MAX_LOSSES = 2;
 /** Stop = this × the option's median 5-min high−low; target = LIVE_PAPER_TARGET_R × stop. */
 export const LIVE_PAPER_STOP_RANGE_MULT = 1.5;
@@ -168,6 +171,8 @@ export interface LivePaperBookState {
   entryMin?: number | null;
   /** IST minute of the last momentum signal bar (signals must be minGapBars apart). */
   lastSignalMin?: number;
+  /** Momentum gauge on the latest completed bar: 30-min move vs the move needed (index points). */
+  gauge?: { move: number; need: number; barMin: number } | null;
 }
 
 export interface LivePaperSession {
@@ -316,6 +321,10 @@ export function emptySession(day: string, asOf = new Date().toISOString()): Live
     kiteFunds: null,
     kiteError: null,
   });
+}
+
+export function hhmm(min: number): string {
+  return `${Math.floor(min / 60)}:${String(min % 60).padStart(2, '0')}`;
 }
 
 export function istDay(d = new Date()): string {
@@ -541,6 +550,10 @@ export function tickBook(
     instrument: instrument || book.instrument,
   };
   const done = completedBars(bars, day, nowMin);
+  if (cfg.strategy === 'momentum' && done.length) {
+    const g = done[done.length - 1].day === day ? momentumGauge(done, done.length - 1) : null;
+    next.gauge = g ? { move: Math.round(g.move * 10) / 10, need: Math.round(g.need * 10) / 10, barMin: done[done.length - 1].min } : null;
+  }
   if (nowMin >= cfg.orE) {
     next.structure = morningStructure(done, day, cfg.orS, cfg.orE, cfg.quietW);
   }
@@ -616,6 +629,10 @@ export function tickBook(
         next.lastSignalMin = bar.min;
       }
       if (cfg.noConfirm) {
+        if (nowMin - (bar.min + 5) > LIVE_PAPER_MAX_SIGNAL_AGE_MIN) {
+          next.reason = `missed ${hit.dir === 1 ? 'up' : 'down'} signal at ${hhmm(bar.min + 5)} (desk was not checking)`;
+          continue;
+        }
         next.mode = hit.mode;
         openAt(next, cfg, hit.dir, bar.close, hit.mode, bar.min);
         if (next.side !== 'flat') break;

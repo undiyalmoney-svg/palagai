@@ -335,6 +335,10 @@ describe('Live paper desk', () => {
     expect(opened.side).toBe('long');
     expect(opened.mode).toBe('momentum');
     expect(opened.entryMin).toBe(9 * 60 + 50);
+    expect(opened.gauge?.move).toBeGreaterThan(opened.gauge?.need ?? 0);
+    const late = tickBook(book, cfg, bars, 24020, '2026-11-04', 10 * 60 + 10, 'NIFTY 50');
+    expect(late.side).toBe('flat');
+    expect(late.reason).toMatch(/missed up signal at 9:50/);
     const bound = bindOptionFill(opened, cfg, 100, { ...crudePick(), lotSize: 65 } as never);
     expect(bound.sl).toBe(60);
     expect(bound.tp).toBe(200);
