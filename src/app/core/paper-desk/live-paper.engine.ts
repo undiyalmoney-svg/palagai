@@ -16,9 +16,9 @@ import { optionRoundTripCharges, venueForBook } from './option-charges.util';
 import { SignalCard, SkippedSignal } from './paper-analytics.models';
 
 /**
- * Pre-registered in OPTIONS-BUYING-RESEARCH.md (2026-11-02) and not tuned since: the only entry that beat random
- * entries over 3 years. Nifty only: Sensex real premiums ran far below the model (MOMENTUM-CHECK-2026-11-04.md),
- * and Bank Nifty and Crude had no tested edge, so those three watch.
+ * Same pre-registered MOMENTUM entry on every book (OPTIONS-BUYING-RESEARCH.md, 2026-11-02). Not tuned since.
+ * Nifty and Sensex beat random entries on 3 years of modelled premiums. Bank Nifty was weaker (CI includes zero).
+ * Crude Mini has only weeks of option history — this is a paper test of the same rule, not a claimed edge.
  */
 export const PAPER_MOMENTUM: Partial<LiveAssumeBookCfg> = {
   strategy: 'momentum',
@@ -36,17 +36,15 @@ export const PAPER_MOMENTUM: Partial<LiveAssumeBookCfg> = {
   expiryAfterTomorrow: false,
 };
 export const PAPER_TEST_HONEST =
-  'Nifty 50: momentum — a 30-min move beyond 1.5× the normal bar range buys the ATM CE (up) or PE (down), ' +
-  'nearest expiry that is not today; stop 40% of premium, target 100%, out after 2 hours or 15:15; at most 3 trades a day. ' +
-  'Sensex, Bank Nifty and Crude Mini watch only: no edge held up on real premiums. Exact Zerodha charges. Momentum is the one ' +
-  'entry that beat random entries over 3 years of modelled premiums; it is not validated on live fills, loses on about 3 days ' +
-  'in 10, one stop is about ₹2,500–4,000 a lot, and it is not a guaranteed profit.';
-export const PAPER_WATCH: Partial<LiveAssumeBookCfg> = { strategy: 'watch' };
+  'All four books: momentum — a 30-min move beyond 1.5× the normal bar range buys the ATM CE (up) or PE (down), ' +
+  'nearest expiry that is not today; stop 40% of premium, target 100%, out after 2 hours or flatten (15:15 index, 23:10 crude); ' +
+  'at most 3 trades a book a day. Exact Zerodha charges. This is a paper test of one rule on every name. It is not validated ' +
+  'on live fills, loses on about 3 days in 10, and is not a guaranteed profit.';
 const PAPER_STRATEGY: Record<string, Partial<LiveAssumeBookCfg>> = {
   nifty: { ...PAPER_MOMENTUM, product: 'ATM CE/PE ×65' },
-  sensex: PAPER_WATCH,
-  bank: PAPER_WATCH,
-  crude: PAPER_WATCH,
+  sensex: { ...PAPER_MOMENTUM, product: 'ATM CE/PE ×20' },
+  bank: { ...PAPER_MOMENTUM, product: 'ATM CE/PE ×30' },
+  crude: { ...PAPER_MOMENTUM, product: 'ATM CE/PE ×10', entryS: 9 * 60 + 30 },
 };
 
 export const LIVE_PAPER_BOOKS: LiveAssumeBookCfg[] = OPTION_14K_LIST.map((plan) => ({
