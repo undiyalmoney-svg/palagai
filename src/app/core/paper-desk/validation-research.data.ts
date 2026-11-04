@@ -2,7 +2,7 @@
  * Static summary of the offline options-buying study (Palagai-Order-API,
  * market-recorder/research/OPTIONS-BUYING-RESEARCH.md, 2026-11-02). Figures are copied from that document.
  * They use MODELLED premiums (Black-Scholes on India VIX) with scenario spreads, not recorded option quotes,
- * so they are unverified and are NOT results of the Paper 14k rules.
+ * so they are unverified and are NOT results of the Paper test rules.
  */
 export interface ResearchBucket {
   bucket: string;
@@ -96,7 +96,7 @@ export const RESEARCH_FINDINGS: string[] = [
   'Of 30,492 modelled configurations, 70-76% lose money on the training years; the median loses ₹34-158 per trade after charges and spread.',
   '3 of 6 CE/PE buckets are positive on the unseen test window. Re-running the whole search on direction-randomised signals gives a positive median "winner" in 7 of 9 sets, so that is no better than chance.',
   'Smallest selection-adjusted p-values are 0.05 (Nifty, both directions) and 0.07 (Nifty PE) out of 9 comparisons; none survives a multiple-comparison correction.',
-  'Only candidate worth forward testing: the 6-bar range-thrust momentum entry (not the Paper 14k rules). Even then expected ₹170-280 a day with a daily standard deviation of ₹2,000-2,900.',
+  'Only candidate worth forward testing: the 6-bar range-thrust momentum entry (not the Paper test rules). Even then expected ₹170-280 a day with a daily standard deviation of ₹2,000-2,900.',
   'Expected-profit confirmation at 80% power needs roughly 775-2,300 trading days of data, far beyond what a few weeks of forward paper can show.',
 ];
 
