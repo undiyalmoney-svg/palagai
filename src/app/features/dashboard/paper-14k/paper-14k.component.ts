@@ -115,13 +115,8 @@ export class Paper14kComponent implements OnDestroy {
         ].filter(Boolean),
       };
     }
-    const gauges = books
-      .filter((b) => b.gauge)
-      .map((b) => `${b.label} ${b.gauge!.move}/${b.gauge!.need}`)
-      .join(' · ');
-    const title = gauges
-      ? `Watching all four on momentum. ${gauges} pts in 30 min (move / need). No trade right now.`
-      : 'Watching all four on momentum. Needs 30 minutes of bars (about 9:45 on the indices, 9:30 on Crude).';
+    const gauges = books.map((b) => bookWatchLine(b)).join(' · ');
+    const title = `Watching all four on momentum. ${gauges}. No trade right now.`;
     const notes = books
       .filter((b) => b.reason && /missed|skipped|max \d|day stop|cooldown/.test(b.reason))
       .map((b) => `${b.label}: ${b.reason}`)
@@ -133,6 +128,16 @@ export class Paper14kComponent implements OnDestroy {
       lines: [notes, checked, today, foot].filter(Boolean),
     };
   }
+}
+
+function bookWatchLine(b: LivePaperBookState): string {
+  const cfg = LIVE_PAPER_BOOKS.find((c) => c.id === b.id);
+  const first = cfg?.id === 'crude' ? '9:30' : '9:45';
+  if (!b.gauge) return `${b.label} waiting for bars (first signal ${first})`;
+  if (b.gauge.sessionBars < 7) {
+    return `${b.label} ${b.gauge.sessionBars}/7 bars, first signal ${first}`;
+  }
+  return `${b.label} ${b.gauge.move}/${b.gauge.need} pts`;
 }
 
 function tradeLine(b: LivePaperBookState): string {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bookSignal, momentumSignal } from './live-assume.engine';
+import { bookSignal, momentumGauge, momentumSignal } from './live-assume.engine';
 import { optionRoundTripCharges } from './option-charges.util';
 import {
   LIVE_PAPER_BOOKS,
@@ -323,6 +323,7 @@ describe('Live paper desk', () => {
     const early = [...prev, ...today.slice(0, 6)];
     early[early.length - 1] = { ...early[early.length - 1], close: 130, high: 131 };
     expect(momentumSignal(early, early.length - 1)).toBe(0);
+    expect(momentumGauge(early, early.length - 1)?.sessionBars).toBe(6);
   });
 
   it('opens momentum on the signal bar, binds 40% / 100% premium levels and exits on time', () => {

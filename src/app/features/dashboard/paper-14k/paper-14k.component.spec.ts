@@ -40,6 +40,30 @@ describe('Paper14kComponent', () => {
     expect(fixture.componentInstance['booksFund']()).toBe(56_000);
   });
 
+  it('lists all four books on the Now card, not only Crude', () => {
+    const paper = fixture.componentInstance['paper'];
+    const cur = paper.session();
+    paper.session.set({
+      ...cur,
+      running: true,
+      kiteError: null,
+      asOf: new Date().toISOString(),
+      books: cur.books.map((b) =>
+        b.id === 'crude'
+          ? { ...b, last: 5400, gauge: { move: 14, need: 126.2, barMin: 580, sessionBars: 10 } }
+          : { ...b, last: 24000, gauge: { move: 8, need: 80, barMin: 575, sessionBars: 5 } },
+      ),
+    });
+    fixture.detectChanges();
+    const title = (fixture.nativeElement.querySelector('[data-testid="paper-now-title"]') as HTMLElement).textContent || '';
+    expect(title).toMatch(/Nifty 50/);
+    expect(title).toMatch(/Sensex/);
+    expect(title).toMatch(/Bank Nifty/);
+    expect(title).toMatch(/Crude Mini/);
+    expect(title).toMatch(/5\/7 bars/);
+    expect(title).toMatch(/14\/126.2/);
+  });
+
   it('asks for Token when Start is hit without a Kite session', async () => {
     await fixture.componentInstance['startPaper']();
     fixture.detectChanges();

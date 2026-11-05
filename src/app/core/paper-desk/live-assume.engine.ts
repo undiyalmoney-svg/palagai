@@ -103,21 +103,24 @@ export interface LiveAssumeBookCfg {
 }
 
 /** Bar i's 6-bar close-to-close move and the move momentum needs (1.5 × √6 × mean range of the 20 bars before it). */
-export function momentumGauge(bars: LiveAssumeBar[], i: number): { move: number; need: number } | null {
+export function momentumGauge(
+  bars: LiveAssumeBar[],
+  i: number,
+): { move: number; need: number; sessionBars: number } | null {
   const b = bars[i];
   if (!b || i < 20) return null;
-  let pos = 0;
-  for (let k = i - 1; k >= 0 && bars[k].day === b.day; k--) pos++;
-  if (pos < 6) return null;
+  let sessionBars = 1;
+  for (let k = i - 1; k >= 0 && bars[k].day === b.day; k--) sessionBars++;
   let sum = 0;
   for (let k = i - 20; k < i; k++) sum += bars[k].high - bars[k].low;
-  return { move: b.close - bars[i - 6].close, need: 1.5 * (sum / 20) * Math.sqrt(6) };
+  const move = i >= 6 ? b.close - bars[i - 6].close : 0;
+  return { move, need: 1.5 * (sum / 20) * Math.sqrt(6), sessionBars };
 }
 
 /** 6-bar close-to-close move beyond 1.5× √6 × the mean range of the 20 bars before this one (same day, bar ≥ 6). */
 export function momentumSignal(bars: LiveAssumeBar[], i: number): number {
   const g = momentumGauge(bars, i);
-  if (!g) return 0;
+  if (!g || g.sessionBars < 7) return 0;
   if (g.move > g.need) return 1;
   if (g.move < -g.need) return -1;
   return 0;

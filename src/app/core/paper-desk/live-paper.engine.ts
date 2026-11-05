@@ -170,7 +170,7 @@ export interface LivePaperBookState {
   /** IST minute of the last momentum signal bar (signals must be minGapBars apart). */
   lastSignalMin?: number;
   /** Momentum gauge on the latest completed bar: 30-min move vs the move needed (index points). */
-  gauge?: { move: number; need: number; barMin: number } | null;
+  gauge?: { move: number; need: number; barMin: number; sessionBars: number } | null;
 }
 
 export interface LivePaperSession {
@@ -550,7 +550,14 @@ export function tickBook(
   const done = completedBars(bars, day, nowMin);
   if (cfg.strategy === 'momentum' && done.length) {
     const g = done[done.length - 1].day === day ? momentumGauge(done, done.length - 1) : null;
-    next.gauge = g ? { move: Math.round(g.move * 10) / 10, need: Math.round(g.need * 10) / 10, barMin: done[done.length - 1].min } : null;
+    next.gauge = g
+      ? {
+          move: Math.round(g.move * 10) / 10,
+          need: Math.round(g.need * 10) / 10,
+          barMin: done[done.length - 1].min,
+          sessionBars: g.sessionBars,
+        }
+      : null;
   }
   if (nowMin >= cfg.orE) {
     next.structure = morningStructure(done, day, cfg.orS, cfg.orE, cfg.quietW);
