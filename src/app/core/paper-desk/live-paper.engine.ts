@@ -38,7 +38,7 @@ const EXIT: Partial<LiveAssumeBookCfg> = {
 
 /** Cards stay so the blotter can show watches. Only Nifty momentum may open — that is the 3-year tape pick. */
 export const PAPER_DESKS: { id: string; label: string; rule: string }[] = [
-  { id: 'momentum', label: 'Momentum', rule: 'Nifty only — 6-bar thrust, same exit as the 3-year tape' },
+  { id: 'momentum', label: 'Momentum', rule: 'Nifty only — 6-bar thrust, skip a range morning, 1 trade a day' },
   { id: 'orb', label: 'Opening range', rule: 'Watch — 3-year test −₹114/trade, CI crosses zero' },
   { id: 'pdhl', label: 'Prev-day break', rule: 'Watch — test CI crosses zero; not the pick' },
   { id: 'vwap', label: 'VWAP fade', rule: 'Watch — 3-year test −₹18/trade (AVGREJECT)' },
@@ -50,7 +50,15 @@ function deskPatch(desk: string, under: string): Partial<LiveAssumeBookCfg> {
   const open = crude ? 9 * 60 : 9 * 60 + 15;
   const afterOpen = crude ? 9 * 60 + 30 : 9 * 60 + 45;
   if (desk === 'momentum' && under === 'nifty') {
-    return { strategy: 'momentum', primary: ALL('momentum'), entryS: afterOpen };
+    return {
+      strategy: 'momentum',
+      primary: ALL('momentum'),
+      orS: 9 * 60 + 15,
+      orE: 9 * 60 + 30,
+      entryS: 9 * 60 + 45,
+      maxTradesPerDay: 1,
+      skipStructures: ['range'],
+    };
   }
   if (desk === 'orb') {
     return { strategy: 'watch', primary: ALL('orb_break'), orS: open, orE: open + 15, entryS: open + 15 };
@@ -70,7 +78,8 @@ function deskPatch(desk: string, under: string): Partial<LiveAssumeBookCfg> {
 export const PAPER_MOMENTUM: Partial<LiveAssumeBookCfg> = { ...EXIT, ...deskPatch('momentum', 'nifty') };
 export const PAPER_TEST_HONEST =
   'Historical pick, not a proven live edge: Nifty 50 momentum only. ATM CE (up) or PE (down), nearest expiry that is not today, ' +
-  '1 lot at the live ask, stop 40%, target 100%, out after 2 hours or 15:15, next-bar fill, max 3 a day, exact charges. ' +
+  '1 lot at the live ask, stop 40%, target 100%, out after 2 hours or 15:15, next-bar fill, exact charges. ' +
+  'Skip a range morning (fake thrust) and take at most one trade a day. ' +
   'Sensex, Bank Nifty, Crude, the other four desks and Scalp are watch-only. The 3-year tape is modelled (previous-day VIX). ' +
   'Forward paper is unproven until 400 trades and a one-sided 95% lower bound above zero on live asks. Not a guaranteed profit.';
 
@@ -650,7 +659,9 @@ function canOpen(book: LivePaperBookState, cfg: LiveAssumeBookCfg, atMin: number
   if (underOf(cfg.id) === 'crude' && LIVE_PAPER_CAPITAL < LIVE_ASSUME_CRUDE_MIN) return 'need ₹8,000 free for Crude';
   if (cfg.maxTradesPerDay != null) {
     const modes = new Set(Object.values(cfg.primary));
-    if (book.fills.filter((f) => modes.has(f.mode)).length >= cfg.maxTradesPerDay) return `max ${cfg.maxTradesPerDay} trades today`;
+    if (book.fills.filter((f) => modes.has(f.mode)).length >= cfg.maxTradesPerDay) {
+      return `max ${cfg.maxTradesPerDay} trade${cfg.maxTradesPerDay === 1 ? '' : 's'} today`;
+    }
   }
   if (cfg.dayStops !== false) {
     if ((book.lossesToday || 0) >= LIVE_PAPER_MAX_LOSSES) return `day stop: ${LIVE_PAPER_MAX_LOSSES} losses`;
@@ -744,7 +755,8 @@ export function tickBook(
       : null;
   }
   if (nowMin >= cfg.orE) {
-    next.structure = morningStructure(done, day, cfg.orS, cfg.orE, cfg.quietW);
+    const st = morningStructure(done, day, cfg.orS, cfg.orE, cfg.quietW);
+    if (st !== 'stand' || next.structure === 'wait' || !next.structure) next.structure = st;
   }
 
   const fillsBefore = next.fills.length;
@@ -813,6 +825,10 @@ export function tickBook(
       const st = next.structure === 'wait' ? 'stand' : next.structure;
       const hit = pickSignal(done, i, cfg, st);
       if (!hit.dir) continue;
+      if (cfg.skipStructures?.includes(st)) {
+        next.reason = `skipped: ${st} morning`;
+        continue;
+      }
       const blocked = canOpen(next, cfg, bar.min);
       if (blocked) {
         next.reason = blocked;

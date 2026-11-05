@@ -116,6 +116,8 @@ export interface LiveAssumeBookCfg {
   vwapPct?: number;
   /** When true, the five-metric mix must pass before an option entry. Off on the historical Nifty pick. */
   mix?: boolean;
+  /** Skip a new entry when the morning opening range is this structure (e.g. range). */
+  skipStructures?: string[];
 }
 
 /** Bar i's 6-bar close-to-close move and the move momentum needs (1.5 × √6 × mean range of the 20 bars before it). */
