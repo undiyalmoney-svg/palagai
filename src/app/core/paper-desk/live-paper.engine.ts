@@ -845,11 +845,24 @@ export function tickBook(
   }
 
   if (next.side === 'flat' && !closedNow.length) {
+    const barMin = cfg.barMinutes ?? 5;
+    if (next.lastBarMin < 0) next.lastBarMin = nowMin - LIVE_PAPER_MAX_SIGNAL_AGE_MIN - 1;
     for (let i = 0; i < done.length; i++) {
       const bar = done[i];
       if (bar.day !== day || bar.min <= next.lastBarMin) continue;
       next.lastBarMin = bar.min;
+      const stale = nowMin - (bar.min + barMin) > LIVE_PAPER_MAX_SIGNAL_AGE_MIN;
       if (next.pendingDir) {
+        if (nowMin >= cfg.flat || stale) {
+          next.pendingDir = 0;
+          next.pendingSig = 0;
+          next.pendingMode = '';
+          next.status = 'watching';
+          next.reason = nowMin >= cfg.flat
+            ? 'session closed'
+            : `missed confirm at ${hhmm(bar.min)} (desk was not checking)`;
+          continue;
+        }
         const ok =
           next.pendingDir === 1
             ? bar.close > bar.open && bar.close > next.pendingSig
@@ -866,9 +879,17 @@ export function tickBook(
         continue;
       }
       if (bar.min < cfg.entryS || bar.min > cfg.flat - 30) continue;
+      if (nowMin >= cfg.flat) {
+        next.reason = 'session closed';
+        continue;
+      }
       const st = next.structure === 'wait' ? 'stand' : next.structure;
       const hit = pickSignal(done, i, cfg, st);
       if (!hit.dir) continue;
+      if (stale) {
+        next.reason = `missed ${hit.dir === 1 ? 'up' : 'down'} signal at ${hhmm(bar.min + 5)} (desk was not checking)`;
+        continue;
+      }
       if (cfg.skipStructures?.includes(st)) {
         next.reason = `skipped: ${st} morning`;
         continue;
@@ -883,17 +904,12 @@ export function tickBook(
         next.reason = mix.reason;
         continue;
       }
-      const barMin = cfg.barMinutes ?? 5;
       const gapMin = cfg.minGapMin ?? (cfg.minGapBars != null ? cfg.minGapBars * barMin : null);
       if (gapMin != null) {
         if (next.lastSignalMin != null && next.lastSignalMin >= 0 && bar.min - next.lastSignalMin <= gapMin) continue;
         next.lastSignalMin = bar.min;
       }
       if (cfg.noConfirm) {
-        if (nowMin - (bar.min + barMin) > LIVE_PAPER_MAX_SIGNAL_AGE_MIN) {
-          next.reason = `missed ${hit.dir === 1 ? 'up' : 'down'} signal at ${hhmm(bar.min + 5)} (desk was not checking)`;
-          continue;
-        }
         next.mode = hit.mode;
         openAt(next, cfg, hit.dir, bar.close, hit.mode, bar.min, day);
         if (next.side !== 'flat') break;

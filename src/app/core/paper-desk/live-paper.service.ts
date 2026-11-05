@@ -260,10 +260,6 @@ export class LivePaperService {
           const spot = underLast ?? (next.optionSymbol ? next.last : null) ?? 0;
           const pair = cheapByUnder.get(under);
           next = await this.bindCheap(next, cfg, chain, spot, quotes, nowMin, auth, pair);
-          if (next.side !== 'flat' && next.optionToken) {
-            const step = cfg.barMinutes ?? 5;
-            next = { ...next, lastBarMin: nowMin - (nowMin % step) };
-          }
         }
         if (cfg.buyOption && next.side !== 'flat' && !next.optionSymbol) {
           next = {

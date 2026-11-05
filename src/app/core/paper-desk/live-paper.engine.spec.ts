@@ -390,7 +390,8 @@ describe('Live paper desk', () => {
     expect(opened.gauge?.move).toBeGreaterThan(opened.gauge?.need ?? 0);
     const late = tickBook(book, cfg, bars, 24020, '2026-11-04', 10 * 60 + 10, 'NIFTY 50');
     expect(late.side).toBe('flat');
-    expect(late.pendingDir).toBe(1);
+    expect(late.pendingDir).toBe(0);
+    expect(late.reason).toMatch(/missed/);
     const bound = bindOptionFill(opened, cfg, 100, { ...crudePick(), lotSize: 65 } as never);
     expect(bound.sl).toBe(98.46);
     expect(bound.tp).toBe(102.31);
@@ -434,6 +435,44 @@ describe('Live paper desk', () => {
     const nextDay = tickBook(fresh, nifty, bars, 24020, '2026-11-04', 9 * 60 + 51, 'NIFTY 50');
     expect(nextDay.pendingDir).toBe(1);
     expect(nextDay.reason).toMatch(/confirm momentum/);
+  });
+
+  it('does not open or flatten a day of missed bars when Start is after the session', () => {
+    const nifty = LIVE_PAPER_BOOKS.find((b) => b.id === 'nifty-momentum')!;
+    const crude = LIVE_PAPER_BOOKS.find((b) => b.id === 'crude-momentum')!;
+    const prev = flatBars('2026-11-04', 20, 15 * 60, 24000);
+    const niftyDay = Array.from({ length: 375 }, (_, k) => {
+      const min = 9 * 60 + 15 + k;
+      const thrust = min === 10 * 60;
+      return {
+        day: '2026-11-05',
+        min,
+        open: thrust ? 24000 : 23990,
+        high: thrust ? 24040 : 23995,
+        low: 23980,
+        close: thrust ? 24035 : 23990,
+      };
+    });
+    const crudeDay = Array.from({ length: 400 }, (_, k) => {
+      const min = 17 * 60 + k;
+      const thrust = min === 17 * 60 + 30;
+      return {
+        day: '2026-11-05',
+        min,
+        open: thrust ? 5400 : 5380,
+        high: thrust ? 5460 : 5385,
+        low: 5370,
+        close: thrust ? 5450 : 5380,
+      };
+    });
+    const lateNifty = tickBook(emptyBook(nifty), nifty, [...prev, ...niftyDay], 24000, '2026-11-05', 20 * 60 + 33, 'NIFTY 50');
+    expect(lateNifty.side).toBe('flat');
+    expect(lateNifty.fills).toHaveLength(0);
+    expect(lateNifty.pendingDir).toBe(0);
+    const lateCrude = tickBook(emptyBook(crude), crude, crudeDay, 5400, '2026-11-05', 20 * 60 + 33, 'CRUDEOILM');
+    expect(lateCrude.side).toBe('flat');
+    expect(lateCrude.fills).toHaveLength(0);
+    expect(lateCrude.pendingDir).toBe(0);
   });
 
   it('writes a night log with desk totals and every closed fill', () => {
