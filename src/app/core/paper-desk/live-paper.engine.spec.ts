@@ -398,7 +398,7 @@ describe('Live paper desk', () => {
     expect(Math.round(((dear.tp ?? 0) - 336.6) * 65)).toBe(LIVE_PAPER_BANK_RS);
   });
 
-  it('stops Nifty momentum after 3 wins or 5 trades', () => {
+  it('stops Nifty momentum after 3 wins or 5 trades that day', () => {
     const nifty = LIVE_PAPER_BOOKS.find((b) => b.id === 'nifty-momentum')!;
     const bars = [...flatBars('2026-11-03', 20, 13 * 60 + 35, 24000), ...flatBars('2026-11-04', 7, 9 * 60 + 15, 24000)];
     bars[bars.length - 1] = { ...bars[bars.length - 1], close: 24020, high: 24021 };
@@ -412,6 +412,11 @@ describe('Live paper desk', () => {
     const capped = tickBook(five, nifty, bars, 24020, '2026-11-04', 9 * 60 + 51, 'NIFTY 50');
     expect(capped.side).toBe('flat');
     expect(capped.reason).toBe('max 5 trades today');
+    const yday = { ...win, day: '2026-11-03' };
+    const fresh = { ...emptyBook(nifty), lastBarMin: 9 * 60 + 40, fills: [yday, yday, yday] as never };
+    const nextDay = tickBook(fresh, nifty, bars, 24020, '2026-11-04', 9 * 60 + 51, 'NIFTY 50');
+    expect(nextDay.pendingDir).toBe(1);
+    expect(nextDay.reason).toMatch(/confirm momentum/);
   });
 
   it('writes a night log with desk totals and every closed fill', () => {

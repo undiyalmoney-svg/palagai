@@ -42,7 +42,7 @@ const EXIT: Partial<LiveAssumeBookCfg> = {
 
 /** Cards stay so the blotter can show watches. Only Nifty momentum may open — that is the 3-year tape pick. */
 export const PAPER_DESKS: { id: string; label: string; rule: string }[] = [
-  { id: 'momentum', label: 'Momentum', rule: 'Nifty only — bank ₹375, stop ₹375, 5 trades, done at 3 wins' },
+  { id: 'momentum', label: 'Momentum', rule: 'Nifty only — bank ₹375, stop ₹375, 5 trades per day, done at 3 wins' },
   { id: 'orb', label: 'Opening range', rule: 'Watch — 3-year test −₹114/trade, CI crosses zero' },
   { id: 'pdhl', label: 'Prev-day break', rule: 'Watch — test CI crosses zero; not the pick' },
   { id: 'vwap', label: 'VWAP fade', rule: 'Watch — 3-year test −₹18/trade (AVGREJECT)' },
@@ -86,7 +86,7 @@ export const PAPER_MOMENTUM: Partial<LiveAssumeBookCfg> = { ...EXIT, ...deskPatc
 export const PAPER_TEST_HONEST =
   'Historical pick, not a proven live edge: Nifty 50 momentum only. ATM CE (up) or PE (down), nearest expiry that is not today, ' +
   '1 lot at the live ask, bank ₹375 / stop ₹375, next-bar fill, exact charges. ' +
-  'Up to 5 trades a day, stop when 3 have won. The 8-month 5-min tape is red at this 1R. ' +
+  '5 trades per day, stop when 3 have won that day. The 8-month 5-min tape is red at this 1R. ' +
   'The last 12 live 1-min fills tagged +₹375 nine times and −₹375 three times. ' +
   'Sensex, Bank Nifty, Crude, the other four desks and Scalp are watch-only. The 3-year tape is modelled (previous-day VIX). ' +
   'Forward paper is unproven until 400 trades and a one-sided 95% lower bound above zero on live asks. Not a guaranteed profit.';
@@ -684,12 +684,12 @@ function hitExit(
   return false;
 }
 
-function canOpen(book: LivePaperBookState, cfg: LiveAssumeBookCfg, atMin: number): string | null {
+function canOpen(book: LivePaperBookState, cfg: LiveAssumeBookCfg, atMin: number, day: string): string | null {
   if (cfg.strategy === 'watch') return 'watch only: no tested edge';
   if (underOf(cfg.id) === 'crude' && LIVE_PAPER_CAPITAL < LIVE_ASSUME_CRUDE_MIN) return 'need ₹8,000 free for Crude';
   if (cfg.maxTradesPerDay != null || cfg.maxWinsPerDay != null) {
     const modes = new Set(Object.values(cfg.primary));
-    const today = book.fills.filter((f) => modes.has(f.mode));
+    const today = book.fills.filter((f) => f.day === day && modes.has(f.mode));
     if (cfg.maxWinsPerDay != null && today.filter((f) => f.rs > 0).length >= cfg.maxWinsPerDay) {
       return `banked ${cfg.maxWinsPerDay} wins today`;
     }
@@ -712,8 +712,9 @@ function openAt(
   entry: number,
   mode: string,
   atMin: number,
+  day: string,
 ): void {
-  const block = canOpen(book, cfg, atMin);
+  const block = canOpen(book, cfg, atMin, day);
   if (block) {
     book.reason = block;
     book.status = 'watching';
@@ -845,7 +846,7 @@ export function tickBook(
             ? bar.close > bar.open && bar.close > next.pendingSig
             : bar.close < bar.open && bar.close < next.pendingSig;
         if (ok) {
-          openAt(next, cfg, next.pendingDir, bar.open, next.pendingMode || next.mode, bar.min);
+          openAt(next, cfg, next.pendingDir, bar.open, next.pendingMode || next.mode, bar.min, day);
         } else {
           next.pendingDir = 0;
           next.pendingSig = 0;
@@ -863,7 +864,7 @@ export function tickBook(
         next.reason = `skipped: ${st} morning`;
         continue;
       }
-      const blocked = canOpen(next, cfg, bar.min);
+      const blocked = canOpen(next, cfg, bar.min, day);
       if (blocked) {
         next.reason = blocked;
         continue;
@@ -883,7 +884,7 @@ export function tickBook(
           continue;
         }
         next.mode = hit.mode;
-        openAt(next, cfg, hit.dir, bar.close, hit.mode, bar.min);
+        openAt(next, cfg, hit.dir, bar.close, hit.mode, bar.min, day);
         if (next.side !== 'flat') break;
         continue;
       }
