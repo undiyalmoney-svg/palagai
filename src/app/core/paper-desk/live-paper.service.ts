@@ -32,7 +32,7 @@ import {
   underOf,
 } from './live-paper.engine';
 
-const STORAGE_KEY = 'palagai_live_paper_v7';
+const STORAGE_KEY = 'palagai_live_paper_v8';
 const UNDERS = ['crude', 'nifty', 'bank', 'sensex'] as const;
 const TICK_MS = 8_000;
 
