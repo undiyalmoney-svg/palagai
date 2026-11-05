@@ -23,9 +23,8 @@ import {
   emptySession,
   istDay,
   istMinutes,
-  optionPctStopPts,
+  optionBoundStops,
   optionRangePts,
-  optionStopPts,
   paperCfg,
   restoreDayStops,
   summarizePaper,
@@ -470,10 +469,7 @@ export class LivePaperService {
     const prem = fill.price;
     const cost = lotCostRs(prem, pick.lotSize);
     const range = await this.optionRange(pick.instrument.instrumentToken, istDay(), nowMin, auth);
-    const stop =
-      cfg.stopPct != null && cfg.targetPct != null
-        ? optionPctStopPts(cfg, prem, pick.lotSize)
-        : optionStopPts(cfg, range);
+    const stop = optionBoundStops(cfg, prem, pick.lotSize, range);
     const stopPts = Math.min(stop.sl, prem - 0.05);
     const riskRs =
       Math.round((stopPts * pick.lotSize + optionRoundTripCharges(prem, prem - stopPts, pick.lotSize, venueForBook(cfg.under || cfg.id))) * 10) / 10;

@@ -24,6 +24,8 @@ import { SignalCard, SkippedSignal } from './paper-analytics.models';
 const ALL = (mode: string) => ({ trend: mode, range: mode, quiet: mode, stand: mode });
 /** One failed Nifty ATM cannot take more than this. 40% of a ₹300+ premium is ~₹8k — too much for a ₹14k book. */
 export const LIVE_PAPER_MAX_STOP_RS = 3_000;
+/** Bank this many rupees and get out. Same rupees on the stop. */
+export const LIVE_PAPER_BANK_RS = 375;
 const EXIT: Partial<LiveAssumeBookCfg> = {
   backup: {},
   stopPct: 0.4,
@@ -40,7 +42,7 @@ const EXIT: Partial<LiveAssumeBookCfg> = {
 
 /** Cards stay so the blotter can show watches. Only Nifty momentum may open — that is the 3-year tape pick. */
 export const PAPER_DESKS: { id: string; label: string; rule: string }[] = [
-  { id: 'momentum', label: 'Momentum', rule: 'Nifty only — 6-bar thrust, 1 trade a day, stop capped at ₹3,000' },
+  { id: 'momentum', label: 'Momentum', rule: 'Nifty only — bank ₹375, stop ₹375, 5 trades, done at 3 wins' },
   { id: 'orb', label: 'Opening range', rule: 'Watch — 3-year test −₹114/trade, CI crosses zero' },
   { id: 'pdhl', label: 'Prev-day break', rule: 'Watch — test CI crosses zero; not the pick' },
   { id: 'vwap', label: 'VWAP fade', rule: 'Watch — 3-year test −₹18/trade (AVGREJECT)' },
@@ -58,8 +60,11 @@ function deskPatch(desk: string, under: string): Partial<LiveAssumeBookCfg> {
       orS: 9 * 60 + 15,
       orE: 9 * 60 + 30,
       entryS: 9 * 60 + 45,
-      maxTradesPerDay: 1,
-      maxStopRs: LIVE_PAPER_MAX_STOP_RS,
+      maxTradesPerDay: 5,
+      maxWinsPerDay: 3,
+      minGapBars: 6,
+      stopRs: LIVE_PAPER_BANK_RS,
+      targetRs: LIVE_PAPER_BANK_RS,
     };
   }
   if (desk === 'orb') {
@@ -80,8 +85,9 @@ function deskPatch(desk: string, under: string): Partial<LiveAssumeBookCfg> {
 export const PAPER_MOMENTUM: Partial<LiveAssumeBookCfg> = { ...EXIT, ...deskPatch('momentum', 'nifty') };
 export const PAPER_TEST_HONEST =
   'Historical pick, not a proven live edge: Nifty 50 momentum only. ATM CE (up) or PE (down), nearest expiry that is not today, ' +
-  '1 lot at the live ask, stop 40% of premium capped at ₹3,000, target 100%, out after 2 hours or 15:15, next-bar fill, exact charges. ' +
-  'One trade a day. No extra skip — a 15-min dead-exit would cut 28% of the 3-year winners. ' +
+  '1 lot at the live ask, bank ₹375 / stop ₹375, next-bar fill, exact charges. ' +
+  'Up to 5 trades a day, stop when 3 have won. The 8-month 5-min tape is red at this 1R. ' +
+  'The last 12 live 1-min fills tagged +₹375 nine times and −₹375 three times. ' +
   'Sensex, Bank Nifty, Crude, the other four desks and Scalp are watch-only. The 3-year tape is modelled (previous-day VIX). ' +
   'Forward paper is unproven until 400 trades and a one-sided 95% lower bound above zero on live asks. Not a guaranteed profit.';
 
@@ -436,6 +442,23 @@ export function optionPctStopPts(cfg: LiveAssumeBookCfg, prem: number, lot: numb
   return { sl: r(sl), tp: r(prem * (cfg.targetPct ?? 0)) };
 }
 
+/** Fixed-rupee stop / target in premium points. */
+export function optionRupeeStopPts(cfg: LiveAssumeBookCfg, lot: number): { sl: number; tp: number } {
+  const r = (n: number) => Math.round(n * 100) / 100;
+  return { sl: r((cfg.stopRs ?? 0) / lot), tp: r((cfg.targetRs ?? 0) / lot) };
+}
+
+export function optionBoundStops(
+  cfg: LiveAssumeBookCfg,
+  prem: number,
+  lot: number,
+  rangePts: number | null = null,
+): { sl: number; tp: number } {
+  if (cfg.stopRs != null && cfg.targetRs != null && lot > 0) return optionRupeeStopPts(cfg, lot);
+  if (cfg.stopPct != null && cfg.targetPct != null) return optionPctStopPts(cfg, prem, lot);
+  return optionStopPts(cfg, rangePts);
+}
+
 export function bindOptionFill(
   book: LivePaperBookState,
   cfg: LiveAssumeBookCfg,
@@ -445,10 +468,7 @@ export function bindOptionFill(
 ): LivePaperBookState {
   if (book.side === 'flat' || prem <= 0) return book;
   const next: LivePaperBookState = { ...book, fills: [...book.fills] };
-  const stop =
-    cfg.stopPct != null && cfg.targetPct != null
-      ? optionPctStopPts(cfg, prem, pick.lotSize)
-      : optionStopPts(cfg, rangePts);
+  const stop = optionBoundStops(cfg, prem, pick.lotSize, rangePts);
   next.entry = prem;
   next.sl = Math.max(0.05, Math.round((prem - stop.sl) * 100) / 100);
   next.tp = Math.round((prem + stop.tp) * 100) / 100;
@@ -667,9 +687,13 @@ function hitExit(
 function canOpen(book: LivePaperBookState, cfg: LiveAssumeBookCfg, atMin: number): string | null {
   if (cfg.strategy === 'watch') return 'watch only: no tested edge';
   if (underOf(cfg.id) === 'crude' && LIVE_PAPER_CAPITAL < LIVE_ASSUME_CRUDE_MIN) return 'need ₹8,000 free for Crude';
-  if (cfg.maxTradesPerDay != null) {
+  if (cfg.maxTradesPerDay != null || cfg.maxWinsPerDay != null) {
     const modes = new Set(Object.values(cfg.primary));
-    if (book.fills.filter((f) => modes.has(f.mode)).length >= cfg.maxTradesPerDay) {
+    const today = book.fills.filter((f) => modes.has(f.mode));
+    if (cfg.maxWinsPerDay != null && today.filter((f) => f.rs > 0).length >= cfg.maxWinsPerDay) {
+      return `banked ${cfg.maxWinsPerDay} wins today`;
+    }
+    if (cfg.maxTradesPerDay != null && today.length >= cfg.maxTradesPerDay) {
       return `max ${cfg.maxTradesPerDay} trade${cfg.maxTradesPerDay === 1 ? '' : 's'} today`;
     }
   }

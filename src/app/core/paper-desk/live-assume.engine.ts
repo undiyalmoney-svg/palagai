@@ -120,6 +120,11 @@ export interface LiveAssumeBookCfg {
   mix?: boolean;
   /** Skip a new entry when the morning opening range is this structure (e.g. range). */
   skipStructures?: string[];
+  /** Fixed rupee stop / target (overrides percent stops). Distance = rupees / lot. */
+  stopRs?: number;
+  targetRs?: number;
+  /** Stop taking new trades after this many green fills today. */
+  maxWinsPerDay?: number;
 }
 
 /** Bar i's 6-bar close-to-close move and the move momentum needs (1.5 × √6 × mean range of the 20 bars before it). */
