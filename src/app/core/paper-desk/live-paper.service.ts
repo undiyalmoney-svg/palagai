@@ -17,7 +17,6 @@ import {
   LIVE_PAPER_BOOKS,
   LivePaperBookState,
   LivePaperSession,
-  PAPER_SCALP_BOOKS,
   bindOptionFill,
   completedBars,
   emptySession,
@@ -33,7 +32,7 @@ import {
   underOf,
 } from './live-paper.engine';
 
-const STORAGE_KEY = 'palagai_live_paper_v6';
+const STORAGE_KEY = 'palagai_live_paper_v7';
 const UNDERS = ['crude', 'nifty', 'bank', 'sensex'] as const;
 const TICK_MS = 8_000;
 
@@ -163,19 +162,11 @@ export class LivePaperService {
       const nifty = findNamed(dump, ['NIFTY 50']) || { tradingSymbol: 'NIFTY 50', token: 256265, exchange: 'NSE' };
       const bank = findNamed(dump, ['NIFTY BANK']) || { tradingSymbol: 'NIFTY BANK', token: 260105, exchange: 'NSE' };
       const sensex = findNamed(dump, ['SENSEX']) || { tradingSymbol: 'SENSEX', token: 265, exchange: 'BSE' };
-      const stocks = new Map<string, { tradingSymbol: string; token: number; exchange: string }>();
-      for (const cfg of PAPER_SCALP_BOOKS) {
-        if (cfg.kind === 'eq' && cfg.nseSymbol) {
-          const inst = findEquity(dump, cfg.nseSymbol);
-          if (inst) stocks.set(cfg.id, inst);
-        }
-      }
       const underKeys = [
         crude ? `MCX:${crude.tradingSymbol}` : '',
         'NSE:NIFTY 50',
         'NSE:NIFTY BANK',
         'BSE:SENSEX',
-        ...[...stocks.values()].map((s) => `NSE:${s.tradingSymbol}`),
       ].filter(Boolean);
       const openOptKeys = cur.books
         .filter((b) => b.side !== 'flat' && b.optionSymbol)
@@ -303,51 +294,6 @@ export class LivePaperService {
         books.push({
           ...next,
           ...neededFields(cheapByUnder.get(under), quotes),
-          quoteAt: quoteStamp(underQuote) || next.quoteAt || '',
-        });
-      }
-      for (const cfg of PAPER_SCALP_BOOKS) {
-        const inst = cfg.kind === 'fut' ? crude : stocks.get(cfg.id) || null;
-        const cacheKey = cfg.kind === 'fut' ? 'crude' : cfg.id;
-        if (!barCache.has(cacheKey) && inst?.token) {
-          const hist = (await firstValueFrom(
-            this.kiteApi.getHistoricalData({
-              instrumentToken: String(inst.token),
-              interval: '5minute',
-              from,
-              to: day,
-              authorization: auth,
-            }),
-          )) as { data?: { candles?: unknown[][] } };
-          barCache.set(cacheKey, (hist?.data?.candles || []).map(kiteBar).filter((b) => b.day));
-        }
-        const prev = cur.books.find((b) => b.id === cfg.id) || emptySession(day).books.find((b) => b.id === cfg.id)!;
-        const bars = barCache.get(cacheKey) || [];
-        const last =
-          cfg.kind === 'fut'
-            ? lastPrice(quotes, 'crude', inst?.tradingSymbol || '')
-            : lastByKey(quotes, `NSE:${cfg.nseSymbol || ''}`);
-        let next = tickBook(prev, cfg, bars, last, day, nowMin, inst?.tradingSymbol || cfg.label);
-        if (next.fills.length > prev.fills.length) {
-          const key = cfg.kind === 'fut'
-            ? underKeyFor('crude', inst?.tradingSymbol, inst?.exchange)
-            : `NSE:${cfg.nseSymbol || ''}`;
-          const q = findQuote(quotes, key);
-          const { bid, ask } = bestBidAsk(q);
-          const stamp = new Date().toISOString();
-          const fills = next.fills.map((f, idx) =>
-            idx >= prev.fills.length ? { ...f, exitBid: bid, exitAsk: ask, exitAt: stamp } : f,
-          );
-          next = { ...next, fills };
-        }
-        const underQuote = findQuote(
-          quotes,
-          cfg.kind === 'fut'
-            ? underKeyFor('crude', inst?.tradingSymbol, inst?.exchange)
-            : `NSE:${cfg.nseSymbol || ''}`,
-        );
-        books.push({
-          ...next,
           quoteAt: quoteStamp(underQuote) || next.quoteAt || '',
         });
       }
@@ -723,20 +669,6 @@ function findNamed(csv: string, names: string[]): { tradingSymbol: string; token
     const name = cols[3].trim().toUpperCase();
     if (want.includes(sym) || want.includes(name)) {
       return { tradingSymbol: cols[2].trim(), token: Number(cols[0]) || 0, exchange: cols[11].trim() };
-    }
-  }
-  return null;
-}
-
-function findEquity(csv: string, symbol: string): { tradingSymbol: string; token: number; exchange: string } | null {
-  const want = symbol.trim().toUpperCase();
-  for (const line of csv.split(/\r?\n/).slice(1)) {
-    const cols = splitCsvLine(line);
-    if (cols.length < 12) continue;
-    if (cols[11].trim().toUpperCase() !== 'NSE') continue;
-    if (cols[9].trim().toUpperCase() !== 'EQ') continue;
-    if (cols[2].trim().toUpperCase() === want) {
-      return { tradingSymbol: cols[2].trim(), token: Number(cols[0]) || 0, exchange: 'NSE' };
     }
   }
   return null;

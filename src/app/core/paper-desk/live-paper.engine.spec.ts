@@ -32,18 +32,15 @@ describe('Live paper desk', () => {
     expect(snap.guaranteed).toBe(false);
     expect(snap.armedOnCrudeBest).toBe(false);
     expect(snap.assumed).toBe(true);
-    expect(snap.books).toHaveLength(24);
-    expect(snap.books.filter((b) => b.desk !== 'scalp')).toHaveLength(20);
-    expect(new Set(snap.books.filter((b) => b.desk !== 'scalp').map((b) => b.under))).toEqual(
-      new Set(['crude', 'nifty', 'bank', 'sensex']),
-    );
-    expect(new Set(snap.books.map((b) => b.desk)).size).toBe(6);
+    expect(snap.books).toHaveLength(4);
+    expect(new Set(snap.books.map((b) => b.under))).toEqual(new Set(['crude', 'nifty', 'bank', 'sensex']));
+    expect(new Set(snap.books.map((b) => b.desk))).toEqual(new Set(['momentum']));
     expect(snap.books.every((b) => b.fund === LIVE_PAPER_CAPITAL)).toBe(true);
-    expect(booksFundEnd(snap.books)).toBe(336_000);
+    expect(booksFundEnd(snap.books)).toBe(56_000);
     expect(snap.honest).toMatch(/Paper only/);
     expect(snap.honest).toMatch(/No Kite order/i);
     expect(snap.honest).toMatch(/buy CE\/PE/);
-    expect(LIVE_PAPER_BOOKS).toHaveLength(20);
+    expect(LIVE_PAPER_BOOKS).toHaveLength(4);
     expect(LIVE_PAPER_BOOKS.every((b) => b.buyOption)).toBe(true);
     expect(LIVE_PAPER_BOOKS.map((b) => b.product).join(' ')).toMatch(/CE\/PE/);
   });
@@ -311,9 +308,10 @@ describe('Live paper desk', () => {
   const flatBars = (day: string, n: number, startMin: number, px = 100, rng = 2) =>
     Array.from({ length: n }, (_, k) => ({ day, min: startMin + 5 * k, open: px, high: px + rng / 2, low: px - rng / 2, close: px }));
 
-  it('trades Nifty, Bank, Sensex and evening Crude Mini momentum; the other desks watch', () => {
-    const by = (under: string, desk = 'momentum') => LIVE_PAPER_BOOKS.find((b) => b.id === `${under}-${desk}`)!;
-    expect(LIVE_PAPER_BOOKS).toHaveLength(20);
+  it('trades only Nifty, Bank, Sensex and evening Crude Mini momentum', () => {
+    const by = (under: string) => LIVE_PAPER_BOOKS.find((b) => b.id === `${under}-momentum`)!;
+    expect(LIVE_PAPER_BOOKS).toHaveLength(4);
+    expect(LIVE_PAPER_BOOKS.every((b) => b.strategy === 'momentum' && b.desk === 'momentum')).toBe(true);
     for (const under of ['nifty', 'bank', 'sensex']) {
       expect(by(under)).toMatchObject({
         strategy: 'momentum',
@@ -344,14 +342,6 @@ describe('Live paper desk', () => {
       orS: 17 * 60,
       noConfirm: false,
     });
-    for (const under of ['nifty', 'sensex', 'bank', 'crude']) {
-      expect(by(under, 'orb').strategy).toBe('watch');
-      expect(by(under, 'pdhl').strategy).toBe('watch');
-      expect(by(under, 'vwap').strategy).toBe('watch');
-      expect(by(under, 'trap').strategy).toBe('watch');
-    }
-    expect(by('crude', 'orb').orS).toBe(9 * 60);
-    expect(by('nifty', 'orb').orS).toBe(9 * 60 + 15);
     expect(PAPER_TEST_HONEST).toMatch(/Not a guaranteed profit/);
     expect(PAPER_TEST_HONEST).toMatch(/evening only/);
   });
@@ -447,7 +437,7 @@ describe('Live paper desk', () => {
   });
 
   it('writes a night log with desk totals and every closed fill', () => {
-    const cfg = LIVE_PAPER_BOOKS.find((b) => b.id === 'nifty-orb')!;
+    const cfg = LIVE_PAPER_BOOKS.find((b) => b.id === 'nifty-momentum')!;
     const book = emptyBook(cfg);
     book.side = 'long';
     book.entry = 100;
@@ -462,17 +452,17 @@ describe('Live paper desk', () => {
     book.optionSymbol = 'NIFTY26N0624000CE';
     book.entryMin = 10 * 60;
     book.lastBarMin = 10 * 60 + 30;
-    const done = tickBook(book, cfg, [], 60, '2026-11-05', 11 * 60, 'NIFTY');
+    const done = tickBook(book, cfg, [], 60, '2026-11-05', 10 * 60 + 45, 'NIFTY');
     const snap = emptySession('2026-11-05');
     snap.books = snap.books.map((b) => (b.id === cfg.id ? done : b));
     snap.closedRs = done.closedRs;
     const log = nightLog(snap);
-    expect(log.desks).toHaveLength(6);
-    const orb = log.desks.find((d) => d.desk === 'orb')!;
-    expect(orb.trades).toBe(1);
-    expect(orb.losses).toBe(1);
+    expect(log.desks).toHaveLength(1);
+    const mom = log.desks.find((d) => d.desk === 'momentum')!;
+    expect(mom.trades).toBe(1);
+    expect(mom.losses).toBe(1);
     expect(log.fills[0]).toMatchObject({
-      desk: 'orb',
+      desk: 'momentum',
       under: 'nifty',
       reason: 'sl',
       optionType: 'CE',

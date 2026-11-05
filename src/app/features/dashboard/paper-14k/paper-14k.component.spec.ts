@@ -27,12 +27,11 @@ describe('Paper14kComponent', () => {
     expect(text).toMatch(/Bank Nifty/);
     expect(text).toMatch(/Sensex/);
     expect(text).toMatch(/Evening from 17:15/);
-    expect(text).toMatch(/Opening range/);
-    expect(text).toMatch(/Prev-day break/);
-    expect(text).toMatch(/VWAP fade/);
-    expect(text).toMatch(/Failed break/);
-    expect(text).toMatch(/Scalp/);
-    expect(text).toMatch(/Capital/);
+    expect(text).not.toMatch(/Opening range/);
+    expect(text).not.toMatch(/Prev-day break/);
+    expect(text).not.toMatch(/VWAP fade/);
+    expect(text).not.toMatch(/Failed break/);
+    expect(text).not.toMatch(/Watch-only desks/);
     expect(text).toMatch(/Closed today/);
     expect(text).toMatch(/Copy night log/);
     expect(text).toMatch(/no Kite order/);
@@ -51,9 +50,10 @@ describe('Paper14kComponent', () => {
     expect(fixture.nativeElement.querySelector('[data-testid="copy-night-log"]')).toBeTruthy();
     expect(fixture.componentInstance['paper'].session().liveOrders).toBe(false);
     expect(fixture.componentInstance['paper'].session().guaranteed).toBe(false);
-    expect(fixture.componentInstance['paper'].session().books).toHaveLength(24);
-    expect(fixture.componentInstance['booksFund']()).toBe(336_000);
-    expect(fixture.nativeElement.querySelector('[data-testid="desk-scalp"]')).toBeTruthy();
+    expect(fixture.componentInstance['paper'].session().books).toHaveLength(4);
+    expect(fixture.componentInstance['booksFund']()).toBe(56_000);
+    expect(fixture.nativeElement.querySelector('[data-testid="desk-scalp"]')).toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-testid="desk-watch"]')).toBeNull();
   });
 
   it('says the Now card is watching Nifty, Bank and Sensex momentum', () => {
@@ -68,8 +68,8 @@ describe('Paper14kComponent', () => {
     });
     fixture.detectChanges();
     const title = (fixture.nativeElement.querySelector('[data-testid="paper-now-title"]') as HTMLElement).textContent || '';
-    expect(title).toMatch(/Nifty, Bank Nifty, Sensex and evening Crude Mini momentum/);
-    expect(title).toMatch(/watch-only/);
+    expect(title).toMatch(/Nifty, Bank Nifty, Sensex and evening Crude Mini/);
+    expect(title).not.toMatch(/watch-only/);
   });
 
   it('asks for Token when Start is hit without a Kite session', async () => {

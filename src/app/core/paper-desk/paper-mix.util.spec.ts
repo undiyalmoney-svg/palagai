@@ -3,7 +3,8 @@ import { LIVE_PAPER_BOOKS, PAPER_SCALP_BOOKS } from './live-paper.engine';
 import { mixGate, MIX_NEED, usesMix } from './paper-mix.util';
 
 const nifty = (desk: string) => ({
-  ...LIVE_PAPER_BOOKS.find((b) => b.id === `nifty-${desk}`)!,
+  ...LIVE_PAPER_BOOKS.find((b) => b.id === 'nifty-momentum')!,
+  id: `nifty-${desk}`,
   mix: true,
 });
 

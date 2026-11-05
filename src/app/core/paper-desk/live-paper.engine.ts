@@ -48,38 +48,13 @@ const EXIT: Partial<LiveAssumeBookCfg> = {
   freshCross: true,
 };
 
-/** Cards stay so the blotter can show watches. Four momentum books may open; orb/pdhl/vwap/trap stay watch. */
+/** The only paper desk: four daily-bank momentum books. */
 export const PAPER_DESKS: { id: string; label: string; rule: string }[] = [
-  { id: 'momentum', label: 'Momentum', rule: 'Nifty / Bank / Sensex 1-min thrust — bank ₹150, stop ₹100, done at 3 wins. Crude Mini evening only — bank ₹200, stop ₹100, done at 2 wins' },
-  { id: 'orb', label: 'Opening range', rule: 'Watch — 3-year test −₹114/trade, CI crosses zero' },
-  { id: 'pdhl', label: 'Prev-day break', rule: 'Watch — test CI crosses zero; not the pick' },
-  { id: 'vwap', label: 'VWAP fade', rule: 'Watch — 3-year test −₹18/trade (AVGREJECT)' },
-  { id: 'trap', label: 'Failed break', rule: 'Watch — no 3-year edge on this exit' },
+  { id: 'momentum', label: 'Daily bank', rule: 'Nifty / Bank / Sensex 1-min thrust — bank ₹150, stop ₹100, done at 3 wins. Crude Mini evening only — bank ₹200, stop ₹100, done at 2 wins' },
 ];
 
-function deskPatch(desk: string, under: string): Partial<LiveAssumeBookCfg> {
-  const crude = under === 'crude';
-  const open = crude ? 9 * 60 : 9 * 60 + 15;
-  const afterOpen = crude ? 9 * 60 + 30 : 9 * 60 + 45;
-  if (desk === 'momentum' && (under === 'nifty' || under === 'bank' || under === 'sensex')) {
-    return {
-      strategy: 'momentum',
-      primary: ALL('momentum'),
-      orS: 9 * 60 + 15,
-      orE: 9 * 60 + 30,
-      entryS: 9 * 60 + 45,
-      maxTradesPerDay: 5,
-      maxWinsPerDay: 3,
-      minDayNetRs: LIVE_PAPER_BANK_RS,
-      barMinutes: 1,
-      momK: 0.8,
-      minGapMin: 10,
-      holdBars: 60,
-      stopRs: LIVE_PAPER_STOP_RS,
-      targetRs: LIVE_PAPER_TARGET_RS,
-    };
-  }
-  if (desk === 'momentum' && under === 'crude') {
+function deskPatch(under: string): Partial<LiveAssumeBookCfg> {
+  if (under === 'crude') {
     return {
       strategy: 'momentum',
       primary: ALL('momentum'),
@@ -97,22 +72,25 @@ function deskPatch(desk: string, under: string): Partial<LiveAssumeBookCfg> {
       targetRs: LIVE_PAPER_CRUDE_TARGET_RS,
     };
   }
-  if (desk === 'orb') {
-    return { strategy: 'watch', primary: ALL('orb_break'), orS: open, orE: open + 15, entryS: open + 15 };
-  }
-  if (desk === 'pdhl') {
-    return { strategy: 'watch', primary: ALL('pdhl'), entryS: afterOpen };
-  }
-  if (desk === 'vwap') {
-    return { strategy: 'watch', primary: ALL('vwap_fade'), entryS: afterOpen };
-  }
-  if (desk === 'trap') {
-    return { strategy: 'watch', primary: ALL('trap'), entryS: afterOpen };
-  }
-  return { strategy: 'watch', primary: ALL('momentum'), entryS: afterOpen };
+  return {
+    strategy: 'momentum',
+    primary: ALL('momentum'),
+    orS: 9 * 60 + 15,
+    orE: 9 * 60 + 30,
+    entryS: 9 * 60 + 45,
+    maxTradesPerDay: 5,
+    maxWinsPerDay: 3,
+    minDayNetRs: LIVE_PAPER_BANK_RS,
+    barMinutes: 1,
+    momK: 0.8,
+    minGapMin: 10,
+    holdBars: 60,
+    stopRs: LIVE_PAPER_STOP_RS,
+    targetRs: LIVE_PAPER_TARGET_RS,
+  };
 }
 
-export const PAPER_MOMENTUM: Partial<LiveAssumeBookCfg> = { ...EXIT, ...deskPatch('momentum', 'nifty') };
+export const PAPER_MOMENTUM: Partial<LiveAssumeBookCfg> = { ...EXIT, ...deskPatch('nifty') };
 export const PAPER_TEST_HONEST =
   'Index-proxy pick, not a proven live edge. ATM CE (up) or PE (down), 1 lot at the live ask, next 1-min confirm, exact charges. ' +
   'Nifty / Bank / Sensex: bank ₹150 / stop ₹100, 0.8× thrust from 09:45, stop at 3 wins or ₹150 net. ' +
@@ -120,17 +98,15 @@ export const PAPER_TEST_HONEST =
   '5 Aug–4 Nov 2026 IST 1-min 0.5-delta: Nifty +₹5,318 (52/61 green), Bank +₹7,509 (50/61), Sensex +₹2,727 (44/63), Crude evening +₹1,568 (45/61; August −₹38). ' +
   'A ₹150 Nifty target is ~2.3 option points; live ask/spread can eat it. Forward paper is unproven until 400 trades and a one-sided 95% lower bound above zero on live asks. Not a guaranteed profit.';
 
-export const LIVE_PAPER_BOOKS: LiveAssumeBookCfg[] = PAPER_DESKS.flatMap((desk) =>
-  OPTION_14K_LIST.map((plan) => ({
-    ...option14kToPaperCfg(plan),
-    ...EXIT,
-    ...deskPatch(desk.id, plan.id),
-    id: `${plan.id}-${desk.id}`,
-    under: plan.id,
-    desk: desk.id,
-    product: `ATM CE/PE ×${plan.lot}`,
-  })),
-);
+export const LIVE_PAPER_BOOKS: LiveAssumeBookCfg[] = OPTION_14K_LIST.map((plan) => ({
+  ...option14kToPaperCfg(plan),
+  ...EXIT,
+  ...deskPatch(plan.id),
+  id: `${plan.id}-momentum`,
+  under: plan.id,
+  desk: 'momentum',
+  product: `ATM CE/PE ×${plan.lot}`,
+}));
 
 /** Separate from the five CE/PE desks. VWAP fade on Crude Mini futures + three cash stocks. */
 export const PAPER_SCALP = {
@@ -209,7 +185,7 @@ export const PAPER_SCALP_BOOKS: LiveAssumeBookCfg[] = [
   scalpStock('infy', 'Infosys', 'INFY', 50),
 ];
 
-export const ALL_PAPER_BOOKS: LiveAssumeBookCfg[] = [...LIVE_PAPER_BOOKS, ...PAPER_SCALP_BOOKS];
+export const ALL_PAPER_BOOKS: LiveAssumeBookCfg[] = LIVE_PAPER_BOOKS;
 
 export function paperCfg(id: string): LiveAssumeBookCfg {
   return ALL_PAPER_BOOKS.find((b) => b.id === id) || LIVE_PAPER_BOOKS[0];
@@ -967,7 +943,7 @@ export function summarizePaper(
     honest:
       `Paper only — no Kite order is placed. Each book takes 1 lot at the live ask and shows that cash. ` +
       `Motto: buy CE/PE. SL, target, and live P/L come from the option. ` +
-      `Scalp is watch-only. ${fundsLine}${PAPER_TEST_HONEST}`,
+      `${fundsLine}${PAPER_TEST_HONEST}`,
   };
 }
 
@@ -982,7 +958,7 @@ export function booksFundEnd(books: LivePaperBookState[]): number {
 /** One night-research dump: every closed fill plus desk totals. Copy from Closed today. */
 export function nightLog(session: LivePaperSession) {
   const fills = allClosedFills(session.books);
-  const desks = [...PAPER_DESKS, PAPER_SCALP].map((d) => {
+  const desks = PAPER_DESKS.map((d) => {
     const books = session.books.filter((b) => (b.desk || deskOf(b.id)) === d.id);
     const rows = fills.filter((f) => (f.desk || deskOf(f.book)) === d.id);
     const wins = rows.filter((f) => f.rs > 0);
