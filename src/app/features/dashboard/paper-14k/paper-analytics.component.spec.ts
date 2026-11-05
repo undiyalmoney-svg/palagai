@@ -192,7 +192,7 @@ describe('PaperAnalyticsComponent', () => {
 });
 
 describe('Paper14kComponent views', () => {
-  it('keeps five strategy cards and Closed today, with liveOrders false', async () => {
+  it('keeps four instrument cards, watch desks, Scalp and Closed today, with liveOrders false', async () => {
     localStorage.clear();
     await TestBed.configureTestingModule({
       imports: [Paper14kComponent],
@@ -201,6 +201,10 @@ describe('Paper14kComponent views', () => {
     const f = TestBed.createComponent(Paper14kComponent);
     f.detectChanges();
     expect(f.nativeElement.querySelector('[data-testid="live-paper-card"]')).toBeTruthy();
+    expect(f.nativeElement.querySelector('[data-testid="book-nifty"]')).toBeTruthy();
+    expect(f.nativeElement.querySelector('[data-testid="book-bank"]')).toBeTruthy();
+    expect(f.nativeElement.querySelector('[data-testid="book-sensex"]')).toBeTruthy();
+    expect(f.nativeElement.querySelector('[data-testid="book-crude"]')).toBeTruthy();
     expect(f.nativeElement.querySelector('[data-testid="desk-orb"]')).toBeTruthy();
     expect(f.nativeElement.querySelector('[data-testid="desk-pdhl"]')).toBeTruthy();
     expect(f.nativeElement.querySelector('[data-testid="desk-vwap"]')).toBeTruthy();

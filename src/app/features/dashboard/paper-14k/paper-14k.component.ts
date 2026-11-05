@@ -13,7 +13,16 @@ import {
   hhmm,
   nightLogJson,
   optionPickLabel,
+  underOf,
 } from '../../../core/paper-desk/live-paper.engine';
+
+const ARMED_ORDER = ['nifty', 'bank', 'sensex', 'crude'] as const;
+const ARMED_RULE: Record<(typeof ARMED_ORDER)[number], string> = {
+  nifty: '1-min thrust from 09:45 — bank ₹150, stop ₹100, done at 3 wins',
+  bank: '1-min thrust from 09:45 — bank ₹150, stop ₹100, done at 3 wins',
+  sensex: '1-min thrust from 09:45 — bank ₹150, stop ₹100, done at 3 wins',
+  crude: 'Evening from 17:15 — 1.5× thrust, bank ₹200, stop ₹100, done at 2 wins',
+};
 
 @Component({
   selector: 'app-paper-14k',
@@ -29,9 +38,16 @@ export class Paper14kComponent implements OnDestroy {
   private readonly clockTimer = setInterval(() => this.clockNow.set(Date.now()), 5_000);
 
   protected readonly now = computed(() => this.nowCard(this.paper.session(), this.paper.busy(), this.clockNow()));
-  protected readonly desks = computed(() => {
+  protected readonly armed = computed(() => {
     const books = this.paper.session().books;
-    return PAPER_DESKS.map((d) => {
+    return ARMED_ORDER.map((under) => {
+      const book = books.find((b) => (b.under || underOf(b.id)) === under && (b.desk || deskOf(b.id)) === 'momentum');
+      return book ? { under, rule: ARMED_RULE[under], book } : null;
+    }).filter((row): row is { under: (typeof ARMED_ORDER)[number]; rule: string; book: LivePaperBookState } => !!row);
+  });
+  protected readonly watches = computed(() => {
+    const books = this.paper.session().books;
+    return PAPER_DESKS.filter((d) => d.id !== 'momentum').map((d) => {
       const rows = books.filter((b) => (b.desk || deskOf(b.id)) === d.id);
       return {
         ...d,

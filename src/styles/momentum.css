@@ -6,6 +6,12 @@
   gap: 1.1rem;
   min-width: 0;
 }
+.mp-armed {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+  min-width: 0;
+}
 
 .mp-grid {
   display: grid;

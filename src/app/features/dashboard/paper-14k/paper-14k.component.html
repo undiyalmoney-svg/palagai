@@ -38,19 +38,20 @@
     </div>
   </div>
 
-  @for (d of desks(); track d.id) {
-    <div class="mp-card" [attr.data-testid]="d.id === 'momentum' ? 'live-paper-card' : 'desk-' + d.id">
+  <div data-testid="live-paper-card" class="mp-armed">
+  @for (d of armed(); track d.under) {
+    <div class="mp-card" [attr.data-testid]="'book-' + d.under">
       <div class="mp-card-head">
         <div>
-          <h2>{{ d.label }}</h2>
+          <h2>{{ d.book.label }}</h2>
           <p class="mp-sub">{{ d.rule }}</p>
         </div>
         <span
           class="mp-stat-value"
-          [class.mp-up]="d.closedRs > 0"
-          [class.mp-down]="d.closedRs < 0"
+          [class.mp-up]="d.book.closedRs > 0"
+          [class.mp-down]="d.book.closedRs < 0"
         >
-          ₹{{ d.closedRs | number : '1.0-0' }}
+          ₹{{ d.book.closedRs | number : '1.0-0' }}
         </span>
       </div>
       <div class="mp-table-wrap">
@@ -68,32 +69,66 @@
             </tr>
           </thead>
           <tbody>
-            @for (b of d.books; track b.id) {
-              <tr>
-                <td class="mp-sym">
-                  {{ b.label }}
-                  @if (b.optionType) {
-                    <div class="mp-pick" data-testid="live-paper-pick">{{ pick(b) }} · {{ b.lot }} qty</div>
-                  }
-                </td>
-                <td class="num">{{ b.last != null ? (b.last | number : '1.0-2') : '—' }}</td>
-                <td>{{ b.side }}</td>
-                <td class="num">{{ b.entry != null ? (b.entry | number : '1.0-2') : '—' }}</td>
-                <td class="num">{{ b.sl != null ? (b.sl | number : '1.0-2') : '—' }}</td>
-                <td class="num">{{ b.tp != null ? (b.tp | number : '1.0-2') : '—' }}</td>
-                <td class="num" [class.mp-up]="b.liveRs > 0" [class.mp-down]="b.liveRs < 0">
-                  {{ b.side === 'flat' ? '—' : (b.liveRs | number : '1.0-0') }}
-                </td>
-                <td class="num" [class.mp-up]="b.closedRs > 0" [class.mp-down]="b.closedRs < 0">
-                  {{ b.closedRs | number : '1.0-0' }}
-                </td>
-              </tr>
-            }
+            <tr>
+              <td class="mp-sym">
+                {{ d.book.label }}
+                @if (d.book.optionType) {
+                  <div class="mp-pick" data-testid="live-paper-pick">{{ pick(d.book) }} · {{ d.book.lot }} qty</div>
+                }
+              </td>
+              <td class="num">{{ d.book.last != null ? (d.book.last | number : '1.0-2') : '—' }}</td>
+              <td>{{ d.book.side }}</td>
+              <td class="num">{{ d.book.entry != null ? (d.book.entry | number : '1.0-2') : '—' }}</td>
+              <td class="num">{{ d.book.sl != null ? (d.book.sl | number : '1.0-2') : '—' }}</td>
+              <td class="num">{{ d.book.tp != null ? (d.book.tp | number : '1.0-2') : '—' }}</td>
+              <td class="num" [class.mp-up]="d.book.liveRs > 0" [class.mp-down]="d.book.liveRs < 0">
+                {{ d.book.side === 'flat' ? '—' : (d.book.liveRs | number : '1.0-0') }}
+              </td>
+              <td class="num" [class.mp-up]="d.book.closedRs > 0" [class.mp-down]="d.book.closedRs < 0">
+                {{ d.book.closedRs | number : '1.0-0' }}
+              </td>
+            </tr>
           </tbody>
         </table>
       </div>
     </div>
   }
+  </div>
+
+  <div class="mp-card" data-testid="desk-watch">
+    <div class="mp-card-head">
+      <div>
+        <h2>Watch-only desks</h2>
+        <p class="mp-sub">Opening range, prev-day break, VWAP fade and failed break stay on the blotter. They do not open.</p>
+      </div>
+    </div>
+    <div class="mp-table-wrap">
+      <table class="mp-table">
+        <thead>
+          <tr>
+            <th>Desk</th>
+            <th>Rule</th>
+            <th class="num">Live ₹</th>
+            <th class="num">Closed ₹</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (d of watches(); track d.id) {
+            <tr [attr.data-testid]="'desk-' + d.id">
+              <td class="mp-sym">{{ d.label }}</td>
+              <td>{{ d.rule }}</td>
+              <td class="num" [class.mp-up]="d.liveRs > 0" [class.mp-down]="d.liveRs < 0">
+                {{ d.liveRs | number : '1.0-0' }}
+              </td>
+              <td class="num" [class.mp-up]="d.closedRs > 0" [class.mp-down]="d.closedRs < 0">
+                {{ d.closedRs | number : '1.0-0' }}
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </div>
 
   @if (scalp(); as s) {
     <div class="mp-card" data-testid="desk-scalp">

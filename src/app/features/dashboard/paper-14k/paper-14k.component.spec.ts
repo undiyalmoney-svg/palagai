@@ -17,7 +17,7 @@ describe('Paper14kComponent', () => {
     fixture.detectChanges();
   });
 
-  it('is a live paper desk: Start, five desks on four names, no Kite order', () => {
+  it('is a live paper desk: Start, four instrument cards, no Kite order', () => {
     const text = fixture.nativeElement.textContent as string;
     expect(text).toMatch(/Paper only/);
     expect(text).toMatch(/buy CE\/PE/);
@@ -26,7 +26,7 @@ describe('Paper14kComponent', () => {
     expect(text).toMatch(/Nifty 50/);
     expect(text).toMatch(/Bank Nifty/);
     expect(text).toMatch(/Sensex/);
-    expect(text).toMatch(/Momentum/);
+    expect(text).toMatch(/Evening from 17:15/);
     expect(text).toMatch(/Opening range/);
     expect(text).toMatch(/Prev-day break/);
     expect(text).toMatch(/VWAP fade/);
@@ -43,6 +43,10 @@ describe('Paper14kComponent', () => {
     expect(text).not.toMatch(/More daily profit/);
     expect(text).not.toMatch(/Run live assumption/);
     expect(fixture.nativeElement.querySelector('[data-testid="live-paper-card"]')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('[data-testid="book-nifty"]')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('[data-testid="book-bank"]')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('[data-testid="book-sensex"]')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('[data-testid="book-crude"]')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('[data-testid="start-live-paper"]')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('[data-testid="copy-night-log"]')).toBeTruthy();
     expect(fixture.componentInstance['paper'].session().liveOrders).toBe(false);
