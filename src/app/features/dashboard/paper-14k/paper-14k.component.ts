@@ -141,7 +141,7 @@ export class Paper14kComponent implements OnDestroy {
     return {
       tone: 'info',
       badge: 'watching',
-      title: 'Watching Nifty, Bank Nifty and Sensex momentum. Crude and the other desks are watch-only. No trade right now.',
+      title: 'Watching Nifty, Bank Nifty, Sensex and evening Crude Mini momentum. Other desks are watch-only. No trade right now.',
       lines: [checked, today, foot].filter(Boolean),
     };
   }

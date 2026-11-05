@@ -64,7 +64,7 @@ describe('Paper14kComponent', () => {
     });
     fixture.detectChanges();
     const title = (fixture.nativeElement.querySelector('[data-testid="paper-now-title"]') as HTMLElement).textContent || '';
-    expect(title).toMatch(/Nifty, Bank Nifty and Sensex momentum/);
+    expect(title).toMatch(/Nifty, Bank Nifty, Sensex and evening Crude Mini momentum/);
     expect(title).toMatch(/watch-only/);
   });
 

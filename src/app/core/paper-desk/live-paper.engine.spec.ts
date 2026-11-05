@@ -7,6 +7,9 @@ import {
   LIVE_PAPER_BANK_RS,
   LIVE_PAPER_STOP_RS,
   LIVE_PAPER_TARGET_RS,
+  LIVE_PAPER_CRUDE_STOP_RS,
+  LIVE_PAPER_CRUDE_TARGET_RS,
+  LIVE_PAPER_CRUDE_MOM_K,
   LIVE_PAPER_COOLDOWN_MIN,
   PAPER_TEST_HONEST,
   PAPER_SCALP_BOOKS,
@@ -129,7 +132,7 @@ describe('Live paper desk', () => {
     });
 
   it('binds a cheap CE fill onto premium SL/TP: target 2× stop, no separate scratch', () => {
-    const cfg = { ...LIVE_PAPER_BOOKS[0], stopPct: undefined, targetPct: undefined };
+    const cfg = { ...LIVE_PAPER_BOOKS[0], stopPct: undefined, targetPct: undefined, stopRs: undefined, targetRs: undefined };
     const book = emptyBook(cfg);
     book.side = 'long';
     book.entry = 5400;
@@ -144,7 +147,7 @@ describe('Live paper desk', () => {
   });
 
   it('widens the stop to 1.5× the option 5-min range and keeps target at 2× stop', () => {
-    const cfg = { ...LIVE_PAPER_BOOKS[0], stopPct: undefined, targetPct: undefined };
+    const cfg = { ...LIVE_PAPER_BOOKS[0], stopPct: undefined, targetPct: undefined, stopRs: undefined, targetRs: undefined };
     const bars = [10, 30, 20, 20, 25].map((r, k) => ({ day: '2026-11-04', min: 600 + 5 * k, open: 100, high: 100 + r, low: 100, close: 100 }));
     expect(optionRangePts(bars)).toBe(20);
     expect(optionRangePts(bars.slice(0, 2))).toBeNull();
@@ -308,7 +311,7 @@ describe('Live paper desk', () => {
   const flatBars = (day: string, n: number, startMin: number, px = 100, rng = 2) =>
     Array.from({ length: n }, (_, k) => ({ day, min: startMin + 5 * k, open: px, high: px + rng / 2, low: px - rng / 2, close: px }));
 
-  it('trades Nifty, Bank and Sensex momentum; Crude and the other desks watch', () => {
+  it('trades Nifty, Bank, Sensex and evening Crude Mini momentum; the other desks watch', () => {
     const by = (under: string, desk = 'momentum') => LIVE_PAPER_BOOKS.find((b) => b.id === `${under}-${desk}`)!;
     expect(LIVE_PAPER_BOOKS).toHaveLength(20);
     for (const under of ['nifty', 'bank', 'sensex']) {
@@ -329,7 +332,18 @@ describe('Live paper desk', () => {
       });
       expect(by(under).skipStructures).toBeUndefined();
     }
-    expect(by('crude').strategy).toBe('watch');
+    expect(by('crude')).toMatchObject({
+      strategy: 'momentum',
+      stopRs: LIVE_PAPER_CRUDE_STOP_RS,
+      targetRs: LIVE_PAPER_CRUDE_TARGET_RS,
+      minDayNetRs: LIVE_PAPER_BANK_RS,
+      maxWinsPerDay: 2,
+      barMinutes: 1,
+      momK: LIVE_PAPER_CRUDE_MOM_K,
+      entryS: 17 * 60 + 15,
+      orS: 17 * 60,
+      noConfirm: false,
+    });
     for (const under of ['nifty', 'sensex', 'bank', 'crude']) {
       expect(by(under, 'orb').strategy).toBe('watch');
       expect(by(under, 'pdhl').strategy).toBe('watch');
@@ -339,7 +353,7 @@ describe('Live paper desk', () => {
     expect(by('crude', 'orb').orS).toBe(9 * 60);
     expect(by('nifty', 'orb').orS).toBe(9 * 60 + 15);
     expect(PAPER_TEST_HONEST).toMatch(/Not a guaranteed profit/);
-    expect(PAPER_TEST_HONEST).toMatch(/Crude Mini was red/);
+    expect(PAPER_TEST_HONEST).toMatch(/evening only/);
   });
 
   it('fires momentum only past 1.5×√6 × the 20-bar mean range, from the 7th bar of the day', () => {

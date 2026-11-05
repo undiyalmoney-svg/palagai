@@ -216,7 +216,7 @@ export class LivePaperService {
           const hist = (await firstValueFrom(
             this.kiteApi.getHistoricalData({
               instrumentToken: String(inst.token),
-              interval: under === 'crude' ? '5minute' : 'minute',
+              interval: 'minute',
               from,
               to: day,
               authorization: auth,

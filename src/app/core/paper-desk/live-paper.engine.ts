@@ -30,6 +30,10 @@ export const LIVE_PAPER_BANK_RS = 150;
 export const LIVE_PAPER_TARGET_RS = 150;
 /** Give back at most this many rupees on a loss. */
 export const LIVE_PAPER_STOP_RS = 100;
+/** Crude Mini evening only: bigger thrust, ₹200 bank, stop after 2 wins. */
+export const LIVE_PAPER_CRUDE_TARGET_RS = 200;
+export const LIVE_PAPER_CRUDE_STOP_RS = 100;
+export const LIVE_PAPER_CRUDE_MOM_K = 1.5;
 const EXIT: Partial<LiveAssumeBookCfg> = {
   backup: {},
   stopPct: 0.4,
@@ -44,9 +48,9 @@ const EXIT: Partial<LiveAssumeBookCfg> = {
   freshCross: true,
 };
 
-/** Cards stay so the blotter can show watches. Nifty, Bank Nifty and Sensex momentum may open. Crude stays watch. */
+/** Cards stay so the blotter can show watches. Four momentum books may open; orb/pdhl/vwap/trap stay watch. */
 export const PAPER_DESKS: { id: string; label: string; rule: string }[] = [
-  { id: 'momentum', label: 'Momentum', rule: 'Nifty / Bank / Sensex 1-min thrust — bank ₹150, stop ₹100, 5 trades per day, done at 3 wins or ₹150 net' },
+  { id: 'momentum', label: 'Momentum', rule: 'Nifty / Bank / Sensex 1-min thrust — bank ₹150, stop ₹100, done at 3 wins. Crude Mini evening only — bank ₹200, stop ₹100, done at 2 wins' },
   { id: 'orb', label: 'Opening range', rule: 'Watch — 3-year test −₹114/trade, CI crosses zero' },
   { id: 'pdhl', label: 'Prev-day break', rule: 'Watch — test CI crosses zero; not the pick' },
   { id: 'vwap', label: 'VWAP fade', rule: 'Watch — 3-year test −₹18/trade (AVGREJECT)' },
@@ -75,6 +79,24 @@ function deskPatch(desk: string, under: string): Partial<LiveAssumeBookCfg> {
       targetRs: LIVE_PAPER_TARGET_RS,
     };
   }
+  if (desk === 'momentum' && under === 'crude') {
+    return {
+      strategy: 'momentum',
+      primary: ALL('momentum'),
+      orS: 17 * 60,
+      orE: 17 * 60 + 15,
+      entryS: 17 * 60 + 15,
+      maxTradesPerDay: 5,
+      maxWinsPerDay: 2,
+      minDayNetRs: LIVE_PAPER_BANK_RS,
+      barMinutes: 1,
+      momK: LIVE_PAPER_CRUDE_MOM_K,
+      minGapMin: 10,
+      holdBars: 60,
+      stopRs: LIVE_PAPER_CRUDE_STOP_RS,
+      targetRs: LIVE_PAPER_CRUDE_TARGET_RS,
+    };
+  }
   if (desk === 'orb') {
     return { strategy: 'watch', primary: ALL('orb_break'), orS: open, orE: open + 15, entryS: open + 15 };
   }
@@ -92,10 +114,10 @@ function deskPatch(desk: string, under: string): Partial<LiveAssumeBookCfg> {
 
 export const PAPER_MOMENTUM: Partial<LiveAssumeBookCfg> = { ...EXIT, ...deskPatch('momentum', 'nifty') };
 export const PAPER_TEST_HONEST =
-  'Index-proxy pick, not a proven live edge: Nifty, Bank Nifty and Sensex momentum. ATM CE (up) or PE (down), nearest expiry that is not today, ' +
-  '1 lot at the live ask, bank ₹150 / stop ₹100, next 1-min fill, exact charges. ' +
-  '5 trades per day, stop when 3 have won or the day is already ≥ ₹150 net. 1-min 6-bar thrust at 0.8×. ' +
-  '6 Oct–4 Nov 2026 IST 1-min tape (0.5-delta proxy): Nifty 19/19 green days, Bank 19/19, Sensex 15/21. Crude Mini was red — it stays watch. ' +
+  'Index-proxy pick, not a proven live edge. ATM CE (up) or PE (down), 1 lot at the live ask, next 1-min confirm, exact charges. ' +
+  'Nifty / Bank / Sensex: bank ₹150 / stop ₹100, 0.8× thrust from 09:45, stop at 3 wins or ₹150 net. ' +
+  'Crude Mini: evening only from 17:15, 1.5× thrust, bank ₹200 / stop ₹100, stop at 2 wins — the day-session copy of the index rule is red on Crude. ' +
+  '5 Aug–4 Nov 2026 IST 1-min 0.5-delta: Nifty +₹5,318 (52/61 green), Bank +₹7,509 (50/61), Sensex +₹2,727 (44/63), Crude evening +₹1,568 (45/61; August −₹38). ' +
   'A ₹150 Nifty target is ~2.3 option points; live ask/spread can eat it. Forward paper is unproven until 400 trades and a one-sided 95% lower bound above zero on live asks. Not a guaranteed profit.';
 
 export const LIVE_PAPER_BOOKS: LiveAssumeBookCfg[] = PAPER_DESKS.flatMap((desk) =>
