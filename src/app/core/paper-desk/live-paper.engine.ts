@@ -38,7 +38,7 @@ const EXIT: Partial<LiveAssumeBookCfg> = {
 
 /** Cards stay so the blotter can show watches. Only Nifty momentum may open — that is the 3-year tape pick. */
 export const PAPER_DESKS: { id: string; label: string; rule: string }[] = [
-  { id: 'momentum', label: 'Momentum', rule: 'Nifty only — 6-bar thrust, skip a range morning, 1 trade a day' },
+  { id: 'momentum', label: 'Momentum', rule: 'Nifty only — 6-bar thrust, 1 trade a day, no extra skip' },
   { id: 'orb', label: 'Opening range', rule: 'Watch — 3-year test −₹114/trade, CI crosses zero' },
   { id: 'pdhl', label: 'Prev-day break', rule: 'Watch — test CI crosses zero; not the pick' },
   { id: 'vwap', label: 'VWAP fade', rule: 'Watch — 3-year test −₹18/trade (AVGREJECT)' },
@@ -57,7 +57,6 @@ function deskPatch(desk: string, under: string): Partial<LiveAssumeBookCfg> {
       orE: 9 * 60 + 30,
       entryS: 9 * 60 + 45,
       maxTradesPerDay: 1,
-      skipStructures: ['range'],
     };
   }
   if (desk === 'orb') {
@@ -79,7 +78,7 @@ export const PAPER_MOMENTUM: Partial<LiveAssumeBookCfg> = { ...EXIT, ...deskPatc
 export const PAPER_TEST_HONEST =
   'Historical pick, not a proven live edge: Nifty 50 momentum only. ATM CE (up) or PE (down), nearest expiry that is not today, ' +
   '1 lot at the live ask, stop 40%, target 100%, out after 2 hours or 15:15, next-bar fill, exact charges. ' +
-  'Skip a range morning (fake thrust) and take at most one trade a day. ' +
+  'One trade a day. No extra skip — a 15-min dead-exit would cut 28% of the 3-year winners. ' +
   'Sensex, Bank Nifty, Crude, the other four desks and Scalp are watch-only. The 3-year tape is modelled (previous-day VIX). ' +
   'Forward paper is unproven until 400 trades and a one-sided 95% lower bound above zero on live asks. Not a guaranteed profit.';
 

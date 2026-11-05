@@ -317,9 +317,9 @@ describe('Live paper desk', () => {
       atm: true,
       noConfirm: false,
       dayStops: false,
-      skipStructures: ['range'],
       orE: 9 * 60 + 30,
     });
+    expect(by('nifty').skipStructures).toBeUndefined();
     for (const under of ['sensex', 'bank', 'crude']) {
       expect(by(under).strategy).toBe('watch');
     }
@@ -386,7 +386,7 @@ describe('Live paper desk', () => {
     expect(timed.fills[0].reason).toBe('time');
   });
 
-  it('caps Nifty momentum at 1 trade a day and skips a range morning', () => {
+  it('caps Nifty momentum at 1 trade a day', () => {
     const nifty = LIVE_PAPER_BOOKS.find((b) => b.id === 'nifty-momentum')!;
     const bars = [...flatBars('2026-11-03', 20, 13 * 60 + 35, 24000), ...flatBars('2026-11-04', 7, 9 * 60 + 15, 24000)];
     bars[bars.length - 1] = { ...bars[bars.length - 1], close: 24020, high: 24021 };
@@ -395,20 +395,6 @@ describe('Live paper desk', () => {
     const capped = tickBook(full, nifty, bars, 24020, '2026-11-04', 9 * 60 + 51, 'NIFTY 50');
     expect(capped.side).toBe('flat');
     expect(capped.reason).toBe('max 1 trade today');
-
-    const rangeOr = [
-      { day: '2026-11-04', min: 9 * 60 + 15, open: 24000, high: 24120, low: 23900, close: 24040 },
-      { day: '2026-11-04', min: 9 * 60 + 20, open: 24040, high: 24100, low: 23920, close: 23980 },
-      { day: '2026-11-04', min: 9 * 60 + 25, open: 23980, high: 24080, low: 23910, close: 24010 },
-      { day: '2026-11-04', min: 9 * 60 + 30, open: 24010, high: 24090, low: 23940, close: 24020 },
-      { day: '2026-11-04', min: 9 * 60 + 35, open: 24020, high: 24040, low: 24000, close: 24030 },
-      { day: '2026-11-04', min: 9 * 60 + 40, open: 24030, high: 24050, low: 24010, close: 24040 },
-      { day: '2026-11-04', min: 9 * 60 + 45, open: 24040, high: 24230, low: 24030, close: 24220 },
-    ];
-    const ranged = [...flatBars('2026-11-03', 20, 13 * 60 + 35, 24000), ...rangeOr];
-    const skipped = tickBook({ ...emptyBook(nifty), lastBarMin: 9 * 60 + 40 }, nifty, ranged, 24220, '2026-11-04', 9 * 60 + 51, 'NIFTY 50');
-    expect(skipped.side).toBe('flat');
-    expect(skipped.reason).toMatch(/range morning/);
   });
 
   it('writes a night log with desk totals and every closed fill', () => {
