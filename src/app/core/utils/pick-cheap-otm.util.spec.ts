@@ -89,4 +89,39 @@ describe('pickCheapOtm', () => {
     expect(pick.fitsBudget).toBe(true);
     expect(pick.instrument.tradingSymbol).toMatch(/CRUDEOILM/);
   });
+
+  it('refuses standard CRUDEOIL options and keeps CRUDEOILM', () => {
+    const chain = [
+      opt({
+        tradingSymbol: 'CRUDEOIL26NOV8300CE',
+        name: 'CRUDEOIL',
+        exchange: 'MCX',
+        instrumentType: 'CE',
+        expiry: '2026-11-17',
+        strike: 8300,
+        lotSize: 100,
+        lastPrice: 40,
+      }),
+      opt({
+        tradingSymbol: 'CRUDEOILM26NOV8300CE',
+        name: 'CRUDEOILM',
+        exchange: 'MCX',
+        instrumentType: 'CE',
+        expiry: '2026-11-17',
+        strike: 8300,
+        lotSize: 10,
+        lastPrice: 42,
+      }),
+    ];
+    const pick = pickCheapOtm({
+      instruments: chain,
+      book: 'crude',
+      direction: 'BUY',
+      spot: 8300,
+      asOf: new Date('2026-11-05T04:00:00Z'),
+    });
+    expect(pick.source).toBe('chain');
+    expect(pick.instrument.tradingSymbol).toBe('CRUDEOILM26NOV8300CE');
+    expect(pick.lotSize).toBe(10);
+  });
 });

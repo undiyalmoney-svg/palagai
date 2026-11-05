@@ -233,8 +233,14 @@ export class LivePaperService {
         const bars = barCache.get(under) || [];
         const underLast = lastPrice(quotes, under, inst?.tradingSymbol || '');
         const optLast = prev.optionSymbol ? lastByKey(quotes, optionKey(prev)) : null;
-        const lastForTick =
-          prev.side !== 'flat' && prev.optionSymbol ? (optLast ?? prev.last) : underLast;
+        const lastForTick = optionMarkLast({
+          buyOption: !!cfg.buyOption,
+          side: prev.side,
+          optionSymbol: prev.optionSymbol,
+          optLast,
+          prevLast: prev.last,
+          underLast,
+        });
         let optionBars: LiveAssumeBar[] = [];
         if (prev.side !== 'flat' && prev.optionToken) {
           const hist = (await firstValueFrom(
@@ -259,12 +265,26 @@ export class LivePaperService {
           optionBars,
         );
         if (cfg.buyOption && needsOption(next)) {
-          const spot = underLast ?? next.last ?? next.entry ?? 0;
+          const spot = underLast ?? (next.optionSymbol ? next.last : null) ?? 0;
           const pair = cheapByUnder.get(under);
           next = await this.bindCheap(next, cfg, chain, spot, quotes, nowMin, auth, pair);
           if (next.side !== 'flat' && next.optionToken) {
             next = { ...next, lastBarMin: nowMin - (nowMin % 5) };
           }
+        }
+        if (cfg.buyOption && next.side !== 'flat' && !next.optionSymbol) {
+          next = {
+            ...next,
+            side: 'flat',
+            entry: null,
+            sl: null,
+            tp: null,
+            scratch: null,
+            livePts: 0,
+            liveRs: 0,
+            status: 'watching',
+            reason: 'skipped: no option fill',
+          };
         } else if (next.side !== 'flat' && next.optionSymbol && optLast != null) {
           next = { ...next, last: optLast };
         }
@@ -723,6 +743,21 @@ export function needsOption(next: LivePaperBookState): boolean {
   return next.side !== 'flat' && !next.optionSymbol;
 }
 
+/** Open CE/PE books are marked on the option last, never on the index or future. */
+export function optionMarkLast(args: {
+  buyOption: boolean;
+  side: LivePaperBookState['side'];
+  optionSymbol?: string;
+  optLast: number | null;
+  prevLast: number | null;
+  underLast: number | null;
+}): number | null {
+  if (!args.buyOption) return args.underLast;
+  if (args.side !== 'flat' && args.optionSymbol) return args.optLast ?? args.prevLast;
+  if (args.side !== 'flat') return args.prevLast;
+  return args.underLast;
+}
+
 function instOf(
   under: string,
   crude: { tradingSymbol: string; token: number; exchange: string } | null,
@@ -796,7 +831,9 @@ function lastPrice(
 ): number | null {
   for (const [k, v] of Object.entries(quotes)) {
     const key = k.toUpperCase();
-    if (id === 'crude' && key.includes('CRUDE')) return Number(v.last_price) || null;
+    if (id === 'crude' && key.includes('CRUDEOILM') && !key.includes('CE') && !key.includes('PE')) {
+      return Number(v.last_price) || null;
+    }
     if (id === 'nifty' && key.includes('NIFTY 50')) return Number(v.last_price) || null;
     if (id === 'bank' && key.includes('BANK')) return Number(v.last_price) || null;
     if (id === 'sensex' && key.includes('SENSEX')) return Number(v.last_price) || null;

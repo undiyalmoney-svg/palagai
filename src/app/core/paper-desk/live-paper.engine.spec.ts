@@ -312,6 +312,7 @@ describe('Live paper desk', () => {
       expect(by(under)).toMatchObject({ strategy: 'momentum', stopPct: 0.4, targetPct: 1, holdBars: 24, maxTradesPerDay: 3, atm: true });
       expect(by(under, 'orb').primary['trend']).toBe('orb_break');
       expect(by(under, 'pdhl').primary['trend']).toBe('pdhl');
+      expect(by(under, 'vwap').strategy).toBe('watch');
       expect(by(under, 'vwap').primary['trend']).toBe('vwap_fade');
       expect(by(under, 'trap').primary['trend']).toBe('trap');
     }

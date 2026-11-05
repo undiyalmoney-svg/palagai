@@ -62,7 +62,7 @@ function isBookOption(item: Instrument, book: Option14kBookId): boolean {
     return sym.startsWith('SENSEX') || nm === 'SENSEX';
   }
   if (ex !== 'MCX') return false;
-  return sym.startsWith('CRUDEOILM') || nm === 'CRUDEOILM' || sym.startsWith('CRUDEOIL');
+  return sym.startsWith('CRUDEOILM') || nm === 'CRUDEOILM';
 }
 
 function lotOf(item: Instrument, book: Option14kBookId): number {

@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { Instrument } from '../models/instrument.model';
 import { pickCheapOtm } from '../utils/pick-cheap-otm.util';
 import { emptyBook, LIVE_PAPER_BOOKS } from './live-paper.engine';
-import { LivePaperService, bestBidAsk, needsOption, nextExpiryAsOf } from './live-paper.service';
+import { LivePaperService, bestBidAsk, needsOption, nextExpiryAsOf, optionMarkLast } from './live-paper.service';
 
 describe('LivePaperService', () => {
   beforeEach(() => {
@@ -62,5 +62,38 @@ describe('LivePaperService', () => {
       pickCheapOtm({ instruments: chain, book: 'sensex', direction: 'BUY', spot: 77300, asOf: at, premiumBudgetRs: 1e7 });
     expect(pick(asOf).expiry).toBe('2026-11-05');
     expect(pick(nextExpiryAsOf(asOf)).expiry).toBe('2026-11-12');
+  });
+
+  it('never marks an open option book on the index or future', () => {
+    expect(
+      optionMarkLast({
+        buyOption: true,
+        side: 'long',
+        optionSymbol: 'NIFTY26N0924450PE',
+        optLast: 113,
+        prevLast: 150,
+        underLast: 24450,
+      }),
+    ).toBe(113);
+    expect(
+      optionMarkLast({
+        buyOption: true,
+        side: 'long',
+        optionSymbol: 'NIFTY26N0924450PE',
+        optLast: null,
+        prevLast: 150,
+        underLast: 24450,
+      }),
+    ).toBe(150);
+    expect(
+      optionMarkLast({
+        buyOption: true,
+        side: 'long',
+        optionSymbol: '',
+        optLast: null,
+        prevLast: 150,
+        underLast: 24450,
+      }),
+    ).toBe(150);
   });
 });

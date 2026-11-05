@@ -40,7 +40,7 @@ export const PAPER_DESKS: { id: string; label: string; rule: string }[] = [
   { id: 'momentum', label: 'Momentum', rule: '30-min thrust > 1.5× normal bar' },
   { id: 'orb', label: 'Opening range', rule: 'First close beyond the first 15-min range' },
   { id: 'pdhl', label: 'Prev-day break', rule: 'First close through yesterday high or low' },
-  { id: 'vwap', label: 'VWAP fade', rule: 'Fade a stretch from the session average' },
+  { id: 'vwap', label: 'VWAP fade', rule: 'Watch only — fade on ATM options is what lost 5 Nov' },
   { id: 'trap', label: 'Failed break', rule: 'Stop-run that closes back inside the 6-bar range' },
 ];
 
@@ -58,7 +58,7 @@ function deskPatch(desk: string, under: string): Partial<LiveAssumeBookCfg> {
     return { strategy: 'rules', primary: ALL('pdhl'), entryS: afterOpen };
   }
   if (desk === 'vwap') {
-    return { strategy: 'rules', primary: ALL('vwap_fade'), entryS: afterOpen };
+    return { strategy: 'watch', primary: ALL('vwap_fade'), entryS: afterOpen };
   }
   return { strategy: 'rules', primary: ALL('trap'), entryS: afterOpen };
 }
@@ -67,7 +67,7 @@ export const PAPER_MOMENTUM: Partial<LiveAssumeBookCfg> = { ...EXIT, ...deskPatc
 export const PAPER_TEST_HONEST =
   'Five desks × four names, same exit: ATM CE (up) or PE (down), nearest expiry that is not today, 1 lot at the live ask, ' +
   'stop 40%, target 100%, out after 2 hours or flatten (15:15 index, 23:10 crude), max 3 trades a book a day, exact charges. ' +
-  'Paper test for one month — not a guaranteed profit.';
+  'VWAP option desk is watch-only after the 5 Nov fade loss. Paper test for one month — not a guaranteed profit.';
 
 export const LIVE_PAPER_BOOKS: LiveAssumeBookCfg[] = PAPER_DESKS.flatMap((desk) =>
   OPTION_14K_LIST.map((plan) => ({
