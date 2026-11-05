@@ -125,6 +125,8 @@ export interface LiveAssumeBookCfg {
   targetRs?: number;
   /** Stop taking new trades after this many green fills today. */
   maxWinsPerDay?: number;
+  /** Stop taking new trades once today's closed net (after charges) is at least this. */
+  minDayNetRs?: number;
   /** Candle size in minutes. 1 = 1-minute thrust (needed for 5 trades a day). */
   barMinutes?: number;
   /** Momentum multiple. Default 1.5. 0.8 is the 1-min 3-of-5 print. */

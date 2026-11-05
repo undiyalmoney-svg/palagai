@@ -24,8 +24,12 @@ import { SignalCard, SkippedSignal } from './paper-analytics.models';
 const ALL = (mode: string) => ({ trend: mode, range: mode, quiet: mode, stand: mode });
 /** One failed Nifty ATM cannot take more than this. 40% of a ₹300+ premium is ~₹8k — too much for a ₹14k book. */
 export const LIVE_PAPER_MAX_STOP_RS = 3_000;
-/** Bank this many rupees and get out. Same rupees on the stop. */
-export const LIVE_PAPER_BANK_RS = 375;
+/** Stop the day once closed net is at least this. Three ₹150 targets after charges lock ~₹200. */
+export const LIVE_PAPER_BANK_RS = 150;
+/** Bank this many rupees on a win. */
+export const LIVE_PAPER_TARGET_RS = 150;
+/** Give back at most this many rupees on a loss. */
+export const LIVE_PAPER_STOP_RS = 100;
 const EXIT: Partial<LiveAssumeBookCfg> = {
   backup: {},
   stopPct: 0.4,
@@ -40,9 +44,9 @@ const EXIT: Partial<LiveAssumeBookCfg> = {
   freshCross: true,
 };
 
-/** Cards stay so the blotter can show watches. Only Nifty momentum may open — that is the 3-year tape pick. */
+/** Cards stay so the blotter can show watches. Nifty, Bank Nifty and Sensex momentum may open. Crude stays watch. */
 export const PAPER_DESKS: { id: string; label: string; rule: string }[] = [
-  { id: 'momentum', label: 'Momentum', rule: 'Nifty 1-min thrust — bank ₹375, stop ₹375, 5 trades per day, done at 3 wins' },
+  { id: 'momentum', label: 'Momentum', rule: 'Nifty / Bank / Sensex 1-min thrust — bank ₹150, stop ₹100, 5 trades per day, done at 3 wins or ₹150 net' },
   { id: 'orb', label: 'Opening range', rule: 'Watch — 3-year test −₹114/trade, CI crosses zero' },
   { id: 'pdhl', label: 'Prev-day break', rule: 'Watch — test CI crosses zero; not the pick' },
   { id: 'vwap', label: 'VWAP fade', rule: 'Watch — 3-year test −₹18/trade (AVGREJECT)' },
@@ -53,7 +57,7 @@ function deskPatch(desk: string, under: string): Partial<LiveAssumeBookCfg> {
   const crude = under === 'crude';
   const open = crude ? 9 * 60 : 9 * 60 + 15;
   const afterOpen = crude ? 9 * 60 + 30 : 9 * 60 + 45;
-  if (desk === 'momentum' && under === 'nifty') {
+  if (desk === 'momentum' && (under === 'nifty' || under === 'bank' || under === 'sensex')) {
     return {
       strategy: 'momentum',
       primary: ALL('momentum'),
@@ -62,12 +66,13 @@ function deskPatch(desk: string, under: string): Partial<LiveAssumeBookCfg> {
       entryS: 9 * 60 + 45,
       maxTradesPerDay: 5,
       maxWinsPerDay: 3,
+      minDayNetRs: LIVE_PAPER_BANK_RS,
       barMinutes: 1,
       momK: 0.8,
       minGapMin: 10,
       holdBars: 60,
-      stopRs: LIVE_PAPER_BANK_RS,
-      targetRs: LIVE_PAPER_BANK_RS,
+      stopRs: LIVE_PAPER_STOP_RS,
+      targetRs: LIVE_PAPER_TARGET_RS,
     };
   }
   if (desk === 'orb') {
@@ -87,12 +92,11 @@ function deskPatch(desk: string, under: string): Partial<LiveAssumeBookCfg> {
 
 export const PAPER_MOMENTUM: Partial<LiveAssumeBookCfg> = { ...EXIT, ...deskPatch('momentum', 'nifty') };
 export const PAPER_TEST_HONEST =
-  'Historical pick, not a proven live edge: Nifty 50 momentum only. ATM CE (up) or PE (down), nearest expiry that is not today, ' +
-  '1 lot at the live ask, bank ₹375 / stop ₹375, next 1-min fill, exact charges. ' +
-  '5 trades per day, stop when 3 have won that day. 1-min 6-bar thrust at 0.8×. ' +
-  'On 15 live 1-min sessions this tagged 3 wins on 11 days. Not an 8-month proof. ' +
-  'Sensex, Bank Nifty, Crude, the other four desks and Scalp are watch-only. The 3-year tape is modelled (previous-day VIX). ' +
-  'Forward paper is unproven until 400 trades and a one-sided 95% lower bound above zero on live asks. Not a guaranteed profit.';
+  'Index-proxy pick, not a proven live edge: Nifty, Bank Nifty and Sensex momentum. ATM CE (up) or PE (down), nearest expiry that is not today, ' +
+  '1 lot at the live ask, bank ₹150 / stop ₹100, next 1-min fill, exact charges. ' +
+  '5 trades per day, stop when 3 have won or the day is already ≥ ₹150 net. 1-min 6-bar thrust at 0.8×. ' +
+  '6 Oct–4 Nov 2026 IST 1-min tape (0.5-delta proxy): Nifty 19/19 green days, Bank 19/19, Sensex 15/21. Crude Mini was red — it stays watch. ' +
+  'A ₹150 Nifty target is ~2.3 option points; live ask/spread can eat it. Forward paper is unproven until 400 trades and a one-sided 95% lower bound above zero on live asks. Not a guaranteed profit.';
 
 export const LIVE_PAPER_BOOKS: LiveAssumeBookCfg[] = PAPER_DESKS.flatMap((desk) =>
   OPTION_14K_LIST.map((plan) => ({
@@ -690,9 +694,13 @@ function hitExit(
 function canOpen(book: LivePaperBookState, cfg: LiveAssumeBookCfg, atMin: number, day: string): string | null {
   if (cfg.strategy === 'watch') return 'watch only: no tested edge';
   if (underOf(cfg.id) === 'crude' && LIVE_PAPER_CAPITAL < LIVE_ASSUME_CRUDE_MIN) return 'need ₹8,000 free for Crude';
-  if (cfg.maxTradesPerDay != null || cfg.maxWinsPerDay != null) {
+  if (cfg.maxTradesPerDay != null || cfg.maxWinsPerDay != null || cfg.minDayNetRs != null) {
     const modes = new Set(Object.values(cfg.primary));
     const today = book.fills.filter((f) => f.day === day && modes.has(f.mode));
+    const dayNet = today.reduce((s, f) => s + (f.rs || 0), 0);
+    if (cfg.minDayNetRs != null && dayNet >= cfg.minDayNetRs) {
+      return `banked ₹${cfg.minDayNetRs} today`;
+    }
     if (cfg.maxWinsPerDay != null && today.filter((f) => f.rs > 0).length >= cfg.maxWinsPerDay) {
       return `banked ${cfg.maxWinsPerDay} wins today`;
     }

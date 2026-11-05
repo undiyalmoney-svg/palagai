@@ -52,7 +52,7 @@ describe('Paper14kComponent', () => {
     expect(fixture.nativeElement.querySelector('[data-testid="desk-scalp"]')).toBeTruthy();
   });
 
-  it('says the Now card is watching Nifty momentum only', () => {
+  it('says the Now card is watching Nifty, Bank and Sensex momentum', () => {
     const paper = fixture.componentInstance['paper'];
     const cur = paper.session();
     paper.session.set({
@@ -64,7 +64,7 @@ describe('Paper14kComponent', () => {
     });
     fixture.detectChanges();
     const title = (fixture.nativeElement.querySelector('[data-testid="paper-now-title"]') as HTMLElement).textContent || '';
-    expect(title).toMatch(/Nifty 50 momentum only/);
+    expect(title).toMatch(/Nifty, Bank Nifty and Sensex momentum/);
     expect(title).toMatch(/watch-only/);
   });
 

@@ -5,6 +5,8 @@ import {
   LIVE_PAPER_BOOKS,
   LIVE_PAPER_CAPITAL,
   LIVE_PAPER_BANK_RS,
+  LIVE_PAPER_STOP_RS,
+  LIVE_PAPER_TARGET_RS,
   LIVE_PAPER_COOLDOWN_MIN,
   PAPER_TEST_HONEST,
   PAPER_SCALP_BOOKS,
@@ -306,27 +308,28 @@ describe('Live paper desk', () => {
   const flatBars = (day: string, n: number, startMin: number, px = 100, rng = 2) =>
     Array.from({ length: n }, (_, k) => ({ day, min: startMin + 5 * k, open: px, high: px + rng / 2, low: px - rng / 2, close: px }));
 
-  it('trades only Nifty momentum; the other 19 option books watch', () => {
+  it('trades Nifty, Bank and Sensex momentum; Crude and the other desks watch', () => {
     const by = (under: string, desk = 'momentum') => LIVE_PAPER_BOOKS.find((b) => b.id === `${under}-${desk}`)!;
     expect(LIVE_PAPER_BOOKS).toHaveLength(20);
-    expect(by('nifty')).toMatchObject({
-      strategy: 'momentum',
-      stopRs: LIVE_PAPER_BANK_RS,
-      targetRs: LIVE_PAPER_BANK_RS,
-      holdBars: 60,
-      maxTradesPerDay: 5,
-      maxWinsPerDay: 3,
-      barMinutes: 1,
-      momK: 0.8,
-      atm: true,
-      noConfirm: false,
-      dayStops: false,
-      orE: 9 * 60 + 30,
-    });
-    expect(by('nifty').skipStructures).toBeUndefined();
-    for (const under of ['sensex', 'bank', 'crude']) {
-      expect(by(under).strategy).toBe('watch');
+    for (const under of ['nifty', 'bank', 'sensex']) {
+      expect(by(under)).toMatchObject({
+        strategy: 'momentum',
+        stopRs: LIVE_PAPER_STOP_RS,
+        targetRs: LIVE_PAPER_TARGET_RS,
+        minDayNetRs: LIVE_PAPER_BANK_RS,
+        holdBars: 60,
+        maxTradesPerDay: 5,
+        maxWinsPerDay: 3,
+        barMinutes: 1,
+        momK: 0.8,
+        atm: true,
+        noConfirm: false,
+        dayStops: false,
+        orE: 9 * 60 + 30,
+      });
+      expect(by(under).skipStructures).toBeUndefined();
     }
+    expect(by('crude').strategy).toBe('watch');
     for (const under of ['nifty', 'sensex', 'bank', 'crude']) {
       expect(by(under, 'orb').strategy).toBe('watch');
       expect(by(under, 'pdhl').strategy).toBe('watch');
@@ -336,7 +339,7 @@ describe('Live paper desk', () => {
     expect(by('crude', 'orb').orS).toBe(9 * 60);
     expect(by('nifty', 'orb').orS).toBe(9 * 60 + 15);
     expect(PAPER_TEST_HONEST).toMatch(/Not a guaranteed profit/);
-    expect(PAPER_TEST_HONEST).toMatch(/Nifty 50 momentum only/);
+    expect(PAPER_TEST_HONEST).toMatch(/Crude Mini was red/);
   });
 
   it('fires momentum only past 1.5×√6 × the 20-bar mean range, from the 7th bar of the day', () => {
@@ -361,7 +364,7 @@ describe('Live paper desk', () => {
     expect(momentumSignal(small, small.length - 1, 0.8)).toBe(1);
   });
 
-  it('opens momentum after the confirm bar, binds ₹375 / ₹375 and exits on time', () => {
+  it('opens momentum after the confirm bar, binds ₹150 / ₹100 and exits on time', () => {
     const cfg = LIVE_PAPER_BOOKS.find((b) => b.id === 'nifty-momentum')!;
     const bars = [...flatBars('2026-11-03', 20, 13 * 60 + 35, 24000), ...flatBars('2026-11-04', 7, 9 * 60 + 15, 24000)];
     const last = bars.length - 1;
@@ -385,8 +388,8 @@ describe('Live paper desk', () => {
     expect(late.side).toBe('flat');
     expect(late.pendingDir).toBe(1);
     const bound = bindOptionFill(opened, cfg, 100, { ...crudePick(), lotSize: 65 } as never);
-    expect(bound.sl).toBe(94.23);
-    expect(bound.tp).toBe(105.77);
+    expect(bound.sl).toBe(98.46);
+    expect(bound.tp).toBe(102.31);
     const held = tickBook({ ...bound, lot: 65 }, cfg, [], 100, '2026-11-04', 9 * 60 + 55 + 55, 'NIFTY');
     expect(held.side).toBe('long');
     const timed = tickBook({ ...bound, lot: 65 }, cfg, [], 100, '2026-11-04', 9 * 60 + 55 + 60, 'NIFTY');
@@ -394,22 +397,26 @@ describe('Live paper desk', () => {
     expect(timed.fills[0].reason).toBe('time');
   });
 
-  it('binds a ₹375 bank and a ₹375 stop on an expensive ATM', () => {
+  it('binds a ₹150 bank and a ₹100 stop on an expensive ATM', () => {
     const cfg = LIVE_PAPER_BOOKS.find((b) => b.id === 'nifty-momentum')!;
     const book = { ...emptyBook(cfg), side: 'long' as const, status: 'open' as const };
     const dear = bindOptionFill(book, cfg, 336.6, { ...crudePick(), lotSize: 65 } as never);
-    expect(dear.sl).toBe(330.83);
-    expect(dear.tp).toBe(342.37);
-    expect(Math.round((336.6 - (dear.sl ?? 0)) * 65)).toBe(LIVE_PAPER_BANK_RS);
-    expect(Math.round(((dear.tp ?? 0) - 336.6) * 65)).toBe(LIVE_PAPER_BANK_RS);
+    expect(dear.sl).toBe(335.06);
+    expect(dear.tp).toBe(338.91);
+    expect(Math.round((336.6 - (dear.sl ?? 0)) * 65)).toBe(LIVE_PAPER_STOP_RS);
+    expect(Math.round(((dear.tp ?? 0) - 336.6) * 65)).toBe(LIVE_PAPER_TARGET_RS);
   });
 
-  it('stops Nifty momentum after 3 wins or 5 trades that day', () => {
+  it('stops Nifty momentum after ₹150 net, 3 wins, or 5 trades that day', () => {
     const nifty = LIVE_PAPER_BOOKS.find((b) => b.id === 'nifty-momentum')!;
     const bars = [...flatBars('2026-11-03', 20, 13 * 60 + 35, 24000), ...flatBars('2026-11-04', 7, 9 * 60 + 15, 24000)];
     bars[bars.length - 1] = { ...bars[bars.length - 1], close: 24020, high: 24021 };
-    const win = { day: '2026-11-04', book: 'nifty', label: 'Nifty', side: 'long', entry: 1, exit: 1, sl: 1, tp: 1, pts: 0, rs: 375, reason: 'tp', mode: 'momentum' };
-    const loss = { ...win, rs: -375, reason: 'sl' };
+    const win = { day: '2026-11-04', book: 'nifty', label: 'Nifty', side: 'long', entry: 1, exit: 1, sl: 1, tp: 1, pts: 0, rs: 40, reason: 'tp', mode: 'momentum' };
+    const loss = { ...win, rs: -100, reason: 'sl' };
+    const banked = { ...emptyBook(nifty), lastBarMin: 9 * 60 + 40, fills: [{ ...win, rs: 80 }, { ...win, rs: 80 }] as never };
+    const locked = tickBook(banked, nifty, bars, 24020, '2026-11-04', 9 * 60 + 51, 'NIFTY 50');
+    expect(locked.side).toBe('flat');
+    expect(locked.reason).toBe('banked ₹150 today');
     const booked = { ...emptyBook(nifty), lastBarMin: 9 * 60 + 40, fills: [win, win, win] as never };
     const done = tickBook(booked, nifty, bars, 24020, '2026-11-04', 9 * 60 + 51, 'NIFTY 50');
     expect(done.side).toBe('flat');
@@ -418,7 +425,7 @@ describe('Live paper desk', () => {
     const capped = tickBook(five, nifty, bars, 24020, '2026-11-04', 9 * 60 + 51, 'NIFTY 50');
     expect(capped.side).toBe('flat');
     expect(capped.reason).toBe('max 5 trades today');
-    const yday = { ...win, day: '2026-11-03' };
+    const yday = { ...win, day: '2026-11-03', rs: 80 };
     const fresh = { ...emptyBook(nifty), lastBarMin: 9 * 60 + 40, fills: [yday, yday, yday] as never };
     const nextDay = tickBook(fresh, nifty, bars, 24020, '2026-11-04', 9 * 60 + 51, 'NIFTY 50');
     expect(nextDay.pendingDir).toBe(1);
