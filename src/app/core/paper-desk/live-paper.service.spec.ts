@@ -22,7 +22,7 @@ describe('LivePaperService', () => {
     expect(snap.liveOrders).toBe(false);
     expect(snap.guaranteed).toBe(false);
     expect(snap.kiteError).toMatch(/Connect Kite/);
-    expect(snap.books).toHaveLength(20);
+    expect(snap.books).toHaveLength(24);
   });
 
   it('reads best bid and ask from quote depth and returns null when the book is empty', () => {

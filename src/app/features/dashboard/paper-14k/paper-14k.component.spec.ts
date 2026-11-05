@@ -31,6 +31,8 @@ describe('Paper14kComponent', () => {
     expect(text).toMatch(/Prev-day break/);
     expect(text).toMatch(/VWAP fade/);
     expect(text).toMatch(/Failed break/);
+    expect(text).toMatch(/Scalp/);
+    expect(text).toMatch(/Capital/);
     expect(text).toMatch(/Closed today/);
     expect(text).toMatch(/Copy night log/);
     expect(text).toMatch(/no Kite order/);
@@ -45,8 +47,9 @@ describe('Paper14kComponent', () => {
     expect(fixture.nativeElement.querySelector('[data-testid="copy-night-log"]')).toBeTruthy();
     expect(fixture.componentInstance['paper'].session().liveOrders).toBe(false);
     expect(fixture.componentInstance['paper'].session().guaranteed).toBe(false);
-    expect(fixture.componentInstance['paper'].session().books).toHaveLength(20);
-    expect(fixture.componentInstance['booksFund']()).toBe(280_000);
+    expect(fixture.componentInstance['paper'].session().books).toHaveLength(24);
+    expect(fixture.componentInstance['booksFund']()).toBe(336_000);
+    expect(fixture.nativeElement.querySelector('[data-testid="desk-scalp"]')).toBeTruthy();
   });
 
   it('lists all four names on the Now card', () => {

@@ -102,8 +102,18 @@ export interface LiveAssumeBookCfg {
   expiryAfterTomorrow?: boolean;
   /** Underlying book (crude/nifty/bank/sensex) when id is `${under}-${desk}`. */
   under?: string;
-  /** Strategy desk id (momentum/orb/pdhl/vwap/trap). */
+  /** Strategy desk id (momentum/orb/pdhl/vwap/trap/scalp). */
   desk?: string;
+  /** Scalp vehicle: futures or cash MIS. Option desks leave this unset. */
+  kind?: 'fut' | 'eq';
+  qty?: number;
+  /** Fixed margin (NRML) when not computed from last × qty × misPct. */
+  capitalRs?: number;
+  misPct?: number;
+  /** NSE/MCX trading symbol for hist and quotes (scalp stocks / crude future). */
+  nseSymbol?: string;
+  /** VWAP fade distance as a fraction of typical price (0.0025 = 0.25%). */
+  vwapPct?: number;
 }
 
 /** Bar i's 6-bar close-to-close move and the move momentum needs (1.5 × √6 × mean range of the 20 bars before it). */
@@ -310,7 +320,8 @@ export function bookSignal(mode: string, bars: LiveAssumeBar[], i: number, cfg: 
     const sess = bars.filter((x) => x.day === b.day && x.min <= b.min);
     const typ = sess.reduce((s, x) => s + (x.high + x.low + x.close) / 3, 0) / Math.max(1, sess.length);
     const dist = b.close - typ;
-    if (Math.abs(dist) < cfg.vwapMin) return 0;
+    const need = cfg.vwapPct != null && typ > 0 ? typ * cfg.vwapPct : cfg.vwapMin;
+    if (Math.abs(dist) < need) return 0;
     if (dist > 0 && dn) return -1;
     if (dist < 0 && up) return 1;
     return 0;

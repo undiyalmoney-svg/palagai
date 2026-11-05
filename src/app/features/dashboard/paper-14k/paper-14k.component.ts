@@ -2,10 +2,11 @@ import { DecimalPipe } from '@angular/common';
 import { Component, OnDestroy, computed, inject, signal } from '@angular/core';
 import { LivePaperService } from '../../../core/paper-desk/live-paper.service';
 import {
-  LIVE_PAPER_BOOKS,
+  ALL_PAPER_BOOKS,
   LivePaperBookState,
   OptionPickView,
   PAPER_DESKS,
+  PAPER_SCALP,
   allClosedFills,
   booksFundEnd,
   deskOf,
@@ -40,6 +41,16 @@ export class Paper14kComponent implements OnDestroy {
       };
     });
   });
+  protected readonly scalp = computed(() => {
+    const rows = this.paper.session().books.filter((b) => (b.desk || deskOf(b.id)) === PAPER_SCALP.id);
+    return {
+      ...PAPER_SCALP,
+      books: rows,
+      liveRs: Math.round(rows.reduce((s, b) => s + (b.side === 'flat' ? 0 : b.liveRs), 0) * 10) / 10,
+      closedRs: Math.round(rows.reduce((s, b) => s + b.closedRs, 0) * 10) / 10,
+      capitalUsed: Math.round(rows.reduce((s, b) => s + (b.capitalUsed || 0), 0)),
+    };
+  });
 
   ngOnDestroy(): void {
     clearInterval(this.clockTimer);
@@ -67,6 +78,7 @@ export class Paper14kComponent implements OnDestroy {
 
   protected deskLabel(id: string): string {
     const desk = id.includes('-') ? deskOf(id) : id;
+    if (desk === PAPER_SCALP.id) return PAPER_SCALP.label;
     return PAPER_DESKS.find((d) => d.id === desk)?.label || desk;
   }
 
@@ -136,8 +148,10 @@ export class Paper14kComponent implements OnDestroy {
 }
 
 function tradeLine(b: LivePaperBookState): string {
-  const cfg = LIVE_PAPER_BOOKS.find((c) => c.id === b.id);
-  const desk = PAPER_DESKS.find((d) => d.id === (b.desk || deskOf(b.id)))?.label || '';
+  const cfg = ALL_PAPER_BOOKS.find((c) => c.id === b.id);
+  const deskId = b.desk || deskOf(b.id);
+  const desk =
+    deskId === PAPER_SCALP.id ? PAPER_SCALP.label : PAPER_DESKS.find((d) => d.id === deskId)?.label || '';
   const name = optionPickLabel(b) || b.label;
   const since = b.entryMin != null ? ` from ${hhmm(b.entryMin)}` : '';
   const flat = cfg?.flat ?? 15 * 60 + 15;

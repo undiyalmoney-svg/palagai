@@ -205,6 +205,7 @@ describe('Paper14kComponent views', () => {
     expect(f.nativeElement.querySelector('[data-testid="desk-pdhl"]')).toBeTruthy();
     expect(f.nativeElement.querySelector('[data-testid="desk-vwap"]')).toBeTruthy();
     expect(f.nativeElement.querySelector('[data-testid="desk-trap"]')).toBeTruthy();
+    expect(f.nativeElement.querySelector('[data-testid="desk-scalp"]')).toBeTruthy();
     expect(f.nativeElement.querySelector('[data-testid="live-paper-fills"]')).toBeTruthy();
     expect(f.nativeElement.querySelector('[data-testid="view-performance"]')).toBeNull();
     expect(f.componentInstance['paper'].session().liveOrders).toBe(false);

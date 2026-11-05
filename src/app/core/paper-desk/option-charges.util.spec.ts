@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { optionChargeBreakdown, optionRoundTripCharges, venueForBook } from './option-charges.util';
+import {
+  equityMisRoundTripCharges,
+  futuresRoundTripCharges,
+  optionChargeBreakdown,
+  optionRoundTripCharges,
+  venueForBook,
+} from './option-charges.util';
 
 // Reference values come from market-recorder/research/costs.py (options_round_trip).
 describe('option round-trip charges', () => {
@@ -33,5 +39,12 @@ describe('option round-trip charges', () => {
     expect(venueForBook('nifty-momentum')).toBe('NSE');
     expect(venueForBook('sensex-orb')).toBe('BSE');
     expect(venueForBook('crude-trap')).toBe('MCX');
+  });
+
+  it('charges a Crude Mini futures round trip and an equity MIS scalp', () => {
+    expect(futuresRoundTripCharges(9128, 9128, 10, 'MCX')).toBeGreaterThan(50);
+    expect(futuresRoundTripCharges(9128, 9128, 10, 'MCX')).toBeLessThan(80);
+    expect(equityMisRoundTripCharges(1400, 1400, 50)).toBeGreaterThan(60);
+    expect(equityMisRoundTripCharges(1400, 1400, 50)).toBeLessThan(90);
   });
 });

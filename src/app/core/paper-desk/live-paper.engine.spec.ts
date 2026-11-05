@@ -6,6 +6,7 @@ import {
   LIVE_PAPER_CAPITAL,
   LIVE_PAPER_COOLDOWN_MIN,
   PAPER_TEST_HONEST,
+  PAPER_SCALP_BOOKS,
   bindOptionFill,
   nightLog,
   optionRangePts,
@@ -25,14 +26,18 @@ describe('Live paper desk', () => {
     expect(snap.guaranteed).toBe(false);
     expect(snap.armedOnCrudeBest).toBe(false);
     expect(snap.assumed).toBe(true);
-    expect(snap.books).toHaveLength(20);
-    expect(new Set(snap.books.map((b) => b.under))).toEqual(new Set(['crude', 'nifty', 'bank', 'sensex']));
-    expect(new Set(snap.books.map((b) => b.desk)).size).toBe(5);
+    expect(snap.books).toHaveLength(24);
+    expect(snap.books.filter((b) => b.desk !== 'scalp')).toHaveLength(20);
+    expect(new Set(snap.books.filter((b) => b.desk !== 'scalp').map((b) => b.under))).toEqual(
+      new Set(['crude', 'nifty', 'bank', 'sensex']),
+    );
+    expect(new Set(snap.books.map((b) => b.desk)).size).toBe(6);
     expect(snap.books.every((b) => b.fund === LIVE_PAPER_CAPITAL)).toBe(true);
-    expect(booksFundEnd(snap.books)).toBe(280_000);
+    expect(booksFundEnd(snap.books)).toBe(336_000);
     expect(snap.honest).toMatch(/Paper only/);
     expect(snap.honest).toMatch(/No Kite order/i);
     expect(snap.honest).toMatch(/buy CE\/PE/);
+    expect(LIVE_PAPER_BOOKS).toHaveLength(20);
     expect(LIVE_PAPER_BOOKS.every((b) => b.buyOption)).toBe(true);
     expect(LIVE_PAPER_BOOKS.map((b) => b.product).join(' ')).toMatch(/CE\/PE/);
   });
@@ -391,7 +396,7 @@ describe('Live paper desk', () => {
     snap.books = snap.books.map((b) => (b.id === cfg.id ? done : b));
     snap.closedRs = done.closedRs;
     const log = nightLog(snap);
-    expect(log.desks).toHaveLength(5);
+    expect(log.desks).toHaveLength(6);
     const orb = log.desks.find((d) => d.desk === 'orb')!;
     expect(orb.trades).toBe(1);
     expect(orb.losses).toBe(1);
@@ -404,5 +409,33 @@ describe('Live paper desk', () => {
     });
     expect(log.fills[0].charges).toBeGreaterThan(0);
     expect(log.fills[0].holdMin).toBe(30);
+  });
+
+  it('keeps scalp off the five CE/PE desks and sizes stop/target as 0.15% / 0.25%', () => {
+    expect(PAPER_SCALP_BOOKS).toHaveLength(4);
+    expect(PAPER_SCALP_BOOKS.every((b) => b.desk === 'scalp' && b.buyOption === false)).toBe(true);
+    expect(PAPER_SCALP_BOOKS.map((b) => b.id)).toEqual([
+      'crude-scalp',
+      'reliance-scalp',
+      'hdfcbank-scalp',
+      'infy-scalp',
+    ]);
+    const cfg = PAPER_SCALP_BOOKS.find((b) => b.id === 'reliance-scalp')!;
+    const book = { ...emptyBook(cfg), lastBarMin: 9 * 60 + 25 };
+    const bars = [
+      { day: '2026-11-05', min: 9 * 60 + 15, open: 1400, high: 1402, low: 1398, close: 1401 },
+      { day: '2026-11-05', min: 9 * 60 + 20, open: 1401, high: 1403, low: 1400, close: 1402 },
+      { day: '2026-11-05', min: 9 * 60 + 30, open: 1412, high: 1414, low: 1408, close: 1409 },
+    ];
+    const opened = tickBook(book, cfg, bars, 1409, '2026-11-05', 9 * 60 + 41, 'RELIANCE');
+    expect(opened.side).toBe('short');
+    expect(opened.sl).toBeCloseTo(1409 * 1.0015, 1);
+    expect(opened.tp).toBeCloseTo(1409 * 0.9975, 1);
+    expect(opened.capitalUsed).toBe(Math.round(1409 * 50 * 0.2));
+    const stopped = tickBook({ ...opened, lastBarMin: 9 * 60 + 35 }, cfg, [], 1415, '2026-11-05', 10 * 60, 'RELIANCE');
+    expect(stopped.side).toBe('flat');
+    expect(stopped.fills[0].reason).toBe('sl');
+    expect(stopped.fills[0].desk).toBe('scalp');
+    expect(stopped.fills[0].charges).toBeGreaterThan(0);
   });
 });

@@ -12,7 +12,12 @@ import {
 } from './live-assume.engine';
 import { OPTION_14K_BOOKS, OPTION_14K_LIST, Option14kBookId, option14kToPaperCfg } from './option-14k-plan';
 import { CheapOtmPick } from '../utils/pick-cheap-otm.util';
-import { optionRoundTripCharges, venueForBook } from './option-charges.util';
+import {
+  equityMisRoundTripCharges,
+  futuresRoundTripCharges,
+  optionRoundTripCharges,
+  venueForBook,
+} from './option-charges.util';
 import { SignalCard, SkippedSignal } from './paper-analytics.models';
 
 const ALL = (mode: string) => ({ trend: mode, range: mode, quiet: mode, stand: mode });
@@ -75,6 +80,89 @@ export const LIVE_PAPER_BOOKS: LiveAssumeBookCfg[] = PAPER_DESKS.flatMap((desk) 
     product: `ATM CE/PE ×${plan.lot}`,
   })),
 );
+
+/** Separate from the five CE/PE desks. VWAP fade on Crude Mini futures + three cash stocks. */
+export const PAPER_SCALP = {
+  id: 'scalp',
+  label: 'Scalp',
+  rule: '5-min VWAP fade · 0.15% stop · 0.25% target',
+};
+const SCALP_EXIT: Partial<LiveAssumeBookCfg> = {
+  buyOption: false,
+  strategy: 'rules',
+  primary: ALL('vwap_fade'),
+  backup: {},
+  stopPct: 0.0015,
+  targetPct: 0.0025,
+  vwapPct: 0.0025,
+  holdBars: 12,
+  maxTradesPerDay: 3,
+  minGapBars: 6,
+  noConfirm: true,
+  dayStops: true,
+  desk: 'scalp',
+  freshCross: true,
+  atm: false,
+};
+const NIFTY_PLAN = option14kToPaperCfg(OPTION_14K_BOOKS.nifty);
+const CRUDE_PLAN = option14kToPaperCfg(OPTION_14K_BOOKS.crude);
+
+function scalpStock(id: string, label: string, symbol: string, qty: number): LiveAssumeBookCfg {
+  return {
+    ...NIFTY_PLAN,
+    ...SCALP_EXIT,
+    id: `${id}-scalp`,
+    under: id,
+    desk: 'scalp',
+    label,
+    product: `MIS ×${qty}`,
+    kind: 'eq',
+    qty,
+    rsPt: qty,
+    nseSymbol: symbol,
+    misPct: 0.2,
+    sl: 2,
+    tp: 4,
+    scratch: 2,
+    entryS: 9 * 60 + 30,
+    orS: 9 * 60 + 15,
+    orE: 9 * 60 + 30,
+    flat: 15 * 60 + 15,
+  };
+}
+
+export const PAPER_SCALP_BOOKS: LiveAssumeBookCfg[] = [
+  {
+    ...CRUDE_PLAN,
+    ...SCALP_EXIT,
+    id: 'crude-scalp',
+    under: 'crude',
+    desk: 'scalp',
+    label: 'Crude Mini',
+    product: 'FUT ×10',
+    kind: 'fut',
+    qty: 10,
+    rsPt: 10,
+    nseSymbol: 'CRUDEOILM',
+    capitalRs: 28_450,
+    sl: 15,
+    tp: 25,
+    scratch: 15,
+    entryS: 9 * 60 + 15,
+    orS: 9 * 60,
+    orE: 9 * 60 + 15,
+    flat: 23 * 60 + 10,
+  },
+  scalpStock('reliance', 'Reliance', 'RELIANCE', 50),
+  scalpStock('hdfcbank', 'HDFC Bank', 'HDFCBANK', 50),
+  scalpStock('infy', 'Infosys', 'INFY', 50),
+];
+
+export const ALL_PAPER_BOOKS: LiveAssumeBookCfg[] = [...LIVE_PAPER_BOOKS, ...PAPER_SCALP_BOOKS];
+
+export function paperCfg(id: string): LiveAssumeBookCfg {
+  return ALL_PAPER_BOOKS.find((b) => b.id === id) || LIVE_PAPER_BOOKS[0];
+}
 
 export function underOf(id: string): Option14kBookId {
   const u = id.split('-')[0];
@@ -204,6 +292,8 @@ export interface LivePaperBookState {
   neededPe?: string;
   neededLot?: number;
   neededAtAsk?: boolean;
+  /** MIS / NRML rupees this scalp book is using. */
+  capitalUsed?: number;
   /** Losing closes today; the book stands down at LIVE_PAPER_MAX_LOSSES. */
   lossesToday?: number;
   /** IST minute before which no new entry is taken (set after a losing close). */
@@ -270,7 +360,7 @@ export function emptyBook(cfg: LiveAssumeBookCfg): LivePaperBookState {
     optionType: '',
     strike: null,
     expiry: '',
-    lot: 0,
+    lot: cfg.qty || 0,
     optionToken: 0,
     neededCeRs: null,
     neededCe: '',
@@ -282,7 +372,20 @@ export function emptyBook(cfg: LiveAssumeBookCfg): LivePaperBookState {
     cooldownUntil: -1,
     entryMin: null,
     lastSignalMin: -1,
+    capitalUsed: capitalUsedOf(cfg, { last: null, entry: null }),
   };
+}
+
+export function capitalUsedOf(
+  cfg: LiveAssumeBookCfg,
+  book: Pick<LivePaperBookState, 'last' | 'entry'>,
+): number {
+  if (cfg.capitalRs) return cfg.capitalRs;
+  const px = book.last ?? book.entry ?? 0;
+  const qty = cfg.qty || cfg.rsPt || 0;
+  const pct = cfg.misPct ?? 0.2;
+  if (!(px > 0) || !(qty > 0)) return 0;
+  return Math.round(px * qty * pct);
 }
 
 function isOptionBuy(cfg: LiveAssumeBookCfg): boolean {
@@ -354,7 +457,7 @@ export function restoreDayStops(book: LivePaperBookState, day: string): LivePape
 }
 
 export function emptySession(day: string, asOf = new Date().toISOString()): LivePaperSession {
-  const books = LIVE_PAPER_BOOKS.map((cfg) => emptyBook(cfg));
+  const books = ALL_PAPER_BOOKS.map((cfg) => emptyBook(cfg));
   return summarizePaper(books, {
     running: false,
     day,
@@ -386,8 +489,16 @@ export function completedBars(bars: LiveAssumeBar[], day: string, nowMin: number
 
 /** Rupee P/L of one round trip after charges: exact Zerodha schedule for option buys, flat charge otherwise. */
 export function netRs(cfg: LiveAssumeBookCfg, book: Pick<LivePaperBookState, 'lot'>, entry: number, exit: number, pts: number): number {
+  const qty = book.lot || cfg.qty || cfg.rsPt;
+  if (cfg.kind === 'eq') {
+    const charges = equityMisRoundTripCharges(entry, Math.max(0, exit), qty);
+    return Math.round((pts * qty - charges) * 10) / 10;
+  }
+  if (cfg.kind === 'fut') {
+    const charges = futuresRoundTripCharges(entry, Math.max(0, exit), qty, venueForBook(cfg.under || cfg.id));
+    return Math.round((pts * qty - charges) * 10) / 10;
+  }
   if (!isOptionBuy(cfg)) return Math.round((pts * cfg.rsPt - LIVE_PAPER_CHARGE) * 10) / 10;
-  const qty = book.lot || cfg.rsPt;
   const charges = optionRoundTripCharges(entry, Math.max(0, exit), qty, venueForBook(cfg.under || cfg.id));
   return Math.round((pts * qty - charges) * 10) / 10;
 }
@@ -417,10 +528,14 @@ function closeAt(
     ? exitPx - book.entry
     : (book.side === 'long' ? 1 : -1) * (exitPx - book.entry);
   const rs = netRs(cfg, book, book.entry, exitPx, pts);
-  const qty = book.lot || cfg.rsPt;
-  const charges = isOptionBuy(cfg)
-    ? optionRoundTripCharges(book.entry, Math.max(0, exitPx), qty, venueForBook(cfg.under || cfg.id))
-    : LIVE_PAPER_CHARGE;
+  const qty = book.lot || cfg.qty || cfg.rsPt;
+  const charges = cfg.kind === 'eq'
+    ? equityMisRoundTripCharges(book.entry, Math.max(0, exitPx), qty)
+    : cfg.kind === 'fut'
+      ? futuresRoundTripCharges(book.entry, Math.max(0, exitPx), qty, venueForBook(cfg.under || cfg.id))
+      : isOptionBuy(cfg)
+        ? optionRoundTripCharges(book.entry, Math.max(0, exitPx), qty, venueForBook(cfg.under || cfg.id))
+        : LIVE_PAPER_CHARGE;
   book.fills.push({
     day,
     book: book.id,
@@ -558,7 +673,14 @@ function openAt(
   const d = dir === 1 ? 1 : -1;
   book.side = d === 1 ? 'long' : 'short';
   book.entry = entry;
-  if (isOptionBuy(cfg)) {
+  if (cfg.kind === 'eq' || cfg.kind === 'fut') {
+    const stop = entry * (cfg.stopPct || 0.0015);
+    const tgt = entry * (cfg.targetPct || 0.0025);
+    book.sl = Math.round((entry - d * stop) * 100) / 100;
+    book.tp = Math.round((entry + d * tgt) * 100) / 100;
+    book.scratch = book.sl;
+    book.lot = cfg.qty || book.lot;
+  } else if (isOptionBuy(cfg)) {
     book.sl = Math.max(0.05, entry - cfg.sl);
     book.tp = entry + cfg.tp;
     book.scratch = book.sl;
@@ -710,6 +832,7 @@ export function tickBook(
   }
 
   markLive(next, last, cfg);
+  next.capitalUsed = capitalUsedOf(cfg, next);
   return next;
 }
 
@@ -742,7 +865,8 @@ export function summarizePaper(
     closedRs,
     honest:
       `Paper only — no Kite order is placed. Each book takes 1 lot at the live ask and shows that cash. ` +
-      `Motto: buy CE/PE. SL, target, and live P/L come from the option. ${fundsLine}${PAPER_TEST_HONEST}`,
+      `Motto: buy CE/PE. SL, target, and live P/L come from the option. ` +
+      `A separate Scalp card fades VWAP on Crude Mini futures and three cash stocks. ${fundsLine}${PAPER_TEST_HONEST}`,
   };
 }
 
@@ -757,7 +881,7 @@ export function booksFundEnd(books: LivePaperBookState[]): number {
 /** One night-research dump: every closed fill plus desk totals. Copy from Closed today. */
 export function nightLog(session: LivePaperSession) {
   const fills = allClosedFills(session.books);
-  const desks = PAPER_DESKS.map((d) => {
+  const desks = [...PAPER_DESKS, PAPER_SCALP].map((d) => {
     const books = session.books.filter((b) => (b.desk || deskOf(b.id)) === d.id);
     const rows = fills.filter((f) => (f.desk || deskOf(f.book)) === d.id);
     const wins = rows.filter((f) => f.rs > 0);
