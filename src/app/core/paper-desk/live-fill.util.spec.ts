@@ -30,7 +30,7 @@ describe('lotCostRs / neededLotQuote', () => {
 
 describe('replayBudgetSkips', () => {
   it('rewinds a flat book that was only skipped for budget, so today can still take that signal', () => {
-    const book = emptyBook(LIVE_PAPER_BOOKS.find((b) => b.id === 'bank')!);
+    const book = emptyBook(LIVE_PAPER_BOOKS.find((b) => b.id === 'bank-momentum')!);
     book.lastBarMin = 10 * 60 + 15;
     book.skips = [
       {
@@ -55,7 +55,7 @@ describe('replayBudgetSkips', () => {
   });
 
   it('does not rewind a book that already filled today', () => {
-    const book = emptyBook(LIVE_PAPER_BOOKS.find((b) => b.id === 'sensex')!);
+    const book = emptyBook(LIVE_PAPER_BOOKS.find((b) => b.id === 'sensex-momentum')!);
     book.lastBarMin = 11 * 60;
     book.fills = [{ day: '2026-11-04', book: 'sensex', label: 'Sensex', side: 'long', entry: 150, exit: 160, sl: 140, tp: 180, pts: 10, rs: 150, reason: 'tp', mode: 'pdhl' }];
     book.skips = [

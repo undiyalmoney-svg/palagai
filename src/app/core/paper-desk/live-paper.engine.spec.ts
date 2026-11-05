@@ -7,6 +7,7 @@ import {
   LIVE_PAPER_COOLDOWN_MIN,
   PAPER_TEST_HONEST,
   bindOptionFill,
+  nightLog,
   optionRangePts,
   optionStopPts,
   restoreDayStops,
@@ -24,10 +25,11 @@ describe('Live paper desk', () => {
     expect(snap.guaranteed).toBe(false);
     expect(snap.armedOnCrudeBest).toBe(false);
     expect(snap.assumed).toBe(true);
-    expect(snap.books).toHaveLength(4);
-    expect(snap.books.map((b) => b.id)).toEqual(['crude', 'nifty', 'bank', 'sensex']);
+    expect(snap.books).toHaveLength(20);
+    expect(new Set(snap.books.map((b) => b.under))).toEqual(new Set(['crude', 'nifty', 'bank', 'sensex']));
+    expect(new Set(snap.books.map((b) => b.desk)).size).toBe(5);
     expect(snap.books.every((b) => b.fund === LIVE_PAPER_CAPITAL)).toBe(true);
-    expect(booksFundEnd(snap.books)).toBe(56_000);
+    expect(booksFundEnd(snap.books)).toBe(280_000);
     expect(snap.honest).toMatch(/Paper only/);
     expect(snap.honest).toMatch(/No Kite order/i);
     expect(snap.honest).toMatch(/buy CE\/PE/);
@@ -204,7 +206,7 @@ describe('Live paper desk', () => {
     expect(bookSignal('pdhl', bars, 3, { ...cfg, freshCross: false })).toBe(1);
   });
   it('names the bought contract like SENSEX 77000 CE and keeps it on the closed fill', () => {
-    const cfg = LIVE_PAPER_BOOKS.find((b) => b.id === 'sensex')!;
+    const cfg = LIVE_PAPER_BOOKS.find((b) => b.id === 'sensex-momentum')!;
     const book = emptyBook(cfg);
     book.side = 'long';
     book.entry = 172.55;
@@ -226,7 +228,7 @@ describe('Live paper desk', () => {
     expect(optionPickLabel({ id: 'sensex' })).toBe('');
   });
   it('never exits an option on index bars: 76,500 index high is not a hit on a 205 premium target', () => {
-    const cfg = LIVE_PAPER_BOOKS.find((b) => b.id === 'sensex')!;
+    const cfg = LIVE_PAPER_BOOKS.find((b) => b.id === 'sensex-momentum')!;
     const book = emptyBook(cfg);
     book.side = 'long';
     book.entry = 172.55;
@@ -256,7 +258,7 @@ describe('Live paper desk', () => {
   });
 
   it('fills a stop at the gap open, not the better stop level, and a target at the target level', () => {
-    const cfg = LIVE_PAPER_BOOKS.find((b) => b.id === 'sensex')!;
+    const cfg = LIVE_PAPER_BOOKS.find((b) => b.id === 'sensex-momentum')!;
     const mk = () => {
       const b = emptyBook(cfg);
       b.side = 'long';
@@ -280,7 +282,7 @@ describe('Live paper desk', () => {
   });
 
   it('rebuilds today\'s loss count and cooldown from the saved fills', () => {
-    const cfg = LIVE_PAPER_BOOKS.find((b) => b.id === 'nifty')!;
+    const cfg = LIVE_PAPER_BOOKS.find((b) => b.id === 'nifty-momentum')!;
     const book = emptyBook(cfg);
     const fill = (rs: number, exitAt: string, day = '2026-11-04') =>
       ({ day, book: 'nifty', label: 'Nifty', side: 'long', entry: 90, exit: 88, sl: 85, tp: 100, pts: -2, rs, reason: 'scratch', mode: 'pdhl', exitAt }) as never;
@@ -298,14 +300,21 @@ describe('Live paper desk', () => {
   const flatBars = (day: string, n: number, startMin: number, px = 100, rng = 2) =>
     Array.from({ length: n }, (_, k) => ({ day, min: startMin + 5 * k, open: px, high: px + rng / 2, low: px - rng / 2, close: px }));
 
-  it('runs pre-registered momentum on all four books', () => {
-    const by = (id: string) => LIVE_PAPER_BOOKS.find((b) => b.id === id)!;
-    for (const id of ['nifty', 'sensex', 'bank', 'crude']) {
-      expect(by(id)).toMatchObject({ strategy: 'momentum', stopPct: 0.4, targetPct: 1, holdBars: 24, maxTradesPerDay: 3, atm: true });
+  it('runs five desks on all four books with the same exit', () => {
+    const by = (under: string, desk = 'momentum') => LIVE_PAPER_BOOKS.find((b) => b.id === `${under}-${desk}`)!;
+    expect(LIVE_PAPER_BOOKS).toHaveLength(20);
+    for (const under of ['nifty', 'sensex', 'bank', 'crude']) {
+      expect(by(under)).toMatchObject({ strategy: 'momentum', stopPct: 0.4, targetPct: 1, holdBars: 24, maxTradesPerDay: 3, atm: true });
+      expect(by(under, 'orb').primary['trend']).toBe('orb_break');
+      expect(by(under, 'pdhl').primary['trend']).toBe('pdhl');
+      expect(by(under, 'vwap').primary['trend']).toBe('vwap_fade');
+      expect(by(under, 'trap').primary['trend']).toBe('trap');
     }
     expect(by('crude').entryS).toBe(9 * 60 + 30);
+    expect(by('crude', 'orb').orS).toBe(9 * 60);
+    expect(by('nifty', 'orb').orS).toBe(9 * 60 + 15);
     expect(PAPER_TEST_HONEST).toMatch(/not a guaranteed profit/);
-    expect(PAPER_TEST_HONEST).toMatch(/All four books: momentum/);
+    expect(PAPER_TEST_HONEST).toMatch(/Five desks/);
   });
 
   it('fires momentum only past 1.5×√6 × the 20-bar mean range, from the 7th bar of the day', () => {
@@ -327,7 +336,7 @@ describe('Live paper desk', () => {
   });
 
   it('opens momentum on the signal bar, binds 40% / 100% premium levels and exits on time', () => {
-    const cfg = LIVE_PAPER_BOOKS.find((b) => b.id === 'nifty')!;
+    const cfg = LIVE_PAPER_BOOKS.find((b) => b.id === 'nifty-momentum')!;
     const bars = [...flatBars('2026-11-03', 20, 13 * 60 + 35, 24000), ...flatBars('2026-11-04', 7, 9 * 60 + 15, 24000)];
     const last = bars.length - 1;
     bars[last] = { ...bars[last], close: 24020, high: 24021 };
@@ -351,7 +360,7 @@ describe('Live paper desk', () => {
   });
 
   it('caps momentum at 3 trades a day', () => {
-    const nifty = LIVE_PAPER_BOOKS.find((b) => b.id === 'nifty')!;
+    const nifty = LIVE_PAPER_BOOKS.find((b) => b.id === 'nifty-momentum')!;
     const bars = [...flatBars('2026-11-03', 20, 13 * 60 + 35, 24000), ...flatBars('2026-11-04', 7, 9 * 60 + 15, 24000)];
     bars[bars.length - 1] = { ...bars[bars.length - 1], close: 24020, high: 24021 };
     const f = { day: '2026-11-04', book: 'nifty', label: 'Nifty', side: 'long', entry: 1, exit: 1, sl: 1, tp: 1, pts: 0, rs: -1, reason: 'sl', mode: 'momentum' } as never;
@@ -359,5 +368,41 @@ describe('Live paper desk', () => {
     const capped = tickBook(full, nifty, bars, 24020, '2026-11-04', 9 * 60 + 51, 'NIFTY 50');
     expect(capped.side).toBe('flat');
     expect(capped.reason).toBe('max 3 trades today');
+  });
+
+  it('writes a night log with desk totals and every closed fill', () => {
+    const cfg = LIVE_PAPER_BOOKS.find((b) => b.id === 'nifty-orb')!;
+    const book = emptyBook(cfg);
+    book.side = 'long';
+    book.entry = 100;
+    book.sl = 60;
+    book.tp = 200;
+    book.scratch = 60;
+    book.status = 'open';
+    book.lot = 65;
+    book.optionType = 'CE';
+    book.strike = 24000;
+    book.expiry = '2026-11-06';
+    book.optionSymbol = 'NIFTY26N0624000CE';
+    book.entryMin = 10 * 60;
+    book.lastBarMin = 10 * 60 + 30;
+    const done = tickBook(book, cfg, [], 60, '2026-11-05', 11 * 60, 'NIFTY');
+    const snap = emptySession('2026-11-05');
+    snap.books = snap.books.map((b) => (b.id === cfg.id ? done : b));
+    snap.closedRs = done.closedRs;
+    const log = nightLog(snap);
+    expect(log.desks).toHaveLength(5);
+    const orb = log.desks.find((d) => d.desk === 'orb')!;
+    expect(orb.trades).toBe(1);
+    expect(orb.losses).toBe(1);
+    expect(log.fills[0]).toMatchObject({
+      desk: 'orb',
+      under: 'nifty',
+      reason: 'sl',
+      optionType: 'CE',
+      strike: 24000,
+    });
+    expect(log.fills[0].charges).toBeGreaterThan(0);
+    expect(log.fills[0].holdMin).toBe(30);
   });
 });

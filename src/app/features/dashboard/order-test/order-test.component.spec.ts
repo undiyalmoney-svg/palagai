@@ -30,7 +30,7 @@ describe('OrderTestComponent', () => {
     fixture.detectChanges();
   });
 
-  it('is a Start-only live paper desk for four isolated books', () => {
+  it('is a Start-only live paper desk for five desks on four names', () => {
     const text = fixture.nativeElement.textContent as string;
     expect(text).toMatch(/Hit Start/);
     expect(text).toMatch(/buy CE\/PE/);

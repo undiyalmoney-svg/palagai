@@ -15,16 +15,9 @@ import { CheapOtmPick } from '../utils/pick-cheap-otm.util';
 import { optionRoundTripCharges, venueForBook } from './option-charges.util';
 import { SignalCard, SkippedSignal } from './paper-analytics.models';
 
-/**
- * Same pre-registered MOMENTUM entry on every book (OPTIONS-BUYING-RESEARCH.md, 2026-11-02). Not tuned since.
- * Nifty and Sensex beat random entries on 3 years of modelled premiums. Bank Nifty was weaker (CI includes zero).
- * Crude Mini has only weeks of option history — this is a paper test of the same rule, not a claimed edge.
- */
-export const PAPER_MOMENTUM: Partial<LiveAssumeBookCfg> = {
-  strategy: 'momentum',
-  primary: { trend: 'momentum', range: 'momentum', quiet: 'momentum', stand: 'momentum' },
+const ALL = (mode: string) => ({ trend: mode, range: mode, quiet: mode, stand: mode });
+const EXIT: Partial<LiveAssumeBookCfg> = {
   backup: {},
-  entryS: 9 * 60 + 45,
   stopPct: 0.4,
   targetPct: 1,
   holdBars: 24,
@@ -34,23 +27,63 @@ export const PAPER_MOMENTUM: Partial<LiveAssumeBookCfg> = {
   noConfirm: true,
   dayStops: false,
   expiryAfterTomorrow: false,
-};
-export const PAPER_TEST_HONEST =
-  'All four books: momentum — a 30-min move beyond 1.5× the normal bar range buys the ATM CE (up) or PE (down), ' +
-  'nearest expiry that is not today; stop 40% of premium, target 100%, out after 2 hours or flatten (15:15 index, 23:10 crude); ' +
-  'at most 3 trades a book a day. Exact Zerodha charges. This is a paper test of one rule on every name. It is not validated ' +
-  'on live fills, loses on about 3 days in 10, and is not a guaranteed profit.';
-const PAPER_STRATEGY: Record<string, Partial<LiveAssumeBookCfg>> = {
-  nifty: { ...PAPER_MOMENTUM, product: 'ATM CE/PE ×65' },
-  sensex: { ...PAPER_MOMENTUM, product: 'ATM CE/PE ×20' },
-  bank: { ...PAPER_MOMENTUM, product: 'ATM CE/PE ×30' },
-  crude: { ...PAPER_MOMENTUM, product: 'ATM CE/PE ×10', entryS: 9 * 60 + 30 },
+  freshCross: true,
 };
 
-export const LIVE_PAPER_BOOKS: LiveAssumeBookCfg[] = OPTION_14K_LIST.map((plan) => ({
-  ...option14kToPaperCfg(plan),
-  ...(PAPER_STRATEGY[plan.id] || {}),
-}));
+/** Five well-known rule-based entries. Same ATM CE/PE exit on every card so a month of paper can rank them. */
+export const PAPER_DESKS: { id: string; label: string; rule: string }[] = [
+  { id: 'momentum', label: 'Momentum', rule: '30-min thrust > 1.5× normal bar' },
+  { id: 'orb', label: 'Opening range', rule: 'First close beyond the first 15-min range' },
+  { id: 'pdhl', label: 'Prev-day break', rule: 'First close through yesterday high or low' },
+  { id: 'vwap', label: 'VWAP fade', rule: 'Fade a stretch from the session average' },
+  { id: 'trap', label: 'Failed break', rule: 'Stop-run that closes back inside the 6-bar range' },
+];
+
+function deskPatch(desk: string, under: string): Partial<LiveAssumeBookCfg> {
+  const crude = under === 'crude';
+  const open = crude ? 9 * 60 : 9 * 60 + 15;
+  const afterOpen = crude ? 9 * 60 + 30 : 9 * 60 + 45;
+  if (desk === 'momentum') {
+    return { strategy: 'momentum', primary: ALL('momentum'), entryS: afterOpen };
+  }
+  if (desk === 'orb') {
+    return { strategy: 'rules', primary: ALL('orb_break'), orS: open, orE: open + 15, entryS: open + 15 };
+  }
+  if (desk === 'pdhl') {
+    return { strategy: 'rules', primary: ALL('pdhl'), entryS: afterOpen };
+  }
+  if (desk === 'vwap') {
+    return { strategy: 'rules', primary: ALL('vwap_fade'), entryS: afterOpen };
+  }
+  return { strategy: 'rules', primary: ALL('trap'), entryS: afterOpen };
+}
+
+export const PAPER_MOMENTUM: Partial<LiveAssumeBookCfg> = { ...EXIT, ...deskPatch('momentum', 'nifty') };
+export const PAPER_TEST_HONEST =
+  'Five desks × four names, same exit: ATM CE (up) or PE (down), nearest expiry that is not today, 1 lot at the live ask, ' +
+  'stop 40%, target 100%, out after 2 hours or flatten (15:15 index, 23:10 crude), max 3 trades a book a day, exact charges. ' +
+  'Paper test for one month — not a guaranteed profit.';
+
+export const LIVE_PAPER_BOOKS: LiveAssumeBookCfg[] = PAPER_DESKS.flatMap((desk) =>
+  OPTION_14K_LIST.map((plan) => ({
+    ...option14kToPaperCfg(plan),
+    ...EXIT,
+    ...deskPatch(desk.id, plan.id),
+    id: `${plan.id}-${desk.id}`,
+    under: plan.id,
+    desk: desk.id,
+    product: `ATM CE/PE ×${plan.lot}`,
+  })),
+);
+
+export function underOf(id: string): Option14kBookId {
+  const u = id.split('-')[0];
+  return (u === 'crude' || u === 'nifty' || u === 'bank' || u === 'sensex' ? u : 'nifty') as Option14kBookId;
+}
+
+export function deskOf(id: string): string {
+  return id.split('-').slice(1).join('-') || 'momentum';
+}
 export const LIVE_PAPER_CAPITAL = LIVE_ASSUME_CAPITAL;
 export const LIVE_PAPER_CHARGE = LIVE_ASSUME_CHARGE;
 export const LIVE_PAPER_COOLDOWN_MIN = 60;
@@ -89,6 +122,14 @@ export interface LivePaperFill {
   entryAt?: string;
   exitAt?: string;
   signal?: SignalCard | null;
+  desk?: string;
+  under?: string;
+  charges?: number;
+  underEntry?: number | null;
+  holdMin?: number;
+  gaugeMove?: number | null;
+  gaugeNeed?: number | null;
+  exitMin?: number;
 }
 
 export interface OptionPickView {
@@ -110,13 +151,15 @@ export function expiryShort(expiry: string | undefined): string {
 /** "SENSEX 77000 CE · exp 6 Nov" — the contract the book bought. */
 export function optionPickLabel(pick: OptionPickView): string {
   if (!pick.optionType || pick.strike == null) return pick.optionSymbol || '';
-  const name = OPTION_14K_BOOKS[pick.id as Option14kBookId]?.name ?? pick.id.toUpperCase();
+  const name = OPTION_14K_BOOKS[underOf(pick.id)]?.name ?? pick.id.toUpperCase();
   const exp = expiryShort(pick.expiry);
   return `${name} ${pick.strike} ${pick.optionType}${exp ? ` · exp ${exp}` : ''}`;
 }
 
 export interface LivePaperBookState {
   id: string;
+  desk?: string;
+  under?: string;
   label: string;
   product: string;
   instrument: string;
@@ -199,6 +242,8 @@ export interface LivePaperSession {
 export function emptyBook(cfg: LiveAssumeBookCfg): LivePaperBookState {
   return {
     id: cfg.id,
+    desk: cfg.desk || deskOf(cfg.id),
+    under: cfg.under || underOf(cfg.id),
     label: cfg.label,
     product: cfg.product,
     instrument: cfg.label,
@@ -343,7 +388,7 @@ export function completedBars(bars: LiveAssumeBar[], day: string, nowMin: number
 export function netRs(cfg: LiveAssumeBookCfg, book: Pick<LivePaperBookState, 'lot'>, entry: number, exit: number, pts: number): number {
   if (!isOptionBuy(cfg)) return Math.round((pts * cfg.rsPt - LIVE_PAPER_CHARGE) * 10) / 10;
   const qty = book.lot || cfg.rsPt;
-  const charges = optionRoundTripCharges(entry, Math.max(0, exit), qty, venueForBook(cfg.id));
+  const charges = optionRoundTripCharges(entry, Math.max(0, exit), qty, venueForBook(cfg.under || cfg.id));
   return Math.round((pts * qty - charges) * 10) / 10;
 }
 
@@ -372,10 +417,16 @@ function closeAt(
     ? exitPx - book.entry
     : (book.side === 'long' ? 1 : -1) * (exitPx - book.entry);
   const rs = netRs(cfg, book, book.entry, exitPx, pts);
+  const qty = book.lot || cfg.rsPt;
+  const charges = isOptionBuy(cfg)
+    ? optionRoundTripCharges(book.entry, Math.max(0, exitPx), qty, venueForBook(cfg.under || cfg.id))
+    : LIVE_PAPER_CHARGE;
   book.fills.push({
     day,
     book: book.id,
     label: book.label,
+    desk: book.desk || deskOf(book.id),
+    under: book.under || underOf(book.id),
     side: book.side,
     entry: book.entry,
     exit: exitPx,
@@ -383,6 +434,7 @@ function closeAt(
     tp: book.tp || 0,
     pts: Math.round(pts * 10) / 10,
     rs,
+    charges: Math.round(charges * 10) / 10,
     reason,
     mode: book.mode,
     optionSymbol: book.optionSymbol,
@@ -395,6 +447,11 @@ function closeAt(
     entryAsk: book.entryAsk ?? null,
     entryAt: book.entryAt,
     signal: book.signal ?? null,
+    holdMin: book.entryMin != null ? Math.max(0, (book.lastBarMin || 0) - book.entryMin) : undefined,
+    gaugeMove: book.gauge?.move ?? null,
+    gaugeNeed: book.gauge?.need ?? null,
+    exitMin: book.lastBarMin,
+    underEntry: book.last != null && book.optionSymbol ? null : book.last,
   });
   book.closedRs = Math.round((book.closedRs + rs) * 10) / 10;
   book.fund = Math.round((LIVE_PAPER_CAPITAL + book.closedRs) * 10) / 10;
@@ -470,7 +527,7 @@ function hitExit(
 
 function canOpen(book: LivePaperBookState, cfg: LiveAssumeBookCfg, atMin: number): string | null {
   if (cfg.strategy === 'watch') return 'watch only: no tested edge';
-  if (cfg.id === 'crude' && LIVE_PAPER_CAPITAL < LIVE_ASSUME_CRUDE_MIN) return 'need ₹8,000 free for Crude';
+  if (underOf(cfg.id) === 'crude' && LIVE_PAPER_CAPITAL < LIVE_ASSUME_CRUDE_MIN) return 'need ₹8,000 free for Crude';
   if (cfg.maxTradesPerDay != null) {
     const modes = new Set(Object.values(cfg.primary));
     if (book.fills.filter((f) => modes.has(f.mode)).length >= cfg.maxTradesPerDay) return `max ${cfg.maxTradesPerDay} trades today`;
@@ -695,4 +752,72 @@ export function allClosedFills(books: LivePaperBookState[]): LivePaperFill[] {
 
 export function booksFundEnd(books: LivePaperBookState[]): number {
   return Math.round(books.reduce((s, b) => s + b.fund, 0) * 10) / 10;
+}
+
+/** One night-research dump: every closed fill plus desk totals. Copy from Closed today. */
+export function nightLog(session: LivePaperSession) {
+  const fills = allClosedFills(session.books);
+  const desks = PAPER_DESKS.map((d) => {
+    const books = session.books.filter((b) => (b.desk || deskOf(b.id)) === d.id);
+    const rows = fills.filter((f) => (f.desk || deskOf(f.book)) === d.id);
+    const wins = rows.filter((f) => f.rs > 0);
+    const losses = rows.filter((f) => f.rs < 0);
+    const closedRs = Math.round(books.reduce((s, b) => s + b.closedRs, 0) * 10) / 10;
+    return {
+      desk: d.id,
+      label: d.label,
+      rule: d.rule,
+      trades: rows.length,
+      wins: wins.length,
+      losses: losses.length,
+      closedRs,
+      liveRs: Math.round(books.reduce((s, b) => s + (b.side === 'flat' ? 0 : b.liveRs), 0) * 10) / 10,
+      avgRs: rows.length ? Math.round((rows.reduce((s, f) => s + f.rs, 0) / rows.length) * 10) / 10 : 0,
+      maxLoss: rows.length ? Math.min(...rows.map((f) => f.rs)) : 0,
+      maxWin: rows.length ? Math.max(...rows.map((f) => f.rs)) : 0,
+    };
+  });
+  return {
+    day: session.day,
+    asOf: session.asOf,
+    closedRs: session.closedRs,
+    liveRs: session.liveRs,
+    desks,
+    fills: fills.map((f) => ({
+      desk: f.desk || deskOf(f.book),
+      under: f.under || underOf(f.book),
+      book: f.book,
+      label: f.label,
+      contract: optionPickLabel({ id: f.book, optionType: f.optionType, strike: f.strike, expiry: f.expiry, optionSymbol: f.optionSymbol }),
+      optionSymbol: f.optionSymbol || '',
+      optionType: f.optionType || '',
+      strike: f.strike ?? null,
+      expiry: f.expiry || '',
+      lot: f.lot || 0,
+      side: f.side,
+      mode: f.mode,
+      structure: f.structure || '',
+      entry: f.entry,
+      exit: f.exit,
+      sl: f.sl,
+      tp: f.tp,
+      pts: f.pts,
+      rs: f.rs,
+      charges: f.charges ?? null,
+      reason: f.reason,
+      entryAt: f.entryAt || '',
+      exitAt: f.exitAt || '',
+      holdMin: f.holdMin ?? null,
+      gaugeMove: f.gaugeMove ?? null,
+      gaugeNeed: f.gaugeNeed ?? null,
+      entryBid: f.entryBid ?? null,
+      entryAsk: f.entryAsk ?? null,
+      exitBid: f.exitBid ?? null,
+      exitAsk: f.exitAsk ?? null,
+    })),
+  };
+}
+
+export function nightLogJson(session: LivePaperSession): string {
+  return JSON.stringify(nightLog(session), null, 2);
 }

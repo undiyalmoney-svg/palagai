@@ -17,7 +17,7 @@ describe('Paper14kComponent', () => {
     fixture.detectChanges();
   });
 
-  it('is a live paper desk: Start, four isolated books, no Kite order', () => {
+  it('is a live paper desk: Start, five desks on four names, no Kite order', () => {
     const text = fixture.nativeElement.textContent as string;
     expect(text).toMatch(/Paper only/);
     expect(text).toMatch(/buy CE\/PE/);
@@ -26,6 +26,13 @@ describe('Paper14kComponent', () => {
     expect(text).toMatch(/Nifty 50/);
     expect(text).toMatch(/Bank Nifty/);
     expect(text).toMatch(/Sensex/);
+    expect(text).toMatch(/Momentum/);
+    expect(text).toMatch(/Opening range/);
+    expect(text).toMatch(/Prev-day break/);
+    expect(text).toMatch(/VWAP fade/);
+    expect(text).toMatch(/Failed break/);
+    expect(text).toMatch(/Closed today/);
+    expect(text).toMatch(/Copy night log/);
     expect(text).toMatch(/no Kite order/);
     expect(text).toMatch(/Not a guaranteed profit/);
     expect(text).not.toMatch(/Play next day/);
@@ -35,12 +42,14 @@ describe('Paper14kComponent', () => {
     expect(text).not.toMatch(/Run live assumption/);
     expect(fixture.nativeElement.querySelector('[data-testid="live-paper-card"]')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('[data-testid="start-live-paper"]')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('[data-testid="copy-night-log"]')).toBeTruthy();
     expect(fixture.componentInstance['paper'].session().liveOrders).toBe(false);
     expect(fixture.componentInstance['paper'].session().guaranteed).toBe(false);
-    expect(fixture.componentInstance['booksFund']()).toBe(56_000);
+    expect(fixture.componentInstance['paper'].session().books).toHaveLength(20);
+    expect(fixture.componentInstance['booksFund']()).toBe(280_000);
   });
 
-  it('lists all four books on the Now card, not only Crude', () => {
+  it('lists all four names on the Now card', () => {
     const paper = fixture.componentInstance['paper'];
     const cur = paper.session();
     paper.session.set({
@@ -48,11 +57,7 @@ describe('Paper14kComponent', () => {
       running: true,
       kiteError: null,
       asOf: new Date().toISOString(),
-      books: cur.books.map((b) =>
-        b.id === 'crude'
-          ? { ...b, last: 5400, gauge: { move: 14, need: 126.2, barMin: 580, sessionBars: 10 } }
-          : { ...b, last: 24000, gauge: { move: 8, need: 80, barMin: 575, sessionBars: 5 } },
-      ),
+      books: cur.books.map((b) => ({ ...b, last: 24000 })),
     });
     fixture.detectChanges();
     const title = (fixture.nativeElement.querySelector('[data-testid="paper-now-title"]') as HTMLElement).textContent || '';
@@ -60,8 +65,7 @@ describe('Paper14kComponent', () => {
     expect(title).toMatch(/Sensex/);
     expect(title).toMatch(/Bank Nifty/);
     expect(title).toMatch(/Crude Mini/);
-    expect(title).toMatch(/5\/7 bars/);
-    expect(title).toMatch(/14\/126.2/);
+    expect(title).toMatch(/five desks/);
   });
 
   it('asks for Token when Start is hit without a Kite session', async () => {

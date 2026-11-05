@@ -30,5 +30,8 @@ describe('option round-trip charges', () => {
     expect(venueForBook('bank')).toBe('NSE');
     expect(venueForBook('sensex')).toBe('BSE');
     expect(venueForBook('crude')).toBe('MCX');
+    expect(venueForBook('nifty-momentum')).toBe('NSE');
+    expect(venueForBook('sensex-orb')).toBe('BSE');
+    expect(venueForBook('crude-trap')).toBe('MCX');
   });
 });

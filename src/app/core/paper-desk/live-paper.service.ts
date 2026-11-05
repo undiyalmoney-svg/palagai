@@ -25,9 +25,12 @@ import {
   restoreDayStops,
   summarizePaper,
   tickBook,
+  deskOf,
+  underOf,
 } from './live-paper.engine';
 
-const STORAGE_KEY = 'palagai_live_paper_v3';
+const STORAGE_KEY = 'palagai_live_paper_v5';
+const UNDERS = ['crude', 'nifty', 'bank', 'sensex'] as const;
 const TICK_MS = 8_000;
 
 @Injectable({ providedIn: 'root' })
@@ -171,14 +174,14 @@ export class LivePaperService {
             ?.data || {}
         : {};
       const asOf = new Date();
-      const cheapByBook = new Map<string, { ce: CheapOtmPick; pe: CheapOtmPick }>();
+      const cheapByUnder = new Map<string, { ce: CheapOtmPick; pe: CheapOtmPick }>();
       const cheapKeys: string[] = [];
-      for (const cfg of LIVE_PAPER_BOOKS) {
-        const inst =
-          cfg.id === 'crude' ? crude : cfg.id === 'nifty' ? nifty : cfg.id === 'bank' ? bank : sensex;
-        const spot = lastPrice(quotes, cfg.id, inst?.tradingSymbol || '') ?? 0;
-        const pair = cheapPair(chain, cfg.id as 'crude' | 'nifty' | 'bank' | 'sensex', spot, pickAsOf(cfg, asOf), cfg.atm ? 0 : undefined);
-        cheapByBook.set(cfg.id, pair);
+      const asOfCfg = LIVE_PAPER_BOOKS[0];
+      for (const under of UNDERS) {
+        const inst = instOf(under, crude, nifty, bank, sensex);
+        const spot = lastPrice(quotes, under, inst?.tradingSymbol || '') ?? 0;
+        const pair = cheapPair(chain, under, spot, pickAsOf(asOfCfg, asOf), asOfCfg.atm ? 0 : undefined);
+        cheapByUnder.set(under, pair);
         for (const pick of [pair.ce, pair.pe]) {
           if (pick.instrument.instrumentToken > 0) {
             cheapKeys.push(`${pick.instrument.exchange}:${pick.instrument.tradingSymbol}`);
@@ -193,11 +196,9 @@ export class LivePaperService {
         quotes = { ...quotes, ...extra };
       }
       const from = shiftDay(day, -8);
-      const books = [];
-      for (const cfg of LIVE_PAPER_BOOKS) {
-        const inst =
-          cfg.id === 'crude' ? crude : cfg.id === 'nifty' ? nifty : cfg.id === 'bank' ? bank : sensex;
-        const prev = cur.books.find((b) => b.id === cfg.id) || emptySession(day).books.find((b) => b.id === cfg.id)!;
+      const barCache = new Map<string, LiveAssumeBar[]>();
+      for (const under of UNDERS) {
+        const inst = instOf(under, crude, nifty, bank, sensex);
         let bars: LiveAssumeBar[] = [];
         if (inst?.token) {
           const hist = (await firstValueFrom(
@@ -211,7 +212,15 @@ export class LivePaperService {
           )) as { data?: { candles?: unknown[][] } };
           bars = (hist?.data?.candles || []).map(kiteBar).filter((b) => b.day);
         }
-        const underLast = lastPrice(quotes, cfg.id, inst?.tradingSymbol || '');
+        barCache.set(under, bars);
+      }
+      const books = [];
+      for (const cfg of LIVE_PAPER_BOOKS) {
+        const under = underOf(cfg.id);
+        const inst = instOf(under, crude, nifty, bank, sensex);
+        const prev = cur.books.find((b) => b.id === cfg.id) || emptySession(day).books.find((b) => b.id === cfg.id)!;
+        const bars = barCache.get(under) || [];
+        const underLast = lastPrice(quotes, under, inst?.tradingSymbol || '');
         const optLast = prev.optionSymbol ? lastByKey(quotes, optionKey(prev)) : null;
         const lastForTick =
           prev.side !== 'flat' && prev.optionSymbol ? (optLast ?? prev.last) : underLast;
@@ -240,7 +249,7 @@ export class LivePaperService {
         );
         if (needsOption(next)) {
           const spot = underLast ?? next.last ?? next.entry ?? 0;
-          const pair = cheapByBook.get(cfg.id);
+          const pair = cheapByUnder.get(under);
           next = await this.bindCheap(next, cfg, chain, spot, quotes, nowMin, auth, pair);
           if (next.side !== 'flat' && next.optionToken) {
             next = { ...next, lastBarMin: nowMin - (nowMin % 5) };
@@ -257,10 +266,10 @@ export class LivePaperService {
           );
           next = { ...next, fills };
         }
-        const underQuote = findQuote(quotes, underKeyFor(cfg.id, inst?.tradingSymbol, inst?.exchange));
+        const underQuote = findQuote(quotes, underKeyFor(under, inst?.tradingSymbol, inst?.exchange));
         books.push({
           ...next,
-          ...neededFields(cheapByBook.get(cfg.id), quotes),
+          ...neededFields(cheapByUnder.get(under), quotes),
           quoteAt: quoteStamp(underQuote) || next.quoteAt || '',
         });
       }
@@ -313,7 +322,7 @@ export class LivePaperService {
     auth: string,
     pair?: { ce: CheapOtmPick; pe: CheapOtmPick },
   ): Promise<LivePaperBookState> {
-    const id = cfg.id as 'crude' | 'nifty' | 'bank' | 'sensex';
+    const id = underOf(cfg.id);
     const pick =
       (book.side === 'long' ? pair?.ce : pair?.pe) ||
       pickCheapOtm({
@@ -367,7 +376,7 @@ export class LivePaperService {
     const stop = optionStopPts(cfg, range);
     const stopPts = Math.min(stop.sl, prem - 0.05);
     const riskRs =
-      Math.round((stopPts * pick.lotSize + optionRoundTripCharges(prem, prem - stopPts, pick.lotSize, venueForBook(cfg.id))) * 10) / 10;
+      Math.round((stopPts * pick.lotSize + optionRoundTripCharges(prem, prem - stopPts, pick.lotSize, venueForBook(cfg.under || cfg.id))) * 10) / 10;
     // Worst-case day = two stops: take a new trade only while today's loss is within one stop.
     if (cfg.dayStops !== false && book.closedRs < 0 && -book.closedRs > riskRs) {
       return flat(`day stop: today −₹${Math.abs(book.closedRs)} > one stop ₹${riskRs}`, {
@@ -395,7 +404,7 @@ export class LivePaperService {
       bound.entry != null && bound.sl != null && bound.tp != null
         ? buildSignalCard({
             book: cfg.id,
-            venue: venueForBook(cfg.id),
+            venue: venueForBook(cfg.under || cfg.id),
             mode: bound.mode,
             structure: bound.structure,
             primaryRule: cfg.primary[bound.structure === 'wait' ? 'stand' : bound.structure] === bound.mode,
@@ -513,6 +522,8 @@ function readStored(): LivePaperSession | null {
       assumed: true,
       books: parsed.books.map((b) => restoreDayStops({
         ...b,
+        desk: b.desk || deskOf(b.id),
+        under: b.under || underOf(b.id),
         optionSymbol: b.optionSymbol || '',
         optionType: b.optionType || '',
         strike: b.strike ?? null,
@@ -639,8 +650,19 @@ export function needsOption(next: LivePaperBookState): boolean {
   return next.side !== 'flat' && !next.optionSymbol;
 }
 
+function instOf(
+  under: string,
+  crude: { tradingSymbol: string; token: number; exchange: string } | null,
+  nifty: { tradingSymbol: string; token: number; exchange: string },
+  bank: { tradingSymbol: string; token: number; exchange: string },
+  sensex: { tradingSymbol: string; token: number; exchange: string },
+) {
+  return under === 'crude' ? crude : under === 'nifty' ? nifty : under === 'bank' ? bank : sensex;
+}
+
 function optionKey(book: Pick<LivePaperBookState, 'optionSymbol' | 'id'>): string {
-  const ex = book.id === 'crude' ? 'MCX' : book.id === 'sensex' ? 'BFO' : 'NFO';
+  const under = underOf(book.id);
+  const ex = under === 'crude' ? 'MCX' : under === 'sensex' ? 'BFO' : 'NFO';
   return `${ex}:${book.optionSymbol}`;
 }
 

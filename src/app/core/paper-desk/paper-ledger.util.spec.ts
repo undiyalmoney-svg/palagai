@@ -63,7 +63,7 @@ describe('paper ledger', () => {
   });
 
   it('carries an engine-closed loss all the way into the ledger and the realistic P&L', () => {
-    const cfg = LIVE_PAPER_BOOKS.find((b) => b.id === 'nifty')!;
+    const cfg = LIVE_PAPER_BOOKS.find((b) => b.id === 'nifty-momentum')!;
     const book = emptyBook(cfg);
     book.side = 'long';
     book.entry = 100;

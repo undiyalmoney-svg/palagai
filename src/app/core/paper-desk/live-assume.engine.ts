@@ -100,6 +100,10 @@ export interface LiveAssumeBookCfg {
   dayStops?: boolean;
   /** Pick an expiry after tomorrow (skip 1 day or less left) instead of only skipping expiry day. */
   expiryAfterTomorrow?: boolean;
+  /** Underlying book (crude/nifty/bank/sensex) when id is `${under}-${desk}`. */
+  under?: string;
+  /** Strategy desk id (momentum/orb/pdhl/vwap/trap). */
+  desk?: string;
 }
 
 /** Bar i's 6-bar close-to-close move and the move momentum needs (1.5 × √6 × mean range of the 20 bars before it). */

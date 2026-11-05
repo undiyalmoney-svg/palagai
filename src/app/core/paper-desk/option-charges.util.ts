@@ -66,7 +66,7 @@ export function optionRoundTripCharges(
 }
 
 export function venueForBook(bookId: string): ChargeVenue {
-  if (bookId === 'sensex') return 'BSE';
-  if (bookId === 'crude') return 'MCX';
+  if (bookId.includes('sensex')) return 'BSE';
+  if (bookId.includes('crude')) return 'MCX';
   return 'NSE';
 }

@@ -10,61 +10,51 @@
     @for (line of now().lines; track line) {
       <p class="mp-sub">{{ line }}</p>
     }
+    <div class="mp-form">
+      <div class="mp-field">
+        <span>&nbsp;</span>
+        <button
+          type="button"
+          class="ui-btn ui-btn-primary"
+          [disabled]="paper.session().running"
+          (click)="startPaper()"
+          data-testid="start-live-paper"
+        >
+          {{ paper.busy() && !paper.session().running ? 'Starting…' : 'Start' }}
+        </button>
+      </div>
+      <div class="mp-field">
+        <span>&nbsp;</span>
+        <button
+          type="button"
+          class="ui-btn"
+          [disabled]="!paper.session().running"
+          (click)="stopPaper()"
+          data-testid="stop-live-paper"
+        >
+          Stop
+        </button>
+      </div>
+    </div>
   </div>
 
-  <nav class="mp-views" aria-label="Paper test views" data-testid="paper-views">
-    @for (v of views; track v.id) {
-      <button
-        type="button"
-        class="mp-view"
-        [class.on]="view() === v.id"
-        (click)="view.set(v.id)"
-        [attr.data-testid]="'view-' + v.id"
-      >
-        {{ v.label }}
-      </button>
-    }
-  </nav>
-
-  @if (analyticsView(); as av) {
-    <app-paper-analytics [view]="av" />
-  } @else {
-    <div class="mp-card" data-testid="live-paper-card">
+  @for (d of desks(); track d.id) {
+    <div class="mp-card" [attr.data-testid]="d.id === 'momentum' ? 'live-paper-card' : 'desk-' + d.id">
       <div class="mp-card-head">
         <div>
-          <h2>Live paper</h2>
-          <p class="mp-sub">Momentum on all four. 1 lot at the live ask. Paper only.</p>
+          <h2>{{ d.label }}</h2>
+          <p class="mp-sub">{{ d.rule }}</p>
         </div>
+        <span
+          class="mp-stat-value"
+          [class.mp-up]="d.closedRs > 0"
+          [class.mp-down]="d.closedRs < 0"
+        >
+          ₹{{ d.closedRs | number : '1.0-0' }}
+        </span>
       </div>
-
-      <div class="mp-stats">
-        <div class="mp-stat">
-          <span class="mp-stat-label">Live P/L</span>
-          <span
-            class="mp-stat-value"
-            data-testid="live-paper-live"
-            [class.mp-up]="paper.session().liveRs > 0"
-            [class.mp-down]="paper.session().liveRs < 0"
-          >
-            ₹{{ paper.session().liveRs | number : '1.0-0' }}
-          </span>
-        </div>
-        <div class="mp-stat">
-          <span class="mp-stat-label">Closed today</span>
-          <span
-            class="mp-stat-value"
-            data-testid="live-paper-closed"
-            [class.mp-up]="paper.session().closedRs > 0"
-            [class.mp-down]="paper.session().closedRs < 0"
-          >
-            ₹{{ paper.session().closedRs | number : '1.0-0' }}
-          </span>
-          <span class="mp-stat-hint">{{ paper.session().day }}</span>
-        </div>
-      </div>
-
       <div class="mp-table-wrap">
-        <table class="mp-table" data-testid="live-paper-books">
+        <table class="mp-table">
           <thead>
             <tr>
               <th>Book</th>
@@ -78,30 +68,12 @@
             </tr>
           </thead>
           <tbody>
-            @for (b of paper.session().books; track b.id) {
+            @for (b of d.books; track b.id) {
               <tr>
                 <td class="mp-sym">
                   {{ b.label }}
-                  @if (strategyNote(b.id); as note) {
-                    <div class="mp-sub" data-testid="book-strategy">{{ note }}</div>
-                  }
                   @if (b.optionType) {
                     <div class="mp-pick" data-testid="live-paper-pick">{{ pick(b) }} · {{ b.lot }} qty</div>
-                  }
-                  @if (b.neededCeRs != null || b.neededPeRs != null) {
-                    <div class="mp-pick" data-testid="book-needed">
-                      1 lot
-                      @if (b.neededCeRs != null) {
-                        CE ₹{{ b.neededCeRs | number : '1.0-0' }}
-                      }
-                      @if (b.neededCeRs != null && b.neededPeRs != null) {
-                        ·
-                      }
-                      @if (b.neededPeRs != null) {
-                        PE ₹{{ b.neededPeRs | number : '1.0-0' }}
-                      }
-                      · {{ b.neededAtAsk ? 'live ask' : 'last' }}
-                    </div>
                   }
                 </td>
                 <td class="num">{{ b.last != null ? (b.last | number : '1.0-2') : '—' }}</td>
@@ -120,75 +92,67 @@
           </tbody>
         </table>
       </div>
-
-      <div class="mp-form">
-        <div class="mp-field">
-          <span>&nbsp;</span>
-          <button
-            type="button"
-            class="ui-btn ui-btn-primary"
-            [disabled]="paper.session().running"
-            (click)="startPaper()"
-            data-testid="start-live-paper"
-          >
-            {{ paper.busy() && !paper.session().running ? 'Starting…' : 'Start' }}
-          </button>
-        </div>
-        <div class="mp-field">
-          <span>&nbsp;</span>
-          <button
-            type="button"
-            class="ui-btn"
-            [disabled]="!paper.session().running"
-            (click)="stopPaper()"
-            data-testid="stop-live-paper"
-          >
-            Stop
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <div class="mp-card" data-testid="live-paper-fills">
-      <div class="mp-card-head">
-        <div>
-          <h2>Closed today</h2>
-        </div>
-      </div>
-      @if (!fills().length) {
-        <p class="mp-sub" data-testid="live-paper-fills-empty">No paper fill yet.</p>
-      } @else {
-        <div class="mp-table-wrap">
-          <table class="mp-table">
-            <thead>
-              <tr>
-                <th>Book</th>
-                <th>Contract</th>
-                <th>Side</th>
-                <th class="num">Entry</th>
-                <th class="num">Exit</th>
-                <th>Why</th>
-                <th class="num">₹</th>
-              </tr>
-            </thead>
-            <tbody>
-              @for (f of fills(); track f.day + f.book + f.reason + f.entry + $index) {
-                <tr>
-                  <td class="mp-sym">{{ f.label }}</td>
-                  <td data-testid="live-paper-fill-pick">{{ pick({ id: f.book, optionType: f.optionType, strike: f.strike, expiry: f.expiry, optionSymbol: f.optionSymbol }) || '—' }}</td>
-                  <td>{{ f.side }}</td>
-                  <td class="num">{{ f.entry | number : '1.0-2' }}</td>
-                  <td class="num">{{ f.exit | number : '1.0-2' }}</td>
-                  <td>{{ f.reason }}</td>
-                  <td class="num" [class.mp-up]="f.rs > 0" [class.mp-down]="f.rs < 0">
-                    {{ f.rs | number : '1.0-0' }}
-                  </td>
-                </tr>
-              }
-            </tbody>
-          </table>
-        </div>
-      }
     </div>
   }
+
+  <div class="mp-card" data-testid="live-paper-fills">
+    <div class="mp-card-head">
+      <div>
+        <h2>Closed today</h2>
+      </div>
+      <button type="button" class="ui-btn" (click)="copyNightLog()" data-testid="copy-night-log">
+        {{ copied() ? 'Copied' : 'Copy night log' }}
+      </button>
+    </div>
+    @if (!fills().length) {
+      <p class="mp-sub" data-testid="live-paper-fills-empty">No paper fill yet.</p>
+    } @else {
+      <div class="mp-table-wrap">
+        <table class="mp-table">
+          <thead>
+            <tr>
+              <th>Desk</th>
+              <th>Book</th>
+              <th>Contract</th>
+              <th>Side</th>
+              <th class="num">Entry</th>
+              <th class="num">Exit</th>
+              <th class="num">SL</th>
+              <th class="num">TP</th>
+              <th>Why</th>
+              <th class="num">₹</th>
+              <th>In</th>
+              <th>Out</th>
+              <th>Hold</th>
+              <th>Gauge</th>
+              <th class="num">Charges</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (f of fills(); track f.day + f.book + f.reason + f.entry + $index) {
+              <tr>
+                <td>{{ deskLabel(f.desk || f.book) }}</td>
+                <td class="mp-sym">{{ f.label }}</td>
+                <td data-testid="live-paper-fill-pick">{{ pick({ id: f.book, optionType: f.optionType, strike: f.strike, expiry: f.expiry, optionSymbol: f.optionSymbol }) || '—' }}</td>
+                <td>{{ f.side }}</td>
+                <td class="num">{{ f.entry | number : '1.0-2' }}</td>
+                <td class="num">{{ f.exit | number : '1.0-2' }}</td>
+                <td class="num">{{ f.sl | number : '1.0-2' }}</td>
+                <td class="num">{{ f.tp | number : '1.0-2' }}</td>
+                <td>{{ f.reason }}</td>
+                <td class="num" [class.mp-up]="f.rs > 0" [class.mp-down]="f.rs < 0">
+                  {{ f.rs | number : '1.0-0' }}
+                </td>
+                <td>{{ clock(f.entryAt) }}</td>
+                <td>{{ clock(f.exitAt) }}</td>
+                <td>{{ f.holdMin != null ? f.holdMin + 'm' : '—' }}</td>
+                <td>{{ f.gaugeMove != null && f.gaugeNeed != null ? f.gaugeMove + '/' + f.gaugeNeed : '—' }}</td>
+                <td class="num">{{ f.charges != null ? (f.charges | number : '1.0-0') : '—' }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </div>
 </div>

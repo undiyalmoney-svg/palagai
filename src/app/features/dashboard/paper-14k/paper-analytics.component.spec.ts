@@ -192,7 +192,7 @@ describe('PaperAnalyticsComponent', () => {
 });
 
 describe('Paper14kComponent views', () => {
-  it('opens the analytics views from the desk and keeps liveOrders false', async () => {
+  it('keeps five strategy cards and Closed today, with liveOrders false', async () => {
     localStorage.clear();
     await TestBed.configureTestingModule({
       imports: [Paper14kComponent],
@@ -201,42 +201,27 @@ describe('Paper14kComponent views', () => {
     const f = TestBed.createComponent(Paper14kComponent);
     f.detectChanges();
     expect(f.nativeElement.querySelector('[data-testid="live-paper-card"]')).toBeTruthy();
-    (f.nativeElement.querySelector('[data-testid="view-performance"]') as HTMLButtonElement).click();
-    f.detectChanges();
-    expect(f.nativeElement.querySelector('[data-testid="kpi-card"]')).toBeTruthy();
-    expect(f.nativeElement.querySelector('[data-testid="live-paper-card"]')).toBeNull();
-    (f.nativeElement.querySelector('[data-testid="view-desk"]') as HTMLButtonElement).click();
-    f.detectChanges();
-    expect(f.nativeElement.querySelector('[data-testid="live-paper-card"]')).toBeTruthy();
+    expect(f.nativeElement.querySelector('[data-testid="desk-orb"]')).toBeTruthy();
+    expect(f.nativeElement.querySelector('[data-testid="desk-pdhl"]')).toBeTruthy();
+    expect(f.nativeElement.querySelector('[data-testid="desk-vwap"]')).toBeTruthy();
+    expect(f.nativeElement.querySelector('[data-testid="desk-trap"]')).toBeTruthy();
+    expect(f.nativeElement.querySelector('[data-testid="live-paper-fills"]')).toBeTruthy();
+    expect(f.nativeElement.querySelector('[data-testid="view-performance"]')).toBeNull();
     expect(f.componentInstance['paper'].session().liveOrders).toBe(false);
   });
 
-  it('shows the live 1-lot cash each book needs and never claims profit is guaranteed', async () => {
+  it('never claims profit is guaranteed', async () => {
     localStorage.clear();
     await TestBed.configureTestingModule({
       imports: [Paper14kComponent],
       providers: [provideHttpClient(), provideRouter([])],
     }).compileComponents();
     const f = TestBed.createComponent(Paper14kComponent);
-    const paper = f.componentInstance['paper'];
-    const cur = paper.session();
-    paper.session.set({
-      ...cur,
-      books: cur.books.map((b, i) =>
-        i === 0
-          ? { ...b, neededCe: 'BANKNIFTY26NOV56200CE', neededCeRs: 17417, neededPe: 'BANKNIFTY26NOV55800PE', neededPeRs: 12300, neededLot: 30, neededAtAsk: true }
-          : b,
-      ),
-    });
     f.detectChanges();
-    const needed = f.nativeElement.querySelector('[data-testid="book-needed"]') as HTMLElement;
-    expect(needed.textContent).toContain('17,417');
-    expect(needed.textContent).toContain('12,300');
-    expect(needed.textContent).toContain('live ask');
     expect((f.nativeElement.querySelector('[data-testid="paper-now"]') as HTMLElement).textContent).toMatch(
       /Not a guaranteed profit/,
     );
-    expect(paper.session().liveOrders).toBe(false);
-    expect(paper.session().guaranteed).toBe(false);
+    expect(f.componentInstance['paper'].session().liveOrders).toBe(false);
+    expect(f.componentInstance['paper'].session().guaranteed).toBe(false);
   });
 });
