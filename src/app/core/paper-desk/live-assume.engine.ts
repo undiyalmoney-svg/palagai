@@ -125,6 +125,12 @@ export interface LiveAssumeBookCfg {
   targetRs?: number;
   /** Stop taking new trades after this many green fills today. */
   maxWinsPerDay?: number;
+  /** Candle size in minutes. 1 = 1-minute thrust (needed for 5 trades a day). */
+  barMinutes?: number;
+  /** Momentum multiple. Default 1.5. 0.8 is the 1-min 3-of-5 print. */
+  momK?: number;
+  /** Minimum minutes between signals. Overrides minGapBars × barMinutes. */
+  minGapMin?: number;
 }
 
 /** Bar i's 6-bar close-to-close move and the move momentum needs (1.5 × √6 × mean range of the 20 bars before it). */
@@ -142,12 +148,13 @@ export function momentumGauge(
   return { move, need: 1.5 * (sum / 20) * Math.sqrt(6), sessionBars };
 }
 
-/** 6-bar close-to-close move beyond 1.5× √6 × the mean range of the 20 bars before this one (same day, bar ≥ 6). */
-export function momentumSignal(bars: LiveAssumeBar[], i: number): number {
+/** 6-bar close-to-close move beyond k × √6 × the mean range of the 20 bars before this one (same day, bar ≥ 6). */
+export function momentumSignal(bars: LiveAssumeBar[], i: number, k = 1.5): number {
   const g = momentumGauge(bars, i);
   if (!g || g.sessionBars < 7) return 0;
-  if (g.move > g.need) return 1;
-  if (g.move < -g.need) return -1;
+  const need = (k / 1.5) * g.need;
+  if (g.move > need) return 1;
+  if (g.move < -need) return -1;
   return 0;
 }
 
@@ -355,7 +362,7 @@ export function bookSignal(mode: string, bars: LiveAssumeBar[], i: number, cfg: 
     if (b.close < orb.lo && dn) return -1;
     return 0;
   };
-  if (mode === 'momentum') return momentumSignal(bars, i);
+  if (mode === 'momentum') return momentumSignal(bars, i, cfg.momK ?? 1.5);
   if (mode === 'pdhl') return pdhl();
   if (mode === 'fade' || mode === 'orb_fade') return fade();
   if (mode === 'trap') return trap();

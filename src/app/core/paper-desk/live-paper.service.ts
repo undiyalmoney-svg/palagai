@@ -216,7 +216,7 @@ export class LivePaperService {
           const hist = (await firstValueFrom(
             this.kiteApi.getHistoricalData({
               instrumentToken: String(inst.token),
-              interval: '5minute',
+              interval: under === 'nifty' ? 'minute' : '5minute',
               from,
               to: day,
               authorization: auth,
@@ -247,7 +247,7 @@ export class LivePaperService {
           const hist = (await firstValueFrom(
             this.kiteApi.getHistoricalData({
               instrumentToken: String(prev.optionToken),
-              interval: '5minute',
+              interval: cfg.barMinutes === 1 ? 'minute' : '5minute',
               from: day,
               to: day,
               authorization: auth,
@@ -270,7 +270,8 @@ export class LivePaperService {
           const pair = cheapByUnder.get(under);
           next = await this.bindCheap(next, cfg, chain, spot, quotes, nowMin, auth, pair);
           if (next.side !== 'flat' && next.optionToken) {
-            next = { ...next, lastBarMin: nowMin - (nowMin % 5) };
+            const step = cfg.barMinutes ?? 5;
+            next = { ...next, lastBarMin: nowMin - (nowMin % step) };
           }
         }
         if (cfg.buyOption && next.side !== 'flat' && !next.optionSymbol) {

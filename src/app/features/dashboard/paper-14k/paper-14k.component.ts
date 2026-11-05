@@ -155,7 +155,7 @@ function tradeLine(b: LivePaperBookState): string {
   const name = optionPickLabel(b) || b.label;
   const since = b.entryMin != null ? ` from ${hhmm(b.entryMin)}` : '';
   const flat = cfg?.flat ?? 15 * 60 + 15;
-  const holdEnd = b.entryMin != null ? b.entryMin + (cfg?.holdBars ?? 24) * 5 : flat;
+  const holdEnd = b.entryMin != null ? b.entryMin + (cfg?.holdBars ?? 24) * (cfg?.barMinutes ?? 5) : flat;
   const out = hhmm(Math.min(holdEnd, flat));
   return `${desk} ${name}${since}. Stop ₹${b.sl ?? '—'}, target ₹${b.tp ?? '—'}. Live ₹${Math.round(b.liveRs).toLocaleString('en-IN')}. Out by ${out}.`;
 }

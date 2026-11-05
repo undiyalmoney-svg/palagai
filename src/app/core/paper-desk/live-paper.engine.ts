@@ -42,7 +42,7 @@ const EXIT: Partial<LiveAssumeBookCfg> = {
 
 /** Cards stay so the blotter can show watches. Only Nifty momentum may open — that is the 3-year tape pick. */
 export const PAPER_DESKS: { id: string; label: string; rule: string }[] = [
-  { id: 'momentum', label: 'Momentum', rule: 'Nifty only — bank ₹375, stop ₹375, 5 trades per day, done at 3 wins' },
+  { id: 'momentum', label: 'Momentum', rule: 'Nifty 1-min thrust — bank ₹375, stop ₹375, 5 trades per day, done at 3 wins' },
   { id: 'orb', label: 'Opening range', rule: 'Watch — 3-year test −₹114/trade, CI crosses zero' },
   { id: 'pdhl', label: 'Prev-day break', rule: 'Watch — test CI crosses zero; not the pick' },
   { id: 'vwap', label: 'VWAP fade', rule: 'Watch — 3-year test −₹18/trade (AVGREJECT)' },
@@ -62,7 +62,10 @@ function deskPatch(desk: string, under: string): Partial<LiveAssumeBookCfg> {
       entryS: 9 * 60 + 45,
       maxTradesPerDay: 5,
       maxWinsPerDay: 3,
-      minGapBars: 6,
+      barMinutes: 1,
+      momK: 0.8,
+      minGapMin: 10,
+      holdBars: 60,
       stopRs: LIVE_PAPER_BANK_RS,
       targetRs: LIVE_PAPER_BANK_RS,
     };
@@ -85,9 +88,9 @@ function deskPatch(desk: string, under: string): Partial<LiveAssumeBookCfg> {
 export const PAPER_MOMENTUM: Partial<LiveAssumeBookCfg> = { ...EXIT, ...deskPatch('momentum', 'nifty') };
 export const PAPER_TEST_HONEST =
   'Historical pick, not a proven live edge: Nifty 50 momentum only. ATM CE (up) or PE (down), nearest expiry that is not today, ' +
-  '1 lot at the live ask, bank ₹375 / stop ₹375, next-bar fill, exact charges. ' +
-  '5 trades per day, stop when 3 have won that day. The 8-month 5-min tape is red at this 1R. ' +
-  'The last 12 live 1-min fills tagged +₹375 nine times and −₹375 three times. ' +
+  '1 lot at the live ask, bank ₹375 / stop ₹375, next 1-min fill, exact charges. ' +
+  '5 trades per day, stop when 3 have won that day. 1-min 6-bar thrust at 0.8×. ' +
+  'On 15 live 1-min sessions this tagged 3 wins on 11 days. Not an 8-month proof. ' +
   'Sensex, Bank Nifty, Crude, the other four desks and Scalp are watch-only. The 3-year tape is modelled (previous-day VIX). ' +
   'Forward paper is unproven until 400 trades and a one-sided 95% lower bound above zero on live asks. Not a guaranteed profit.';
 
@@ -527,8 +530,8 @@ export function istMinutes(d = new Date()): number {
   return ist.getUTCHours() * 60 + ist.getUTCMinutes();
 }
 
-export function completedBars(bars: LiveAssumeBar[], day: string, nowMin: number): LiveAssumeBar[] {
-  return bars.filter((b) => b.day < day || (b.day === day && b.min + 5 <= nowMin));
+export function completedBars(bars: LiveAssumeBar[], day: string, nowMin: number, barMinutes = 5): LiveAssumeBar[] {
+  return bars.filter((b) => b.day < day || (b.day === day && b.min + barMinutes <= nowMin));
 }
 
 /** Rupee P/L of one round trip after charges: exact Zerodha schedule for option buys, flat charge otherwise. */
@@ -777,7 +780,7 @@ export function tickBook(
     fills: [...book.fills],
     instrument: instrument || book.instrument,
   };
-  const done = completedBars(bars, day, nowMin);
+  const done = completedBars(bars, day, nowMin, cfg.barMinutes ?? 5);
   if (cfg.strategy === 'momentum' && done.length) {
     const g = done[done.length - 1].day === day ? momentumGauge(done, done.length - 1) : null;
     next.gauge = g
@@ -797,7 +800,7 @@ export function tickBook(
   const fillsBefore = next.fills.length;
   if (next.side === 'long' || next.side === 'short') {
     // SL / TP / scratch are premium levels. Index bars (e.g. 76,500) must never be tested against them.
-    const exitBars = isOptionBuy(cfg) ? completedBars(optionBars, day, nowMin) : done;
+    const exitBars = isOptionBuy(cfg) ? completedBars(optionBars, day, nowMin, cfg.barMinutes ?? 5) : done;
     for (const bar of exitBars) {
       if (bar.day !== day || bar.min <= next.lastBarMin) continue;
       if (hitExit(next, bar.high, bar.low, bar.close, cfg, day, bar.open)) {
@@ -813,7 +816,7 @@ export function tickBook(
       (next.side === 'long' || next.side === 'short') &&
       cfg.holdBars != null &&
       next.entryMin != null &&
-      nowMin >= next.entryMin + cfg.holdBars * 5 &&
+      nowMin >= next.entryMin + cfg.holdBars * (cfg.barMinutes ?? 5) &&
       last != null
     ) {
       closeAt(next, cfg, last, 'time', day);
@@ -874,12 +877,14 @@ export function tickBook(
         next.reason = mix.reason;
         continue;
       }
-      if (cfg.minGapBars != null) {
-        if (next.lastSignalMin != null && next.lastSignalMin >= 0 && bar.min - next.lastSignalMin <= cfg.minGapBars * 5) continue;
+      const barMin = cfg.barMinutes ?? 5;
+      const gapMin = cfg.minGapMin ?? (cfg.minGapBars != null ? cfg.minGapBars * barMin : null);
+      if (gapMin != null) {
+        if (next.lastSignalMin != null && next.lastSignalMin >= 0 && bar.min - next.lastSignalMin <= gapMin) continue;
         next.lastSignalMin = bar.min;
       }
       if (cfg.noConfirm) {
-        if (nowMin - (bar.min + 5) > LIVE_PAPER_MAX_SIGNAL_AGE_MIN) {
+        if (nowMin - (bar.min + barMin) > LIVE_PAPER_MAX_SIGNAL_AGE_MIN) {
           next.reason = `missed ${hit.dir === 1 ? 'up' : 'down'} signal at ${hhmm(bar.min + 5)} (desk was not checking)`;
           continue;
         }
