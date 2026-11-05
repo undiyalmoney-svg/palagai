@@ -11,6 +11,7 @@ import {
   morningStructure,
 } from './live-assume.engine';
 import { OPTION_14K_BOOKS, OPTION_14K_LIST, Option14kBookId, option14kToPaperCfg } from './option-14k-plan';
+import { mixGate } from './paper-mix.util';
 import { CheapOtmPick } from '../utils/pick-cheap-otm.util';
 import {
   equityMisRoundTripCharges,
@@ -29,19 +30,19 @@ const EXIT: Partial<LiveAssumeBookCfg> = {
   maxTradesPerDay: 3,
   minGapBars: 12,
   atm: true,
-  noConfirm: true,
-  dayStops: false,
+  noConfirm: false,
+  dayStops: true,
   expiryAfterTomorrow: false,
   freshCross: true,
 };
 
 /** Five well-known rule-based entries. Same ATM CE/PE exit on every card so a month of paper can rank them. */
 export const PAPER_DESKS: { id: string; label: string; rule: string }[] = [
-  { id: 'momentum', label: 'Momentum', rule: '30-min thrust > 1.5× normal bar' },
-  { id: 'orb', label: 'Opening range', rule: 'First close beyond the first 15-min range' },
-  { id: 'pdhl', label: 'Prev-day break', rule: 'First close through yesterday high or low' },
-  { id: 'vwap', label: 'VWAP fade', rule: 'Watch only — fade on ATM options is what lost 5 Nov' },
-  { id: 'trap', label: 'Failed break', rule: 'Stop-run that closes back inside the 6-bar range' },
+  { id: 'momentum', label: 'Momentum', rule: '30-min thrust · mix with VWAP + one other' },
+  { id: 'orb', label: 'Opening range', rule: 'First close beyond the 15-min range · mix with VWAP' },
+  { id: 'pdhl', label: 'Prev-day break', rule: 'First close through yesterday high/low · not against VWAP' },
+  { id: 'vwap', label: 'VWAP fade', rule: 'Stretch from the session average · no fade on a trend day' },
+  { id: 'trap', label: 'Failed break', rule: 'Stop-run back inside the 6-bar range · no fade on a trend day' },
 ];
 
 function deskPatch(desk: string, under: string): Partial<LiveAssumeBookCfg> {
@@ -58,7 +59,7 @@ function deskPatch(desk: string, under: string): Partial<LiveAssumeBookCfg> {
     return { strategy: 'rules', primary: ALL('pdhl'), entryS: afterOpen };
   }
   if (desk === 'vwap') {
-    return { strategy: 'watch', primary: ALL('vwap_fade'), entryS: afterOpen };
+    return { strategy: 'rules', primary: ALL('vwap_fade'), entryS: afterOpen };
   }
   return { strategy: 'rules', primary: ALL('trap'), entryS: afterOpen };
 }
@@ -67,7 +68,8 @@ export const PAPER_MOMENTUM: Partial<LiveAssumeBookCfg> = { ...EXIT, ...deskPatc
 export const PAPER_TEST_HONEST =
   'Five desks × four names, same exit: ATM CE (up) or PE (down), nearest expiry that is not today, 1 lot at the live ask, ' +
   'stop 40%, target 100%, out after 2 hours or flatten (15:15 index, 23:10 crude), max 3 trades a book a day, exact charges. ' +
-  'VWAP option desk is watch-only after the 5 Nov fade loss. Paper test for one month — not a guaranteed profit.';
+  'Entry mix: confirm bar, with-VWAP on continuation, no fade on a trend day, spread under 3%, 2-loss day stop. ' +
+  'Paper test for one month — not a guaranteed profit.';
 
 export const LIVE_PAPER_BOOKS: LiveAssumeBookCfg[] = PAPER_DESKS.flatMap((desk) =>
   OPTION_14K_LIST.map((plan) => ({
@@ -808,6 +810,16 @@ export function tickBook(
       const st = next.structure === 'wait' ? 'stand' : next.structure;
       const hit = pickSignal(done, i, cfg, st);
       if (!hit.dir) continue;
+      const blocked = canOpen(next, cfg, bar.min);
+      if (blocked) {
+        next.reason = blocked;
+        continue;
+      }
+      const mix = mixGate(done, i, cfg, hit, st);
+      if (!mix.ok) {
+        next.reason = mix.reason;
+        continue;
+      }
       if (cfg.minGapBars != null) {
         if (next.lastSignalMin != null && next.lastSignalMin >= 0 && bar.min - next.lastSignalMin <= cfg.minGapBars * 5) continue;
         next.lastSignalMin = bar.min;

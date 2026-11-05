@@ -10,6 +10,7 @@ import { liveBuyPrice, lotCostRs, neededLotQuote, replayBudgetSkips } from './li
 import { optionRoundTripCharges, venueForBook } from './option-charges.util';
 import { PaperLedgerService } from './paper-ledger.service';
 import { SkippedSignal } from './paper-analytics.models';
+import { MIX_SPREAD_PCT } from './paper-mix.util';
 import { buildSignalCard } from './signal-card.util';
 import {
   ALL_PAPER_BOOKS,
@@ -429,6 +430,25 @@ export class LivePaperService {
       liveRs: 0,
       skips: [...(book.skips || []), skip].slice(-100),
     });
+    if (bid != null && ask != null && ask > 0) {
+      const mid = (bid + ask) / 2;
+      if (mid > 0 && (ask - bid) / mid > MIX_SPREAD_PCT) {
+        return flat('skipped: spread over 3%', {
+          at: new Date().toISOString(),
+          day: istDay(),
+          book: cfg.id,
+          side: pick.side,
+          mode: book.mode,
+          structure: book.structure,
+          contract: pick.instrument.tradingSymbol,
+          premium: fill.price,
+          lot: pick.lotSize,
+          costRs: null,
+          budgetRs: 0,
+          reason: 'spread-over-3pct',
+        });
+      }
+    }
     if (!listed || fill.price == null) {
       const skip: SkippedSignal = {
         at: new Date().toISOString(),

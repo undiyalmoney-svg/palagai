@@ -149,5 +149,5 @@ export interface SkippedSignal {
   lot: number;
   costRs: number | null;
   budgetRs: number;
-  reason: 'premium-over-budget' | 'no-listed-contract' | 'no-live-quote' | 'day-stop';
+  reason: 'premium-over-budget' | 'no-listed-contract' | 'no-live-quote' | 'day-stop' | 'spread-over-3pct';
 }

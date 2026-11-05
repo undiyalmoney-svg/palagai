@@ -119,6 +119,8 @@
               </p>
             } @else if (sk.reason === 'no-live-quote') {
               <p class="pa-note">{{ sk.contract }} had no live ask or last; no trade was invented.</p>
+            } @else if (sk.reason === 'spread-over-3pct') {
+              <p class="pa-note">{{ sk.contract }} bid/ask was over 3% of premium; no trade.</p>
             } @else {
               <p class="pa-note">No listed contract found for {{ sk.contract }}; no trade was invented.</p>
             }

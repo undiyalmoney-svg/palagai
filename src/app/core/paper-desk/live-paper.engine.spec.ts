@@ -312,8 +312,10 @@ describe('Live paper desk', () => {
       expect(by(under)).toMatchObject({ strategy: 'momentum', stopPct: 0.4, targetPct: 1, holdBars: 24, maxTradesPerDay: 3, atm: true });
       expect(by(under, 'orb').primary['trend']).toBe('orb_break');
       expect(by(under, 'pdhl').primary['trend']).toBe('pdhl');
-      expect(by(under, 'vwap').strategy).toBe('watch');
+      expect(by(under, 'vwap').strategy).toBe('rules');
       expect(by(under, 'vwap').primary['trend']).toBe('vwap_fade');
+      expect(by(under).noConfirm).toBe(false);
+      expect(by(under).dayStops).toBe(true);
       expect(by(under, 'trap').primary['trend']).toBe('trap');
     }
     expect(by('crude').entryS).toBe(9 * 60 + 30);
@@ -341,26 +343,35 @@ describe('Live paper desk', () => {
     expect(momentumGauge(early, early.length - 1)?.sessionBars).toBe(6);
   });
 
-  it('opens momentum on the signal bar, binds 40% / 100% premium levels and exits on time', () => {
+  it('opens momentum after the confirm bar, binds 40% / 100% premium levels and exits on time', () => {
     const cfg = LIVE_PAPER_BOOKS.find((b) => b.id === 'nifty-momentum')!;
     const bars = [...flatBars('2026-11-03', 20, 13 * 60 + 35, 24000), ...flatBars('2026-11-04', 7, 9 * 60 + 15, 24000)];
     const last = bars.length - 1;
     bars[last] = { ...bars[last], close: 24020, high: 24021 };
     const book = { ...emptyBook(cfg), lastBarMin: 9 * 60 + 40 };
-    const opened = tickBook(book, cfg, bars, 24020, '2026-11-04', 9 * 60 + 51, 'NIFTY 50');
+    const pending = tickBook(book, cfg, bars, 24020, '2026-11-04', 9 * 60 + 51, 'NIFTY 50');
+    expect(pending.side).toBe('flat');
+    expect(pending.pendingDir).toBe(1);
+    expect(pending.reason).toMatch(/confirm momentum/);
+    const more = [
+      ...bars,
+      { day: '2026-11-04', min: 9 * 60 + 50, open: 24021, high: 24030, low: 24020, close: 24028 },
+    ];
+    const opened = tickBook(pending, cfg, more, 24028, '2026-11-04', 9 * 60 + 56, 'NIFTY 50');
     expect(opened.side).toBe('long');
     expect(opened.mode).toBe('momentum');
-    expect(opened.entryMin).toBe(9 * 60 + 50);
+    expect(opened.entry).toBe(24021);
+    expect(opened.entryMin).toBe(9 * 60 + 55);
     expect(opened.gauge?.move).toBeGreaterThan(opened.gauge?.need ?? 0);
     const late = tickBook(book, cfg, bars, 24020, '2026-11-04', 10 * 60 + 10, 'NIFTY 50');
     expect(late.side).toBe('flat');
-    expect(late.reason).toMatch(/missed up signal at 9:50/);
+    expect(late.pendingDir).toBe(1);
     const bound = bindOptionFill(opened, cfg, 100, { ...crudePick(), lotSize: 65 } as never);
     expect(bound.sl).toBe(60);
     expect(bound.tp).toBe(200);
-    const held = tickBook({ ...bound, lot: 65 }, cfg, [], 110, '2026-11-04', 9 * 60 + 50 + 115, 'NIFTY');
+    const held = tickBook({ ...bound, lot: 65 }, cfg, [], 110, '2026-11-04', 9 * 60 + 55 + 115, 'NIFTY');
     expect(held.side).toBe('long');
-    const timed = tickBook({ ...bound, lot: 65 }, cfg, [], 110, '2026-11-04', 9 * 60 + 50 + 120, 'NIFTY');
+    const timed = tickBook({ ...bound, lot: 65 }, cfg, [], 110, '2026-11-04', 9 * 60 + 55 + 120, 'NIFTY');
     expect(timed.side).toBe('flat');
     expect(timed.fills[0].reason).toBe('time');
   });

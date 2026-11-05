@@ -251,6 +251,15 @@ export const LIVE_ASSUME_BOOKS: LiveAssumeBookCfg[] = [
   },
 ];
 
+/** Session typical-price VWAP through bar i (same day, inclusive). */
+export function sessionVwap(bars: LiveAssumeBar[], i: number): number | null {
+  const b = bars[i];
+  if (!b) return null;
+  const sess = bars.filter((x) => x.day === b.day && x.min <= b.min);
+  if (!sess.length) return null;
+  return sess.reduce((s, x) => s + (x.high + x.low + x.close) / 3, 0) / sess.length;
+}
+
 export function morningStructure(bars: LiveAssumeBar[], day: string, orS: number, orE: number, quietW: number): string {
   const or = bars.filter((b) => b.day === day && b.min >= orS && b.min <= orE);
   if (or.length < 2) return 'stand';
@@ -317,8 +326,8 @@ export function bookSignal(mode: string, bars: LiveAssumeBar[], i: number, cfg: 
     return 0;
   };
   const vwapFade = () => {
-    const sess = bars.filter((x) => x.day === b.day && x.min <= b.min);
-    const typ = sess.reduce((s, x) => s + (x.high + x.low + x.close) / 3, 0) / Math.max(1, sess.length);
+    const typ = sessionVwap(bars, i);
+    if (typ == null) return 0;
     const dist = b.close - typ;
     const need = cfg.vwapPct != null && typ > 0 ? typ * cfg.vwapPct : cfg.vwapMin;
     if (Math.abs(dist) < need) return 0;
