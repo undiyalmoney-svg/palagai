@@ -305,24 +305,32 @@ describe('Live paper desk', () => {
   const flatBars = (day: string, n: number, startMin: number, px = 100, rng = 2) =>
     Array.from({ length: n }, (_, k) => ({ day, min: startMin + 5 * k, open: px, high: px + rng / 2, low: px - rng / 2, close: px }));
 
-  it('runs five desks on all four books with the same exit', () => {
+  it('trades only Nifty momentum; the other 19 option books watch', () => {
     const by = (under: string, desk = 'momentum') => LIVE_PAPER_BOOKS.find((b) => b.id === `${under}-${desk}`)!;
     expect(LIVE_PAPER_BOOKS).toHaveLength(20);
-    for (const under of ['nifty', 'sensex', 'bank', 'crude']) {
-      expect(by(under)).toMatchObject({ strategy: 'momentum', stopPct: 0.4, targetPct: 1, holdBars: 24, maxTradesPerDay: 3, atm: true });
-      expect(by(under, 'orb').primary['trend']).toBe('orb_break');
-      expect(by(under, 'pdhl').primary['trend']).toBe('pdhl');
-      expect(by(under, 'vwap').strategy).toBe('rules');
-      expect(by(under, 'vwap').primary['trend']).toBe('vwap_fade');
-      expect(by(under).noConfirm).toBe(false);
-      expect(by(under).dayStops).toBe(true);
-      expect(by(under, 'trap').primary['trend']).toBe('trap');
+    expect(by('nifty')).toMatchObject({
+      strategy: 'momentum',
+      stopPct: 0.4,
+      targetPct: 1,
+      holdBars: 24,
+      maxTradesPerDay: 3,
+      atm: true,
+      noConfirm: false,
+      dayStops: false,
+    });
+    for (const under of ['sensex', 'bank', 'crude']) {
+      expect(by(under).strategy).toBe('watch');
     }
-    expect(by('crude').entryS).toBe(9 * 60 + 30);
+    for (const under of ['nifty', 'sensex', 'bank', 'crude']) {
+      expect(by(under, 'orb').strategy).toBe('watch');
+      expect(by(under, 'pdhl').strategy).toBe('watch');
+      expect(by(under, 'vwap').strategy).toBe('watch');
+      expect(by(under, 'trap').strategy).toBe('watch');
+    }
     expect(by('crude', 'orb').orS).toBe(9 * 60);
     expect(by('nifty', 'orb').orS).toBe(9 * 60 + 15);
-    expect(PAPER_TEST_HONEST).toMatch(/not a guaranteed profit/);
-    expect(PAPER_TEST_HONEST).toMatch(/Five desks/);
+    expect(PAPER_TEST_HONEST).toMatch(/Not a guaranteed profit/);
+    expect(PAPER_TEST_HONEST).toMatch(/Nifty 50 momentum only/);
   });
 
   it('fires momentum only past 1.5×√6 × the 20-bar mean range, from the 7th bar of the day', () => {
@@ -440,14 +448,13 @@ describe('Live paper desk', () => {
       { day: '2026-11-05', min: 9 * 60 + 30, open: 1412, high: 1414, low: 1408, close: 1409 },
     ];
     const opened = tickBook(book, cfg, bars, 1409, '2026-11-05', 9 * 60 + 41, 'RELIANCE');
-    expect(opened.side).toBe('short');
-    expect(opened.sl).toBeCloseTo(1409 * 1.0015, 1);
-    expect(opened.tp).toBeCloseTo(1409 * 0.9975, 1);
-    expect(opened.capitalUsed).toBe(Math.round(1409 * 50 * 0.2));
-    const stopped = tickBook({ ...opened, lastBarMin: 9 * 60 + 35 }, cfg, [], 1415, '2026-11-05', 10 * 60, 'RELIANCE');
-    expect(stopped.side).toBe('flat');
-    expect(stopped.fills[0].reason).toBe('sl');
-    expect(stopped.fills[0].desk).toBe('scalp');
-    expect(stopped.fills[0].charges).toBeGreaterThan(0);
+    expect(opened.side).toBe('flat');
+    expect(opened.reason).toMatch(/watch only/);
+    expect(cfg.strategy).toBe('watch');
+    const armed = { ...cfg, strategy: 'rules' as const };
+    const live = tickBook(book, armed, bars, 1409, '2026-11-05', 9 * 60 + 41, 'RELIANCE');
+    expect(live.side).toBe('short');
+    expect(live.sl).toBeCloseTo(1409 * 1.0015, 1);
+    expect(live.tp).toBeCloseTo(1409 * 0.9975, 1);
   });
 });

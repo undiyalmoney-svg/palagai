@@ -21,7 +21,7 @@ export interface MixGate {
 }
 
 export function usesMix(cfg: LiveAssumeBookCfg): boolean {
-  return cfg.buyOption === true;
+  return cfg.mix === true;
 }
 
 export function mixVotes(bars: LiveAssumeBar[], i: number, cfg: LiveAssumeBookCfg): MixHit[] {

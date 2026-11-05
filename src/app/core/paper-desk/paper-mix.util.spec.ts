@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { LIVE_PAPER_BOOKS, PAPER_SCALP_BOOKS } from './live-paper.engine';
 import { mixGate, MIX_NEED, usesMix } from './paper-mix.util';
 
-const nifty = (desk: string) => LIVE_PAPER_BOOKS.find((b) => b.id === `nifty-${desk}`)!;
+const nifty = (desk: string) => ({
+  ...LIVE_PAPER_BOOKS.find((b) => b.id === `nifty-${desk}`)!,
+  mix: true,
+});
 
 const bar = (min: number, close: number, open = close, day = '2026-11-05') => ({
   day,
@@ -14,8 +17,8 @@ const bar = (min: number, close: number, open = close, day = '2026-11-05') => ({
 });
 
 describe('paper mix', () => {
-  it('is on the five CE/PE desks and off Scalp', () => {
-    expect(LIVE_PAPER_BOOKS.every((b) => usesMix(b))).toBe(true);
+  it('is off the historical Nifty pick and off Scalp', () => {
+    expect(LIVE_PAPER_BOOKS.every((b) => !usesMix(b))).toBe(true);
     expect(PAPER_SCALP_BOOKS.every((b) => !usesMix(b))).toBe(true);
     expect(mixGate([], 0, PAPER_SCALP_BOOKS[0], { dir: -1, mode: 'vwap_fade' }, 'range').ok).toBe(true);
   });

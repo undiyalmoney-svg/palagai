@@ -141,7 +141,7 @@ export class Paper14kComponent implements OnDestroy {
     return {
       tone: 'info',
       badge: 'watching',
-      title: `Watching five desks on ${names} No trade right now.`,
+      title: 'Watching Nifty 50 momentum only. Other desks are watch-only. No trade right now.',
       lines: [checked, today, foot].filter(Boolean),
     };
   }

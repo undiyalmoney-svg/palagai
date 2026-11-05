@@ -31,45 +31,48 @@ const EXIT: Partial<LiveAssumeBookCfg> = {
   minGapBars: 12,
   atm: true,
   noConfirm: false,
-  dayStops: true,
+  dayStops: false,
   expiryAfterTomorrow: false,
   freshCross: true,
 };
 
-/** Five well-known rule-based entries. Same ATM CE/PE exit on every card so a month of paper can rank them. */
+/** Cards stay so the blotter can show watches. Only Nifty momentum may open — that is the 3-year tape pick. */
 export const PAPER_DESKS: { id: string; label: string; rule: string }[] = [
-  { id: 'momentum', label: 'Momentum', rule: '30-min thrust · mix with VWAP + one other' },
-  { id: 'orb', label: 'Opening range', rule: 'First close beyond the 15-min range · mix with VWAP' },
-  { id: 'pdhl', label: 'Prev-day break', rule: 'First close through yesterday high/low · not against VWAP' },
-  { id: 'vwap', label: 'VWAP fade', rule: 'Stretch from the session average · no fade on a trend day' },
-  { id: 'trap', label: 'Failed break', rule: 'Stop-run back inside the 6-bar range · no fade on a trend day' },
+  { id: 'momentum', label: 'Momentum', rule: 'Nifty only — 6-bar thrust, same exit as the 3-year tape' },
+  { id: 'orb', label: 'Opening range', rule: 'Watch — 3-year test −₹114/trade, CI crosses zero' },
+  { id: 'pdhl', label: 'Prev-day break', rule: 'Watch — test CI crosses zero; not the pick' },
+  { id: 'vwap', label: 'VWAP fade', rule: 'Watch — 3-year test −₹18/trade (AVGREJECT)' },
+  { id: 'trap', label: 'Failed break', rule: 'Watch — no 3-year edge on this exit' },
 ];
 
 function deskPatch(desk: string, under: string): Partial<LiveAssumeBookCfg> {
   const crude = under === 'crude';
   const open = crude ? 9 * 60 : 9 * 60 + 15;
   const afterOpen = crude ? 9 * 60 + 30 : 9 * 60 + 45;
-  if (desk === 'momentum') {
+  if (desk === 'momentum' && under === 'nifty') {
     return { strategy: 'momentum', primary: ALL('momentum'), entryS: afterOpen };
   }
   if (desk === 'orb') {
-    return { strategy: 'rules', primary: ALL('orb_break'), orS: open, orE: open + 15, entryS: open + 15 };
+    return { strategy: 'watch', primary: ALL('orb_break'), orS: open, orE: open + 15, entryS: open + 15 };
   }
   if (desk === 'pdhl') {
-    return { strategy: 'rules', primary: ALL('pdhl'), entryS: afterOpen };
+    return { strategy: 'watch', primary: ALL('pdhl'), entryS: afterOpen };
   }
   if (desk === 'vwap') {
-    return { strategy: 'rules', primary: ALL('vwap_fade'), entryS: afterOpen };
+    return { strategy: 'watch', primary: ALL('vwap_fade'), entryS: afterOpen };
   }
-  return { strategy: 'rules', primary: ALL('trap'), entryS: afterOpen };
+  if (desk === 'trap') {
+    return { strategy: 'watch', primary: ALL('trap'), entryS: afterOpen };
+  }
+  return { strategy: 'watch', primary: ALL('momentum'), entryS: afterOpen };
 }
 
 export const PAPER_MOMENTUM: Partial<LiveAssumeBookCfg> = { ...EXIT, ...deskPatch('momentum', 'nifty') };
 export const PAPER_TEST_HONEST =
-  'Five desks × four names, same exit: ATM CE (up) or PE (down), nearest expiry that is not today, 1 lot at the live ask, ' +
-  'stop 40%, target 100%, out after 2 hours or flatten (15:15 index, 23:10 crude), max 3 trades a book a day, exact charges. ' +
-  'Entry mix: confirm bar, with-VWAP on continuation, no fade on a trend day, spread under 3%, 2-loss day stop. ' +
-  'Paper test for one month — not a guaranteed profit.';
+  'Historical pick, not a proven live edge: Nifty 50 momentum only. ATM CE (up) or PE (down), nearest expiry that is not today, ' +
+  '1 lot at the live ask, stop 40%, target 100%, out after 2 hours or 15:15, next-bar fill, max 3 a day, exact charges. ' +
+  'Sensex, Bank Nifty, Crude, the other four desks and Scalp are watch-only. The 3-year tape is modelled (previous-day VIX). ' +
+  'Forward paper is unproven until 400 trades and a one-sided 95% lower bound above zero on live asks. Not a guaranteed profit.';
 
 export const LIVE_PAPER_BOOKS: LiveAssumeBookCfg[] = PAPER_DESKS.flatMap((desk) =>
   OPTION_14K_LIST.map((plan) => ({
@@ -87,11 +90,11 @@ export const LIVE_PAPER_BOOKS: LiveAssumeBookCfg[] = PAPER_DESKS.flatMap((desk) 
 export const PAPER_SCALP = {
   id: 'scalp',
   label: 'Scalp',
-  rule: '5-min VWAP fade · 0.15% stop · 0.25% target',
+  rule: 'Watch — no 3-year after-cost edge on Crude Mini or the three cash names',
 };
 const SCALP_EXIT: Partial<LiveAssumeBookCfg> = {
   buyOption: false,
-  strategy: 'rules',
+  strategy: 'watch',
   primary: ALL('vwap_fade'),
   backup: {},
   stopPct: 0.0015,
@@ -878,7 +881,7 @@ export function summarizePaper(
     honest:
       `Paper only — no Kite order is placed. Each book takes 1 lot at the live ask and shows that cash. ` +
       `Motto: buy CE/PE. SL, target, and live P/L come from the option. ` +
-      `A separate Scalp card fades VWAP on Crude Mini futures and three cash stocks. ${fundsLine}${PAPER_TEST_HONEST}`,
+      `Scalp is watch-only. ${fundsLine}${PAPER_TEST_HONEST}`,
   };
 }
 

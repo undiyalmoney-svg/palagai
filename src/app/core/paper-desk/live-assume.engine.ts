@@ -114,6 +114,8 @@ export interface LiveAssumeBookCfg {
   nseSymbol?: string;
   /** VWAP fade distance as a fraction of typical price (0.0025 = 0.25%). */
   vwapPct?: number;
+  /** When true, the five-metric mix must pass before an option entry. Off on the historical Nifty pick. */
+  mix?: boolean;
 }
 
 /** Bar i's 6-bar close-to-close move and the move momentum needs (1.5 × √6 × mean range of the 20 bars before it). */
