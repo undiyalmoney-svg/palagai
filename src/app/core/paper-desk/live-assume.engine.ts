@@ -87,6 +87,8 @@ export interface LiveAssumeBookCfg {
   /** Stop / target as fractions of the entry premium (overrides the point stops). */
   stopPct?: number;
   targetPct?: number;
+  /** Cap the stop distance so one fail cannot take more than this many rupees (lot × pts). */
+  maxStopRs?: number;
   /** Time exit, in 5-minute bars after the fill bar opens. */
   holdBars?: number;
   maxTradesPerDay?: number;

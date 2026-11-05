@@ -4,6 +4,7 @@ import { optionRoundTripCharges } from './option-charges.util';
 import {
   LIVE_PAPER_BOOKS,
   LIVE_PAPER_CAPITAL,
+  LIVE_PAPER_MAX_STOP_RS,
   LIVE_PAPER_COOLDOWN_MIN,
   PAPER_TEST_HONEST,
   PAPER_SCALP_BOOKS,
@@ -312,6 +313,7 @@ describe('Live paper desk', () => {
       strategy: 'momentum',
       stopPct: 0.4,
       targetPct: 1,
+      maxStopRs: LIVE_PAPER_MAX_STOP_RS,
       holdBars: 24,
       maxTradesPerDay: 1,
       atm: true,
@@ -384,6 +386,18 @@ describe('Live paper desk', () => {
     const timed = tickBook({ ...bound, lot: 65 }, cfg, [], 110, '2026-11-04', 9 * 60 + 55 + 120, 'NIFTY');
     expect(timed.side).toBe('flat');
     expect(timed.fills[0].reason).toBe('time');
+  });
+
+  it('caps an expensive ATM stop at ₹3,000 and leaves a cheap premium on 40%', () => {
+    const cfg = LIVE_PAPER_BOOKS.find((b) => b.id === 'nifty-momentum')!;
+    const book = { ...emptyBook(cfg), side: 'long' as const, status: 'open' as const };
+    const dear = bindOptionFill(book, cfg, 336.6, { ...crudePick(), lotSize: 65 } as never);
+    expect(dear.sl).toBe(290.45);
+    expect(Math.round((336.6 - (dear.sl ?? 0)) * 65)).toBe(LIVE_PAPER_MAX_STOP_RS);
+    expect(dear.tp).toBe(673.2);
+    const cheap = bindOptionFill(book, cfg, 74, { ...crudePick(), lotSize: 65 } as never);
+    expect(cheap.sl).toBe(44.4);
+    expect(cheap.tp).toBe(148);
   });
 
   it('caps Nifty momentum at 1 trade a day', () => {
