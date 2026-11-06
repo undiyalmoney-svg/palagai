@@ -24,15 +24,14 @@ import { SignalCard, SkippedSignal } from './paper-analytics.models';
 const ALL = (mode: string) => ({ trend: mode, range: mode, quiet: mode, stand: mode });
 /** One failed Nifty ATM cannot take more than this. 40% of a ₹300+ premium is ~₹8k — too much for a ₹14k book. */
 export const LIVE_PAPER_MAX_STOP_RS = 3_000;
-/** Stop the day once closed net is at least this. Three ₹150 targets after charges lock ~₹200. */
-export const LIVE_PAPER_BANK_RS = 150;
-/** Bank this many rupees on a win. */
-export const LIVE_PAPER_TARGET_RS = 150;
+/** Sit when today's closed net (after charges) is at least this. */
+export const LIVE_PAPER_BANK_RS = 370;
+/** Bank this many rupees on a win (gross of charges). */
+export const LIVE_PAPER_TARGET_RS = 370;
 /** Give back at most this many rupees on a loss. */
-export const LIVE_PAPER_STOP_RS = 100;
-/** Crude Mini evening only: bigger thrust, ₹200 bank, stop after 2 wins. */
-export const LIVE_PAPER_CRUDE_TARGET_RS = 200;
-export const LIVE_PAPER_CRUDE_STOP_RS = 100;
+export const LIVE_PAPER_STOP_RS = 370;
+export const LIVE_PAPER_CRUDE_TARGET_RS = 370;
+export const LIVE_PAPER_CRUDE_STOP_RS = 370;
 export const LIVE_PAPER_CRUDE_MOM_K = 1.5;
 const EXIT: Partial<LiveAssumeBookCfg> = {
   backup: {},
@@ -43,14 +42,14 @@ const EXIT: Partial<LiveAssumeBookCfg> = {
   minGapBars: 12,
   atm: true,
   noConfirm: false,
-  dayStops: false,
+  dayStops: true,
   expiryAfterTomorrow: false,
   freshCross: true,
 };
 
-/** The only paper desk: four daily-bank momentum books. */
+/** The only paper desk: four daily ₹370 momentum books. */
 export const PAPER_DESKS: { id: string; label: string; rule: string }[] = [
-  { id: 'momentum', label: 'Daily bank', rule: 'Nifty / Bank / Sensex 1-min thrust — bank ₹150, stop ₹100, done at 3 wins. Crude Mini evening only — bank ₹200, stop ₹100, done at 2 wins' },
+  { id: 'momentum', label: 'Daily ₹370', rule: 'Nifty / Bank / Sensex 1-min thrust — bank ₹370, stop ₹370, sit at +₹370 net. Crude Mini evening only from 17:15' },
 ];
 
 function deskPatch(under: string): Partial<LiveAssumeBookCfg> {
@@ -62,7 +61,6 @@ function deskPatch(under: string): Partial<LiveAssumeBookCfg> {
       orE: 17 * 60 + 15,
       entryS: 17 * 60 + 15,
       maxTradesPerDay: 5,
-      maxWinsPerDay: 2,
       minDayNetRs: LIVE_PAPER_BANK_RS,
       barMinutes: 1,
       momK: LIVE_PAPER_CRUDE_MOM_K,
@@ -79,7 +77,6 @@ function deskPatch(under: string): Partial<LiveAssumeBookCfg> {
     orE: 9 * 60 + 30,
     entryS: 9 * 60 + 45,
     maxTradesPerDay: 5,
-    maxWinsPerDay: 3,
     minDayNetRs: LIVE_PAPER_BANK_RS,
     barMinutes: 1,
     momK: 0.8,
@@ -92,11 +89,12 @@ function deskPatch(under: string): Partial<LiveAssumeBookCfg> {
 
 export const PAPER_MOMENTUM: Partial<LiveAssumeBookCfg> = { ...EXIT, ...deskPatch('nifty') };
 export const PAPER_TEST_HONEST =
-  'Index-proxy pick, not a proven live edge. ATM CE (up) or PE (down), 1 lot at the live ask, next 1-min confirm, exact charges. ' +
-  'Nifty / Bank / Sensex: bank ₹150 / stop ₹100, 0.8× thrust from 09:45, stop at 3 wins or ₹150 net. ' +
-  'Crude Mini: evening only from 17:15, 1.5× thrust, bank ₹200 / stop ₹100, stop at 2 wins — the day-session copy of the index rule is red on Crude. ' +
-  '5 Aug–4 Nov 2026 IST 1-min 0.5-delta: Nifty +₹5,318 (52/61 green), Bank +₹7,509 (50/61), Sensex +₹2,727 (44/63), Crude evening +₹1,568 (45/61; August −₹38). ' +
-  'A ₹150 Nifty target is ~2.3 option points; live ask/spread can eat it. Forward paper is unproven until 400 trades and a one-sided 95% lower bound above zero on live asks. Not a guaranteed profit.';
+  'Index-proxy pick, not a lock. ATM CE (up) or PE (down), 1 lot at the live ask, next 1-min confirm, exact charges. ' +
+  'Daily bank ₹370 / stop ₹370, 0.8× 1-min thrust from 09:45, sit when the book is +₹370 net after charges. ' +
+  'Crude Mini: evening only from 17:15, 1.5× thrust, same ₹370 bank. ' +
+  'A ₹370 Nifty target is ~5.7 option points (the ₹100 stop was ~1.5 pts and live spread ate it). ' +
+  'Cousin ₹375 rule on 15 live 1-min sessions tagged 3 wins on 11 days — not every day, not 8 months. ' +
+  'Nothing here is a guaranteed ₹370. Forward paper is unproven until 400 trades and a one-sided 95% lower bound above zero on live asks. Not a guaranteed profit.';
 
 export const LIVE_PAPER_BOOKS: LiveAssumeBookCfg[] = OPTION_14K_LIST.map((plan) => ({
   ...option14kToPaperCfg(plan),
@@ -578,6 +576,7 @@ function closeAt(
   exitPx: number,
   reason: string,
   day: string,
+  nowMin?: number,
 ): void {
   if (book.side === 'flat' || book.entry == null) return;
   const pts = isOptionBuy(cfg)
@@ -618,7 +617,9 @@ function closeAt(
     entryAsk: book.entryAsk ?? null,
     entryAt: book.entryAt,
     signal: book.signal ?? null,
-    holdMin: book.entryMin != null ? Math.max(0, (book.lastBarMin || 0) - book.entryMin) : undefined,
+    holdMin: book.entryMin != null
+      ? Math.max(0, (nowMin ?? book.lastBarMin ?? 0) - book.entryMin)
+      : undefined,
     gaugeMove: book.gauge?.move ?? null,
     gaugeNeed: book.gauge?.need ?? null,
     exitMin: book.lastBarMin,
@@ -659,38 +660,43 @@ function hitExit(
   cfg: LiveAssumeBookCfg,
   day: string,
   open: number = close,
+  nowMin?: number,
+  fillBid?: number | null,
 ): boolean {
   if (book.side === 'flat' || book.entry == null || book.sl == null || book.tp == null || book.scratch == null) {
     return false;
   }
   const long = isOptionBuy(cfg) || book.side === 'long';
+  const hasBid = fillBid != null && fillBid > 0;
   if (long) {
-    // A stop is a market-style exit: if the price gapped through the level the fill is the open (or the last
-    // price on a tick check), never the better stop level. Targets fill at the target level, never better.
-    if (low <= book.sl) {
-      closeAt(book, cfg, Math.min(book.sl, open), 'sl', day);
+    // Sell the stop at the live bid when we have one. A 1-min wick or candle open
+    // sitting below the bid is not an executable fill (that printed as Nifty 159.8 vs bid 167.8).
+    const throughSl = hasBid ? fillBid <= book.sl : low <= book.sl;
+    if (throughSl) {
+      closeAt(book, cfg, hasBid ? fillBid : Math.min(book.sl, open), 'sl', day, nowMin);
       return true;
     }
-    if (low <= book.scratch) {
-      closeAt(book, cfg, Math.min(book.scratch, open), 'scratch', day);
+    const throughScratch = hasBid ? fillBid <= book.scratch : low <= book.scratch;
+    if (throughScratch) {
+      closeAt(book, cfg, hasBid ? fillBid : Math.min(book.scratch, open), 'scratch', day, nowMin);
       return true;
     }
     if (high >= book.tp) {
-      closeAt(book, cfg, book.tp, 'tp', day);
+      closeAt(book, cfg, book.tp, 'tp', day, nowMin);
       return true;
     }
     return false;
   }
   if (high >= book.sl) {
-    closeAt(book, cfg, book.sl, 'sl', day);
+    closeAt(book, cfg, book.sl, 'sl', day, nowMin);
     return true;
   }
   if (high >= book.scratch) {
-    closeAt(book, cfg, book.scratch, 'scratch', day);
+    closeAt(book, cfg, book.scratch, 'scratch', day, nowMin);
     return true;
   }
   if (low <= book.tp) {
-    closeAt(book, cfg, book.tp, 'tp', day);
+    closeAt(book, cfg, book.tp, 'tp', day, nowMin);
     return true;
   }
   return false;
@@ -759,7 +765,7 @@ function openAt(
   book.mode = mode;
   book.status = 'open';
   book.reason = 'open';
-  book.entryMin = atMin + 5;
+  book.entryMin = atMin + (cfg.barMinutes ?? 5);
   book.pendingDir = 0;
   book.pendingSig = 0;
   book.pendingMode = '';
@@ -827,14 +833,14 @@ export function tickBook(
         next.lastBarMin = bar.min;
         continue;
       }
-      if (hitExit(next, bar.high, bar.low, bar.close, cfg, day, bar.open)) {
+      if (hitExit(next, bar.high, bar.low, bar.close, cfg, day, bar.open, nowMin, exec.bid)) {
         next.lastBarMin = bar.min;
         break;
       }
       next.lastBarMin = bar.min;
     }
     if ((next.side === 'long' || next.side === 'short') && nowMin >= cfg.flat && last != null) {
-      closeAt(next, cfg, sellPx ?? last, 'eod', day);
+      closeAt(next, cfg, sellPx ?? last, 'eod', day, nowMin);
     }
     if (
       (next.side === 'long' || next.side === 'short') &&
@@ -843,17 +849,16 @@ export function tickBook(
       nowMin >= next.entryMin + cfg.holdBars * barMin &&
       last != null
     ) {
-      closeAt(next, cfg, sellPx ?? last, 'time', day);
+      closeAt(next, cfg, sellPx ?? last, 'time', day, nowMin);
     }
-    // Option books follow 1-min candles after the fill, matching the research. A last-price
-    // check on the next 8s tick would stop a ₹100 ATM on the same minute's earlier low or a
-    // stale last sitting below the live bid.
+    // Option books follow completed candles after the fill. A last-price check on the next
+    // 8s tick would stop on the same bar's earlier low or a stale last sitting below the live bid.
     const tickExitPx = sellPx ?? last;
     const tooSoon =
       isOptionBuy(cfg) && next.entryMin != null && nowMin <= next.entryMin + barMin;
     const barsHandleExit = isOptionBuy(cfg) && optionBars.length > 0;
     if ((next.side === 'long' || next.side === 'short') && tickExitPx != null && !tooSoon && !barsHandleExit) {
-      hitExit(next, tickExitPx, tickExitPx, tickExitPx, cfg, day, tickExitPx);
+      hitExit(next, tickExitPx, tickExitPx, tickExitPx, cfg, day, tickExitPx, nowMin, exec.bid);
     }
   }
 

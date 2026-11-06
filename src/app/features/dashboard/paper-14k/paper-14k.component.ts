@@ -17,10 +17,10 @@ import {
 
 const ARMED_ORDER = ['nifty', 'bank', 'sensex', 'crude'] as const;
 const ARMED_RULE: Record<(typeof ARMED_ORDER)[number], string> = {
-  nifty: '1-min thrust from 09:45 — bank ₹150, stop ₹100, done at 3 wins',
-  bank: '1-min thrust from 09:45 — bank ₹150, stop ₹100, done at 3 wins',
-  sensex: '1-min thrust from 09:45 — bank ₹150, stop ₹100, done at 3 wins',
-  crude: 'Evening from 17:15 — 1.5× thrust, bank ₹200, stop ₹100, done at 2 wins',
+  nifty: '1-min thrust from 09:45 — bank ₹370, stop ₹370, sit at +₹370 net',
+  bank: '1-min thrust from 09:45 — bank ₹370, stop ₹370, sit at +₹370 net',
+  sensex: '1-min thrust from 09:45 — bank ₹370, stop ₹370, sit at +₹370 net',
+  crude: 'Evening from 17:15 — 1.5× thrust, bank ₹370, stop ₹370, sit at +₹370 net',
 };
 
 @Component({
