@@ -462,7 +462,8 @@ describe('Live paper desk', () => {
     expect(PAPER_TEST_HONEST).toMatch(/Not a guaranteed profit/);
     expect(PAPER_TEST_HONEST).toMatch(/evening only/);
     expect(PAPER_TEST_HONEST).toMatch(/Daily bank ₹370/);
-    expect(PAPER_TEST_HONEST).toMatch(/one of Nifty\/Bank\/Sensex/);
+    expect(PAPER_TEST_HONEST).toMatch(/one index trade a day/);
+    expect(PAPER_TEST_HONEST).toMatch(/Nifty is skipped/);
     expect(paperTickOrder(LIVE_PAPER_BOOKS).map((b) => b.under)).toEqual(['bank', 'sensex', 'nifty', 'crude']);
   });
 
@@ -582,6 +583,31 @@ describe('Live paper desk', () => {
     expect(cleared.pendingDir).toBe(0);
     expect(cleared.reason).toBe('one index book at a time');
     expect(indexDeskBlockReason('crude-momentum', [idle, openBank])).toBeNull();
+    const filledBank = {
+      ...emptyBook(bank),
+      closedRs: 264.3,
+      fills: [
+        {
+          day: '2026-11-04',
+          book: 'bank-momentum',
+          label: 'Bank',
+          side: 'long' as const,
+          entry: 1,
+          exit: 1,
+          sl: 1,
+          tp: 1,
+          pts: 0,
+          rs: 264.3,
+          reason: 'tp',
+          mode: 'momentum',
+        },
+      ],
+    };
+    expect(indexDeskBlockReason('sensex-momentum', [idle, filledBank], '2026-11-04')).toBe('one index trade today');
+    expect(indexDeskBlockReason('nifty-momentum', [idle, emptyBook(bank)], '2026-11-04')).toMatch(
+      /Nifty stop is 5\.7 pts — Bank\/Sensex only/,
+    );
+    expect(indexDeskBlockReason('bank-momentum', [idle, emptyBook(bank)], '2026-11-04')).toBeNull();
   });
 
   it('does not open or flatten a day of missed bars when Start is after the session', () => {

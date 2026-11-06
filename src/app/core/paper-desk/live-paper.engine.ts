@@ -49,7 +49,7 @@ const EXIT: Partial<LiveAssumeBookCfg> = {
 
 /** The only paper desk: four daily ₹370 momentum books. */
 export const PAPER_DESKS: { id: string; label: string; rule: string }[] = [
-  { id: 'momentum', label: 'Daily ₹370', rule: 'One of Nifty / Bank / Sensex at a time — target nets ₹370 after charges, stop ₹370, sit the desk at +₹370. Crude Mini evening only from 17:15' },
+  { id: 'momentum', label: 'Daily ₹370', rule: 'One index trade a day — Bank then Sensex (Nifty skip: ₹370 is only 5.7 pts). Target nets ₹370 after charges, fill at the live bid, sit at +₹370. Crude Mini evening only from 17:15' },
 ];
 
 function deskPatch(under: string): Partial<LiveAssumeBookCfg> {
@@ -90,9 +90,9 @@ function deskPatch(under: string): Partial<LiveAssumeBookCfg> {
 export const PAPER_MOMENTUM: Partial<LiveAssumeBookCfg> = { ...EXIT, ...deskPatch('nifty') };
 export const PAPER_TEST_HONEST =
   'Index-proxy pick, not a lock. ATM CE (up) or PE (down), 1 lot at the live ask, next 1-min confirm, exact charges. ' +
-  'Daily bank ₹370 net after charges / stop ₹370, 0.8× 1-min thrust from 09:45, one of Nifty/Bank/Sensex in a trade at a time (Bank first), sit the index desk when combined closed net is +₹370. Target fills at the live bid when it is already through. ' +
+  'Daily bank ₹370 net after charges / stop ₹370, 0.8× 1-min thrust from 09:45, one index trade a day (Bank then Sensex). ' +
+  'Nifty is skipped: a ₹370 stop is only ~5.7 pts there and the live bid printed −₹627 against two +₹370-gross wins. Target fills at the live bid when it is already through. Sit the index desk after that trade or at +₹370 combined. ' +
   'Crude Mini: evening only from 17:15, 1.5× thrust, same ₹370 bank. ' +
-  'A ₹370 Nifty target is ~5.7 option points before charges (the ₹100 stop was ~1.5 pts and live spread ate it). ' +
   'Cousin ₹375 rule on 15 live 1-min sessions tagged 3 wins on 11 days — not every day, not 8 months. ' +
   'Nothing here is a guaranteed ₹370. Forward paper is unproven until 400 trades and a one-sided 95% lower bound above zero on live asks. Not a guaranteed profit.';
 
@@ -221,14 +221,33 @@ export function indexDeskNet(books: Pick<LivePaperBookState, 'id' | 'closedRs'>[
   return Math.round(books.filter((b) => isIndexMomentumBook(b.id)).reduce((s, b) => s + (b.closedRs || 0), 0) * 10) / 10;
 }
 
+export function indexDeskFillsToday(
+  books: Pick<LivePaperBookState, 'id' | 'fills'>[],
+  day: string,
+): number {
+  return books
+    .filter((b) => isIndexMomentumBook(b.id))
+    .reduce((n, b) => n + (b.fills || []).filter((f) => f.day === day).length, 0);
+}
+
+/** ₹370 / Nifty lot 65 is only ~5.7 premium points — a live bid through that stop printed −₹627. */
+export const LIVE_PAPER_MIN_STOP_PTS = 10;
+
 export function indexDeskBlockReason(
   cfgId: string,
-  books: Pick<LivePaperBookState, 'id' | 'side' | 'pendingDir' | 'closedRs'>[],
+  books: Pick<LivePaperBookState, 'id' | 'side' | 'pendingDir' | 'closedRs' | 'fills'>[],
+  day?: string,
 ): string | null {
   if (!isIndexMomentumBook(cfgId)) return null;
   if (indexDeskNet(books) >= LIVE_PAPER_BANK_RS) return `desk banked ₹${LIVE_PAPER_BANK_RS}`;
+  if (day && indexDeskFillsToday(books, day) >= 1) return 'one index trade today';
   const others = books.filter((b) => b.id !== cfgId);
   if (indexDeskOpen(others)) return 'one index book at a time';
+  const lot = OPTION_14K_BOOKS[underOf(cfgId)]?.lot ?? 0;
+  const stopPts = lot > 0 ? LIVE_PAPER_STOP_RS / lot : 0;
+  if (stopPts > 0 && stopPts < LIVE_PAPER_MIN_STOP_PTS) {
+    return `Nifty stop is ${stopPts.toFixed(1)} pts — Bank/Sensex only`;
+  }
   return null;
 }
 

@@ -265,7 +265,7 @@ export class LivePaperService {
           nowMin,
           prev.optionSymbol || inst?.tradingSymbol || cfg.label,
           optionBars,
-          { bid: optBid, ask: optAsk, blockOpen: indexDeskBlockReason(cfg.id, peers) },
+          { bid: optBid, ask: optAsk, blockOpen: indexDeskBlockReason(cfg.id, peers, day) },
         );
         if (cfg.buyOption && needsOption(next)) {
           const spot = underLast ?? (next.optionSymbol ? next.last : null) ?? 0;
