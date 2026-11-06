@@ -32,7 +32,7 @@ import {
   underOf,
 } from './live-paper.engine';
 
-const STORAGE_KEY = 'palagai_live_paper_v8';
+const STORAGE_KEY = 'palagai_live_paper_v9';
 const UNDERS = ['crude', 'nifty', 'bank', 'sensex'] as const;
 const TICK_MS = 8_000;
 
@@ -224,7 +224,9 @@ export class LivePaperService {
         const prev = cur.books.find((b) => b.id === cfg.id) || emptySession(day).books.find((b) => b.id === cfg.id)!;
         const bars = barCache.get(under) || [];
         const underLast = lastPrice(quotes, under, inst?.tradingSymbol || '');
-        const optLast = prev.optionSymbol ? lastByKey(quotes, optionKey(prev)) : null;
+        const optQuote = prev.optionSymbol ? findQuote(quotes, optionKey(prev)) : null;
+        const optLast = optQuote ? lastByKey(quotes, optionKey(prev)) : null;
+        const { bid: optBid, ask: optAsk } = bestBidAsk(optQuote);
         const lastForTick = optionMarkLast({
           buyOption: !!cfg.buyOption,
           side: prev.side,
@@ -255,6 +257,7 @@ export class LivePaperService {
           nowMin,
           prev.optionSymbol || inst?.tradingSymbol || cfg.label,
           optionBars,
+          { bid: optBid, ask: optAsk },
         );
         if (cfg.buyOption && needsOption(next)) {
           const spot = underLast ?? (next.optionSymbol ? next.last : null) ?? 0;
@@ -275,7 +278,8 @@ export class LivePaperService {
             reason: 'skipped: no option fill',
           };
         } else if (next.side !== 'flat' && next.optionSymbol && optLast != null) {
-          next = { ...next, last: optLast };
+          const mark = optBid != null && optLast < optBid ? optBid : optLast;
+          next = { ...next, last: mark };
         }
         if (next.fills.length > prev.fills.length && prev.optionSymbol) {
           const q = findQuote(quotes, optionKey(prev));
@@ -436,7 +440,7 @@ export class LivePaperService {
     pick.lastPrice = prem;
     pick.openCostRs = cost;
     pick.fitsBudget = true;
-    const bound = bindOptionFill(book, cfg, prem, pick, range);
+    const bound = bindOptionFill(book, cfg, prem, pick, range, nowMin);
     const mid = bid != null && ask != null ? (bid + ask) / 2 : null;
     const spreadPct = mid != null && mid > 0 ? (ask! - bid!) / mid : null;
     const signal =

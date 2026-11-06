@@ -289,6 +289,51 @@ describe('Live paper desk', () => {
     expect(won.fills[0].exit).toBe(204.55);
   });
 
+  it('does not stop an ATM CE on the option minute that was still forming when we bought', () => {
+    const cfg = LIVE_PAPER_BOOKS.find((b) => b.id === 'nifty-momentum')!;
+    const mk = () => {
+      const b = emptyBook(cfg);
+      b.side = 'long';
+      b.entry = 149;
+      b.sl = 147.46;
+      b.tp = 151.31;
+      b.scratch = 147.46;
+      b.status = 'open';
+      b.lot = 65;
+      b.optionSymbol = 'NIFTY26N0924650CE';
+      b.optionType = 'CE';
+      b.entryMin = 9 * 60 + 57;
+      b.lastBarMin = 9 * 60 + 56;
+      return b;
+    };
+    const sameMinute = [
+      { day: '2026-11-06', min: 9 * 60 + 57, open: 138.8, high: 149.2, low: 138.8, close: 146 },
+    ];
+    const held = tickBook(mk(), cfg, [], 138.8, '2026-11-06', 9 * 60 + 58, 'NIFTY', sameMinute, {
+      bid: 145.75,
+      ask: 146.05,
+    });
+    expect(held.side).toBe('long');
+    expect(held.fills).toHaveLength(0);
+    expect(held.lastBarMin).toBe(9 * 60 + 57);
+    expect(held.liveRs).toBeLessThan(0);
+
+    const later = [{ day: '2026-11-06', min: 9 * 60 + 58, open: 140, high: 146, low: 139, close: 141 }];
+    const stopped = tickBook({ ...mk(), lastBarMin: 9 * 60 + 57 }, cfg, [], 141, '2026-11-06', 9 * 60 + 59, 'NIFTY', later);
+    expect(stopped.side).toBe('flat');
+    expect(stopped.fills[0].reason).toBe('sl');
+    expect(stopped.fills[0].exit).toBe(140);
+  });
+
+  it('binds the fill to the current minute so older option candles cannot stop it', () => {
+    const cfg = LIVE_PAPER_BOOKS.find((b) => b.id === 'nifty-momentum')!;
+    const book = { ...emptyBook(cfg), side: 'long' as const, status: 'open' as const, lastBarMin: 9 * 60 + 56 };
+    const bound = bindOptionFill(book, cfg, 149, { ...crudePick(), lotSize: 65 } as never, null, 9 * 60 + 57);
+    expect(bound.entryMin).toBe(9 * 60 + 57);
+    expect(bound.lastBarMin).toBe(9 * 60 + 57);
+    expect(bound.sl).toBe(147.46);
+  });
+
   it('rebuilds today\'s loss count and cooldown from the saved fills', () => {
     const cfg = LIVE_PAPER_BOOKS.find((b) => b.id === 'nifty-momentum')!;
     const book = emptyBook(cfg);

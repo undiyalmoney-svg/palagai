@@ -470,6 +470,7 @@ export function bindOptionFill(
   prem: number,
   pick: CheapOtmPick,
   rangePts: number | null = null,
+  atMin?: number,
 ): LivePaperBookState {
   if (book.side === 'flat' || prem <= 0) return book;
   const next: LivePaperBookState = { ...book, fills: [...book.fills] };
@@ -487,6 +488,12 @@ export function bindOptionFill(
   next.optionToken = pick.instrument.instrumentToken;
   next.last = prem;
   next.reason = `open ${pick.side} ${pick.instrument.tradingSymbol}`;
+  // The fill is now, not on the confirm bar. Option candles that opened at or before this
+  // minute include price action from before we bought — they must not stop us.
+  if (atMin != null) {
+    next.entryMin = atMin;
+    next.lastBarMin = Math.max(next.lastBarMin, atMin);
+  }
   markLive(next, prem, cfg);
   return next;
 }
@@ -780,6 +787,7 @@ export function tickBook(
   nowMin: number,
   instrument: string,
   optionBars: LiveAssumeBar[] = [],
+  exec: { bid?: number | null; ask?: number | null } = {},
 ): LivePaperBookState {
   const next: LivePaperBookState = {
     ...book,
@@ -804,11 +812,21 @@ export function tickBook(
   }
 
   const fillsBefore = next.fills.length;
+  const barMin = cfg.barMinutes ?? 5;
+  const sellPx =
+    isOptionBuy(cfg) && exec.bid != null && exec.bid > 0
+      ? exec.bid
+      : last;
   if (next.side === 'long' || next.side === 'short') {
     // SL / TP / scratch are premium levels. Index bars (e.g. 76,500) must never be tested against them.
-    const exitBars = isOptionBuy(cfg) ? completedBars(optionBars, day, nowMin, cfg.barMinutes ?? 5) : done;
+    const exitBars = isOptionBuy(cfg) ? completedBars(optionBars, day, nowMin, barMin) : done;
     for (const bar of exitBars) {
       if (bar.day !== day || bar.min <= next.lastBarMin) continue;
+      // The option minute we bought in still contains prints from before the fill.
+      if (isOptionBuy(cfg) && next.entryMin != null && bar.min <= next.entryMin) {
+        next.lastBarMin = bar.min;
+        continue;
+      }
       if (hitExit(next, bar.high, bar.low, bar.close, cfg, day, bar.open)) {
         next.lastBarMin = bar.min;
         break;
@@ -816,19 +834,26 @@ export function tickBook(
       next.lastBarMin = bar.min;
     }
     if ((next.side === 'long' || next.side === 'short') && nowMin >= cfg.flat && last != null) {
-      closeAt(next, cfg, last, 'eod', day);
+      closeAt(next, cfg, sellPx ?? last, 'eod', day);
     }
     if (
       (next.side === 'long' || next.side === 'short') &&
       cfg.holdBars != null &&
       next.entryMin != null &&
-      nowMin >= next.entryMin + cfg.holdBars * (cfg.barMinutes ?? 5) &&
+      nowMin >= next.entryMin + cfg.holdBars * barMin &&
       last != null
     ) {
-      closeAt(next, cfg, last, 'time', day);
+      closeAt(next, cfg, sellPx ?? last, 'time', day);
     }
-    if ((next.side === 'long' || next.side === 'short') && last != null) {
-      hitExit(next, last, last, last, cfg, day);
+    // Option books follow 1-min candles after the fill, matching the research. A last-price
+    // check on the next 8s tick would stop a ₹100 ATM on the same minute's earlier low or a
+    // stale last sitting below the live bid.
+    const tickExitPx = sellPx ?? last;
+    const tooSoon =
+      isOptionBuy(cfg) && next.entryMin != null && nowMin <= next.entryMin + barMin;
+    const barsHandleExit = isOptionBuy(cfg) && optionBars.length > 0;
+    if ((next.side === 'long' || next.side === 'short') && tickExitPx != null && !tooSoon && !barsHandleExit) {
+      hitExit(next, tickExitPx, tickExitPx, tickExitPx, cfg, day, tickExitPx);
     }
   }
 
@@ -924,7 +949,7 @@ export function tickBook(
     }
   }
 
-  markLive(next, last, cfg);
+  markLive(next, next.side !== 'flat' && isOptionBuy(cfg) && sellPx != null ? sellPx : last, cfg);
   next.capitalUsed = capitalUsedOf(cfg, next);
   return next;
 }
