@@ -20,11 +20,13 @@ import {
   bindOptionFill,
   completedBars,
   emptySession,
+  indexDeskBlockReason,
   istDay,
   istMinutes,
   optionBoundStops,
   optionRangePts,
   paperCfg,
+  paperTickOrder,
   restoreDayStops,
   summarizePaper,
   tickBook,
@@ -32,7 +34,7 @@ import {
   underOf,
 } from './live-paper.engine';
 
-const STORAGE_KEY = 'palagai_live_paper_v10';
+const STORAGE_KEY = 'palagai_live_paper_v11';
 const UNDERS = ['crude', 'nifty', 'bank', 'sensex'] as const;
 const TICK_MS = 8_000;
 
@@ -217,8 +219,8 @@ export class LivePaperService {
         }
         barCache.set(under, bars);
       }
-      const books = [];
-      for (const cfg of LIVE_PAPER_BOOKS) {
+      const nextById = new Map<string, LivePaperBookState>();
+      for (const cfg of paperTickOrder(LIVE_PAPER_BOOKS)) {
         const under = underOf(cfg.id);
         const inst = instOf(under, crude, nifty, bank, sensex);
         const prev = cur.books.find((b) => b.id === cfg.id) || emptySession(day).books.find((b) => b.id === cfg.id)!;
@@ -248,6 +250,12 @@ export class LivePaperService {
           ).catch(() => null)) as { data?: { candles?: unknown[][] } } | null;
           optionBars = (hist?.data?.candles || []).map(kiteBar).filter((b) => b.day);
         }
+        const peers = LIVE_PAPER_BOOKS.map(
+          (c) =>
+            nextById.get(c.id) ||
+            cur.books.find((b) => b.id === c.id) ||
+            emptySession(day).books.find((b) => b.id === c.id)!,
+        );
         let next = tickBook(
           prev,
           cfg,
@@ -257,7 +265,7 @@ export class LivePaperService {
           nowMin,
           prev.optionSymbol || inst?.tradingSymbol || cfg.label,
           optionBars,
-          { bid: optBid, ask: optAsk },
+          { bid: optBid, ask: optAsk, blockOpen: indexDeskBlockReason(cfg.id, peers, day) },
         );
         if (cfg.buyOption && needsOption(next)) {
           const spot = underLast ?? (next.optionSymbol ? next.last : null) ?? 0;
@@ -291,12 +299,15 @@ export class LivePaperService {
           next = { ...next, fills };
         }
         const underQuote = findQuote(quotes, underKeyFor(under, inst?.tradingSymbol, inst?.exchange));
-        books.push({
+        nextById.set(cfg.id, {
           ...next,
           ...neededFields(cheapByUnder.get(under), quotes),
           quoteAt: quoteStamp(underQuote) || next.quoteAt || '',
         });
       }
+      const books = LIVE_PAPER_BOOKS.map(
+        (c) => nextById.get(c.id) || cur.books.find((b) => b.id === c.id)!,
+      );
       const snap = summarizePaper(books, {
         running: true,
         day,

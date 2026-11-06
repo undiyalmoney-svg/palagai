@@ -26,7 +26,7 @@ const ALL = (mode: string) => ({ trend: mode, range: mode, quiet: mode, stand: m
 export const LIVE_PAPER_MAX_STOP_RS = 3_000;
 /** Sit when today's closed net (after charges) is at least this. */
 export const LIVE_PAPER_BANK_RS = 370;
-/** Bank this many rupees on a win (gross of charges). */
+/** Bank this many rupees on a win, after exact charges. */
 export const LIVE_PAPER_TARGET_RS = 370;
 /** Give back at most this many rupees on a loss. */
 export const LIVE_PAPER_STOP_RS = 370;
@@ -49,7 +49,7 @@ const EXIT: Partial<LiveAssumeBookCfg> = {
 
 /** The only paper desk: four daily ₹370 momentum books. */
 export const PAPER_DESKS: { id: string; label: string; rule: string }[] = [
-  { id: 'momentum', label: 'Daily ₹370', rule: 'Nifty / Bank / Sensex 1-min thrust — bank ₹370, stop ₹370, sit at +₹370 net. Crude Mini evening only from 17:15' },
+  { id: 'momentum', label: 'Daily ₹370', rule: 'One index trade a day — Bank then Sensex (Nifty skip: ₹370 is only 5.7 pts). Target nets ₹370 after charges, fill at the live bid, sit at +₹370. Crude Mini evening only from 17:15' },
 ];
 
 function deskPatch(under: string): Partial<LiveAssumeBookCfg> {
@@ -90,9 +90,9 @@ function deskPatch(under: string): Partial<LiveAssumeBookCfg> {
 export const PAPER_MOMENTUM: Partial<LiveAssumeBookCfg> = { ...EXIT, ...deskPatch('nifty') };
 export const PAPER_TEST_HONEST =
   'Index-proxy pick, not a lock. ATM CE (up) or PE (down), 1 lot at the live ask, next 1-min confirm, exact charges. ' +
-  'Daily bank ₹370 / stop ₹370, 0.8× 1-min thrust from 09:45, sit when the book is +₹370 net after charges. ' +
+  'Daily bank ₹370 net after charges / stop ₹370, 0.8× 1-min thrust from 09:45, one index trade a day (Bank then Sensex). ' +
+  'Nifty is skipped: a ₹370 stop is only ~5.7 pts there and the live bid printed −₹627 against two +₹370-gross wins. Target fills at the live bid when it is already through. Sit the index desk after that trade or at +₹370 combined. ' +
   'Crude Mini: evening only from 17:15, 1.5× thrust, same ₹370 bank. ' +
-  'A ₹370 Nifty target is ~5.7 option points (the ₹100 stop was ~1.5 pts and live spread ate it). ' +
   'Cousin ₹375 rule on 15 live 1-min sessions tagged 3 wins on 11 days — not every day, not 8 months. ' +
   'Nothing here is a guaranteed ₹370. Forward paper is unproven until 400 trades and a one-sided 95% lower bound above zero on live asks. Not a guaranteed profit.';
 
@@ -192,6 +192,63 @@ export function paperCfg(id: string): LiveAssumeBookCfg {
 export function underOf(id: string): Option14kBookId {
   const u = id.split('-')[0];
   return (u === 'crude' || u === 'nifty' || u === 'bank' || u === 'sensex' ? u : 'nifty') as Option14kBookId;
+}
+
+export function isIndexMomentumBook(id: string): boolean {
+  const u = underOf(id);
+  return u === 'nifty' || u === 'bank' || u === 'sensex';
+}
+
+/** Bank, then Sensex, then Nifty, then Crude — so one same-tick thrust keeps Bank, not Nifty+Bank. */
+export function paperTickOrder<T extends { id: string }>(cfgs: readonly T[]): T[] {
+  const rank = (id: string) => {
+    const u = underOf(id);
+    if (u === 'bank') return 0;
+    if (u === 'sensex') return 1;
+    if (u === 'nifty') return 2;
+    return 3;
+  };
+  return [...cfgs].sort((a, b) => rank(a.id) - rank(b.id));
+}
+
+export function indexDeskOpen(
+  books: Pick<LivePaperBookState, 'id' | 'side' | 'pendingDir'>[],
+): boolean {
+  return books.some((b) => isIndexMomentumBook(b.id) && (b.side !== 'flat' || !!b.pendingDir));
+}
+
+export function indexDeskNet(books: Pick<LivePaperBookState, 'id' | 'closedRs'>[]): number {
+  return Math.round(books.filter((b) => isIndexMomentumBook(b.id)).reduce((s, b) => s + (b.closedRs || 0), 0) * 10) / 10;
+}
+
+export function indexDeskFillsToday(
+  books: Pick<LivePaperBookState, 'id' | 'fills'>[],
+  day: string,
+): number {
+  return books
+    .filter((b) => isIndexMomentumBook(b.id))
+    .reduce((n, b) => n + (b.fills || []).filter((f) => f.day === day).length, 0);
+}
+
+/** ₹370 / Nifty lot 65 is only ~5.7 premium points — a live bid through that stop printed −₹627. */
+export const LIVE_PAPER_MIN_STOP_PTS = 10;
+
+export function indexDeskBlockReason(
+  cfgId: string,
+  books: Pick<LivePaperBookState, 'id' | 'side' | 'pendingDir' | 'closedRs' | 'fills'>[],
+  day?: string,
+): string | null {
+  if (!isIndexMomentumBook(cfgId)) return null;
+  if (indexDeskNet(books) >= LIVE_PAPER_BANK_RS) return `desk banked ₹${LIVE_PAPER_BANK_RS}`;
+  if (day && indexDeskFillsToday(books, day) >= 1) return 'one index trade today';
+  const others = books.filter((b) => b.id !== cfgId);
+  if (indexDeskOpen(others)) return 'one index book at a time';
+  const lot = OPTION_14K_BOOKS[underOf(cfgId)]?.lot ?? 0;
+  const stopPts = lot > 0 ? LIVE_PAPER_STOP_RS / lot : 0;
+  if (stopPts > 0 && stopPts < LIVE_PAPER_MIN_STOP_PTS) {
+    return `Nifty stop is ${stopPts.toFixed(1)} pts — Bank/Sensex only`;
+  }
+  return null;
 }
 
 export function deskOf(id: string): string {
@@ -451,6 +508,21 @@ export function optionRupeeStopPts(cfg: LiveAssumeBookCfg, lot: number): { sl: n
   return { sl: r((cfg.stopRs ?? 0) / lot), tp: r((cfg.targetRs ?? 0) / lot) };
 }
 
+/** Target distance in premium points so a fill at TP nets `targetRs` after exact charges. */
+export function optionNetTargetPts(cfg: LiveAssumeBookCfg, prem: number, lot: number): number {
+  const r = (n: number) => Math.round(n * 100) / 100;
+  const targetRs = cfg.targetRs ?? 0;
+  if (!(lot > 0) || !(targetRs > 0)) return r(targetRs);
+  if (!(prem > 0)) return r(targetRs / lot);
+  const venue = venueForBook(cfg.under || cfg.id);
+  let pts = targetRs / lot;
+  for (let i = 0; i < 3; i++) {
+    const charges = optionRoundTripCharges(prem, prem + pts, lot, venue);
+    pts = (targetRs + charges) / lot;
+  }
+  return r(pts);
+}
+
 export function optionBoundStops(
   cfg: LiveAssumeBookCfg,
   prem: number,
@@ -473,9 +545,11 @@ export function bindOptionFill(
   if (book.side === 'flat' || prem <= 0) return book;
   const next: LivePaperBookState = { ...book, fills: [...book.fills] };
   const stop = optionBoundStops(cfg, prem, pick.lotSize, rangePts);
+  const tpPts =
+    cfg.targetRs != null && pick.lotSize > 0 ? optionNetTargetPts(cfg, prem, pick.lotSize) : stop.tp;
   next.entry = prem;
   next.sl = Math.max(0.05, Math.round((prem - stop.sl) * 100) / 100);
-  next.tp = Math.round((prem + stop.tp) * 100) / 100;
+  next.tp = Math.round((prem + tpPts) * 100) / 100;
   next.scratch = next.sl;
   next.instrument = pick.instrument.tradingSymbol;
   next.optionSymbol = pick.instrument.tradingSymbol;
@@ -681,8 +755,9 @@ function hitExit(
       closeAt(book, cfg, hasBid ? fillBid : Math.min(book.scratch, open), 'scratch', day, nowMin);
       return true;
     }
-    if (high >= book.tp) {
-      closeAt(book, cfg, book.tp, 'tp', day, nowMin);
+    const throughTp = hasBid ? fillBid >= book.tp : high >= book.tp;
+    if (throughTp) {
+      closeAt(book, cfg, hasBid ? fillBid : book.tp, 'tp', day, nowMin);
       return true;
     }
     return false;
@@ -793,7 +868,7 @@ export function tickBook(
   nowMin: number,
   instrument: string,
   optionBars: LiveAssumeBar[] = [],
-  exec: { bid?: number | null; ask?: number | null } = {},
+  exec: { bid?: number | null; ask?: number | null; blockOpen?: string | null } = {},
 ): LivePaperBookState {
   const next: LivePaperBookState = {
     ...book,
@@ -815,6 +890,13 @@ export function tickBook(
   if (nowMin >= cfg.orE) {
     const st = morningStructure(done, day, cfg.orS, cfg.orE, cfg.quietW);
     if (st !== 'stand' || next.structure === 'wait' || !next.structure) next.structure = st;
+  }
+  if (exec.blockOpen && next.side === 'flat' && next.pendingDir) {
+    next.pendingDir = 0;
+    next.pendingSig = 0;
+    next.pendingMode = '';
+    next.status = 'watching';
+    next.reason = exec.blockOpen;
   }
 
   const fillsBefore = next.fills.length;
@@ -893,6 +975,14 @@ export function tickBook(
             : `missed confirm at ${hhmm(bar.min)} (desk was not checking)`;
           continue;
         }
+        if (exec.blockOpen) {
+          next.pendingDir = 0;
+          next.pendingSig = 0;
+          next.pendingMode = '';
+          next.status = 'watching';
+          next.reason = exec.blockOpen;
+          continue;
+        }
         const ok =
           next.pendingDir === 1
             ? bar.close > bar.open && bar.close > next.pendingSig
@@ -924,7 +1014,7 @@ export function tickBook(
         next.reason = `skipped: ${st} morning`;
         continue;
       }
-      const blocked = canOpen(next, cfg, bar.min, day);
+      const blocked = canOpen(next, cfg, bar.min, day) || exec.blockOpen || null;
       if (blocked) {
         next.reason = blocked;
         continue;
