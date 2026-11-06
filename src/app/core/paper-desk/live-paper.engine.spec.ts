@@ -448,6 +448,7 @@ describe('Live paper desk', () => {
       });
       expect(by(under).skipStructures).toBeUndefined();
     }
+    expect(LIVE_PAPER_CRUDE_MOM_K).toBe(0.8);
     expect(by('crude')).toMatchObject({
       strategy: 'momentum',
       stopRs: LIVE_PAPER_STOP_RS,
@@ -459,6 +460,7 @@ describe('Live paper desk', () => {
       orS: 17 * 60,
       noConfirm: false,
     });
+    expect(by('crude').momK).toBe(by('bank').momK);
     expect(PAPER_TEST_HONEST).toMatch(/Not a guaranteed profit/);
     expect(PAPER_TEST_HONEST).toMatch(/evening only/);
     expect(PAPER_TEST_HONEST).toMatch(/Daily bank ₹370/);
