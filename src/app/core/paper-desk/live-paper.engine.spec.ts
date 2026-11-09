@@ -427,7 +427,7 @@ describe('Live paper desk', () => {
   const flatBars = (day: string, n: number, startMin: number, px = 100, rng = 2) =>
     Array.from({ length: n }, (_, k) => ({ day, min: startMin + 5 * k, open: px, high: px + rng / 2, low: px - rng / 2, close: px }));
 
-  it('trades only Nifty, Bank, Sensex and evening Crude Mini momentum', () => {
+  it('trades only Nifty, Bank, Sensex and Crude Mini momentum from 09:00', () => {
     const by = (under: string) => LIVE_PAPER_BOOKS.find((b) => b.id === `${under}-momentum`)!;
     expect(LIVE_PAPER_BOOKS).toHaveLength(4);
     expect(LIVE_PAPER_BOOKS.every((b) => b.strategy === 'momentum' && b.desk === 'momentum')).toBe(true);
@@ -456,17 +456,33 @@ describe('Live paper desk', () => {
       minDayNetRs: LIVE_PAPER_BANK_RS,
       barMinutes: 1,
       momK: LIVE_PAPER_CRUDE_MOM_K,
-      entryS: 17 * 60 + 15,
-      orS: 17 * 60,
+      entryS: 9 * 60 + 15,
+      orS: 9 * 60,
+      orE: 9 * 60 + 15,
       noConfirm: false,
     });
     expect(by('crude').momK).toBe(by('bank').momK);
     expect(PAPER_TEST_HONEST).toMatch(/Not a guaranteed profit/);
-    expect(PAPER_TEST_HONEST).toMatch(/evening only/);
+    expect(PAPER_TEST_HONEST).toMatch(/from 09:00 MCX open/);
     expect(PAPER_TEST_HONEST).toMatch(/Daily bank ₹370/);
     expect(PAPER_TEST_HONEST).toMatch(/one index trade a day/);
     expect(PAPER_TEST_HONEST).toMatch(/Nifty is skipped/);
     expect(paperTickOrder(LIVE_PAPER_BOOKS).map((b) => b.under)).toEqual(['bank', 'sensex', 'nifty', 'crude']);
+  });
+
+  it('arms Crude Mini from 09:15, not only after 17:15', () => {
+    const cfg = LIVE_PAPER_BOOKS.find((b) => b.id === 'crude-momentum')!;
+    const bars = [...flatBars('2026-11-03', 20, 13 * 60 + 35, 5400), ...flatBars('2026-11-04', 7, 9 * 60, 5400)];
+    const last = bars.length - 1;
+    bars[last] = { ...bars[last], close: 5420, high: 5421 };
+    const book = { ...emptyBook(cfg), lastBarMin: 9 * 60 + 25 };
+    const pending = tickBook(book, cfg, bars, 5420, '2026-11-04', 9 * 60 + 31, 'CRUDEOILM');
+    expect(pending.side).toBe('flat');
+    expect(pending.pendingDir).toBe(1);
+    expect(pending.reason).toMatch(/confirm momentum/);
+    const eveningOnly = { ...cfg, entryS: 17 * 60 + 15, orS: 17 * 60, orE: 17 * 60 + 15 };
+    const blocked = tickBook(book, eveningOnly, bars, 5420, '2026-11-04', 9 * 60 + 31, 'CRUDEOILM');
+    expect(blocked.pendingDir).toBe(0);
   });
 
   it('fires momentum only past 1.5×√6 × the 20-bar mean range, from the 7th bar of the day', () => {

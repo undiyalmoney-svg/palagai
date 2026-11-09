@@ -26,7 +26,7 @@ describe('Paper14kComponent', () => {
     expect(text).toMatch(/Nifty 50/);
     expect(text).toMatch(/Bank Nifty/);
     expect(text).toMatch(/Sensex/);
-    expect(text).toMatch(/Evening from 17:15/);
+    expect(text).toMatch(/From 09:00 MCX open/);
     expect(text).toMatch(/one index trade a day/);
     expect(text).toMatch(/target nets ₹370/);
     expect(text).toMatch(/Bank\/Sensex take/);
@@ -71,7 +71,7 @@ describe('Paper14kComponent', () => {
     });
     fixture.detectChanges();
     const title = (fixture.nativeElement.querySelector('[data-testid="paper-now-title"]') as HTMLElement).textContent || '';
-    expect(title).toMatch(/Nifty, Bank Nifty, Sensex and evening Crude Mini/);
+    expect(title).toMatch(/Nifty, Bank Nifty, Sensex and Crude Mini from 09:00/);
     expect(title).not.toMatch(/watch-only/);
   });
 
