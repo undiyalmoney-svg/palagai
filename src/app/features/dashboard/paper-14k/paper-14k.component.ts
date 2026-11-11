@@ -20,7 +20,7 @@ const ARMED_RULE: Record<(typeof ARMED_ORDER)[number], string> = {
   nifty: 'Watch — ₹370 is only 5.7 pts here (live bid printed −₹627). Bank/Sensex take the one daily trade',
   bank: '1-min from 09:45 — one index trade a day · target nets ₹370 after charges · fill TP at the live bid · sit at +₹370',
   sensex: '1-min from 09:45 — one index trade a day · target nets ₹370 after charges · fill TP at the live bid · sit at +₹370',
-  crude: 'From 09:00 MCX open — 0.8× thrust (same as Bank/Sensex), target nets ₹370 after charges, sit at +₹370 net',
+  crude: 'From 09:00 MCX open — one trade a day · sits if index already banked ₹370 · 0.8× thrust',
 };
 
 @Component({
