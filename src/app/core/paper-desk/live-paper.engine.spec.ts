@@ -460,6 +460,7 @@ describe('Live paper desk', () => {
       entryS: 9 * 60 + 15,
       orS: 9 * 60,
       orE: 9 * 60 + 15,
+      maxTradesPerDay: 1,
       noConfirm: false,
     });
     expect(by('crude').momK).toBe(by('bank').momK);
@@ -468,6 +469,8 @@ describe('Live paper desk', () => {
     expect(PAPER_TEST_HONEST).toMatch(/Daily bank ₹370/);
     expect(PAPER_TEST_HONEST).toMatch(/one index trade a day/);
     expect(PAPER_TEST_HONEST).toMatch(/Nifty is skipped/);
+    expect(PAPER_TEST_HONEST).toMatch(/one trade a day/);
+    expect(PAPER_TEST_HONEST).toMatch(/index desk already banked/);
     expect(paperTickOrder(LIVE_PAPER_BOOKS).map((b) => b.under)).toEqual(['bank', 'sensex', 'nifty', 'crude']);
   });
 
@@ -484,6 +487,28 @@ describe('Live paper desk', () => {
     const eveningOnly = { ...cfg, entryS: 17 * 60 + 15, orS: 17 * 60, orE: 17 * 60 + 15 };
     const blocked = tickBook(book, eveningOnly, bars, 5420, '2026-11-04', 9 * 60 + 31, 'CRUDEOILM');
     expect(blocked.pendingDir).toBe(0);
+    const one = {
+      ...book,
+      fills: [
+        {
+          day: '2026-11-04',
+          book: 'crude-momentum',
+          label: 'Crude',
+          side: 'long' as const,
+          entry: 1,
+          exit: 1,
+          sl: 1,
+          tp: 1,
+          pts: 0,
+          rs: -208,
+          reason: 'time',
+          mode: 'momentum',
+        },
+      ],
+    };
+    const capped = tickBook(one, cfg, bars, 5420, '2026-11-04', 9 * 60 + 31, 'CRUDEOILM');
+    expect(capped.pendingDir).toBe(0);
+    expect(capped.reason).toBe('max 1 trade today');
   });
 
   it('fires momentum only past 1.5×√6 × the 20-bar mean range, from the 7th bar of the day', () => {
@@ -602,6 +627,9 @@ describe('Live paper desk', () => {
     expect(cleared.pendingDir).toBe(0);
     expect(cleared.reason).toBe('one index book at a time');
     expect(indexDeskBlockReason('crude-momentum', [idle, openBank])).toBeNull();
+    expect(indexDeskBlockReason('crude-momentum', [idle, { ...emptyBook(bank), closedRs: 370 }])).toBe(
+      'index desk banked ₹370',
+    );
     const filledBank = {
       ...emptyBook(bank),
       closedRs: 264.3,

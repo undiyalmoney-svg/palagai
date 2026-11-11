@@ -28,6 +28,7 @@ describe('Paper14kComponent', () => {
     expect(text).toMatch(/Sensex/);
     expect(text).toMatch(/From 09:00 MCX open/);
     expect(text).toMatch(/one index trade a day/);
+    expect(text).toMatch(/sits if index already banked/);
     expect(text).toMatch(/target nets ₹370/);
     expect(text).toMatch(/Bank\/Sensex take/);
     expect(text).not.toMatch(/Opening range/);
