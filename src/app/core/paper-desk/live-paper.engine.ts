@@ -602,6 +602,19 @@ export function hhmm(min: number): string {
   return `${Math.floor(min / 60)}:${String(min % 60).padStart(2, '0')}`;
 }
 
+/** Wall-clock minutes between fill timestamps. Falls back to confirm-bar minutes. */
+export function paperHoldMin(
+  entryAt?: string | null,
+  exitAt?: string | null,
+  fallback?: number | null,
+): number | null {
+  if (entryAt && exitAt) {
+    const ms = Date.parse(exitAt) - Date.parse(entryAt);
+    if (Number.isFinite(ms)) return Math.max(0, Math.round(ms / 60_000));
+  }
+  return fallback ?? null;
+}
+
 export function istDay(d = new Date()): string {
   const ist = new Date(d.getTime() + 330 * 60 * 1000);
   return ist.toISOString().slice(0, 10);
@@ -1145,7 +1158,7 @@ export function nightLog(session: LivePaperSession) {
       reason: f.reason,
       entryAt: f.entryAt || '',
       exitAt: f.exitAt || '',
-      holdMin: f.holdMin ?? null,
+      holdMin: paperHoldMin(f.entryAt, f.exitAt, f.holdMin),
       gaugeMove: f.gaugeMove ?? null,
       gaugeNeed: f.gaugeNeed ?? null,
       entryBid: f.entryBid ?? null,

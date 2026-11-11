@@ -15,6 +15,7 @@ import {
   indexDeskBlockReason,
   netRs,
   nightLog,
+  paperHoldMin,
   optionRangePts,
   optionStopPts,
   paperTickOrder,
@@ -700,6 +701,24 @@ describe('Live paper desk', () => {
     });
     expect(log.fills[0].charges).toBeGreaterThan(0);
     expect(log.fills[0].holdMin).toBe(45);
+    expect(paperHoldMin('2026-11-11T05:18:35.549Z', '2026-11-11T05:18:45.676Z', 4)).toBe(0);
+    const sameTick = nightLog({
+      ...snap,
+      books: snap.books.map((b) =>
+        b.id === cfg.id
+          ? {
+              ...done,
+              fills: done.fills.map((f) => ({
+                ...f,
+                holdMin: 4,
+                entryAt: '2026-11-11T05:18:35.549Z',
+                exitAt: '2026-11-11T05:18:45.676Z',
+              })),
+            }
+          : b,
+      ),
+    });
+    expect(sameTick.fills[0].holdMin).toBe(0);
   });
 
   it('keeps scalp off the five CE/PE desks and sizes stop/target as 0.15% / 0.25%', () => {
