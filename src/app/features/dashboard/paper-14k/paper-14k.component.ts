@@ -17,10 +17,10 @@ import {
 
 const ARMED_ORDER = ['nifty', 'bank', 'sensex', 'crude'] as const;
 const ARMED_RULE: Record<(typeof ARMED_ORDER)[number], string> = {
-  nifty: 'Watch — ₹370 is only 5.7 pts here (live bid printed −₹627). Bank/Sensex take the one daily trade',
-  bank: '1-min from 09:45 — one index trade a day · target nets ₹370 after charges · fill TP at the live bid · sit at +₹370',
-  sensex: '1-min from 09:45 — one index trade a day · target nets ₹370 after charges · fill TP at the live bid · sit at +₹370',
-  crude: 'From 09:00 MCX open — one trade a day · sits if index already banked ₹370 · 0.8× thrust',
+  nifty: 'Watch — ₹370 is only 5.7 pts here. Bank takes the one daily index trade',
+  bank: '1-min from 09:45 — one Bank trade a day · target nets ₹370 after charges · fill TP at the live bid · sit at +₹370',
+  sensex: 'Watch — Bank takes Daily ₹370. 12 Nov PE stop −₹572 used the one index slot',
+  crude: 'From 09:00 MCX open — one trade a day · sits if Bank already banked ₹370 · 0.8× thrust',
 };
 
 @Component({
