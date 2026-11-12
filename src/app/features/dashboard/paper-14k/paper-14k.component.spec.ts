@@ -27,11 +27,15 @@ describe('Paper14kComponent', () => {
     expect(text).toMatch(/Bank Nifty/);
     expect(text).toMatch(/Sensex/);
     expect(text).toMatch(/From 09:00 MCX open/);
-    expect(text).toMatch(/one Bank trade a day/);
-    expect(text).toMatch(/sits if Bank already banked/);
+    expect(text).toMatch(/own fill/);
     expect(text).toMatch(/target nets ₹370/);
-    expect(text).toMatch(/Bank takes the one daily index trade/);
-    expect(text).toMatch(/Bank takes Daily ₹370/);
+    expect(text).toMatch(/Live Kite/);
+    expect(text).toMatch(/Place real Kite orders and resting SLs/);
+    expect(fixture.nativeElement.querySelector('[data-testid="paper-live-toggle"]')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('[data-testid="paper-live-confirm"]')).toBeTruthy();
+    expect((fixture.nativeElement.querySelector('[data-testid="paper-live-badge"]') as HTMLElement).textContent).toMatch(
+      /Paper only/,
+    );
     expect(text).not.toMatch(/Opening range/);
     expect(text).not.toMatch(/Prev-day break/);
     expect(text).not.toMatch(/VWAP fade/);
@@ -39,7 +43,7 @@ describe('Paper14kComponent', () => {
     expect(text).not.toMatch(/Watch-only desks/);
     expect(text).toMatch(/Closed today/);
     expect(text).toMatch(/Copy night log/);
-    expect(text).toMatch(/no Kite order/);
+    expect(text).toMatch(/Paper only until Live Kite/);
     expect(text).toMatch(/Not a guaranteed profit/);
     expect(text).not.toMatch(/Play next day/);
     expect(text).not.toMatch(/2-year tape/);
@@ -75,6 +79,27 @@ describe('Paper14kComponent', () => {
     const title = (fixture.nativeElement.querySelector('[data-testid="paper-now-title"]') as HTMLElement).textContent || '';
     expect(title).toMatch(/Nifty, Bank Nifty, Sensex and Crude Mini from 09:00/);
     expect(title).not.toMatch(/watch-only/);
+  });
+
+  it('arms live Kite only after the toggle and the checkbox are both on', () => {
+    const paper = fixture.componentInstance['paper'];
+    const toggle = fixture.nativeElement.querySelector('[data-testid="paper-live-toggle"]') as HTMLButtonElement;
+    const box = fixture.nativeElement.querySelector('[data-testid="paper-live-confirm"]') as HTMLInputElement;
+    toggle.click();
+    fixture.detectChanges();
+    expect(paper.liveArmed()).toBe(false);
+    expect((fixture.nativeElement.querySelector('[data-testid="paper-live-badge"]') as HTMLElement).textContent).toMatch(
+      /Paper only/,
+    );
+    box.checked = true;
+    box.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+    expect(paper.liveArmed()).toBe(true);
+    expect(paper.session().liveOrders).toBe(true);
+    expect((fixture.nativeElement.querySelector('[data-testid="paper-live-badge"]') as HTMLElement).textContent).toMatch(
+      /Real Kite on/,
+    );
+    expect(fixture.nativeElement.querySelector('[data-testid="paper-live-warn"]')).toBeTruthy();
   });
 
   it('asks for Token when Start is hit without a Kite session', async () => {

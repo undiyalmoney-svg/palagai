@@ -38,6 +38,49 @@
     </div>
   </div>
 
+  <div class="mp-card" data-testid="paper-live-kite">
+    <div class="mp-card-head">
+      <div>
+        <h2>Live Kite</h2>
+        <p class="mp-sub">
+          Paper still runs on all four books. Real MIS buys and resting SLs go out only when the toggle and the
+          checkbox are both on. A refresh does not arm this. Not a guaranteed profit.
+        </p>
+      </div>
+      <span class="mp-badge" [attr.data-tone]="paper.liveArmed() ? 'down' : 'info'" data-testid="paper-live-badge">
+        {{ paper.liveArmed() ? 'Real Kite on' : 'Paper only' }}
+      </span>
+    </div>
+    <div class="mp-form">
+      <div class="mp-field">
+        <span>Toggle</span>
+        <button
+          type="button"
+          class="ui-btn"
+          [class.ui-btn-primary]="paper.liveToggle()"
+          (click)="paper.setLiveToggle(!paper.liveToggle())"
+          data-testid="paper-live-toggle"
+        >
+          {{ paper.liveToggle() ? 'Live Kite on' : 'Live Kite off' }}
+        </button>
+      </div>
+    </div>
+    <label class="ui-check">
+      <input
+        type="checkbox"
+        [checked]="paper.liveConfirm()"
+        (change)="onLiveConfirm($event)"
+        data-testid="paper-live-confirm"
+      />
+      Place real Kite orders and resting SLs on fills from this desk (1 lot per book)
+    </label>
+    @if (paper.liveArmed()) {
+      <p class="mp-sub mp-down" data-testid="paper-live-warn">
+        REAL MONEY — next paper fill sends a MARKET buy and an SL to Kite. Turn either control off to stop sending.
+      </p>
+    }
+  </div>
+
   <div data-testid="live-paper-card" class="mp-armed">
   @for (d of armed(); track d.under) {
     <div class="mp-card" [attr.data-testid]="'book-' + d.under">
@@ -74,6 +117,9 @@
                 {{ d.book.label }}
                 @if (d.book.optionType) {
                   <div class="mp-pick" data-testid="live-paper-pick">{{ pick(d.book) }} · {{ d.book.lot }} qty</div>
+                }
+                @if (d.book.kiteNote) {
+                  <div class="mp-pick" data-testid="live-paper-kite-note">{{ d.book.kiteNote }}</div>
                 }
               </td>
               <td class="num">{{ d.book.last != null ? (d.book.last | number : '1.0-2') : '—' }}</td>

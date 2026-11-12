@@ -17,10 +17,10 @@ import {
 
 const ARMED_ORDER = ['nifty', 'bank', 'sensex', 'crude'] as const;
 const ARMED_RULE: Record<(typeof ARMED_ORDER)[number], string> = {
-  nifty: 'Watch — ₹370 is only 5.7 pts here. Bank takes the one daily index trade',
-  bank: '1-min from 09:45 — one Bank trade a day · target nets ₹370 after charges · fill TP at the live bid · sit at +₹370',
-  sensex: 'Watch — Bank takes Daily ₹370. 12 Nov PE stop −₹572 used the one index slot',
-  crude: 'From 09:00 MCX open — one trade a day · sits if Bank already banked ₹370 · 0.8× thrust',
+  nifty: '1-min from 09:45 — own fill · target nets ₹370 after charges · fill TP at the live bid · sit at +₹370',
+  bank: '1-min from 09:45 — own fill · target nets ₹370 after charges · fill TP at the live bid · sit at +₹370',
+  sensex: '1-min from 09:45 — own fill · target nets ₹370 after charges · fill TP at the live bid · sit at +₹370',
+  crude: 'From 09:00 MCX open — one trade a day · 0.8× thrust · sit at +₹370',
 };
 
 @Component({
@@ -54,6 +54,10 @@ export class Paper14kComponent implements OnDestroy {
 
   protected stopPaper(): void {
     this.paper.stop();
+  }
+
+  protected onLiveConfirm(ev: Event): void {
+    this.paper.setLiveConfirm(!!(ev.target as HTMLInputElement | null)?.checked);
   }
 
   protected booksFund(): number {
@@ -99,7 +103,9 @@ export class Paper14kComponent implements OnDestroy {
         : '';
     const today = `Today ${s.day}: closed ₹${Math.round(s.closedRs).toLocaleString('en-IN')}.`;
     const names = 'Crude Mini, Nifty 50, Bank Nifty, Sensex.';
-    const foot = 'Paper only — no Kite order. No order is placed. Motto: buy CE/PE. Not a guaranteed profit.';
+    const foot = s.liveOrders
+      ? 'LIVE Kite — next fill sends a MARKET buy and a resting SL. Motto: buy CE/PE. Not a guaranteed profit.'
+      : 'Paper only until Live Kite toggle and the checkbox are both on. Motto: buy CE/PE. Not a guaranteed profit.';
 
     if (s.kiteError) {
       return { tone: 'down', badge: 'needs Token', title: s.kiteError, lines: [today, foot] };

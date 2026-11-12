@@ -467,11 +467,10 @@ describe('Live paper desk', () => {
     expect(PAPER_TEST_HONEST).toMatch(/Not a guaranteed profit/);
     expect(PAPER_TEST_HONEST).toMatch(/from 09:00 MCX open/);
     expect(PAPER_TEST_HONEST).toMatch(/Daily bank ₹370/);
-    expect(PAPER_TEST_HONEST).toMatch(/one Bank trade a day/);
-    expect(PAPER_TEST_HONEST).toMatch(/Nifty is skipped/);
-    expect(PAPER_TEST_HONEST).toMatch(/Sensex is skipped/);
+    expect(PAPER_TEST_HONEST).toMatch(/Nifty, Bank and Sensex each take their own fill/);
     expect(PAPER_TEST_HONEST).toMatch(/one trade a day/);
-    expect(PAPER_TEST_HONEST).toMatch(/Bank already banked/);
+    expect(PAPER_TEST_HONEST).toMatch(/Live Kite stays off/);
+    expect(PAPER_TEST_HONEST).toMatch(/toggle and the real-order checkbox/);
     expect(paperTickOrder(LIVE_PAPER_BOOKS).map((b) => b.under)).toEqual(['bank', 'sensex', 'nifty', 'crude']);
   });
 
@@ -599,7 +598,7 @@ describe('Live paper desk', () => {
     expect(nextDay.reason).toMatch(/confirm momentum/);
   });
 
-  it('blocks a second index book and sits the desk when combined net is ₹370', () => {
+  it('lets Nifty, Bank and Sensex each take a fill — occupancy no longer hides them', () => {
     const nifty = LIVE_PAPER_BOOKS.find((b) => b.id === 'nifty-momentum')!;
     const bank = LIVE_PAPER_BOOKS.find((b) => b.id === 'bank-momentum')!;
     const sensex = LIVE_PAPER_BOOKS.find((b) => b.id === 'sensex-momentum')!;
@@ -607,7 +606,8 @@ describe('Live paper desk', () => {
     bars[bars.length - 1] = { ...bars[bars.length - 1], close: 24020, high: 24021 };
     const idle = { ...emptyBook(nifty), lastBarMin: 9 * 60 + 40 };
     const openBank = { ...emptyBook(bank), side: 'long' as const, status: 'open' as const, pendingDir: 0 };
-    expect(indexDeskBlockReason('nifty-momentum', [idle, openBank])).toMatch(/Nifty stop is 5\.7 pts — Bank only/);
+    expect(indexDeskBlockReason('nifty-momentum', [idle, openBank])).toBeNull();
+    expect(indexDeskBlockReason('sensex-momentum', [idle, openBank])).toBeNull();
     const occupied = tickBook(idle, nifty, bars, 24020, '2026-11-04', 9 * 60 + 51, 'NIFTY 50', [], {
       blockOpen: 'one index book at a time',
     });
@@ -615,24 +615,9 @@ describe('Live paper desk', () => {
     expect(occupied.pendingDir).toBe(0);
     expect(occupied.reason).toBe('one index book at a time');
     const bankedBank = { ...emptyBook(bank), closedRs: 370 };
-    expect(indexDeskBlockReason('nifty-momentum', [idle, bankedBank])).toMatch(/Nifty stop is 5\.7 pts — Bank only/);
-    expect(indexDeskBlockReason('bank-momentum', [idle, bankedBank])).toBe('desk banked ₹370');
-    const sat = tickBook(idle, nifty, bars, 24020, '2026-11-04', 9 * 60 + 51, 'NIFTY 50', [], {
-      blockOpen: 'desk banked ₹370',
-    });
-    expect(sat.side).toBe('flat');
-    expect(sat.pendingDir).toBe(0);
-    expect(sat.reason).toBe('desk banked ₹370');
-    const pendingNifty = { ...idle, pendingDir: 1, pendingSig: 24020, status: 'pending' as const };
-    const cleared = tickBook(pendingNifty, nifty, bars, 24020, '2026-11-04', 9 * 60 + 51, 'NIFTY 50', [], {
-      blockOpen: 'one index book at a time',
-    });
-    expect(cleared.pendingDir).toBe(0);
-    expect(cleared.reason).toBe('one index book at a time');
-    expect(indexDeskBlockReason('crude-momentum', [idle, openBank])).toBeNull();
-    expect(indexDeskBlockReason('crude-momentum', [idle, { ...emptyBook(bank), closedRs: 370 }])).toBe(
-      'index desk banked ₹370',
-    );
+    expect(indexDeskBlockReason('nifty-momentum', [idle, bankedBank])).toBeNull();
+    expect(indexDeskBlockReason('bank-momentum', [idle, bankedBank])).toBeNull();
+    expect(indexDeskBlockReason('crude-momentum', [idle, { ...emptyBook(bank), closedRs: 370 }])).toBeNull();
     const filledBank = {
       ...emptyBook(bank),
       closedRs: 264.3,
@@ -653,16 +638,10 @@ describe('Live paper desk', () => {
         },
       ],
     };
-    expect(indexDeskBlockReason('sensex-momentum', [idle, filledBank], '2026-11-04')).toBe(
-      'Sensex watch — Bank takes Daily ₹370',
-    );
-    expect(indexDeskBlockReason('nifty-momentum', [idle, emptyBook(bank)], '2026-11-04')).toMatch(
-      /Nifty stop is 5\.7 pts — Bank only/,
-    );
-    expect(indexDeskBlockReason('bank-momentum', [idle, emptyBook(bank)], '2026-11-04')).toBeNull();
-    expect(indexDeskBlockReason('bank-momentum', [idle, filledBank], '2026-11-04')).toBe('one Bank trade today');
+    expect(indexDeskBlockReason('sensex-momentum', [idle, filledBank], '2026-11-04')).toBeNull();
+    expect(indexDeskBlockReason('bank-momentum', [idle, filledBank], '2026-11-04')).toBeNull();
     const openSensex = { ...emptyBook(sensex), side: 'long' as const, status: 'open' as const, pendingDir: 0 };
-    expect(indexDeskBlockReason('bank-momentum', [idle, openSensex])).toBe('one index book at a time');
+    expect(indexDeskBlockReason('bank-momentum', [idle, openSensex])).toBeNull();
     const lostSensex = {
       ...emptyBook(sensex),
       closedRs: -571.9,
@@ -683,11 +662,8 @@ describe('Live paper desk', () => {
         },
       ],
     };
-    expect(indexDeskBlockReason('bank-momentum', [lostSensex, emptyBook(bank)], '2026-11-12')).toBeNull();
+    expect(indexDeskBlockReason('nifty-momentum', [lostSensex, emptyBook(bank)], '2026-11-12')).toBeNull();
     expect(indexDeskBlockReason('crude-momentum', [lostSensex, emptyBook(bank)])).toBeNull();
-    expect(indexDeskBlockReason('sensex-momentum', [lostSensex, emptyBook(bank)])).toBe(
-      'Sensex watch — Bank takes Daily ₹370',
-    );
   });
 
   it('does not open or flatten a day of missed bars when Start is after the session', () => {
