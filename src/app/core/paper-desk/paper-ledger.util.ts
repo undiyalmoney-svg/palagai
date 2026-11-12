@@ -1,5 +1,5 @@
 /** Append-only forward-paper ledger helpers. Trades are never edited or removed once recorded. */
-import { LivePaperFill } from './live-paper.engine';
+import { LivePaperFill, paperFillGrade } from './live-paper.engine';
 import { PaperTrade } from './paper-analytics.models';
 
 export const LEDGER_VERSION = 1;
@@ -38,6 +38,7 @@ export function fillToTrade(f: LivePaperFill): PaperTrade {
     sl: f.sl,
     tp: f.tp,
     paperNetRs: f.rs,
+    grade: f.grade || paperFillGrade(f),
     entryBid: f.entryBid ?? null,
     entryAsk: f.entryAsk ?? null,
     exitBid: f.exitBid ?? null,

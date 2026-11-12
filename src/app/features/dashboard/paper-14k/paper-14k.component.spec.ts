@@ -31,6 +31,8 @@ describe('Paper14kComponent', () => {
     expect(text).toMatch(/up to five fills/);
     expect(text).toMatch(/own fill/);
     expect(text).toMatch(/target nets ₹370/);
+    expect(text).toMatch(/Grade/);
+    expect(text).toMatch(/A banks ₹370/);
     expect(text).toMatch(/Live Kite/);
     expect(text).toMatch(/Place real Kite order and SL/);
     expect(fixture.nativeElement.querySelector('[data-testid="paper-live-radio-off"]')).toBeTruthy();

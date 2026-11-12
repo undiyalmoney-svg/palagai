@@ -188,6 +188,13 @@ describe('PaperAnalyticsComponent', () => {
     await mount('trades');
     const rows = fixture.nativeElement.querySelectorAll('[data-testid="history-table"] tbody tr');
     expect(rows.length).toBe(3);
+    expect(fixture.nativeElement.textContent).toMatch(/Grade/);
+    const grades = [...fixture.nativeElement.querySelectorAll('[data-testid="history-grade"]')].map(
+      (el) => (el.textContent || '').trim(),
+    );
+    expect(grades).toContain('A');
+    expect(grades).toContain('F');
+    expect(grades).toContain('C');
   });
 });
 

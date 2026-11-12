@@ -41,6 +41,8 @@ export interface PaperTrade {
   tp: number;
   /** Net P&L the existing paper engine reports (flat charge, last-price fills). */
   paperNetRs: number;
+  /** A banks ₹370. B green short of bank. C scratch/flat. D small loss. F stop. */
+  grade?: 'A' | 'B' | 'C' | 'D' | 'F';
   entryBid: number | null;
   entryAsk: number | null;
   exitBid: number | null;

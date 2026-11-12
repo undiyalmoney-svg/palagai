@@ -476,7 +476,7 @@
         <p class="pa-note">Every closed forward trade, newest first. Nothing is filtered, edited or removed. Tap a row for its signal card.</p>
         <div class="mp-table-wrap">
           <table class="mp-table" data-testid="history-table">
-            <thead><tr><th>Contract</th><th>Closed (IST)</th><th class="num">Entry</th><th class="num">Exit</th><th>Why</th><th class="num">Paper ₹</th><th class="num">Realistic ₹</th></tr></thead>
+            <thead><tr><th>Contract</th><th>Closed (IST)</th><th class="num">Entry</th><th class="num">Exit</th><th>Why</th><th>Grade</th><th class="num">Paper ₹</th><th class="num">Realistic ₹</th></tr></thead>
             <tbody>
               @for (r of tradeList(); track r.t.id) {
                 <tr class="clickable" (click)="select(r.t.id)">
@@ -485,11 +485,12 @@
                   <td class="num">{{ r.t.entry | number : '1.0-2' }}</td>
                   <td class="num">{{ r.t.exit | number : '1.0-2' }}</td>
                   <td>{{ r.t.reason }}</td>
+                  <td><span class="mp-badge" [attr.data-tone]="gradeTone(r.t)" data-testid="history-grade">{{ gradeOf(r.t) }}</span></td>
                   <td class="num" [class]="tone(r.t.paperNetRs)">{{ inr(r.t.paperNetRs) }}</td>
                   <td class="num" [class]="tone(r.real.netRs)">{{ inr(r.real.netRs) }}</td>
                 </tr>
               } @empty {
-                <tr><td colspan="7" class="pa-empty">No closed forward trades in this range.</td></tr>
+                <tr><td colspan="8" class="pa-empty">No closed forward trades in this range.</td></tr>
               }
             </tbody>
           </table>
