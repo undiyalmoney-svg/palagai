@@ -474,7 +474,7 @@ describe('Live paper desk', () => {
       entryS: 9 * 60 + 15,
       orS: 9 * 60,
       orE: 9 * 60 + 15,
-      maxTradesPerDay: 1,
+      maxTradesPerDay: 5,
       noConfirm: false,
     });
     expect(by('crude').momK).toBe(by('bank').momK);
@@ -482,7 +482,7 @@ describe('Live paper desk', () => {
     expect(PAPER_TEST_HONEST).toMatch(/from 09:00 MCX open/);
     expect(PAPER_TEST_HONEST).toMatch(/Daily bank ₹370/);
     expect(PAPER_TEST_HONEST).toMatch(/Nifty, Bank and Sensex each take their own fill/);
-    expect(PAPER_TEST_HONEST).toMatch(/one trade a day/);
+    expect(PAPER_TEST_HONEST).toMatch(/up to five fills/);
     expect(PAPER_TEST_HONEST).toMatch(/Paper always records/);
     expect(PAPER_TEST_HONEST).toMatch(/Kite reject does not drop the paper fill/);
     expect(paperTickOrder(LIVE_PAPER_BOOKS).map((b) => b.under)).toEqual(['bank', 'sensex', 'nifty', 'crude']);
@@ -501,28 +501,29 @@ describe('Live paper desk', () => {
     const eveningOnly = { ...cfg, entryS: 17 * 60 + 15, orS: 17 * 60, orE: 17 * 60 + 15 };
     const blocked = tickBook(book, eveningOnly, bars, 5420, '2026-11-04', 9 * 60 + 31, 'CRUDEOILM');
     expect(blocked.pendingDir).toBe(0);
-    const one = {
-      ...book,
-      fills: [
-        {
-          day: '2026-11-04',
-          book: 'crude-momentum',
-          label: 'Crude',
-          side: 'long' as const,
-          entry: 1,
-          exit: 1,
-          sl: 1,
-          tp: 1,
-          pts: 0,
-          rs: -208,
-          reason: 'time',
-          mode: 'momentum',
-        },
-      ],
-    };
-    const capped = tickBook(one, cfg, bars, 5420, '2026-11-04', 9 * 60 + 31, 'CRUDEOILM');
+    const fill = (over: { rs: number }): (typeof pending.fills)[number] => ({
+      day: '2026-11-04',
+      book: 'crude-momentum',
+      label: 'Crude',
+      side: 'long',
+      entry: 1,
+      exit: 1,
+      sl: 1,
+      tp: 1,
+      pts: 0,
+      rs: over.rs,
+      reason: 'time',
+      mode: 'momentum',
+    });
+    const afterOne = tickBook({ ...book, fills: [fill({ rs: 224.6 })] }, cfg, bars, 5420, '2026-11-04', 9 * 60 + 31, 'CRUDEOILM');
+    expect(afterOne.pendingDir).toBe(1);
+    const five = Array.from({ length: 5 }, () => fill({ rs: 10 }));
+    const capped = tickBook({ ...book, fills: five }, cfg, bars, 5420, '2026-11-04', 9 * 60 + 31, 'CRUDEOILM');
     expect(capped.pendingDir).toBe(0);
-    expect(capped.reason).toBe('max 1 trade today');
+    expect(capped.reason).toBe('max 5 trades today');
+    const banked = tickBook({ ...book, fills: [fill({ rs: 370 })] }, cfg, bars, 5420, '2026-11-04', 9 * 60 + 31, 'CRUDEOILM');
+    expect(banked.pendingDir).toBe(0);
+    expect(banked.reason).toBe('banked ₹370 today');
   });
 
   it('fires momentum only past 1.5×√6 × the 20-bar mean range, from the 7th bar of the day', () => {

@@ -21,7 +21,7 @@ const ARMED_RULE: Record<(typeof ARMED_ORDER)[number], string> = {
   nifty: '1-min from 09:45 — own fill · target nets ₹370 after charges · fill TP at the live bid · sit at +₹370',
   bank: '1-min from 09:45 — own fill · target nets ₹370 after charges · fill TP at the live bid · sit at +₹370',
   sensex: '1-min from 09:45 — own fill · target nets ₹370 after charges · fill TP at the live bid · sit at +₹370',
-  crude: 'From 09:00 MCX open — one trade a day · 0.8× thrust · sit at +₹370',
+  crude: 'From 09:00 MCX open — up to five fills · 0.8× thrust · sit at +₹370',
 };
 
 @Component({
