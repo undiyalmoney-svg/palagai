@@ -1,3 +1,10 @@
+.mp-live-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem 1.15rem;
+  margin: 0.7rem 0 0;
+}
+
 .mp-list {
   margin: 0;
   padding-left: 1.15rem;

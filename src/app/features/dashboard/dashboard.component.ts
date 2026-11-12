@@ -121,7 +121,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   private readonly titles: Record<string, { title: string; subtitle: string }> = {
     '/dashboard/paper-14k': {
       title: 'Paper test',
-      subtitle: 'Four books take their own fill. Live Kite stays off until the toggle and the checkbox are both on.',
+      subtitle: 'Four books take their own fill. Live Kite stays off until Live Kite is selected and a book is ticked.',
     },
     '/dashboard/order-test': {
       title: 'Test',

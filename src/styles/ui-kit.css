@@ -242,10 +242,14 @@
   user-select: none;
 }
 
-.ui-check input[type='checkbox'] {
+.ui-check input[type='checkbox'],
+.ui-check input[type='radio'] {
   width: 1.05rem;
   height: 1.05rem;
   accent-color: var(--pg-bull);
+}
+
+.ui-check input[type='checkbox'] {
   border-radius: 4px;
 }
 

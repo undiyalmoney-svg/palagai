@@ -43,40 +43,53 @@
       <div>
         <h2>Live Kite</h2>
         <p class="mp-sub">
-          Paper still runs on all four books. Real MIS buys and resting SLs go out only when the toggle and the
-          checkbox are both on. A refresh does not arm this. Not a guaranteed profit.
+          Paper still runs on all four books. Real MIS buys and resting SLs go out only when Live Kite is selected
+          and that book's checkbox is ticked. A refresh does not arm this. Not a guaranteed profit.
         </p>
       </div>
       <span class="mp-badge" [attr.data-tone]="paper.liveArmed() ? 'down' : 'info'" data-testid="paper-live-badge">
         {{ paper.liveArmed() ? 'Real Kite on' : 'Paper only' }}
       </span>
     </div>
-    <div class="mp-form">
-      <div class="mp-field">
-        <span>Toggle</span>
-        <button
-          type="button"
-          class="ui-btn"
-          [class.ui-btn-primary]="paper.liveToggle()"
-          (click)="paper.setLiveToggle(!paper.liveToggle())"
-          data-testid="paper-live-toggle"
-        >
-          {{ paper.liveToggle() ? 'Live Kite on' : 'Live Kite off' }}
-        </button>
-      </div>
+    <div class="mp-live-row">
+      <label class="ui-check">
+        <input
+          type="radio"
+          name="paper-live-mode"
+          [checked]="!paper.liveToggle()"
+          (change)="paper.setLiveToggle(false)"
+          data-testid="paper-live-radio-off"
+        />
+        Paper only
+      </label>
+      <label class="ui-check">
+        <input
+          type="radio"
+          name="paper-live-mode"
+          [checked]="paper.liveToggle()"
+          (change)="paper.setLiveToggle(true)"
+          data-testid="paper-live-radio-on"
+        />
+        Live Kite
+      </label>
     </div>
-    <label class="ui-check">
-      <input
-        type="checkbox"
-        [checked]="paper.liveConfirm()"
-        (change)="onLiveConfirm($event)"
-        data-testid="paper-live-confirm"
-      />
-      Place real Kite orders and resting SLs on fills from this desk (1 lot per book)
-    </label>
+    <div class="mp-live-row">
+      @for (row of liveBookRows; track row.under) {
+        <label class="ui-check">
+          <input
+            type="checkbox"
+            [checked]="paper.liveBooks()[row.under]"
+            (change)="onLiveBook(row.under, $event)"
+            [attr.data-testid]="'paper-live-book-' + row.under"
+          />
+          {{ row.label }}
+        </label>
+      }
+    </div>
     @if (paper.liveArmed()) {
       <p class="mp-sub mp-down" data-testid="paper-live-warn">
-        REAL MONEY — next paper fill sends a MARKET buy and an SL to Kite. Turn either control off to stop sending.
+        REAL MONEY — ticked books send a MARKET buy and an SL to Kite. Switch to Paper only or untick a book to stop
+        sending.
       </p>
     }
   </div>
@@ -88,6 +101,15 @@
         <div>
           <h2>{{ d.book.label }}</h2>
           <p class="mp-sub">{{ d.rule }}</p>
+          <label class="ui-check">
+            <input
+              type="checkbox"
+              [checked]="paper.liveBooks()[d.under]"
+              (change)="onLiveBook(d.under, $event)"
+              [attr.data-testid]="'paper-live-card-' + d.under"
+            />
+            Place real Kite order and SL
+          </label>
         </div>
         <span
           class="mp-stat-value"
