@@ -1,4 +1,4 @@
-/** Live paper: isolated ₹14k books, Kite watch. Live Kite stays off until Live radio + a book checkbox. Motto: buy CE/PE. */
+/** Live paper: isolated ₹14k books, Kite watch. Paper always records; Live Kite is extra. Motto: buy CE/PE. */
 
 import {
   LIVE_ASSUME_CAPITAL,
@@ -50,7 +50,7 @@ const EXIT: Partial<LiveAssumeBookCfg> = {
 
 /** The only paper desk: four daily ₹370 momentum books. */
 export const PAPER_DESKS: { id: string; label: string; rule: string }[] = [
-  { id: 'momentum', label: 'Daily ₹370', rule: 'Nifty, Bank, Sensex and Crude Mini each take their own ATM CE/PE. Target nets ₹370 after charges, fill at the live bid, sit that book at +₹370. Crude Mini from 09:00 — one trade a day. Live Kite stays off until Live Kite is selected and that book is ticked' },
+  { id: 'momentum', label: 'Daily ₹370', rule: 'Nifty, Bank, Sensex and Crude Mini each take their own ATM CE/PE. Paper always records, Live on or off. Target nets ₹370 after charges, fill at the live bid, sit that book at +₹370. Crude Mini from 09:00 — one trade a day. Live Kite on a ticked book adds a real order' },
 ];
 
 function deskPatch(under: string): Partial<LiveAssumeBookCfg> {
@@ -94,7 +94,7 @@ export const PAPER_TEST_HONEST =
   'Daily bank ₹370 net after charges / stop ₹370, 0.8× 1-min thrust from 09:45. Nifty, Bank and Sensex each take their own fill so a wrong trade can be corrected. ' +
   'Target fills at the live bid when it is already through. Sit that book at +₹370. ' +
   'Crude Mini: from 09:00 MCX open, 0.8× thrust, one trade a day. Same ₹370 bank, flatten 23:10. ' +
-  'Live Kite stays off until Live Kite is selected and that book is ticked — then 1 lot MARKET buy and a resting SL. A refresh does not arm this. ' +
+  'Paper always records, Live on or off. Live Kite on a ticked book adds a 1 lot MARKET buy and a resting SL — a Kite reject does not drop the paper fill. A refresh does not arm Live. ' +
   'Cousin ₹375 rule on 15 live 1-min sessions tagged 3 wins on 11 days — not every day, not 8 months. ' +
   'Nothing here is a guaranteed ₹370. Forward paper is unproven until 400 trades and a one-sided 95% lower bound above zero on live asks. Not a guaranteed profit.';
 
@@ -1105,9 +1105,9 @@ export function summarizePaper(
     liveRs,
     closedRs,
     honest: live
-      ? `LIVE Kite — 1 lot MARKET buy and a resting SL on ticked books. Switch to Paper only or untick a book to stop sending. Motto: buy CE/PE. ` +
+      ? `Paper always records. LIVE Kite also sends a 1 lot MARKET buy and a resting SL on ticked books. A Kite reject does not drop the paper fill. Motto: buy CE/PE. ` +
         `${fundsLine}${PAPER_TEST_HONEST}`
-      : `Paper only — no Kite order is placed until Live Kite is selected and a book is ticked. Each book takes 1 lot at the live ask and shows that cash. ` +
+      : `Paper always records, Live on or off. No Kite order until Live Kite is selected and a book is ticked. Each book takes 1 lot at the live ask and shows that cash. ` +
         `Motto: buy CE/PE. SL, target, and live P/L come from the option. ` +
         `${fundsLine}${PAPER_TEST_HONEST}`,
   };

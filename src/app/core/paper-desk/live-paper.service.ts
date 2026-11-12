@@ -39,6 +39,7 @@ import {
   PaperLiveBooks,
   PaperLiveUnder,
   emptyPaperLiveBooks,
+  overlayPaperWithKite,
   paperLiveArmed,
   paperLiveArmedFor,
   paperLiveBuyFields,
@@ -121,7 +122,7 @@ export class LivePaperService {
       const snap = {
         ...idle,
         liveOrders: this.liveArmed(),
-        kiteError: 'Connect Kite on Token first. Paper only until Live Kite is armed.',
+        kiteError: 'Connect Kite on Token first. Paper still records once started; Live Kite needs Token.',
         source: 'idle',
       };
       this.session.set(snap);
@@ -192,7 +193,7 @@ export class LivePaperService {
       const snap = {
         ...cur,
         running: false,
-        kiteError: 'Connect Kite on Token first. Paper only until Live Kite is armed.',
+        kiteError: 'Connect Kite on Token first. Paper still records once started; Live Kite needs Token.',
       };
       this.clearTimer();
       this.session.set(snap);
@@ -351,7 +352,8 @@ export class LivePaperService {
           );
           next = { ...next, fills };
         }
-        next = await this.syncKite(prev, next);
+        const paper = next;
+        next = await overlayPaperWithKite(paper, () => this.syncKite(prev, paper), kiteOrderErrorOf);
         const underQuote = findQuote(quotes, underKeyFor(under, inst?.tradingSymbol, inst?.exchange));
         nextById.set(cfg.id, {
           ...next,

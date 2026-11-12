@@ -43,12 +43,13 @@
       <div>
         <h2>Live Kite</h2>
         <p class="mp-sub">
-          Paper still runs on all four books. Real MIS buys and resting SLs go out only when Live Kite is selected
-          and that book's checkbox is ticked. A refresh does not arm this. Not a guaranteed profit.
+          Paper always records on all four books, Live on or off. Real MIS buys and resting SLs go out only when Live
+          Kite is selected and that book's checkbox is ticked. A Kite reject does not drop the paper fill. A refresh
+          does not arm Live. Not a guaranteed profit.
         </p>
       </div>
       <span class="mp-badge" [attr.data-tone]="paper.liveArmed() ? 'down' : 'info'" data-testid="paper-live-badge">
-        {{ paper.liveArmed() ? 'Real Kite on' : 'Paper only' }}
+        {{ paper.liveArmed() ? 'Paper + Kite' : 'Paper' }}
       </span>
     </div>
     <div class="mp-live-row">
@@ -88,8 +89,8 @@
     </div>
     @if (paper.liveArmed()) {
       <p class="mp-sub mp-down" data-testid="paper-live-warn">
-        REAL MONEY — ticked books send a MARKET buy and an SL to Kite. Switch to Paper only or untick a book to stop
-        sending.
+        REAL MONEY on ticked books. Paper still records every fill even if Kite rejects. Switch to Paper only or untick
+        a book to stop sending real orders.
       </p>
     }
   </div>

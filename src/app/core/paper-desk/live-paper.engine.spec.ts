@@ -24,6 +24,7 @@ import {
   emptyBook,
   emptySession,
   optionPickLabel,
+  summarizePaper,
   tickBook,
 } from './live-paper.engine';
 
@@ -39,12 +40,25 @@ describe('Live paper desk', () => {
     expect(new Set(snap.books.map((b) => b.desk))).toEqual(new Set(['momentum']));
     expect(snap.books.every((b) => b.fund === LIVE_PAPER_CAPITAL)).toBe(true);
     expect(booksFundEnd(snap.books)).toBe(56_000);
-    expect(snap.honest).toMatch(/Paper only/);
+    expect(snap.honest).toMatch(/Paper always records/);
     expect(snap.honest).toMatch(/No Kite order/i);
     expect(snap.honest).toMatch(/buy CE\/PE/);
     expect(LIVE_PAPER_BOOKS).toHaveLength(4);
     expect(LIVE_PAPER_BOOKS.every((b) => b.buyOption)).toBe(true);
     expect(LIVE_PAPER_BOOKS.map((b) => b.product).join(' ')).toMatch(/CE\/PE/);
+    const live = summarizePaper(snap.books, {
+      running: true,
+      day: snap.day,
+      startedAt: snap.startedAt,
+      asOf: snap.asOf,
+      source: 'kite',
+      kiteFunds: null,
+      kiteError: null,
+      liveOrders: true,
+    });
+    expect(live.honest).toMatch(/Paper always records/);
+    expect(live.honest).toMatch(/Kite reject does not drop the paper fill/);
+    expect(live.liveOrders).toBe(true);
   });
 
   const mcx = (buy: number, sell: number, qty = 10) =>
@@ -469,8 +483,8 @@ describe('Live paper desk', () => {
     expect(PAPER_TEST_HONEST).toMatch(/Daily bank ₹370/);
     expect(PAPER_TEST_HONEST).toMatch(/Nifty, Bank and Sensex each take their own fill/);
     expect(PAPER_TEST_HONEST).toMatch(/one trade a day/);
-    expect(PAPER_TEST_HONEST).toMatch(/Live Kite stays off/);
-    expect(PAPER_TEST_HONEST).toMatch(/Live Kite is selected and that book is ticked/);
+    expect(PAPER_TEST_HONEST).toMatch(/Paper always records/);
+    expect(PAPER_TEST_HONEST).toMatch(/Kite reject does not drop the paper fill/);
     expect(paperTickOrder(LIVE_PAPER_BOOKS).map((b) => b.under)).toEqual(['bank', 'sensex', 'nifty', 'crude']);
   });
 
