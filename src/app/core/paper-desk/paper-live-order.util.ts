@@ -1,14 +1,29 @@
 /**
- * Paper-desk live Kite tickets. Off until the Live Kite toggle AND the
- * real-order checkbox are both on. Crude Mini order qty is 1, never CSV lot 10.
+ * Paper-desk live Kite tickets. Off until Live Kite radio is on AND that
+ * book's checkbox is ticked. Crude Mini order qty is 1, never CSV lot 10.
  */
 
 export const PAPER_LIVE_BUY_TAG = 'PALAGAI_PAPER';
 export const PAPER_LIVE_SL_TAG = 'PALAGAI_PAPER_SL';
 export const PAPER_LIVE_EXIT_TAG = 'PALAGAI_PAPER_X';
 
-export function paperLiveArmed(toggle: boolean, confirm: boolean): boolean {
-  return !!toggle && !!confirm;
+export const PAPER_LIVE_UNDERS = ['nifty', 'bank', 'sensex', 'crude'] as const;
+export type PaperLiveUnder = (typeof PAPER_LIVE_UNDERS)[number];
+
+export type PaperLiveBooks = Record<PaperLiveUnder, boolean>;
+
+export function emptyPaperLiveBooks(): PaperLiveBooks {
+  return { nifty: false, bank: false, sensex: false, crude: false };
+}
+
+/** Desk-wide: Live radio on and at least one book ticked. */
+export function paperLiveArmed(live: boolean, books: PaperLiveBooks): boolean {
+  return !!live && PAPER_LIVE_UNDERS.some((u) => !!books[u]);
+}
+
+/** This book sends a Kite order only when Live is on and its checkbox is ticked. */
+export function paperLiveArmedFor(live: boolean, books: PaperLiveBooks, under: string): boolean {
+  return !!live && !!books[under as PaperLiveUnder];
 }
 
 export function paperLiveExchange(under: string): 'NFO' | 'BFO' | 'MCX' {

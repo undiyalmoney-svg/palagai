@@ -30,9 +30,13 @@ describe('Paper14kComponent', () => {
     expect(text).toMatch(/own fill/);
     expect(text).toMatch(/target nets ₹370/);
     expect(text).toMatch(/Live Kite/);
-    expect(text).toMatch(/Place real Kite orders and resting SLs/);
-    expect(fixture.nativeElement.querySelector('[data-testid="paper-live-toggle"]')).toBeTruthy();
-    expect(fixture.nativeElement.querySelector('[data-testid="paper-live-confirm"]')).toBeTruthy();
+    expect(text).toMatch(/Place real Kite order and SL/);
+    expect(fixture.nativeElement.querySelector('[data-testid="paper-live-radio-off"]')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('[data-testid="paper-live-radio-on"]')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('[data-testid="paper-live-book-nifty"]')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('[data-testid="paper-live-book-bank"]')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('[data-testid="paper-live-book-sensex"]')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('[data-testid="paper-live-book-crude"]')).toBeTruthy();
     expect((fixture.nativeElement.querySelector('[data-testid="paper-live-badge"]') as HTMLElement).textContent).toMatch(
       /Paper only/,
     );
@@ -43,7 +47,7 @@ describe('Paper14kComponent', () => {
     expect(text).not.toMatch(/Watch-only desks/);
     expect(text).toMatch(/Closed today/);
     expect(text).toMatch(/Copy night log/);
-    expect(text).toMatch(/Paper only until Live Kite/);
+    expect(text).toMatch(/Paper only until Live Kite is selected/);
     expect(text).toMatch(/Not a guaranteed profit/);
     expect(text).not.toMatch(/Play next day/);
     expect(text).not.toMatch(/2-year tape/);
@@ -81,25 +85,38 @@ describe('Paper14kComponent', () => {
     expect(title).not.toMatch(/watch-only/);
   });
 
-  it('arms live Kite only after the toggle and the checkbox are both on', () => {
+  it('arms live Kite only after Live radio is on and a book is ticked', () => {
     const paper = fixture.componentInstance['paper'];
-    const toggle = fixture.nativeElement.querySelector('[data-testid="paper-live-toggle"]') as HTMLButtonElement;
-    const box = fixture.nativeElement.querySelector('[data-testid="paper-live-confirm"]') as HTMLInputElement;
-    toggle.click();
+    const liveOn = fixture.nativeElement.querySelector('[data-testid="paper-live-radio-on"]') as HTMLInputElement;
+    const nifty = fixture.nativeElement.querySelector('[data-testid="paper-live-book-nifty"]') as HTMLInputElement;
+    const bank = fixture.nativeElement.querySelector('[data-testid="paper-live-book-bank"]') as HTMLInputElement;
+    liveOn.checked = true;
+    liveOn.dispatchEvent(new Event('change'));
     fixture.detectChanges();
     expect(paper.liveArmed()).toBe(false);
     expect((fixture.nativeElement.querySelector('[data-testid="paper-live-badge"]') as HTMLElement).textContent).toMatch(
       /Paper only/,
     );
-    box.checked = true;
-    box.dispatchEvent(new Event('change'));
+    nifty.checked = true;
+    nifty.dispatchEvent(new Event('change'));
     fixture.detectChanges();
     expect(paper.liveArmed()).toBe(true);
+    expect(paper.liveArmedFor('nifty')).toBe(true);
+    expect(paper.liveArmedFor('bank')).toBe(false);
     expect(paper.session().liveOrders).toBe(true);
     expect((fixture.nativeElement.querySelector('[data-testid="paper-live-badge"]') as HTMLElement).textContent).toMatch(
       /Real Kite on/,
     );
     expect(fixture.nativeElement.querySelector('[data-testid="paper-live-warn"]')).toBeTruthy();
+    bank.checked = true;
+    bank.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+    expect(paper.liveArmedFor('bank')).toBe(true);
+    const paperOnly = fixture.nativeElement.querySelector('[data-testid="paper-live-radio-off"]') as HTMLInputElement;
+    paperOnly.checked = true;
+    paperOnly.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+    expect(paper.liveArmed()).toBe(false);
   });
 
   it('asks for Token when Start is hit without a Kite session', async () => {

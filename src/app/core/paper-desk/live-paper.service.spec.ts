@@ -25,14 +25,16 @@ describe('LivePaperService', () => {
     expect(snap.books).toHaveLength(4);
   });
 
-  it('keeps liveOrders off until the toggle and the checkbox are both on', () => {
+  it('keeps liveOrders off until Live radio is on and a book is ticked', () => {
     const svc = TestBed.inject(LivePaperService);
     expect(svc.liveArmed()).toBe(false);
     svc.setLiveToggle(true);
     expect(svc.liveArmed()).toBe(false);
     expect(svc.session().liveOrders).toBe(false);
-    svc.setLiveConfirm(true);
+    svc.setLiveBook('nifty', true);
     expect(svc.liveArmed()).toBe(true);
+    expect(svc.liveArmedFor('nifty')).toBe(true);
+    expect(svc.liveArmedFor('bank')).toBe(false);
     expect(svc.session().liveOrders).toBe(true);
     svc.setLiveToggle(false);
     expect(svc.liveArmed()).toBe(false);

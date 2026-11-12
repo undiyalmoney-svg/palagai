@@ -470,7 +470,7 @@ describe('Live paper desk', () => {
     expect(PAPER_TEST_HONEST).toMatch(/Nifty, Bank and Sensex each take their own fill/);
     expect(PAPER_TEST_HONEST).toMatch(/one trade a day/);
     expect(PAPER_TEST_HONEST).toMatch(/Live Kite stays off/);
-    expect(PAPER_TEST_HONEST).toMatch(/toggle and the real-order checkbox/);
+    expect(PAPER_TEST_HONEST).toMatch(/Live Kite is selected and that book is ticked/);
     expect(paperTickOrder(LIVE_PAPER_BOOKS).map((b) => b.under)).toEqual(['bank', 'sensex', 'nifty', 'crude']);
   });
 

@@ -5,7 +5,9 @@ import {
   PAPER_LIVE_SL_TAG,
   kiteOrderErrorOf,
   kiteOrderIdOf,
+  emptyPaperLiveBooks,
   paperLiveArmed,
+  paperLiveArmedFor,
   paperLiveBuyFields,
   paperLiveExchange,
   paperLiveExitFields,
@@ -18,11 +20,16 @@ describe('paper live Kite tickets', () => {
   const sensex = { under: 'sensex', optionSymbol: 'SENSEX26N1982200PE', optionToken: 22, lot: 20 };
   const crude = { under: 'crude', optionSymbol: 'CRUDEOILM26NOV8050PE', optionToken: 33, lot: 10 };
 
-  it('arms only when the toggle and the checkbox are both on', () => {
-    expect(paperLiveArmed(false, false)).toBe(false);
-    expect(paperLiveArmed(true, false)).toBe(false);
-    expect(paperLiveArmed(false, true)).toBe(false);
-    expect(paperLiveArmed(true, true)).toBe(true);
+  it('arms a book only when Live radio is on and that book is ticked', () => {
+    const none = emptyPaperLiveBooks();
+    const nifty = { ...none, nifty: true };
+    expect(paperLiveArmed(false, nifty)).toBe(false);
+    expect(paperLiveArmed(true, none)).toBe(false);
+    expect(paperLiveArmed(true, nifty)).toBe(true);
+    expect(paperLiveArmedFor(true, nifty, 'nifty')).toBe(true);
+    expect(paperLiveArmedFor(true, nifty, 'bank')).toBe(false);
+    expect(paperLiveArmedFor(true, nifty, 'sensex')).toBe(false);
+    expect(paperLiveArmedFor(true, nifty, 'crude')).toBe(false);
   });
 
   it('sends Crude Mini qty 1 and Sensex on BFO', () => {

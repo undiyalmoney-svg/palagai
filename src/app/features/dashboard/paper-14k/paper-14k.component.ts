@@ -1,6 +1,7 @@
 import { DecimalPipe } from '@angular/common';
 import { Component, OnDestroy, computed, inject, signal } from '@angular/core';
 import { LivePaperService } from '../../../core/paper-desk/live-paper.service';
+import { PaperLiveUnder } from '../../../core/paper-desk/paper-live-order.util';
 import {
   ALL_PAPER_BOOKS,
   LivePaperBookState,
@@ -56,8 +57,15 @@ export class Paper14kComponent implements OnDestroy {
     this.paper.stop();
   }
 
-  protected onLiveConfirm(ev: Event): void {
-    this.paper.setLiveConfirm(!!(ev.target as HTMLInputElement | null)?.checked);
+  protected readonly liveBookRows = [
+    { under: 'nifty' as const, label: 'Nifty 50' },
+    { under: 'bank' as const, label: 'Bank Nifty' },
+    { under: 'sensex' as const, label: 'Sensex' },
+    { under: 'crude' as const, label: 'Crude Mini' },
+  ];
+
+  protected onLiveBook(under: PaperLiveUnder, ev: Event): void {
+    this.paper.setLiveBook(under, !!(ev.target as HTMLInputElement | null)?.checked);
   }
 
   protected booksFund(): number {
@@ -105,7 +113,7 @@ export class Paper14kComponent implements OnDestroy {
     const names = 'Crude Mini, Nifty 50, Bank Nifty, Sensex.';
     const foot = s.liveOrders
       ? 'LIVE Kite — next fill sends a MARKET buy and a resting SL. Motto: buy CE/PE. Not a guaranteed profit.'
-      : 'Paper only until Live Kite toggle and the checkbox are both on. Motto: buy CE/PE. Not a guaranteed profit.';
+      : 'Paper only until Live Kite is selected and a book is ticked. Motto: buy CE/PE. Not a guaranteed profit.';
 
     if (s.kiteError) {
       return { tone: 'down', badge: 'needs Token', title: s.kiteError, lines: [today, foot] };

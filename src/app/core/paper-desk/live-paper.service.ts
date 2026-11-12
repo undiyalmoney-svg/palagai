@@ -36,7 +36,11 @@ import {
 import {
   kiteOrderErrorOf,
   kiteOrderIdOf,
+  PaperLiveBooks,
+  PaperLiveUnder,
+  emptyPaperLiveBooks,
   paperLiveArmed,
+  paperLiveArmedFor,
   paperLiveBuyFields,
   paperLiveExitFields,
   paperLiveStopFields,
@@ -56,10 +60,10 @@ export class LivePaperService {
 
   readonly session = signal<LivePaperSession>(readStored() || emptySession(istDay()));
   readonly busy = signal(false);
-  /** Live Kite toggle. Off after every refresh. */
+  /** Live Kite radio. Off after every refresh. */
   readonly liveToggle = signal(false);
-  /** Real-order checkbox. Both this and the toggle must be on. */
-  readonly liveConfirm = signal(false);
+  /** Per-book real-order checkboxes. Off after every refresh. */
+  readonly liveBooks = signal<PaperLiveBooks>(emptyPaperLiveBooks());
   private readonly placing = new Set<string>();
 
   constructor() {
@@ -77,7 +81,11 @@ export class LivePaperService {
   }
 
   liveArmed(): boolean {
-    return paperLiveArmed(this.liveToggle(), this.liveConfirm());
+    return paperLiveArmed(this.liveToggle(), this.liveBooks());
+  }
+
+  liveArmedFor(under: string): boolean {
+    return paperLiveArmedFor(this.liveToggle(), this.liveBooks(), under);
   }
 
   setLiveToggle(on: boolean): void {
@@ -85,8 +93,8 @@ export class LivePaperService {
     this.stampLive();
   }
 
-  setLiveConfirm(on: boolean): void {
-    this.liveConfirm.set(!!on);
+  setLiveBook(under: PaperLiveUnder, on: boolean): void {
+    this.liveBooks.update((cur) => ({ ...cur, [under]: !!on }));
     this.stampLive();
   }
 
@@ -527,11 +535,10 @@ export class LivePaperService {
   }
 
   private async syncKite(prev: LivePaperBookState, next: LivePaperBookState): Promise<LivePaperBookState> {
-    if (!this.liveArmed()) return next;
     const auth = this.kite.getAuthorizationHeader();
-    if (!auth) return { ...next, kiteNote: 'Live Kite needs Token.' };
     const closed = next.fills.length > prev.fills.length;
     if (closed && (prev.kiteBuyOrderId || prev.kiteSlOrderId)) {
+      if (!auth) return { ...next, kiteNote: 'Live Kite needs Token.' };
       return this.kiteFlatten(
         {
           ...next,
@@ -544,6 +551,8 @@ export class LivePaperService {
         auth,
       );
     }
+    if (!this.liveArmedFor(underOf(next.id))) return next;
+    if (!auth) return { ...next, kiteNote: 'Live Kite needs Token.' };
     if (next.side !== 'flat' && next.optionSymbol && next.optionToken > 0) {
       return this.kiteEnter(next, auth);
     }
