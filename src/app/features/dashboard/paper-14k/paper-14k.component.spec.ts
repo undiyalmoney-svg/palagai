@@ -28,6 +28,7 @@ describe('Paper14kComponent', () => {
     expect(text).toMatch(/Bank Nifty/);
     expect(text).toMatch(/Sensex/);
     expect(text).toMatch(/From 09:00 MCX open/);
+    expect(text).toMatch(/up to five fills/);
     expect(text).toMatch(/own fill/);
     expect(text).toMatch(/target nets ₹370/);
     expect(text).toMatch(/Live Kite/);

@@ -50,7 +50,7 @@ const EXIT: Partial<LiveAssumeBookCfg> = {
 
 /** The only paper desk: four daily ₹370 momentum books. */
 export const PAPER_DESKS: { id: string; label: string; rule: string }[] = [
-  { id: 'momentum', label: 'Daily ₹370', rule: 'Nifty, Bank, Sensex and Crude Mini each take their own ATM CE/PE. Paper always records, Live on or off. Target nets ₹370 after charges, fill at the live bid, sit that book at +₹370. Crude Mini from 09:00 — one trade a day. Live Kite on a ticked book adds a real order' },
+  { id: 'momentum', label: 'Daily ₹370', rule: 'Nifty, Bank, Sensex and Crude Mini each take their own ATM CE/PE. Paper always records, Live on or off. Target nets ₹370 after charges, fill at the live bid, sit that book at +₹370. Crude Mini from 09:00, up to five fills, sit at +₹370. Live Kite on a ticked book adds a real order' },
 ];
 
 function deskPatch(under: string): Partial<LiveAssumeBookCfg> {
@@ -61,7 +61,7 @@ function deskPatch(under: string): Partial<LiveAssumeBookCfg> {
       orS: 9 * 60,
       orE: 9 * 60 + 15,
       entryS: 9 * 60 + 15,
-      maxTradesPerDay: 1,
+      maxTradesPerDay: 5,
       minDayNetRs: LIVE_PAPER_BANK_RS,
       barMinutes: 1,
       momK: LIVE_PAPER_CRUDE_MOM_K,
@@ -93,7 +93,7 @@ export const PAPER_TEST_HONEST =
   'Index-proxy pick, not a lock. ATM CE (up) or PE (down), 1 lot at the live ask, next 1-min confirm, exact charges. ' +
   'Daily bank ₹370 net after charges / stop ₹370, 0.8× 1-min thrust from 09:45. Nifty, Bank and Sensex each take their own fill so a wrong trade can be corrected. ' +
   'Target fills at the live bid when it is already through. Sit that book at +₹370. ' +
-  'Crude Mini: from 09:00 MCX open, 0.8× thrust, one trade a day. Same ₹370 bank, flatten 23:10. ' +
+  'Crude Mini: from 09:00 MCX open, 0.8× thrust, up to five fills, sit that book at +₹370. Same ₹370 bank, flatten 23:10. ' +
   'Paper always records, Live on or off. Live Kite on a ticked book adds a 1 lot MARKET buy and a resting SL — a Kite reject does not drop the paper fill. A refresh does not arm Live. ' +
   'Cousin ₹375 rule on 15 live 1-min sessions tagged 3 wins on 11 days — not every day, not 8 months. ' +
   'Nothing here is a guaranteed ₹370. Forward paper is unproven until 400 trades and a one-sided 95% lower bound above zero on live asks. Not a guaranteed profit.';
