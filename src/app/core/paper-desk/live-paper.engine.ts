@@ -1,4 +1,4 @@
-/** Live paper: isolated ₹14k books, Kite watch, no Kite order. Motto: buy CE/PE. */
+/** Live paper: isolated ₹14k books, Kite watch. Live Kite stays off until toggle + checkbox. Motto: buy CE/PE. */
 
 import {
   LIVE_ASSUME_CAPITAL,
@@ -50,7 +50,7 @@ const EXIT: Partial<LiveAssumeBookCfg> = {
 
 /** The only paper desk: four daily ₹370 momentum books. */
 export const PAPER_DESKS: { id: string; label: string; rule: string }[] = [
-  { id: 'momentum', label: 'Daily ₹370', rule: 'One Bank trade a day — Nifty and Sensex watch. Target nets ₹370 after charges, fill at the live bid, sit at +₹370. Crude Mini from 09:00 — one trade a day, sits if Bank already banked ₹370' },
+  { id: 'momentum', label: 'Daily ₹370', rule: 'Nifty, Bank, Sensex and Crude Mini each take their own ATM CE/PE. Target nets ₹370 after charges, fill at the live bid, sit that book at +₹370. Crude Mini from 09:00 — one trade a day. Live Kite stays off until the toggle and the checkbox are both on' },
 ];
 
 function deskPatch(under: string): Partial<LiveAssumeBookCfg> {
@@ -91,9 +91,10 @@ function deskPatch(under: string): Partial<LiveAssumeBookCfg> {
 export const PAPER_MOMENTUM: Partial<LiveAssumeBookCfg> = { ...EXIT, ...deskPatch('nifty') };
 export const PAPER_TEST_HONEST =
   'Index-proxy pick, not a lock. ATM CE (up) or PE (down), 1 lot at the live ask, next 1-min confirm, exact charges. ' +
-  'Daily bank ₹370 net after charges / stop ₹370, 0.8× 1-min thrust from 09:45, one Bank trade a day. ' +
-  'Nifty is skipped (₹370 is only ~5.7 pts). Sensex is skipped (12 Nov PE stop −₹572 used the one index slot while Bank had no trade). Target fills at the live bid when it is already through. Sit after that Bank trade or at +₹370. ' +
-  'Crude Mini: from 09:00 MCX open, 0.8× thrust, one trade a day, sits if Bank already banked ₹370. Same ₹370 bank, flatten 23:10. ' +
+  'Daily bank ₹370 net after charges / stop ₹370, 0.8× 1-min thrust from 09:45. Nifty, Bank and Sensex each take their own fill so a wrong trade can be corrected. ' +
+  'Target fills at the live bid when it is already through. Sit that book at +₹370. ' +
+  'Crude Mini: from 09:00 MCX open, 0.8× thrust, one trade a day. Same ₹370 bank, flatten 23:10. ' +
+  'Live Kite stays off until the Live Kite toggle and the real-order checkbox are both on — then 1 lot MARKET buy and a resting SL. A refresh does not arm this. ' +
   'Cousin ₹375 rule on 15 live 1-min sessions tagged 3 wins on 11 days — not every day, not 8 months. ' +
   'Nothing here is a guaranteed ₹370. Forward paper is unproven until 400 trades and a one-sided 95% lower bound above zero on live asks. Not a guaranteed profit.';
 
@@ -249,26 +250,12 @@ export function bankDeskFillsToday(
   return bankBooks(books).reduce((n, b) => n + (b.fills || []).filter((f) => f.day === day).length, 0);
 }
 
+/** Each book takes its own fill. Nifty/Sensex skip and one-index occupancy hid trades we need to correct. */
 export function indexDeskBlockReason(
-  cfgId: string,
-  books: Pick<LivePaperBookState, 'id' | 'side' | 'pendingDir' | 'closedRs' | 'fills'>[],
-  day?: string,
+  _cfgId?: string,
+  _books?: Pick<LivePaperBookState, 'id' | 'side' | 'pendingDir' | 'closedRs' | 'fills'>[],
+  _day?: string,
 ): string | null {
-  if (underOf(cfgId) === 'crude') {
-    if (bankDeskNet(books) >= LIVE_PAPER_BANK_RS) return `index desk banked ₹${LIVE_PAPER_BANK_RS}`;
-    return null;
-  }
-  if (underOf(cfgId) === 'sensex') return 'Sensex watch — Bank takes Daily ₹370';
-  if (underOf(cfgId) === 'nifty') {
-    const lot = OPTION_14K_BOOKS.nifty?.lot ?? 0;
-    const stopPts = lot > 0 ? LIVE_PAPER_STOP_RS / lot : 0;
-    return `Nifty stop is ${stopPts.toFixed(1)} pts — Bank only`;
-  }
-  if (!isIndexMomentumBook(cfgId)) return null;
-  if (bankDeskNet(books) >= LIVE_PAPER_BANK_RS) return `desk banked ₹${LIVE_PAPER_BANK_RS}`;
-  if (day && bankDeskFillsToday(books, day) >= 1) return 'one Bank trade today';
-  const others = books.filter((b) => b.id !== cfgId);
-  if (indexDeskOpen(others)) return 'one index book at a time';
   return null;
 }
 
@@ -407,11 +394,17 @@ export interface LivePaperBookState {
   lastSignalMin?: number;
   /** Momentum gauge on the latest completed bar: 30-min move vs the move needed (index points). */
   gauge?: { move: number; need: number; barMin: number; sessionBars: number } | null;
+  /** Kite MARKET buy id when Live Kite is armed. */
+  kiteBuyOrderId?: string;
+  /** Resting SL id on Kite. */
+  kiteSlOrderId?: string;
+  /** Last live-order note (sent / failed). */
+  kiteNote?: string;
 }
 
 export interface LivePaperSession {
   assumed: true;
-  liveOrders: false;
+  liveOrders: boolean;
   guaranteed: false;
   armedOnCrudeBest: false;
   running: boolean;
@@ -1088,16 +1081,17 @@ export function summarizePaper(
   extra: Pick<
     LivePaperSession,
     'running' | 'day' | 'startedAt' | 'asOf' | 'source' | 'kiteFunds' | 'kiteError'
-  >,
+  > & { liveOrders?: boolean },
 ): LivePaperSession {
   const liveRs = Math.round(books.reduce((s, b) => s + (b.side === 'flat' ? 0 : b.liveRs), 0) * 10) / 10;
   const closedRs = Math.round(books.reduce((s, b) => s + b.closedRs, 0) * 10) / 10;
   const fundsLine = extra.kiteFunds
     ? `Kite equity ₹${extra.kiteFunds.equityCash.toLocaleString('en-IN')} · commodity ₹${extra.kiteFunds.commodityCash.toLocaleString('en-IN')}. `
     : '';
+  const live = !!extra.liveOrders;
   return {
     assumed: true,
-    liveOrders: false,
+    liveOrders: live,
     guaranteed: false,
     armedOnCrudeBest: false,
     running: extra.running,
@@ -1110,10 +1104,12 @@ export function summarizePaper(
     books,
     liveRs,
     closedRs,
-    honest:
-      `Paper only — no Kite order is placed. Each book takes 1 lot at the live ask and shows that cash. ` +
-      `Motto: buy CE/PE. SL, target, and live P/L come from the option. ` +
-      `${fundsLine}${PAPER_TEST_HONEST}`,
+    honest: live
+      ? `LIVE Kite — 1 lot MARKET buy and a resting SL on each fill. Turn the toggle or the checkbox off to stop sending. Motto: buy CE/PE. ` +
+        `${fundsLine}${PAPER_TEST_HONEST}`
+      : `Paper only — no Kite order is placed until the Live Kite toggle and the checkbox are both on. Each book takes 1 lot at the live ask and shows that cash. ` +
+        `Motto: buy CE/PE. SL, target, and live P/L come from the option. ` +
+        `${fundsLine}${PAPER_TEST_HONEST}`,
   };
 }
 

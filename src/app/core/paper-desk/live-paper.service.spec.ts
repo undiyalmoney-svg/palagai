@@ -25,6 +25,20 @@ describe('LivePaperService', () => {
     expect(snap.books).toHaveLength(4);
   });
 
+  it('keeps liveOrders off until the toggle and the checkbox are both on', () => {
+    const svc = TestBed.inject(LivePaperService);
+    expect(svc.liveArmed()).toBe(false);
+    svc.setLiveToggle(true);
+    expect(svc.liveArmed()).toBe(false);
+    expect(svc.session().liveOrders).toBe(false);
+    svc.setLiveConfirm(true);
+    expect(svc.liveArmed()).toBe(true);
+    expect(svc.session().liveOrders).toBe(true);
+    svc.setLiveToggle(false);
+    expect(svc.liveArmed()).toBe(false);
+    expect(svc.session().liveOrders).toBe(false);
+  });
+
   it('reads best bid and ask from quote depth and returns null when the book is empty', () => {
     expect(
       bestBidAsk({ depth: { buy: [{ price: 171.9 }], sell: [{ price: 172.3 }] } }),

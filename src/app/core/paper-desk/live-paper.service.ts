@@ -33,6 +33,14 @@ import {
   deskOf,
   underOf,
 } from './live-paper.engine';
+import {
+  kiteOrderErrorOf,
+  kiteOrderIdOf,
+  paperLiveArmed,
+  paperLiveBuyFields,
+  paperLiveExitFields,
+  paperLiveStopFields,
+} from './paper-live-order.util';
 
 const STORAGE_KEY = 'palagai_live_paper_v11';
 const UNDERS = ['crude', 'nifty', 'bank', 'sensex'] as const;
@@ -48,6 +56,11 @@ export class LivePaperService {
 
   readonly session = signal<LivePaperSession>(readStored() || emptySession(istDay()));
   readonly busy = signal(false);
+  /** Live Kite toggle. Off after every refresh. */
+  readonly liveToggle = signal(false);
+  /** Real-order checkbox. Both this and the toggle must be on. */
+  readonly liveConfirm = signal(false);
+  private readonly placing = new Set<string>();
 
   constructor() {
     if (typeof localStorage === 'undefined') return;
@@ -63,13 +76,44 @@ export class LivePaperService {
     }
   }
 
+  liveArmed(): boolean {
+    return paperLiveArmed(this.liveToggle(), this.liveConfirm());
+  }
+
+  setLiveToggle(on: boolean): void {
+    this.liveToggle.set(!!on);
+    this.stampLive();
+  }
+
+  setLiveConfirm(on: boolean): void {
+    this.liveConfirm.set(!!on);
+    this.stampLive();
+  }
+
+  private stampLive(): void {
+    const cur = this.session();
+    const snap = summarizePaper(cur.books, {
+      running: cur.running,
+      day: cur.day,
+      startedAt: cur.startedAt,
+      asOf: cur.asOf,
+      source: cur.source,
+      kiteFunds: cur.kiteFunds,
+      kiteError: cur.kiteError,
+      liveOrders: this.liveArmed(),
+    });
+    this.session.set(snap);
+    persist(snap);
+  }
+
   async start(): Promise<void> {
     const auth = this.kite.getAuthorizationHeader();
     if (!auth) {
       const idle = emptySession(istDay());
       const snap = {
         ...idle,
-        kiteError: 'Connect Kite on Token first. Paper only — no order is placed.',
+        liveOrders: this.liveArmed(),
+        kiteError: 'Connect Kite on Token first. Paper only until Live Kite is armed.',
         source: 'idle',
       };
       this.session.set(snap);
@@ -111,6 +155,7 @@ export class LivePaperService {
       source: cur.source,
       kiteFunds: cur.kiteFunds,
       kiteError: cur.kiteError,
+      liveOrders: this.liveArmed(),
     });
     this.session.set(snap);
     persist(snap);
@@ -139,7 +184,7 @@ export class LivePaperService {
       const snap = {
         ...cur,
         running: false,
-        kiteError: 'Connect Kite on Token first. Paper only — no order is placed.',
+        kiteError: 'Connect Kite on Token first. Paper only until Live Kite is armed.',
       };
       this.clearTimer();
       this.session.set(snap);
@@ -298,6 +343,7 @@ export class LivePaperService {
           );
           next = { ...next, fills };
         }
+        next = await this.syncKite(prev, next);
         const underQuote = findQuote(quotes, underKeyFor(under, inst?.tradingSymbol, inst?.exchange));
         nextById.set(cfg.id, {
           ...next,
@@ -316,6 +362,7 @@ export class LivePaperService {
         source: 'kite',
         kiteFunds: funds,
         kiteError: null,
+        liveOrders: this.liveArmed(),
       });
       this.session.set(snap);
       persist(snap);
@@ -478,6 +525,111 @@ export class LivePaperService {
         : null;
     return { ...bound, entryBid: bid, entryAsk: ask, entryAt: new Date().toISOString(), signal };
   }
+
+  private async syncKite(prev: LivePaperBookState, next: LivePaperBookState): Promise<LivePaperBookState> {
+    if (!this.liveArmed()) return next;
+    const auth = this.kite.getAuthorizationHeader();
+    if (!auth) return { ...next, kiteNote: 'Live Kite needs Token.' };
+    const closed = next.fills.length > prev.fills.length;
+    if (closed && (prev.kiteBuyOrderId || prev.kiteSlOrderId)) {
+      return this.kiteFlatten(
+        {
+          ...next,
+          optionSymbol: next.optionSymbol || prev.optionSymbol,
+          optionToken: next.optionToken || prev.optionToken,
+          lot: next.lot || prev.lot,
+          kiteBuyOrderId: prev.kiteBuyOrderId,
+          kiteSlOrderId: prev.kiteSlOrderId,
+        },
+        auth,
+      );
+    }
+    if (next.side !== 'flat' && next.optionSymbol && next.optionToken > 0) {
+      return this.kiteEnter(next, auth);
+    }
+    return next;
+  }
+
+  private async kiteEnter(book: LivePaperBookState, auth: string): Promise<LivePaperBookState> {
+    if (this.placing.has(book.id)) return book;
+    const ticket = {
+      under: underOf(book.id),
+      optionSymbol: book.optionSymbol,
+      optionToken: book.optionToken,
+      lot: book.lot,
+    };
+    let next = book;
+    this.placing.add(book.id);
+    try {
+      if (!next.kiteBuyOrderId) {
+        const fields = paperLiveBuyFields(ticket);
+        if (!fields) return { ...next, kiteNote: 'No listed contract — Kite buy skipped.' };
+        try {
+          const res = await firstValueFrom(this.kiteApi.placeRegularOrder(auth, fields));
+          const id = kiteOrderIdOf(res);
+          if (!id) return { ...next, kiteNote: 'Kite returned no buy id. Check the order book.' };
+          next = { ...next, kiteBuyOrderId: id, kiteNote: `Kite buy ${id}` };
+        } catch (err) {
+          return { ...next, kiteNote: kiteOrderErrorOf(err) };
+        }
+      }
+      if (next.kiteBuyOrderId && !next.kiteSlOrderId && next.sl != null && next.sl > 0) {
+        const fields = paperLiveStopFields(ticket, next.sl);
+        if (!fields) return { ...next, kiteNote: `${next.kiteNote || ''} · could not rest SL`.trim() };
+        try {
+          const res = await firstValueFrom(this.kiteApi.placeRegularOrder(auth, fields));
+          const id = kiteOrderIdOf(res);
+          if (!id) return { ...next, kiteNote: `${next.kiteNote || ''} · Kite returned no SL id`.trim() };
+          next = { ...next, kiteSlOrderId: id, kiteNote: `${next.kiteNote || ''} · SL ${id} at ₹${fields['trigger_price']}`.trim() };
+        } catch (err) {
+          return { ...next, kiteNote: `${next.kiteNote || ''} · SL ${kiteOrderErrorOf(err)}`.trim() };
+        }
+      }
+      return next;
+    } finally {
+      this.placing.delete(book.id);
+    }
+  }
+
+  private async kiteFlatten(book: LivePaperBookState, auth: string): Promise<LivePaperBookState> {
+    if (this.placing.has(`x:${book.id}`)) return book;
+    this.placing.add(`x:${book.id}`);
+    const notes: string[] = [];
+    try {
+      if (book.kiteSlOrderId) {
+        try {
+          await firstValueFrom(this.kiteApi.cancelRegularOrder(auth, book.kiteSlOrderId));
+          notes.push(`cancelled SL ${book.kiteSlOrderId}`);
+        } catch (err) {
+          notes.push(`SL cancel ${kiteOrderErrorOf(err)}`);
+        }
+      }
+      const ticket = {
+        under: underOf(book.id),
+        optionSymbol: book.optionSymbol,
+        optionToken: book.optionToken,
+        lot: book.lot,
+      };
+      const fields = paperLiveExitFields(ticket);
+      if (fields) {
+        try {
+          const res = await firstValueFrom(this.kiteApi.placeRegularOrder(auth, fields));
+          const id = kiteOrderIdOf(res);
+          notes.push(id ? `Kite exit ${id}` : 'Kite returned no exit id');
+        } catch (err) {
+          notes.push(`exit ${kiteOrderErrorOf(err)}`);
+        }
+      }
+      return {
+        ...book,
+        kiteBuyOrderId: '',
+        kiteSlOrderId: '',
+        kiteNote: notes.join(' · ') || book.kiteNote,
+      };
+    } finally {
+      this.placing.delete(`x:${book.id}`);
+    }
+  }
 }
 
 const NO_BUDGET_CAP = 10_000_000;
@@ -597,6 +749,9 @@ function readStored(): LivePaperSession | null {
         entryMin: b.entryMin ?? null,
         lastSignalMin: b.lastSignalMin ?? -1,
         capitalUsed: b.capitalUsed || 0,
+        kiteBuyOrderId: b.kiteBuyOrderId || '',
+        kiteSlOrderId: b.kiteSlOrderId || '',
+        kiteNote: b.kiteNote || '',
       }, parsed.day)),
     };
   } catch {
