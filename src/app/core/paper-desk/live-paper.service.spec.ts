@@ -5,6 +5,7 @@ import { Instrument } from '../models/instrument.model';
 import { pickCheapOtm } from '../utils/pick-cheap-otm.util';
 import { emptyBook, LIVE_PAPER_BOOKS } from './live-paper.engine';
 import { LivePaperService, bestBidAsk, needsOption, nextExpiryAsOf, optionMarkLast } from './live-paper.service';
+import { PAPER_LIVE_ARM_KEY, readPaperLiveArm } from './paper-live-arm.util';
 
 describe('LivePaperService', () => {
   beforeEach(() => {
@@ -39,6 +40,25 @@ describe('LivePaperService', () => {
     svc.setLiveToggle(false);
     expect(svc.liveArmed()).toBe(false);
     expect(svc.session().liveOrders).toBe(false);
+  });
+
+  it('restores Live radio and book checks after a refresh', async () => {
+    const svc = TestBed.inject(LivePaperService);
+    svc.setLiveToggle(true);
+    svc.setLiveBook('crude', true);
+    expect(readPaperLiveArm()).toMatchObject({ live: true, books: { crude: true, nifty: false } });
+    expect(svc.session().liveOrders).toBe(true);
+    expect(localStorage.getItem(PAPER_LIVE_ARM_KEY)).toMatch(/crude/);
+    await TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [provideHttpClient()],
+    });
+    const again = TestBed.inject(LivePaperService);
+    expect(again.liveToggle()).toBe(true);
+    expect(again.liveBooks().crude).toBe(true);
+    expect(again.liveArmed()).toBe(true);
+    expect(again.liveArmedFor('crude')).toBe(true);
+    expect(again.session().liveOrders).toBe(true);
   });
 
   it('reads best bid and ask from quote depth and returns null when the book is empty', () => {

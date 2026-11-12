@@ -118,6 +118,7 @@ describe('paper live Kite tickets', () => {
 
   it('reads a Kite order id and error body', () => {
     expect(kiteOrderIdOf({ data: { order_id: '123456' } })).toBe('123456');
+    expect(kiteOrderIdOf({ data: { data: { order_id: '99' } } })).toBe('99');
     expect(kiteOrderIdOf({})).toBeNull();
     expect(kiteOrderErrorOf({ error: { message: 'Insufficient funds' } })).toBe('Insufficient funds');
   });

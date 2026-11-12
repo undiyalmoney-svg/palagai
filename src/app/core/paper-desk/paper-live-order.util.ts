@@ -137,7 +137,8 @@ export function paperLiveExitFields(ticket: PaperLiveTicket): Record<string, str
 }
 
 export function kiteOrderIdOf(res: unknown): string | null {
-  const id = (res as { data?: { order_id?: string | number } } | null)?.data?.order_id;
+  const body = res as { data?: { order_id?: string | number; data?: { order_id?: string | number } } } | null;
+  const id = body?.data?.order_id ?? body?.data?.data?.order_id;
   const s = id != null ? String(id).trim() : '';
   return s || null;
 }

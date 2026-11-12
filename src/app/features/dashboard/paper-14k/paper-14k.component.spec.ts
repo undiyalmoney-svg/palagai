@@ -35,6 +35,7 @@ describe('Paper14kComponent', () => {
     expect(text).toMatch(/A banks ₹370/);
     expect(text).toMatch(/Live Kite/);
     expect(text).toMatch(/Place real Kite order and SL/);
+    expect(text).toMatch(/closing this tab does not disarm/);
     expect(fixture.nativeElement.querySelector('[data-testid="paper-live-radio-off"]')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('[data-testid="paper-live-radio-on"]')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('[data-testid="paper-live-book-nifty"]')).toBeTruthy();

@@ -122,7 +122,7 @@ export class Paper14kComponent implements OnDestroy {
     const ageSec = s.asOf ? Math.max(0, Math.round((nowMs - Date.parse(s.asOf)) / 1000)) : null;
     const checked =
       s.asOf && ageSec != null && Number.isFinite(ageSec)
-        ? `Last Kite check ${istClock(s.asOf)} IST${ageSec >= 90 ? ` — ${Math.round(ageSec / 60)} min ago. This tab was in the background, so the desk paused. Leave it open and in front.` : '.'}`
+        ? `Last Kite check ${istClock(s.asOf)} IST${ageSec >= 90 ? ` — ${Math.round(ageSec / 60)} min ago. This tab was in the background. If Live is on, the droplet keeps placing.` : '.'}`
         : '';
     const today = `Today ${s.day}: closed ₹${Math.round(s.closedRs).toLocaleString('en-IN')}.`;
     const names = 'Crude Mini, Nifty 50, Bank Nifty, Sensex.';
@@ -137,7 +137,7 @@ export class Paper14kComponent implements OnDestroy {
       return {
         tone: 'info',
         badge: 'not watching',
-        title: 'Not watching. Hit Start and leave this tab open through the session.',
+        title: 'Not watching. Hit Start. Live stays on if you close the tab — the droplet keeps checking.',
         lines: [names, today, foot],
       };
     }

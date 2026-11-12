@@ -44,8 +44,9 @@
         <h2>Live Kite</h2>
         <p class="mp-sub">
           Paper always records on all four books, Live on or off. Real MIS buys and resting SLs go out only when Live
-          Kite is selected and that book's checkbox is ticked. A Kite reject does not drop the paper fill. A refresh
-          does not arm Live. Not a guaranteed profit.
+          Kite is selected and that book's checkbox is ticked. A Kite reject does not drop the paper fill. Live stays on
+          until you switch to Paper only — closing this tab does not disarm; the droplet keeps placing. Not a guaranteed
+          profit.
         </p>
       </div>
       <span class="mp-badge" [attr.data-tone]="paper.liveArmed() ? 'down' : 'info'" data-testid="paper-live-badge">
@@ -90,7 +91,18 @@
     @if (paper.liveArmed()) {
       <p class="mp-sub mp-down" data-testid="paper-live-warn">
         REAL MONEY on ticked books. Paper still records every fill even if Kite rejects. Switch to Paper only or untick
-        a book to stop sending real orders.
+        a book to stop sending real orders. Closing this tab does not disarm Live.
+      </p>
+    }
+    @if (paper.dropletWatching() || paper.dropletPlacing() || paper.dropletNote()) {
+      <p class="mp-sub" data-testid="paper-live-droplet">
+        {{
+          paper.dropletPlacing()
+            ? 'Droplet is placing and watching exits with this tab closed.'
+            : paper.dropletWatching()
+              ? 'Droplet is watching paper with this tab closed.'
+              : paper.dropletNote()
+        }}
       </p>
     }
   </div>
