@@ -26,6 +26,38 @@ export function paperLiveArmedFor(live: boolean, books: PaperLiveBooks, under: s
   return !!live && !!books[under as PaperLiveUnder];
 }
 
+export type PaperKiteOverlay = {
+  kiteBuyOrderId?: string;
+  kiteSlOrderId?: string;
+  kiteNote?: string;
+};
+
+/**
+ * Paper side/fills/closed ₹ stay. Live Kite may only stamp order ids and a note.
+ * A Kite reject or throw must not drop the paper fill.
+ */
+export function keepPaperOnKite<T extends PaperKiteOverlay>(paper: T, kite: PaperKiteOverlay): T {
+  return {
+    ...paper,
+    kiteBuyOrderId: kite.kiteBuyOrderId ?? paper.kiteBuyOrderId,
+    kiteSlOrderId: kite.kiteSlOrderId ?? paper.kiteSlOrderId,
+    kiteNote: kite.kiteNote ?? paper.kiteNote,
+  };
+}
+
+/** Run Live Kite after paper. A throw stamps a note; paper fills stay. */
+export async function overlayPaperWithKite<T extends PaperKiteOverlay>(
+  paper: T,
+  kiteFn: () => Promise<PaperKiteOverlay>,
+  noteOf: (err: unknown) => string,
+): Promise<T> {
+  try {
+    return keepPaperOnKite(paper, await kiteFn());
+  } catch (err) {
+    return keepPaperOnKite(paper, { kiteNote: noteOf(err) });
+  }
+}
+
 export function paperLiveExchange(under: string): 'NFO' | 'BFO' | 'MCX' {
   if (under === 'crude') return 'MCX';
   if (under === 'sensex') return 'BFO';

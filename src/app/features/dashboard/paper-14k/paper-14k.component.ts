@@ -112,8 +112,8 @@ export class Paper14kComponent implements OnDestroy {
     const today = `Today ${s.day}: closed ₹${Math.round(s.closedRs).toLocaleString('en-IN')}.`;
     const names = 'Crude Mini, Nifty 50, Bank Nifty, Sensex.';
     const foot = s.liveOrders
-      ? 'LIVE Kite — next fill sends a MARKET buy and a resting SL. Motto: buy CE/PE. Not a guaranteed profit.'
-      : 'Paper only until Live Kite is selected and a book is ticked. Motto: buy CE/PE. Not a guaranteed profit.';
+      ? 'Paper always records. LIVE Kite also sends a MARKET buy and SL on ticked books. Motto: buy CE/PE. Not a guaranteed profit.'
+      : 'Paper always records. Live Kite is extra — select Live Kite and tick a book to send a real order. Motto: buy CE/PE. Not a guaranteed profit.';
 
     if (s.kiteError) {
       return { tone: 'down', badge: 'needs Token', title: s.kiteError, lines: [today, foot] };

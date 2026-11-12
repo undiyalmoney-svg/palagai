@@ -20,6 +20,7 @@ describe('Paper14kComponent', () => {
   it('is a live paper desk: Start, four instrument cards, no Kite order', () => {
     const text = fixture.nativeElement.textContent as string;
     expect(text).toMatch(/Paper only/);
+    expect(text).toMatch(/Paper always records/);
     expect(text).toMatch(/buy CE\/PE/);
     expect(text).toMatch(/Hit Start/);
     expect(text).toMatch(/Crude Mini/);
@@ -37,8 +38,8 @@ describe('Paper14kComponent', () => {
     expect(fixture.nativeElement.querySelector('[data-testid="paper-live-book-bank"]')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('[data-testid="paper-live-book-sensex"]')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('[data-testid="paper-live-book-crude"]')).toBeTruthy();
-    expect((fixture.nativeElement.querySelector('[data-testid="paper-live-badge"]') as HTMLElement).textContent).toMatch(
-      /Paper only/,
+    expect((fixture.nativeElement.querySelector('[data-testid="paper-live-badge"]') as HTMLElement).textContent.trim()).toBe(
+      'Paper',
     );
     expect(text).not.toMatch(/Opening range/);
     expect(text).not.toMatch(/Prev-day break/);
@@ -47,7 +48,7 @@ describe('Paper14kComponent', () => {
     expect(text).not.toMatch(/Watch-only desks/);
     expect(text).toMatch(/Closed today/);
     expect(text).toMatch(/Copy night log/);
-    expect(text).toMatch(/Paper only until Live Kite is selected/);
+    expect(text).toMatch(/Paper always records/);
     expect(text).toMatch(/Not a guaranteed profit/);
     expect(text).not.toMatch(/Play next day/);
     expect(text).not.toMatch(/2-year tape/);
@@ -95,7 +96,7 @@ describe('Paper14kComponent', () => {
     fixture.detectChanges();
     expect(paper.liveArmed()).toBe(false);
     expect((fixture.nativeElement.querySelector('[data-testid="paper-live-badge"]') as HTMLElement).textContent).toMatch(
-      /Paper only/,
+      /\bPaper\b/,
     );
     nifty.checked = true;
     nifty.dispatchEvent(new Event('change'));
@@ -105,7 +106,7 @@ describe('Paper14kComponent', () => {
     expect(paper.liveArmedFor('bank')).toBe(false);
     expect(paper.session().liveOrders).toBe(true);
     expect((fixture.nativeElement.querySelector('[data-testid="paper-live-badge"]') as HTMLElement).textContent).toMatch(
-      /Real Kite on/,
+      /Paper \+ Kite/,
     );
     expect(fixture.nativeElement.querySelector('[data-testid="paper-live-warn"]')).toBeTruthy();
     bank.checked = true;

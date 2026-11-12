@@ -6,6 +6,8 @@ import {
   kiteOrderErrorOf,
   kiteOrderIdOf,
   emptyPaperLiveBooks,
+  keepPaperOnKite,
+  overlayPaperWithKite,
   paperLiveArmed,
   paperLiveArmedFor,
   paperLiveBuyFields,
@@ -30,6 +32,46 @@ describe('paper live Kite tickets', () => {
     expect(paperLiveArmedFor(true, nifty, 'bank')).toBe(false);
     expect(paperLiveArmedFor(true, nifty, 'sensex')).toBe(false);
     expect(paperLiveArmedFor(true, nifty, 'crude')).toBe(false);
+  });
+
+  it('keeps the paper fill when Kite overlay fails or returns a flat book', () => {
+    const paper = {
+      side: 'long' as const,
+      fills: [{ rs: 224.6, reason: 'time' }],
+      closedRs: 224.6,
+      entry: 192.5,
+      kiteBuyOrderId: '',
+      kiteSlOrderId: '',
+      kiteNote: '',
+    };
+    const dropped = keepPaperOnKite(paper, {
+      kiteNote: 'Insufficient funds',
+      kiteBuyOrderId: '',
+    });
+    expect(dropped.side).toBe('long');
+    expect(dropped.fills).toEqual(paper.fills);
+    expect(dropped.closedRs).toBe(224.6);
+    expect(dropped.entry).toBe(192.5);
+    expect(dropped.kiteNote).toBe('Insufficient funds');
+    const live = keepPaperOnKite(paper, { kiteBuyOrderId: '9', kiteSlOrderId: '10', kiteNote: 'Kite buy 9' });
+    expect(live.fills).toEqual(paper.fills);
+    expect(live.kiteBuyOrderId).toBe('9');
+  });
+
+  it('keeps paper fills when the Kite overlay throws', async () => {
+    const paper = {
+      side: 'long' as const,
+      fills: [{ rs: 224.6, reason: 'time' }],
+      closedRs: 224.6,
+      kiteNote: '',
+    };
+    const next = await overlayPaperWithKite(paper, async () => {
+      throw new Error('Insufficient funds');
+    }, kiteOrderErrorOf);
+    expect(next.side).toBe('long');
+    expect(next.fills).toEqual(paper.fills);
+    expect(next.closedRs).toBe(224.6);
+    expect(next.kiteNote).toMatch(/Insufficient funds/);
   });
 
   it('sends Crude Mini qty 1 and Sensex on BFO', () => {
