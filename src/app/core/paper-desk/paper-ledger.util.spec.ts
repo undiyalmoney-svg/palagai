@@ -32,6 +32,7 @@ describe('paper ledger', () => {
   it('records a losing trade exactly as the engine closed it', () => {
     const t = fillToTrade(fill());
     expect(t.paperNetRs).toBe(-370);
+    expect(t.grade).toBe('F');
     expect(t.qty).toBe(20);
     expect(t.optionType).toBe('CE');
     expect(t.strike).toBe(77000);

@@ -132,6 +132,7 @@
               <th class="num">TP</th>
               <th class="num">Live ₹</th>
               <th class="num">Closed ₹</th>
+              <th>Grade</th>
             </tr>
           </thead>
           <tbody>
@@ -156,6 +157,13 @@
               <td class="num" [class.mp-up]="d.book.closedRs > 0" [class.mp-down]="d.book.closedRs < 0">
                 {{ d.book.closedRs | number : '1.0-0' }}
               </td>
+              <td>
+                @if (lastGrade(d.book); as g) {
+                  <span class="mp-badge" [attr.data-tone]="gradeTone(d.book.fills[d.book.fills.length - 1]!)" data-testid="book-grade">{{ g }}</span>
+                } @else {
+                  —
+                }
+              </td>
             </tr>
           </tbody>
         </table>
@@ -168,6 +176,7 @@
     <div class="mp-card-head">
       <div>
         <h2>Closed today</h2>
+        <p class="mp-sub">Grade: A banks ₹370 · B green · C scratch · D small loss · F stop</p>
       </div>
       <button type="button" class="ui-btn" (click)="copyNightLog()" data-testid="copy-night-log">
         {{ copied() ? 'Copied' : 'Copy night log' }}
@@ -189,6 +198,7 @@
               <th class="num">SL</th>
               <th class="num">TP</th>
               <th>Why</th>
+              <th>Grade</th>
               <th class="num">₹</th>
               <th>In</th>
               <th>Out</th>
@@ -209,6 +219,9 @@
                 <td class="num">{{ f.sl | number : '1.0-2' }}</td>
                 <td class="num">{{ f.tp | number : '1.0-2' }}</td>
                 <td>{{ f.reason }}</td>
+                <td>
+                  <span class="mp-badge" [attr.data-tone]="gradeTone(f)" data-testid="live-paper-fill-grade">{{ gradeOf(f) }}</span>
+                </td>
                 <td class="num" [class.mp-up]="f.rs > 0" [class.mp-down]="f.rs < 0">
                   {{ f.rs | number : '1.0-0' }}
                 </td>

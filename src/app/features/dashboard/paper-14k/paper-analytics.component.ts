@@ -1,7 +1,7 @@
 import { DecimalPipe } from '@angular/common';
 import { Component, computed, inject, input, signal } from '@angular/core';
 import { realisticFill } from '../../../core/paper-desk/execution-model.util';
-import { istDay } from '../../../core/paper-desk/live-paper.engine';
+import { istDay, paperFillGrade, paperFillGradeTone } from '../../../core/paper-desk/live-paper.engine';
 import { LivePaperService } from '../../../core/paper-desk/live-paper.service';
 import { PaperLedgerService } from '../../../core/paper-desk/paper-ledger.service';
 import { PaperTrade, PeriodKind, RealisticFill } from '../../../core/paper-desk/paper-analytics.models';
@@ -318,6 +318,14 @@ export class PaperAnalyticsComponent {
   protected contract(t: PaperTrade): string {
     if (!t.optionType || t.strike == null) return t.optionSymbol || '—';
     return `${t.label} ${t.strike} ${t.optionType}`;
+  }
+
+  protected gradeOf(t: PaperTrade): string {
+    return t.grade || paperFillGrade({ rs: t.paperNetRs, reason: t.reason });
+  }
+
+  protected gradeTone(t: PaperTrade): string {
+    return paperFillGradeTone(paperFillGrade({ rs: t.paperNetRs, reason: t.reason }));
   }
 
   protected stale(): boolean {

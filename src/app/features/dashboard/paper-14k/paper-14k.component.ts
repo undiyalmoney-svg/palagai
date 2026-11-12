@@ -13,15 +13,17 @@ import {
   hhmm,
   nightLogJson,
   optionPickLabel,
+  paperFillGrade,
+  paperFillGradeTone,
   underOf,
 } from '../../../core/paper-desk/live-paper.engine';
 
 const ARMED_ORDER = ['nifty', 'bank', 'sensex', 'crude'] as const;
 const ARMED_RULE: Record<(typeof ARMED_ORDER)[number], string> = {
-  nifty: '1-min from 09:45 — own fill · target nets ₹370 after charges · fill TP at the live bid · sit at +₹370',
-  bank: '1-min from 09:45 — own fill · target nets ₹370 after charges · fill TP at the live bid · sit at +₹370',
-  sensex: '1-min from 09:45 — own fill · target nets ₹370 after charges · fill TP at the live bid · sit at +₹370',
-  crude: 'From 09:00 MCX open — up to five fills · 0.8× thrust · sit at +₹370',
+  nifty: '1-min from 09:45 — own fill · up to five fills · target nets ₹370 after charges · fill TP at the live bid',
+  bank: '1-min from 09:45 — own fill · up to five fills · target nets ₹370 after charges · fill TP at the live bid',
+  sensex: '1-min from 09:45 — own fill · up to five fills · target nets ₹370 after charges · fill TP at the live bid',
+  crude: 'From 09:00 MCX open — up to five fills · 0.8× thrust · target nets ₹370',
 };
 
 @Component({
@@ -78,6 +80,19 @@ export class Paper14kComponent implements OnDestroy {
 
   protected fills() {
     return allClosedFills(this.paper.session().books);
+  }
+
+  protected gradeOf(f: { rs: number; reason: string; grade?: string }): string {
+    return f.grade || paperFillGrade(f);
+  }
+
+  protected gradeTone(f: { rs: number; reason: string; grade?: string }): string {
+    return paperFillGradeTone(paperFillGrade(f));
+  }
+
+  protected lastGrade(book: LivePaperBookState): string {
+    const last = book.fills[book.fills.length - 1];
+    return last ? this.gradeOf(last) : '';
   }
 
   protected deskLabel(id: string): string {
