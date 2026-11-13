@@ -249,4 +249,55 @@
       </div>
     }
   </div>
+
+  @if (review(); as r) {
+    <div class="mp-grid" data-testid="paper-review">
+      <div class="mp-card mp-col-4" data-testid="paper-review-taken">
+        <div class="mp-card-head">
+          <div>
+            <h2>{{ r.taken.title }}</h2>
+            <p class="mp-sub">Scout — why the desk bought this fill</p>
+          </div>
+          <span class="mp-badge" data-tone="info">Scout</span>
+        </div>
+        <p class="mp-sub">{{ r.taken.body }}</p>
+        <ul class="mp-list">
+          @for (row of r.taken.fills; track row.under + row.note) {
+            <li>{{ row.note }}</li>
+          }
+        </ul>
+      </div>
+      <div class="mp-card mp-col-4" data-testid="paper-review-failed">
+        <div class="mp-card-head">
+          <div>
+            <h2>{{ r.failed.title }}</h2>
+            <p class="mp-sub">Critic — why it failed, or what to change</p>
+          </div>
+          <span class="mp-badge" data-tone="down">Critic</span>
+        </div>
+        <p class="mp-sub">{{ r.failed.body }}</p>
+        <ul class="mp-list">
+          @for (row of r.failed.fills; track row.under + row.note) {
+            <li>{{ row.note }}</li>
+          }
+        </ul>
+      </div>
+      <div class="mp-card mp-col-4" data-testid="paper-review-judge">
+        <div class="mp-card-head">
+          <div>
+            <h2>{{ r.judge.title }}</h2>
+            <p class="mp-sub">One exact change. Not a guaranteed ₹370.</p>
+          </div>
+          <span class="mp-badge" data-tone="warn">Judge</span>
+        </div>
+        <p class="mp-sub">{{ r.judge.body }}</p>
+        @if (r.judge.change) {
+          <p class="mp-sub" data-testid="paper-review-change">{{ r.judge.change }}</p>
+        }
+        @if (r.judge.changeId) {
+          <p class="mp-sub">changeId {{ r.judge.changeId }}</p>
+        }
+      </div>
+    </div>
+  }
 </div>
