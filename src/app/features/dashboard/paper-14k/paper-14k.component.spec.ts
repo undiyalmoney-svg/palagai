@@ -131,4 +131,51 @@ describe('Paper14kComponent', () => {
     expect(fixture.componentInstance['paper'].session().running).toBe(false);
     expect(fixture.componentInstance['paper'].session().liveOrders).toBe(false);
   });
+
+  it('shows scout, critic and judge after a closed fill', () => {
+    const paper = fixture.componentInstance['paper'];
+    const cur = paper.session();
+    const fill = {
+      day: '2026-11-13',
+      book: 'nifty-momentum',
+      label: 'Nifty 50',
+      side: 'long' as const,
+      entry: 162.1,
+      exit: 141.6,
+      sl: 156.41,
+      tp: 168.92,
+      pts: -20.5,
+      rs: -1402.1,
+      reason: 'sl',
+      mode: 'momentum',
+      optionType: 'CE' as const,
+      strike: 25250,
+      expiry: '2026-11-17',
+      lot: 65,
+      structure: 'range',
+      grade: 'F' as const,
+      holdMin: 10,
+      gaugeMove: -22.4,
+      gaugeNeed: 17.6,
+      entryAt: '2026-11-13T05:22:15.711Z',
+      exitAt: '2026-11-13T05:32:37.600Z',
+      under: 'nifty',
+      desk: 'momentum',
+    };
+    paper.session.set({
+      ...cur,
+      books: cur.books.map((b) => (b.id === 'nifty-momentum' ? { ...b, fills: [fill] } : b)),
+    });
+    fixture.detectChanges();
+    const text = fixture.nativeElement.textContent as string;
+    expect(fixture.nativeElement.querySelector('[data-testid="paper-review-taken"]')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('[data-testid="paper-review-failed"]')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('[data-testid="paper-review-judge"]')).toBeTruthy();
+    expect(text).toMatch(/Why taken/);
+    expect(text).toMatch(/Why it failed/);
+    expect(text).toMatch(/Judge/);
+    expect(text).toMatch(/Scout/);
+    expect(text).toMatch(/Critic/);
+    expect(text).not.toMatch(/Why losers failed/);
+  });
 });

@@ -12,6 +12,7 @@ import {
 } from './live-assume.engine';
 import { OPTION_14K_BOOKS, OPTION_14K_LIST, Option14kBookId, option14kToPaperCfg } from './option-14k-plan';
 import { mixGate } from './paper-mix.util';
+import { reviewPaperDesk } from './paper-review.util';
 import { CheapOtmPick } from '../utils/pick-cheap-otm.util';
 import {
   equityMisRoundTripCharges,
@@ -988,10 +989,18 @@ export function tickBook(
     }
     // Option books follow completed candles after the fill. A last-price check on the next
     // 8s tick would stop on the same bar's earlier low or a stale last sitting below the live bid.
+    // A live bid already through SL/TP must not wait for the next 1-min candle (13 Nov Nifty/Bank).
     const tickExitPx = sellPx ?? last;
     const tooSoon =
       isOptionBuy(cfg) && next.entryMin != null && nowMin <= next.entryMin + barMin;
-    const barsHandleExit = isOptionBuy(cfg) && optionBars.length > 0;
+    const bid = exec.bid != null && exec.bid > 0 ? exec.bid : null;
+    const bidThrough =
+      isOptionBuy(cfg) &&
+      bid != null &&
+      ((next.sl != null && bid <= next.sl) ||
+        (next.scratch != null && bid <= next.scratch) ||
+        (next.tp != null && bid >= next.tp));
+    const barsHandleExit = isOptionBuy(cfg) && optionBars.length > 0 && !bidThrough;
     if ((next.side === 'long' || next.side === 'short') && tickExitPx != null && !tooSoon && !barsHandleExit) {
       hitExit(next, tickExitPx, tickExitPx, tickExitPx, cfg, day, tickExitPx, nowMin, exec.bid);
     }
@@ -1170,45 +1179,47 @@ export function nightLog(session: LivePaperSession) {
       maxWin: rows.length ? Math.max(...rows.map((f) => f.rs)) : 0,
     };
   });
+  const mapped = fills.map((f) => ({
+    desk: f.desk || deskOf(f.book),
+    under: f.under || underOf(f.book),
+    book: f.book,
+    label: f.label,
+    contract: optionPickLabel({ id: f.book, optionType: f.optionType, strike: f.strike, expiry: f.expiry, optionSymbol: f.optionSymbol }),
+    optionSymbol: f.optionSymbol || '',
+    optionType: f.optionType || '',
+    strike: f.strike ?? null,
+    expiry: f.expiry || '',
+    lot: f.lot || 0,
+    side: f.side,
+    mode: f.mode,
+    structure: f.structure || '',
+    entry: f.entry,
+    exit: f.exit,
+    sl: f.sl,
+    tp: f.tp,
+    pts: f.pts,
+    rs: f.rs,
+    grade: f.grade || paperFillGrade(f),
+    charges: f.charges ?? null,
+    reason: f.reason,
+    entryAt: f.entryAt || '',
+    exitAt: f.exitAt || '',
+    holdMin: paperHoldMin(f.entryAt, f.exitAt, f.holdMin),
+    gaugeMove: f.gaugeMove ?? null,
+    gaugeNeed: f.gaugeNeed ?? null,
+    entryBid: f.entryBid ?? null,
+    entryAsk: f.entryAsk ?? null,
+    exitBid: f.exitBid ?? null,
+    exitAsk: f.exitAsk ?? null,
+  }));
   return {
     day: session.day,
     asOf: session.asOf,
     closedRs: session.closedRs,
     liveRs: session.liveRs,
     desks,
-    fills: fills.map((f) => ({
-      desk: f.desk || deskOf(f.book),
-      under: f.under || underOf(f.book),
-      book: f.book,
-      label: f.label,
-      contract: optionPickLabel({ id: f.book, optionType: f.optionType, strike: f.strike, expiry: f.expiry, optionSymbol: f.optionSymbol }),
-      optionSymbol: f.optionSymbol || '',
-      optionType: f.optionType || '',
-      strike: f.strike ?? null,
-      expiry: f.expiry || '',
-      lot: f.lot || 0,
-      side: f.side,
-      mode: f.mode,
-      structure: f.structure || '',
-      entry: f.entry,
-      exit: f.exit,
-      sl: f.sl,
-      tp: f.tp,
-      pts: f.pts,
-      rs: f.rs,
-      grade: f.grade || paperFillGrade(f),
-      charges: f.charges ?? null,
-      reason: f.reason,
-      entryAt: f.entryAt || '',
-      exitAt: f.exitAt || '',
-      holdMin: paperHoldMin(f.entryAt, f.exitAt, f.holdMin),
-      gaugeMove: f.gaugeMove ?? null,
-      gaugeNeed: f.gaugeNeed ?? null,
-      entryBid: f.entryBid ?? null,
-      entryAsk: f.entryAsk ?? null,
-      exitBid: f.exitBid ?? null,
-      exitAsk: f.exitAsk ?? null,
-    })),
+    fills: mapped,
+    review: reviewPaperDesk({ day: session.day, closedRs: session.closedRs, fills: mapped }),
   };
 }
 

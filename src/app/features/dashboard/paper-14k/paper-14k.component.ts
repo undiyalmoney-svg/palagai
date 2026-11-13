@@ -11,12 +11,14 @@ import {
   booksFundEnd,
   deskOf,
   hhmm,
+  nightLog,
   nightLogJson,
   optionPickLabel,
   paperFillGrade,
   paperFillGradeTone,
   underOf,
 } from '../../../core/paper-desk/live-paper.engine';
+import { PaperReview } from '../../../core/paper-desk/paper-review.util';
 
 const ARMED_ORDER = ['nifty', 'bank', 'sensex', 'crude'] as const;
 const ARMED_RULE: Record<(typeof ARMED_ORDER)[number], string> = {
@@ -81,6 +83,11 @@ export class Paper14kComponent implements OnDestroy {
   protected fills() {
     return allClosedFills(this.paper.session().books);
   }
+
+  protected readonly review = computed((): PaperReview | null => {
+    const fills = allClosedFills(this.paper.session().books);
+    return fills.length ? nightLog(this.paper.session()).review : null;
+  });
 
   protected gradeOf(f: { rs: number; reason: string; grade?: string }): string {
     return f.grade || paperFillGrade(f);

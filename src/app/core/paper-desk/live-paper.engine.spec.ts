@@ -413,6 +413,36 @@ describe('Live paper desk', () => {
     expect(soldAtBid.fills[0].exit).toBe(145.75);
   });
 
+  it('honors a live bid through SL even when the latest option candle is stale', () => {
+    const cfg = LIVE_PAPER_BOOKS.find((b) => b.id === 'nifty-momentum')!;
+    const book = emptyBook(cfg);
+    book.side = 'long';
+    book.entry = 162.1;
+    book.sl = 156.41;
+    book.tp = 168.92;
+    book.scratch = 156.41;
+    book.status = 'open';
+    book.lot = 65;
+    book.optionSymbol = 'NIFTY26N1725250CE';
+    book.optionType = 'CE';
+    book.entryMin = 10 * 60 + 52;
+    book.lastBarMin = 10 * 60 + 52;
+    const stale = [{ day: '2026-11-13', min: 10 * 60 + 52, open: 162, high: 163, low: 160, close: 161 }];
+    const dumped = tickBook(book, cfg, [], 141.6, '2026-11-13', 10 * 60 + 62, 'NIFTY', stale, {
+      bid: 141.6,
+      ask: 141.95,
+    });
+    expect(dumped.side).toBe('flat');
+    expect(dumped.fills[0].reason).toBe('sl');
+    expect(dumped.fills[0].exit).toBe(141.6);
+    const held = tickBook(book, cfg, [], 141.6, '2026-11-13', 10 * 60 + 62, 'NIFTY', stale, {
+      bid: 160.1,
+      ask: 160.4,
+    });
+    expect(held.side).toBe('long');
+    expect(held.fills).toHaveLength(0);
+  });
+
   it('fills a through-target at the live bid, not the limit', () => {
     const cfg = LIVE_PAPER_BOOKS.find((b) => b.id === 'bank-momentum')!;
     const book = emptyBook(cfg);
@@ -832,6 +862,9 @@ describe('Live paper desk', () => {
     });
     expect(log.fills[0].charges).toBeGreaterThan(0);
     expect(log.fills[0].holdMin).toBe(45);
+    expect(log.review.taken.title).toBe('Why taken');
+    expect(log.review.failed.title).toBe('Why it failed');
+    expect(log.review.judge.title).toBe('Judge');
     expect(paperHoldMin('2026-11-11T05:18:35.549Z', '2026-11-11T05:18:45.676Z', 4)).toBe(0);
     const sameTick = nightLog({
       ...snap,
