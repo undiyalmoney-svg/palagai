@@ -24,6 +24,7 @@ import {
   overlayPaperWithKite,
   paperLiveArmed,
   paperLiveArmedFor,
+  paperLiveBuyHalted,
   paperLiveBuyFields,
   paperLiveExitFields,
   paperLiveStopFields,
@@ -354,6 +355,7 @@ export class LivePaperService {
     }
     if (!this.liveArmedFor(underOf(next.id))) return next;
     if (!auth) return { ...next, kiteNote: 'Live Kite needs Token.' };
+    if (paperLiveBuyHalted(next)) return next;
     if (next.side !== 'flat' && next.optionSymbol && next.optionToken > 0) {
       return this.kiteEnter(next, auth);
     }
@@ -377,10 +379,20 @@ export class LivePaperService {
         try {
           const res = await firstValueFrom(this.kiteApi.placeRegularOrder(auth, fields));
           const id = kiteOrderIdOf(res);
-          if (!id) return { ...next, kiteNote: 'Kite returned no buy id. Check the order book.' };
-          next = { ...next, kiteBuyOrderId: id, kiteNote: `Kite buy ${id}` };
+          if (!id) {
+            return {
+              ...next,
+              kiteHalt: true,
+              kiteNote: 'Kite rejected — not retrying. Check the order book.',
+            };
+          }
+          next = { ...next, kiteBuyOrderId: id, kiteHalt: false, kiteNote: `Kite buy ${id}` };
         } catch (err) {
-          return { ...next, kiteNote: kiteOrderErrorOf(err) };
+          return {
+            ...next,
+            kiteHalt: true,
+            kiteNote: `Kite rejected — not retrying. ${kiteOrderErrorOf(err)}`,
+          };
         }
       }
       if (next.kiteBuyOrderId && !next.kiteSlOrderId && next.sl != null && next.sl > 0) {
@@ -434,6 +446,7 @@ export class LivePaperService {
         ...book,
         kiteBuyOrderId: '',
         kiteSlOrderId: '',
+        kiteHalt: false,
         kiteNote: notes.join(' · ') || book.kiteNote,
       };
     } finally {
@@ -495,6 +508,7 @@ function readStored(): LivePaperSession | null {
         kiteBuyOrderId: b.kiteBuyOrderId || '',
         kiteSlOrderId: b.kiteSlOrderId || '',
         kiteNote: b.kiteNote || '',
+        kiteHalt: !!b.kiteHalt,
       }, parsed.day)),
     };
   } catch {

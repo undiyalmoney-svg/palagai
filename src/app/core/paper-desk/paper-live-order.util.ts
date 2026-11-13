@@ -30,6 +30,8 @@ export type PaperKiteOverlay = {
   kiteBuyOrderId?: string;
   kiteSlOrderId?: string;
   kiteNote?: string;
+  /** Broker rejected this fill — do not send another BUY on the 8s tick. */
+  kiteHalt?: boolean;
 };
 
 /**
@@ -42,10 +44,11 @@ export function keepPaperOnKite<T extends PaperKiteOverlay>(paper: T, kite: Pape
     kiteBuyOrderId: kite.kiteBuyOrderId ?? paper.kiteBuyOrderId,
     kiteSlOrderId: kite.kiteSlOrderId ?? paper.kiteSlOrderId,
     kiteNote: kite.kiteNote ?? paper.kiteNote,
+    kiteHalt: kite.kiteHalt ?? paper.kiteHalt,
   };
 }
 
-/** Run Live Kite after paper. A throw stamps a note; paper fills stay. */
+/** Run Live Kite after paper. A throw stamps a note and stops BUY retries; paper fills stay. */
 export async function overlayPaperWithKite<T extends PaperKiteOverlay>(
   paper: T,
   kiteFn: () => Promise<PaperKiteOverlay>,
@@ -54,8 +57,13 @@ export async function overlayPaperWithKite<T extends PaperKiteOverlay>(
   try {
     return keepPaperOnKite(paper, await kiteFn());
   } catch (err) {
-    return keepPaperOnKite(paper, { kiteNote: noteOf(err) });
+    return keepPaperOnKite(paper, { kiteNote: noteOf(err), kiteHalt: true });
   }
+}
+
+/** One Kite BUY per paper fill. A reject must not fire again every tick. */
+export function paperLiveBuyHalted(book: PaperKiteOverlay): boolean {
+  return !!book.kiteHalt && !book.kiteBuyOrderId;
 }
 
 export function paperLiveExchange(under: string): 'NFO' | 'BFO' | 'MCX' {

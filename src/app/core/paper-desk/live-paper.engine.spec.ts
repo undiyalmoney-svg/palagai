@@ -169,6 +169,21 @@ describe('Live paper desk', () => {
     expect(bound.scratch).toBe(bound.sl);
     expect(bound.optionType).toBe('CE');
     expect(bound.instrument).toBe('CRUDEOILM26NOV5500CE');
+    expect(bound.kiteHalt).toBe(false);
+    expect(bound.kiteBuyOrderId).toBe('');
+  });
+
+  it('clears a previous Kite reject so the next paper fill may send one BUY', () => {
+    const cfg = LIVE_PAPER_BOOKS[0];
+    const book = emptyBook(cfg);
+    book.side = 'long';
+    book.status = 'open';
+    book.kiteHalt = true;
+    book.kiteNote = 'Kite rejected — not retrying.';
+    book.kiteBuyOrderId = '';
+    const bound = bindOptionFill(book, cfg, 150, crudePick() as never);
+    expect(bound.kiteHalt).toBe(false);
+    expect(bound.kiteNote).toBe('');
   });
 
   it('widens the stop to 1.5× the option 5-min range and keeps target at 2× stop', () => {

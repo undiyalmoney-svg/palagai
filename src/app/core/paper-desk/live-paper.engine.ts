@@ -419,6 +419,8 @@ export interface LivePaperBookState {
   kiteSlOrderId?: string;
   /** Last live-order note (sent / failed). */
   kiteNote?: string;
+  /** Kite rejected this fill — do not send another BUY until the next paper open. */
+  kiteHalt?: boolean;
 }
 
 export interface LivePaperSession {
@@ -593,6 +595,10 @@ export function bindOptionFill(
   next.optionToken = pick.instrument.instrumentToken;
   next.last = prem;
   next.reason = `open ${pick.side} ${pick.instrument.tradingSymbol}`;
+  next.kiteBuyOrderId = '';
+  next.kiteSlOrderId = '';
+  next.kiteNote = '';
+  next.kiteHalt = false;
   // The fill is now, not on the confirm bar. Option candles that opened at or before this
   // minute include price action from before we bought — they must not stop us.
   if (atMin != null) {

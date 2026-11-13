@@ -8,6 +8,7 @@ import {
   emptyPaperLiveBooks,
   keepPaperOnKite,
   overlayPaperWithKite,
+  paperLiveBuyHalted,
   paperLiveArmed,
   paperLiveArmedFor,
   paperLiveBuyFields,
@@ -64,6 +65,7 @@ describe('paper live Kite tickets', () => {
       fills: [{ rs: 224.6, reason: 'time' }],
       closedRs: 224.6,
       kiteNote: '',
+      kiteHalt: false,
     };
     const next = await overlayPaperWithKite(paper, async () => {
       throw new Error('Insufficient funds');
@@ -72,6 +74,14 @@ describe('paper live Kite tickets', () => {
     expect(next.fills).toEqual(paper.fills);
     expect(next.closedRs).toBe(224.6);
     expect(next.kiteNote).toMatch(/Insufficient funds/);
+    expect(next.kiteHalt).toBe(true);
+    expect(paperLiveBuyHalted(next)).toBe(true);
+  });
+
+  it('does not send another BUY after a reject on the same fill', () => {
+    expect(paperLiveBuyHalted({ kiteHalt: true, kiteBuyOrderId: '' })).toBe(true);
+    expect(paperLiveBuyHalted({ kiteHalt: true, kiteBuyOrderId: '9' })).toBe(false);
+    expect(paperLiveBuyHalted({ kiteHalt: false, kiteBuyOrderId: '' })).toBe(false);
   });
 
   it('sends Crude Mini qty 1 and Sensex on BFO', () => {
