@@ -24,7 +24,9 @@ import {
   overlayPaperWithKite,
   paperLiveArmed,
   paperLiveArmedFor,
-  paperLiveBuyHalted,
+  paperLiveBuyPlaced,
+  paperLiveOpenBuyId,
+  kiteOrderDead,
   paperLiveBuyFields,
   paperLiveExitFields,
   paperLiveStopFields,
@@ -355,7 +357,6 @@ export class LivePaperService {
     }
     if (!this.liveArmedFor(underOf(next.id))) return next;
     if (!auth) return { ...next, kiteNote: 'Live Kite needs Token.' };
-    if (paperLiveBuyHalted(next)) return next;
     if (next.side !== 'flat' && next.optionSymbol && next.optionToken > 0) {
       return this.kiteEnter(next, auth);
     }
@@ -373,26 +374,31 @@ export class LivePaperService {
     let next = book;
     this.placing.add(book.id);
     try {
-      if (!next.kiteBuyOrderId) {
-        const fields = paperLiveBuyFields(ticket);
-        if (!fields) return { ...next, kiteNote: 'No listed contract — Kite buy skipped.' };
-        try {
-          const res = await firstValueFrom(this.kiteApi.placeRegularOrder(auth, fields));
-          const id = kiteOrderIdOf(res);
-          if (!id) {
-            return {
-              ...next,
-              kiteHalt: true,
-              kiteNote: 'Kite rejected — not retrying. Check the order book.',
-            };
+      if (!paperLiveBuyPlaced(next)) {
+        const existing = await this.existingPaperBuy(auth, ticket.optionSymbol);
+        if (existing) {
+          next = { ...next, kiteBuyOrderId: existing, kiteHalt: true, kiteNote: `Kite buy ${existing} already on the book` };
+        } else {
+          const fields = paperLiveBuyFields(ticket);
+          if (!fields) return { ...next, kiteNote: 'No listed contract — Kite buy skipped.' };
+          try {
+            const res = await firstValueFrom(this.kiteApi.placeRegularOrder(auth, fields));
+            const id = kiteOrderIdOf(res);
+            if (!id) {
+              return { ...next, kiteHalt: false, kiteNote: 'Kite rejected — will retry.' };
+            }
+            if (!(await this.buyStillLive(auth, id))) {
+              return { ...next, kiteHalt: false, kiteNote: `Kite rejected ${id} — will retry.` };
+            }
+            next = { ...next, kiteBuyOrderId: id, kiteHalt: true, kiteNote: `Kite buy ${id}` };
+          } catch (err) {
+            const id = kiteOrderIdOf(err);
+            if (id && (await this.buyStillLive(auth, id))) {
+              next = { ...next, kiteBuyOrderId: id, kiteHalt: true, kiteNote: `Kite buy ${id}` };
+            } else {
+              return { ...next, kiteHalt: false, kiteNote: `Kite rejected — will retry. ${kiteOrderErrorOf(err)}` };
+            }
           }
-          next = { ...next, kiteBuyOrderId: id, kiteHalt: false, kiteNote: `Kite buy ${id}` };
-        } catch (err) {
-          return {
-            ...next,
-            kiteHalt: true,
-            kiteNote: `Kite rejected — not retrying. ${kiteOrderErrorOf(err)}`,
-          };
         }
       }
       if (next.kiteBuyOrderId && !next.kiteSlOrderId && next.sl != null && next.sl > 0) {
@@ -451,6 +457,31 @@ export class LivePaperService {
       };
     } finally {
       this.placing.delete(`x:${book.id}`);
+    }
+  }
+
+  private async existingPaperBuy(auth: string, symbol: string): Promise<string | null> {
+    try {
+      const res = await firstValueFrom(this.kiteApi.getOrders(auth));
+      const rows = Array.isArray((res as { data?: unknown })?.data)
+        ? ((res as { data: Array<{ order_id?: string | number; tradingsymbol?: string; transaction_type?: string; tag?: string; status?: string }> }).data)
+        : [];
+      return paperLiveOpenBuyId(rows, symbol);
+    } catch {
+      return null;
+    }
+  }
+
+  private async buyStillLive(auth: string, orderId: string): Promise<boolean> {
+    try {
+      const res = (await firstValueFrom(this.kiteApi.getOrderHistory(auth, orderId))) as {
+        data?: Array<{ status?: string }>;
+      };
+      const rows = Array.isArray(res?.data) ? res.data : [];
+      const last = rows.length ? rows[rows.length - 1] : null;
+      return !kiteOrderDead(last?.status);
+    } catch {
+      return true;
     }
   }
 }

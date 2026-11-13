@@ -8,7 +8,9 @@ import {
   emptyPaperLiveBooks,
   keepPaperOnKite,
   overlayPaperWithKite,
-  paperLiveBuyHalted,
+  paperLiveBuyPlaced,
+  paperLiveOpenBuyId,
+  kiteOrderDead,
   paperLiveArmed,
   paperLiveArmedFor,
   paperLiveBuyFields,
@@ -74,14 +76,23 @@ describe('paper live Kite tickets', () => {
     expect(next.fills).toEqual(paper.fills);
     expect(next.closedRs).toBe(224.6);
     expect(next.kiteNote).toMatch(/Insufficient funds/);
-    expect(next.kiteHalt).toBe(true);
-    expect(paperLiveBuyHalted(next)).toBe(true);
+    expect(paperLiveBuyPlaced(next)).toBe(false);
   });
 
-  it('does not send another BUY after a reject on the same fill', () => {
-    expect(paperLiveBuyHalted({ kiteHalt: true, kiteBuyOrderId: '' })).toBe(true);
-    expect(paperLiveBuyHalted({ kiteHalt: true, kiteBuyOrderId: '9' })).toBe(false);
-    expect(paperLiveBuyHalted({ kiteHalt: false, kiteBuyOrderId: '' })).toBe(false);
+  it('treats a live BUY id as placed and retries after a reject', () => {
+    expect(paperLiveBuyPlaced({ kiteBuyOrderId: '9' })).toBe(true);
+    expect(paperLiveBuyPlaced({ kiteBuyOrderId: '' })).toBe(false);
+    expect(kiteOrderDead('REJECTED')).toBe(true);
+    expect(kiteOrderDead('COMPLETE')).toBe(false);
+    expect(
+      paperLiveOpenBuyId(
+        [
+          { order_id: '1', tradingsymbol: 'CRUDEOILM26NOV8300PE', transaction_type: 'BUY', tag: PAPER_LIVE_BUY_TAG, status: 'REJECTED' },
+          { order_id: '2', tradingsymbol: 'CRUDEOILM26NOV8300PE', transaction_type: 'BUY', tag: PAPER_LIVE_BUY_TAG, status: 'COMPLETE' },
+        ],
+        'CRUDEOILM26NOV8300PE',
+      ),
+    ).toBe('2');
   });
 
   it('sends Crude Mini qty 1 and Sensex on BFO', () => {
@@ -129,6 +140,7 @@ describe('paper live Kite tickets', () => {
   it('reads a Kite order id and error body', () => {
     expect(kiteOrderIdOf({ data: { order_id: '123456' } })).toBe('123456');
     expect(kiteOrderIdOf({ data: { data: { order_id: '99' } } })).toBe('99');
+    expect(kiteOrderIdOf({ error: { data: { order_id: '7' } } })).toBe('7');
     expect(kiteOrderIdOf({})).toBeNull();
     expect(kiteOrderErrorOf({ error: { message: 'Insufficient funds' } })).toBe('Insufficient funds');
   });

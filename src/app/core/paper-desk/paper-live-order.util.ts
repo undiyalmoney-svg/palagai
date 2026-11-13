@@ -30,7 +30,7 @@ export type PaperKiteOverlay = {
   kiteBuyOrderId?: string;
   kiteSlOrderId?: string;
   kiteNote?: string;
-  /** Broker rejected this fill — do not send another BUY on the 8s tick. */
+  /** True only after a BUY was accepted. A reject must still retry. */
   kiteHalt?: boolean;
 };
 
@@ -48,7 +48,7 @@ export function keepPaperOnKite<T extends PaperKiteOverlay>(paper: T, kite: Pape
   };
 }
 
-/** Run Live Kite after paper. A throw stamps a note and stops BUY retries; paper fills stay. */
+/** Run Live Kite after paper. A throw stamps a note and retries next tick; paper fills stay. */
 export async function overlayPaperWithKite<T extends PaperKiteOverlay>(
   paper: T,
   kiteFn: () => Promise<PaperKiteOverlay>,
@@ -57,13 +57,37 @@ export async function overlayPaperWithKite<T extends PaperKiteOverlay>(
   try {
     return keepPaperOnKite(paper, await kiteFn());
   } catch (err) {
-    return keepPaperOnKite(paper, { kiteNote: noteOf(err), kiteHalt: true });
+    return keepPaperOnKite(paper, { kiteNote: noteOf(err) });
   }
 }
 
-/** One Kite BUY per paper fill. A reject must not fire again every tick. */
-export function paperLiveBuyHalted(book: PaperKiteOverlay): boolean {
-  return !!book.kiteHalt && !book.kiteBuyOrderId;
+/** BUY already accepted — do not send another. Rejects leave this false so the 8s tick retries. */
+export function paperLiveBuyPlaced(book: PaperKiteOverlay): boolean {
+  return !!String(book.kiteBuyOrderId || '').trim();
+}
+
+const DEAD_STATUS = new Set(['REJECTED', 'CANCELLED', 'EXPIRED']);
+
+export function kiteOrderDead(status: string | undefined | null): boolean {
+  return DEAD_STATUS.has(String(status || '').trim().toUpperCase());
+}
+
+/** Open / complete PALAGAI_PAPER BUY on this contract — reuse that id, do not place again. */
+export function paperLiveOpenBuyId(
+  orders: Array<{ order_id?: string | number; tradingsymbol?: string; transaction_type?: string; tag?: string; status?: string }>,
+  symbol: string,
+): string | null {
+  const want = String(symbol || '').trim().toUpperCase();
+  if (!want) return null;
+  for (const o of orders) {
+    if (String(o.tradingsymbol || '').trim().toUpperCase() !== want) continue;
+    if (String(o.transaction_type || '').toUpperCase() !== 'BUY') continue;
+    if (String(o.tag || '').toUpperCase() !== PAPER_LIVE_BUY_TAG) continue;
+    if (kiteOrderDead(o.status)) continue;
+    const id = o.order_id != null ? String(o.order_id).trim() : '';
+    if (id) return id;
+  }
+  return null;
 }
 
 export function paperLiveExchange(under: string): 'NFO' | 'BFO' | 'MCX' {
@@ -145,10 +169,22 @@ export function paperLiveExitFields(ticket: PaperLiveTicket): Record<string, str
 }
 
 export function kiteOrderIdOf(res: unknown): string | null {
-  const body = res as { data?: { order_id?: string | number; data?: { order_id?: string | number } } } | null;
-  const id = body?.data?.order_id ?? body?.data?.data?.order_id;
-  const s = id != null ? String(id).trim() : '';
-  return s || null;
+  return pickOrderId(res, 0);
+}
+
+function pickOrderId(node: unknown, depth: number): string | null {
+  if (node == null || depth > 5) return null;
+  if (typeof node === 'object') {
+    const o = node as Record<string, unknown>;
+    for (const key of ['order_id', 'orderId']) {
+      if (o[key] != null && String(o[key]).trim()) return String(o[key]).trim();
+    }
+    for (const key of ['data', 'error']) {
+      const inner = pickOrderId(o[key], depth + 1);
+      if (inner) return inner;
+    }
+  }
+  return null;
 }
 
 export function kiteOrderErrorOf(error: unknown): string {

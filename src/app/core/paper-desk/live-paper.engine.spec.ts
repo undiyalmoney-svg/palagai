@@ -173,16 +173,17 @@ describe('Live paper desk', () => {
     expect(bound.kiteBuyOrderId).toBe('');
   });
 
-  it('clears a previous Kite reject so the next paper fill may send one BUY', () => {
+  it('clears a previous Kite buy id so the next paper fill may send one BUY', () => {
     const cfg = LIVE_PAPER_BOOKS[0];
     const book = emptyBook(cfg);
     book.side = 'long';
     book.status = 'open';
     book.kiteHalt = true;
-    book.kiteNote = 'Kite rejected — not retrying.';
-    book.kiteBuyOrderId = '';
+    book.kiteBuyOrderId = '99';
+    book.kiteNote = 'Kite buy 99';
     const bound = bindOptionFill(book, cfg, 150, crudePick() as never);
     expect(bound.kiteHalt).toBe(false);
+    expect(bound.kiteBuyOrderId).toBe('');
     expect(bound.kiteNote).toBe('');
   });
 

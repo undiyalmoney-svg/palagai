@@ -419,7 +419,7 @@ export interface LivePaperBookState {
   kiteSlOrderId?: string;
   /** Last live-order note (sent / failed). */
   kiteNote?: string;
-  /** Kite rejected this fill — do not send another BUY until the next paper open. */
+  /** True after a BUY was accepted. Rejects stay false so the next tick retries. */
   kiteHalt?: boolean;
 }
 
