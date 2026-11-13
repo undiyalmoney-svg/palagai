@@ -286,16 +286,18 @@
         <div class="mp-card-head">
           <div>
             <h2>{{ r.judge.title }}</h2>
-            <p class="mp-sub">One exact change. Not a guaranteed ₹370.</p>
+            <p class="mp-sub">Applies one exact change. Next ticks use it. Not a guaranteed ₹370.</p>
           </div>
-          <span class="mp-badge" data-tone="warn">Judge</span>
+          <span class="mp-badge" [attr.data-tone]="r.judge.changeId && r.judge.changeId !== 'none' ? 'warn' : 'info'">
+            {{ r.judge.changeId && r.judge.changeId !== 'none' ? 'Pending' : 'Applied' }}
+          </span>
         </div>
         <p class="mp-sub">{{ r.judge.body }}</p>
         @if (r.judge.change) {
           <p class="mp-sub" data-testid="paper-review-change">{{ r.judge.change }}</p>
         }
         @if (r.judge.changeId) {
-          <p class="mp-sub">changeId {{ r.judge.changeId }}</p>
+          <p class="mp-sub" data-testid="paper-review-change-id">changeId {{ r.judge.changeId }}</p>
         }
       </div>
     </div>

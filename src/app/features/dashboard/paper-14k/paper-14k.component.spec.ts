@@ -176,6 +176,7 @@ describe('Paper14kComponent', () => {
     expect(text).toMatch(/Judge/);
     expect(text).toMatch(/Scout/);
     expect(text).toMatch(/Critic/);
+    expect(text).toMatch(/Applies one exact change|Already applied|Pending|Applied/);
     expect(text).not.toMatch(/Why losers failed/);
   });
 });

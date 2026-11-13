@@ -443,6 +443,34 @@ describe('Live paper desk', () => {
     expect(held.fills).toHaveLength(0);
   });
 
+  it('catch-up of lagged option bars stops at the bar, not the crashed live bid', () => {
+    const cfg = LIVE_PAPER_BOOKS.find((b) => b.id === 'nifty-momentum')!;
+    const book = emptyBook(cfg);
+    book.side = 'long';
+    book.entry = 162.1;
+    book.sl = 156.41;
+    book.tp = 168.92;
+    book.scratch = 156.41;
+    book.status = 'open';
+    book.lot = 65;
+    book.optionSymbol = 'NIFTY26N1725250CE';
+    book.optionType = 'CE';
+    book.entryMin = 10 * 60 + 52;
+    book.lastBarMin = 10 * 60 + 52;
+    const lagged = [
+      { day: '2026-11-13', min: 10 * 60 + 53, open: 160, high: 161, low: 155, close: 156 },
+      { day: '2026-11-13', min: 10 * 60 + 54, open: 156, high: 157, low: 140, close: 141 },
+    ];
+    const dumped = tickBook(book, cfg, [], 141.6, '2026-11-13', 10 * 60 + 62, 'NIFTY', lagged, {
+      bid: 141.6,
+      ask: 141.95,
+      evolve: { bidThroughTick: true, barCatchupIgnoresLiveBid: true },
+    });
+    expect(dumped.side).toBe('flat');
+    expect(dumped.fills[0].reason).toBe('sl');
+    expect(dumped.fills[0].exit).toBe(156.41);
+  });
+
   it('fills a through-target at the live bid, not the limit', () => {
     const cfg = LIVE_PAPER_BOOKS.find((b) => b.id === 'bank-momentum')!;
     const book = emptyBook(cfg);

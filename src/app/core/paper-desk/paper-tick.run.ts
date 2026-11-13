@@ -18,6 +18,7 @@ import {
   istDay,
   istMinutes,
   optionBoundStops,
+  nightLog,
   optionRangePts,
   paperTickOrder,
   summarizePaper,
@@ -26,6 +27,12 @@ import {
 } from './live-paper.engine';
 import { optionRoundTripCharges, venueForBook } from './option-charges.util';
 import { MIX_SPREAD_PCT } from './paper-mix.util';
+import {
+  PaperEvolveState,
+  emptyEvolve,
+  evolvePaperDesk,
+  paperEvolveFlags,
+} from './paper-evolve.util';
 import { PaperLiveBooks, paperLiveArmed } from './paper-live-order.util';
 import { SkippedSignal } from './paper-analytics.models';
 import { buildSignalCard } from './signal-card.util';
@@ -52,6 +59,7 @@ export type PaperTickIo = {
   fetchCsv: () => Promise<string>;
   fetchQuotes: (keys: string[]) => Promise<Record<string, PaperTickQuote>>;
   fetchHistorical: (token: string, interval: string, from: string, to: string) => Promise<unknown[][]>;
+  evolve?: PaperEvolveState;
 };
 
 export async function runPaperTick(io: PaperTickIo): Promise<LivePaperSession> {
@@ -60,6 +68,8 @@ export async function runPaperTick(io: PaperTickIo): Promise<LivePaperSession> {
   const nowMin = istMinutes(now);
   const raw = io.session.day === day ? io.session : emptySession(day, now.toISOString());
   const cur = { ...raw, books: raw.books.map(replayBudgetSkips) };
+  const evolved = evolvePaperDesk(nightLog(cur), io.evolve || cur.evolve || emptyEvolve());
+  const flags = paperEvolveFlags(evolved.state);
   const [margins, csv] = await Promise.all([io.fetchMargins(), io.fetchCsv()]);
   const funds = margins ? parseFunds(margins) : cur.kiteFunds;
   const dump = String(csv || '');
@@ -146,7 +156,7 @@ export async function runPaperTick(io: PaperTickIo): Promise<LivePaperSession> {
       nowMin,
       prev.optionSymbol || inst?.tradingSymbol || cfg.label,
       optionBars,
-      { bid: optBid, ask: optAsk, blockOpen: indexDeskBlockReason(cfg.id, peers, day) },
+      { bid: optBid, ask: optAsk, blockOpen: indexDeskBlockReason(cfg.id, peers, day), evolve: flags },
     );
     if (cfg.buyOption && needsOption(next)) {
       const spot = underLast ?? (next.optionSymbol ? next.last : null) ?? 0;
@@ -187,7 +197,7 @@ export async function runPaperTick(io: PaperTickIo): Promise<LivePaperSession> {
     });
   }
   const books = LIVE_PAPER_BOOKS.map((c) => nextById.get(c.id) || cur.books.find((b) => b.id === c.id)!);
-  return summarizePaper(books, {
+  const snap = summarizePaper(books, {
     running: true,
     day,
     startedAt: cur.startedAt || now.toISOString(),
@@ -196,7 +206,10 @@ export async function runPaperTick(io: PaperTickIo): Promise<LivePaperSession> {
     kiteFunds: funds,
     kiteError: null,
     liveOrders: paperLiveArmed(io.live, io.liveBooks),
+    evolve: evolved.state,
   });
+  const after = evolvePaperDesk(nightLog(snap), evolved.state);
+  return { ...snap, evolve: after.state };
 }
 
 async function bindCheap(

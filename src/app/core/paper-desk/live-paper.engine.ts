@@ -12,7 +12,7 @@ import {
 } from './live-assume.engine';
 import { OPTION_14K_BOOKS, OPTION_14K_LIST, Option14kBookId, option14kToPaperCfg } from './option-14k-plan';
 import { mixGate } from './paper-mix.util';
-import { reviewPaperDesk } from './paper-review.util';
+import { PaperEvolveFlags, PaperEvolveState, emptyEvolve, reviewEvolvingDesk } from './paper-evolve.util';
 import { CheapOtmPick } from '../utils/pick-cheap-otm.util';
 import {
   equityMisRoundTripCharges,
@@ -445,6 +445,8 @@ export interface LivePaperSession {
   liveRs: number;
   closedRs: number;
   honest: string;
+  /** Judge-applied patches. Survives a new IST day via palagai_paper_evolve_v1. */
+  evolve?: PaperEvolveState;
 }
 
 export function emptyBook(cfg: LiveAssumeBookCfg): LivePaperBookState {
@@ -922,7 +924,12 @@ export function tickBook(
   nowMin: number,
   instrument: string,
   optionBars: LiveAssumeBar[] = [],
-  exec: { bid?: number | null; ask?: number | null; blockOpen?: string | null } = {},
+  exec: {
+    bid?: number | null;
+    ask?: number | null;
+    blockOpen?: string | null;
+    evolve?: PaperEvolveFlags;
+  } = {},
 ): LivePaperBookState {
   const next: LivePaperBookState = {
     ...book,
@@ -969,7 +976,10 @@ export function tickBook(
         next.lastBarMin = bar.min;
         continue;
       }
-      if (hitExit(next, bar.high, bar.low, bar.close, cfg, day, bar.open, nowMin, exec.bid)) {
+      const lagged = isOptionBuy(cfg) && bar.min + barMin < nowMin;
+      const barBid =
+        lagged && exec.evolve?.barCatchupIgnoresLiveBid ? null : exec.bid;
+      if (hitExit(next, bar.high, bar.low, bar.close, cfg, day, bar.open, nowMin, barBid)) {
         next.lastBarMin = bar.min;
         break;
       }
@@ -995,6 +1005,7 @@ export function tickBook(
       isOptionBuy(cfg) && next.entryMin != null && nowMin <= next.entryMin + barMin;
     const bid = exec.bid != null && exec.bid > 0 ? exec.bid : null;
     const bidThrough =
+      (exec.evolve?.bidThroughTick !== false) &&
       isOptionBuy(cfg) &&
       bid != null &&
       ((next.sl != null && bid <= next.sl) ||
@@ -1115,7 +1126,7 @@ export function summarizePaper(
   books: LivePaperBookState[],
   extra: Pick<
     LivePaperSession,
-    'running' | 'day' | 'startedAt' | 'asOf' | 'source' | 'kiteFunds' | 'kiteError'
+    'running' | 'day' | 'startedAt' | 'asOf' | 'source' | 'kiteFunds' | 'kiteError' | 'evolve'
   > & { liveOrders?: boolean },
 ): LivePaperSession {
   const liveRs = Math.round(books.reduce((s, b) => s + (b.side === 'flat' ? 0 : b.liveRs), 0) * 10) / 10;
@@ -1139,6 +1150,7 @@ export function summarizePaper(
     books,
     liveRs,
     closedRs,
+    evolve: extra.evolve || emptyEvolve(),
     honest: live
       ? `Paper always records. LIVE Kite also sends a 1 lot MARKET buy and a resting SL on ticked books. A Kite reject does not drop the paper fill. Motto: buy CE/PE. ` +
         `${fundsLine}${PAPER_TEST_HONEST}`
@@ -1219,7 +1231,11 @@ export function nightLog(session: LivePaperSession) {
     liveRs: session.liveRs,
     desks,
     fills: mapped,
-    review: reviewPaperDesk({ day: session.day, closedRs: session.closedRs, fills: mapped }),
+    evolve: session.evolve || emptyEvolve(),
+    review: reviewEvolvingDesk(
+      { day: session.day, closedRs: session.closedRs, fills: mapped },
+      session.evolve || emptyEvolve(),
+    ),
   };
 }
 

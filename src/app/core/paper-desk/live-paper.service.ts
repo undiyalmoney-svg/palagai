@@ -33,6 +33,7 @@ import {
 } from './paper-live-order.util';
 import { PaperLiveApiService, PaperLiveView } from './paper-live-api.service';
 import { readPaperLiveArm, writePaperLiveArm } from './paper-live-arm.util';
+import { readPaperEvolve, writePaperEvolve } from './paper-evolve.util';
 import { PaperTickQuote, runPaperTick } from './paper-tick.run';
 
 export { bestBidAsk, needsOption, nextExpiryAsOf, optionMarkLast } from './paper-tick.run';
@@ -110,6 +111,7 @@ export class LivePaperService {
       kiteFunds: cur.kiteFunds,
       kiteError: cur.kiteError,
       liveOrders: this.liveArmed(),
+      evolve: cur.evolve || readPaperEvolve(),
     });
     this.session.set(snap);
     persist(snap);
@@ -207,6 +209,7 @@ export class LivePaperService {
         live: this.liveToggle(),
         liveBooks: this.liveBooks(),
         session: this.session(),
+        evolve: readPaperEvolve(),
         fetchMargins: () => firstValueFrom(this.kiteApi.getUserMargins(auth)).catch(() => null),
         fetchCsv: () => firstValueFrom(this.kiteApi.getInstrumentsCsv(auth)).catch(() => ''),
         fetchQuotes: async (keys) => {
@@ -244,10 +247,12 @@ export class LivePaperService {
           kiteFunds: snap.kiteFunds,
           kiteError: snap.kiteError,
           liveOrders: this.liveArmed(),
+          evolve: snap.evolve,
         });
       }
       this.session.set(snap);
       persist(snap);
+      if (snap.evolve) writePaperEvolve(snap.evolve);
       this.ledger.sync(snap.day, snap.books.flatMap((b) => b.fills));
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Kite fetch failed';
@@ -280,6 +285,7 @@ export class LivePaperService {
       const snap = { ...view.session, liveOrders: this.liveArmed() };
       this.session.set(snap);
       persist(snap);
+      if (snap.evolve) writePaperEvolve(snap.evolve);
       this.ledger.sync(snap.day, snap.books.flatMap((b) => b.fills));
     } else {
       this.stampLive();
