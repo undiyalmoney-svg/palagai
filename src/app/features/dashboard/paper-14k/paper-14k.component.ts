@@ -1,34 +1,15 @@
 import { DecimalPipe } from '@angular/common';
 import { Component, OnDestroy, computed, inject, signal } from '@angular/core';
 import { LivePaperService } from '../../../core/paper-desk/live-paper.service';
-import { PaperLiveUnder } from '../../../core/paper-desk/paper-live-order.util';
-import {
-  ALL_PAPER_BOOKS,
-  LivePaperBookState,
-  OptionPickView,
-  PAPER_DESKS,
-  allClosedFills,
-  booksFundEnd,
-  deskOf,
-  hhmm,
-  nightLog,
-  nightLogJson,
-  optionPickLabel,
-  paperFillGrade,
-  paperFillGradeTone,
-  underOf,
-} from '../../../core/paper-desk/live-paper.engine';
-import { PaperReview } from '../../../core/paper-desk/paper-review.util';
 import { PAPER_HUNT_CAP, PAPER_HUNT_HONEST, PAPER_HUNT_METHODS } from '../../../core/paper-desk/paper-hunt.methods';
 import { huntTabNet, huntTickets } from '../../../core/paper-desk/paper-hunt.engine';
 
-const ARMED_ORDER = ['nifty', 'bank', 'sensex', 'crude'] as const;
-const ARMED_RULE: Record<(typeof ARMED_ORDER)[number], string> = {
-  nifty: '1-min from 09:45 — own fill · up to five fills · target nets ₹370 after charges · fill TP at the live bid',
-  bank: '1-min from 09:45 — own fill · up to five fills · target nets ₹370 after charges · fill TP at the live bid',
-  sensex: '1-min from 09:45 — own fill · up to five fills · target nets ₹370 after charges · fill TP at the live bid',
-  crude: 'From 09:00 MCX open — up to five fills · 0.8× thrust · target nets ₹370',
-};
+const HUNT_TABS = [
+  { under: 'nifty' as const, label: 'Nifty 50' },
+  { under: 'bank' as const, label: 'Bank Nifty' },
+  { under: 'sensex' as const, label: 'Sensex' },
+  { under: 'crude' as const, label: 'Crude Mini' },
+];
 
 @Component({
   selector: 'app-paper-14k',
@@ -39,63 +20,15 @@ const ARMED_RULE: Record<(typeof ARMED_ORDER)[number], string> = {
 })
 export class Paper14kComponent implements OnDestroy {
   protected readonly paper = inject(LivePaperService);
-  protected readonly copied = signal(false);
   private readonly clockNow = signal(Date.now());
   private readonly clockTimer = setInterval(() => this.clockNow.set(Date.now()), 5_000);
 
   protected readonly now = computed(() => this.nowCard(this.paper.session(), this.paper.busy(), this.clockNow()));
-  protected readonly armed = computed(() => {
-    const books = this.paper.session().books;
-    return ARMED_ORDER.map((under) => {
-      const book = books.find((b) => (b.under || underOf(b.id)) === under && (b.desk || deskOf(b.id)) === 'momentum');
-      return book ? { under, rule: ARMED_RULE[under], book } : null;
-    }).filter((row): row is { under: (typeof ARMED_ORDER)[number]; rule: string; book: LivePaperBookState } => !!row);
-  });
-  ngOnDestroy(): void {
-    clearInterval(this.clockTimer);
-  }
-
-  protected startPaper(): void {
-    void this.paper.start();
-  }
-
-  protected stopPaper(): void {
-    this.paper.stop();
-  }
-
-  protected readonly liveBookRows = [
-    { under: 'nifty' as const, label: 'Nifty 50' },
-    { under: 'bank' as const, label: 'Bank Nifty' },
-    { under: 'sensex' as const, label: 'Sensex' },
-    { under: 'crude' as const, label: 'Crude Mini' },
-  ];
-
-  protected onLiveBook(under: PaperLiveUnder, ev: Event): void {
-    this.paper.setLiveBook(under, !!(ev.target as HTMLInputElement | null)?.checked);
-  }
-
-  protected booksFund(): number {
-    return booksFundEnd(this.paper.session().books);
-  }
-
-  protected pick(row: OptionPickView): string {
-    return optionPickLabel(row);
-  }
-
-  protected fills() {
-    return allClosedFills(this.paper.session().books);
-  }
-
-  protected readonly review = computed((): PaperReview | null => {
-    const fills = allClosedFills(this.paper.session().books);
-    return fills.length ? nightLog(this.paper.session()).review : null;
-  });
-
   protected readonly huntHonest = PAPER_HUNT_HONEST;
   protected readonly huntMethodCount = PAPER_HUNT_METHODS.length;
   protected readonly huntCap = PAPER_HUNT_CAP;
-  protected readonly huntTabs = this.liveBookRows;
-  protected readonly huntTab = signal<(typeof ARMED_ORDER)[number]>('nifty');
+  protected readonly huntTabs = HUNT_TABS;
+  protected readonly huntTab = signal<(typeof HUNT_TABS)[number]['under']>('nifty');
   protected readonly hunt = computed(() => this.paper.session().hunt || null);
   protected readonly huntTabTickets = computed(() => huntTickets(this.hunt(), this.huntTab()));
   protected readonly huntTabClosed = computed(() => huntTabNet(this.hunt(), this.huntTab()));
@@ -103,38 +36,31 @@ export class Paper14kComponent implements OnDestroy {
     () => this.huntTabs.find((r) => r.under === this.huntTab())?.label || this.huntTab(),
   );
 
-  protected selectHuntTab(under: (typeof ARMED_ORDER)[number]): void {
+  constructor() {
+    this.paper.setLiveToggle(false);
+    for (const row of HUNT_TABS) this.paper.setLiveBook(row.under, false);
+  }
+
+  ngOnDestroy(): void {
+    clearInterval(this.clockTimer);
+  }
+
+  protected startPaper(): void {
+    this.paper.setLiveToggle(false);
+    for (const row of HUNT_TABS) this.paper.setLiveBook(row.under, false);
+    void this.paper.start();
+  }
+
+  protected stopPaper(): void {
+    this.paper.stop();
+  }
+
+  protected selectHuntTab(under: (typeof HUNT_TABS)[number]['under']): void {
     this.huntTab.set(under);
-  }
-
-  protected gradeOf(f: { rs: number; reason: string; grade?: string }): string {
-    return f.grade || paperFillGrade(f);
-  }
-
-  protected gradeTone(f: { rs: number; reason: string; grade?: string }): string {
-    return paperFillGradeTone(paperFillGrade(f));
-  }
-
-  protected lastGrade(book: LivePaperBookState): string {
-    const last = book.fills[book.fills.length - 1];
-    return last ? this.gradeOf(last) : '';
-  }
-
-  protected deskLabel(id: string): string {
-    const desk = id.includes('-') ? deskOf(id) : id;
-    return PAPER_DESKS.find((d) => d.id === desk)?.label || desk;
   }
 
   protected clock(iso?: string): string {
     return istClock(iso || '');
-  }
-
-  protected copyNightLog(): void {
-    const text = nightLogJson(this.paper.session());
-    void navigator.clipboard?.writeText(text).then(() => {
-      this.copied.set(true);
-      setTimeout(() => this.copied.set(false), 2000);
-    });
   }
 
   private nowCard(
@@ -142,18 +68,14 @@ export class Paper14kComponent implements OnDestroy {
     busy: boolean,
     nowMs: number,
   ): { tone: string; badge: string; title: string; lines: string[] } {
-    const books = s.books;
-    const open = books.filter((b) => b.side !== 'flat');
+    const huntTrades = s.hunt?.trades || 0;
     const ageSec = s.asOf ? Math.max(0, Math.round((nowMs - Date.parse(s.asOf)) / 1000)) : null;
     const checked =
       s.asOf && ageSec != null && Number.isFinite(ageSec)
-        ? `Last Kite check ${istClock(s.asOf)} IST${ageSec >= 90 ? ` — ${Math.round(ageSec / 60)} min ago. This tab was in the background. If Live is on, the droplet keeps placing.` : '.'}`
+        ? `Last Kite check ${istClock(s.asOf)} IST${ageSec >= 90 ? ` — ${Math.round(ageSec / 60)} min ago.` : '.'}`
         : '';
-    const today = `Today ${s.day}: closed ₹${Math.round(s.closedRs).toLocaleString('en-IN')}.`;
-    const names = 'Crude Mini, Nifty 50, Bank Nifty, Sensex.';
-    const foot = s.liveOrders
-      ? 'Paper always records. LIVE Kite also sends a MARKET buy and SL on ticked books. Motto: buy CE/PE. Not a guaranteed profit.'
-      : 'Paper always records. Live Kite is extra — select Live Kite and tick a book to send a real order. Motto: buy CE/PE. Not a guaranteed profit.';
+    const today = `Today ${s.day}: ${huntTrades.toLocaleString('en-IN')} paper tickets.`;
+    const foot = 'Paper hunt only. One Start runs 50 methods on all four names. Not a guaranteed profit.';
 
     if (s.kiteError) {
       return { tone: 'down', badge: 'needs Token', title: s.kiteError, lines: [today, foot] };
@@ -162,46 +84,20 @@ export class Paper14kComponent implements OnDestroy {
       return {
         tone: 'info',
         badge: 'not watching',
-        title: 'Not watching. Hit Start. Live stays on if you close the tab — the droplet keeps checking.',
-        lines: [names, today, foot],
+        title: 'Not watching. Hit Start. One Start runs all four on paper.',
+        lines: ['Nifty 50, Bank Nifty, Sensex, Crude Mini.', today, foot],
       };
     }
-    if (busy && !books.some((b) => b.last != null)) {
+    if (busy && huntTrades === 0 && !s.hunt) {
       return { tone: 'info', badge: 'checking Kite', title: 'Checking Kite…', lines: [foot] };
-    }
-    if (open.length) {
-      const lead = open[0];
-      return {
-        tone: open.some((b) => b.liveRs < 0) ? 'down' : 'up',
-        badge: open.length > 1 ? `${open.length} trades` : 'in a trade',
-        title: tradeLine(lead),
-        lines: [
-          open.length > 1 ? open.slice(1).map((b) => tradeLine(b)).join(' ') : '',
-          checked,
-          today,
-          foot,
-        ].filter(Boolean),
-      };
     }
     return {
       tone: 'info',
       badge: 'watching',
-      title: 'Watching Nifty, Bank Nifty, Sensex and Crude Mini from 09:00. No trade right now.',
+      title: 'Watching Nifty, Bank Nifty, Sensex and Crude Mini from 09:00. 50 methods each, paper only.',
       lines: [checked, today, foot].filter(Boolean),
     };
   }
-}
-
-function tradeLine(b: LivePaperBookState): string {
-  const cfg = ALL_PAPER_BOOKS.find((c) => c.id === b.id);
-  const deskId = b.desk || deskOf(b.id);
-  const desk = PAPER_DESKS.find((d) => d.id === deskId)?.label || '';
-  const name = optionPickLabel(b) || b.label;
-  const since = b.entryMin != null ? ` from ${hhmm(b.entryMin)}` : '';
-  const flat = cfg?.flat ?? 15 * 60 + 15;
-  const holdEnd = b.entryMin != null ? b.entryMin + (cfg?.holdBars ?? 24) * (cfg?.barMinutes ?? 5) : flat;
-  const out = hhmm(Math.min(holdEnd, flat));
-  return `${desk} ${name}${since}. Stop ₹${b.sl ?? '—'}, target ₹${b.tp ?? '—'}. Live ₹${Math.round(b.liveRs).toLocaleString('en-IN')}. Out by ${out}.`;
 }
 
 function istClock(iso: string): string {

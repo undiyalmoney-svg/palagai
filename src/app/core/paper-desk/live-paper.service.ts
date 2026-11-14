@@ -113,6 +113,7 @@ export class LivePaperService {
       kiteError: cur.kiteError,
       liveOrders: this.liveArmed(),
       evolve: cur.evolve || readPaperEvolve(),
+      hunt: cur.hunt,
     });
     this.session.set(snap);
     persist(snap);
@@ -162,6 +163,8 @@ export class LivePaperService {
       kiteFunds: cur.kiteFunds,
       kiteError: cur.kiteError,
       liveOrders: this.liveArmed(),
+      evolve: cur.evolve,
+      hunt: cur.hunt,
     });
     this.session.set(snap);
     persist(snap);
@@ -249,6 +252,7 @@ export class LivePaperService {
           kiteError: snap.kiteError,
           liveOrders: this.liveArmed(),
           evolve: snap.evolve,
+          hunt: snap.hunt,
         });
       }
       this.session.set(snap);
