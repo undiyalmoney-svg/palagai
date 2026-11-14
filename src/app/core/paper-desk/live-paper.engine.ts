@@ -328,6 +328,14 @@ export interface LivePaperFill {
   gaugeNeed?: number | null;
   exitMin?: number;
   grade?: PaperFillGrade;
+  /** Highest option premium (or last) while the ticket was open. */
+  maxPx?: number | null;
+  /** Lowest option premium (or last) while the ticket was open. */
+  minPx?: number | null;
+  /** Best rupees the ticket saw (max favorable excursion, after charges). */
+  mfeRs?: number | null;
+  /** Worst rupees the ticket saw (max adverse excursion, after charges). */
+  maeRs?: number | null;
 }
 
 export interface OptionPickView {
@@ -422,6 +430,10 @@ export interface LivePaperBookState {
   kiteNote?: string;
   /** True after a BUY was accepted. Rejects stay false so the next tick retries. */
   kiteHalt?: boolean;
+  /** Highest mark while this ticket is open (hunt + Closed today). */
+  peakPx?: number | null;
+  /** Lowest mark while this ticket is open. */
+  troughPx?: number | null;
 }
 
 export interface LivePaperSession {
@@ -447,6 +459,34 @@ export interface LivePaperSession {
   honest: string;
   /** Judge-applied patches. Survives a new IST day via palagai_paper_evolve_v1. */
   evolve?: PaperEvolveState;
+  /** Shadow 50-method hunt. Never a Kite order. */
+  hunt?: PaperHuntState;
+}
+
+export type PaperHuntFamily = 'momentum' | 'pattern' | 'mix' | 'rule';
+
+export interface PaperHuntMethodStat {
+  id: string;
+  method: string;
+  label: string;
+  family: PaperHuntFamily;
+  under: string;
+  trades: number;
+  wins: number;
+  losses: number;
+  closedRs: number;
+  maxPx: number | null;
+  minPx: number | null;
+  mfeRs: number;
+  maeRs: number;
+  avgRs: number;
+}
+
+export interface PaperHuntState {
+  day: string;
+  trades: number;
+  stats: PaperHuntMethodStat[];
+  books: LivePaperBookState[];
 }
 
 export function emptyBook(cfg: LiveAssumeBookCfg): LivePaperBookState {
@@ -493,6 +533,8 @@ export function emptyBook(cfg: LiveAssumeBookCfg): LivePaperBookState {
     entryMin: null,
     lastSignalMin: -1,
     capitalUsed: capitalUsedOf(cfg, { last: null, entry: null }),
+    peakPx: null,
+    troughPx: null,
   };
 }
 
@@ -697,6 +739,10 @@ function markLive(book: LivePaperBookState, last: number | null, cfg: LiveAssume
   const pts = isOptionBuy(cfg) ? px - book.entry : (book.side === 'long' ? 1 : -1) * (px - book.entry);
   book.livePts = Math.round(pts * 10) / 10;
   book.liveRs = netRs(cfg, book, book.entry, px, pts);
+  if (px != null) {
+    book.peakPx = book.peakPx == null ? px : Math.max(book.peakPx, px);
+    book.troughPx = book.troughPx == null ? px : Math.min(book.troughPx, px);
+  }
 }
 
 function closeAt(
@@ -720,6 +766,10 @@ function closeAt(
       : isOptionBuy(cfg)
         ? optionRoundTripCharges(book.entry, Math.max(0, exitPx), qty, venueForBook(cfg.under || cfg.id))
         : LIVE_PAPER_CHARGE;
+  const hi = book.peakPx != null ? Math.max(book.peakPx, exitPx) : exitPx;
+  const lo = book.troughPx != null ? Math.min(book.troughPx, exitPx) : exitPx;
+  const mfePts = isOptionBuy(cfg) ? hi - book.entry : (book.side === 'long' ? 1 : -1) * (hi - book.entry);
+  const maePts = isOptionBuy(cfg) ? lo - book.entry : (book.side === 'long' ? 1 : -1) * (lo - book.entry);
   book.fills.push({
     day,
     book: book.id,
@@ -754,6 +804,10 @@ function closeAt(
     gaugeNeed: book.gauge?.need ?? null,
     exitMin: book.lastBarMin,
     underEntry: book.last != null && book.optionSymbol ? null : book.last,
+    maxPx: hi,
+    minPx: lo,
+    mfeRs: netRs(cfg, book, book.entry, isOptionBuy(cfg) || book.side === 'long' ? hi : lo, mfePts),
+    maeRs: netRs(cfg, book, book.entry, isOptionBuy(cfg) || book.side === 'long' ? lo : hi, maePts),
   });
   book.closedRs = Math.round((book.closedRs + rs) * 10) / 10;
   book.fund = Math.round((LIVE_PAPER_CAPITAL + book.closedRs) * 10) / 10;
@@ -780,6 +834,8 @@ function closeAt(
   book.entryAt = '';
   book.entryMin = null;
   book.signal = null;
+  book.peakPx = null;
+  book.troughPx = null;
 }
 
 function hitExit(
@@ -900,6 +956,8 @@ function openAt(
   book.pendingDir = 0;
   book.pendingSig = 0;
   book.pendingMode = '';
+  book.peakPx = entry;
+  book.troughPx = entry;
 }
 
 function pickSignal(bars: LiveAssumeBar[], i: number, cfg: LiveAssumeBookCfg, structure: string): { dir: number; mode: string } {
@@ -1079,6 +1137,7 @@ export function tickBook(
       const st = next.structure === 'wait' ? 'stand' : next.structure;
       const hit = pickSignal(done, i, cfg, st);
       if (!hit.dir) continue;
+      if (cfg.onlyDir && hit.dir !== cfg.onlyDir) continue;
       if (stale) {
         next.reason = `missed ${hit.dir === 1 ? 'up' : 'down'} signal at ${hhmm(bar.min + 5)} (desk was not checking)`;
         continue;
@@ -1126,7 +1185,7 @@ export function summarizePaper(
   books: LivePaperBookState[],
   extra: Pick<
     LivePaperSession,
-    'running' | 'day' | 'startedAt' | 'asOf' | 'source' | 'kiteFunds' | 'kiteError' | 'evolve'
+    'running' | 'day' | 'startedAt' | 'asOf' | 'source' | 'kiteFunds' | 'kiteError' | 'evolve' | 'hunt'
   > & { liveOrders?: boolean },
 ): LivePaperSession {
   const liveRs = Math.round(books.reduce((s, b) => s + (b.side === 'flat' ? 0 : b.liveRs), 0) * 10) / 10;
@@ -1151,6 +1210,7 @@ export function summarizePaper(
     liveRs,
     closedRs,
     evolve: extra.evolve || emptyEvolve(),
+    hunt: extra.hunt,
     honest: live
       ? `Paper always records. LIVE Kite also sends a 1 lot MARKET buy and a resting SL on ticked books. A Kite reject does not drop the paper fill. Motto: buy CE/PE. ` +
         `${fundsLine}${PAPER_TEST_HONEST}`
@@ -1223,6 +1283,10 @@ export function nightLog(session: LivePaperSession) {
     entryAsk: f.entryAsk ?? null,
     exitBid: f.exitBid ?? null,
     exitAsk: f.exitAsk ?? null,
+    maxPx: f.maxPx ?? null,
+    minPx: f.minPx ?? null,
+    mfeRs: f.mfeRs ?? null,
+    maeRs: f.maeRs ?? null,
   }));
   return {
     day: session.day,
@@ -1232,6 +1296,15 @@ export function nightLog(session: LivePaperSession) {
     desks,
     fills: mapped,
     evolve: session.evolve || emptyEvolve(),
+    hunt: session.hunt
+      ? {
+          trades: session.hunt.trades,
+          profitable: [...session.hunt.stats]
+            .filter((s) => s.closedRs > 0 && s.trades > 0)
+            .sort((a, b) => b.closedRs - a.closedRs)
+            .slice(0, 20),
+        }
+      : null,
     review: reviewEvolvingDesk(
       { day: session.day, closedRs: session.closedRs, fills: mapped },
       session.evolve || emptyEvolve(),

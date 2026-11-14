@@ -35,6 +35,7 @@ import { PaperLiveApiService, PaperLiveView } from './paper-live-api.service';
 import { readPaperLiveArm, writePaperLiveArm } from './paper-live-arm.util';
 import { readPaperEvolve, writePaperEvolve } from './paper-evolve.util';
 import { PaperTickQuote, runPaperTick } from './paper-tick.run';
+import { compactHunt } from './paper-hunt.engine';
 
 export { bestBidAsk, needsOption, nextExpiryAsOf, optionMarkLast } from './paper-tick.run';
 
@@ -495,7 +496,7 @@ export class LivePaperService {
 function persist(snap: LivePaperSession): void {
   try {
     if (typeof localStorage === 'undefined') return;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(snap));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(snap.hunt ? { ...snap, hunt: compactHunt(snap.hunt) } : snap));
   } catch {
     /* ignore quota */
   }

@@ -19,6 +19,8 @@ import {
   underOf,
 } from '../../../core/paper-desk/live-paper.engine';
 import { PaperReview } from '../../../core/paper-desk/paper-review.util';
+import { PAPER_HUNT_CAP, PAPER_HUNT_HONEST, PAPER_HUNT_METHODS } from '../../../core/paper-desk/paper-hunt.methods';
+import { bestHuntByUnder, profitableHunt, rankHunt } from '../../../core/paper-desk/paper-hunt.engine';
 
 const ARMED_ORDER = ['nifty', 'bank', 'sensex', 'crude'] as const;
 const ARMED_RULE: Record<(typeof ARMED_ORDER)[number], string> = {
@@ -88,6 +90,14 @@ export class Paper14kComponent implements OnDestroy {
     const fills = allClosedFills(this.paper.session().books);
     return fills.length ? nightLog(this.paper.session()).review : null;
   });
+
+  protected readonly huntHonest = PAPER_HUNT_HONEST;
+  protected readonly huntMethodCount = PAPER_HUNT_METHODS.length;
+  protected readonly huntCap = PAPER_HUNT_CAP;
+  protected readonly hunt = computed(() => this.paper.session().hunt || null);
+  protected readonly huntBest = computed(() => (this.hunt() ? bestHuntByUnder(this.hunt()!.stats) : []));
+  protected readonly huntPaid = computed(() => (this.hunt() ? profitableHunt(this.hunt()!.stats) : []));
+  protected readonly huntRows = computed(() => (this.hunt() ? rankHunt(this.hunt()!.stats).slice(0, 20) : []));
 
   protected gradeOf(f: { rs: number; reason: string; grade?: string }): string {
     return f.grade || paperFillGrade(f);

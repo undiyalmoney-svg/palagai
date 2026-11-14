@@ -66,6 +66,15 @@ describe('Paper14kComponent', () => {
     expect(fixture.nativeElement.querySelector('[data-testid="book-crude"]')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('[data-testid="start-live-paper"]')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('[data-testid="copy-night-log"]')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('[data-testid="paper-hunt"]')).toBeTruthy();
+    expect(text).toMatch(/50 methods/);
+    expect(text).toMatch(/10,000 paper tickets/);
+    expect(text).toMatch(/max price reached/i);
+    expect(text).toMatch(/max loss reached/i);
+    expect(text).toMatch(/Live Kite never sees the hunt/);
+    expect((fixture.nativeElement.querySelector('[data-testid="paper-hunt-count"]') as HTMLElement).textContent).toMatch(
+      /50 × 4/,
+    );
     expect(fixture.componentInstance['paper'].session().liveOrders).toBe(false);
     expect(fixture.componentInstance['paper'].session().guaranteed).toBe(false);
     expect(fixture.componentInstance['paper'].session().books).toHaveLength(4);

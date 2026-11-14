@@ -184,6 +184,113 @@
   }
   </div>
 
+  <div class="mp-card" data-testid="paper-hunt">
+    <div class="mp-card-head">
+      <div>
+        <h2>50 methods · find the strategy</h2>
+        <p class="mp-sub" data-testid="paper-hunt-honest">{{ huntHonest }}</p>
+      </div>
+      <span class="mp-badge" data-tone="info" data-testid="paper-hunt-count">{{ huntMethodCount }} × 4 · up to {{ huntCap | number : '1.0-0' }} paper tickets</span>
+    </div>
+    @if (!hunt()?.trades) {
+      <p class="mp-sub" data-testid="paper-hunt-empty">Start from the open. All four names stay on. Hunt is paper only — Live Kite never sees it.</p>
+    } @else {
+      <p class="mp-sub" data-testid="paper-hunt-trades">{{ hunt()!.trades | number : '1.0-0' }} paper tickets today. Max price and max loss on each.</p>
+      <div class="mp-table-wrap">
+        <table class="mp-table">
+          <thead>
+            <tr>
+              <th>Book</th>
+              <th>Best method now</th>
+              <th>Family</th>
+              <th class="num">Trades</th>
+              <th class="num">Max price</th>
+              <th class="num">Max loss ₹</th>
+              <th class="num">Closed ₹</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of huntBest(); track row.id) {
+              <tr data-testid="paper-hunt-best">
+                <td class="mp-sym">{{ row.under }}</td>
+                <td>{{ row.label }}</td>
+                <td>{{ row.family }}</td>
+                <td class="num">{{ row.trades }}</td>
+                <td class="num">{{ row.maxPx != null ? (row.maxPx | number : '1.0-2') : '—' }}</td>
+                <td class="num" [class.mp-down]="row.maeRs < 0">{{ row.maeRs | number : '1.0-0' }}</td>
+                <td class="num" [class.mp-up]="row.closedRs > 0" [class.mp-down]="row.closedRs < 0">{{ row.closedRs | number : '1.0-0' }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      <h3 class="mp-sub">Profitable methods (closed ₹ &gt; 0)</h3>
+      @if (!huntPaid().length) {
+        <p class="mp-sub" data-testid="paper-hunt-none">No method is green yet.</p>
+      } @else {
+        <div class="mp-table-wrap">
+          <table class="mp-table" data-testid="paper-hunt-paid">
+            <thead>
+              <tr>
+                <th>Book</th>
+                <th>Method</th>
+                <th>Family</th>
+                <th class="num">W/L</th>
+                <th class="num">Max price</th>
+                <th class="num">Max loss ₹</th>
+                <th class="num">MFE ₹</th>
+                <th class="num">Closed ₹</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (row of huntPaid(); track row.id) {
+                <tr>
+                  <td>{{ row.under }}</td>
+                  <td>{{ row.label }}</td>
+                  <td>{{ row.family }}</td>
+                  <td class="num">{{ row.wins }}/{{ row.losses }}</td>
+                  <td class="num">{{ row.maxPx != null ? (row.maxPx | number : '1.0-2') : '—' }}</td>
+                  <td class="num">{{ row.maeRs | number : '1.0-0' }}</td>
+                  <td class="num">{{ row.mfeRs | number : '1.0-0' }}</td>
+                  <td class="num mp-up">{{ row.closedRs | number : '1.0-0' }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+      <h3 class="mp-sub">Top 20 by closed ₹</h3>
+      <div class="mp-table-wrap">
+        <table class="mp-table" data-testid="paper-hunt-top">
+          <thead>
+            <tr>
+              <th>Book</th>
+              <th>Method</th>
+              <th>Family</th>
+              <th class="num">Trades</th>
+              <th class="num">Max price</th>
+              <th class="num">Max loss ₹</th>
+              <th class="num">Closed ₹</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of huntRows(); track row.id) {
+              <tr>
+                <td>{{ row.under }}</td>
+                <td>{{ row.label }}</td>
+                <td>{{ row.family }}</td>
+                <td class="num">{{ row.trades }}</td>
+                <td class="num">{{ row.maxPx != null ? (row.maxPx | number : '1.0-2') : '—' }}</td>
+                <td class="num">{{ row.maeRs | number : '1.0-0' }}</td>
+                <td class="num" [class.mp-up]="row.closedRs > 0" [class.mp-down]="row.closedRs < 0">{{ row.closedRs | number : '1.0-0' }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </div>
+
   <div class="mp-card" data-testid="live-paper-fills">
     <div class="mp-card-head">
       <div>
@@ -207,6 +314,8 @@
               <th>Side</th>
               <th class="num">Entry</th>
               <th class="num">Exit</th>
+              <th class="num">Max price</th>
+              <th class="num">Max loss ₹</th>
               <th class="num">SL</th>
               <th class="num">TP</th>
               <th>Why</th>
@@ -228,6 +337,8 @@
                 <td>{{ f.side }}</td>
                 <td class="num">{{ f.entry | number : '1.0-2' }}</td>
                 <td class="num">{{ f.exit | number : '1.0-2' }}</td>
+                <td class="num">{{ f.maxPx != null ? (f.maxPx | number : '1.0-2') : '—' }}</td>
+                <td class="num" [class.mp-down]="(f.maeRs ?? 0) < 0">{{ f.maeRs != null ? (f.maeRs | number : '1.0-0') : '—' }}</td>
                 <td class="num">{{ f.sl | number : '1.0-2' }}</td>
                 <td class="num">{{ f.tp | number : '1.0-2' }}</td>
                 <td>{{ f.reason }}</td>

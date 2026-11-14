@@ -36,6 +36,7 @@ import {
 import { PaperLiveBooks, paperLiveArmed } from './paper-live-order.util';
 import { SkippedSignal } from './paper-analytics.models';
 import { buildSignalCard } from './signal-card.util';
+import { HuntSideQuote, tickPaperHunt } from './paper-hunt.engine';
 
 const UNDERS = ['crude', 'nifty', 'bank', 'sensex'] as const;
 const NO_BUDGET_CAP = 10_000_000;
@@ -197,6 +198,26 @@ export async function runPaperTick(io: PaperTickIo): Promise<LivePaperSession> {
     });
   }
   const books = LIVE_PAPER_BOOKS.map((c) => nextById.get(c.id) || cur.books.find((b) => b.id === c.id)!);
+  const quotesByUnder = new Map<string, { ce: HuntSideQuote; pe: HuntSideQuote; underLast: number | null }>();
+  for (const under of UNDERS) {
+    const inst = instOf(under, crude, nifty, bank, sensex);
+    const pair = cheapByUnder.get(under);
+    quotesByUnder.set(under, {
+      ce: huntSideQuote(quotes, pair?.ce),
+      pe: huntSideQuote(quotes, pair?.pe),
+      underLast: lastPrice(quotes, under, inst?.tradingSymbol || ''),
+    });
+  }
+  const hunt = tickPaperHunt({
+    prev: cur.hunt,
+    day,
+    nowMin,
+    nowIso: now.toISOString(),
+    barsByUnder: barCache,
+    quotesByUnder,
+    picksByUnder: cheapByUnder,
+    evolve: flags,
+  });
   const snap = summarizePaper(books, {
     running: true,
     day,
@@ -207,6 +228,7 @@ export async function runPaperTick(io: PaperTickIo): Promise<LivePaperSession> {
     kiteError: null,
     liveOrders: paperLiveArmed(io.live, io.liveBooks),
     evolve: evolved.state,
+    hunt,
   });
   const after = evolvePaperDesk(nightLog(snap), evolved.state);
   return { ...snap, evolve: after.state };
@@ -572,6 +594,17 @@ function findQuote(quotes: Record<string, PaperTickQuote>, key: string): PaperTi
     if (k.toUpperCase() === want) return v;
   }
   return null;
+}
+
+function huntSideQuote(
+  quotes: Record<string, PaperTickQuote>,
+  pick: CheapOtmPick | undefined,
+): HuntSideQuote {
+  if (!pick?.instrument?.tradingSymbol) return { bid: null, ask: null, last: null };
+  const key = `${pick.instrument.exchange}:${pick.instrument.tradingSymbol}`;
+  const q = findQuote(quotes, key);
+  const { bid, ask } = bestBidAsk(q);
+  return { bid, ask, last: lastByKey(quotes, key) };
 }
 
 export function bestBidAsk(q: PaperTickQuote | null): { bid: number | null; ask: number | null } {

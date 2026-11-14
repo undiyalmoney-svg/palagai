@@ -133,6 +133,8 @@ export interface LiveAssumeBookCfg {
   momK?: number;
   /** Minimum minutes between signals. Overrides minGapBars × barMinutes. */
   minGapMin?: number;
+  /** 1 = CE / up only. −1 = PE / down only. Omit for both. */
+  onlyDir?: 1 | -1;
 }
 
 /** Bar i's 6-bar close-to-close move and the move momentum needs (1.5 × √6 × mean range of the 20 bars before it). */
