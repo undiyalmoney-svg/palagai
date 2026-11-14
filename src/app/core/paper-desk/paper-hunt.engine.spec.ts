@@ -10,6 +10,8 @@ import {
   compactHunt,
   emptyHunt,
   huntMethodCfg,
+  huntTabNet,
+  huntTickets,
   profitableHunt,
   rankHunt,
   tickPaperHunt,
@@ -94,6 +96,123 @@ describe('paper hunt 50 methods', () => {
     expect(ranked[0].id).toBe('bank-mom-08');
     expect(profitableHunt(hunt.stats).map((s) => s.under)).toEqual(['bank']);
     expect(bestHuntByUnder(hunt.stats).find((s) => s.under === 'bank')?.method).toBe('mom-08');
+  });
+
+  it('lists one instrument tab from high profit to high loss', () => {
+    const hunt = emptyHunt('2026-11-16');
+    const niftyMom = hunt.books.find((b) => b.id === 'nifty-mom-08')!;
+    const niftyPe = hunt.books.find((b) => b.id === 'nifty-mom-08-pe')!;
+    const bankMom = hunt.books.find((b) => b.id === 'bank-mom-08')!;
+    niftyMom.fills = [
+      {
+        day: '2026-11-16',
+        book: niftyMom.id,
+        label: niftyMom.label,
+        side: 'long',
+        entry: 162,
+        exit: 141,
+        sl: 156,
+        tp: 170,
+        pts: -21,
+        rs: -370,
+        reason: 'sl',
+        mode: 'momentum',
+        optionType: 'CE',
+        strike: 25250,
+        expiry: '2026-11-17',
+        optionSymbol: 'NIFTY26N1725250CE',
+        entryAt: '2026-11-16T04:00:00.000Z',
+        exitAt: '2026-11-16T04:10:00.000Z',
+      },
+      {
+        day: '2026-11-16',
+        book: niftyMom.id,
+        label: niftyMom.label,
+        side: 'long',
+        entry: 160,
+        exit: 168,
+        sl: 154,
+        tp: 168,
+        pts: 8,
+        rs: 1977,
+        reason: 'tp',
+        mode: 'momentum',
+        optionType: 'CE',
+        strike: 25250,
+        expiry: '2026-11-17',
+        optionSymbol: 'NIFTY26N1725250CE',
+        entryAt: '2026-11-16T05:00:00.000Z',
+        exitAt: '2026-11-16T05:00:10.000Z',
+      },
+    ];
+    niftyPe.fills = [
+      {
+        day: '2026-11-16',
+        book: niftyPe.id,
+        label: niftyPe.label,
+        side: 'short',
+        entry: 150,
+        exit: 142,
+        sl: 156,
+        tp: 140,
+        pts: 8,
+        rs: 520,
+        reason: 'tp',
+        mode: 'momentum',
+        optionType: 'PE',
+        strike: 25200,
+        expiry: '2026-11-17',
+        optionSymbol: 'NIFTY26N1725200PE',
+        entryAt: '2026-11-16T06:00:00.000Z',
+        exitAt: '2026-11-16T06:12:00.000Z',
+      },
+    ];
+    bankMom.fills = [
+      {
+        day: '2026-11-16',
+        book: bankMom.id,
+        label: bankMom.label,
+        side: 'long',
+        entry: 400,
+        exit: 420,
+        sl: 380,
+        tp: 420,
+        pts: 20,
+        rs: 1110,
+        reason: 'tp',
+        mode: 'momentum',
+        optionType: 'CE',
+        strike: 58000,
+        expiry: '2026-11-17',
+        optionSymbol: 'BANKNIFTY26N1758000CE',
+        entryAt: '2026-11-16T04:30:00.000Z',
+        exitAt: '2026-11-16T04:31:00.000Z',
+      },
+    ];
+    hunt.stats = hunt.stats.map((s) =>
+      s.id === 'nifty-mom-08'
+        ? { ...s, trades: 2, closedRs: 1607 }
+        : s.id === 'nifty-mom-08-pe'
+          ? { ...s, trades: 1, closedRs: 520 }
+          : s.id === 'bank-mom-08'
+            ? { ...s, trades: 1, closedRs: 1110 }
+            : s,
+    );
+    const nifty = huntTickets(hunt, 'nifty');
+    expect(nifty.map((r) => r.rs)).toEqual([1977, 520, -370]);
+    expect(nifty.every((r) => r.under === 'nifty')).toBe(true);
+    expect(nifty[0]).toMatchObject({
+      methodLabel: 'mom 0.8× both',
+      exit: 'tp',
+      sl: 154,
+      entryPx: 160,
+      exitPx: 168,
+    });
+    expect(nifty[0].entry).toMatch(/CE/);
+    expect(huntTickets(hunt, 'bank')).toHaveLength(1);
+    expect(huntTickets(hunt, 'bank')[0].rs).toBe(1110);
+    expect(huntTabNet(hunt, 'nifty')).toBe(2127);
+    expect(huntTabNet(hunt, 'sensex')).toBe(0);
   });
 
   it('ticks the hunt on a 0.8× up tape without opening a live Kite book', () => {

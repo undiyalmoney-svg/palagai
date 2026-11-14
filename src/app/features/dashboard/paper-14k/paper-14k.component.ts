@@ -20,7 +20,7 @@ import {
 } from '../../../core/paper-desk/live-paper.engine';
 import { PaperReview } from '../../../core/paper-desk/paper-review.util';
 import { PAPER_HUNT_CAP, PAPER_HUNT_HONEST, PAPER_HUNT_METHODS } from '../../../core/paper-desk/paper-hunt.methods';
-import { bestHuntByUnder, profitableHunt, rankHunt } from '../../../core/paper-desk/paper-hunt.engine';
+import { huntTabNet, huntTickets } from '../../../core/paper-desk/paper-hunt.engine';
 
 const ARMED_ORDER = ['nifty', 'bank', 'sensex', 'crude'] as const;
 const ARMED_RULE: Record<(typeof ARMED_ORDER)[number], string> = {
@@ -94,10 +94,18 @@ export class Paper14kComponent implements OnDestroy {
   protected readonly huntHonest = PAPER_HUNT_HONEST;
   protected readonly huntMethodCount = PAPER_HUNT_METHODS.length;
   protected readonly huntCap = PAPER_HUNT_CAP;
+  protected readonly huntTabs = this.liveBookRows;
+  protected readonly huntTab = signal<(typeof ARMED_ORDER)[number]>('nifty');
   protected readonly hunt = computed(() => this.paper.session().hunt || null);
-  protected readonly huntBest = computed(() => (this.hunt() ? bestHuntByUnder(this.hunt()!.stats) : []));
-  protected readonly huntPaid = computed(() => (this.hunt() ? profitableHunt(this.hunt()!.stats) : []));
-  protected readonly huntRows = computed(() => (this.hunt() ? rankHunt(this.hunt()!.stats).slice(0, 20) : []));
+  protected readonly huntTabTickets = computed(() => huntTickets(this.hunt(), this.huntTab()));
+  protected readonly huntTabClosed = computed(() => huntTabNet(this.hunt(), this.huntTab()));
+  protected readonly huntTabLabel = computed(
+    () => this.huntTabs.find((r) => r.under === this.huntTab())?.label || this.huntTab(),
+  );
+
+  protected selectHuntTab(under: (typeof ARMED_ORDER)[number]): void {
+    this.huntTab.set(under);
+  }
 
   protected gradeOf(f: { rs: number; reason: string; grade?: string }): string {
     return f.grade || paperFillGrade(f);

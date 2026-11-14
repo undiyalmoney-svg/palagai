@@ -12,6 +12,7 @@ import {
   PaperHuntState,
   bindOptionFill,
   emptyBook,
+  optionPickLabel,
   tickBook,
   underOf,
 } from './live-paper.engine';
@@ -109,6 +110,64 @@ export function bestHuntByUnder(stats: PaperHuntMethodStat[]): PaperHuntMethodSt
   return UNDERS.map((under) => rankHunt(stats.filter((s) => s.under === under))[0]).filter(
     (s): s is PaperHuntMethodStat => !!s,
   );
+}
+
+export interface HuntTicketRow {
+  key: string;
+  method: string;
+  methodLabel: string;
+  under: string;
+  entry: string;
+  exit: string;
+  entryAt: string;
+  exitAt: string;
+  sl: number;
+  entryPx: number;
+  exitPx: number;
+  rs: number;
+}
+
+/** Closed hunt tickets for one name, high profit to high loss. */
+export function huntTickets(state: PaperHuntState | null | undefined, under: string): HuntTicketRow[] {
+  if (!state) return [];
+  const rows: HuntTicketRow[] = [];
+  for (const book of state.books) {
+    if ((book.under || underOf(book.id)) !== under) continue;
+    const method = book.id.slice(under.length + 1);
+    const def = PAPER_HUNT_METHODS.find((m) => m.id === method);
+    for (let i = 0; i < book.fills.length; i++) {
+      const f = book.fills[i];
+      rows.push({
+        key: `${book.id}-${i}-${f.entryAt || ''}-${f.exitAt || ''}`,
+        method,
+        methodLabel: def?.label || method,
+        under,
+        entry:
+          optionPickLabel({
+            id: f.book || book.id,
+            optionType: f.optionType,
+            strike: f.strike,
+            expiry: f.expiry,
+            optionSymbol: f.optionSymbol,
+          }) ||
+          f.optionType ||
+          (f.side === 'long' ? 'CE' : 'PE'),
+        exit: f.reason,
+        entryAt: f.entryAt || '',
+        exitAt: f.exitAt || '',
+        sl: f.sl,
+        entryPx: f.entry,
+        exitPx: f.exit,
+        rs: f.rs,
+      });
+    }
+  }
+  return rows.sort((a, b) => b.rs - a.rs || a.entryAt.localeCompare(b.entryAt));
+}
+
+export function huntTabNet(state: PaperHuntState | null | undefined, under: string): number {
+  if (!state) return 0;
+  return Math.round(state.stats.filter((s) => s.under === under).reduce((n, s) => n + s.closedRs, 0) * 10) / 10;
 }
 
 export function compactHunt(state: PaperHuntState): PaperHuntState {

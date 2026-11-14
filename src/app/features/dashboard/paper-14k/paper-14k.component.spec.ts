@@ -3,6 +3,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideRouter } from '@angular/router';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Paper14kComponent } from './paper-14k.component';
+import { emptyHunt } from '../../../core/paper-desk/paper-hunt.engine';
 
 describe('Paper14kComponent', () => {
   let fixture: ComponentFixture<Paper14kComponent>;
@@ -75,6 +76,16 @@ describe('Paper14kComponent', () => {
     expect((fixture.nativeElement.querySelector('[data-testid="paper-hunt-count"]') as HTMLElement).textContent).toMatch(
       /50 × 4/,
     );
+    expect(fixture.nativeElement.querySelector('[data-testid="paper-hunt-tabs"]')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('[data-testid="paper-hunt-tab-nifty"]')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('[data-testid="paper-hunt-tab-bank"]')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('[data-testid="paper-hunt-tab-sensex"]')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('[data-testid="paper-hunt-tab-crude"]')).toBeTruthy();
+    expect(text).toMatch(/One Start runs all four/);
+    expect(text).toMatch(/Entry time/);
+    expect(text).toMatch(/Exit price/);
+    expect(text).toMatch(/Profit\/loss/);
+    expect(fixture.nativeElement.querySelectorAll('[data-testid="start-live-paper"]').length).toBe(1);
     expect(fixture.componentInstance['paper'].session().liveOrders).toBe(false);
     expect(fixture.componentInstance['paper'].session().guaranteed).toBe(false);
     expect(fixture.componentInstance['paper'].session().books).toHaveLength(4);
@@ -187,5 +198,92 @@ describe('Paper14kComponent', () => {
     expect(text).toMatch(/Critic/);
     expect(text).toMatch(/Applies one exact change|Already applied|Pending|Applied/);
     expect(text).not.toMatch(/Why losers failed/);
+  });
+
+  it('shows the selected instrument tickets high profit first; one Start still runs all four', () => {
+    const paper = fixture.componentInstance['paper'];
+    const cur = paper.session();
+    const hunt = emptyHunt('2026-11-16');
+    const nifty = hunt.books.find((b) => b.id === 'nifty-mom-08')!;
+    const bank = hunt.books.find((b) => b.id === 'bank-mom-08')!;
+    nifty.fills = [
+      {
+        day: '2026-11-16',
+        book: nifty.id,
+        label: nifty.label,
+        side: 'long',
+        entry: 162,
+        exit: 141,
+        sl: 156,
+        tp: 170,
+        pts: -21,
+        rs: -370,
+        reason: 'sl',
+        mode: 'momentum',
+        optionType: 'CE',
+        strike: 25250,
+        expiry: '2026-11-17',
+        optionSymbol: 'NIFTY26N1725250CE',
+        entryAt: '2026-11-16T04:00:00.000Z',
+        exitAt: '2026-11-16T04:10:00.000Z',
+      },
+      {
+        day: '2026-11-16',
+        book: nifty.id,
+        label: nifty.label,
+        side: 'long',
+        entry: 160,
+        exit: 168,
+        sl: 154,
+        tp: 168,
+        pts: 8,
+        rs: 1977,
+        reason: 'tp',
+        mode: 'momentum',
+        optionType: 'CE',
+        strike: 25250,
+        expiry: '2026-11-17',
+        optionSymbol: 'NIFTY26N1725250CE',
+        entryAt: '2026-11-16T05:00:00.000Z',
+        exitAt: '2026-11-16T05:00:10.000Z',
+      },
+    ];
+    bank.fills = [
+      {
+        day: '2026-11-16',
+        book: bank.id,
+        label: bank.label,
+        side: 'long',
+        entry: 400,
+        exit: 420,
+        sl: 380,
+        tp: 420,
+        pts: 20,
+        rs: 1110,
+        reason: 'tp',
+        mode: 'momentum',
+        optionType: 'CE',
+        strike: 58000,
+        expiry: '2026-11-17',
+        optionSymbol: 'BANKNIFTY26N1758000CE',
+        entryAt: '2026-11-16T04:30:00.000Z',
+        exitAt: '2026-11-16T04:31:00.000Z',
+      },
+    ];
+    paper.session.set({ ...cur, hunt });
+    fixture.detectChanges();
+    const niftyRows = fixture.nativeElement.querySelectorAll('[data-testid="paper-hunt-ticket"]') as NodeListOf<HTMLElement>;
+    expect(niftyRows.length).toBe(2);
+    expect(niftyRows[0].textContent).toMatch(/1,977/);
+    expect(niftyRows[1].textContent).toMatch(/-370/);
+    expect(niftyRows[0].textContent).toMatch(/Entry price|160/);
+    const bankTab = fixture.nativeElement.querySelector('[data-testid="paper-hunt-tab-bank"]') as HTMLButtonElement;
+    bankTab.click();
+    fixture.detectChanges();
+    const bankRows = fixture.nativeElement.querySelectorAll('[data-testid="paper-hunt-ticket"]') as NodeListOf<HTMLElement>;
+    expect(bankRows.length).toBe(1);
+    expect(bankRows[0].textContent).toMatch(/1,110/);
+    expect(bankRows[0].textContent).not.toMatch(/1,977/);
+    expect(fixture.nativeElement.querySelectorAll('[data-testid="start-live-paper"]').length).toBe(1);
   });
 });
