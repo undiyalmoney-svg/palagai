@@ -58,6 +58,14 @@ describe('Paper14kComponent', () => {
     expect(text).toMatch(/Profit\/loss/);
     expect(text).toMatch(/Not a guaranteed profit/);
     expect(text).toMatch(/Max capital used/);
+    expect(text).toMatch(/Win %/);
+    expect(text).toMatch(/Leaders/);
+    expect(text).toMatch(/mix \+ Supertrend/);
+    expect(text).toMatch(/algo EMA 9\/21 CE only/);
+    expect(fixture.nativeElement.querySelector('[data-testid="paper-hunt-leaders"]')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('[data-testid="paper-hunt-leaders-empty"]')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('[data-testid="paper-hunt-view-traded"]')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('[data-testid="paper-hunt-view-green"]')).toBeTruthy();
     expect((fixture.nativeElement.querySelector('[data-testid="paper-hunt-count"]') as HTMLElement).textContent).toMatch(
       new RegExp(`${PAPER_HUNT_METHODS.length} × 4`),
     );
@@ -212,6 +220,17 @@ describe('Paper14kComponent', () => {
     expect(niftyRows[0].textContent).toMatch(/1,607/);
     expect(niftyRows[0].textContent).toMatch(/2,400/);
     expect(niftyRows[0].querySelector('[data-testid="paper-hunt-floor"]')?.textContent).toMatch(/80/);
+    expect(niftyRows[0].textContent).toMatch(/50/);
+    expect(fixture.nativeElement.querySelector('[data-testid="paper-hunt-leaders-empty"]')).toBeNull();
+    expect(fixture.nativeElement.querySelectorAll('[data-testid="paper-hunt-leader"]').length).toBeGreaterThanOrEqual(2);
+    (fixture.nativeElement.querySelector('[data-testid="paper-hunt-view-traded"]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelectorAll('[data-testid="paper-hunt-method"]').length).toBe(1);
+    (fixture.nativeElement.querySelector('[data-testid="paper-hunt-view-all"]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelectorAll('[data-testid="paper-hunt-method"]').length).toBe(
+      PAPER_HUNT_METHODS.length,
+    );
     const niftySum = fixture.nativeElement.querySelector('[data-testid="paper-hunt-summary-nifty"]') as HTMLElement;
     expect(niftySum.textContent).toMatch(/mom 0\.8× both/);
     expect(niftySum.textContent).toMatch(/1,977/);

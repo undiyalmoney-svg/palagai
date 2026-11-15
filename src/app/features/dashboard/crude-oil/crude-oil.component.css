@@ -58,6 +58,10 @@
   }
 }
 
+.mp-tabs + .mp-tabs {
+  margin-top: 0.45rem;
+}
+
 .mp-card .mp-list {
   margin-top: 0.85rem;
 }

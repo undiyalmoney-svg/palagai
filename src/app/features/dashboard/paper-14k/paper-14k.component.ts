@@ -2,7 +2,14 @@ import { DecimalPipe } from '@angular/common';
 import { Component, OnDestroy, computed, inject, signal } from '@angular/core';
 import { LivePaperService } from '../../../core/paper-desk/live-paper.service';
 import { PAPER_HUNT_CAP, PAPER_HUNT_HONEST, PAPER_HUNT_METHODS } from '../../../core/paper-desk/paper-hunt.methods';
-import { huntMethodRows, huntSummaries, huntTabNet } from '../../../core/paper-desk/paper-hunt.engine';
+import {
+  HuntMethodView,
+  filterHuntMethodRows,
+  huntLeaders,
+  huntMethodRows,
+  huntSummaries,
+  huntTabNet,
+} from '../../../core/paper-desk/paper-hunt.engine';
 
 const HUNT_TABS = [
   { under: 'nifty' as const, label: 'Nifty 50' },
@@ -29,9 +36,18 @@ export class Paper14kComponent implements OnDestroy {
   protected readonly huntCap = PAPER_HUNT_CAP;
   protected readonly huntTabs = HUNT_TABS;
   protected readonly huntTab = signal<(typeof HUNT_TABS)[number]['under']>('nifty');
+  protected readonly huntView = signal<HuntMethodView>('all');
+  protected readonly huntViews: { id: HuntMethodView; label: string }[] = [
+    { id: 'all', label: 'All' },
+    { id: 'traded', label: 'Traded' },
+    { id: 'green', label: 'Green' },
+  ];
   protected readonly hunt = computed(() => this.paper.session().hunt || null);
   protected readonly huntSummaries = computed(() => huntSummaries(this.hunt()));
-  protected readonly huntTabMethods = computed(() => huntMethodRows(this.hunt(), this.huntTab()));
+  protected readonly huntLeaders = computed(() => huntLeaders(this.hunt()));
+  protected readonly huntTabMethods = computed(() =>
+    filterHuntMethodRows(huntMethodRows(this.hunt(), this.huntTab()), this.huntView()),
+  );
   protected readonly huntTabClosed = computed(() => huntTabNet(this.hunt(), this.huntTab()));
   protected readonly huntTabLabel = computed(
     () => this.huntTabs.find((r) => r.under === this.huntTab())?.label || this.huntTab(),
@@ -66,6 +82,10 @@ export class Paper14kComponent implements OnDestroy {
 
   protected selectHuntTab(under: (typeof HUNT_TABS)[number]['under']): void {
     this.huntTab.set(under);
+  }
+
+  protected selectHuntView(view: HuntMethodView): void {
+    this.huntView.set(view);
   }
 
   protected clock(iso?: string): string {

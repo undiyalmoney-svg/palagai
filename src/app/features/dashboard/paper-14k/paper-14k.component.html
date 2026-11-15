@@ -68,6 +68,45 @@
     </div>
   </div>
 
+  <div class="mp-card" data-testid="paper-hunt-leaders">
+    <div class="mp-card-head">
+      <div>
+        <h2>Leaders</h2>
+        <p class="mp-sub">Best closed ₹ across all four names. Empty until a paper ticket prints. Sample only — not a guaranteed next move.</p>
+      </div>
+    </div>
+    @if (huntLeaders().length) {
+      <div class="mp-table-wrap">
+        <table class="mp-table" data-testid="paper-hunt-leaders-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Method</th>
+              <th class="num">Trades</th>
+              <th class="num">Win %</th>
+              <th class="num">Profit/loss</th>
+              <th class="num">Lowest peak ₹</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of huntLeaders(); track row.key) {
+              <tr data-testid="paper-hunt-leader">
+                <td>{{ row.underLabel }}</td>
+                <td>{{ row.methodLabel }}{{ row.open ? ' · open' : '' }}</td>
+                <td class="num">{{ row.trades | number : '1.0-0' }}</td>
+                <td class="num">{{ row.winPct | number : '1.0-0' }}</td>
+                <td class="num" [class.mp-up]="row.closedRs > 0" [class.mp-down]="row.closedRs < 0">{{ row.closedRs | number : '1.0-0' }}</td>
+                <td class="num">{{ row.floorMfeRs | number : '1.0-0' }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    } @else {
+      <p class="mp-sub" data-testid="paper-hunt-leaders-empty">No tickets yet. Hit Start, then Refresh after fills.</p>
+    }
+  </div>
+
   <div class="mp-card" data-testid="paper-hunt">
     <div class="mp-card-head">
       <div>
@@ -91,6 +130,21 @@
         </button>
       }
     </div>
+    <div class="mp-tabs" role="tablist" data-testid="paper-hunt-views">
+      @for (row of huntViews; track row.id) {
+        <button
+          type="button"
+          class="mp-tab"
+          role="tab"
+          [class.active]="huntView() === row.id"
+          (click)="selectHuntView(row.id)"
+          [attr.aria-selected]="huntView() === row.id"
+          [attr.data-testid]="'paper-hunt-view-' + row.id"
+        >
+          {{ row.label }}
+        </button>
+      }
+    </div>
     <p class="mp-sub" data-testid="paper-hunt-tab-net">
       {{ huntTabLabel() }} · {{ huntTabMethods().length | number : '1.0-0' }} methods
     </p>
@@ -102,6 +156,7 @@
             <th class="num">Trades</th>
             <th class="num">Profit trades</th>
             <th class="num">Loss trades</th>
+            <th class="num">Win %</th>
             <th class="num">SL hits</th>
             <th>Last entry</th>
             <th class="num">Profit/loss</th>
@@ -117,6 +172,7 @@
               <td class="num">{{ row.trades | number : '1.0-0' }}</td>
               <td class="num">{{ row.wins | number : '1.0-0' }}</td>
               <td class="num">{{ row.losses | number : '1.0-0' }}</td>
+              <td class="num">{{ row.winPct | number : '1.0-0' }}</td>
               <td class="num">{{ row.slHits | number : '1.0-0' }}</td>
               <td>{{ clock(row.lastEntryAt) }}</td>
               <td class="num" [class.mp-up]="row.closedRs > 0" [class.mp-down]="row.closedRs < 0">{{ row.closedRs | number : '1.0-0' }}</td>

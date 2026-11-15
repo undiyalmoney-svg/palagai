@@ -9,6 +9,8 @@ import {
   bestHuntByUnder,
   compactHunt,
   emptyHunt,
+  filterHuntMethodRows,
+  huntLeaders,
   huntMethodCfg,
   huntInstrumentSummary,
   huntMethodRows,
@@ -34,7 +36,7 @@ describe('paper hunt methods', () => {
   const capText = PAPER_HUNT_CAP.toLocaleString('en-IN');
 
   it('lists momentum, pattern, mix, rule and algo methods with a four-name ticket cap', () => {
-    expect(n).toBeGreaterThanOrEqual(65);
+    expect(n).toBe(100);
     expect(new Set(PAPER_HUNT_METHODS.map((m) => m.id)).size).toBe(n);
     expect(PAPER_HUNT_METHODS.some((m) => m.family === 'momentum')).toBe(true);
     expect(PAPER_HUNT_METHODS.some((m) => m.family === 'pattern')).toBe(true);
@@ -48,6 +50,9 @@ describe('paper hunt methods', () => {
       'algo-rsi',
       'algo-macd',
       'algo-supertrend',
+      'algo-ema-ce',
+      'mix-supertrend',
+      'mom-08-tp370',
     ]));
     expect(PAPER_HUNT_MAX_TRADES).toBe(50);
     expect(PAPER_HUNT_CAP).toBe(PAPER_HUNT_MAX_TRADES * 4 * n);
@@ -258,12 +263,22 @@ describe('paper hunt methods', () => {
       trades: 2,
       wins: 1,
       losses: 1,
+      winPct: 50,
       slHits: 1,
       closedRs: 1607,
       mfeRs: 2400,
       maeRs: -370,
       floorMfeRs: 80,
     });
+    expect(filterHuntMethodRows(niftyMethods, 'traded').map((r) => r.method)).toEqual(['mom-08', 'mom-08-pe']);
+    expect(filterHuntMethodRows(niftyMethods, 'green').every((r) => r.closedRs > 0)).toBe(true);
+    expect(huntLeaders(hunt)[0]).toMatchObject({
+      under: 'nifty',
+      underLabel: 'Nifty 50',
+      method: 'mom-08',
+      closedRs: 1607,
+    });
+    expect(huntLeaders(hunt).some((r) => r.under === 'bank' && r.closedRs === 1110)).toBe(true);
     const niftySum = huntInstrumentSummary(hunt, 'nifty');
     expect(niftySum).toMatchObject({
       trades: 3,

@@ -184,10 +184,13 @@ export interface HuntMethodRow {
   key: string;
   method: string;
   methodLabel: string;
+  family: string;
   under: string;
+  underLabel: string;
   trades: number;
   wins: number;
   losses: number;
+  winPct: number;
   slHits: number;
   open: boolean;
   closedRs: number;
@@ -200,6 +203,8 @@ export interface HuntMethodRow {
   capitalRs: number;
   lastEntryAt: string;
 }
+
+export type HuntMethodView = 'all' | 'traded' | 'green';
 
 export interface HuntInstrumentSummary {
   under: (typeof UNDERS)[number];
@@ -227,14 +232,18 @@ const UNDER_LABEL: Record<(typeof UNDERS)[number], string> = {
 };
 
 function emptyMethodRow(under: string, def: PaperHuntMethodDef): HuntMethodRow {
+  const u = (UNDERS as readonly string[]).includes(under) ? (under as (typeof UNDERS)[number]) : 'nifty';
   return {
     key: `${under}-${def.id}`,
     method: def.id,
     methodLabel: def.label,
+    family: def.family,
     under,
+    underLabel: UNDER_LABEL[u],
     trades: 0,
     wins: 0,
     losses: 0,
+    winPct: 0,
     slHits: 0,
     open: false,
     closedRs: 0,
@@ -265,14 +274,18 @@ export function huntMethodRow(book: LivePaperBookState): HuntMethodRow {
     const at = f.entryAt || '';
     return !latest || at > latest ? at : latest;
   }, '');
+  const u = (UNDERS as readonly string[]).includes(under) ? (under as (typeof UNDERS)[number]) : 'nifty';
   return {
     key: book.id,
     method,
     methodLabel: def?.label || method,
+    family: def?.family || 'momentum',
     under,
+    underLabel: UNDER_LABEL[u],
     trades: fills.length,
     wins: wins.length,
     losses: losses.length,
+    winPct: fills.length ? rupee((100 * wins.length) / fills.length) : 0,
     slHits: fills.filter((f) => f.reason === 'sl').length,
     open: book.side !== 'flat',
     closedRs: rupee(fills.reduce((s, f) => s + (f.rs || 0), 0) || book.closedRs || 0),
@@ -300,6 +313,23 @@ export function huntMethodRows(state: PaperHuntState | null | undefined, under: 
   return [...byMethod.values()].sort(
     (a, b) => b.closedRs - a.closedRs || b.wins - a.wins || a.maeRs - b.maeRs || a.methodLabel.localeCompare(b.methodLabel),
   );
+}
+
+export function filterHuntMethodRows(rows: HuntMethodRow[], view: HuntMethodView): HuntMethodRow[] {
+  if (view === 'green') return rows.filter((r) => r.closedRs > 0);
+  if (view === 'traded') {
+    const traded = rows.filter((r) => r.trades > 0 || r.open);
+    return traded.length ? traded : rows;
+  }
+  return rows;
+}
+
+/** Top closed-₹ methods across all four names. Empty until a ticket prints. */
+export function huntLeaders(state: PaperHuntState | null | undefined, limit = 8): HuntMethodRow[] {
+  const rows = UNDERS.flatMap((under) => huntMethodRows(state, under)).filter((r) => r.trades > 0 || r.open);
+  return rows
+    .sort((a, b) => b.closedRs - a.closedRs || b.floorMfeRs - a.floorMfeRs || b.wins - a.wins)
+    .slice(0, limit);
 }
 
 export function huntInstrumentSummary(
