@@ -30,7 +30,7 @@ describe('OrderTestComponent', () => {
     fixture.detectChanges();
   });
 
-  it('is a Start-only 50-method paper hunt for four instrument tabs', () => {
+  it('is a Start-only paper hunt for four instrument tabs', () => {
     const text = fixture.nativeElement.textContent as string;
     expect(text).toMatch(/Hit Start/);
     expect(text).toMatch(/Crude Mini/);
@@ -38,7 +38,8 @@ describe('OrderTestComponent', () => {
     expect(text).toMatch(/Bank Nifty/);
     expect(text).toMatch(/Sensex/);
     expect(text).toMatch(/No order is placed/);
-    expect(text).toMatch(/50 methods/);
+    expect(text).toMatch(/methods/);
+    expect(text).toMatch(/algo/);
     expect(text).not.toMatch(/2-year tape/);
     expect(text).not.toMatch(/Why losers failed/);
     expect(text).not.toMatch(/More daily profit/);

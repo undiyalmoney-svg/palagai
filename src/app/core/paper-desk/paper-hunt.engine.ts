@@ -1,5 +1,5 @@
 /**
- * Shadow hunt: 50 methods × 4 names as paper tickets.
+ * Shadow hunt: named methods × 4 names as paper tickets.
  * Never places a Kite order. Ranks EOD by closed ₹, max price, max loss.
  */
 import { LiveAssumeBar, LiveAssumeBookCfg } from './live-assume.engine';

@@ -3,6 +3,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideRouter } from '@angular/router';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Paper14kComponent } from './paper-14k.component';
+import { PAPER_HUNT_CAP, PAPER_HUNT_METHODS } from '../../../core/paper-desk/paper-hunt.methods';
 import { emptyHunt } from '../../../core/paper-desk/paper-hunt.engine';
 
 describe('Paper14kComponent', () => {
@@ -18,10 +19,11 @@ describe('Paper14kComponent', () => {
     fixture.detectChanges();
   });
 
-  it('shows only the 50-method hunt: one Start, four tabs, no old desk', () => {
+  it('shows only the method hunt: one Start, four tabs, no old desk', () => {
     const text = fixture.nativeElement.textContent as string;
-    expect(text).toMatch(/50 methods/);
-    expect(text).toMatch(/10,000 paper tickets/);
+    expect(text).toMatch(new RegExp(`${PAPER_HUNT_METHODS.length} methods`));
+    expect(text).toMatch(/algo/);
+    expect(text).toMatch(new RegExp(`${PAPER_HUNT_CAP.toLocaleString('en-IN')} paper tickets`));
     expect(text).toMatch(/max price reached/i);
     expect(text).toMatch(/max loss reached/i);
     expect(text).toMatch(/Live Kite never sees the hunt/);
@@ -36,7 +38,7 @@ describe('Paper14kComponent', () => {
     expect(text).toMatch(/Profit\/loss/);
     expect(text).toMatch(/Not a guaranteed profit/);
     expect((fixture.nativeElement.querySelector('[data-testid="paper-hunt-count"]') as HTMLElement).textContent).toMatch(
-      /50 × 4/,
+      new RegExp(`${PAPER_HUNT_METHODS.length} × 4`),
     );
     expect(fixture.nativeElement.querySelector('[data-testid="paper-hunt"]')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('[data-testid="paper-hunt-tabs"]')).toBeTruthy();
@@ -81,7 +83,7 @@ describe('Paper14kComponent', () => {
     fixture.detectChanges();
     const title = (fixture.nativeElement.querySelector('[data-testid="paper-now-title"]') as HTMLElement).textContent || '';
     expect(title).toMatch(/Nifty, Bank Nifty, Sensex and Crude Mini from 09:00/);
-    expect(title).toMatch(/50 methods/);
+    expect(title).toMatch(new RegExp(`${PAPER_HUNT_METHODS.length} methods`));
     expect(title).not.toMatch(/watch-only/);
   });
 

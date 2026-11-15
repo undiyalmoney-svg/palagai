@@ -257,6 +257,61 @@ describe('Live paper desk', () => {
     expect(bookSignal('pdhl', bars, 3, cfg)).toBe(0);
     expect(bookSignal('pdhl', bars, 3, { ...cfg, freshCross: false })).toBe(1);
   });
+
+  it('fires classic algo signals on a fresh cross, not on every later bar', () => {
+    const cfg = { ...LIVE_PAPER_BOOKS[0], orS: 555, orE: 585, vwapMin: 2, orMin: 1, orMax: 1e9, pdMax: 1e9 };
+    const inside = [
+      { day: '2026-11-16', min: 600, open: 100, high: 110, low: 99, close: 105 },
+      { day: '2026-11-16', min: 601, open: 105, high: 108, low: 102, close: 104 },
+      { day: '2026-11-16', min: 602, open: 104, high: 112, low: 103, close: 111 },
+    ];
+    expect(bookSignal('inside_break', inside, 2, cfg)).toBe(1);
+    expect(bookSignal('inside_break', inside, 1, cfg)).toBe(0);
+
+    const range = Array.from({ length: 20 }, (_, i) => ({
+      day: '2026-11-16',
+      min: 600 + i,
+      open: 105,
+      high: 110,
+      low: 100,
+      close: 105,
+    }));
+    const brk = { day: '2026-11-16', min: 620, open: 110, high: 116, low: 109, close: 115 };
+    expect(bookSignal('donch20', [...range, brk], 20, cfg)).toBe(1);
+    expect(bookSignal('donch20', range, 19, cfg)).toBe(0);
+
+    const down = Array.from({ length: 30 }, (_, i) => 200 - i);
+    const up = Array.from({ length: 25 }, (_, i) => 171 + i * 2);
+    const closes = [...down, ...up];
+    const emaBars = closes.map((c, i) => {
+      const open = i ? closes[i - 1] : c;
+      return {
+        day: '2026-11-16',
+        min: 555 + i,
+        open,
+        high: Math.max(open, c) + 0.2,
+        low: Math.min(open, c) - 0.2,
+        close: c,
+      };
+    });
+    const emaDirs = emaBars.map((_, i) => bookSignal('ema_cross', emaBars, i, cfg));
+    expect(emaDirs.some((d) => d === 1)).toBe(true);
+    expect(emaDirs.filter((d) => d !== 0).length).toBeLessThan(6);
+
+    const prev = [{ day: '2026-11-14', min: 900, open: 100, high: 101, low: 99, close: 100 }];
+    const gapOpen = { day: '2026-11-16', min: 555, open: 104, high: 105, low: 103, close: 104.5 };
+    const gapFade = { day: '2026-11-16', min: 556, open: 104.2, high: 104.3, low: 102, close: 102.5 };
+    expect(bookSignal('gap_fade', [...prev, gapOpen, gapFade], 2, cfg)).toBe(-1);
+
+    const orBars = [
+      { day: '2026-11-16', min: 555, open: 100, high: 102, low: 99, close: 101 },
+      { day: '2026-11-16', min: 570, open: 101, high: 103, low: 100, close: 102 },
+      { day: '2026-11-16', min: 585, open: 102, high: 104, low: 101, close: 103 },
+      { day: '2026-11-16', min: 586, open: 103, high: 108, low: 102, close: 107 },
+      { day: '2026-11-16', min: 587, open: 103.8, high: 106, low: 103.5, close: 105.5 },
+    ];
+    expect(bookSignal('or_retest', orBars, 4, cfg)).toBe(1);
+  });
   it('names the bought contract like SENSEX 77000 CE and keeps it on the closed fill', () => {
     const cfg = LIVE_PAPER_BOOKS.find((b) => b.id === 'sensex-momentum')!;
     const book = emptyBook(cfg);

@@ -75,7 +75,7 @@ export class Paper14kComponent implements OnDestroy {
         ? `Last Kite check ${istClock(s.asOf)} IST${ageSec >= 90 ? ` — ${Math.round(ageSec / 60)} min ago.` : '.'}`
         : '';
     const today = `Today ${s.day}: ${huntTrades.toLocaleString('en-IN')} paper tickets.`;
-    const foot = 'Paper hunt only. One Start runs 50 methods on all four names. Not a guaranteed profit.';
+    const foot = `Paper hunt only. One Start runs ${this.huntMethodCount} methods on all four names. Not a guaranteed profit.`;
 
     if (s.kiteError) {
       return { tone: 'down', badge: 'needs Token', title: s.kiteError, lines: [today, foot] };
@@ -94,7 +94,7 @@ export class Paper14kComponent implements OnDestroy {
     return {
       tone: 'info',
       badge: 'watching',
-      title: 'Watching Nifty, Bank Nifty, Sensex and Crude Mini from 09:00. 50 methods each, paper only.',
+      title: `Watching Nifty, Bank Nifty, Sensex and Crude Mini from 09:00. ${this.huntMethodCount} methods each, paper only.`,
       lines: [checked, today, foot].filter(Boolean),
     };
   }

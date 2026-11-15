@@ -25,30 +25,46 @@ function upBars(day: string, n = 40): LiveAssumeBar[] {
   });
 }
 
-describe('paper hunt 50 methods', () => {
-  it('lists 50 methods and a 10,000-ticket cap across four names', () => {
-    expect(PAPER_HUNT_METHODS).toHaveLength(50);
-    expect(new Set(PAPER_HUNT_METHODS.map((m) => m.id)).size).toBe(50);
+describe('paper hunt methods', () => {
+  const n = PAPER_HUNT_METHODS.length;
+  const books = n * 4;
+  const capText = PAPER_HUNT_CAP.toLocaleString('en-IN');
+
+  it('lists momentum, pattern, mix, rule and algo methods with a four-name ticket cap', () => {
+    expect(n).toBeGreaterThanOrEqual(65);
+    expect(new Set(PAPER_HUNT_METHODS.map((m) => m.id)).size).toBe(n);
     expect(PAPER_HUNT_METHODS.some((m) => m.family === 'momentum')).toBe(true);
     expect(PAPER_HUNT_METHODS.some((m) => m.family === 'pattern')).toBe(true);
     expect(PAPER_HUNT_METHODS.some((m) => m.family === 'mix')).toBe(true);
     expect(PAPER_HUNT_METHODS.some((m) => m.family === 'rule')).toBe(true);
+    expect(PAPER_HUNT_METHODS.some((m) => m.family === 'algo')).toBe(true);
+    expect(PAPER_HUNT_METHODS.filter((m) => m.family === 'algo').length).toBeGreaterThanOrEqual(14);
+    expect(PAPER_HUNT_METHODS.map((m) => m.id)).toEqual(expect.arrayContaining([
+      'algo-ema-cross',
+      'algo-donch20',
+      'algo-rsi',
+      'algo-macd',
+      'algo-supertrend',
+    ]));
     expect(PAPER_HUNT_MAX_TRADES).toBe(50);
-    expect(PAPER_HUNT_CAP).toBe(10_000);
-    expect(PAPER_HUNT_HONEST).toMatch(/10,000 paper tickets/);
-    expect(PAPER_HUNT_HONEST).toMatch(/not 10,000 Kite orders/i);
+    expect(PAPER_HUNT_CAP).toBe(PAPER_HUNT_MAX_TRADES * 4 * n);
+    expect(PAPER_HUNT_HONEST).toContain(`${n} methods`);
+    expect(PAPER_HUNT_HONEST).toMatch(/algo/);
+    expect(PAPER_HUNT_HONEST).toContain(`${capText} paper tickets`);
+    expect(PAPER_HUNT_HONEST).toMatch(new RegExp(`not ${capText} Kite orders`, 'i'));
     expect(PAPER_HUNT_HONEST).toMatch(/max price reached/i);
     expect(PAPER_HUNT_HONEST).toMatch(/max loss reached/i);
     expect(PAPER_HUNT_HONEST).toMatch(/Not a guaranteed profit/);
   });
 
-  it('builds 200 isolated hunt books (50 × 4) that never sit on the live four', () => {
+  it('builds isolated hunt books (methods × 4) that never sit on the live four', () => {
     const hunt = emptyHunt('2026-11-16');
-    expect(hunt.books).toHaveLength(200);
+    expect(hunt.books).toHaveLength(books);
     expect(hunt.books.every((b) => b.desk === 'hunt')).toBe(true);
     expect(new Set(hunt.books.map((b) => b.under))).toEqual(new Set(['nifty', 'bank', 'sensex', 'crude']));
-    expect(hunt.books.filter((b) => b.under === 'nifty')).toHaveLength(50);
+    expect(hunt.books.filter((b) => b.under === 'nifty')).toHaveLength(n);
     expect(hunt.books.every((b) => b.id !== 'nifty-momentum')).toBe(true);
+    expect(hunt.books.some((b) => b.id === 'nifty-algo-ema-cross')).toBe(true);
   });
 
   it('records max price and max loss on a closed option ticket', () => {
@@ -74,6 +90,17 @@ describe('paper hunt 50 methods', () => {
     expect(dumped.fills[0].minPx).toBeLessThanOrEqual(90);
     expect((dumped.fills[0].mfeRs || 0) > (dumped.fills[0].rs || 0)).toBe(true);
     expect((dumped.fills[0].maeRs || 0) <= dumped.fills[0].rs).toBe(true);
+  });
+
+  it('algo methods use named book signals, not the 0.8× momentum patch', () => {
+    const ema = huntMethodCfg('nifty', PAPER_HUNT_METHODS.find((m) => m.id === 'algo-ema-cross')!);
+    expect(ema.strategy).toBe('rules');
+    expect(ema.primary).toEqual({ trend: 'ema_cross', range: 'ema_cross', quiet: 'ema_cross', stand: 'ema_cross' });
+    expect(ema.desk).toBe('hunt');
+    const rsi = huntMethodCfg('bank', PAPER_HUNT_METHODS.find((m) => m.id === 'algo-rsi')!);
+    expect(rsi.primary['trend']).toBe('rsi14');
+    const skip = huntMethodCfg('sensex', PAPER_HUNT_METHODS.find((m) => m.id === 'algo-ema-skip-range')!);
+    expect(skip.skipStructures).toEqual(['range']);
   });
 
   it('CE-only methods skip a down signal', () => {
@@ -239,14 +266,14 @@ describe('paper hunt 50 methods', () => {
       ]),
       picksByUnder: new Map(),
     });
-    expect(out.books).toHaveLength(200);
-    expect(out.stats).toHaveLength(200);
+    expect(out.books).toHaveLength(PAPER_HUNT_METHODS.length * 4);
+    expect(out.stats).toHaveLength(PAPER_HUNT_METHODS.length * 4);
     expect(out.books.some((b) => b.pendingDir !== 0 || b.side !== 'flat' || b.fills.length > 0 || /confirm|open|skipped/.test(b.reason))).toBe(
       true,
     );
   });
 
-  it('compacts hunt books so 10,000 paper tickets can persist without kite fields', () => {
+  it('compacts hunt books so the full paper-ticket cap can persist without kite fields', () => {
     const hunt = emptyHunt('2026-11-16');
     hunt.books[0] = {
       ...hunt.books[0],

@@ -1,6 +1,6 @@
 /**
- * 50 named methods. Same list on Nifty, Bank, Sensex and Crude Mini.
- * Mix, patterns, rules, momentum. Paper hunt only — never a Kite order.
+ * Named methods. Same list on Nifty, Bank, Sensex and Crude Mini.
+ * Mix, patterns, rules, momentum, and classic algos. Paper hunt only — never a Kite order.
  */
 import { LiveAssumeBookCfg } from './live-assume.engine';
 import { PaperHuntFamily } from './live-paper.engine';
@@ -11,7 +11,6 @@ const RANGE = (mode: string) => ({ trend: 'stand', range: mode, quiet: 'stand', 
 const QUIET = (mode: string) => ({ trend: 'stand', range: 'stand', quiet: mode, stand: 'stand' });
 
 export const PAPER_HUNT_MAX_TRADES = 50;
-export const PAPER_HUNT_CAP = PAPER_HUNT_MAX_TRADES * 4 * 50;
 
 export interface PaperHuntMethodDef {
   id: string;
@@ -74,10 +73,30 @@ export const PAPER_HUNT_METHODS: PaperHuntMethodDef[] = [
   { id: 'rule-sit-370', label: 'mom 0.8× sit at ₹370', family: 'rule', patch: { strategy: 'momentum', primary: ALL('momentum'), momK: 0.8, minDayNetRs: 370 } },
   { id: 'rule-2-wins', label: 'mom 0.8× sit after 2 wins', family: 'rule', patch: { strategy: 'momentum', primary: ALL('momentum'), momK: 0.8, maxWinsPerDay: 2 } },
   { id: 'rule-dense', label: 'mom 0.8× dense (no gap, no day stop)', family: 'rule', patch: { strategy: 'momentum', primary: ALL('momentum'), momK: 0.8, minGapMin: 0, dayStops: false, noConfirm: true } },
+
+  { id: 'algo-ema-cross', label: 'algo EMA 9/21 cross', family: 'algo', patch: { strategy: 'rules', primary: ALL('ema_cross'), backup: {} } },
+  { id: 'algo-ema-pull', label: 'algo EMA 21 pullback', family: 'algo', patch: { strategy: 'rules', primary: ALL('ema_pull'), backup: {} } },
+  { id: 'algo-donch20', label: 'algo Donchian 20', family: 'algo', patch: { strategy: 'rules', primary: ALL('donch20'), backup: {} } },
+  { id: 'algo-donch55', label: 'algo Donchian 55 turtle', family: 'algo', patch: { strategy: 'rules', primary: ALL('donch55'), backup: {} } },
+  { id: 'algo-inside', label: 'algo inside-bar break', family: 'algo', patch: { strategy: 'rules', primary: ALL('inside_break'), backup: {} } },
+  { id: 'algo-vwap-reclaim', label: 'algo VWAP reclaim', family: 'algo', patch: { strategy: 'rules', primary: ALL('vwap_reclaim'), backup: {} } },
+  { id: 'algo-gap-fade', label: 'algo gap fade', family: 'algo', patch: { strategy: 'rules', primary: ALL('gap_fade'), backup: {} } },
+  { id: 'algo-rsi', label: 'algo RSI 14 bounce', family: 'algo', patch: { strategy: 'rules', primary: ALL('rsi14'), backup: {} } },
+  { id: 'algo-macd', label: 'algo MACD cross', family: 'algo', patch: { strategy: 'rules', primary: ALL('macd'), backup: {} } },
+  { id: 'algo-bb', label: 'algo Bollinger mean', family: 'algo', patch: { strategy: 'rules', primary: ALL('bb_mean'), backup: {} } },
+  { id: 'algo-supertrend', label: 'algo Supertrend flip', family: 'algo', patch: { strategy: 'rules', primary: ALL('supertrend'), backup: {} } },
+  { id: 'algo-or-retest', label: 'algo OR retest', family: 'algo', patch: { strategy: 'rules', primary: ALL('or_retest'), backup: {} } },
+  { id: 'algo-ema-skip-range', label: 'algo EMA 9/21 skip range', family: 'algo', patch: { strategy: 'rules', primary: ALL('ema_cross'), backup: {}, skipStructures: ['range'] } },
+  { id: 'algo-donch20-skip-range', label: 'algo Donchian 20 skip range', family: 'algo', patch: { strategy: 'rules', primary: ALL('donch20'), backup: {}, skipStructures: ['range'] } },
+  { id: 'mix-algo-ema', label: 'mix + EMA 9/21', family: 'mix', patch: { strategy: 'rules', primary: ALL('ema_cross'), backup: {}, mix: true } },
 ];
 
+export const PAPER_HUNT_CAP = PAPER_HUNT_MAX_TRADES * 4 * PAPER_HUNT_METHODS.length;
+
+const huntCapText = PAPER_HUNT_CAP.toLocaleString('en-IN');
+
 export const PAPER_HUNT_HONEST =
-  'Each of Nifty, Bank, Sensex and Crude Mini runs the same 50 methods as paper tickets. ' +
-  'Each method may take up to 50 fills, so a full session can print up to 10,000 paper tickets — not 10,000 Kite orders. ' +
+  `Each of Nifty, Bank, Sensex and Crude Mini runs the same ${PAPER_HUNT_METHODS.length} methods (momentum, pattern, mix, rule and algo) as paper tickets. ` +
+  `Each method may take up to 50 fills, so a full session can print up to ${huntCapText} paper tickets — not ${huntCapText} Kite orders. ` +
   'Every ticket stores max price reached and max loss reached. EOD ranks the method. Start from the open; a late Start does not catch up stale bars. ' +
   'Live Kite never sees the hunt. Not a guaranteed profit.';

@@ -199,7 +199,7 @@ describe('PaperAnalyticsComponent', () => {
 });
 
 describe('Paper14kComponent views', () => {
-  it('shows only the 50-method hunt tabs, with liveOrders false', async () => {
+  it('shows only the method hunt tabs, with liveOrders false', async () => {
     localStorage.clear();
     await TestBed.configureTestingModule({
       imports: [Paper14kComponent],

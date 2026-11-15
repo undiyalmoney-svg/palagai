@@ -459,11 +459,11 @@ export interface LivePaperSession {
   honest: string;
   /** Judge-applied patches. Survives a new IST day via palagai_paper_evolve_v1. */
   evolve?: PaperEvolveState;
-  /** Shadow 50-method hunt. Never a Kite order. */
+  /** Shadow hunt of named methods. Never a Kite order. */
   hunt?: PaperHuntState;
 }
 
-export type PaperHuntFamily = 'momentum' | 'pattern' | 'mix' | 'rule';
+export type PaperHuntFamily = 'momentum' | 'pattern' | 'mix' | 'rule' | 'algo';
 
 export interface PaperHuntMethodStat {
   id: string;
