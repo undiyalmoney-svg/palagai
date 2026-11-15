@@ -27,6 +27,7 @@ export type HuntSideQuote = { bid: number | null; ask: number | null; last: numb
 
 export function huntMethodCfg(under: string, def: PaperHuntMethodDef): LiveAssumeBookCfg {
   const base = LIVE_PAPER_BOOKS.find((b) => underOf(b.id) === under) || LIVE_PAPER_BOOKS[0];
+  const open5 = def.id.startsWith('open5-zone');
   return {
     ...base,
     ...def.patch,
@@ -41,6 +42,7 @@ export function huntMethodCfg(under: string, def: PaperHuntMethodDef): LiveAssum
     dayStops: def.patch.dayStops ?? false,
     minGapMin: def.patch.minGapMin ?? 1,
     backup: def.patch.backup ?? {},
+    ...(open5 ? { entryS: (base.orS ?? 9 * 60 + 15) + 5 } : {}),
   };
 }
 

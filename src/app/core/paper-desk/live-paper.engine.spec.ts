@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bookSignal, momentumGauge, momentumSignal } from './live-assume.engine';
+import { OPEN5_ZONE_PCT, bookSignal, first5MinClose, momentumGauge, momentumSignal } from './live-assume.engine';
 import { optionRoundTripCharges } from './option-charges.util';
 import {
   LIVE_PAPER_BOOKS,
@@ -311,6 +311,37 @@ describe('Live paper desk', () => {
       { day: '2026-11-16', min: 587, open: 103.8, high: 106, low: 103.5, close: 105.5 },
     ];
     expect(bookSignal('or_retest', orBars, 4, cfg)).toBe(1);
+
+    const open = 9 * 60 + 15;
+    const first5 = Array.from({ length: 5 }, (_, i) => ({
+      day: '2026-11-16',
+      min: open + i,
+      open: 25000,
+      high: 25020,
+      low: 24980,
+      close: 25000,
+    }));
+    expect(first5MinClose(first5, '2026-11-16', open)).toBe(25000);
+    expect(25000 * (1 - OPEN5_ZONE_PCT)).toBeCloseTo(24899.725, 3);
+    const bounce = {
+      day: '2026-11-16',
+      min: open + 5,
+      open: 24940,
+      high: 24950,
+      low: 24890,
+      close: 24920,
+    };
+    const lose = {
+      day: '2026-11-16',
+      min: open + 5,
+      open: 24940,
+      high: 24950,
+      low: 24870,
+      close: 24880,
+    };
+    expect(bookSignal('open5_zone', [...first5, bounce], 5, { ...cfg, orS: open })).toBe(1);
+    expect(bookSignal('open5_zone', [...first5, lose], 5, { ...cfg, orS: open })).toBe(-1);
+    expect(bookSignal('open5_zone', first5, 4, { ...cfg, orS: open })).toBe(0);
   });
   it('names the bought contract like SENSEX 77000 CE and keeps it on the closed fill', () => {
     const cfg = LIVE_PAPER_BOOKS.find((b) => b.id === 'sensex-momentum')!;

@@ -5,6 +5,8 @@ export const LIVE_ASSUME_CHARGE = 50;
 export const LIVE_ASSUME_CRUDE_MIN = 8_000;
 export const LIVE_ASSUME_PREMIUM_BUDGET = 3_500;
 export const LIVE_ASSUME_DAY_LOSS = 420;
+/** First 5-min close minus this fraction is the Nifty maths zone (25,000 − 0.4011% = 24,899.725). */
+export const OPEN5_ZONE_PCT = 0.004011;
 
 export interface LiveAssumeBar {
   day: string;
@@ -304,6 +306,13 @@ function sessionOr(bars: LiveAssumeBar[], day: string, orS: number, orE: number)
   return { hi: Math.max(...or.map((b) => b.high)), lo: Math.min(...or.map((b) => b.low)) };
 }
 
+/** Close of the first 5 one-minute bars from session open (`orS`). */
+export function first5MinClose(bars: LiveAssumeBar[], day: string, openMin: number): number | null {
+  const win = bars.filter((x) => x.day === day && x.min >= openMin && x.min < openMin + 5);
+  if (!win.length) return null;
+  return win[win.length - 1].close;
+}
+
 function prevHl(bars: LiveAssumeBar[], day: string): { hi: number; lo: number } | null {
   const days = [...new Set(bars.map((b) => b.day))].sort();
   const i = days.indexOf(day);
@@ -579,6 +588,18 @@ export function bookSignal(mode: string, bars: LiveAssumeBar[], i: number, cfg: 
     const brokeLo = after.some((x) => x.close < orb.lo);
     if (brokeHi && b.low <= orb.hi && b.close > orb.hi && up) return 1;
     if (brokeLo && b.high >= orb.lo && b.close < orb.lo && dn) return -1;
+    return 0;
+  }
+  if (mode === 'open5_zone') {
+    const openMin = cfg.orS;
+    if (b.min < openMin + 5) return 0;
+    const c0 = first5MinClose(bars, b.day, openMin);
+    if (c0 == null || c0 <= 0) return 0;
+    const zone = c0 * (1 - OPEN5_ZONE_PCT);
+    const prior = i > 0 && bars[i - 1].day === b.day ? bars[i - 1] : null;
+    if (!prior) return 0;
+    if (prior.close > zone && b.low <= zone && b.close > zone) return 1;
+    if (prior.close >= zone && b.close < zone) return -1;
     return 0;
   }
   return 0;

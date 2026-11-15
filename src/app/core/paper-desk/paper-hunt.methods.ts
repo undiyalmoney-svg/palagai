@@ -129,6 +129,10 @@ export const PAPER_HUNT_METHODS: PaperHuntMethodDef[] = [
   { id: 'algo-inside-skip-range', label: 'algo inside-bar skip range', family: 'algo', patch: { strategy: 'rules', primary: ALL('inside_break'), backup: {}, skipStructures: ['range'] } },
   { id: 'algo-bb-skip-range', label: 'algo Bollinger skip range', family: 'algo', patch: { strategy: 'rules', primary: ALL('bb_mean'), backup: {}, skipStructures: ['range'] } },
   { id: 'algo-st-ce', label: 'algo Supertrend CE only', family: 'algo', patch: { strategy: 'rules', primary: ALL('supertrend'), backup: {}, onlyDir: 1 } },
+
+  { id: 'open5-zone', label: 'open5 zone −0.4011%', family: 'pattern', patch: { strategy: 'rules', primary: ALL('open5_zone'), backup: {} } },
+  { id: 'open5-zone-ce', label: 'open5 zone bounce CE', family: 'pattern', patch: { strategy: 'rules', primary: ALL('open5_zone'), backup: {}, onlyDir: 1 } },
+  { id: 'open5-zone-pe', label: 'open5 zone lose PE', family: 'pattern', patch: { strategy: 'rules', primary: ALL('open5_zone'), backup: {}, onlyDir: -1 } },
 ];
 
 export const PAPER_HUNT_CAP = PAPER_HUNT_MAX_TRADES * 4 * PAPER_HUNT_METHODS.length;

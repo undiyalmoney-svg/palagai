@@ -36,7 +36,7 @@ describe('paper hunt methods', () => {
   const capText = PAPER_HUNT_CAP.toLocaleString('en-IN');
 
   it('lists momentum, pattern, mix, rule and algo methods with a four-name ticket cap', () => {
-    expect(n).toBe(100);
+    expect(n).toBe(103);
     expect(new Set(PAPER_HUNT_METHODS.map((m) => m.id)).size).toBe(n);
     expect(PAPER_HUNT_METHODS.some((m) => m.family === 'momentum')).toBe(true);
     expect(PAPER_HUNT_METHODS.some((m) => m.family === 'pattern')).toBe(true);
@@ -53,6 +53,9 @@ describe('paper hunt methods', () => {
       'algo-ema-ce',
       'mix-supertrend',
       'mom-08-tp370',
+      'open5-zone',
+      'open5-zone-ce',
+      'open5-zone-pe',
     ]));
     expect(PAPER_HUNT_MAX_TRADES).toBe(50);
     expect(PAPER_HUNT_CAP).toBe(PAPER_HUNT_MAX_TRADES * 4 * n);
@@ -110,6 +113,12 @@ describe('paper hunt methods', () => {
     expect(rsi.primary['trend']).toBe('rsi14');
     const skip = huntMethodCfg('sensex', PAPER_HUNT_METHODS.find((m) => m.id === 'algo-ema-skip-range')!);
     expect(skip.skipStructures).toEqual(['range']);
+    const zone = huntMethodCfg('nifty', PAPER_HUNT_METHODS.find((m) => m.id === 'open5-zone')!);
+    expect(zone.strategy).toBe('rules');
+    expect(zone.primary['trend']).toBe('open5_zone');
+    expect(zone.entryS).toBe(9 * 60 + 20);
+    const crudeZone = huntMethodCfg('crude', PAPER_HUNT_METHODS.find((m) => m.id === 'open5-zone')!);
+    expect(crudeZone.entryS).toBe(9 * 60 + 5);
   });
 
   it('CE-only methods skip a down signal', () => {

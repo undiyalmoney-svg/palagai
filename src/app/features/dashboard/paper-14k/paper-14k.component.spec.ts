@@ -62,6 +62,7 @@ describe('Paper14kComponent', () => {
     expect(text).toMatch(/Leaders/);
     expect(text).toMatch(/mix \+ Supertrend/);
     expect(text).toMatch(/algo EMA 9\/21 CE only/);
+    expect(text).toMatch(/open5 zone −0\.4011%/);
     expect(fixture.nativeElement.querySelector('[data-testid="paper-hunt-leaders"]')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('[data-testid="paper-hunt-leaders-empty"]')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('[data-testid="paper-hunt-view-traded"]')).toBeTruthy();
