@@ -4,7 +4,7 @@
  */
 import { LiveAssumeBar, LiveAssumeBookCfg } from './live-assume.engine';
 import { CheapOtmPick } from '../utils/pick-cheap-otm.util';
-import { liveBuyPrice } from './live-fill.util';
+import { liveBuyPrice, lotCostRs } from './live-fill.util';
 import {
   LIVE_PAPER_BOOKS,
   LivePaperBookState,
@@ -60,6 +60,10 @@ export function huntCfgOf(id: string): LiveAssumeBookCfg {
   const method = id.slice(under.length + 1);
   const def = PAPER_HUNT_METHODS.find((m) => m.id === method) || PAPER_HUNT_METHODS[0];
   return huntMethodCfg(under, def);
+}
+
+function rupee(n: number): number {
+  return Math.round(n * 10) / 10;
 }
 
 function statOf(book: LivePaperBookState): PaperHuntMethodStat {
@@ -173,7 +177,161 @@ export function huntTickets(state: PaperHuntState | null | undefined, under: str
 
 export function huntTabNet(state: PaperHuntState | null | undefined, under: string): number {
   if (!state) return 0;
-  return Math.round(state.stats.filter((s) => s.under === under).reduce((n, s) => n + s.closedRs, 0) * 10) / 10;
+  return rupee(huntMethodRows(state, under).reduce((n, s) => n + s.closedRs, 0));
+}
+
+export interface HuntMethodRow {
+  key: string;
+  method: string;
+  methodLabel: string;
+  under: string;
+  trades: number;
+  wins: number;
+  losses: number;
+  slHits: number;
+  open: boolean;
+  closedRs: number;
+  profitRs: number;
+  lossRs: number;
+  mfeRs: number;
+  maeRs: number;
+  /** Smallest max-profit reached on a closed ticket. That sample only — not a guaranteed next move. */
+  floorMfeRs: number;
+  capitalRs: number;
+  lastEntryAt: string;
+}
+
+export interface HuntInstrumentSummary {
+  under: (typeof UNDERS)[number];
+  label: string;
+  trades: number;
+  wins: number;
+  losses: number;
+  profitRs: number;
+  lossRs: number;
+  closedRs: number;
+  bestLabel: string;
+  bestRs: number;
+  worstLabel: string;
+  worstRs: number;
+  slLabel: string;
+  slHits: number;
+  maxCapitalRs: number;
+}
+
+const UNDER_LABEL: Record<(typeof UNDERS)[number], string> = {
+  nifty: 'Nifty 50',
+  bank: 'Bank Nifty',
+  sensex: 'Sensex',
+  crude: 'Crude Mini',
+};
+
+function emptyMethodRow(under: string, def: PaperHuntMethodDef): HuntMethodRow {
+  return {
+    key: `${under}-${def.id}`,
+    method: def.id,
+    methodLabel: def.label,
+    under,
+    trades: 0,
+    wins: 0,
+    losses: 0,
+    slHits: 0,
+    open: false,
+    closedRs: 0,
+    profitRs: 0,
+    lossRs: 0,
+    mfeRs: 0,
+    maeRs: 0,
+    floorMfeRs: 0,
+    capitalRs: 0,
+    lastEntryAt: '',
+  };
+}
+
+export function huntMethodRow(book: LivePaperBookState): HuntMethodRow {
+  const under = book.under || underOf(book.id);
+  const method = book.id.slice(under.length + 1);
+  const def = PAPER_HUNT_METHODS.find((m) => m.id === method);
+  const fills = book.fills;
+  const wins = fills.filter((f) => f.rs > 0);
+  const losses = fills.filter((f) => f.rs < 0);
+  const peaks = fills.map((f) => f.mfeRs ?? f.rs);
+  let capitalRs = 0;
+  for (const f of fills) capitalRs = Math.max(capitalRs, lotCostRs(f.entry || 0, f.lot || 0));
+  if (book.side !== 'flat' && book.entry != null && book.lot) {
+    capitalRs = Math.max(capitalRs, lotCostRs(book.entry, book.lot));
+  }
+  const lastFillAt = fills.reduce((latest, f) => {
+    const at = f.entryAt || '';
+    return !latest || at > latest ? at : latest;
+  }, '');
+  return {
+    key: book.id,
+    method,
+    methodLabel: def?.label || method,
+    under,
+    trades: fills.length,
+    wins: wins.length,
+    losses: losses.length,
+    slHits: fills.filter((f) => f.reason === 'sl').length,
+    open: book.side !== 'flat',
+    closedRs: rupee(fills.reduce((s, f) => s + (f.rs || 0), 0) || book.closedRs || 0),
+    profitRs: rupee(wins.reduce((s, f) => s + f.rs, 0)),
+    lossRs: rupee(losses.reduce((s, f) => s + f.rs, 0)),
+    mfeRs: rupee(fills.reduce((m, f) => Math.max(m, f.mfeRs ?? f.rs), 0)),
+    maeRs: rupee(fills.reduce((m, f) => Math.min(m, f.maeRs ?? f.rs), 0)),
+    floorMfeRs: peaks.length ? rupee(Math.min(...peaks)) : 0,
+    capitalRs,
+    lastEntryAt: lastFillAt || book.entryAt || '',
+  };
+}
+
+/** All methods for one name, high closed ₹ first. Zero-trade methods stay listed. */
+export function huntMethodRows(state: PaperHuntState | null | undefined, under: string): HuntMethodRow[] {
+  const byMethod = new Map<string, HuntMethodRow>();
+  for (const def of PAPER_HUNT_METHODS) byMethod.set(def.id, emptyMethodRow(under, def));
+  if (state) {
+    for (const book of state.books) {
+      if ((book.under || underOf(book.id)) !== under) continue;
+      const row = huntMethodRow(book);
+      byMethod.set(row.method, row);
+    }
+  }
+  return [...byMethod.values()].sort(
+    (a, b) => b.closedRs - a.closedRs || b.wins - a.wins || a.maeRs - b.maeRs || a.methodLabel.localeCompare(b.methodLabel),
+  );
+}
+
+export function huntInstrumentSummary(
+  state: PaperHuntState | null | undefined,
+  under: (typeof UNDERS)[number],
+): HuntInstrumentSummary {
+  const rows = huntMethodRows(state, under);
+  const traded = rows.filter((r) => r.trades > 0 || r.open);
+  const best = [...traded].sort((a, b) => b.closedRs - a.closedRs)[0];
+  const worst = [...traded].sort((a, b) => a.closedRs - b.closedRs)[0];
+  const slWorst = [...traded].sort((a, b) => b.slHits - a.slHits || a.closedRs - b.closedRs)[0];
+  return {
+    under,
+    label: UNDER_LABEL[under],
+    trades: rows.reduce((n, r) => n + r.trades, 0),
+    wins: rows.reduce((n, r) => n + r.wins, 0),
+    losses: rows.reduce((n, r) => n + r.losses, 0),
+    profitRs: rupee(rows.reduce((n, r) => n + r.profitRs, 0)),
+    lossRs: rupee(rows.reduce((n, r) => n + r.lossRs, 0)),
+    closedRs: rupee(rows.reduce((n, r) => n + r.closedRs, 0)),
+    bestLabel: best?.methodLabel || '—',
+    bestRs: best?.closedRs || 0,
+    worstLabel: worst?.methodLabel || '—',
+    worstRs: worst?.closedRs || 0,
+    slLabel: slWorst && slWorst.slHits ? slWorst.methodLabel : '—',
+    slHits: slWorst?.slHits || 0,
+    maxCapitalRs: rows.reduce((n, r) => Math.max(n, r.capitalRs), 0),
+  };
+}
+
+export function huntSummaries(state: PaperHuntState | null | undefined): HuntInstrumentSummary[] {
+  return UNDERS.map((under) => huntInstrumentSummary(state, under));
 }
 
 export function compactHunt(state: PaperHuntState): PaperHuntState {

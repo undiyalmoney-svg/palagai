@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideRouter } from '@angular/router';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Paper14kComponent } from './paper-14k.component';
 import { PAPER_HUNT_CAP, PAPER_HUNT_METHODS } from '../../../core/paper-desk/paper-hunt.methods';
 import { emptyHunt } from '../../../core/paper-desk/paper-hunt.engine';
@@ -19,13 +19,33 @@ describe('Paper14kComponent', () => {
     fixture.detectChanges();
   });
 
-  it('shows only the method hunt: one Start, four tabs, no old desk', () => {
+  it('refresh loads the latest tick only while watching', async () => {
+    const paper = fixture.componentInstance['paper'];
+    const refresh = vi.spyOn(paper, 'refresh').mockResolvedValue();
+    (fixture.nativeElement.querySelector('[data-testid="paper-hunt-refresh"]') as HTMLButtonElement).click();
+    expect(refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it('puts Start and Stop at the top and enables only one at a time', () => {
+    const start = fixture.nativeElement.querySelector('[data-testid="start-live-paper"]') as HTMLButtonElement;
+    const stop = fixture.nativeElement.querySelector('[data-testid="stop-live-paper"]') as HTMLButtonElement;
+    expect(start.disabled).toBe(false);
+    expect(stop.disabled).toBe(true);
+    const paper = fixture.componentInstance['paper'];
+    paper.session.set({ ...paper.session(), running: true, kiteError: null });
+    fixture.detectChanges();
+    expect(start.disabled).toBe(true);
+    expect(stop.disabled).toBe(false);
+  });
+
+  it('shows only the method hunt: one Start, summary, four tabs, no old desk', () => {
     const text = fixture.nativeElement.textContent as string;
     expect(text).toMatch(new RegExp(`${PAPER_HUNT_METHODS.length} methods`));
     expect(text).toMatch(/algo/);
     expect(text).toMatch(new RegExp(`${PAPER_HUNT_CAP.toLocaleString('en-IN')} paper tickets`));
     expect(text).toMatch(/max profit reached/i);
     expect(text).toMatch(/max loss reached/i);
+    expect(text).toMatch(/Lowest peak/);
     expect(text).toMatch(/not a guaranteed next move/i);
     expect(text).toMatch(/Live Kite never sees the hunt/);
     expect(text).toMatch(/One Start runs all four/);
@@ -34,20 +54,29 @@ describe('Paper14kComponent', () => {
     expect(text).toMatch(/Bank Nifty/);
     expect(text).toMatch(/Sensex/);
     expect(text).toMatch(/Crude Mini/);
-    expect(text).toMatch(/Entry time/);
-    expect(text).toMatch(/Exit price/);
+    expect(text).toMatch(/Last entry/);
     expect(text).toMatch(/Profit\/loss/);
     expect(text).toMatch(/Not a guaranteed profit/);
+    expect(text).toMatch(/Max capital used/);
     expect((fixture.nativeElement.querySelector('[data-testid="paper-hunt-count"]') as HTMLElement).textContent).toMatch(
       new RegExp(`${PAPER_HUNT_METHODS.length} × 4`),
     );
     expect(fixture.nativeElement.querySelector('[data-testid="paper-hunt"]')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('[data-testid="paper-hunt-summary"]')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('[data-testid="paper-hunt-refresh"]')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('[data-testid="paper-hunt-summary-nifty"]')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('[data-testid="paper-hunt-summary-bank"]')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('[data-testid="paper-hunt-summary-sensex"]')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('[data-testid="paper-hunt-summary-crude"]')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('[data-testid="paper-hunt-tabs"]')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('[data-testid="paper-hunt-tab-nifty"]')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('[data-testid="paper-hunt-tab-bank"]')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('[data-testid="paper-hunt-tab-sensex"]')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('[data-testid="paper-hunt-tab-crude"]')).toBeTruthy();
     expect(fixture.nativeElement.querySelectorAll('[data-testid="start-live-paper"]').length).toBe(1);
+    expect(fixture.nativeElement.querySelectorAll('[data-testid="paper-hunt-method"]').length).toBe(
+      PAPER_HUNT_METHODS.length,
+    );
     expect(fixture.nativeElement.querySelector('[data-testid="paper-live-kite"]')).toBeNull();
     expect(fixture.nativeElement.querySelector('[data-testid="paper-live-radio-on"]')).toBeNull();
     expect(fixture.nativeElement.querySelector('[data-testid="live-paper-card"]')).toBeNull();
@@ -62,7 +91,6 @@ describe('Paper14kComponent', () => {
     expect(text).not.toMatch(/Scout/);
     expect(text).not.toMatch(/Critic/);
     expect(text).not.toMatch(/Judge/);
-    expect(text).not.toMatch(/Paper only/);
     expect(text).not.toMatch(/Opening range/);
     expect(text).not.toMatch(/Prev-day break/);
     expect(text).not.toMatch(/VWAP fade/);
@@ -97,7 +125,7 @@ describe('Paper14kComponent', () => {
     expect(fixture.componentInstance['paper'].liveArmed()).toBe(false);
   });
 
-  it('shows the selected instrument tickets high profit first; one Start still runs all four', () => {
+  it('shows all methods high profit first and a four-name summary', () => {
     const paper = fixture.componentInstance['paper'];
     const cur = paper.session();
     const hunt = emptyHunt('2026-11-16');
@@ -121,6 +149,7 @@ describe('Paper14kComponent', () => {
         strike: 25250,
         expiry: '2026-11-17',
         optionSymbol: 'NIFTY26N1725250CE',
+        lot: 65,
         entryAt: '2026-11-16T04:00:00.000Z',
         exitAt: '2026-11-16T04:10:00.000Z',
         mfeRs: 80,
@@ -143,6 +172,7 @@ describe('Paper14kComponent', () => {
         strike: 25250,
         expiry: '2026-11-17',
         optionSymbol: 'NIFTY26N1725250CE',
+        lot: 65,
         entryAt: '2026-11-16T05:00:00.000Z',
         exitAt: '2026-11-16T05:00:10.000Z',
         mfeRs: 2400,
@@ -167,27 +197,32 @@ describe('Paper14kComponent', () => {
         strike: 58000,
         expiry: '2026-11-17',
         optionSymbol: 'BANKNIFTY26N1758000CE',
+        lot: 30,
         entryAt: '2026-11-16T04:30:00.000Z',
         exitAt: '2026-11-16T04:31:00.000Z',
+        mfeRs: 1110,
+        maeRs: -40,
       },
     ];
     paper.session.set({ ...cur, hunt });
     fixture.detectChanges();
-    const niftyRows = fixture.nativeElement.querySelectorAll('[data-testid="paper-hunt-ticket"]') as NodeListOf<HTMLElement>;
-    expect(niftyRows.length).toBe(2);
-    expect(niftyRows[0].textContent).toMatch(/1,977/);
+    const niftyRows = fixture.nativeElement.querySelectorAll('[data-testid="paper-hunt-method"]') as NodeListOf<HTMLElement>;
+    expect(niftyRows.length).toBe(PAPER_HUNT_METHODS.length);
+    expect(niftyRows[0].getAttribute('data-method')).toBe('mom-08');
+    expect(niftyRows[0].textContent).toMatch(/1,607/);
     expect(niftyRows[0].textContent).toMatch(/2,400/);
-    expect(niftyRows[0].textContent).toMatch(/-90/);
-    expect(niftyRows[1].textContent).toMatch(/-370/);
-    expect(niftyRows[1].querySelector('[data-testid="paper-hunt-mfe"]')?.textContent).toMatch(/80/);
-    expect(niftyRows[1].querySelector('[data-testid="paper-hunt-mae"]')?.textContent).toMatch(/-370/);
+    expect(niftyRows[0].querySelector('[data-testid="paper-hunt-floor"]')?.textContent).toMatch(/80/);
+    const niftySum = fixture.nativeElement.querySelector('[data-testid="paper-hunt-summary-nifty"]') as HTMLElement;
+    expect(niftySum.textContent).toMatch(/mom 0\.8× both/);
+    expect(niftySum.textContent).toMatch(/1,977/);
+    expect(niftySum.textContent).toMatch(/-370/);
     const bankTab = fixture.nativeElement.querySelector('[data-testid="paper-hunt-tab-bank"]') as HTMLButtonElement;
     bankTab.click();
     fixture.detectChanges();
-    const bankRows = fixture.nativeElement.querySelectorAll('[data-testid="paper-hunt-ticket"]') as NodeListOf<HTMLElement>;
-    expect(bankRows.length).toBe(1);
+    const bankRows = fixture.nativeElement.querySelectorAll('[data-testid="paper-hunt-method"]') as NodeListOf<HTMLElement>;
+    expect(bankRows.length).toBe(PAPER_HUNT_METHODS.length);
     expect(bankRows[0].textContent).toMatch(/1,110/);
-    expect(bankRows[0].textContent).not.toMatch(/1,977/);
+    expect(bankRows[0].textContent).not.toMatch(/1,607/);
     expect(fixture.nativeElement.querySelectorAll('[data-testid="start-live-paper"]').length).toBe(1);
     expect(fixture.nativeElement.querySelector('[data-testid="paper-review"]')).toBeNull();
     expect(fixture.nativeElement.querySelector('[data-testid="live-paper-fills"]')).toBeNull();

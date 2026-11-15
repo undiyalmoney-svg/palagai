@@ -146,8 +146,13 @@ export class LivePaperService {
     await this.tick();
   }
 
+  /** Latest hunt numbers without starting. Pulls the droplet, then ticks only if already watching. */
+  async refresh(): Promise<void> {
+    await this.hydrateDroplet();
+    if (this.session().running) await this.tick();
+  }
+
   stop(): void {
-    this.clearTimer();
     this.dropletLoop = false;
     const cur = this.session();
     const books = cur.books.map((b) => {

@@ -2,7 +2,7 @@ import { DecimalPipe } from '@angular/common';
 import { Component, OnDestroy, computed, inject, signal } from '@angular/core';
 import { LivePaperService } from '../../../core/paper-desk/live-paper.service';
 import { PAPER_HUNT_CAP, PAPER_HUNT_HONEST, PAPER_HUNT_METHODS } from '../../../core/paper-desk/paper-hunt.methods';
-import { huntTabNet, huntTickets } from '../../../core/paper-desk/paper-hunt.engine';
+import { huntMethodRows, huntSummaries, huntTabNet } from '../../../core/paper-desk/paper-hunt.engine';
 
 const HUNT_TABS = [
   { under: 'nifty' as const, label: 'Nifty 50' },
@@ -30,11 +30,14 @@ export class Paper14kComponent implements OnDestroy {
   protected readonly huntTabs = HUNT_TABS;
   protected readonly huntTab = signal<(typeof HUNT_TABS)[number]['under']>('nifty');
   protected readonly hunt = computed(() => this.paper.session().hunt || null);
-  protected readonly huntTabTickets = computed(() => huntTickets(this.hunt(), this.huntTab()));
+  protected readonly huntSummaries = computed(() => huntSummaries(this.hunt()));
+  protected readonly huntTabMethods = computed(() => huntMethodRows(this.hunt(), this.huntTab()));
   protected readonly huntTabClosed = computed(() => huntTabNet(this.hunt(), this.huntTab()));
   protected readonly huntTabLabel = computed(
     () => this.huntTabs.find((r) => r.under === this.huntTab())?.label || this.huntTab(),
   );
+  protected readonly startOff = computed(() => this.paper.session().running || this.paper.busy());
+  protected readonly stopOff = computed(() => !this.paper.session().running);
 
   constructor() {
     this.paper.setLiveToggle(false);
@@ -46,13 +49,19 @@ export class Paper14kComponent implements OnDestroy {
   }
 
   protected startPaper(): void {
+    if (this.startOff()) return;
     this.paper.setLiveToggle(false);
     for (const row of HUNT_TABS) this.paper.setLiveBook(row.under, false);
     void this.paper.start();
   }
 
   protected stopPaper(): void {
+    if (this.stopOff()) return;
     this.paper.stop();
+  }
+
+  protected refreshPaper(): void {
+    void this.paper.refresh();
   }
 
   protected selectHuntTab(under: (typeof HUNT_TABS)[number]['under']): void {

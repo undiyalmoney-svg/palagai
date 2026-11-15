@@ -15,6 +15,13 @@ describe('LivePaperService', () => {
     });
   });
 
+  it('refresh does not start a stopped hunt', async () => {
+    const svc = TestBed.inject(LivePaperService);
+    await svc.refresh();
+    expect(svc.session().running).toBe(false);
+    expect(svc.session().liveOrders).toBe(false);
+  });
+
   it('refuses to start without Token and never places an order', async () => {
     const svc = TestBed.inject(LivePaperService);
     await svc.start();

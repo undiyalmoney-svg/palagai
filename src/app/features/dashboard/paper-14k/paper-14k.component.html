@@ -1,44 +1,81 @@
 <div class="mp-page" data-testid="paper-14k-page">
-  <div class="mp-card" data-testid="paper-hunt">
+  <div class="mp-card" data-testid="paper-hunt-controls">
     <div class="mp-card-head">
       <div>
         <h2>{{ huntMethodCount }} methods · find the strategy</h2>
         <p class="mp-sub" data-testid="paper-now-title">{{ now().title }}</p>
-        <p class="mp-sub" data-testid="paper-hunt-honest">{{ huntHonest }}</p>
       </div>
-      <span class="mp-badge" [attr.data-tone]="now().tone" data-testid="paper-now-badge">{{ now().badge }}</span>
-    </div>
-    @for (line of now().lines; track line) {
-      <p class="mp-sub">{{ line }}</p>
-    }
-    <div class="mp-form">
-      <div class="mp-field">
-        <span>&nbsp;</span>
+      <div class="mp-row">
         <button
           type="button"
           class="ui-btn ui-btn-primary"
-          [disabled]="paper.session().running"
+          [disabled]="startOff()"
           (click)="startPaper()"
           data-testid="start-live-paper"
         >
           {{ paper.busy() && !paper.session().running ? 'Starting…' : 'Start' }}
         </button>
-      </div>
-      <div class="mp-field">
-        <span>&nbsp;</span>
         <button
           type="button"
           class="ui-btn"
-          [disabled]="!paper.session().running"
+          [disabled]="stopOff()"
           (click)="stopPaper()"
           data-testid="stop-live-paper"
         >
           Stop
         </button>
+        <span class="mp-badge" [attr.data-tone]="now().tone" data-testid="paper-now-badge">{{ now().badge }}</span>
       </div>
     </div>
-    <p class="mp-sub">One Start runs all four on paper. Pick a tab for that instrument only. High profit at the top. Max profit / max loss is after entry on that ticket, not a guaranteed next move.</p>
-    <span class="mp-badge" data-tone="info" data-testid="paper-hunt-count">{{ huntMethodCount }} × 4 · up to {{ huntCap | number : '1.0-0' }} paper tickets</span>
+    <p class="mp-sub" data-testid="paper-hunt-honest">{{ huntHonest }}</p>
+    @for (line of now().lines; track line) {
+      <p class="mp-sub">{{ line }}</p>
+    }
+    <p class="mp-sub">One Start runs all four on paper. Peak ₹ is what that ticket reached after entry, not a guaranteed next move.</p>
+  </div>
+
+  <div class="mp-card" data-testid="paper-hunt-summary">
+    <div class="mp-card-head">
+      <div>
+        <h2>Summary</h2>
+        <p class="mp-sub">Each name: trades, profit, loss, best and worst method, max capital used.</p>
+      </div>
+      <button
+        type="button"
+        class="ui-btn"
+        (click)="refreshPaper()"
+        [disabled]="paper.busy()"
+        data-testid="paper-hunt-refresh"
+      >
+        {{ paper.busy() ? 'Refreshing…' : 'Refresh' }}
+      </button>
+    </div>
+    <div class="mp-hunt-summary">
+      @for (row of huntSummaries(); track row.under) {
+        <div class="mp-hunt-tile" [attr.data-testid]="'paper-hunt-summary-' + row.under">
+          <h3>{{ row.label }}</h3>
+          <p class="mp-hunt-kv"><span>Trades</span><strong>{{ row.trades | number : '1.0-0' }}</strong></p>
+          <p class="mp-hunt-kv"><span>Profit trades</span><strong class="mp-up">{{ row.wins | number : '1.0-0' }}</strong></p>
+          <p class="mp-hunt-kv"><span>Loss trades</span><strong class="mp-down">{{ row.losses | number : '1.0-0' }}</strong></p>
+          <p class="mp-hunt-kv"><span>Profit now</span><strong class="mp-up">₹{{ row.profitRs | number : '1.0-0' }}</strong></p>
+          <p class="mp-hunt-kv"><span>Loss now</span><strong class="mp-down">₹{{ row.lossRs | number : '1.0-0' }}</strong></p>
+          <p class="mp-hunt-kv"><span>Best</span><strong class="mp-up">{{ row.bestLabel }} · ₹{{ row.bestRs | number : '1.0-0' }}</strong></p>
+          <p class="mp-hunt-kv"><span>Worst</span><strong class="mp-down">{{ row.worstLabel }} · ₹{{ row.worstRs | number : '1.0-0' }}</strong></p>
+          <p class="mp-hunt-kv"><span>Most SL hits</span><strong>{{ row.slLabel }}{{ row.slHits ? ' · ' + row.slHits : '' }}</strong></p>
+          <p class="mp-hunt-kv"><span>Max capital used</span><strong>₹{{ row.maxCapitalRs | number : '1.0-0' }}</strong></p>
+        </div>
+      }
+    </div>
+  </div>
+
+  <div class="mp-card" data-testid="paper-hunt">
+    <div class="mp-card-head">
+      <div>
+        <h2>Methods</h2>
+        <p class="mp-sub">{{ huntTabLabel() }} closed ₹{{ huntTabClosed() | number : '1.0-0' }} · {{ huntMethodCount }} methods · gainers first. Lowest peak ₹ is the smallest max-profit that ticket sample reached — not a guaranteed next move. Not a guaranteed profit.</p>
+      </div>
+      <span class="mp-badge" data-tone="info" data-testid="paper-hunt-count">{{ huntMethodCount }} × 4 · up to {{ huntCap | number : '1.0-0' }} paper tickets</span>
+    </div>
     <div class="mp-tabs" role="tablist" data-testid="paper-hunt-tabs">
       @for (row of huntTabs; track row.under) {
         <button
@@ -55,42 +92,37 @@
       }
     </div>
     <p class="mp-sub" data-testid="paper-hunt-tab-net">
-      {{ huntTabLabel() }} closed ₹{{ huntTabClosed() | number : '1.0-0' }} · {{ huntTabTickets().length | number : '1.0-0' }} tickets · high profit first
+      {{ huntTabLabel() }} · {{ huntTabMethods().length | number : '1.0-0' }} methods
     </p>
-    @if (!huntTabTickets().length) {
-      <p class="mp-sub" data-testid="paper-hunt-empty">Start from the open. No {{ huntTabLabel() }} paper ticket yet.</p>
-    }
     <div class="mp-table-wrap">
-      <table class="mp-table" data-testid="paper-hunt-tickets">
+      <table class="mp-table" data-testid="paper-hunt-methods">
         <thead>
           <tr>
             <th>Method</th>
-            <th>Entry</th>
-            <th>Exit</th>
-            <th>Entry time</th>
-            <th>Exit time</th>
-            <th class="num">SL</th>
-            <th class="num">Entry price</th>
-            <th class="num">Exit price</th>
+            <th class="num">Trades</th>
+            <th class="num">Profit trades</th>
+            <th class="num">Loss trades</th>
+            <th class="num">SL hits</th>
+            <th>Last entry</th>
             <th class="num">Profit/loss</th>
             <th class="num">Max profit reached</th>
             <th class="num">Max loss reached</th>
+            <th class="num">Lowest peak ₹</th>
           </tr>
         </thead>
         <tbody>
-          @for (row of huntTabTickets(); track row.key) {
-            <tr data-testid="paper-hunt-ticket">
-              <td>{{ row.methodLabel }}</td>
-              <td class="mp-sym">{{ row.entry }}</td>
-              <td>{{ row.exit }}</td>
-              <td>{{ clock(row.entryAt) }}</td>
-              <td>{{ clock(row.exitAt) }}</td>
-              <td class="num">{{ row.sl | number : '1.0-2' }}</td>
-              <td class="num">{{ row.entryPx | number : '1.0-2' }}</td>
-              <td class="num">{{ row.exitPx | number : '1.0-2' }}</td>
-              <td class="num" [class.mp-up]="row.rs > 0" [class.mp-down]="row.rs < 0">{{ row.rs | number : '1.0-0' }}</td>
+          @for (row of huntTabMethods(); track row.key) {
+            <tr data-testid="paper-hunt-method" [attr.data-method]="row.method">
+              <td>{{ row.methodLabel }}{{ row.open ? ' · open' : '' }}</td>
+              <td class="num">{{ row.trades | number : '1.0-0' }}</td>
+              <td class="num">{{ row.wins | number : '1.0-0' }}</td>
+              <td class="num">{{ row.losses | number : '1.0-0' }}</td>
+              <td class="num">{{ row.slHits | number : '1.0-0' }}</td>
+              <td>{{ clock(row.lastEntryAt) }}</td>
+              <td class="num" [class.mp-up]="row.closedRs > 0" [class.mp-down]="row.closedRs < 0">{{ row.closedRs | number : '1.0-0' }}</td>
               <td class="num" data-testid="paper-hunt-mfe" [class.mp-up]="row.mfeRs > 0">{{ row.mfeRs | number : '1.0-0' }}</td>
               <td class="num" data-testid="paper-hunt-mae" [class.mp-down]="row.maeRs < 0">{{ row.maeRs | number : '1.0-0' }}</td>
+              <td class="num" data-testid="paper-hunt-floor">{{ row.floorMfeRs | number : '1.0-0' }}</td>
             </tr>
           }
         </tbody>

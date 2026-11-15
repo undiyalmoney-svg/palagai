@@ -10,6 +10,9 @@ import {
   compactHunt,
   emptyHunt,
   huntMethodCfg,
+  huntInstrumentSummary,
+  huntMethodRows,
+  huntSummaries,
   huntTabNet,
   huntTickets,
   profitableHunt,
@@ -248,6 +251,32 @@ describe('paper hunt methods', () => {
     expect(huntTickets(hunt, 'bank')[0].rs).toBe(1110);
     expect(huntTabNet(hunt, 'nifty')).toBe(2127);
     expect(huntTabNet(hunt, 'sensex')).toBe(0);
+    const niftyMethods = huntMethodRows(hunt, 'nifty');
+    expect(niftyMethods).toHaveLength(PAPER_HUNT_METHODS.length);
+    expect(niftyMethods[0]).toMatchObject({
+      method: 'mom-08',
+      trades: 2,
+      wins: 1,
+      losses: 1,
+      slHits: 1,
+      closedRs: 1607,
+      mfeRs: 2400,
+      maeRs: -370,
+      floorMfeRs: 80,
+    });
+    const niftySum = huntInstrumentSummary(hunt, 'nifty');
+    expect(niftySum).toMatchObject({
+      trades: 3,
+      wins: 2,
+      losses: 1,
+      profitRs: 2497,
+      lossRs: -370,
+      bestLabel: 'mom 0.8× both',
+      worstLabel: 'mom 0.8× PE only',
+      slLabel: 'mom 0.8× both',
+      slHits: 1,
+    });
+    expect(huntSummaries(hunt)).toHaveLength(4);
   });
 
   it('ticks the hunt on a 0.8× up tape without opening a live Kite book', () => {
