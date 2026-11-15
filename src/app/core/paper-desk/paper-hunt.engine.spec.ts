@@ -52,8 +52,9 @@ describe('paper hunt methods', () => {
     expect(PAPER_HUNT_HONEST).toMatch(/algo/);
     expect(PAPER_HUNT_HONEST).toContain(`${capText} paper tickets`);
     expect(PAPER_HUNT_HONEST).toMatch(new RegExp(`not ${capText} Kite orders`, 'i'));
-    expect(PAPER_HUNT_HONEST).toMatch(/max price reached/i);
+    expect(PAPER_HUNT_HONEST).toMatch(/max profit reached/i);
     expect(PAPER_HUNT_HONEST).toMatch(/max loss reached/i);
+    expect(PAPER_HUNT_HONEST).toMatch(/not a guaranteed next move/i);
     expect(PAPER_HUNT_HONEST).toMatch(/Not a guaranteed profit/);
   });
 
@@ -150,6 +151,8 @@ describe('paper hunt methods', () => {
         optionSymbol: 'NIFTY26N1725250CE',
         entryAt: '2026-11-16T04:00:00.000Z',
         exitAt: '2026-11-16T04:10:00.000Z',
+        mfeRs: 80,
+        maeRs: -370,
       },
       {
         day: '2026-11-16',
@@ -170,6 +173,8 @@ describe('paper hunt methods', () => {
         optionSymbol: 'NIFTY26N1725250CE',
         entryAt: '2026-11-16T05:00:00.000Z',
         exitAt: '2026-11-16T05:00:10.000Z',
+        mfeRs: 2400,
+        maeRs: -90,
       },
     ];
     niftyPe.fills = [
@@ -234,7 +239,10 @@ describe('paper hunt methods', () => {
       sl: 154,
       entryPx: 160,
       exitPx: 168,
+      mfeRs: 2400,
+      maeRs: -90,
     });
+    expect(nifty[2]).toMatchObject({ rs: -370, mfeRs: 80, maeRs: -370 });
     expect(nifty[0].entry).toMatch(/CE/);
     expect(huntTickets(hunt, 'bank')).toHaveLength(1);
     expect(huntTickets(hunt, 'bank')[0].rs).toBe(1110);

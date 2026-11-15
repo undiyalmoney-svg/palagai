@@ -37,7 +37,7 @@
         </button>
       </div>
     </div>
-    <p class="mp-sub">One Start runs all four on paper. Pick a tab for that instrument only. High profit at the top.</p>
+    <p class="mp-sub">One Start runs all four on paper. Pick a tab for that instrument only. High profit at the top. Max profit / max loss is after entry on that ticket, not a guaranteed next move.</p>
     <span class="mp-badge" data-tone="info" data-testid="paper-hunt-count">{{ huntMethodCount }} × 4 · up to {{ huntCap | number : '1.0-0' }} paper tickets</span>
     <div class="mp-tabs" role="tablist" data-testid="paper-hunt-tabs">
       @for (row of huntTabs; track row.under) {
@@ -73,6 +73,8 @@
             <th class="num">Entry price</th>
             <th class="num">Exit price</th>
             <th class="num">Profit/loss</th>
+            <th class="num">Max profit reached</th>
+            <th class="num">Max loss reached</th>
           </tr>
         </thead>
         <tbody>
@@ -87,6 +89,8 @@
               <td class="num">{{ row.entryPx | number : '1.0-2' }}</td>
               <td class="num">{{ row.exitPx | number : '1.0-2' }}</td>
               <td class="num" [class.mp-up]="row.rs > 0" [class.mp-down]="row.rs < 0">{{ row.rs | number : '1.0-0' }}</td>
+              <td class="num" data-testid="paper-hunt-mfe" [class.mp-up]="row.mfeRs > 0">{{ row.mfeRs | number : '1.0-0' }}</td>
+              <td class="num" data-testid="paper-hunt-mae" [class.mp-down]="row.maeRs < 0">{{ row.maeRs | number : '1.0-0' }}</td>
             </tr>
           }
         </tbody>

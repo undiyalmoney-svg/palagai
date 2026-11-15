@@ -24,8 +24,9 @@ describe('Paper14kComponent', () => {
     expect(text).toMatch(new RegExp(`${PAPER_HUNT_METHODS.length} methods`));
     expect(text).toMatch(/algo/);
     expect(text).toMatch(new RegExp(`${PAPER_HUNT_CAP.toLocaleString('en-IN')} paper tickets`));
-    expect(text).toMatch(/max price reached/i);
+    expect(text).toMatch(/max profit reached/i);
     expect(text).toMatch(/max loss reached/i);
+    expect(text).toMatch(/not a guaranteed next move/i);
     expect(text).toMatch(/Live Kite never sees the hunt/);
     expect(text).toMatch(/One Start runs all four/);
     expect(text).toMatch(/Hit Start/);
@@ -122,6 +123,8 @@ describe('Paper14kComponent', () => {
         optionSymbol: 'NIFTY26N1725250CE',
         entryAt: '2026-11-16T04:00:00.000Z',
         exitAt: '2026-11-16T04:10:00.000Z',
+        mfeRs: 80,
+        maeRs: -370,
       },
       {
         day: '2026-11-16',
@@ -142,6 +145,8 @@ describe('Paper14kComponent', () => {
         optionSymbol: 'NIFTY26N1725250CE',
         entryAt: '2026-11-16T05:00:00.000Z',
         exitAt: '2026-11-16T05:00:10.000Z',
+        mfeRs: 2400,
+        maeRs: -90,
       },
     ];
     bank.fills = [
@@ -171,7 +176,11 @@ describe('Paper14kComponent', () => {
     const niftyRows = fixture.nativeElement.querySelectorAll('[data-testid="paper-hunt-ticket"]') as NodeListOf<HTMLElement>;
     expect(niftyRows.length).toBe(2);
     expect(niftyRows[0].textContent).toMatch(/1,977/);
+    expect(niftyRows[0].textContent).toMatch(/2,400/);
+    expect(niftyRows[0].textContent).toMatch(/-90/);
     expect(niftyRows[1].textContent).toMatch(/-370/);
+    expect(niftyRows[1].querySelector('[data-testid="paper-hunt-mfe"]')?.textContent).toMatch(/80/);
+    expect(niftyRows[1].querySelector('[data-testid="paper-hunt-mae"]')?.textContent).toMatch(/-370/);
     const bankTab = fixture.nativeElement.querySelector('[data-testid="paper-hunt-tab-bank"]') as HTMLButtonElement;
     bankTab.click();
     fixture.detectChanges();

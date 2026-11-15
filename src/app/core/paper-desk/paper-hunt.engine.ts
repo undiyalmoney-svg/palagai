@@ -125,6 +125,10 @@ export interface HuntTicketRow {
   entryPx: number;
   exitPx: number;
   rs: number;
+  /** After-entry peak closed ₹ (MFE). That ticket only — not a guaranteed next move. */
+  mfeRs: number;
+  /** After-entry trough closed ₹ (MAE). That ticket only — not a guaranteed next move. */
+  maeRs: number;
 }
 
 /** Closed hunt tickets for one name, high profit to high loss. */
@@ -159,6 +163,8 @@ export function huntTickets(state: PaperHuntState | null | undefined, under: str
         entryPx: f.entry,
         exitPx: f.exit,
         rs: f.rs,
+        mfeRs: Math.round((f.mfeRs ?? f.rs) * 10) / 10,
+        maeRs: Math.round((f.maeRs ?? f.rs) * 10) / 10,
       });
     }
   }
