@@ -646,24 +646,19 @@ describe('Live paper desk', () => {
     expect(LIVE_PAPER_BOOKS).toHaveLength(4);
     expect(LIVE_PAPER_BOOKS.every((b) => b.desk === 'momentum')).toBe(true);
     expect(by('nifty')).toMatchObject({
-      strategy: 'momentum',
+      strategy: 'rules',
+      primary: { trend: 'vwap_fade', range: 'vwap_fade', quiet: 'vwap_fade', stand: 'vwap_fade' },
       stopRs: LIVE_PAPER_STOP_RS,
       targetRs: LIVE_PAPER_TARGET_RS,
-      holdBars: 60,
-      maxTradesPerDay: 5,
-      barMinutes: 1,
-      momK: 0.8,
-      atm: true,
-      noConfirm: false,
-      dayStops: true,
-      orE: 9 * 60 + 30,
+      label: 'Nifty 50 · vwap stretch',
     });
     expect(by('bank')).toMatchObject({
-      strategy: 'rules',
-      primary: { trend: 'or_retest', range: 'or_retest', quiet: 'or_retest', stand: 'or_retest' },
+      strategy: 'momentum',
+      momK: 0.6,
+      noConfirm: false,
       stopRs: LIVE_PAPER_STOP_RS,
       targetRs: LIVE_PAPER_TARGET_RS,
-      label: 'Bank Nifty · algo OR retest',
+      label: 'Bank Nifty · mom 0.6× both',
     });
     expect(by('sensex')).toMatchObject({
       strategy: 'momentum',
@@ -691,7 +686,8 @@ describe('Live paper desk', () => {
     expect(PAPER_TEST_HONEST).toMatch(/Arise tab/);
     expect(PAPER_TEST_HONEST).not.toMatch(/Crude Oil tab/);
     expect(PAPER_TEST_HONEST).not.toMatch(/Crude Mini tab/);
-    expect(PAPER_TEST_HONEST).toMatch(/Bank Nifty algo OR retest/);
+    expect(PAPER_TEST_HONEST).toMatch(/Bank Nifty mom 0\.6× both/);
+    expect(PAPER_TEST_HONEST).toMatch(/Nifty 50 vwap stretch/);
     expect(PAPER_TEST_HONEST).toMatch(/Sensex mom 0\.8× no confirm/);
     expect(PAPER_TEST_HONEST).toMatch(/cancels the resting SL/);
     expect(PAPER_TEST_HONEST).toMatch(/Daily bank ₹370/);
@@ -762,7 +758,7 @@ describe('Live paper desk', () => {
   });
 
   it('opens momentum after the confirm bar, binds ₹370 / ₹370 and exits on time', () => {
-    const cfg = LIVE_PAPER_BOOKS.find((b) => b.id === 'nifty-momentum')!;
+    const cfg = LIVE_PAPER_BOOKS.find((b) => b.id === 'bank-momentum')!;
     const bars = [...flatBars('2026-11-03', 20, 13 * 60 + 35, 24000), ...flatBars('2026-11-04', 7, 9 * 60 + 15, 24000)];
     const last = bars.length - 1;
     bars[last] = { ...bars[last], close: 24020, high: 24021 };
@@ -813,7 +809,7 @@ describe('Live paper desk', () => {
       bars[bars.length - 1] = { ...bars[bars.length - 1], close: px + 20, high: px + 21 };
       return bars;
     };
-    for (const under of ['nifty', 'crude'] as const) {
+    for (const under of ['bank', 'crude'] as const) {
       const cfg = LIVE_PAPER_BOOKS.find((b) => b.id === `${under}-momentum`)!;
       const bars = barsFor(under);
       const lastBarMin = under === 'crude' ? 9 * 60 + 25 : 9 * 60 + 40;
@@ -848,12 +844,12 @@ describe('Live paper desk', () => {
       expect(capped.pendingDir).toBe(0);
       expect(capped.reason).toBe('max 5 trades today');
     }
-    const nifty = LIVE_PAPER_BOOKS.find((b) => b.id === 'nifty-momentum')!;
-    const bars = barsFor('nifty');
+    const bank = LIVE_PAPER_BOOKS.find((b) => b.id === 'bank-momentum')!;
+    const bars = barsFor('bank');
     const yday = {
       day: '2026-11-03',
-      book: 'nifty',
-      label: 'Nifty',
+      book: 'bank',
+      label: 'Bank',
       side: 'long' as const,
       entry: 1,
       exit: 1,
@@ -865,13 +861,13 @@ describe('Live paper desk', () => {
       mode: 'momentum',
     };
     const nextDay = tickBook(
-      { ...emptyBook(nifty), lastBarMin: 9 * 60 + 40, fills: [yday, yday, yday] },
-      nifty,
+      { ...emptyBook(bank), lastBarMin: 9 * 60 + 40, fills: [yday, yday, yday] },
+      bank,
       bars,
       24020,
       '2026-11-04',
       9 * 60 + 51,
-      'NIFTY 50',
+      'BANKNIFTY',
     );
     expect(nextDay.pendingDir).toBe(1);
     expect(nextDay.reason).toMatch(/confirm momentum/);
@@ -887,9 +883,19 @@ describe('Live paper desk', () => {
     const openBank = { ...emptyBook(bank), side: 'long' as const, status: 'open' as const, pendingDir: 0 };
     expect(indexDeskBlockReason('nifty-momentum', [idle, openBank])).toBeNull();
     expect(indexDeskBlockReason('sensex-momentum', [idle, openBank])).toBeNull();
-    const occupied = tickBook(idle, nifty, bars, 24020, '2026-11-04', 9 * 60 + 51, 'NIFTY 50', [], {
-      blockOpen: 'one index book at a time',
-    });
+    const occupied = tickBook(
+      { ...emptyBook(bank), lastBarMin: 9 * 60 + 40 },
+      bank,
+      bars,
+      24020,
+      '2026-11-04',
+      9 * 60 + 51,
+      'BANKNIFTY',
+      [],
+      {
+        blockOpen: 'one index book at a time',
+      },
+    );
     expect(occupied.side).toBe('flat');
     expect(occupied.pendingDir).toBe(0);
     expect(occupied.reason).toBe('one index book at a time');

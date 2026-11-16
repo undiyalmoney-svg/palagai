@@ -70,21 +70,27 @@ const EXIT: Partial<LiveAssumeBookCfg> = {
   freshCross: true,
 };
 
-/** Live Kite on the Arise tab — Bank Nifty and Sensex only, hunt winners. */
-export const LIVE_TAKE_UNDERS = ['bank', 'sensex'] as const;
+/** Live Kite on the Arise tab — today's hunt leaders, sample only. */
+export const LIVE_TAKE_UNDERS = ['bank', 'nifty', 'sensex'] as const;
 export type LiveTakeUnder = (typeof LIVE_TAKE_UNDERS)[number];
 export const LIVE_TAKE_METHOD: Record<LiveTakeUnder, string> = {
-  bank: 'algo OR retest',
+  bank: 'mom 0.6× both',
+  nifty: 'vwap stretch',
   sensex: 'mom 0.8× no confirm',
 };
+export const LIVE_TAKE_LABEL: Record<LiveTakeUnder, string> = {
+  bank: 'Bank Nifty',
+  nifty: 'Nifty 50',
+  sensex: 'Sensex',
+};
 
-/** The only paper desk: four daily ₹370 books. Live Kite is Bank + Sensex hunt winners. */
+/** The only paper desk: four daily ₹370 books. Live Kite is today's hunt leaders. */
 export const PAPER_DESKS: { id: string; label: string; rule: string }[] = [
   {
     id: 'momentum',
     label: 'Daily ₹370',
     rule:
-      'Paper always records. Live Kite on the Arise tab is Bank Nifty algo OR retest and Sensex mom 0.8× no confirm only. ' +
+      'Paper always records. Live Kite on the Arise tab is Bank Nifty mom 0.6× both, Nifty 50 vwap stretch, and Sensex mom 0.8× no confirm only. ' +
       'Target nets ₹370 after charges, fill at the live bid. When target hits, Live cancels the resting SL and sells MARKET. ' +
       'Hunt stays paper-only. Not a guaranteed profit.',
   },
@@ -109,8 +115,27 @@ function deskPatch(under: string): Partial<LiveAssumeBookCfg> {
   }
   if (under === 'bank') {
     return {
+      strategy: 'momentum',
+      primary: ALL('momentum'),
+      momK: 0.6,
+      mix: false,
+      noConfirm: false,
+      orS: 9 * 60 + 15,
+      orE: 9 * 60 + 30,
+      entryS: 9 * 60 + 45,
+      maxTradesPerDay: 5,
+      barMinutes: 1,
+      minGapMin: 10,
+      holdBars: 60,
+      stopRs: LIVE_PAPER_STOP_RS,
+      targetRs: LIVE_PAPER_TARGET_RS,
+      label: 'Bank Nifty · mom 0.6× both',
+    };
+  }
+  if (under === 'nifty') {
+    return {
       strategy: 'rules',
-      primary: ALL('or_retest'),
+      primary: ALL('vwap_fade'),
       backup: {},
       orS: 9 * 60 + 15,
       orE: 9 * 60 + 30,
@@ -121,7 +146,7 @@ function deskPatch(under: string): Partial<LiveAssumeBookCfg> {
       holdBars: 60,
       stopRs: LIVE_PAPER_STOP_RS,
       targetRs: LIVE_PAPER_TARGET_RS,
-      label: 'Bank Nifty · algo OR retest',
+      label: 'Nifty 50 · vwap stretch',
     };
   }
   if (under === 'sensex') {
@@ -162,7 +187,7 @@ function deskPatch(under: string): Partial<LiveAssumeBookCfg> {
 export const PAPER_MOMENTUM: Partial<LiveAssumeBookCfg> = { ...EXIT, ...deskPatch('nifty') };
 export const PAPER_TEST_HONEST =
   'Index-proxy pick, not a lock. ATM CE (up) or PE (down), 1 lot at the live ask, exact charges. ' +
-  'Live Kite on the Arise tab is Bank Nifty algo OR retest and Sensex mom 0.8× no confirm only — today\'s paper hunt leaders, sample only. ' +
+  'Live Kite on the Arise tab is Bank Nifty mom 0.6× both, Nifty 50 vwap stretch, and Sensex mom 0.8× no confirm only — today\'s paper hunt leaders, sample only. ' +
   'Daily bank ₹370 net after charges / stop ₹370. When the paper target hits, Live cancels the resting SL and sells MARKET. ' +
   'Hunt on all four names stays paper tickets — Live Kite never sees the hunt. ' +
   'Paper always records, Live on or off. Live Kite on a ticked book adds a 1 lot MARKET buy and a resting SL — a Kite reject does not drop the paper fill. A refresh does not arm Live. ' +
