@@ -259,11 +259,14 @@ describe('paper hunt methods', () => {
       exitPx: 168,
       mfeRs: 2400,
       maeRs: -90,
+      open: false,
     });
     expect(nifty[2]).toMatchObject({ rs: -370, mfeRs: 80, maeRs: -370 });
     expect(nifty[0].entry).toMatch(/CE/);
     expect(huntTickets(hunt, 'bank')).toHaveLength(1);
-    expect(huntTickets(hunt, 'bank')[0].rs).toBe(1110);
+    expect(huntTickets(hunt, 'bank')[0]).toMatchObject({ rs: 1110, entryPx: 400, exitPx: 420 });
+    expect(huntTickets(hunt, 'sensex')).toEqual([]);
+    expect(huntTickets(hunt, 'crude')).toEqual([]);
     expect(huntTabNet(hunt, 'nifty')).toBe(2127);
     expect(huntTabNet(hunt, 'sensex')).toBe(0);
     const niftyMethods = huntMethodRows(hunt, 'nifty');
@@ -279,6 +282,8 @@ describe('paper hunt methods', () => {
       mfeRs: 2400,
       maeRs: -370,
       floorMfeRs: 80,
+      lastEntryPx: 160,
+      lastExitPx: 168,
     });
     expect(filterHuntMethodRows(niftyMethods, 'traded').map((r) => r.method)).toEqual(['mom-08', 'mom-08-pe']);
     expect(filterHuntMethodRows(niftyMethods, 'green').every((r) => r.closedRs > 0)).toBe(true);
@@ -302,6 +307,37 @@ describe('paper hunt methods', () => {
       slHits: 1,
     });
     expect(huntSummaries(hunt)).toHaveLength(4);
+  });
+
+  it('lists an open Nifty ticket with live mark as exit price so P/L can be checked against premium', () => {
+    const hunt = emptyHunt('2026-11-16');
+    const book = hunt.books.find((b) => b.id === 'nifty-mom-08')!;
+    book.side = 'long';
+    book.entry = 118.4;
+    book.last = 124.9;
+    book.liveRs = 370;
+    book.lot = 65;
+    book.sl = 110;
+    book.optionType = 'CE';
+    book.strike = 25950;
+    book.expiry = '2026-11-17';
+    book.optionSymbol = 'NIFTY26N1725950CE';
+    book.entryAt = '2026-11-16T05:02:00.000Z';
+    const rows = huntTickets(hunt, 'nifty');
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      method: 'mom-08',
+      open: true,
+      exit: 'open',
+      lot: 65,
+      entryPx: 118.4,
+      exitPx: 124.9,
+      rs: 370,
+    });
+    expect(rows[0].entry).toMatch(/25950 CE/);
+    const method = huntMethodRows(hunt, 'nifty').find((r) => r.method === 'mom-08')!;
+    expect(method).toMatchObject({ lastEntryPx: 118.4, lastExitPx: 124.9, open: true });
+    expect(huntTickets(hunt, 'bank')).toEqual([]);
   });
 
   it('ticks the hunt on a 0.8× up tape without opening a live Kite book', () => {

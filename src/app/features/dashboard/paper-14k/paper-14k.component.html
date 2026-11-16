@@ -147,8 +147,47 @@
       }
     </div>
     <p class="mp-sub" data-testid="paper-hunt-tab-net">
-      {{ huntTabLabel() }} · {{ huntTabMethods().length | number : '1.0-0' }} methods
+      {{ huntTabLabel() }} · {{ huntTabMethods().length | number : '1.0-0' }} methods · {{ huntTabTickets().length | number : '1.0-0' }} tickets
     </p>
+    <p class="mp-sub">
+      Entry and exit are option premium, not the index. Profit/loss is (exit − entry) × lot − charges. That ticket only — not a guaranteed next move.
+    </p>
+    @if (!huntTabTickets().length) {
+      <p class="mp-sub" data-testid="paper-hunt-empty">No {{ huntTabLabel() }} paper ticket yet. Hit Start, then Refresh after fills.</p>
+    } @else {
+      <div class="mp-table-wrap">
+        <table class="mp-table" data-testid="paper-hunt-tickets">
+          <thead>
+            <tr>
+              <th>Method</th>
+              <th>Contract</th>
+              <th>Exit</th>
+              <th>Entry time</th>
+              <th>Exit time</th>
+              <th class="num">Lot</th>
+              <th class="num">Entry price</th>
+              <th class="num">Exit price</th>
+              <th class="num">Profit/loss</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of huntTabTickets(); track row.key) {
+              <tr data-testid="paper-hunt-ticket" [attr.data-open]="row.open ? 'true' : null">
+                <td>{{ row.methodLabel }}{{ row.open ? ' · open' : '' }}</td>
+                <td class="mp-sym">{{ row.entry }}</td>
+                <td>{{ row.exit }}</td>
+                <td>{{ clock(row.entryAt) }}</td>
+                <td>{{ row.open ? '—' : clock(row.exitAt) }}</td>
+                <td class="num">{{ row.lot | number : '1.0-0' }}</td>
+                <td class="num" data-testid="paper-hunt-entry-px">{{ row.entryPx | number : '1.0-2' }}</td>
+                <td class="num" data-testid="paper-hunt-exit-px">{{ row.exitPx | number : '1.0-2' }}</td>
+                <td class="num" [class.mp-up]="row.rs > 0" [class.mp-down]="row.rs < 0">{{ row.rs | number : '1.0-0' }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
     <div class="mp-table-wrap">
       <table class="mp-table" data-testid="paper-hunt-methods">
         <thead>
@@ -161,6 +200,8 @@
             <th class="num">Win %</th>
             <th class="num">SL hits</th>
             <th>Last entry</th>
+            <th class="num">Entry price</th>
+            <th class="num">Exit price</th>
             <th class="num">Profit/loss</th>
             <th class="num">Max profit reached</th>
             <th class="num">Max loss reached</th>
@@ -178,6 +219,8 @@
               <td class="num">{{ row.winPct | number : '1.0-0' }}</td>
               <td class="num">{{ row.slHits | number : '1.0-0' }}</td>
               <td>{{ clock(row.lastEntryAt) }}</td>
+              <td class="num" data-testid="paper-hunt-method-entry-px">{{ row.lastEntryPx != null ? (row.lastEntryPx | number : '1.0-2') : '—' }}</td>
+              <td class="num" data-testid="paper-hunt-method-exit-px">{{ row.lastExitPx != null ? (row.lastExitPx | number : '1.0-2') : '—' }}</td>
               <td class="num" [class.mp-up]="row.closedRs > 0" [class.mp-down]="row.closedRs < 0">{{ row.closedRs | number : '1.0-0' }}</td>
               <td class="num" data-testid="paper-hunt-mfe" [class.mp-up]="row.mfeRs > 0">{{ row.mfeRs | number : '1.0-0' }}</td>
               <td class="num" data-testid="paper-hunt-mae" [class.mp-down]="row.maeRs < 0">{{ row.maeRs | number : '1.0-0' }}</td>

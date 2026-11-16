@@ -162,16 +162,36 @@ export interface HuntTicketRow {
   entryAt: string;
   exitAt: string;
   sl: number;
+  lot: number;
   entryPx: number;
   exitPx: number;
   rs: number;
+  open: boolean;
   /** After-entry peak closed ₹ (MFE). That ticket only — not a guaranteed next move. */
   mfeRs: number;
   /** After-entry trough closed ₹ (MAE). That ticket only — not a guaranteed next move. */
   maeRs: number;
 }
 
-/** Closed hunt tickets for one name, high profit to high loss. */
+function contractLabel(
+  book: LivePaperBookState,
+  fill?: { optionType?: '' | 'CE' | 'PE'; strike?: number | null; expiry?: string; optionSymbol?: string; side?: 'long' | 'short'; book?: string },
+): string {
+  return (
+    optionPickLabel({
+      id: fill?.book || book.id,
+      optionType: fill?.optionType || book.optionType,
+      strike: fill?.strike ?? book.strike,
+      expiry: fill?.expiry || book.expiry,
+      optionSymbol: fill?.optionSymbol || book.optionSymbol,
+    }) ||
+    fill?.optionType ||
+    book.optionType ||
+    (fill?.side === 'short' || book.side === 'short' ? 'PE' : 'CE')
+  );
+}
+
+/** Closed hunt tickets plus any still-open fill for one name, high profit to high loss. */
 export function huntTickets(state: PaperHuntState | null | undefined, under: string): HuntTicketRow[] {
   if (!state) return [];
   const rows: HuntTicketRow[] = [];
@@ -186,29 +206,45 @@ export function huntTickets(state: PaperHuntState | null | undefined, under: str
         method,
         methodLabel: def?.label || method,
         under,
-        entry:
-          optionPickLabel({
-            id: f.book || book.id,
-            optionType: f.optionType,
-            strike: f.strike,
-            expiry: f.expiry,
-            optionSymbol: f.optionSymbol,
-          }) ||
-          f.optionType ||
-          (f.side === 'long' ? 'CE' : 'PE'),
+        entry: contractLabel(book, f),
         exit: f.reason,
         entryAt: f.entryAt || '',
         exitAt: f.exitAt || '',
         sl: f.sl,
+        lot: f.lot || book.lot || 0,
         entryPx: f.entry,
         exitPx: f.exit,
         rs: f.rs,
+        open: false,
         mfeRs: Math.round((f.mfeRs ?? f.rs) * 10) / 10,
         maeRs: Math.round((f.maeRs ?? f.rs) * 10) / 10,
       });
     }
+    if (book.side !== 'flat' && book.entry != null && optionPremiumPx(book.entry) != null) {
+      const mark = optionPremiumPx(book.last) ?? book.entry;
+      rows.push({
+        key: `${book.id}-open-${book.entryAt || ''}`,
+        method,
+        methodLabel: def?.label || method,
+        under,
+        entry: contractLabel(book),
+        exit: 'open',
+        entryAt: book.entryAt || '',
+        exitAt: '',
+        sl: book.sl || 0,
+        lot: book.lot || 0,
+        entryPx: book.entry,
+        exitPx: mark,
+        rs: book.liveRs || 0,
+        open: true,
+        mfeRs: Math.round((book.liveRs > 0 ? book.liveRs : 0) * 10) / 10,
+        maeRs: Math.round((book.liveRs < 0 ? book.liveRs : 0) * 10) / 10,
+      });
+    }
   }
-  return rows.sort((a, b) => b.rs - a.rs || a.entryAt.localeCompare(b.entryAt));
+  return rows.sort(
+    (a, b) => Number(b.open) - Number(a.open) || b.rs - a.rs || a.entryAt.localeCompare(b.entryAt),
+  );
 }
 
 export function huntTabNet(state: PaperHuntState | null | undefined, under: string): number {
@@ -238,6 +274,10 @@ export interface HuntMethodRow {
   floorMfeRs: number;
   capitalRs: number;
   lastEntryAt: string;
+  /** Last ticket's option premium at entry. Null until a fill. */
+  lastEntryPx: number | null;
+  /** Last ticket's option premium at exit, or the live mark while open. Null until a fill. */
+  lastExitPx: number | null;
   note: string;
 }
 
@@ -292,6 +332,8 @@ function emptyMethodRow(under: string, def: PaperHuntMethodDef): HuntMethodRow {
     floorMfeRs: 0,
     capitalRs: 0,
     lastEntryAt: '',
+    lastEntryPx: null,
+    lastExitPx: null,
     note: '',
   };
 }
@@ -313,6 +355,8 @@ export function huntMethodRow(book: LivePaperBookState): HuntMethodRow {
     const at = f.entryAt || '';
     return !latest || at > latest ? at : latest;
   }, '');
+  const lastFill = fills[fills.length - 1];
+  const open = book.side !== 'flat' && book.entry != null;
   const u = (UNDERS as readonly string[]).includes(under) ? (under as (typeof UNDERS)[number]) : 'nifty';
   return {
     key: book.id,
@@ -335,6 +379,8 @@ export function huntMethodRow(book: LivePaperBookState): HuntMethodRow {
     floorMfeRs: peaks.length ? rupee(Math.min(...peaks)) : 0,
     capitalRs,
     lastEntryAt: lastFillAt || book.entryAt || '',
+    lastEntryPx: open ? book.entry : lastFill?.entry ?? null,
+    lastExitPx: open ? book.last : lastFill?.exit ?? null,
     note: book.reason || '',
   };
 }
