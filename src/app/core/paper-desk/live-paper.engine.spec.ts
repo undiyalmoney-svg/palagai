@@ -668,11 +668,11 @@ describe('Live paper desk', () => {
     expect(by('sensex')).toMatchObject({
       strategy: 'momentum',
       momK: 0.8,
-      mix: true,
+      mix: false,
       noConfirm: true,
       stopRs: LIVE_PAPER_STOP_RS,
       targetRs: LIVE_PAPER_TARGET_RS,
-      label: 'Sensex · mix + no confirm',
+      label: 'Sensex · mom 0.8× no confirm',
     });
     expect(LIVE_PAPER_CRUDE_MOM_K).toBe(0.8);
     expect(by('crude')).toMatchObject({
@@ -692,7 +692,7 @@ describe('Live paper desk', () => {
     expect(PAPER_TEST_HONEST).not.toMatch(/Crude Oil tab/);
     expect(PAPER_TEST_HONEST).not.toMatch(/Crude Mini tab/);
     expect(PAPER_TEST_HONEST).toMatch(/Bank Nifty algo OR retest/);
-    expect(PAPER_TEST_HONEST).toMatch(/Sensex mix \+ no confirm/);
+    expect(PAPER_TEST_HONEST).toMatch(/Sensex mom 0\.8× no confirm/);
     expect(PAPER_TEST_HONEST).toMatch(/cancels the resting SL/);
     expect(PAPER_TEST_HONEST).toMatch(/Daily bank ₹370/);
     expect(PAPER_TEST_HONEST).toMatch(/Live Kite never sees the hunt/);
