@@ -1,240 +1,215 @@
 <div class="mp-page" data-testid="crude-oil-page">
-  <div class="mp-banner" [attr.data-tone]="liveMoney()?.enabled ? 'down' : 'warn'" data-testid="crude-banner">
-    @if (liveMoney()?.enabled) {
-      Real money worker is armed on CRUDEOILM FUT. Kite is rejecting 1 lot at ₹14,000 — today’s NRML is ~₹31,000.
-      Stop this desk so it stops sending doomed orders. Cheap CE/PE is the ₹14k plan on Test. Not a guaranteed profit.
-    } @else {
-      Do not arm Crude Mini FUT at ₹14,000. Kite NRML is ~₹31,000 and MIS already rejects at ₹14k free.
-      Motto is buy CE/PE — cheap OTM on Crude, Nifty, Bank Nifty and Sensex is the Test book. ATM stays blocked.
-      Does not auto-start. Not a guaranteed profit.
-    }
-  </div>
-
-  <div class="mp-card" data-testid="capital-guard-card">
+  <div class="mp-card" data-testid="crude-banner">
     <div class="mp-card-head">
       <div>
-        <h2>₹14,000 capital</h2>
-        <p class="mp-sub">
-          Motto: buy CE/PE. Cheap next-expiry OTM on all four books. Premium budget ₹{{ capital.premiumBudgetRs | number }},
-          hard day-loss ₹{{ capital.dayLossCapRs | number }}. ATM stays locked until ₹40,000. Crude Mini FUT needs
-          ~₹31,000 — ₹14,000 is rejected. Not a guaranteed profit.
-        </p>
+        <h2>Bank Nifty and Sensex</h2>
+        <p class="mp-sub" data-testid="crude-now-title">{{ now().title }}</p>
       </div>
-      <span class="mp-badge" data-tone="warn">FUT blocked at ₹14k · Test buys CE/PE</span>
-    </div>
-    <div class="mp-stats">
-      <div class="mp-stat">
-        <span class="mp-stat-label">Cash</span>
-        <span class="mp-stat-value">₹{{ capital.capitalRs | number }}</span>
-        <span class="mp-stat-hint">Owner capital</span>
-      </div>
-      <div class="mp-stat">
-        <span class="mp-stat-label">Day loss cap</span>
-        <span class="mp-stat-value">₹{{ capital.dayLossCapRs | number }}</span>
-        <span class="mp-stat-hint">3% · matches 40-pt Crude stop</span>
-      </div>
-      <div class="mp-stat">
-        <span class="mp-stat-label">Premium budget</span>
-        <span class="mp-stat-value">₹{{ capital.premiumBudgetRs | number }}</span>
-        <span class="mp-stat-hint">25% — cheap OTM CE/PE fits; ATM does not</span>
-      </div>
-      @if (liveMoney()?.funds; as f) {
-        <div class="mp-stat" data-testid="kite-equity">
-          <span class="mp-stat-label">Kite equity</span>
-          <span class="mp-stat-value">₹{{ f.equityCash | number }}</span>
-          <span class="mp-stat-hint">NSE / BSE CE/PE</span>
-        </div>
-        <div class="mp-stat" data-testid="kite-commodity">
-          <span class="mp-stat-label">Kite commodity</span>
-          <span class="mp-stat-value">₹{{ f.commodityCash | number }}</span>
-          <span class="mp-stat-hint">{{ f.commodityCash > 0 ? 'MCX Crude Mini' : '₹0 — MCX cannot open' }}</span>
-        </div>
-      }
-    </div>
-    <div class="mp-table-wrap">
-      <table class="mp-table" data-testid="capital-books">
-        <thead>
-          <tr>
-            <th>Book</th>
-            <th>Product</th>
-            <th class="num">Lots</th>
-            <th class="num">1-stop</th>
-            <th>Rule</th>
-          </tr>
-        </thead>
-        <tbody>
-          @for (b of capital.books; track b.book) {
-            <tr>
-              <td class="mp-sym">{{ bookLabel[b.book] }}</td>
-              <td>
-                <span class="mp-badge" [attr.data-tone]="b.allowed ? 'up' : 'down'">
-                  {{ b.allowed ? b.product : 'blocked' }}
-                </span>
-              </td>
-              <td class="num">{{ b.lots }}</td>
-              <td class="num">₹{{ b.oneLossRs | number }} ({{ b.oneLossPct }}%)</td>
-              <td>{{ b.reason }}</td>
-            </tr>
-          }
-        </tbody>
-      </table>
-    </div>
-    <ul class="mp-list" data-testid="expiry-rules">
-      @for (line of expiryLines; track line.book) {
-        <li>{{ line.rule }}</li>
-      }
-    </ul>
-  </div>
-
-  <div class="mp-card">
-    <div class="mp-card-head">
-      <div>
-        <h2>Contract</h2>
-        <p class="mp-sub">
-          Always the next CRUDEOILM future. On expiry day the dying month is skipped so orders go to the following
-          contract.
-        </p>
-      </div>
-      <span class="mp-badge" [attr.data-tone]="liveMoney()?.contract?.expiryDay ? 'warn' : 'info'">
-        {{ liveMoney()?.contract?.expiryDay ? 'Expiry day · next month' : 'CRUDEOILM FUT' }}
-      </span>
-    </div>
-    @if (liveMoney()?.contract; as c) {
-      <div class="mp-stats">
-        <div class="mp-stat">
-          <span class="mp-stat-label">Trading</span>
-          <span class="mp-stat-value" data-testid="crude-symbol">{{ c.tradingSymbol }}</span>
-          <span class="mp-stat-hint">Expires {{ c.expiry || '—' }}</span>
-        </div>
-        <div class="mp-stat">
-          <span class="mp-stat-label">Lot</span>
-          <span class="mp-stat-value">{{ c.lotSize || 1 }}</span>
-          <span class="mp-stat-hint">₹{{ locked.rupeesPerPoint }}/pt · ₹{{ locked.chargeRs }}/RT</span>
-        </div>
-      </div>
-    } @else {
-      <p class="mp-sub" data-testid="crude-contract-empty">
-        Connect Kite on <a routerLink="/dashboard/get-token">Token</a> so this desk can read the MCX list and pick the
-        next month.
-      </p>
-    }
-  </div>
-
-  <div class="mp-card">
-    <div class="mp-card-head">
-      <div>
-        <h2>Rules</h2>
-        <p class="mp-sub">
-          Daily-min DNA. TP 25 is ₹200 after charges on a clean ticket. PDHL plus fade/trap so red and sideways days
-          still get a shot. Sit at first win. Not a guaranteed ₹150–200.
-        </p>
-      </div>
-      <span class="mp-badge" data-tone="info">{{ engineVersion() || dna()?.profileId || locked.profileId }}</span>
-    </div>
-    <ul class="mp-list" data-testid="crude-rules">
-      <li>Entries {{ locked.entryStart }}–{{ locked.entryEnd }} IST · flatten {{ locked.flatten }}</li>
-      <li>
-        Scratch {{ locked.scratchPts }} pts · TP {{ locked.targetPts }} · hard SL {{ locked.stopPts }} · max
-        {{ locked.maxTrades }}/day
-      </li>
-      <li>
-        Day lock +{{ locked.dayLockPts }} · first win · day loss −{{ locked.dayLossPts }} · week lock off so later days
-        still hunt
-      </li>
-      <li>PDHL, 10:00–11:00 fade, or 6-bar trap · next-bar confirm · first-bar smell exit</li>
-    </ul>
-  </div>
-
-  <div class="mp-card" data-testid="live-money-card">
-    <div class="mp-card-head">
-      <div>
-        <h2>Live money</h2>
-        <p class="mp-sub">
-          Places real Kite MIS. Tick the box to arm. Stop flatten cancels the SL-M, then market-exits anything still
-          open. Idle until you start it — a deploy does not arm this.
-        </p>
-      </div>
-      <span class="mp-badge" [attr.data-tone]="liveMoney()?.enabled ? 'down' : 'info'">
-        {{ liveMoney()?.enabled ? 'Real money on' : 'Armed off' }}
-      </span>
-    </div>
-    <div class="mp-form">
-      <label class="ui-check">
-        <input
-          type="checkbox"
-          [(ngModel)]="liveConfirm"
-          [disabled]="liveMoneyBusy() || !!liveMoney()?.enabled"
-          data-testid="live-money-confirm"
-        />
-        Place real Kite MIS on 1 lot Crude Mini, with scratch 10 / TP 25 (₹200) / hard SL-M 20 and 23:10 flatten
-      </label>
-      <div class="mp-field">
-        <span>&nbsp;</span>
+      <div class="mp-row">
         <button
           type="button"
           class="ui-btn ui-btn-primary"
-          [disabled]="liveMoneyBusy() || !!liveMoney()?.enabled || !liveConfirmOk()"
-          (click)="startLiveMoney()"
-          data-testid="start-live-money"
+          [disabled]="startOff()"
+          (click)="startDesk()"
+          data-testid="start-live-paper"
         >
-          {{ liveMoneyBusy() && !liveMoney()?.enabled ? 'Starting…' : 'Start live money' }}
+          {{ paper.busy() && !paper.session().running ? 'Starting…' : 'Start' }}
         </button>
-      </div>
-      <div class="mp-field">
-        <span>&nbsp;</span>
         <button
           type="button"
           class="ui-btn"
-          [disabled]="liveMoneyBusy() || !(liveMoney()?.enabled || liveMoney()?.fills?.length)"
-          (click)="stopLiveMoney()"
-          data-testid="stop-live-money"
+          [disabled]="stopOff()"
+          (click)="stopDesk()"
+          data-testid="stop-live-paper"
         >
-          Stop flatten
+          Stop
         </button>
+        <button
+          type="button"
+          class="ui-btn"
+          (click)="refreshDesk()"
+          [disabled]="paper.busy()"
+          data-testid="crude-refresh"
+        >
+          {{ paper.busy() ? 'Refreshing…' : 'Refresh' }}
+        </button>
+        <span class="mp-badge" [attr.data-tone]="now().tone" data-testid="crude-now-badge">{{ now().badge }}</span>
       </div>
     </div>
-    @if (error()) {
-      <p class="mp-sub mp-down">{{ error() }}</p>
+    <p class="mp-sub" data-testid="crude-honest">{{ honest }}</p>
+    @for (line of now().lines; track line) {
+      <p class="mp-sub">{{ line }}</p>
     }
-    @if (liveMoney(); as money) {
-      <p class="mp-sub" data-testid="live-money-status">
-        {{ money.lastMessage || 'Idle until Start live money.' }}
-        Week {{ money.weekNetPts | number : '1.0-0' }} pts · day {{ money.dayNetPts | number : '1.0-0' }} pts ·
-        {{ money.tradesToday }}/2 fills.
-      </p>
-      @if (money.lastError) {
-        <p class="mp-sub mp-down">{{ money.lastError }}</p>
+  </div>
+
+  <div class="mp-card" data-testid="paper-live-kite">
+    <div class="mp-card-head">
+      <div>
+        <h2>Live Kite · Bank Nifty and Sensex</h2>
+        <p class="mp-sub">
+          Paper always records. Live Kite sends a MARKET buy and a resting SL only when Live is on and that book is ticked.
+          Bank Nifty uses algo OR retest. Sensex uses mix + no confirm. When the paper target hits, Live cancels the SL and sells MARKET.
+          Hunt stays paper-only on Paper test. Sample only — not a guaranteed profit.
+        </p>
+      </div>
+      <span class="mp-badge" [attr.data-tone]="paper.liveArmed() ? 'down' : 'info'" data-testid="paper-live-badge">
+        {{ paper.liveArmed() ? 'Real Kite on' : 'Paper only' }}
+      </span>
+    </div>
+    <div class="mp-live-row">
+      <label class="ui-check">
+        <input
+          type="radio"
+          name="crude-live-mode"
+          [checked]="!paper.liveToggle()"
+          (change)="paper.setLiveToggle(false)"
+          data-testid="paper-live-radio-off"
+        />
+        Paper only
+      </label>
+      <label class="ui-check">
+        <input
+          type="radio"
+          name="crude-live-mode"
+          [checked]="paper.liveToggle()"
+          (change)="paper.setLiveToggle(true)"
+          data-testid="paper-live-radio-on"
+        />
+        Live Kite
+      </label>
+    </div>
+    <div class="mp-live-row">
+      @for (row of liveBookRows; track row.under) {
+        <label class="ui-check">
+          <input
+            type="checkbox"
+            [checked]="paper.liveBooks()[row.under]"
+            (change)="onLiveBook(row.under, $event)"
+            [attr.data-testid]="'paper-live-book-' + row.under"
+          />
+          {{ row.label }} · {{ row.method }}
+        </label>
       }
-      @if (money.fills.length) {
+    </div>
+    @if (paper.liveArmed()) {
+      <p class="mp-sub mp-down" data-testid="paper-live-warn">
+        REAL MONEY — ticked books send a MARKET buy and an SL to Kite. Switch to Paper only or untick a book to stop sending.
+      </p>
+    }
+  </div>
+
+  <div data-testid="live-paper-card">
+    @for (d of liveBooks(); track d.under) {
+      <div class="mp-card" [attr.data-testid]="'book-' + d.under">
+        <div class="mp-card-head">
+          <div>
+            <h2>{{ d.book.label }}</h2>
+            <p class="mp-sub">{{ d.method }} · paper always · Live Kite when ticked. Target ₹370 after charges. SL cancelled after target. Not a guaranteed profit.</p>
+            <label class="ui-check">
+              <input
+                type="checkbox"
+                [checked]="paper.liveBooks()[d.under]"
+                (change)="onLiveBook(d.under, $event)"
+                [attr.data-testid]="'paper-live-card-' + d.under"
+              />
+              Place real Kite order and SL
+            </label>
+          </div>
+          <span class="mp-stat-value" [class.mp-up]="d.book.closedRs > 0" [class.mp-down]="d.book.closedRs < 0">
+            ₹{{ d.book.closedRs | number : '1.0-0' }}
+          </span>
+        </div>
         <div class="mp-table-wrap">
           <table class="mp-table">
             <thead>
               <tr>
-                <th>Symbol</th>
+                <th>Contract</th>
                 <th>Side</th>
-                <th>In</th>
-                <th class="num">Qty</th>
                 <th class="num">Entry</th>
-                <th class="num">SL-M</th>
+                <th class="num">SL</th>
                 <th class="num">TP</th>
+                <th class="num">Live ₹</th>
+                <th class="num">Closed ₹</th>
               </tr>
             </thead>
             <tbody>
-              @for (f of money.fills; track f.instrument) {
-                <tr>
-                  <td class="mp-sym">{{ f.instrument }}</td>
-                  <td>{{ f.side === 'S' ? 'Short' : 'Long' }}</td>
-                  <td>{{ f.signalT || '—' }}</td>
-                  <td class="num">{{ f.qty }}</td>
-                  <td class="num">{{ f.entry | number : '1.0-1' }}</td>
-                  <td class="num">{{ f.stop | number : '1.0-1' }}</td>
-                  <td class="num">{{ f.target | number : '1.0-1' }}</td>
-                </tr>
-              }
+              <tr>
+                <td class="mp-sym">
+                  {{ pick(d.book) || d.book.label }}
+                  @if (d.book.optionType) {
+                    <div class="mp-pick" data-testid="live-paper-pick">{{ pick(d.book) }} · {{ d.book.lot }} qty</div>
+                  }
+                  @if (d.book.kiteNote) {
+                    <div class="mp-pick" data-testid="live-paper-kite-note">{{ d.book.kiteNote }}</div>
+                  }
+                </td>
+                <td>{{ d.book.side }}</td>
+                <td class="num">{{ d.book.entry != null ? (d.book.entry | number : '1.0-2') : '—' }}</td>
+                <td class="num">{{ d.book.sl != null ? (d.book.sl | number : '1.0-2') : '—' }}</td>
+                <td class="num">{{ d.book.tp != null ? (d.book.tp | number : '1.0-2') : '—' }}</td>
+                <td class="num" [class.mp-up]="d.book.liveRs > 0" [class.mp-down]="d.book.liveRs < 0">
+                  {{ d.book.side === 'flat' ? '—' : (d.book.liveRs | number : '1.0-0') }}
+                </td>
+                <td class="num" [class.mp-up]="d.book.closedRs > 0" [class.mp-down]="d.book.closedRs < 0">
+                  {{ d.book.closedRs | number : '1.0-0' }}
+                </td>
+              </tr>
             </tbody>
           </table>
         </div>
-      }
+      </div>
+    }
+  </div>
+
+  <div class="mp-card" data-testid="live-paper-fills">
+    <div class="mp-card-head">
+      <div>
+        <h2>Closed today</h2>
+        <p class="mp-sub">Bank Nifty and Sensex paper fills. Live Kite cancels SL after target. Not a guaranteed profit.</p>
+      </div>
+      <button type="button" class="ui-btn" (click)="copyNightLog()" data-testid="copy-night-log">
+        {{ copiedLeader() === 'log' ? 'Copied' : 'Copy night log' }}
+      </button>
+    </div>
+    @if (!liveFills().length) {
+      <p class="mp-sub" data-testid="live-paper-fills-empty">No Bank Nifty or Sensex paper fill yet.</p>
+    } @else {
+      <div class="mp-table-wrap">
+        <table class="mp-table">
+          <thead>
+            <tr>
+              <th>Book</th>
+              <th>Contract</th>
+              <th>Side</th>
+              <th class="num">Entry</th>
+              <th class="num">Exit</th>
+              <th class="num">SL</th>
+              <th class="num">TP</th>
+              <th>Why</th>
+              <th class="num">₹</th>
+              <th>In</th>
+              <th>Out</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (f of liveFills(); track f.day + f.book + f.reason + f.entry + $index) {
+              <tr>
+                <td class="mp-sym">{{ f.label }}</td>
+                <td data-testid="live-paper-fill-pick">{{ pick({ id: f.book, optionType: f.optionType, strike: f.strike, expiry: f.expiry, optionSymbol: f.optionSymbol }) || '—' }}</td>
+                <td>{{ f.side }}</td>
+                <td class="num">{{ f.entry | number : '1.0-2' }}</td>
+                <td class="num">{{ f.exit | number : '1.0-2' }}</td>
+                <td class="num">{{ f.sl | number : '1.0-2' }}</td>
+                <td class="num">{{ f.tp | number : '1.0-2' }}</td>
+                <td>{{ f.reason }}</td>
+                <td class="num" [class.mp-up]="f.rs > 0" [class.mp-down]="f.rs < 0">{{ f.rs | number : '1.0-0' }}</td>
+                <td>{{ clock(f.entryAt) }}</td>
+                <td>{{ clock(f.exitAt) }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
     }
   </div>
 </div>

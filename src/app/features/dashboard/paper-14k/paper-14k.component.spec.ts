@@ -101,24 +101,12 @@ describe('Paper14kComponent', () => {
     expect(fixture.nativeElement.querySelector('[data-testid="copy-night-log"]')).toBeNull();
     (fixture.nativeElement.querySelector('[data-testid="paper-hunt-tab-crude"]') as HTMLButtonElement).click();
     fixture.detectChanges();
-    expect(fixture.nativeElement.querySelector('[data-testid="paper-live-kite"]')).toBeTruthy();
-    expect(fixture.nativeElement.querySelector('[data-testid="paper-live-radio-on"]')).toBeTruthy();
-    expect(fixture.nativeElement.querySelector('[data-testid="paper-live-book-bank"]')).toBeTruthy();
-    expect(fixture.nativeElement.querySelector('[data-testid="paper-live-book-sensex"]')).toBeTruthy();
-    expect(fixture.nativeElement.querySelector('[data-testid="paper-live-book-nifty"]')).toBeNull();
-    expect(fixture.nativeElement.querySelector('[data-testid="paper-live-book-crude"]')).toBeNull();
-    expect(fixture.nativeElement.querySelector('[data-testid="book-bank"]')).toBeTruthy();
-    expect(fixture.nativeElement.querySelector('[data-testid="book-sensex"]')).toBeTruthy();
-    expect(fixture.nativeElement.querySelector('[data-testid="live-paper-fills"]')).toBeTruthy();
-    expect((fixture.nativeElement.querySelector('[data-testid="paper-live-kite"]') as HTMLElement).textContent).toMatch(
-      /algo OR retest/,
-    );
-    expect((fixture.nativeElement.querySelector('[data-testid="paper-live-kite"]') as HTMLElement).textContent).toMatch(
-      /mix \+ no confirm/,
-    );
-    expect((fixture.nativeElement.querySelector('[data-testid="paper-live-kite"]') as HTMLElement).textContent).toMatch(
-      /cancels the SL and sells MARKET/,
-    );
+    expect(fixture.nativeElement.querySelector('[data-testid="paper-live-kite"]')).toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-testid="paper-live-radio-on"]')).toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-testid="paper-live-book-bank"]')).toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-testid="book-bank"]')).toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-testid="live-paper-fills"]')).toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-testid="paper-hunt-tab-crude"]')).toBeTruthy();
     (fixture.nativeElement.querySelector('[data-testid="paper-hunt-tab-nifty"]') as HTMLButtonElement).click();
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('[data-testid="paper-live-kite"]')).toBeNull();
@@ -308,8 +296,8 @@ describe('Paper14kComponent', () => {
     (fixture.nativeElement.querySelector('[data-testid="paper-hunt-tab-crude"]') as HTMLButtonElement).click();
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('[data-testid="paper-hunt-empty"]')?.textContent).toMatch(/Crude Mini/);
-    expect(fixture.nativeElement.querySelector('[data-testid="live-paper-fills"]')).toBeTruthy();
-    expect(fixture.nativeElement.querySelector('[data-testid="paper-live-radio-on"]')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('[data-testid="live-paper-fills"]')).toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-testid="paper-live-radio-on"]')).toBeNull();
     expect(fixture.nativeElement.querySelectorAll('[data-testid="start-live-paper"]').length).toBe(1);
     expect(fixture.nativeElement.querySelector('[data-testid="paper-review"]')).toBeNull();
   });

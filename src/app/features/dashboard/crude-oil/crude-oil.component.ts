@@ -1,111 +1,158 @@
 import { DecimalPipe } from '@angular/common';
-import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
-import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { Component, OnDestroy, computed, inject, signal } from '@angular/core';
+import { LivePaperService } from '../../../core/paper-desk/live-paper.service';
+import { PaperLiveUnder } from '../../../core/paper-desk/paper-live-order.util';
 import {
-  GUARD_BOOK_LABEL,
-  OWNER_CAPITAL_RS,
-  expiryRule,
-  guardCapital,
-} from '../../../core/paper-desk/capital-guard.util';
-import { CRUDE_DAILY_GREEN } from '../../../core/strategy-engine/strategies/crude-daily-green/crude-daily-green.dna';
-import { CrudeOilApiService } from './crude-oil-api.service';
-import { CrudeLiveDna, CrudeLiveMoney } from './crude-oil.models';
+  LIVE_TAKE_METHOD,
+  LIVE_TAKE_UNDERS,
+  LivePaperBookState,
+  OptionPickView,
+  PAPER_TEST_HONEST,
+  allClosedFills,
+  deskOf,
+  nightLogJson,
+  optionPickLabel,
+  underOf,
+} from '../../../core/paper-desk/live-paper.engine';
 
 @Component({
   selector: 'app-crude-oil',
   standalone: true,
-  imports: [FormsModule, DecimalPipe, RouterLink],
+  imports: [DecimalPipe],
   templateUrl: './crude-oil.component.html',
   styleUrl: './crude-oil.component.css',
 })
-export class CrudeOilComponent implements OnInit, OnDestroy {
-  private readonly api = inject(CrudeOilApiService);
-  private pollTimer: ReturnType<typeof setTimeout> | null = null;
+export class CrudeOilComponent implements OnDestroy {
+  protected readonly paper = inject(LivePaperService);
+  private readonly clockNow = signal(Date.now());
+  private readonly clockTimer = setInterval(() => this.clockNow.set(Date.now()), 5_000);
 
-  protected liveConfirm = false;
-  protected readonly liveMoney = signal<CrudeLiveMoney | null>(null);
-  protected readonly dna = signal<CrudeLiveDna | null>(null);
-  protected readonly engineVersion = signal('');
-  protected readonly liveMoneyBusy = signal(false);
-  protected readonly error = signal('');
-  protected readonly locked = CRUDE_DAILY_GREEN;
-  protected readonly capital = guardCapital(OWNER_CAPITAL_RS);
-  protected readonly bookLabel = GUARD_BOOK_LABEL;
-  protected readonly expiryLines = (['nifty', 'bank', 'sensex', 'crude'] as const).map((book) => ({
-    book,
-    rule: expiryRule(book),
+  protected readonly honest = PAPER_TEST_HONEST;
+  protected readonly now = computed(() => this.nowCard(this.paper.session(), this.paper.busy(), this.clockNow()));
+  protected readonly liveBookRows = LIVE_TAKE_UNDERS.map((under) => ({
+    under,
+    label: under === 'bank' ? 'Bank Nifty' : 'Sensex',
+    method: LIVE_TAKE_METHOD[under],
   }));
+  protected readonly liveBooks = computed(() => {
+    const books = this.paper.session().books;
+    return this.liveBookRows
+      .map((row) => {
+        const book = books.find((b) => (b.under || underOf(b.id)) === row.under && (b.desk || deskOf(b.id)) === 'momentum');
+        return book ? { ...row, book } : null;
+      })
+      .filter((row): row is { under: (typeof LIVE_TAKE_UNDERS)[number]; label: string; method: string; book: LivePaperBookState } => !!row);
+  });
+  protected readonly liveFills = computed(() =>
+    allClosedFills(this.paper.session().books).filter((f) =>
+      LIVE_TAKE_UNDERS.includes((f.under || underOf(f.book)) as (typeof LIVE_TAKE_UNDERS)[number]),
+    ),
+  );
+  protected readonly copiedLeader = signal('');
+  protected readonly startOff = computed(() => this.paper.session().running || this.paper.busy());
+  protected readonly stopOff = computed(() => !this.paper.session().running);
 
-  ngOnInit(): void {
-    this.poll();
+  constructor() {
+    this.paper.setLiveBook('nifty', false);
+    this.paper.setLiveBook('crude', false);
   }
 
   ngOnDestroy(): void {
-    this.clearPoll();
+    clearInterval(this.clockTimer);
   }
 
-  protected liveConfirmOk(): boolean {
-    return this.liveConfirm === true;
+  protected startDesk(): void {
+    if (this.startOff()) return;
+    this.paper.setLiveBook('nifty', false);
+    this.paper.setLiveBook('crude', false);
+    void this.paper.start();
   }
 
-  protected async startLiveMoney(): Promise<void> {
-    this.error.set('');
-    this.liveMoneyBusy.set(true);
+  protected stopDesk(): void {
+    if (this.stopOff()) return;
+    this.paper.stop();
+  }
+
+  protected refreshDesk(): void {
+    void this.paper.refresh();
+  }
+
+  protected onLiveBook(under: PaperLiveUnder, ev: Event): void {
+    if (under !== 'bank' && under !== 'sensex') return;
+    this.paper.setLiveBook(under, !!(ev.target as HTMLInputElement | null)?.checked);
+  }
+
+  protected pick(row: OptionPickView): string {
+    return optionPickLabel(row);
+  }
+
+  protected copyNightLog(): void {
+    void this.writeClipboard(nightLogJson(this.paper.session()), 'log');
+  }
+
+  protected clock(iso?: string): string {
+    return istClock(iso || '');
+  }
+
+  private async writeClipboard(text: string, key: string): Promise<void> {
+    if (!text) return;
     try {
-      const res = await this.api.startLiveMoney();
-      this.apply(res);
-      this.poll();
-    } catch (err) {
-      this.error.set(this.fmtErr(err));
-    } finally {
-      this.liveMoneyBusy.set(false);
-    }
-  }
-
-  protected async stopLiveMoney(): Promise<void> {
-    this.error.set('');
-    this.liveMoneyBusy.set(true);
-    try {
-      const res = await this.api.stopLiveMoney();
-      this.apply(res);
-    } catch (err) {
-      this.error.set(this.fmtErr(err));
-    } finally {
-      this.liveMoneyBusy.set(false);
-    }
-  }
-
-  private poll(): void {
-    this.clearPoll();
-    void this.refresh();
-    this.pollTimer = setTimeout(() => this.poll(), 3000);
-  }
-
-  private async refresh(): Promise<void> {
-    try {
-      const res = await this.api.status();
-      this.apply(res);
+      await navigator.clipboard.writeText(text);
+      this.copiedLeader.set(key);
+      window.setTimeout(() => {
+        if (this.copiedLeader() === key) this.copiedLeader.set('');
+      }, 1600);
     } catch {
-      /* droplet status is optional until Start */
+      this.copiedLeader.set('');
     }
   }
 
-  private apply(res: { money?: CrudeLiveMoney; dna?: CrudeLiveDna; engineVersion?: string }): void {
-    if (res.money) this.liveMoney.set(res.money);
-    if (res.dna) this.dna.set(res.dna);
-    if (res.engineVersion) this.engineVersion.set(res.engineVersion);
-  }
+  private nowCard(
+    s: ReturnType<LivePaperService['session']>,
+    busy: boolean,
+    nowMs: number,
+  ): { tone: string; badge: string; title: string; lines: string[] } {
+    const ageSec = s.asOf ? Math.max(0, Math.round((nowMs - Date.parse(s.asOf)) / 1000)) : null;
+    const checked =
+      s.asOf && ageSec != null && Number.isFinite(ageSec)
+        ? `Last Kite check ${istClock(s.asOf)} IST${ageSec >= 90 ? ` — ${Math.round(ageSec / 60)} min ago.` : '.'}`
+        : '';
+    const bank = this.liveBooks().find((d) => d.under === 'bank');
+    const sensex = this.liveBooks().find((d) => d.under === 'sensex');
+    const today = `Today ${s.day}: Bank ₹${Math.round(bank?.book.closedRs || 0).toLocaleString('en-IN')} · Sensex ₹${Math.round(sensex?.book.closedRs || 0).toLocaleString('en-IN')}.`;
+    const droplet = this.paper.dropletNote();
+    const foot =
+      'Paper always records. Live Kite is Bank Nifty algo OR retest and Sensex mix + no confirm. Hunt stays on Paper test. Not a guaranteed profit.';
 
-  private clearPoll(): void {
-    if (this.pollTimer) {
-      clearTimeout(this.pollTimer);
-      this.pollTimer = null;
+    if (s.kiteError) {
+      return { tone: 'down', badge: 'needs Token', title: s.kiteError, lines: [today, foot].filter(Boolean) };
     }
+    if (!s.running) {
+      return {
+        tone: 'info',
+        badge: 'not watching',
+        title: 'Not watching. Hit Start. Paper always. Live Kite is extra on ticked books.',
+        lines: ['Bank Nifty algo OR retest and Sensex mix + no confirm.', today, foot].filter(Boolean),
+      };
+    }
+    if (busy && !s.asOf) {
+      return { tone: 'info', badge: 'checking Kite', title: 'Checking Kite…', lines: [foot] };
+    }
+    return {
+      tone: this.paper.liveArmed() ? 'down' : 'info',
+      badge: this.paper.liveArmed() ? 'Live Kite on' : 'watching',
+      title: this.paper.liveArmed()
+        ? 'Watching Bank Nifty and Sensex. Live Kite sends a MARKET buy and a resting SL on ticked books.'
+        : 'Watching Bank Nifty and Sensex on paper. Switch to Live Kite to send orders.',
+      lines: [checked, today, droplet, foot].filter(Boolean),
+    };
   }
+}
 
-  private fmtErr(err: unknown): string {
-    const raw = err as { error?: { message?: string }; message?: string };
-    return raw?.error?.message || raw?.message || 'Could not reach Crude Mini live money.';
-  }
+function istClock(iso: string): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  const ist = new Date(d.getTime() + 330 * 60 * 1000);
+  return `${String(ist.getUTCHours()).padStart(2, '0')}:${String(ist.getUTCMinutes()).padStart(2, '0')}`;
 }

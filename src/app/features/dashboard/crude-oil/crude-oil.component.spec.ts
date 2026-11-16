@@ -1,140 +1,76 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideHttpClient } from '@angular/common/http';
 import { provideRouter } from '@angular/router';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { CrudeOilApiService } from './crude-oil-api.service';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { CrudeOilComponent } from './crude-oil.component';
 
 describe('CrudeOilComponent', () => {
   let fixture: ComponentFixture<CrudeOilComponent>;
-  const idleMoney = {
-    enabled: false,
-    liveOrders: false,
-    date: '2026-10-16',
-    weekNetPts: 0,
-    dayNetPts: 0,
-    tradesToday: 0,
-    contract: {
-      tradingSymbol: 'CRUDEOILM26NOVFUT',
-      instrumentToken: 222,
-      expiry: '2026-11-17',
-      lotSize: 1,
-      tickSize: 1,
-      expiryDay: true,
-    },
-    fills: [] as unknown[],
-    lastTick: null as string | null,
-    lastError: null as string | null,
-    lastMessage: null as string | null,
-    sessionOk: false,
-    guaranteed: false,
-    funds: { equityCash: 14_085, commodityCash: 0 },
-  };
-  let moneyState = { ...idleMoney };
-  const statusMock = vi.fn(() =>
-    Promise.resolve({
-      status: 'ok',
-      liveOrders: moneyState.enabled,
-      dna: {
-        profileId: 'daily-min-sc10',
-        entryStart: '10:00',
-        entryEnd: '23:00',
-        flatten: '23:10',
-        stopPts: 20,
-        targetPts: 20,
-        dayLockPts: 20,
-        dayLossPts: 40,
-        maxTrades: 2,
-        weekLockPts: 0,
-        rupeesPerPoint: 10,
-        chargeRs: 50,
-        qty: 1,
-      },
-      money: { ...moneyState },
-    }),
-  );
-  const startLiveMoneyMock = vi.fn(() => {
-    moneyState = {
-      ...idleMoney,
-      enabled: true,
-      liveOrders: true,
-      lastMessage: 'Live Crude Mini armed. 1 lot CRUDEOILM FUT. Entries 10:00–23:00 IST.',
-      sessionOk: true,
-    };
-    return Promise.resolve({ status: 'ok', liveOrders: true, money: { ...moneyState } });
-  });
-  const stopLiveMoneyMock = vi.fn(() => {
-    moneyState = { ...idleMoney, lastMessage: 'Live Crude Mini stopped. Flat.' };
-    return Promise.resolve({ status: 'ok', liveOrders: false, money: { ...moneyState } });
-  });
 
   beforeEach(async () => {
-    statusMock.mockClear();
-    startLiveMoneyMock.mockClear();
-    stopLiveMoneyMock.mockClear();
-    moneyState = { ...idleMoney };
+    localStorage.clear();
     await TestBed.configureTestingModule({
       imports: [CrudeOilComponent],
-      providers: [
-        provideRouter([]),
-        {
-          provide: CrudeOilApiService,
-          useValue: {
-            status: statusMock,
-            startLiveMoney: startLiveMoneyMock,
-            stopLiveMoney: stopLiveMoneyMock,
-          },
-        },
-      ],
+      providers: [provideHttpClient(), provideRouter([])],
     }).compileComponents();
     fixture = TestBed.createComponent(CrudeOilComponent);
     fixture.detectChanges();
-    await fixture.whenStable();
-    fixture.detectChanges();
   });
 
-  it('shows the next-month contract on expiry day and the 10:00–23:00 window', () => {
+  it('is the parent Crude Oil desk: Bank Nifty and Sensex paper plus Live Kite', () => {
     const text = fixture.nativeElement.textContent as string;
-    expect(text).toMatch(/CRUDEOILM26NOVFUT/);
-    expect(text).toMatch(/Expiry day · next month/);
-    expect(text).toMatch(/10:00–23:00/);
-    expect(text).toMatch(/flatten 23:10/);
-    expect(text).toMatch(/week lock off/);
-    expect(text).toMatch(/Scratch 10/);
-    expect(text).toMatch(/TP 25/);
-    expect(text).toMatch(/₹200/);
-    expect(text).toMatch(/Start live money/i);
-    expect(text).toMatch(/Not a guaranteed profit/);
-    expect(text).toMatch(/₹14,000 capital/);
-    expect(text).toMatch(/Nifty 50/);
+    expect(fixture.nativeElement.querySelector('[data-testid="crude-oil-page"]')).toBeTruthy();
     expect(text).toMatch(/Bank Nifty/);
     expect(text).toMatch(/Sensex/);
-    expect(text).toMatch(/cheap CE\/PE/i);
-    expect(text).toMatch(/Test buys CE\/PE/);
-    expect(text).toMatch(/FUT blocked at ₹14k/);
-    expect(text).toMatch(/Kite equity/);
-    expect(text).toMatch(/14,085/);
-    expect(text).toMatch(/MCX cannot open/);
-    expect(text).not.toMatch(/No option buying at this cash/);
-    expect(text).toMatch(/next listed expiry/i);
-    expect(text).toMatch(/never the dying week/i);
+    expect(text).toMatch(/algo OR retest/);
+    expect(text).toMatch(/mix \+ no confirm/);
+    expect(text).toMatch(/cancels the SL and sells MARKET/);
+    expect(text).toMatch(/Paper only/);
+    expect(text).toMatch(/Live Kite/);
+    expect(text).toMatch(/Place real Kite order and SL/);
+    expect(text).toMatch(/Closed today/);
+    expect(text).toMatch(/Copy night log/);
+    expect(text).toMatch(/Not a guaranteed profit/);
+    expect(text).toMatch(/Hunt stays paper-only on Paper test/);
+    expect(fixture.nativeElement.querySelector('[data-testid="paper-live-kite"]')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('[data-testid="paper-live-radio-on"]')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('[data-testid="paper-live-book-bank"]')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('[data-testid="paper-live-book-sensex"]')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('[data-testid="paper-live-book-nifty"]')).toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-testid="paper-live-book-crude"]')).toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-testid="book-bank"]')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('[data-testid="book-sensex"]')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('[data-testid="book-nifty"]')).toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-testid="book-crude"]')).toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-testid="live-paper-fills"]')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('[data-testid="start-live-paper"]')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('[data-testid="stop-live-paper"]')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('[data-testid="start-live-money"]')).toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-testid="paper-hunt"]')).toBeNull();
+    expect(text).not.toMatch(/Start live money/i);
+    expect(text).not.toMatch(/CRUDEOILM FUT/);
+    expect(fixture.componentInstance['paper'].liveArmed()).toBe(false);
+    expect(fixture.componentInstance['paper'].liveBooks().nifty).toBe(false);
+    expect(fixture.componentInstance['paper'].liveBooks().crude).toBe(false);
   });
 
-  it('arms real-money scanning only after the confirm checkbox', async () => {
-    const cmp = fixture.componentInstance;
-    const startBtn = fixture.nativeElement.querySelector('[data-testid="start-live-money"]') as HTMLButtonElement;
-    expect(startBtn.disabled).toBe(true);
-    const box = fixture.nativeElement.querySelector('[data-testid="live-money-confirm"]') as HTMLInputElement;
-    box.click();
+  it('arms Live Kite only after Live is on and a book is ticked', () => {
+    const paper = fixture.componentInstance['paper'];
+    expect(paper.liveArmed()).toBe(false);
+    (fixture.nativeElement.querySelector('[data-testid="paper-live-radio-on"]') as HTMLInputElement).click();
     fixture.detectChanges();
-    expect(cmp['liveConfirmOk']()).toBe(true);
-    expect((fixture.nativeElement.querySelector('[data-testid="start-live-money"]') as HTMLButtonElement).disabled).toBe(
-      false,
+    expect(paper.liveToggle()).toBe(true);
+    expect(paper.liveArmed()).toBe(false);
+    (fixture.nativeElement.querySelector('[data-testid="paper-live-book-bank"]') as HTMLInputElement).click();
+    fixture.detectChanges();
+    expect(paper.liveBooks().bank).toBe(true);
+    expect(paper.liveArmed()).toBe(true);
+    expect(fixture.nativeElement.querySelector('[data-testid="paper-live-warn"]')).toBeTruthy();
+    expect((fixture.nativeElement.querySelector('[data-testid="paper-live-badge"]') as HTMLElement).textContent).toMatch(
+      /Real Kite on/,
     );
-    await cmp['startLiveMoney']();
-    expect(startLiveMoneyMock).toHaveBeenCalledTimes(1);
+    (fixture.nativeElement.querySelector('[data-testid="paper-live-radio-off"]') as HTMLInputElement).click();
     fixture.detectChanges();
-    const text = fixture.nativeElement.textContent as string;
-    expect(text).toMatch(/rejecting 1 lot at ₹14,000/);
-    expect(text).toMatch(/NRML is ~₹31,000/);
+    expect(paper.liveArmed()).toBe(false);
   });
 });

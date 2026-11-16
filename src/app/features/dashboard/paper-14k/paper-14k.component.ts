@@ -1,7 +1,6 @@
 import { DecimalPipe } from '@angular/common';
 import { Component, OnDestroy, computed, inject, signal } from '@angular/core';
 import { LivePaperService } from '../../../core/paper-desk/live-paper.service';
-import { PaperLiveUnder } from '../../../core/paper-desk/paper-live-order.util';
 import { PAPER_HUNT_CAP, PAPER_HUNT_HONEST, PAPER_HUNT_METHODS } from '../../../core/paper-desk/paper-hunt.methods';
 import {
   HuntMethodRow,
@@ -15,17 +14,6 @@ import {
   huntTabNet,
   huntTickets,
 } from '../../../core/paper-desk/paper-hunt.engine';
-import {
-  LIVE_TAKE_METHOD,
-  LIVE_TAKE_UNDERS,
-  LivePaperBookState,
-  OptionPickView,
-  allClosedFills,
-  deskOf,
-  nightLogJson,
-  optionPickLabel,
-  underOf,
-} from '../../../core/paper-desk/live-paper.engine';
 
 const HUNT_TABS = [
   { under: 'nifty' as const, label: 'Nifty 50' },
@@ -62,23 +50,6 @@ export class Paper14kComponent implements OnDestroy {
   protected readonly huntSummaries = computed(() => huntSummaries(this.hunt()));
   protected readonly huntLeaders = computed(() => huntLeaders(this.hunt()));
   protected readonly copiedLeader = signal('');
-  protected readonly liveBookRows = LIVE_TAKE_UNDERS.map((under) => ({
-    under,
-    label: under === 'bank' ? 'Bank Nifty' : 'Sensex',
-    method: LIVE_TAKE_METHOD[under],
-  }));
-  protected readonly liveBooks = computed(() => {
-    const books = this.paper.session().books;
-    return this.liveBookRows
-      .map((row) => {
-        const book = books.find((b) => (b.under || underOf(b.id)) === row.under && (b.desk || deskOf(b.id)) === 'momentum');
-        return book ? { ...row, book } : null;
-      })
-      .filter((row): row is { under: (typeof LIVE_TAKE_UNDERS)[number]; label: string; method: string; book: LivePaperBookState } => !!row);
-  });
-  protected readonly liveFills = computed(() =>
-    allClosedFills(this.paper.session().books).filter((f) => LIVE_TAKE_UNDERS.includes((f.under || underOf(f.book)) as (typeof LIVE_TAKE_UNDERS)[number])),
-  );
   protected readonly huntTabMethods = computed(() =>
     filterHuntMethodRows(huntMethodRows(this.hunt(), this.huntTab()), this.huntView()),
   );
@@ -121,19 +92,6 @@ export class Paper14kComponent implements OnDestroy {
 
   protected copyLeaders(): void {
     void this.writeClipboard(huntLeadersCopyText(this.huntLeaders()), 'all');
-  }
-
-  protected onLiveBook(under: PaperLiveUnder, ev: Event): void {
-    if (under !== 'bank' && under !== 'sensex') return;
-    this.paper.setLiveBook(under, !!(ev.target as HTMLInputElement | null)?.checked);
-  }
-
-  protected pick(row: OptionPickView): string {
-    return optionPickLabel(row);
-  }
-
-  protected copyNightLog(): void {
-    void this.writeClipboard(nightLogJson(this.paper.session()), 'log');
   }
 
   protected selectHuntTab(under: (typeof HUNT_TABS)[number]['under']): void {
