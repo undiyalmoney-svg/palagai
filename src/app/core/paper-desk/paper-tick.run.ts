@@ -6,7 +6,7 @@ import { Instrument } from '../models/instrument.model';
 import { parseKiteInstrumentsCsv } from '../utils/csv.util';
 import { CheapOtmPick, pickCheapOtm } from '../utils/pick-cheap-otm.util';
 import { LiveAssumeBar, LiveAssumeBookCfg } from './live-assume.engine';
-import { liveBuyPrice, lotCostRs, neededLotQuote, replayBudgetSkips } from './live-fill.util';
+import { liveBuyPrice, lotCostRs, neededLotQuote, optionPremiumPx, replayBudgetSkips } from './live-fill.util';
 import {
   LIVE_PAPER_BOOKS,
   LivePaperBookState,
@@ -156,11 +156,11 @@ export async function runPaperTick(io: PaperTickIo): Promise<LivePaperSession> {
       { bid: optBid, ask: optAsk, blockOpen: indexDeskBlockReason(cfg.id, peers, day), evolve: flags },
     );
     if (cfg.buyOption && needsOption(next)) {
-      const spot = underLast ?? (next.optionSymbol ? next.last : null) ?? 0;
+      const spot = underLast ?? 0;
       const pair = cheapByUnder.get(under);
       next = await bindCheap(next, cfg, chain, spot, quotes, nowMin, io, pair, now);
     }
-    if (cfg.buyOption && next.side !== 'flat' && !next.optionSymbol) {
+    if (cfg.buyOption && next.side !== 'flat' && (!next.optionSymbol || optionPremiumPx(next.entry) == null)) {
       next = {
         ...next,
         side: 'flat',
@@ -174,8 +174,9 @@ export async function runPaperTick(io: PaperTickIo): Promise<LivePaperSession> {
         reason: 'skipped: no option fill',
       };
     } else if (next.side !== 'flat' && next.optionSymbol && optLast != null) {
-      const mark = optBid != null && optLast < optBid ? optBid : optLast;
-      next = { ...next, last: mark };
+      const raw = optBid != null && optLast < optBid ? optBid : optLast;
+      const mark = optionPremiumPx(raw, underLast);
+      if (mark != null) next = { ...next, last: mark };
     }
     if (next.fills.length > prev.fills.length && prev.optionSymbol) {
       const q = findQuote(quotes, optionKey(prev));
@@ -295,7 +296,7 @@ async function bindCheap(
       });
     }
   }
-  if (!listed || fill.price == null) {
+  if (!listed || fill.price == null || optionPremiumPx(fill.price) == null) {
     const skip: SkippedSignal = {
       at: now.toISOString(),
       day: istDay(now),
@@ -598,9 +599,9 @@ export function optionMarkLast(args: {
   underLast: number | null;
 }): number | null {
   if (!args.buyOption) return args.underLast;
-  if (args.side !== 'flat' && args.optionSymbol) return args.optLast ?? args.prevLast;
-  if (args.side !== 'flat') return args.prevLast;
-  return args.underLast;
+  const prem = optionPremiumPx(args.optLast, args.underLast) ?? optionPremiumPx(args.prevLast, args.underLast);
+  if (args.side !== 'flat') return prem;
+  return prem;
 }
 
 function instOf(
@@ -669,16 +670,22 @@ function lastByKey(quotes: Record<string, PaperTickQuote>, key: string): number 
   return null;
 }
 
-function lastPrice(quotes: Record<string, PaperTickQuote>, id: string, symbol: string): number | null {
+export function lastPrice(quotes: Record<string, PaperTickQuote>, id: string, symbol: string): number | null {
+  const want =
+    id === 'nifty' ? 'NSE:NIFTY 50' : id === 'bank' ? 'NSE:NIFTY BANK' : id === 'sensex' ? 'BSE:SENSEX' : '';
+  if (want) {
+    const n = Number(findQuote(quotes, want)?.last_price);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  }
   for (const [k, v] of Object.entries(quotes)) {
     const key = k.toUpperCase();
     if (id === 'crude' && key.includes('CRUDEOILM') && !key.includes('CE') && !key.includes('PE')) {
       return Number(v.last_price) || null;
     }
-    if (id === 'nifty' && key.includes('NIFTY 50')) return Number(v.last_price) || null;
-    if (id === 'bank' && key.includes('BANK')) return Number(v.last_price) || null;
-    if (id === 'sensex' && key.includes('SENSEX')) return Number(v.last_price) || null;
-    if (symbol && key.includes(symbol.toUpperCase())) return Number(v.last_price) || null;
+    if (symbol && key.includes(symbol.toUpperCase()) && !key.includes('CE') && !key.includes('PE')) {
+      const n = Number(v.last_price);
+      if (Number.isFinite(n) && n > 0) return n;
+    }
   }
   return null;
 }

@@ -4,7 +4,7 @@
  */
 import { LiveAssumeBar, LiveAssumeBookCfg } from './live-assume.engine';
 import { CheapOtmPick } from '../utils/pick-cheap-otm.util';
-import { liveBuyPrice, lotCostRs } from './live-fill.util';
+import { liveBuyPrice, lotCostRs, optionPremiumPx } from './live-fill.util';
 import {
   LIVE_PAPER_BOOKS,
   LivePaperBookState,
@@ -55,6 +55,40 @@ export function emptyHunt(day: string): PaperHuntState {
     PAPER_HUNT_METHODS.map((def) => emptyBook(huntMethodCfg(under, def))),
   );
   return { day, trades: 0, stats: books.map((b) => statOf(b)), books, feed: '' };
+}
+
+const HUNT_MAX_ABS_RS = 50_000;
+
+function scrubHuntBook(book: LivePaperBookState): LivePaperBookState {
+  const fills = (book.fills || []).filter((f) => {
+    if (optionPremiumPx(f.entry) == null || optionPremiumPx(f.exit) == null) return false;
+    return Math.abs(Number(f.rs) || 0) <= HUNT_MAX_ABS_RS;
+  });
+  const closedRs = Math.round(fills.reduce((s, f) => s + (f.rs || 0), 0) * 10) / 10;
+  const entryOk = optionPremiumPx(book.entry) != null;
+  if (book.side !== 'flat' && !entryOk) {
+    return {
+      ...book,
+      fills,
+      closedRs,
+      side: 'flat',
+      entry: null,
+      sl: null,
+      tp: null,
+      scratch: null,
+      last: optionPremiumPx(book.last),
+      livePts: 0,
+      liveRs: 0,
+      status: 'watching',
+      reason: 'dropped index-priced ticket',
+      optionSymbol: '',
+      optionType: '',
+      strike: null,
+      peakPx: null,
+      troughPx: null,
+    };
+  }
+  return { ...book, fills, closedRs, last: optionPremiumPx(book.last) ?? book.last };
 }
 
 export function huntCfgOf(id: string): LiveAssumeBookCfg {
@@ -430,7 +464,7 @@ export function huntBindOption(
     };
   }
   const fill = liveBuyPrice(side.ask, side.last);
-  if (fill.price == null) {
+  if (fill.price == null || optionPremiumPx(fill.price) == null) {
     return {
       ...book,
       side: 'flat',
@@ -478,7 +512,7 @@ export function tickPaperHunt(args: {
   const prev = args.prev?.day === args.day && args.prev.books.length === UNDERS.length * PAPER_HUNT_METHODS.length
     ? args.prev
     : emptyHunt(args.day);
-  const byId = new Map(prev.books.map((b) => [b.id, b]));
+  const byId = new Map(prev.books.map((b) => [b.id, scrubHuntBook(b)]));
   const nextBooks: LivePaperBookState[] = [];
   for (const under of UNDERS) {
     const bars = args.barsByUnder.get(under) || [];
@@ -488,9 +522,12 @@ export function tickPaperHunt(args: {
       const cfg = huntMethodCfg(under, def);
       const prevBook = byId.get(cfg.id) || emptyBook(cfg);
       const side = prevBook.optionType === 'PE' || prevBook.side === 'short' ? q?.pe : q?.ce;
-      const mark = side?.last ?? side?.bid ?? q?.underLast ?? prevBook.last;
-      const bid = side?.bid ?? null;
-      const ask = side?.ask ?? null;
+      const mark =
+        optionPremiumPx(side?.last, q?.underLast) ??
+        optionPremiumPx(side?.bid, q?.underLast) ??
+        optionPremiumPx(prevBook.last, q?.underLast);
+      const bid = optionPremiumPx(side?.bid, q?.underLast);
+      const ask = optionPremiumPx(side?.ask, q?.underLast);
       let next = tickBook(prevBook, cfg, bars, mark, args.day, args.nowMin, prevBook.optionSymbol || cfg.label, [], {
         bid,
         ask,
@@ -507,6 +544,26 @@ export function tickPaperHunt(args: {
           args.nowIso,
           args.day,
         );
+      }
+      if (next.side !== 'flat' && optionPremiumPx(next.entry) == null) {
+        next = {
+          ...next,
+          side: 'flat',
+          entry: null,
+          sl: null,
+          tp: null,
+          scratch: null,
+          last: optionPremiumPx(next.last),
+          livePts: 0,
+          liveRs: 0,
+          status: 'watching',
+          reason: 'dropped index-priced ticket',
+          optionSymbol: '',
+          optionType: '',
+          strike: null,
+          peakPx: null,
+          troughPx: null,
+        };
       }
       nextBooks.push(next);
     }

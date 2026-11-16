@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { emptyBook, LIVE_PAPER_BOOKS } from './live-paper.engine';
-import { liveBuyPrice, lotCostRs, neededLotQuote, replayBudgetSkips } from './live-fill.util';
+import { liveBuyPrice, lotCostRs, neededLotQuote, optionPremiumPx, replayBudgetSkips } from './live-fill.util';
 
 describe('liveBuyPrice', () => {
   it('pays the ask like a live buy', () => {
@@ -10,6 +10,17 @@ describe('liveBuyPrice', () => {
   it('falls back to last only when the ask is missing', () => {
     expect(liveBuyPrice(null, 575)).toEqual({ price: 575, atAsk: false });
     expect(liveBuyPrice(0, 0)).toEqual({ price: null, atAsk: false });
+  });
+});
+
+describe('optionPremiumPx', () => {
+  it('keeps a CE/PE last and rejects the index / future', () => {
+    expect(optionPremiumPx(162.5, 58_000)).toBe(162.5);
+    expect(optionPremiumPx(580.55, 58_000)).toBe(580.55);
+    expect(optionPremiumPx(58_000, 58_000)).toBeNull();
+    expect(optionPremiumPx(15_715, 58_000)).toBeNull();
+    expect(optionPremiumPx(82_400, 82_400)).toBeNull();
+    expect(optionPremiumPx(5_400, 5_400)).toBeNull();
   });
 });
 

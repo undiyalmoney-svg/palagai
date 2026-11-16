@@ -204,15 +204,25 @@ function kiteBar(row: unknown[]): LiveAssumeBar {
 function lastPrice(
   quotes: Record<string, { last_price?: number }>,
   id: string,
-  symbol: string,
+  _symbol: string,
 ): number | null {
+  const want =
+    id === 'nifty' ? 'NSE:NIFTY 50' : id === 'bank' ? 'NSE:NIFTY BANK' : id === 'sensex' ? 'BSE:SENSEX' : '';
+  if (want) {
+    for (const [k, v] of Object.entries(quotes)) {
+      if (k.toUpperCase() === want) {
+        const n = Number(v.last_price);
+        return Number.isFinite(n) && n > 0 ? n : null;
+      }
+    }
+    return null;
+  }
   for (const [k, v] of Object.entries(quotes)) {
     const key = k.toUpperCase();
-    if (id === 'crude' && key.includes('CRUDE')) return Number(v.last_price) || null;
-    if (id === 'nifty' && key.includes('NIFTY 50')) return Number(v.last_price) || null;
-    if (id === 'bank' && key.includes('BANK')) return Number(v.last_price) || null;
-    if (id === 'sensex' && key.includes('SENSEX')) return Number(v.last_price) || null;
-    if (symbol && key.includes(symbol.toUpperCase())) return Number(v.last_price) || null;
+    if (id === 'crude' && key.includes('CRUDEOILM') && !key.includes('CE') && !key.includes('PE')) {
+      const n = Number(v.last_price);
+      return Number.isFinite(n) && n > 0 ? n : null;
+    }
   }
   return null;
 }

@@ -357,6 +357,64 @@ describe('paper hunt methods', () => {
     expect(huntInstrumentSummary(out, 'nifty').open).toBe(0);
   });
 
+  it('drops index-priced Bank/Sensex tickets so P/L cannot print in crores', () => {
+    const day = '2026-11-16';
+    const hunt = emptyHunt(day);
+    const bank = hunt.books.find((b) => b.id === 'bank-algo-donch20')!;
+    bank.fills = [
+      {
+        day,
+        book: bank.id,
+        label: bank.label,
+        side: 'long',
+        entry: 15_715,
+        exit: 58_040,
+        sl: 15_700,
+        tp: 15_800,
+        pts: 12_425,
+        rs: 372_749,
+        reason: 'eod',
+        mode: 'open',
+        optionType: 'CE',
+        strike: 200,
+        expiry: '2026-11-17',
+        optionSymbol: 'BANKNIFTY26N17200CE',
+        entryAt: '2026-11-16T04:00:00.000Z',
+        exitAt: '2026-11-16T04:31:00.000Z',
+      },
+    ];
+    bank.closedRs = 372_749;
+    bank.side = 'long';
+    bank.entry = 15_715;
+    bank.last = 58_040;
+    const q = { bid: 58_040, ask: 58_100, last: 58_040 };
+    const out = tickPaperHunt({
+      prev: hunt,
+      day,
+      nowMin: 10 * 60,
+      nowIso: '2026-11-16T04:30:00.000Z',
+      barsByUnder: new Map([
+        ['nifty', upBars(day, 20)],
+        ['bank', upBars(day, 20).map((b) => ({ ...b, open: 58_000, high: 58_100, low: 57_900, close: 58_050 }))],
+        ['sensex', upBars(day, 20)],
+        ['crude', upBars(day, 20)],
+      ]),
+      quotesByUnder: new Map([
+        ['nifty', { ce: { bid: 162, ask: 163, last: 162.5 }, pe: { bid: 162, ask: 163, last: 162.5 }, underLast: 25_200 }],
+        ['bank', { ce: q, pe: q, underLast: 58_040 }],
+        ['sensex', { ce: q, pe: q, underLast: 82_100 }],
+        ['crude', { ce: { bid: 14, ask: 15, last: 14.5 }, pe: { bid: 14, ask: 15, last: 14.5 }, underLast: 5_400 }],
+      ]),
+      picksByUnder: new Map(),
+    });
+    const bankOut = out.books.find((b) => b.id === 'bank-algo-donch20')!;
+    expect(bankOut.fills).toHaveLength(0);
+    expect(Math.abs(bankOut.closedRs)).toBeLessThan(50_000);
+    expect(Math.abs(bankOut.liveRs)).toBeLessThan(50_000);
+    expect(out.books.every((b) => Math.abs(b.closedRs) < 50_000 && Math.abs(b.liveRs) < 50_000)).toBe(true);
+    expect(Math.abs(huntInstrumentSummary(out, 'bank').profitRs)).toBeLessThan(50_000);
+  });
+
   it('compacts hunt books so the full paper-ticket cap can persist without kite fields', () => {
     const hunt = emptyHunt('2026-11-16');
     hunt.books[0] = {
