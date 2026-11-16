@@ -10,6 +10,8 @@ import {
   bestHuntByUnder,
   compactHunt,
   emptyHunt,
+  mergeHunt,
+  slimHunt,
   filterHuntMethodRows,
   huntLeaders,
   huntMethodCfg,
@@ -489,6 +491,57 @@ describe('paper hunt methods', () => {
     expect(out.books[0].fills[0].maxPx).toBe(140);
     expect(out.books[0].fills[0].maeRs).toBe(-80);
     expect(out.books[0].fills[0].signal).toBeNull();
+    const slim = slimHunt(hunt);
+    expect(slim.books).toHaveLength(1);
+    const restored = mergeHunt(slim, emptyHunt('2026-11-16'), '2026-11-16');
+    expect(restored.books).toHaveLength(PAPER_HUNT_METHODS.length * 4);
+    expect(restored.books[0].fills).toHaveLength(1);
+    expect(restored.books[0].fills[0].rs).toBe(2400);
+    expect(restored.trades).toBe(1);
+  });
+
+  it('keeps printed tickets when the droplet hunt is empty or the method count changed', () => {
+    const day = '2026-11-16';
+    const local = emptyHunt(day);
+    local.books[0] = {
+      ...local.books[0],
+      fills: [
+        {
+          day,
+          book: local.books[0].id,
+          label: local.books[0].label,
+          side: 'long',
+          entry: 118.4,
+          exit: 124.9,
+          sl: 110,
+          tp: 140,
+          pts: 6.5,
+          rs: 370,
+          reason: 'time',
+          mode: 'momentum',
+          lot: 65,
+        },
+      ],
+      closedRs: 370,
+    };
+    const remote = emptyHunt(day);
+    const kept = mergeHunt(local, remote, day);
+    expect(kept.books[0].fills).toHaveLength(1);
+    expect(kept.books[0].fills[0].rs).toBe(370);
+    expect(kept.trades).toBe(1);
+    const slimPrev = slimHunt(local);
+    expect(slimPrev.books).toHaveLength(1);
+    const ticked = tickPaperHunt({
+      prev: slimPrev,
+      day,
+      nowMin: 11 * 60,
+      nowIso: '2026-11-16T05:30:00.000Z',
+      barsByUnder: new Map(),
+      quotesByUnder: new Map(),
+      picksByUnder: new Map(),
+    });
+    expect(ticked.books.find((b) => b.id === local.books[0].id)?.fills).toHaveLength(1);
+    expect(ticked.trades).toBeGreaterThanOrEqual(1);
   });
 
   it('opens a Crude Mini hunt ticket from the chain last when MCX depth is empty', () => {

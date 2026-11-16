@@ -7,6 +7,7 @@ import {
   ALL_PAPER_BOOKS,
   LivePaperBookState,
   LivePaperSession,
+  PaperHuntState,
   emptySession,
   istDay,
   paperCfg,
@@ -35,11 +36,12 @@ import { PaperLiveApiService, PaperLiveView } from './paper-live-api.service';
 import { readPaperLiveArm, writePaperLiveArm } from './paper-live-arm.util';
 import { readPaperEvolve, writePaperEvolve } from './paper-evolve.util';
 import { PaperTickQuote, runPaperTick } from './paper-tick.run';
-import { compactHunt } from './paper-hunt.engine';
+import { mergeHunt, slimHunt } from './paper-hunt.engine';
 
 export { bestBidAsk, needsOption, nextExpiryAsOf, optionMarkLast } from './paper-tick.run';
 
 const STORAGE_KEY = 'palagai_live_paper_v12';
+const HUNT_KEY = 'palagai_paper_hunt_v12';
 const TICK_MS = 8_000;
 
 @Injectable({ providedIn: 'root' })
@@ -148,7 +150,16 @@ export class LivePaperService {
 
   /** Latest hunt numbers without starting. Pulls the droplet, then ticks only if already watching. */
   async refresh(): Promise<void> {
+    const localHunt = this.session().hunt;
+    const day = this.session().day || istDay();
     await this.hydrateDroplet();
+    const cur = this.session();
+    const hunt = mergeHunt(localHunt, cur.hunt, cur.day || day);
+    if (hunt !== cur.hunt) {
+      const snap = { ...cur, hunt };
+      this.session.set(snap);
+      persist(snap);
+    }
     if (this.session().running) await this.tick();
   }
 
@@ -295,7 +306,13 @@ export class LivePaperService {
     }
     const takeSession = opts?.takeSession !== false;
     if (takeSession && view.session && Array.isArray(view.session.books) && view.session.books.length) {
-      const snap = { ...view.session, liveOrders: this.liveArmed() };
+      const cur = this.session();
+      const day = view.session.day || cur.day || istDay();
+      const snap = {
+        ...view.session,
+        liveOrders: this.liveArmed(),
+        hunt: mergeHunt(cur.hunt, view.session.hunt, day),
+      };
       this.session.set(snap);
       persist(snap);
       if (snap.evolve) writePaperEvolve(snap.evolve);
@@ -336,11 +353,12 @@ export class LivePaperService {
   }
 
   private dropletBody() {
+    const session = this.session();
     return {
-      running: this.session().running,
+      running: session.running,
       live: this.liveToggle(),
       books: this.liveBooks(),
-      session: this.session(),
+      session: session.hunt ? { ...session, hunt: slimHunt(session.hunt) } : session,
     };
   }
 
@@ -505,10 +523,29 @@ export class LivePaperService {
   }
 }
 
-function persist(snap: LivePaperSession): void {
+function readStoredHunt(): PaperHuntState | null {
   try {
-    if (typeof localStorage === 'undefined') return;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(snap.hunt ? { ...snap, hunt: compactHunt(snap.hunt) } : snap));
+    if (typeof localStorage === 'undefined') return null;
+    const raw = localStorage.getItem(HUNT_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as PaperHuntState;
+    if (!parsed || !Array.isArray(parsed.books)) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function persist(snap: LivePaperSession): void {
+  if (typeof localStorage === 'undefined') return;
+  const hunt = snap.hunt ? slimHunt(snap.hunt) : null;
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(hunt ? { ...snap, hunt } : snap));
+  } catch {
+    /* ignore quota — hunt sidecar may still fit */
+  }
+  try {
+    if (hunt) localStorage.setItem(HUNT_KEY, JSON.stringify(hunt));
   } catch {
     /* ignore quota */
   }
@@ -528,8 +565,10 @@ function readStored(): LivePaperSession | null {
       .every((b) => String(b.product || '').includes('CE/PE'));
     if (ids !== want || !optionOk) return null;
     const arm = readPaperLiveArm();
+    const day = parsed.day || istDay();
     return {
       ...parsed,
+      hunt: mergeHunt(parsed.hunt, readStoredHunt(), day),
       liveOrders: paperLiveArmed(arm.live, arm.books),
       guaranteed: false,
       armedOnCrudeBest: false,
