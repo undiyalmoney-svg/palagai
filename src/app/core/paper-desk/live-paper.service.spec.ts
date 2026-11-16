@@ -1,10 +1,11 @@
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Instrument } from '../models/instrument.model';
 import { pickCheapOtm } from '../utils/pick-cheap-otm.util';
-import { emptyBook, LIVE_PAPER_BOOKS } from './live-paper.engine';
+import { emptyBook, emptySession, LIVE_PAPER_BOOKS } from './live-paper.engine';
 import { LivePaperService, bestBidAsk, needsOption, nextExpiryAsOf, optionMarkLast } from './live-paper.service';
+import { emptyHunt } from './paper-hunt.engine';
 import { PAPER_LIVE_ARM_KEY, readPaperLiveArm } from './paper-live-arm.util';
 
 describe('LivePaperService', () => {
@@ -20,6 +21,46 @@ describe('LivePaperService', () => {
     await svc.refresh();
     expect(svc.session().running).toBe(false);
     expect(svc.session().liveOrders).toBe(false);
+  });
+
+  it('refresh keeps printed hunt tickets when the droplet session has none', async () => {
+    const svc = TestBed.inject(LivePaperService);
+    const day = '2026-11-16';
+    const hunt = emptyHunt(day);
+    hunt.books[0] = {
+      ...hunt.books[0],
+      fills: [
+        {
+          day,
+          book: hunt.books[0].id,
+          label: hunt.books[0].label,
+          side: 'long',
+          entry: 160,
+          exit: 168,
+          sl: 154,
+          tp: 168,
+          pts: 8,
+          rs: 420,
+          reason: 'tp',
+          mode: 'momentum',
+          lot: 65,
+        },
+      ],
+      closedRs: 420,
+    };
+    hunt.trades = 1;
+    svc.session.set({ ...svc.session(), day, hunt, running: false });
+    vi.spyOn(svc['paperLiveApi'], 'get').mockResolvedValue({
+      running: false,
+      dropletWatching: false,
+      session: { ...emptySession(day), hunt: emptyHunt(day) },
+    });
+    await svc.refresh();
+    const kept = svc.session().hunt?.books.find((b) => b.id === hunt.books[0].id);
+    expect(kept?.fills).toHaveLength(1);
+    expect(kept?.fills[0].rs).toBe(420);
+    expect(svc.session().hunt?.trades).toBeGreaterThanOrEqual(1);
+    expect(svc.session().running).toBe(false);
   });
 
   it('refuses to start without Token and never places an order', async () => {

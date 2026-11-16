@@ -468,6 +468,62 @@ export function compactHunt(state: PaperHuntState): PaperHuntState {
   };
 }
 
+/** Persist only books that printed — empty method slots rebuild from the catalog. */
+export function slimHunt(state: PaperHuntState): PaperHuntState {
+  return compactHunt({
+    ...state,
+    books: state.books.filter((b) => (b.fills && b.fills.length > 0) || b.side !== 'flat'),
+  });
+}
+
+function bookTickets(book: LivePaperBookState | undefined): number {
+  if (!book) return 0;
+  return (book.fills?.length || 0) + (book.side !== 'flat' ? 1 : 0);
+}
+
+function richerBook(a: LivePaperBookState | undefined, b: LivePaperBookState | undefined): LivePaperBookState | undefined {
+  if (!a) return b;
+  if (!b) return a;
+  const aN = bookTickets(a);
+  const bN = bookTickets(b);
+  if (aN !== bN) return aN > bN ? a : b;
+  if (a.side !== 'flat' && b.side === 'flat') return a;
+  if (b.side !== 'flat' && a.side === 'flat') return b;
+  return (a.closedRs || 0) >= (b.closedRs || 0) ? a : b;
+}
+
+/**
+ * Keep printed tickets when method count changes or a droplet copy is empty.
+ * Never start the catalog from scratch just because 50 vs 103 books differ.
+ */
+export function mergeHunt(
+  local: PaperHuntState | null | undefined,
+  remote: PaperHuntState | null | undefined,
+  day: string,
+): PaperHuntState {
+  const a = local?.day === day ? local : null;
+  const b = remote?.day === day ? remote : null;
+  const byId = new Map<string, LivePaperBookState>();
+  for (const book of [...(b?.books || []), ...(a?.books || [])]) {
+    const keep = richerBook(byId.get(book.id), book);
+    if (keep) byId.set(book.id, keep);
+  }
+  const books = UNDERS.flatMap((under) =>
+    PAPER_HUNT_METHODS.map((def) => {
+      const id = huntBookId(under, def.id);
+      return byId.get(id) || emptyBook(huntMethodCfg(under, def));
+    }),
+  );
+  const stats = books.map(statOf);
+  return compactHunt({
+    day,
+    trades: stats.reduce((s, r) => s + r.trades, 0),
+    stats,
+    books,
+    feed: a?.feed || b?.feed || '',
+  });
+}
+
 export function huntBindOption(
   book: LivePaperBookState,
   cfg: LiveAssumeBookCfg,
@@ -557,9 +613,7 @@ export function tickPaperHunt(args: {
   picksByUnder: Map<string, { ce: CheapOtmPick; pe: CheapOtmPick }>;
   evolve?: PaperEvolveFlags;
 }): PaperHuntState {
-  const prev = args.prev?.day === args.day && args.prev.books.length === UNDERS.length * PAPER_HUNT_METHODS.length
-    ? args.prev
-    : emptyHunt(args.day);
+  const prev = mergeHunt(args.prev, null, args.day);
   const byId = new Map(prev.books.map((b) => [b.id, scrubHuntBook(b)]));
   const nextBooks: LivePaperBookState[] = [];
   for (const under of UNDERS) {
