@@ -55,6 +55,8 @@ describe('Paper14kComponent', () => {
     expect(text).toMatch(/Sensex/);
     expect(text).toMatch(/Crude Mini/);
     expect(text).toMatch(/Last entry/);
+    expect(text).toMatch(/Open now/);
+    expect(text).toMatch(/Status/);
     expect(text).toMatch(/Profit\/loss/);
     expect(text).toMatch(/Not a guaranteed profit/);
     expect(text).toMatch(/Max capital used/);

@@ -334,6 +334,29 @@ describe('paper hunt methods', () => {
     );
   });
 
+  it('keeps a skip note when the chain has no listed contract so the blotter is not a silent zero', () => {
+    const day = '2026-11-16';
+    const bars = upBars(day, 40);
+    const out = tickPaperHunt({
+      prev: emptyHunt(day),
+      day,
+      nowMin: bars[bars.length - 1].min + 2,
+      nowIso: '2026-11-16T05:00:00.000Z',
+      barsByUnder: new Map([
+        ['nifty', bars],
+        ['bank', bars],
+        ['sensex', bars],
+        ['crude', bars],
+      ]),
+      quotesByUnder: new Map(),
+      picksByUnder: new Map(),
+    });
+    expect(out.books.some((b) => b.reason === 'skipped: no listed contract')).toBe(true);
+    expect(out.feed).toMatch(/skipped: no listed contract/);
+    expect(huntMethodRows(out, 'nifty').some((r) => r.note === 'skipped: no listed contract')).toBe(true);
+    expect(huntInstrumentSummary(out, 'nifty').open).toBe(0);
+  });
+
   it('compacts hunt books so the full paper-ticket cap can persist without kite fields', () => {
     const hunt = emptyHunt('2026-11-16');
     hunt.books[0] = {
@@ -366,7 +389,8 @@ describe('paper hunt methods', () => {
     const out = compactHunt(hunt);
     expect(out.books[0].kiteNote).toBe('');
     expect(out.books[0].kiteBuyOrderId).toBe('');
-    expect(out.books[0].skips).toEqual([]);
+    expect(out.books[0]?.skips).toHaveLength(1);
+    expect(out.books[0]?.skips?.[0]?.reason).toBe('no-live-quote');
     expect(out.books[0].fills[0].maxPx).toBe(140);
     expect(out.books[0].fills[0].maeRs).toBe(-80);
     expect(out.books[0].fills[0].signal).toBeNull();

@@ -54,7 +54,7 @@ export function emptyHunt(day: string): PaperHuntState {
   const books = UNDERS.flatMap((under) =>
     PAPER_HUNT_METHODS.map((def) => emptyBook(huntMethodCfg(under, def))),
   );
-  return { day, trades: 0, stats: books.map((b) => statOf(b)), books };
+  return { day, trades: 0, stats: books.map((b) => statOf(b)), books, feed: '' };
 }
 
 export function huntCfgOf(id: string): LiveAssumeBookCfg {
@@ -204,6 +204,7 @@ export interface HuntMethodRow {
   floorMfeRs: number;
   capitalRs: number;
   lastEntryAt: string;
+  note: string;
 }
 
 export type HuntMethodView = 'all' | 'traded' | 'green';
@@ -222,9 +223,10 @@ export interface HuntInstrumentSummary {
   worstLabel: string;
   worstRs: number;
   slLabel: string;
-  slHits: number;
-  maxCapitalRs: number;
-}
+    slHits: number;
+    maxCapitalRs: number;
+    open: number;
+  }
 
 const UNDER_LABEL: Record<(typeof UNDERS)[number], string> = {
   nifty: 'Nifty 50',
@@ -256,6 +258,7 @@ function emptyMethodRow(under: string, def: PaperHuntMethodDef): HuntMethodRow {
     floorMfeRs: 0,
     capitalRs: 0,
     lastEntryAt: '',
+    note: '',
   };
 }
 
@@ -298,6 +301,7 @@ export function huntMethodRow(book: LivePaperBookState): HuntMethodRow {
     floorMfeRs: peaks.length ? rupee(Math.min(...peaks)) : 0,
     capitalRs,
     lastEntryAt: lastFillAt || book.entryAt || '',
+    note: book.reason || '',
   };
 }
 
@@ -359,6 +363,7 @@ export function huntInstrumentSummary(
     slLabel: slWorst && slWorst.slHits ? slWorst.methodLabel : '—',
     slHits: slWorst?.slHits || 0,
     maxCapitalRs: rows.reduce((n, r) => Math.max(n, r.capitalRs), 0),
+    open: rows.filter((r) => r.open).length,
   };
 }
 
@@ -371,7 +376,7 @@ export function compactHunt(state: PaperHuntState): PaperHuntState {
     ...state,
     books: state.books.map((b) => ({
       ...b,
-      skips: [],
+      skips: (b.skips || []).slice(-1),
       signal: null,
       kiteNote: '',
       kiteBuyOrderId: '',
@@ -390,6 +395,7 @@ export function huntBindOption(
   side: HuntSideQuote,
   nowMin: number,
   nowIso: string,
+  day = '',
 ): LivePaperBookState {
   const pick = book.side === 'long' ? pair?.ce : pair?.pe;
   if (!pick || !(pick.instrument.instrumentToken > 0)) {
@@ -404,6 +410,23 @@ export function huntBindOption(
       livePts: 0,
       liveRs: 0,
       reason: 'skipped: no listed contract',
+      skips: [
+        ...(book.skips || []),
+        {
+          at: nowIso,
+          day,
+          book: cfg.id,
+          side: pick?.side || (book.side === 'long' ? 'CE' : 'PE'),
+          mode: book.mode,
+          structure: book.structure,
+          contract: pick ? `${pick.side} ${pick.strike}` : cfg.label,
+          premium: null,
+          lot: pick?.lotSize || book.lot,
+          costRs: null,
+          budgetRs: 0,
+          reason: 'no-listed-contract' as const,
+        },
+      ].slice(-20),
     };
   }
   const fill = liveBuyPrice(side.ask, side.last);
@@ -419,6 +442,23 @@ export function huntBindOption(
       livePts: 0,
       liveRs: 0,
       reason: 'skipped: no live quote',
+      skips: [
+        ...(book.skips || []),
+        {
+          at: nowIso,
+          day,
+          book: cfg.id,
+          side: pick.side,
+          mode: book.mode,
+          structure: book.structure,
+          contract: pick.instrument.tradingSymbol,
+          premium: null,
+          lot: pick.lotSize,
+          costRs: null,
+          budgetRs: 0,
+          reason: 'no-live-quote' as const,
+        },
+      ].slice(-20),
     };
   }
   const bound = bindOptionFill(book, cfg, fill.price, pick, null, nowMin);
@@ -458,16 +498,26 @@ export function tickPaperHunt(args: {
         evolve: args.evolve,
       });
       if (next.side !== 'flat' && !next.optionSymbol) {
-        next = huntBindOption(next, cfg, pair, next.side === 'long' ? q?.ce || { bid: null, ask: null, last: null } : q?.pe || { bid: null, ask: null, last: null }, args.nowMin, args.nowIso);
+        next = huntBindOption(
+          next,
+          cfg,
+          pair,
+          next.side === 'long' ? q?.ce || { bid: null, ask: null, last: null } : q?.pe || { bid: null, ask: null, last: null },
+          args.nowMin,
+          args.nowIso,
+          args.day,
+        );
       }
       nextBooks.push(next);
     }
   }
   const stats = nextBooks.map(statOf);
+  const skipNote = nextBooks.find((b) => /skipped:/.test(b.reason))?.reason || '';
   return compactHunt({
     day: args.day,
     trades: stats.reduce((s, r) => s + r.trades, 0),
     stats,
     books: nextBooks,
+    feed: skipNote,
   });
 }

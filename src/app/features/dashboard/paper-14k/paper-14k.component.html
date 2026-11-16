@@ -55,6 +55,7 @@
         <div class="mp-hunt-tile" [attr.data-testid]="'paper-hunt-summary-' + row.under">
           <h3>{{ row.label }}</h3>
           <p class="mp-hunt-kv"><span>Trades</span><strong>{{ row.trades | number : '1.0-0' }}</strong></p>
+          <p class="mp-hunt-kv"><span>Open now</span><strong>{{ row.open | number : '1.0-0' }}</strong></p>
           <p class="mp-hunt-kv"><span>Profit trades</span><strong class="mp-up">{{ row.wins | number : '1.0-0' }}</strong></p>
           <p class="mp-hunt-kv"><span>Loss trades</span><strong class="mp-down">{{ row.losses | number : '1.0-0' }}</strong></p>
           <p class="mp-hunt-kv"><span>Profit now</span><strong class="mp-up">₹{{ row.profitRs | number : '1.0-0' }}</strong></p>
@@ -151,9 +152,10 @@
     <div class="mp-table-wrap">
       <table class="mp-table" data-testid="paper-hunt-methods">
         <thead>
-          <tr>
-            <th>Method</th>
-            <th class="num">Trades</th>
+            <tr>
+              <th>Method</th>
+              <th>Status</th>
+              <th class="num">Trades</th>
             <th class="num">Profit trades</th>
             <th class="num">Loss trades</th>
             <th class="num">Win %</th>
@@ -169,6 +171,7 @@
           @for (row of huntTabMethods(); track row.key) {
             <tr data-testid="paper-hunt-method" [attr.data-method]="row.method">
               <td>{{ row.methodLabel }}{{ row.open ? ' · open' : '' }}</td>
+              <td data-testid="paper-hunt-note">{{ row.note || (row.open ? 'open' : '—') }}</td>
               <td class="num">{{ row.trades | number : '1.0-0' }}</td>
               <td class="num">{{ row.wins | number : '1.0-0' }}</td>
               <td class="num">{{ row.losses | number : '1.0-0' }}</td>

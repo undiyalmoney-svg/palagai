@@ -193,7 +193,8 @@ export class LivePaperService {
 
   async tick(): Promise<void> {
     if (this.ticking) return;
-    if (this.dropletWatching() && this.dropletLoop) {
+    const tabHidden = typeof document !== 'undefined' && document.hidden === true;
+    if (tabHidden && this.dropletWatching() && this.dropletLoop) {
       await this.pullDroplet();
       return;
     }
@@ -264,6 +265,7 @@ export class LivePaperService {
       persist(snap);
       if (snap.evolve) writePaperEvolve(snap.evolve);
       this.ledger.sync(snap.day, snap.books.flatMap((b) => b.fills));
+      await this.pushDroplet({ takeSession: false });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Kite fetch failed';
       const cur = this.session();
@@ -276,7 +278,7 @@ export class LivePaperService {
     }
   }
 
-  private applyDroplet(view: PaperLiveView | null): boolean {
+  private applyDroplet(view: PaperLiveView | null, opts?: { takeSession?: boolean }): boolean {
     if (!view) {
       this.dropletWatching.set(false);
       this.dropletPlacing.set(false);
@@ -291,13 +293,14 @@ export class LivePaperService {
       if (view.books) this.liveBooks.set({ ...this.liveBooks(), ...view.books });
       this.persistArm();
     }
-    if (view.session && Array.isArray(view.session.books) && view.session.books.length) {
+    const takeSession = opts?.takeSession !== false;
+    if (takeSession && view.session && Array.isArray(view.session.books) && view.session.books.length) {
       const snap = { ...view.session, liveOrders: this.liveArmed() };
       this.session.set(snap);
       persist(snap);
       if (snap.evolve) writePaperEvolve(snap.evolve);
       this.ledger.sync(snap.day, snap.books.flatMap((b) => b.fills));
-    } else {
+    } else if (takeSession) {
       this.stampLive();
     }
     return !!view.dropletWatching;
@@ -341,9 +344,9 @@ export class LivePaperService {
     };
   }
 
-  private async pushDroplet(): Promise<void> {
+  private async pushDroplet(opts?: { takeSession?: boolean }): Promise<void> {
     const view = await this.paperLiveApi.set(this.dropletBody());
-    const watching = this.applyDroplet(view);
+    const watching = this.applyDroplet(view, opts);
     this.dropletLoop = watching && this.session().running;
   }
 

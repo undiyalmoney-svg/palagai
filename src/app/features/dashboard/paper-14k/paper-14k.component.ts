@@ -104,27 +104,29 @@ export class Paper14kComponent implements OnDestroy {
         ? `Last Kite check ${istClock(s.asOf)} IST${ageSec >= 90 ? ` — ${Math.round(ageSec / 60)} min ago.` : '.'}`
         : '';
     const today = `Today ${s.day}: ${huntTrades.toLocaleString('en-IN')} paper tickets.`;
+    const feed = s.hunt?.feed || '';
+    const droplet = this.paper.dropletNote();
     const foot = `Paper hunt only. One Start runs ${this.huntMethodCount} methods on all four names. Not a guaranteed profit.`;
 
     if (s.kiteError) {
-      return { tone: 'down', badge: 'needs Token', title: s.kiteError, lines: [today, foot] };
+      return { tone: 'down', badge: 'needs Token', title: s.kiteError, lines: [today, feed, foot].filter(Boolean) };
     }
     if (!s.running) {
       return {
         tone: 'info',
         badge: 'not watching',
         title: 'Not watching. Hit Start. One Start runs all four on paper.',
-        lines: ['Nifty 50, Bank Nifty, Sensex, Crude Mini.', today, foot],
+        lines: ['Nifty 50, Bank Nifty, Sensex, Crude Mini.', today, feed, foot].filter(Boolean),
       };
     }
     if (busy && huntTrades === 0 && !s.hunt) {
       return { tone: 'info', badge: 'checking Kite', title: 'Checking Kite…', lines: [foot] };
     }
     return {
-      tone: 'info',
+      tone: feed ? 'warn' : 'info',
       badge: 'watching',
       title: `Watching Nifty, Bank Nifty, Sensex and Crude Mini from 09:00. ${this.huntMethodCount} methods each, paper only.`,
-      lines: [checked, today, foot].filter(Boolean),
+      lines: [checked, today, feed, droplet, foot].filter(Boolean),
     };
   }
 }

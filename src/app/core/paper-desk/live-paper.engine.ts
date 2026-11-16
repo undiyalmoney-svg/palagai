@@ -487,6 +487,8 @@ export interface PaperHuntState {
   trades: number;
   stats: PaperHuntMethodStat[];
   books: LivePaperBookState[];
+  /** Why the blotter is empty (no 1-min bars, skipped bind). Empty when the feed is fine. */
+  feed?: string;
 }
 
 export function emptyBook(cfg: LiveAssumeBookCfg): LivePaperBookState {

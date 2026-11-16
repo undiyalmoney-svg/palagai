@@ -40,6 +40,8 @@ import { HuntSideQuote, tickPaperHunt } from './paper-hunt.engine';
 
 const UNDERS = ['crude', 'nifty', 'bank', 'sensex'] as const;
 const NO_BUDGET_CAP = 10_000_000;
+/** Calendar days before today. One Kite 1-min request cannot span this window — Crude Mini alone is ~870 bars/day, cap 2000. */
+export const HIST_MINUTE_LOOKBACK_DAYS = 3;
 
 export type PaperTickQuote = {
   last_price?: number;
@@ -106,16 +108,10 @@ export async function runPaperTick(io: PaperTickIo): Promise<LivePaperSession> {
   if (extraKeys.length) {
     quotes = { ...quotes, ...((await io.fetchQuotes(extraKeys)) || {}) };
   }
-  const from = shiftDay(day, -8);
   const barCache = new Map<string, LiveAssumeBar[]>();
   for (const under of UNDERS) {
     const inst = instOf(under, crude, nifty, bank, sensex);
-    let bars: LiveAssumeBar[] = [];
-    if (inst?.token) {
-      const candles = await io.fetchHistorical(String(inst.token), 'minute', from, day);
-      bars = (candles || []).map(kiteBar).filter((b) => b.day);
-    }
-    barCache.set(under, bars);
+    barCache.set(under, inst?.token ? await loadMinuteBars(io.fetchHistorical, String(inst.token), day) : []);
   }
   const nextById = new Map<string, LivePaperBookState>();
   for (const cfg of paperTickOrder(LIVE_PAPER_BOOKS)) {
@@ -208,7 +204,7 @@ export async function runPaperTick(io: PaperTickIo): Promise<LivePaperSession> {
       underLast: lastPrice(quotes, under, inst?.tradingSymbol || ''),
     });
   }
-  const hunt = tickPaperHunt({
+  const ticked = tickPaperHunt({
     prev: cur.hunt,
     day,
     nowMin,
@@ -218,6 +214,10 @@ export async function runPaperTick(io: PaperTickIo): Promise<LivePaperSession> {
     picksByUnder: cheapByUnder,
     evolve: flags,
   });
+  const hunt = {
+    ...ticked,
+    feed: barFeedLine(barCache, day) || ticked.feed || '',
+  };
   const snap = summarizePaper(books, {
     running: true,
     day,
@@ -528,6 +528,44 @@ function findNamed(csv: string, names: string[]): { tradingSymbol: string; token
     }
   }
   return null;
+}
+
+/** Today first, then lookback. If Kite rate-limits, we still have this session's candles. */
+export function minuteDayWindows(day: string, lookbackDays = HIST_MINUTE_LOOKBACK_DAYS): string[] {
+  const out = [day];
+  for (let i = 1; i <= lookbackDays; i += 1) out.push(shiftDay(day, -i));
+  return out;
+}
+
+export async function loadMinuteBars(
+  fetchHistorical: PaperTickIo['fetchHistorical'],
+  token: string,
+  day: string,
+): Promise<LiveAssumeBar[]> {
+  const bars: LiveAssumeBar[] = [];
+  for (const d of minuteDayWindows(day)) {
+    const candles = await fetchHistorical(token, 'minute', d, d).catch(() => [] as unknown[][]);
+    for (const row of candles || []) {
+      const bar = kiteBar(row);
+      if (bar.day) bars.push(bar);
+    }
+  }
+  return bars;
+}
+
+export function barFeedLine(barsByUnder: Map<string, LiveAssumeBar[]>, day: string): string {
+  const counts = UNDERS.map((under) => ({
+    under,
+    n: (barsByUnder.get(under) || []).filter((b) => b.day === day).length,
+  }));
+  if (counts.every((c) => c.n === 0)) {
+    return 'Kite sent no completed 1-min bars for today. Paper cannot open a ticket until those candles arrive.';
+  }
+  const missing = counts.filter((c) => c.n === 0).map((c) => c.under);
+  if (missing.length) {
+    return `Kite 1-min bars today: ${counts.map((c) => `${c.under} ${c.n}`).join(', ')}.`;
+  }
+  return '';
 }
 
 function kiteBar(row: unknown[]): LiveAssumeBar {
