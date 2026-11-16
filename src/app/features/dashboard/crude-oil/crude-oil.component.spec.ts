@@ -17,14 +17,15 @@ describe('CrudeOilComponent', () => {
     fixture.detectChanges();
   });
 
-  it('is the Arise desk: Bank Nifty algo OR retest and Sensex mix + no confirm', () => {
+  it('is the Arise desk: Bank Nifty algo OR retest and Sensex mom 0.8× no confirm', () => {
     const text = fixture.nativeElement.textContent as string;
     expect(fixture.nativeElement.querySelector('[data-testid="crude-oil-page"]')).toBeTruthy();
     expect(text).toMatch(/Arise/);
     expect(text).toMatch(/Bank Nifty/);
     expect(text).toMatch(/Sensex/);
     expect(text).toMatch(/algo OR retest/);
-    expect(text).toMatch(/mix \+ no confirm/);
+    expect(text).toMatch(/mom 0\.8× no confirm/);
+    expect(text).not.toMatch(/mix \+ no confirm/);
     expect(text).toMatch(/cancels the SL and sells MARKET/);
     expect(text).toMatch(/Paper only/);
     expect(text).toMatch(/Live Kite/);

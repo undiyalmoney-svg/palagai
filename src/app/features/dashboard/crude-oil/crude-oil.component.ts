@@ -122,7 +122,7 @@ export class CrudeOilComponent implements OnDestroy {
     const today = `Today ${s.day}: Bank ₹${Math.round(bank?.book.closedRs || 0).toLocaleString('en-IN')} · Sensex ₹${Math.round(sensex?.book.closedRs || 0).toLocaleString('en-IN')}.`;
     const droplet = this.paper.dropletNote();
     const foot =
-      'Paper always records. Arise Live Kite is Bank Nifty algo OR retest and Sensex mix + no confirm. Hunt stays on Paper test. Not a guaranteed profit.';
+      'Paper always records. Arise Live Kite is Bank Nifty algo OR retest and Sensex mom 0.8× no confirm. Hunt stays on Paper test. Not a guaranteed profit.';
 
     if (s.kiteError) {
       return { tone: 'down', badge: 'needs Token', title: s.kiteError, lines: [today, foot].filter(Boolean) };
@@ -132,7 +132,7 @@ export class CrudeOilComponent implements OnDestroy {
         tone: 'info',
         badge: 'not watching',
         title: 'Not watching. Hit Start. Paper always. Live Kite is extra on ticked books.',
-        lines: ['Bank Nifty algo OR retest and Sensex mix + no confirm.', today, foot].filter(Boolean),
+        lines: ['Bank Nifty algo OR retest and Sensex mom 0.8× no confirm.', today, foot].filter(Boolean),
       };
     }
     if (busy && !s.asOf) {
