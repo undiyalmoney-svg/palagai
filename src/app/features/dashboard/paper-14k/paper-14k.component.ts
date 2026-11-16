@@ -62,7 +62,6 @@ export class Paper14kComponent implements OnDestroy {
   protected readonly stopOff = computed(() => !this.paper.session().running);
 
   constructor() {
-    this.paper.setLiveBook('nifty', false);
     this.paper.setLiveBook('crude', false);
   }
 
@@ -72,7 +71,6 @@ export class Paper14kComponent implements OnDestroy {
 
   protected startPaper(): void {
     if (this.startOff()) return;
-    this.paper.setLiveBook('nifty', false);
     this.paper.setLiveBook('crude', false);
     void this.paper.start();
   }

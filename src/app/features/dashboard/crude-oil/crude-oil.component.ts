@@ -3,6 +3,7 @@ import { Component, OnDestroy, computed, inject, signal } from '@angular/core';
 import { LivePaperService } from '../../../core/paper-desk/live-paper.service';
 import { PaperLiveUnder } from '../../../core/paper-desk/paper-live-order.util';
 import {
+  LIVE_TAKE_LABEL,
   LIVE_TAKE_METHOD,
   LIVE_TAKE_UNDERS,
   LivePaperBookState,
@@ -31,7 +32,7 @@ export class CrudeOilComponent implements OnDestroy {
   protected readonly now = computed(() => this.nowCard(this.paper.session(), this.paper.busy(), this.clockNow()));
   protected readonly liveBookRows = LIVE_TAKE_UNDERS.map((under) => ({
     under,
-    label: under === 'bank' ? 'Bank Nifty' : 'Sensex',
+    label: LIVE_TAKE_LABEL[under],
     method: LIVE_TAKE_METHOD[under],
   }));
   protected readonly liveBooks = computed(() => {
@@ -53,7 +54,6 @@ export class CrudeOilComponent implements OnDestroy {
   protected readonly stopOff = computed(() => !this.paper.session().running);
 
   constructor() {
-    this.paper.setLiveBook('nifty', false);
     this.paper.setLiveBook('crude', false);
   }
 
@@ -63,7 +63,6 @@ export class CrudeOilComponent implements OnDestroy {
 
   protected startDesk(): void {
     if (this.startOff()) return;
-    this.paper.setLiveBook('nifty', false);
     this.paper.setLiveBook('crude', false);
     void this.paper.start();
   }
@@ -78,7 +77,7 @@ export class CrudeOilComponent implements OnDestroy {
   }
 
   protected onLiveBook(under: PaperLiveUnder, ev: Event): void {
-    if (under !== 'bank' && under !== 'sensex') return;
+    if (!LIVE_TAKE_UNDERS.includes(under as (typeof LIVE_TAKE_UNDERS)[number])) return;
     this.paper.setLiveBook(under, !!(ev.target as HTMLInputElement | null)?.checked);
   }
 
@@ -118,11 +117,12 @@ export class CrudeOilComponent implements OnDestroy {
         ? `Last Kite check ${istClock(s.asOf)} IST${ageSec >= 90 ? ` — ${Math.round(ageSec / 60)} min ago.` : '.'}`
         : '';
     const bank = this.liveBooks().find((d) => d.under === 'bank');
+    const nifty = this.liveBooks().find((d) => d.under === 'nifty');
     const sensex = this.liveBooks().find((d) => d.under === 'sensex');
-    const today = `Today ${s.day}: Bank ₹${Math.round(bank?.book.closedRs || 0).toLocaleString('en-IN')} · Sensex ₹${Math.round(sensex?.book.closedRs || 0).toLocaleString('en-IN')}.`;
+    const today = `Today ${s.day}: Bank ₹${Math.round(bank?.book.closedRs || 0).toLocaleString('en-IN')} · Nifty ₹${Math.round(nifty?.book.closedRs || 0).toLocaleString('en-IN')} · Sensex ₹${Math.round(sensex?.book.closedRs || 0).toLocaleString('en-IN')}.`;
     const droplet = this.paper.dropletNote();
     const foot =
-      'Paper always records. Arise Live Kite is Bank Nifty algo OR retest and Sensex mom 0.8× no confirm. Hunt stays on Paper test. Not a guaranteed profit.';
+      'Paper always records. Arise Live Kite is Bank Nifty mom 0.6× both, Nifty 50 vwap stretch, and Sensex mom 0.8× no confirm. Hunt stays on Paper test. Not a guaranteed profit.';
 
     if (s.kiteError) {
       return { tone: 'down', badge: 'needs Token', title: s.kiteError, lines: [today, foot].filter(Boolean) };
@@ -132,7 +132,7 @@ export class CrudeOilComponent implements OnDestroy {
         tone: 'info',
         badge: 'not watching',
         title: 'Not watching. Hit Start. Paper always. Live Kite is extra on ticked books.',
-        lines: ['Bank Nifty algo OR retest and Sensex mom 0.8× no confirm.', today, foot].filter(Boolean),
+        lines: ['Bank Nifty mom 0.6× both, Nifty 50 vwap stretch, Sensex mom 0.8× no confirm.', today, foot].filter(Boolean),
       };
     }
     if (busy && !s.asOf) {
@@ -142,8 +142,8 @@ export class CrudeOilComponent implements OnDestroy {
       tone: this.paper.liveArmed() ? 'down' : 'info',
       badge: this.paper.liveArmed() ? 'Live Kite on' : 'watching',
       title: this.paper.liveArmed()
-        ? 'Watching Bank Nifty and Sensex. Live Kite sends a MARKET buy and a resting SL on ticked books.'
-        : 'Watching Bank Nifty and Sensex on paper. Switch to Live Kite to send orders.',
+        ? 'Watching Bank Nifty, Nifty 50 and Sensex. Live Kite sends a MARKET buy and a resting SL on ticked books.'
+        : 'Watching Bank Nifty, Nifty 50 and Sensex on paper. Switch to Live Kite to send orders.',
       lines: [checked, today, droplet, foot].filter(Boolean),
     };
   }
