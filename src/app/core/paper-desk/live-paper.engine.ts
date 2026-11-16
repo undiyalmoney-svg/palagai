@@ -70,7 +70,7 @@ const EXIT: Partial<LiveAssumeBookCfg> = {
   freshCross: true,
 };
 
-/** Live Kite on the Crude Oil parent tab — Bank Nifty and Sensex only, hunt winners. */
+/** Live Kite on the Arise tab — Bank Nifty and Sensex only, hunt winners. */
 export const LIVE_TAKE_UNDERS = ['bank', 'sensex'] as const;
 export type LiveTakeUnder = (typeof LIVE_TAKE_UNDERS)[number];
 export const LIVE_TAKE_METHOD: Record<LiveTakeUnder, string> = {
@@ -84,7 +84,7 @@ export const PAPER_DESKS: { id: string; label: string; rule: string }[] = [
     id: 'momentum',
     label: 'Daily ₹370',
     rule:
-      'Paper always records. Live Kite on the Crude Oil tab is Bank Nifty algo OR retest and Sensex mix + no confirm only. ' +
+      'Paper always records. Live Kite on the Arise tab is Bank Nifty algo OR retest and Sensex mix + no confirm only. ' +
       'Target nets ₹370 after charges, fill at the live bid. When target hits, Live cancels the resting SL and sells MARKET. ' +
       'Hunt stays paper-only. Not a guaranteed profit.',
   },
@@ -162,7 +162,7 @@ function deskPatch(under: string): Partial<LiveAssumeBookCfg> {
 export const PAPER_MOMENTUM: Partial<LiveAssumeBookCfg> = { ...EXIT, ...deskPatch('nifty') };
 export const PAPER_TEST_HONEST =
   'Index-proxy pick, not a lock. ATM CE (up) or PE (down), 1 lot at the live ask, exact charges. ' +
-  'Live Kite on the Crude Oil tab is Bank Nifty algo OR retest and Sensex mix + no confirm only — today\'s paper hunt leaders, sample only. ' +
+  'Live Kite on the Arise tab is Bank Nifty algo OR retest and Sensex mix + no confirm only — today\'s paper hunt leaders, sample only. ' +
   'Daily bank ₹370 net after charges / stop ₹370. When the paper target hits, Live cancels the resting SL and sells MARKET. ' +
   'Hunt on all four names stays paper tickets — Live Kite never sees the hunt. ' +
   'Paper always records, Live on or off. Live Kite on a ticked book adds a 1 lot MARKET buy and a resting SL — a Kite reject does not drop the paper fill. A refresh does not arm Live. ' +

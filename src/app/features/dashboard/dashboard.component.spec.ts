@@ -88,11 +88,12 @@ describe('DashboardComponent navigation', () => {
     expect(el.textContent).not.toMatch(/Historical Backtest/i);
   });
 
-  it('lists Crude Oil and navigates there from Token', async () => {
+  it('lists Arise and navigates there from Token', async () => {
     const el = fixture.nativeElement as HTMLElement;
     const link = el.querySelector('[data-testid="nav-crude"]') as HTMLAnchorElement | null;
     expect(link).toBeTruthy();
-    expect(link?.textContent).toMatch(/Crude Oil/i);
+    expect(link?.textContent).toMatch(/Arise/);
+    expect(link?.textContent).not.toMatch(/Crude Oil/i);
 
     fixture.componentInstance['go']('/dashboard/crude-oil');
     await fixture.whenStable();
@@ -104,7 +105,7 @@ describe('DashboardComponent navigation', () => {
     const link = el.querySelector('[data-testid="nav-crude-best"]') as HTMLAnchorElement | null;
     expect(link).toBeTruthy();
     expect(link?.textContent).toMatch(/Crude Best/i);
-    expect(el.querySelector('[data-testid="nav-crude"]')?.textContent).toMatch(/Crude Oil/i);
+    expect(el.querySelector('[data-testid="nav-crude"]')?.textContent).toMatch(/Arise/);
 
     fixture.componentInstance['go']('/dashboard/crude-best');
     await fixture.whenStable();

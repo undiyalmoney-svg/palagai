@@ -12,7 +12,7 @@ export const MAX_DESK_LOTS = 10;
 export const MAX_CRUDE_LOTS = MAX_DESK_LOTS * CRUDE_LOTS_PER_BAND;
 
 /**
- * Funds ladder used by Charts and the Crude Oil tab.
+ * Funds ladder used by Charts and Crude Best.
  *
  * Below ₹40k, index ATM lots are 0 — a ₹14k account cannot buy one Nifty/Bank
  * premium without washing the cash. Crude Mini futures need ~₹31k NRML;
