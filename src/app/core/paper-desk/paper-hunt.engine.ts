@@ -418,6 +418,20 @@ export function huntLeaders(state: PaperHuntState | null | undefined, limit = 8)
     .slice(0, limit);
 }
 
+function inr(n: number): string {
+  return Math.round(n).toLocaleString('en-IN');
+}
+
+/** One paste-ready line: name, method, closed ₹. Sample only — not a guaranteed next move. */
+export function huntLeaderCopyLine(row: HuntMethodRow): string {
+  const open = row.open ? ' · open' : '';
+  return `${row.underLabel} · ${row.methodLabel}${open} · ₹${inr(row.closedRs)}`;
+}
+
+export function huntLeadersCopyText(rows: HuntMethodRow[]): string {
+  return rows.map(huntLeaderCopyLine).join('\n');
+}
+
 export function huntInstrumentSummary(
   state: PaperHuntState | null | undefined,
   under: (typeof UNDERS)[number],

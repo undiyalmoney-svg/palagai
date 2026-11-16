@@ -3,9 +3,12 @@ import { Component, OnDestroy, computed, inject, signal } from '@angular/core';
 import { LivePaperService } from '../../../core/paper-desk/live-paper.service';
 import { PAPER_HUNT_CAP, PAPER_HUNT_HONEST, PAPER_HUNT_METHODS } from '../../../core/paper-desk/paper-hunt.methods';
 import {
+  HuntMethodRow,
   HuntMethodView,
   filterHuntMethodRows,
+  huntLeaderCopyLine,
   huntLeaders,
+  huntLeadersCopyText,
   huntMethodRows,
   huntSummaries,
   huntTabNet,
@@ -46,6 +49,7 @@ export class Paper14kComponent implements OnDestroy {
   protected readonly hunt = computed(() => this.paper.session().hunt || null);
   protected readonly huntSummaries = computed(() => huntSummaries(this.hunt()));
   protected readonly huntLeaders = computed(() => huntLeaders(this.hunt()));
+  protected readonly copiedLeader = signal('');
   protected readonly huntTabMethods = computed(() =>
     filterHuntMethodRows(huntMethodRows(this.hunt(), this.huntTab()), this.huntView()),
   );
@@ -82,6 +86,14 @@ export class Paper14kComponent implements OnDestroy {
     void this.paper.refresh();
   }
 
+  protected copyLeader(row: HuntMethodRow): void {
+    void this.writeClipboard(huntLeaderCopyLine(row), row.key);
+  }
+
+  protected copyLeaders(): void {
+    void this.writeClipboard(huntLeadersCopyText(this.huntLeaders()), 'all');
+  }
+
   protected selectHuntTab(under: (typeof HUNT_TABS)[number]['under']): void {
     this.huntTab.set(under);
   }
@@ -92,6 +104,19 @@ export class Paper14kComponent implements OnDestroy {
 
   protected clock(iso?: string): string {
     return istClock(iso || '');
+  }
+
+  private async writeClipboard(text: string, key: string): Promise<void> {
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      this.copiedLeader.set(key);
+      window.setTimeout(() => {
+        if (this.copiedLeader() === key) this.copiedLeader.set('');
+      }, 1600);
+    } catch {
+      this.copiedLeader.set('');
+    }
   }
 
   private nowCard(

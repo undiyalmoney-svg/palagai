@@ -75,6 +75,16 @@
         <h2>Leaders</h2>
         <p class="mp-sub">Best closed ₹ across all four names. Empty until a paper ticket prints. Sample only — not a guaranteed next move.</p>
       </div>
+      @if (huntLeaders().length) {
+        <button
+          type="button"
+          class="ui-btn"
+          (click)="copyLeaders()"
+          data-testid="paper-hunt-leaders-copy-all"
+        >
+          {{ copiedLeader() === 'all' ? 'Copied' : 'Copy all' }}
+        </button>
+      }
     </div>
     @if (huntLeaders().length) {
       <div class="mp-table-wrap">
@@ -87,6 +97,7 @@
               <th class="num">Win %</th>
               <th class="num">Profit/loss</th>
               <th class="num">Lowest peak ₹</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
@@ -98,6 +109,17 @@
                 <td class="num">{{ row.winPct | number : '1.0-0' }}</td>
                 <td class="num" [class.mp-up]="row.closedRs > 0" [class.mp-down]="row.closedRs < 0">{{ row.closedRs | number : '1.0-0' }}</td>
                 <td class="num">{{ row.floorMfeRs | number : '1.0-0' }}</td>
+                <td>
+                  <button
+                    type="button"
+                    class="ui-btn mp-btn-sm"
+                    (click)="copyLeader(row)"
+                    data-testid="paper-hunt-leader-copy"
+                    [attr.aria-label]="'Copy ' + row.underLabel + ' ' + row.methodLabel"
+                  >
+                    {{ copiedLeader() === row.key ? 'Copied' : 'Copy' }}
+                  </button>
+                </td>
               </tr>
             }
           </tbody>

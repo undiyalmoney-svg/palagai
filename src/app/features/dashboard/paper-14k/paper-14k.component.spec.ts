@@ -70,6 +70,8 @@ describe('Paper14kComponent', () => {
     expect(text).toMatch(/open5 zone −0\.4011%/);
     expect(fixture.nativeElement.querySelector('[data-testid="paper-hunt-leaders"]')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('[data-testid="paper-hunt-leaders-empty"]')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('[data-testid="paper-hunt-leaders-copy-all"]')).toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-testid="paper-hunt-leader-copy"]')).toBeNull();
     expect(fixture.nativeElement.querySelector('[data-testid="paper-hunt-view-traded"]')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('[data-testid="paper-hunt-view-green"]')).toBeTruthy();
     expect((fixture.nativeElement.querySelector('[data-testid="paper-hunt-count"]') as HTMLElement).textContent).toMatch(
@@ -139,7 +141,7 @@ describe('Paper14kComponent', () => {
     expect(fixture.componentInstance['paper'].liveArmed()).toBe(false);
   });
 
-  it('shows all methods high profit first and a four-name summary', () => {
+  it('shows all methods high profit first and a four-name summary', async () => {
     const paper = fixture.componentInstance['paper'];
     const cur = paper.session();
     const hunt = emptyHunt('2026-11-16');
@@ -238,6 +240,16 @@ describe('Paper14kComponent', () => {
     expect(niftyTickets[1].querySelector('[data-testid="paper-hunt-exit-px"]')?.textContent).toMatch(/141/);
     expect(fixture.nativeElement.querySelector('[data-testid="paper-hunt-leaders-empty"]')).toBeNull();
     expect(fixture.nativeElement.querySelectorAll('[data-testid="paper-hunt-leader"]').length).toBeGreaterThanOrEqual(2);
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, { clipboard: { writeText } });
+    const copyOne = fixture.nativeElement.querySelector('[data-testid="paper-hunt-leader-copy"]') as HTMLButtonElement;
+    expect(copyOne?.textContent).toMatch(/Copy/);
+    copyOne.click();
+    await Promise.resolve();
+    expect(writeText).toHaveBeenCalledWith('Nifty 50 · mom 0.8× both · ₹1,607');
+    (fixture.nativeElement.querySelector('[data-testid="paper-hunt-leaders-copy-all"]') as HTMLButtonElement).click();
+    await Promise.resolve();
+    expect(writeText.mock.calls.at(-1)?.[0]).toContain('Bank Nifty · mom 0.8× both · ₹1,110');
     (fixture.nativeElement.querySelector('[data-testid="paper-hunt-view-traded"]') as HTMLButtonElement).click();
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelectorAll('[data-testid="paper-hunt-method"]').length).toBe(1);

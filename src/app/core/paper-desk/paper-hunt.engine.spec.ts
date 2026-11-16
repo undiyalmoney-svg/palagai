@@ -13,7 +13,9 @@ import {
   mergeHunt,
   slimHunt,
   filterHuntMethodRows,
+  huntLeaderCopyLine,
   huntLeaders,
+  huntLeadersCopyText,
   huntMethodCfg,
   huntInstrumentSummary,
   huntMethodRows,
@@ -296,6 +298,8 @@ describe('paper hunt methods', () => {
       closedRs: 1607,
     });
     expect(huntLeaders(hunt).some((r) => r.under === 'bank' && r.closedRs === 1110)).toBe(true);
+    expect(huntLeaderCopyLine(huntLeaders(hunt)[0])).toBe('Nifty 50 · mom 0.8× both · ₹1,607');
+    expect(huntLeadersCopyText(huntLeaders(hunt))).toContain('Bank Nifty · mom 0.8× both · ₹1,110');
     const niftySum = huntInstrumentSummary(hunt, 'nifty');
     expect(niftySum).toMatchObject({
       trades: 3,
