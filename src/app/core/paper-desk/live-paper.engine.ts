@@ -70,9 +70,24 @@ const EXIT: Partial<LiveAssumeBookCfg> = {
   freshCross: true,
 };
 
-/** The only paper desk: four daily ₹370 momentum books. */
+/** Live Kite on Paper test Crude Mini tab — Bank Nifty and Sensex only, hunt winners. */
+export const LIVE_TAKE_UNDERS = ['bank', 'sensex'] as const;
+export type LiveTakeUnder = (typeof LIVE_TAKE_UNDERS)[number];
+export const LIVE_TAKE_METHOD: Record<LiveTakeUnder, string> = {
+  bank: 'algo OR retest',
+  sensex: 'mix + no confirm',
+};
+
+/** The only paper desk: four daily ₹370 books. Live Kite is Bank + Sensex hunt winners. */
 export const PAPER_DESKS: { id: string; label: string; rule: string }[] = [
-  { id: 'momentum', label: 'Daily ₹370', rule: 'Nifty, Bank, Sensex and Crude Mini each take their own ATM CE/PE. Paper always records, Live on or off. Target nets ₹370 after charges, fill at the live bid. All four: up to five fills so a wrong trade can be corrected. Crude Mini from 09:00. Live Kite on a ticked book adds a real order' },
+  {
+    id: 'momentum',
+    label: 'Daily ₹370',
+    rule:
+      'Paper always records. Live Kite on the Crude Mini tab is Bank Nifty algo OR retest and Sensex mix + no confirm only. ' +
+      'Target nets ₹370 after charges, fill at the live bid. When target hits, Live cancels the resting SL and sells MARKET. ' +
+      'Hunt stays paper-only. Not a guaranteed profit.',
+  },
 ];
 
 function deskPatch(under: string): Partial<LiveAssumeBookCfg> {
@@ -90,6 +105,42 @@ function deskPatch(under: string): Partial<LiveAssumeBookCfg> {
       holdBars: 60,
       stopRs: LIVE_PAPER_CRUDE_STOP_RS,
       targetRs: LIVE_PAPER_CRUDE_TARGET_RS,
+    };
+  }
+  if (under === 'bank') {
+    return {
+      strategy: 'rules',
+      primary: ALL('or_retest'),
+      backup: {},
+      orS: 9 * 60 + 15,
+      orE: 9 * 60 + 30,
+      entryS: 9 * 60 + 45,
+      maxTradesPerDay: 5,
+      barMinutes: 1,
+      minGapMin: 10,
+      holdBars: 60,
+      stopRs: LIVE_PAPER_STOP_RS,
+      targetRs: LIVE_PAPER_TARGET_RS,
+      label: 'Bank Nifty · algo OR retest',
+    };
+  }
+  if (under === 'sensex') {
+    return {
+      strategy: 'momentum',
+      primary: ALL('momentum'),
+      momK: 0.8,
+      mix: true,
+      noConfirm: true,
+      orS: 9 * 60 + 15,
+      orE: 9 * 60 + 30,
+      entryS: 9 * 60 + 45,
+      maxTradesPerDay: 5,
+      barMinutes: 1,
+      minGapMin: 10,
+      holdBars: 60,
+      stopRs: LIVE_PAPER_STOP_RS,
+      targetRs: LIVE_PAPER_TARGET_RS,
+      label: 'Sensex · mix + no confirm',
     };
   }
   return {
@@ -110,13 +161,12 @@ function deskPatch(under: string): Partial<LiveAssumeBookCfg> {
 
 export const PAPER_MOMENTUM: Partial<LiveAssumeBookCfg> = { ...EXIT, ...deskPatch('nifty') };
 export const PAPER_TEST_HONEST =
-  'Index-proxy pick, not a lock. ATM CE (up) or PE (down), 1 lot at the live ask, next 1-min confirm, exact charges. ' +
-  'Daily bank ₹370 net after charges / stop ₹370, 0.8× 1-min thrust from 09:45. Nifty, Bank, Sensex and Crude Mini each take their own fill, up to five, so a wrong trade can be corrected. ' +
-  'Target fills at the live bid when it is already through. A +₹370 win does not sit the book. Each closed fill is graded A–F (A banks ₹370, F is a stop). ' +
-  'Crude Mini: from 09:00 MCX open, 0.8× thrust, up to five fills, flatten 23:10. Same ₹370 target. ' +
+  'Index-proxy pick, not a lock. ATM CE (up) or PE (down), 1 lot at the live ask, exact charges. ' +
+  'Live Kite on the Crude Mini tab is Bank Nifty algo OR retest and Sensex mix + no confirm only — today\'s paper hunt leaders, sample only. ' +
+  'Daily bank ₹370 net after charges / stop ₹370. When the paper target hits, Live cancels the resting SL and sells MARKET. ' +
+  'Hunt on all four names stays paper tickets — Live Kite never sees the hunt. ' +
   'Paper always records, Live on or off. Live Kite on a ticked book adds a 1 lot MARKET buy and a resting SL — a Kite reject does not drop the paper fill. A refresh does not arm Live. ' +
-  'Cousin ₹375 rule on 15 live 1-min sessions tagged 3 wins on 11 days — not every day, not 8 months. ' +
-  'Nothing here is a guaranteed ₹370. Forward paper is unproven until 400 trades and a one-sided 95% lower bound above zero on live asks. Not a guaranteed profit.';
+  'Nothing here is a guaranteed ₹370. Not a guaranteed profit.';
 
 export const LIVE_PAPER_BOOKS: LiveAssumeBookCfg[] = OPTION_14K_LIST.map((plan) => ({
   ...option14kToPaperCfg(plan),

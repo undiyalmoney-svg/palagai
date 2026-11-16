@@ -644,23 +644,36 @@ describe('Live paper desk', () => {
   it('trades only Nifty, Bank, Sensex and Crude Mini momentum from 09:00', () => {
     const by = (under: string) => LIVE_PAPER_BOOKS.find((b) => b.id === `${under}-momentum`)!;
     expect(LIVE_PAPER_BOOKS).toHaveLength(4);
-    expect(LIVE_PAPER_BOOKS.every((b) => b.strategy === 'momentum' && b.desk === 'momentum')).toBe(true);
-    for (const under of ['nifty', 'bank', 'sensex']) {
-      expect(by(under)).toMatchObject({
-        strategy: 'momentum',
-        stopRs: LIVE_PAPER_STOP_RS,
-        targetRs: LIVE_PAPER_TARGET_RS,
-        holdBars: 60,
-        maxTradesPerDay: 5,
-        barMinutes: 1,
-        momK: 0.8,
-        atm: true,
-        noConfirm: false,
-        dayStops: true,
-        orE: 9 * 60 + 30,
-      });
-      expect(by(under).skipStructures).toBeUndefined();
-    }
+    expect(LIVE_PAPER_BOOKS.every((b) => b.desk === 'momentum')).toBe(true);
+    expect(by('nifty')).toMatchObject({
+      strategy: 'momentum',
+      stopRs: LIVE_PAPER_STOP_RS,
+      targetRs: LIVE_PAPER_TARGET_RS,
+      holdBars: 60,
+      maxTradesPerDay: 5,
+      barMinutes: 1,
+      momK: 0.8,
+      atm: true,
+      noConfirm: false,
+      dayStops: true,
+      orE: 9 * 60 + 30,
+    });
+    expect(by('bank')).toMatchObject({
+      strategy: 'rules',
+      primary: { trend: 'or_retest', range: 'or_retest', quiet: 'or_retest', stand: 'or_retest' },
+      stopRs: LIVE_PAPER_STOP_RS,
+      targetRs: LIVE_PAPER_TARGET_RS,
+      label: 'Bank Nifty · algo OR retest',
+    });
+    expect(by('sensex')).toMatchObject({
+      strategy: 'momentum',
+      momK: 0.8,
+      mix: true,
+      noConfirm: true,
+      stopRs: LIVE_PAPER_STOP_RS,
+      targetRs: LIVE_PAPER_TARGET_RS,
+      label: 'Sensex · mix + no confirm',
+    });
     expect(LIVE_PAPER_CRUDE_MOM_K).toBe(0.8);
     expect(by('crude')).toMatchObject({
       strategy: 'momentum',
@@ -674,13 +687,12 @@ describe('Live paper desk', () => {
       maxTradesPerDay: 5,
       noConfirm: false,
     });
-    expect(by('crude').momK).toBe(by('bank').momK);
     expect(PAPER_TEST_HONEST).toMatch(/Not a guaranteed profit/);
-    expect(PAPER_TEST_HONEST).toMatch(/from 09:00 MCX open/);
+    expect(PAPER_TEST_HONEST).toMatch(/Bank Nifty algo OR retest/);
+    expect(PAPER_TEST_HONEST).toMatch(/Sensex mix \+ no confirm/);
+    expect(PAPER_TEST_HONEST).toMatch(/cancels the resting SL/);
     expect(PAPER_TEST_HONEST).toMatch(/Daily bank ₹370/);
-    expect(PAPER_TEST_HONEST).toMatch(/Nifty, Bank, Sensex and Crude Mini each take their own fill/);
-    expect(PAPER_TEST_HONEST).toMatch(/up to five fills/);
-    expect(PAPER_TEST_HONEST).toMatch(/graded A/);
+    expect(PAPER_TEST_HONEST).toMatch(/Live Kite never sees the hunt/);
     expect(PAPER_TEST_HONEST).toMatch(/Paper always records/);
     expect(PAPER_TEST_HONEST).toMatch(/Kite reject does not drop the paper fill/);
     expect(paperTickOrder(LIVE_PAPER_BOOKS).map((b) => b.under)).toEqual(['bank', 'sensex', 'nifty', 'crude']);
@@ -798,7 +810,7 @@ describe('Live paper desk', () => {
       bars[bars.length - 1] = { ...bars[bars.length - 1], close: px + 20, high: px + 21 };
       return bars;
     };
-    for (const under of ['nifty', 'bank', 'sensex', 'crude'] as const) {
+    for (const under of ['nifty', 'crude'] as const) {
       const cfg = LIVE_PAPER_BOOKS.find((b) => b.id === `${under}-momentum`)!;
       const bars = barsFor(under);
       const lastBarMin = under === 'crude' ? 9 * 60 + 25 : 9 * 60 + 40;
