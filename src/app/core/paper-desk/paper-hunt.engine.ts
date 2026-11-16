@@ -464,7 +464,9 @@ export function huntBindOption(
     };
   }
   const fill = liveBuyPrice(side.ask, side.last);
-  if (fill.price == null || optionPremiumPx(fill.price) == null) {
+  const chainPrem = pick.source === 'chain' ? optionPremiumPx(pick.instrument.lastPrice) : null;
+  const prem = fill.price != null && optionPremiumPx(fill.price) != null ? fill.price : chainPrem;
+  if (prem == null) {
     return {
       ...book,
       side: 'flat',
@@ -495,7 +497,7 @@ export function huntBindOption(
       ].slice(-20),
     };
   }
-  const bound = bindOptionFill(book, cfg, fill.price, pick, null, nowMin);
+  const bound = bindOptionFill(book, cfg, prem, pick, null, nowMin);
   return { ...bound, entryBid: side.bid, entryAsk: side.ask, entryAt: nowIso };
 }
 

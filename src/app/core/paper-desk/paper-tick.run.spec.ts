@@ -4,6 +4,7 @@ import { emptyPaperLiveBooks } from './paper-live-order.util';
 import {
   HIST_MINUTE_LOOKBACK_DAYS,
   barFeedLine,
+  findCrudeMini,
   lastPrice,
   minuteDayWindows,
   runPaperTick,
@@ -24,6 +25,26 @@ describe('spot from Kite quotes', () => {
 
   it('returns null for Bank when only the option quote is present, so ATM is not 162', () => {
     expect(lastPrice({ 'NFO:BANKNIFTY26N1758000CE': { last_price: 162 } }, 'bank', 'NIFTY BANK')).toBeNull();
+  });
+});
+
+describe('Crude Mini future from Kite CSV', () => {
+  const header =
+    'instrument_token,exchange_token,tradingsymbol,name,last_price,expiry,strike,tick_size,lot_size,instrument_type,segment,exchange';
+  const csv = [
+    header,
+    '111,0,CRUDEOILM26NOVFUT,CRUDEOILM,0,2026-11-17,0,1,1,FUT,MCX-FUT,MCX',
+    '222,0,CRUDEOILM26DECFUT,CRUDEOILM,0,2026-12-17,0,1,1,FUT,MCX-FUT,MCX',
+  ].join('\n');
+
+  it('picks the November contract the day before expiry', () => {
+    expect(findCrudeMini(csv, '2026-11-16')?.tradingSymbol).toBe('CRUDEOILM26NOVFUT');
+  });
+
+  it('rolls to December on November expiry day, and keeps November if that is the only row', () => {
+    expect(findCrudeMini(csv, '2026-11-17')?.tradingSymbol).toBe('CRUDEOILM26DECFUT');
+    const onlyNov = [header, '111,0,CRUDEOILM26NOVFUT,CRUDEOILM,0,2026-11-17,0,1,1,FUT,MCX-FUT,MCX'].join('\n');
+    expect(findCrudeMini(onlyNov, '2026-11-17')?.tradingSymbol).toBe('CRUDEOILM26NOVFUT');
   });
 });
 

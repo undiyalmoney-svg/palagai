@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { CheapOtmPick } from '../utils/pick-cheap-otm.util';
 import { LiveAssumeBar } from './live-assume.engine';
 import { emptyBook, emptySession, nightLog, tickBook } from './live-paper.engine';
 import {
@@ -452,6 +453,69 @@ describe('paper hunt methods', () => {
     expect(out.books[0].fills[0].maxPx).toBe(140);
     expect(out.books[0].fills[0].maeRs).toBe(-80);
     expect(out.books[0].fills[0].signal).toBeNull();
+  });
+
+  it('opens a Crude Mini hunt ticket from the chain last when MCX depth is empty', () => {
+    const day = '2026-11-16';
+    const bars = Array.from({ length: 40 }, (_, i) => {
+      const min = 9 * 60 + i;
+      const base = 5400 + i * 3;
+      return { day, min, open: base, high: base + 6, low: base - 1, close: base + 3 };
+    });
+    const pick = (side: 'CE' | 'PE'): CheapOtmPick => ({
+      instrument: {
+        instrumentToken: 99,
+        exchangeToken: 1,
+        tradingSymbol: `CRUDEOILM26NOV5400${side}`,
+        name: 'CRUDEOILM',
+        lastPrice: 139.4,
+        expiry: '2026-11-17',
+        strike: 5400,
+        tickSize: 0.1,
+        lotSize: 10,
+        instrumentType: side,
+        segment: 'MCX-OPT',
+        exchange: 'MCX',
+      },
+      source: 'chain',
+      side,
+      strike: 5400,
+      expiry: '2026-11-17',
+      lotSize: 10,
+      lastPrice: 139.4,
+      openCostRs: 1394,
+      fitsBudget: true,
+    });
+    const emptyQ = { bid: null, ask: null, last: null };
+    const nowMin = bars[bars.length - 1].min + 2;
+    const out = tickPaperHunt({
+      prev: emptyHunt(day),
+      day,
+      nowMin,
+      nowIso: '2026-11-16T04:45:00.000Z',
+      barsByUnder: new Map([
+        ['nifty', upBars(day, 10)],
+        ['bank', upBars(day, 10)],
+        ['sensex', upBars(day, 10)],
+        ['crude', bars],
+      ]),
+      quotesByUnder: new Map([
+        ['nifty', { ce: emptyQ, pe: emptyQ, underLast: 25200 }],
+        ['bank', { ce: emptyQ, pe: emptyQ, underLast: 58000 }],
+        ['sensex', { ce: emptyQ, pe: emptyQ, underLast: 82100 }],
+        ['crude', { ce: emptyQ, pe: emptyQ, underLast: 5517 }],
+      ]),
+      picksByUnder: new Map([['crude', { ce: pick('CE'), pe: pick('PE') }]]),
+    });
+    const crude = out.books.filter((b) => b.under === 'crude' || b.id.startsWith('crude-'));
+    expect(crude.some((b) => b.side !== 'flat' || b.fills.length > 0)).toBe(true);
+    expect(
+      crude.every((b) => {
+        const px = b.side !== 'flat' ? b.entry : b.fills[0]?.entry;
+        return px == null || px < 1_000;
+      }),
+    ).toBe(true);
+    expect(Math.abs(huntInstrumentSummary(out, 'crude').maxCapitalRs)).toBeLessThan(20_000);
   });
 
   it('puts profitable hunt methods with max price and max loss on the night log', () => {

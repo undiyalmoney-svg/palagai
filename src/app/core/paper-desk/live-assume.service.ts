@@ -10,6 +10,7 @@ import {
   closeBook,
   summarize,
 } from './live-assume.engine';
+import { kiteBar } from './kite-bar.util';
 
 @Injectable({ providedIn: 'root' })
 export class LiveAssumeService {
@@ -184,22 +185,6 @@ function findNamed(csv: string, names: string[]): { tradingSymbol: string; token
   return null;
 }
 
-function kiteBar(row: unknown[]): LiveAssumeBar {
-  const raw = String(row[0] || '');
-  const d = new Date(raw);
-  const ist = new Date(d.getTime() + 330 * 60 * 1000);
-  const day = raw.slice(0, 10);
-  const hh = Number.isNaN(d.getTime()) ? Number(raw.slice(11, 13)) : ist.getUTCHours();
-  const mm = Number.isNaN(d.getTime()) ? Number(raw.slice(14, 16)) : ist.getUTCMinutes();
-  return {
-    day,
-    min: hh * 60 + mm,
-    open: Number(row[1]) || 0,
-    high: Number(row[2]) || 0,
-    low: Number(row[3]) || 0,
-    close: Number(row[4]) || 0,
-  };
-}
 
 function lastPrice(
   quotes: Record<string, { last_price?: number }>,
