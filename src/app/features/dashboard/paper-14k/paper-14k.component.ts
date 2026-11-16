@@ -9,6 +9,7 @@ import {
   huntMethodRows,
   huntSummaries,
   huntTabNet,
+  huntTickets,
 } from '../../../core/paper-desk/paper-hunt.engine';
 
 const HUNT_TABS = [
@@ -48,6 +49,7 @@ export class Paper14kComponent implements OnDestroy {
   protected readonly huntTabMethods = computed(() =>
     filterHuntMethodRows(huntMethodRows(this.hunt(), this.huntTab()), this.huntView()),
   );
+  protected readonly huntTabTickets = computed(() => huntTickets(this.hunt(), this.huntTab()));
   protected readonly huntTabClosed = computed(() => huntTabNet(this.hunt(), this.huntTab()));
   protected readonly huntTabLabel = computed(
     () => this.huntTabs.find((r) => r.under === this.huntTab())?.label || this.huntTab(),
