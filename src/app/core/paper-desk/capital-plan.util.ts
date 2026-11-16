@@ -95,7 +95,7 @@ export function planLotsForCapital(capitalRs: number = DEFAULT_TRADING_CAPITAL_R
       capital,
       premiumBudgetRs,
       `Capital ₹${capital.toLocaleString('en-IN')} is below ₹${DEFAULT_TRADING_CAPITAL_RS.toLocaleString('en-IN')}. ` +
-        `Index ATM CE/PE stands down. Crude Mini futures ×1 lives on the Crude Oil tab.`,
+        `Index ATM CE/PE stands down. Crude Mini futures ×1 lives on Crude Best.`,
     );
   }
 

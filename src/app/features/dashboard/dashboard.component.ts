@@ -71,7 +71,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   protected readonly clockLabel = signal('');
   protected readonly pageTitle = signal('Palagai');
   protected readonly pageSubtitle = signal(
-    'Token, Crude Best, Crude Oil, Paper test, and Test.',
+    'Token, Crude Best, Arise, Paper test, and Test.',
   );
   protected readonly sidebarOpen = signal(true);
   protected readonly profileOpen = signal(false);
@@ -93,8 +93,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
       testId: 'crude-best',
     },
     {
-      label: 'Crude Oil',
-      shortLabel: 'Crude',
+      label: 'Arise',
+      shortLabel: 'Arise',
       route: '/dashboard/crude-oil',
       icon: 'activity',
       module: 'crude',
@@ -121,7 +121,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   private readonly titles: Record<string, { title: string; subtitle: string }> = {
     '/dashboard/paper-14k': {
       title: 'Paper test',
-      subtitle: 'Paper hunt only. Live Kite is on Crude Oil.',
+      subtitle: 'Paper hunt only. Live Kite is on Arise.',
     },
     '/dashboard/order-test': {
       title: 'Test',
@@ -136,7 +136,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
       subtitle: 'Token, then Start trading. System picks the next Crude Mini, 1 lot, SL-M, and TP. Not guaranteed.',
     },
     '/dashboard/crude-oil': {
-      title: 'Crude Oil',
+      title: 'Arise',
       subtitle: 'Bank Nifty algo OR retest and Sensex mix + no confirm. Paper always. Live Kite is extra. Not guaranteed.',
     },
     '/dashboard/settings': {
@@ -155,7 +155,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   protected readonly hideFunds = computed(() => this.authService.isPublic());
 
-  /** Bottom tab bar on phone — Token, Crude Best, Crude Oil, Paper test, Test. */
+  /** Bottom tab bar on phone — Token, Crude Best, Arise, Paper test, Test. */
   protected readonly mobileTabItems = computed(() => this.navItems());
 
   protected readonly username = computed(() => {
@@ -355,7 +355,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
       return 'Could not open Crude Best. Retry, or hard-refresh the tab.';
     }
     if (/crude-oil/i.test(`${event.url} ${msg}`)) {
-      return 'Could not open Crude Oil. Retry, or hard-refresh the tab.';
+      return 'Could not open Arise. Retry, or hard-refresh the tab.';
     }
     return msg || 'Could not open that desk.';
   }

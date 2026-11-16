@@ -122,7 +122,7 @@ export class CrudeOilComponent implements OnDestroy {
     const today = `Today ${s.day}: Bank ₹${Math.round(bank?.book.closedRs || 0).toLocaleString('en-IN')} · Sensex ₹${Math.round(sensex?.book.closedRs || 0).toLocaleString('en-IN')}.`;
     const droplet = this.paper.dropletNote();
     const foot =
-      'Paper always records. Live Kite is Bank Nifty algo OR retest and Sensex mix + no confirm. Hunt stays on Paper test. Not a guaranteed profit.';
+      'Paper always records. Arise Live Kite is Bank Nifty algo OR retest and Sensex mix + no confirm. Hunt stays on Paper test. Not a guaranteed profit.';
 
     if (s.kiteError) {
       return { tone: 'down', badge: 'needs Token', title: s.kiteError, lines: [today, foot].filter(Boolean) };

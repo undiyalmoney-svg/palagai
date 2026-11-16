@@ -17,9 +17,10 @@ describe('CrudeOilComponent', () => {
     fixture.detectChanges();
   });
 
-  it('is the parent Crude Oil desk: Bank Nifty and Sensex paper plus Live Kite', () => {
+  it('is the Arise desk: Bank Nifty algo OR retest and Sensex mix + no confirm', () => {
     const text = fixture.nativeElement.textContent as string;
     expect(fixture.nativeElement.querySelector('[data-testid="crude-oil-page"]')).toBeTruthy();
+    expect(text).toMatch(/Arise/);
     expect(text).toMatch(/Bank Nifty/);
     expect(text).toMatch(/Sensex/);
     expect(text).toMatch(/algo OR retest/);
