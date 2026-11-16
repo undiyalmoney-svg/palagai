@@ -138,5 +138,15 @@ describe('LivePaperService', () => {
         underLast: 24450,
       }),
     ).toBe(150);
+    expect(
+      optionMarkLast({
+        buyOption: true,
+        side: 'long',
+        optionSymbol: 'BANKNIFTY26N1758000CE',
+        optLast: 58_040,
+        prevLast: 162,
+        underLast: 58_040,
+      }),
+    ).toBe(162);
   });
 });

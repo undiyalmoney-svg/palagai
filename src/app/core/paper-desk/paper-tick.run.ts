@@ -6,7 +6,7 @@ import { Instrument } from '../models/instrument.model';
 import { parseKiteInstrumentsCsv } from '../utils/csv.util';
 import { CheapOtmPick, pickCheapOtm } from '../utils/pick-cheap-otm.util';
 import { LiveAssumeBar, LiveAssumeBookCfg } from './live-assume.engine';
-import { liveBuyPrice, lotCostRs, neededLotQuote, replayBudgetSkips } from './live-fill.util';
+import { liveBuyPrice, lotCostRs, neededLotQuote, optionPremiumPx, replayBudgetSkips } from './live-fill.util';
 import {
   LIVE_PAPER_BOOKS,
   LivePaperBookState,
@@ -37,6 +37,7 @@ import { PaperLiveBooks, paperLiveArmed } from './paper-live-order.util';
 import { SkippedSignal } from './paper-analytics.models';
 import { buildSignalCard } from './signal-card.util';
 import { HuntSideQuote, tickPaperHunt } from './paper-hunt.engine';
+import { kiteBar } from './kite-bar.util';
 
 const UNDERS = ['crude', 'nifty', 'bank', 'sensex'] as const;
 const NO_BUDGET_CAP = 10_000_000;
@@ -156,11 +157,11 @@ export async function runPaperTick(io: PaperTickIo): Promise<LivePaperSession> {
       { bid: optBid, ask: optAsk, blockOpen: indexDeskBlockReason(cfg.id, peers, day), evolve: flags },
     );
     if (cfg.buyOption && needsOption(next)) {
-      const spot = underLast ?? (next.optionSymbol ? next.last : null) ?? 0;
+      const spot = underLast ?? 0;
       const pair = cheapByUnder.get(under);
       next = await bindCheap(next, cfg, chain, spot, quotes, nowMin, io, pair, now);
     }
-    if (cfg.buyOption && next.side !== 'flat' && !next.optionSymbol) {
+    if (cfg.buyOption && next.side !== 'flat' && (!next.optionSymbol || optionPremiumPx(next.entry) == null)) {
       next = {
         ...next,
         side: 'flat',
@@ -174,8 +175,9 @@ export async function runPaperTick(io: PaperTickIo): Promise<LivePaperSession> {
         reason: 'skipped: no option fill',
       };
     } else if (next.side !== 'flat' && next.optionSymbol && optLast != null) {
-      const mark = optBid != null && optLast < optBid ? optBid : optLast;
-      next = { ...next, last: mark };
+      const raw = optBid != null && optLast < optBid ? optBid : optLast;
+      const mark = optionPremiumPx(raw, underLast);
+      if (mark != null) next = { ...next, last: mark };
     }
     if (next.fills.length > prev.fills.length && prev.optionSymbol) {
       const q = findQuote(quotes, optionKey(prev));
@@ -263,6 +265,8 @@ async function bindCheap(
   const { bid, ask } = bestBidAsk(q);
   const liveLast = listed ? lastByKey(quotes, key) : null;
   const fill = liveBuyPrice(ask, liveLast);
+  const chainPrem = pick.source === 'chain' ? optionPremiumPx(pick.instrument.lastPrice) : null;
+  const premPx = fill.price != null && optionPremiumPx(fill.price) != null ? fill.price : chainPrem;
   const flat = (reason: string, skip: SkippedSignal): LivePaperBookState => ({
     ...book,
     side: 'flat',
@@ -295,7 +299,7 @@ async function bindCheap(
       });
     }
   }
-  if (!listed || fill.price == null) {
+  if (!listed || premPx == null) {
     const skip: SkippedSignal = {
       at: now.toISOString(),
       day: istDay(now),
@@ -312,7 +316,7 @@ async function bindCheap(
     };
     return flat(listed ? 'skipped: no live quote' : 'skipped: no listed contract', skip);
   }
-  const prem = fill.price;
+  const prem = premPx;
   const cost = lotCostRs(prem, pick.lotSize);
   const range = await optionRange(pick.instrument.instrumentToken, istDay(now), nowMin, io);
   const stop = optionBoundStops(cfg, prem, pick.lotSize, range);
@@ -498,22 +502,28 @@ function splitCsvLine(line: string): string[] {
   return out;
 }
 
-function findCrudeMini(csv: string, today: string): { tradingSymbol: string; token: number; exchange: string } | null {
+export function findCrudeMini(csv: string, today: string): { tradingSymbol: string; token: number; exchange: string } | null {
   const rows: { tradingSymbol: string; token: number; exchange: string; expiry: string }[] = [];
   for (const line of csv.split(/\r?\n/).slice(1)) {
     const cols = splitCsvLine(line);
     if (cols.length < 12) continue;
     if (cols[11].trim().toUpperCase() !== 'MCX' || cols[9].trim().toUpperCase() !== 'FUT') continue;
     if (!cols[2].toUpperCase().startsWith('CRUDEOILM')) continue;
+    const exp = /^(\d{4}-\d{2}-\d{2})/.exec((cols[5] || '').trim());
     rows.push({
       token: Number(cols[0]) || 0,
       tradingSymbol: cols[2].trim(),
       exchange: 'MCX',
-      expiry: (cols[5] || '').slice(0, 10),
+      expiry: exp ? exp[1] : '',
     });
   }
   rows.sort((a, b) => a.expiry.localeCompare(b.expiry));
-  return rows.find((r) => !r.expiry || r.expiry > today) || null;
+  return (
+    rows.find((r) => !r.expiry || r.expiry > today) ||
+    rows.find((r) => r.expiry >= today) ||
+    rows[0] ||
+    null
+  );
 }
 
 function findNamed(csv: string, names: string[]): { tradingSymbol: string; token: number; exchange: string } | null {
@@ -568,22 +578,7 @@ export function barFeedLine(barsByUnder: Map<string, LiveAssumeBar[]>, day: stri
   return '';
 }
 
-function kiteBar(row: unknown[]): LiveAssumeBar {
-  const raw = String(row[0] || '');
-  const d = new Date(raw);
-  const ist = new Date(d.getTime() + 330 * 60 * 1000);
-  const day = raw.slice(0, 10);
-  const hh = Number.isNaN(d.getTime()) ? Number(raw.slice(11, 13)) : ist.getUTCHours();
-  const mm = Number.isNaN(d.getTime()) ? Number(raw.slice(14, 16)) : ist.getUTCMinutes();
-  return {
-    day,
-    min: hh * 60 + mm,
-    open: Number(row[1]) || 0,
-    high: Number(row[2]) || 0,
-    low: Number(row[3]) || 0,
-    close: Number(row[4]) || 0,
-  };
-}
+export { kiteBar } from './kite-bar.util';
 
 export function needsOption(next: LivePaperBookState): boolean {
   return next.side !== 'flat' && !next.optionSymbol;
@@ -598,9 +593,9 @@ export function optionMarkLast(args: {
   underLast: number | null;
 }): number | null {
   if (!args.buyOption) return args.underLast;
-  if (args.side !== 'flat' && args.optionSymbol) return args.optLast ?? args.prevLast;
-  if (args.side !== 'flat') return args.prevLast;
-  return args.underLast;
+  const prem = optionPremiumPx(args.optLast, args.underLast) ?? optionPremiumPx(args.prevLast, args.underLast);
+  if (args.side !== 'flat') return prem;
+  return prem;
 }
 
 function instOf(
@@ -642,7 +637,9 @@ function huntSideQuote(
   const key = `${pick.instrument.exchange}:${pick.instrument.tradingSymbol}`;
   const q = findQuote(quotes, key);
   const { bid, ask } = bestBidAsk(q);
-  return { bid, ask, last: lastByKey(quotes, key) };
+  const live = lastByKey(quotes, key);
+  const chain = pick.source === 'chain' ? optionPremiumPx(pick.instrument.lastPrice) : null;
+  return { bid, ask, last: live ?? chain };
 }
 
 export function bestBidAsk(q: PaperTickQuote | null): { bid: number | null; ask: number | null } {
@@ -669,16 +666,28 @@ function lastByKey(quotes: Record<string, PaperTickQuote>, key: string): number 
   return null;
 }
 
-function lastPrice(quotes: Record<string, PaperTickQuote>, id: string, symbol: string): number | null {
+export function lastPrice(quotes: Record<string, PaperTickQuote>, id: string, symbol: string): number | null {
+  const want =
+    id === 'nifty' ? 'NSE:NIFTY 50' : id === 'bank' ? 'NSE:NIFTY BANK' : id === 'sensex' ? 'BSE:SENSEX' : '';
+  if (want) {
+    const n = Number(findQuote(quotes, want)?.last_price);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  }
+  if (id === 'crude' && symbol) {
+    const exact = findQuote(quotes, `MCX:${symbol}`);
+    const n = Number(exact?.last_price);
+    if (Number.isFinite(n) && n > 0) return n;
+  }
   for (const [k, v] of Object.entries(quotes)) {
     const key = k.toUpperCase();
     if (id === 'crude' && key.includes('CRUDEOILM') && !key.includes('CE') && !key.includes('PE')) {
-      return Number(v.last_price) || null;
+      const n = Number(v.last_price);
+      if (Number.isFinite(n) && n > 0) return n;
     }
-    if (id === 'nifty' && key.includes('NIFTY 50')) return Number(v.last_price) || null;
-    if (id === 'bank' && key.includes('BANK')) return Number(v.last_price) || null;
-    if (id === 'sensex' && key.includes('SENSEX')) return Number(v.last_price) || null;
-    if (symbol && key.includes(symbol.toUpperCase())) return Number(v.last_price) || null;
+    if (symbol && key.includes(symbol.toUpperCase()) && !key.includes('CE') && !key.includes('PE')) {
+      const n = Number(v.last_price);
+      if (Number.isFinite(n) && n > 0) return n;
+    }
   }
   return null;
 }

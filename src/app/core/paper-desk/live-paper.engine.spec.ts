@@ -395,6 +395,33 @@ describe('Live paper desk', () => {
     expect(won.fills[0].reason).toBe('tp');
   });
 
+  it('does not bank Bank Nifty last as a CE/PE win', () => {
+    const cfg = LIVE_PAPER_BOOKS.find((b) => b.id === 'bank-momentum')!;
+    const book = emptyBook(cfg);
+    book.side = 'long';
+    book.entry = 162;
+    book.sl = 150;
+    book.tp = 200;
+    book.scratch = 150;
+    book.status = 'open';
+    book.lot = 30;
+    book.last = 162;
+    book.lastBarMin = 10 * 60;
+    book.entryMin = 10 * 60;
+    book.optionSymbol = 'BANKNIFTY26N1758000CE';
+    const indexBars = [
+      { day: '2026-11-16', min: 10 * 60 + 5, open: 58_000, high: 58_100, low: 57_900, close: 58_050 },
+    ];
+    const marked = tickBook(book, cfg, indexBars, 58_050, '2026-11-16', 10 * 60 + 20, 'BANKNIFTY', [], {
+      bid: 58_050,
+      ask: 58_100,
+    });
+    expect(marked.side).toBe('long');
+    expect(marked.fills).toHaveLength(0);
+    expect(marked.last).toBe(162);
+    expect(Math.abs(marked.liveRs)).toBeLessThan(5_000);
+  });
+
   it('fills a stop at the gap open, not the better stop level, and a target at the target level', () => {
     const cfg = LIVE_PAPER_BOOKS.find((b) => b.id === 'sensex-momentum')!;
     const mk = () => {

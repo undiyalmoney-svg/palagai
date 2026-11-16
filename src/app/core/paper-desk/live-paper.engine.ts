@@ -14,6 +14,7 @@ import { OPTION_14K_BOOKS, OPTION_14K_LIST, Option14kBookId, option14kToPaperCfg
 import { mixGate } from './paper-mix.util';
 import { PaperEvolveFlags, PaperEvolveState, emptyEvolve, reviewEvolvingDesk } from './paper-evolve.util';
 import { CheapOtmPick } from '../utils/pick-cheap-otm.util';
+import { optionPremiumPx } from './live-fill.util';
 import {
   equityMisRoundTripCharges,
   futuresRoundTripCharges,
@@ -625,6 +626,7 @@ export function bindOptionFill(
   atMin?: number,
 ): LivePaperBookState {
   if (book.side === 'flat' || prem <= 0) return book;
+  if (isOptionBuy(cfg) && optionPremiumPx(prem) == null) return book;
   const next: LivePaperBookState = { ...book, fills: [...book.fills] };
   const stop = optionBoundStops(cfg, prem, pick.lotSize, rangePts);
   const tpPts =
@@ -730,14 +732,19 @@ export function netRs(cfg: LiveAssumeBookCfg, book: Pick<LivePaperBookState, 'lo
   return Math.round((pts * qty - charges) * 10) / 10;
 }
 
-function markLive(book: LivePaperBookState, last: number | null, cfg: LiveAssumeBookCfg): void {
-  book.last = last;
+function markLive(book: LivePaperBookState, last: number | null, cfg: LiveAssumeBookCfg, underLast?: number | null): void {
+  const mark = isOptionBuy(cfg) ? optionPremiumPx(last, underLast) ?? optionPremiumPx(book.last, underLast) : last;
+  if (isOptionBuy(cfg)) {
+    if (mark != null) book.last = mark;
+  } else {
+    book.last = mark ?? last;
+  }
   if (book.side === 'flat' || book.entry == null) {
     book.livePts = 0;
     book.liveRs = 0;
     return;
   }
-  const px = last ?? book.entry;
+  const px = (isOptionBuy(cfg) ? mark : last) ?? book.entry;
   const pts = isOptionBuy(cfg) ? px - book.entry : (book.side === 'long' ? 1 : -1) * (px - book.entry);
   book.livePts = Math.round(pts * 10) / 10;
   book.liveRs = netRs(cfg, book, book.entry, px, pts);
@@ -754,8 +761,10 @@ function closeAt(
   reason: string,
   day: string,
   nowMin?: number,
+  underLast?: number | null,
 ): void {
   if (book.side === 'flat' || book.entry == null) return;
+  if (isOptionBuy(cfg) && optionPremiumPx(exitPx, underLast) == null) return;
   const pts = isOptionBuy(cfg)
     ? exitPx - book.entry
     : (book.side === 'long' ? 1 : -1) * (exitPx - book.entry);
@@ -850,42 +859,63 @@ function hitExit(
   open: number = close,
   nowMin?: number,
   fillBid?: number | null,
+  underLast?: number | null,
 ): boolean {
   if (book.side === 'flat' || book.entry == null || book.sl == null || book.tp == null || book.scratch == null) {
     return false;
   }
-  const long = isOptionBuy(cfg) || book.side === 'long';
+  if (isOptionBuy(cfg)) {
+    const bidPx = optionPremiumPx(fillBid, underLast);
+    const hi = optionPremiumPx(high, underLast);
+    const lo = optionPremiumPx(low, underLast);
+    const openPx = optionPremiumPx(open, underLast) ?? hi ?? lo;
+    if (bidPx == null && hi == null && lo == null) return false;
+    const fill = (reason: 'sl' | 'scratch' | 'tp', px: number): boolean => {
+      closeAt(book, cfg, px, reason, day, nowMin, underLast);
+      return book.side === 'flat';
+    };
+    if (bidPx != null && bidPx <= book.sl) return fill('sl', bidPx);
+    if (bidPx == null && lo != null && lo <= book.sl) return fill('sl', Math.min(book.sl, openPx ?? book.sl));
+    if (bidPx != null && bidPx <= book.scratch) return fill('scratch', bidPx);
+    if (bidPx == null && lo != null && lo <= book.scratch) {
+      return fill('scratch', Math.min(book.scratch, openPx ?? book.scratch));
+    }
+    if (bidPx != null && bidPx >= book.tp) return fill('tp', bidPx);
+    if (bidPx == null && hi != null && hi >= book.tp) return fill('tp', book.tp);
+    return false;
+  }
+  const long = book.side === 'long';
   const hasBid = fillBid != null && fillBid > 0;
   if (long) {
     // Sell the stop at the live bid when we have one. A 1-min wick or candle open
     // sitting below the bid is not an executable fill (that printed as Nifty 159.8 vs bid 167.8).
     const throughSl = hasBid ? fillBid <= book.sl : low <= book.sl;
     if (throughSl) {
-      closeAt(book, cfg, hasBid ? fillBid : Math.min(book.sl, open), 'sl', day, nowMin);
+      closeAt(book, cfg, hasBid ? fillBid : Math.min(book.sl, open), 'sl', day, nowMin, underLast);
       return true;
     }
     const throughScratch = hasBid ? fillBid <= book.scratch : low <= book.scratch;
     if (throughScratch) {
-      closeAt(book, cfg, hasBid ? fillBid : Math.min(book.scratch, open), 'scratch', day, nowMin);
+      closeAt(book, cfg, hasBid ? fillBid : Math.min(book.scratch, open), 'scratch', day, nowMin, underLast);
       return true;
     }
     const throughTp = hasBid ? fillBid >= book.tp : high >= book.tp;
     if (throughTp) {
-      closeAt(book, cfg, hasBid ? fillBid : book.tp, 'tp', day, nowMin);
+      closeAt(book, cfg, hasBid ? fillBid : book.tp, 'tp', day, nowMin, underLast);
       return true;
     }
     return false;
   }
   if (high >= book.sl) {
-    closeAt(book, cfg, book.sl, 'sl', day, nowMin);
+    closeAt(book, cfg, book.sl, 'sl', day, nowMin, underLast);
     return true;
   }
   if (high >= book.scratch) {
-    closeAt(book, cfg, book.scratch, 'scratch', day, nowMin);
+    closeAt(book, cfg, book.scratch, 'scratch', day, nowMin, underLast);
     return true;
   }
   if (low <= book.tp) {
-    closeAt(book, cfg, book.tp, 'tp', day, nowMin);
+    closeAt(book, cfg, book.tp, 'tp', day, nowMin, underLast);
     return true;
   }
   return false;
@@ -997,6 +1027,10 @@ export function tickBook(
     instrument: instrument || book.instrument,
   };
   const done = completedBars(bars, day, nowMin, cfg.barMinutes ?? 5);
+  const underLast = [...done].reverse().find((b) => b.day === day)?.close ?? null;
+  const optBid = optionPremiumPx(exec.bid, underLast);
+  const optAsk = optionPremiumPx(exec.ask, underLast);
+  const optLast = isOptionBuy(cfg) ? optionPremiumPx(last, underLast) ?? optionPremiumPx(next.last, underLast) : last;
   if (cfg.strategy === 'momentum' && done.length) {
     const g = done[done.length - 1].day === day ? momentumGauge(done, done.length - 1) : null;
     next.gauge = g
@@ -1022,10 +1056,7 @@ export function tickBook(
 
   const fillsBefore = next.fills.length;
   const barMin = cfg.barMinutes ?? 5;
-  const sellPx =
-    isOptionBuy(cfg) && exec.bid != null && exec.bid > 0
-      ? exec.bid
-      : last;
+  const sellPx = isOptionBuy(cfg) ? (optBid ?? optLast) : last;
   if (next.side === 'long' || next.side === 'short') {
     // SL / TP / scratch are premium levels. Index bars (e.g. 76,500) must never be tested against them.
     const exitBars = isOptionBuy(cfg) ? completedBars(optionBars, day, nowMin, barMin) : done;
@@ -1039,14 +1070,14 @@ export function tickBook(
       const lagged = isOptionBuy(cfg) && bar.min + barMin < nowMin;
       const barBid =
         lagged && exec.evolve?.barCatchupIgnoresLiveBid ? null : exec.bid;
-      if (hitExit(next, bar.high, bar.low, bar.close, cfg, day, bar.open, nowMin, barBid)) {
+      if (hitExit(next, bar.high, bar.low, bar.close, cfg, day, bar.open, nowMin, barBid, underLast)) {
         next.lastBarMin = bar.min;
         break;
       }
       next.lastBarMin = bar.min;
     }
     if ((next.side === 'long' || next.side === 'short') && nowMin >= cfg.flat && last != null) {
-      closeAt(next, cfg, sellPx ?? last, 'eod', day, nowMin);
+      closeAt(next, cfg, sellPx ?? last, 'eod', day, nowMin, underLast);
     }
     if (
       (next.side === 'long' || next.side === 'short') &&
@@ -1055,7 +1086,7 @@ export function tickBook(
       nowMin >= next.entryMin + cfg.holdBars * barMin &&
       last != null
     ) {
-      closeAt(next, cfg, sellPx ?? last, 'time', day, nowMin);
+      closeAt(next, cfg, sellPx ?? last, 'time', day, nowMin, underLast);
     }
     // Option books follow completed candles after the fill. A last-price check on the next
     // 8s tick would stop on the same bar's earlier low or a stale last sitting below the live bid.
@@ -1063,7 +1094,7 @@ export function tickBook(
     const tickExitPx = sellPx ?? last;
     const tooSoon =
       isOptionBuy(cfg) && next.entryMin != null && nowMin <= next.entryMin + barMin;
-    const bid = exec.bid != null && exec.bid > 0 ? exec.bid : null;
+    const bid = optBid;
     const bidThrough =
       (exec.evolve?.bidThroughTick !== false) &&
       isOptionBuy(cfg) &&
@@ -1073,7 +1104,7 @@ export function tickBook(
         (next.tp != null && bid >= next.tp));
     const barsHandleExit = isOptionBuy(cfg) && optionBars.length > 0 && !bidThrough;
     if ((next.side === 'long' || next.side === 'short') && tickExitPx != null && !tooSoon && !barsHandleExit) {
-      hitExit(next, tickExitPx, tickExitPx, tickExitPx, cfg, day, tickExitPx, nowMin, exec.bid);
+      hitExit(next, tickExitPx, tickExitPx, tickExitPx, cfg, day, tickExitPx, nowMin, bid, underLast);
     }
   }
 
@@ -1121,7 +1152,7 @@ export function tickBook(
             ? bar.close > bar.open && bar.close > next.pendingSig
             : bar.close < bar.open && bar.close < next.pendingSig;
         if (ok) {
-          openAt(next, cfg, next.pendingDir, bar.open, next.pendingMode || next.mode, bar.min, day);
+          openAt(next, cfg, next.pendingDir, isOptionBuy(cfg) ? optAsk ?? optLast ?? bar.open : bar.open, next.pendingMode || next.mode, bar.min, day);
         } else {
           next.pendingDir = 0;
           next.pendingSig = 0;
@@ -1165,7 +1196,7 @@ export function tickBook(
       }
       if (cfg.noConfirm) {
         next.mode = hit.mode;
-        openAt(next, cfg, hit.dir, bar.close, hit.mode, bar.min, day);
+        openAt(next, cfg, hit.dir, isOptionBuy(cfg) ? optAsk ?? optLast ?? bar.close : bar.close, hit.mode, bar.min, day);
         if (next.side !== 'flat') break;
         continue;
       }
@@ -1178,7 +1209,7 @@ export function tickBook(
     }
   }
 
-  markLive(next, next.side !== 'flat' && isOptionBuy(cfg) && sellPx != null ? sellPx : last, cfg);
+  markLive(next, next.side !== 'flat' && isOptionBuy(cfg) && sellPx != null ? sellPx : optLast ?? last, cfg, underLast);
   next.capitalUsed = capitalUsedOf(cfg, next);
   return next;
 }

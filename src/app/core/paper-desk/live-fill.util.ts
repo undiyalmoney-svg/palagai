@@ -10,6 +10,22 @@ export interface LiveBuyPrice {
   atAsk: boolean;
 }
 
+/**
+ * CE/PE last/ask. Index and futures lasts (Nifty 25k, Bank 58k, Sensex 82k)
+ * must never be treated as a premium — that printed ₹15L “wins” on Bank.
+ */
+export function optionPremiumPx(
+  px: number | null | undefined,
+  underLast?: number | null,
+): number | null {
+  const p = Number(px);
+  if (!Number.isFinite(p) || p <= 0) return null;
+  if (p >= 5_000) return null;
+  const spot = Number(underLast);
+  if (Number.isFinite(spot) && spot > 1_000 && p >= spot * 0.2) return null;
+  return p;
+}
+
 /** Live buy: ask first, last as fallback. Null when neither is a real quote. */
 export function liveBuyPrice(ask: number | null | undefined, last: number | null | undefined): LiveBuyPrice {
   const a = Number(ask);

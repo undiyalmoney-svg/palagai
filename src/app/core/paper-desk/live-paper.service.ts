@@ -39,7 +39,7 @@ import { compactHunt } from './paper-hunt.engine';
 
 export { bestBidAsk, needsOption, nextExpiryAsOf, optionMarkLast } from './paper-tick.run';
 
-const STORAGE_KEY = 'palagai_live_paper_v11';
+const STORAGE_KEY = 'palagai_live_paper_v12';
 const TICK_MS = 8_000;
 
 @Injectable({ providedIn: 'root' })

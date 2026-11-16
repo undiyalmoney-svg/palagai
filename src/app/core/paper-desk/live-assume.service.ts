@@ -10,6 +10,7 @@ import {
   closeBook,
   summarize,
 } from './live-assume.engine';
+import { kiteBar } from './kite-bar.util';
 
 @Injectable({ providedIn: 'root' })
 export class LiveAssumeService {
@@ -184,35 +185,29 @@ function findNamed(csv: string, names: string[]): { tradingSymbol: string; token
   return null;
 }
 
-function kiteBar(row: unknown[]): LiveAssumeBar {
-  const raw = String(row[0] || '');
-  const d = new Date(raw);
-  const ist = new Date(d.getTime() + 330 * 60 * 1000);
-  const day = raw.slice(0, 10);
-  const hh = Number.isNaN(d.getTime()) ? Number(raw.slice(11, 13)) : ist.getUTCHours();
-  const mm = Number.isNaN(d.getTime()) ? Number(raw.slice(14, 16)) : ist.getUTCMinutes();
-  return {
-    day,
-    min: hh * 60 + mm,
-    open: Number(row[1]) || 0,
-    high: Number(row[2]) || 0,
-    low: Number(row[3]) || 0,
-    close: Number(row[4]) || 0,
-  };
-}
 
 function lastPrice(
   quotes: Record<string, { last_price?: number }>,
   id: string,
-  symbol: string,
+  _symbol: string,
 ): number | null {
+  const want =
+    id === 'nifty' ? 'NSE:NIFTY 50' : id === 'bank' ? 'NSE:NIFTY BANK' : id === 'sensex' ? 'BSE:SENSEX' : '';
+  if (want) {
+    for (const [k, v] of Object.entries(quotes)) {
+      if (k.toUpperCase() === want) {
+        const n = Number(v.last_price);
+        return Number.isFinite(n) && n > 0 ? n : null;
+      }
+    }
+    return null;
+  }
   for (const [k, v] of Object.entries(quotes)) {
     const key = k.toUpperCase();
-    if (id === 'crude' && key.includes('CRUDE')) return Number(v.last_price) || null;
-    if (id === 'nifty' && key.includes('NIFTY 50')) return Number(v.last_price) || null;
-    if (id === 'bank' && key.includes('BANK')) return Number(v.last_price) || null;
-    if (id === 'sensex' && key.includes('SENSEX')) return Number(v.last_price) || null;
-    if (symbol && key.includes(symbol.toUpperCase())) return Number(v.last_price) || null;
+    if (id === 'crude' && key.includes('CRUDEOILM') && !key.includes('CE') && !key.includes('PE')) {
+      const n = Number(v.last_price);
+      return Number.isFinite(n) && n > 0 ? n : null;
+    }
   }
   return null;
 }

@@ -4,10 +4,49 @@ import { emptyPaperLiveBooks } from './paper-live-order.util';
 import {
   HIST_MINUTE_LOOKBACK_DAYS,
   barFeedLine,
+  findCrudeMini,
+  lastPrice,
   minuteDayWindows,
   runPaperTick,
 } from './paper-tick.run';
 import { LiveAssumeBar } from './live-assume.engine';
+
+describe('spot from Kite quotes', () => {
+  it('does not treat a BANKNIFTY CE last as Bank Nifty spot', () => {
+    const quotes = {
+      'NSE:NIFTY BANK': { last_price: 58_040 },
+      'NFO:BANKNIFTY26N1758000CE': { last_price: 162 },
+      'BFO:SENSEX26N1682000CE': { last_price: 210 },
+      'BSE:SENSEX': { last_price: 82_100 },
+    };
+    expect(lastPrice(quotes, 'bank', 'NIFTY BANK')).toBe(58_040);
+    expect(lastPrice(quotes, 'sensex', 'SENSEX')).toBe(82_100);
+  });
+
+  it('returns null for Bank when only the option quote is present, so ATM is not 162', () => {
+    expect(lastPrice({ 'NFO:BANKNIFTY26N1758000CE': { last_price: 162 } }, 'bank', 'NIFTY BANK')).toBeNull();
+  });
+});
+
+describe('Crude Mini future from Kite CSV', () => {
+  const header =
+    'instrument_token,exchange_token,tradingsymbol,name,last_price,expiry,strike,tick_size,lot_size,instrument_type,segment,exchange';
+  const csv = [
+    header,
+    '111,0,CRUDEOILM26NOVFUT,CRUDEOILM,0,2026-11-17,0,1,1,FUT,MCX-FUT,MCX',
+    '222,0,CRUDEOILM26DECFUT,CRUDEOILM,0,2026-12-17,0,1,1,FUT,MCX-FUT,MCX',
+  ].join('\n');
+
+  it('picks the November contract the day before expiry', () => {
+    expect(findCrudeMini(csv, '2026-11-16')?.tradingSymbol).toBe('CRUDEOILM26NOVFUT');
+  });
+
+  it('rolls to December on November expiry day, and keeps November if that is the only row', () => {
+    expect(findCrudeMini(csv, '2026-11-17')?.tradingSymbol).toBe('CRUDEOILM26DECFUT');
+    const onlyNov = [header, '111,0,CRUDEOILM26NOVFUT,CRUDEOILM,0,2026-11-17,0,1,1,FUT,MCX-FUT,MCX'].join('\n');
+    expect(findCrudeMini(onlyNov, '2026-11-17')?.tradingSymbol).toBe('CRUDEOILM26NOVFUT');
+  });
+});
 
 describe('paper tick 1-min history windows', () => {
   it('asks Kite for one calendar day at a time, today first', () => {
