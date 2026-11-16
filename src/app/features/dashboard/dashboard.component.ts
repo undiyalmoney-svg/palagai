@@ -121,7 +121,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   private readonly titles: Record<string, { title: string; subtitle: string }> = {
     '/dashboard/paper-14k': {
       title: 'Paper test',
-      subtitle: 'Paper always records. Live Kite is extra on ticked books.',
+      subtitle: 'Paper hunt only. Live Kite is on Crude Oil.',
     },
     '/dashboard/order-test': {
       title: 'Test',
@@ -137,7 +137,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     },
     '/dashboard/crude-oil': {
       title: 'Crude Oil',
-      subtitle: 'Live Crude Mini. Aims for ₹200 a day (TP 25) on red, sideways, and green sessions. Not guaranteed.',
+      subtitle: 'Bank Nifty algo OR retest and Sensex mix + no confirm. Paper always. Live Kite is extra. Not guaranteed.',
     },
     '/dashboard/settings': {
       title: 'Settings',

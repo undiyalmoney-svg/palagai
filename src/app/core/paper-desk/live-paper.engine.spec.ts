@@ -688,6 +688,8 @@ describe('Live paper desk', () => {
       noConfirm: false,
     });
     expect(PAPER_TEST_HONEST).toMatch(/Not a guaranteed profit/);
+    expect(PAPER_TEST_HONEST).toMatch(/Crude Oil tab/);
+    expect(PAPER_TEST_HONEST).not.toMatch(/Crude Mini tab/);
     expect(PAPER_TEST_HONEST).toMatch(/Bank Nifty algo OR retest/);
     expect(PAPER_TEST_HONEST).toMatch(/Sensex mix \+ no confirm/);
     expect(PAPER_TEST_HONEST).toMatch(/cancels the resting SL/);
