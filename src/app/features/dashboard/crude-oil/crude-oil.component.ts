@@ -4,6 +4,7 @@ import { LivePaperService } from '../../../core/paper-desk/live-paper.service';
 import { PaperLiveUnder } from '../../../core/paper-desk/paper-live-order.util';
 import {
   LIVE_TAKE_LABEL,
+  LIVE_TAKE_LINE,
   LIVE_TAKE_METHOD,
   LIVE_TAKE_UNDERS,
   LivePaperBookState,
@@ -53,17 +54,12 @@ export class CrudeOilComponent implements OnDestroy {
   protected readonly startOff = computed(() => this.paper.session().running || this.paper.busy());
   protected readonly stopOff = computed(() => !this.paper.session().running);
 
-  constructor() {
-    this.paper.setLiveBook('crude', false);
-  }
-
   ngOnDestroy(): void {
     clearInterval(this.clockTimer);
   }
 
   protected startDesk(): void {
     if (this.startOff()) return;
-    this.paper.setLiveBook('crude', false);
     void this.paper.start();
   }
 
@@ -119,10 +115,10 @@ export class CrudeOilComponent implements OnDestroy {
     const bank = this.liveBooks().find((d) => d.under === 'bank');
     const nifty = this.liveBooks().find((d) => d.under === 'nifty');
     const sensex = this.liveBooks().find((d) => d.under === 'sensex');
-    const today = `Today ${s.day}: Bank ₹${Math.round(bank?.book.closedRs || 0).toLocaleString('en-IN')} · Nifty ₹${Math.round(nifty?.book.closedRs || 0).toLocaleString('en-IN')} · Sensex ₹${Math.round(sensex?.book.closedRs || 0).toLocaleString('en-IN')}.`;
+    const crude = this.liveBooks().find((d) => d.under === 'crude');
+    const today = `Today ${s.day}: Bank ₹${Math.round(bank?.book.closedRs || 0).toLocaleString('en-IN')} · Nifty ₹${Math.round(nifty?.book.closedRs || 0).toLocaleString('en-IN')} · Sensex ₹${Math.round(sensex?.book.closedRs || 0).toLocaleString('en-IN')} · Crude ₹${Math.round(crude?.book.closedRs || 0).toLocaleString('en-IN')}.`;
     const droplet = this.paper.dropletNote();
-    const foot =
-      'Paper always records. Arise Live Kite is Bank Nifty mom 0.6× both, Nifty 50 vwap stretch, and Sensex mom 0.8× no confirm. Hunt stays on Paper test. Not a guaranteed profit.';
+    const foot = `Paper always records. Arise Live Kite is ${LIVE_TAKE_LINE}. Hunt stays on Paper test. Not a guaranteed profit.`;
 
     if (s.kiteError) {
       return { tone: 'down', badge: 'needs Token', title: s.kiteError, lines: [today, foot].filter(Boolean) };
@@ -133,8 +129,8 @@ export class CrudeOilComponent implements OnDestroy {
         badge: 'not watching',
         title: 'Not watching. Hit Start. Paper always. Live Kite is extra on ticked books.',
         lines: [
-          'Bank Nifty mom 0.6× both, Nifty 50 vwap stretch, Sensex mom 0.8× no confirm.',
-          'First tickets from 09:45 IST after the 09:15–09:30 opening range.',
+          LIVE_TAKE_LINE + '.',
+          'Index tickets from 09:45 IST after the 09:15–09:30 opening range. Crude Mini from 09:15 IST.',
           today,
           foot,
         ].filter(Boolean),
@@ -147,8 +143,8 @@ export class CrudeOilComponent implements OnDestroy {
       tone: this.paper.liveArmed() ? 'down' : 'info',
       badge: this.paper.liveArmed() ? 'Live Kite on' : 'watching',
       title: this.paper.liveArmed()
-        ? 'Watching Bank Nifty, Nifty 50 and Sensex. First tickets from 09:45 IST. Live Kite sends a MARKET buy and a resting SL on ticked books.'
-        : 'Watching Bank Nifty, Nifty 50 and Sensex on paper. First tickets from 09:45 IST. Switch to Live Kite to send orders.',
+        ? 'Watching Bank Nifty, Nifty 50, Sensex and Crude Mini. Index from 09:45 IST, Crude Mini from 09:15 IST. Live Kite sends a MARKET buy and a resting SL on ticked books.'
+        : 'Watching Bank Nifty, Nifty 50, Sensex and Crude Mini on paper. Index from 09:45 IST, Crude Mini from 09:15 IST. Switch to Live Kite to send orders.',
       lines: [checked, today, droplet, foot].filter(Boolean),
     };
   }

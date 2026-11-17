@@ -70,18 +70,34 @@ const EXIT: Partial<LiveAssumeBookCfg> = {
   freshCross: true,
 };
 
-/** Live Kite on the Arise tab — today's hunt leaders, sample only. */
-export const LIVE_TAKE_UNDERS = ['bank', 'nifty', 'sensex'] as const;
+/** Live Kite on the Arise tab — today's hunt-best algos, sample only. */
+export const LIVE_TAKE_UNDERS = ['bank', 'nifty', 'sensex', 'crude'] as const;
 export type LiveTakeUnder = (typeof LIVE_TAKE_UNDERS)[number];
 export const LIVE_TAKE_METHOD: Record<LiveTakeUnder, string> = {
-  bank: 'mom 0.6× both',
-  nifty: 'vwap stretch',
-  sensex: 'mom 0.8× no confirm',
+  bank: 'mix + MACD',
+  nifty: 'algo RSI 14 bounce',
+  sensex: 'algo EMA 21 pullback',
+  crude: 'algo Bollinger mean',
 };
 export const LIVE_TAKE_LABEL: Record<LiveTakeUnder, string> = {
   bank: 'Bank Nifty',
   nifty: 'Nifty 50',
   sensex: 'Sensex',
+  crude: 'Crude Mini',
+};
+export const LIVE_TAKE_LINE =
+  'Bank Nifty mix + MACD, Nifty 50 algo RSI 14 bounce, Sensex algo EMA 21 pullback, and Crude Mini algo Bollinger mean';
+
+const INDEX_CLOCK: Partial<LiveAssumeBookCfg> = {
+  orS: 9 * 60 + 15,
+  orE: 9 * 60 + 30,
+  entryS: 9 * 60 + 45,
+  maxTradesPerDay: 5,
+  barMinutes: 1,
+  minGapMin: 10,
+  holdBars: 60,
+  stopRs: LIVE_PAPER_STOP_RS,
+  targetRs: LIVE_PAPER_TARGET_RS,
 };
 
 /** The only paper desk: four daily ₹370 books. Live Kite is today's hunt leaders. */
@@ -90,8 +106,8 @@ export const PAPER_DESKS: { id: string; label: string; rule: string }[] = [
     id: 'momentum',
     label: 'Daily ₹370',
     rule:
-      'Paper always records. Index tickets from 09:45 IST after the 09:15–09:30 opening range. ' +
-      'Live Kite on the Arise tab is Bank Nifty mom 0.6× both, Nifty 50 vwap stretch, and Sensex mom 0.8× no confirm only. ' +
+      'Paper always records. Index tickets from 09:45 IST after the 09:15–09:30 opening range. Crude Mini from 09:15 IST. ' +
+      `Live Kite on the Arise tab is ${LIVE_TAKE_LINE} only. ` +
       'Target nets ₹370 after charges, fill at the live bid. When target hits, Live cancels the resting SL and sells MARKET. ' +
       'Hunt stays paper-only. Not a guaranteed profit.',
   },
@@ -100,96 +116,65 @@ export const PAPER_DESKS: { id: string; label: string; rule: string }[] = [
 function deskPatch(under: string): Partial<LiveAssumeBookCfg> {
   if (under === 'crude') {
     return {
-      strategy: 'momentum',
-      primary: ALL('momentum'),
+      strategy: 'rules',
+      primary: ALL('bb_mean'),
+      backup: {},
+      mix: false,
       orS: 9 * 60,
       orE: 9 * 60 + 15,
       entryS: 9 * 60 + 15,
       maxTradesPerDay: 5,
       barMinutes: 1,
-      momK: LIVE_PAPER_CRUDE_MOM_K,
       minGapMin: 10,
       holdBars: 60,
       stopRs: LIVE_PAPER_CRUDE_STOP_RS,
       targetRs: LIVE_PAPER_CRUDE_TARGET_RS,
+      label: 'Crude Mini · algo Bollinger mean',
     };
   }
   if (under === 'bank') {
     return {
-      strategy: 'momentum',
-      primary: ALL('momentum'),
-      momK: 0.6,
-      mix: false,
-      noConfirm: false,
-      orS: 9 * 60 + 15,
-      orE: 9 * 60 + 30,
-      entryS: 9 * 60 + 45,
-      maxTradesPerDay: 5,
-      barMinutes: 1,
-      minGapMin: 10,
-      holdBars: 60,
-      stopRs: LIVE_PAPER_STOP_RS,
-      targetRs: LIVE_PAPER_TARGET_RS,
-      label: 'Bank Nifty · mom 0.6× both',
+      ...INDEX_CLOCK,
+      strategy: 'rules',
+      primary: ALL('macd'),
+      backup: {},
+      mix: true,
+      label: 'Bank Nifty · mix + MACD',
     };
   }
   if (under === 'nifty') {
     return {
+      ...INDEX_CLOCK,
       strategy: 'rules',
-      primary: ALL('vwap_fade'),
+      primary: ALL('rsi14'),
       backup: {},
-      orS: 9 * 60 + 15,
-      orE: 9 * 60 + 30,
-      entryS: 9 * 60 + 45,
-      maxTradesPerDay: 5,
-      barMinutes: 1,
-      minGapMin: 10,
-      holdBars: 60,
-      stopRs: LIVE_PAPER_STOP_RS,
-      targetRs: LIVE_PAPER_TARGET_RS,
-      label: 'Nifty 50 · vwap stretch',
+      mix: false,
+      label: 'Nifty 50 · algo RSI 14 bounce',
     };
   }
   if (under === 'sensex') {
     return {
-      strategy: 'momentum',
-      primary: ALL('momentum'),
-      momK: 0.8,
+      ...INDEX_CLOCK,
+      strategy: 'rules',
+      primary: ALL('ema_pull'),
+      backup: {},
       mix: false,
-      noConfirm: true,
-      orS: 9 * 60 + 15,
-      orE: 9 * 60 + 30,
-      entryS: 9 * 60 + 45,
-      maxTradesPerDay: 5,
-      barMinutes: 1,
-      minGapMin: 10,
-      holdBars: 60,
-      stopRs: LIVE_PAPER_STOP_RS,
-      targetRs: LIVE_PAPER_TARGET_RS,
-      label: 'Sensex · mom 0.8× no confirm',
+      label: 'Sensex · algo EMA 21 pullback',
     };
   }
   return {
+    ...INDEX_CLOCK,
     strategy: 'momentum',
     primary: ALL('momentum'),
-    orS: 9 * 60 + 15,
-    orE: 9 * 60 + 30,
-    entryS: 9 * 60 + 45,
-    maxTradesPerDay: 5,
-    barMinutes: 1,
     momK: 0.8,
-    minGapMin: 10,
-    holdBars: 60,
-    stopRs: LIVE_PAPER_STOP_RS,
-    targetRs: LIVE_PAPER_TARGET_RS,
   };
 }
 
 export const PAPER_MOMENTUM: Partial<LiveAssumeBookCfg> = { ...EXIT, ...deskPatch('nifty') };
 export const PAPER_TEST_HONEST =
   'Index-proxy pick, not a lock. ATM CE (up) or PE (down), 1 lot at the live ask, exact charges. ' +
-  'Index tickets from 09:45 IST after the 09:15–09:30 opening range. ' +
-  'Live Kite on the Arise tab is Bank Nifty mom 0.6× both, Nifty 50 vwap stretch, and Sensex mom 0.8× no confirm only — today\'s paper hunt leaders, sample only. ' +
+  'Index tickets from 09:45 IST after the 09:15–09:30 opening range. Crude Mini from 09:15 IST. ' +
+  `Live Kite on the Arise tab is ${LIVE_TAKE_LINE} only — today's paper hunt leaders, sample only. ` +
   'Daily bank ₹370 net after charges / stop ₹370. When the paper target hits, Live cancels the resting SL and sells MARKET. ' +
   'Hunt on all four names stays paper tickets — Live Kite never sees the hunt. ' +
   'Paper always records, Live on or off. Live Kite on a ticked book adds a 1 lot MARKET buy and a resting SL — a Kite reject does not drop the paper fill. A refresh does not arm Live. ' +
