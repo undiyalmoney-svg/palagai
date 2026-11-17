@@ -36,6 +36,7 @@ describe('CrudeOilComponent', () => {
     expect(text).toMatch(/Copy night log/);
     expect(text).toMatch(/Not a guaranteed profit/);
     expect(text).toMatch(/Hunt stays paper-only on Paper test/);
+    expect(text).toMatch(/09:45 IST/);
     expect(fixture.nativeElement.querySelector('[data-testid="paper-live-kite"]')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('[data-testid="paper-live-radio-on"]')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('[data-testid="paper-live-book-bank"]')).toBeTruthy();

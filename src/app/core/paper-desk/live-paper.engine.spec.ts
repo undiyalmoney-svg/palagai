@@ -651,6 +651,9 @@ describe('Live paper desk', () => {
       stopRs: LIVE_PAPER_STOP_RS,
       targetRs: LIVE_PAPER_TARGET_RS,
       label: 'Nifty 50 · vwap stretch',
+      entryS: 9 * 60 + 45,
+      orS: 9 * 60 + 15,
+      orE: 9 * 60 + 30,
     });
     expect(by('bank')).toMatchObject({
       strategy: 'momentum',
@@ -659,6 +662,9 @@ describe('Live paper desk', () => {
       stopRs: LIVE_PAPER_STOP_RS,
       targetRs: LIVE_PAPER_TARGET_RS,
       label: 'Bank Nifty · mom 0.6× both',
+      entryS: 9 * 60 + 45,
+      orS: 9 * 60 + 15,
+      orE: 9 * 60 + 30,
     });
     expect(by('sensex')).toMatchObject({
       strategy: 'momentum',
@@ -668,6 +674,9 @@ describe('Live paper desk', () => {
       stopRs: LIVE_PAPER_STOP_RS,
       targetRs: LIVE_PAPER_TARGET_RS,
       label: 'Sensex · mom 0.8× no confirm',
+      entryS: 9 * 60 + 45,
+      orS: 9 * 60 + 15,
+      orE: 9 * 60 + 30,
     });
     expect(LIVE_PAPER_CRUDE_MOM_K).toBe(0.8);
     expect(by('crude')).toMatchObject({
@@ -682,6 +691,7 @@ describe('Live paper desk', () => {
       maxTradesPerDay: 5,
       noConfirm: false,
     });
+    expect(PAPER_TEST_HONEST).toMatch(/Index tickets from 09:45 IST/);
     expect(PAPER_TEST_HONEST).toMatch(/Not a guaranteed profit/);
     expect(PAPER_TEST_HONEST).toMatch(/Arise tab/);
     expect(PAPER_TEST_HONEST).not.toMatch(/Crude Oil tab/);

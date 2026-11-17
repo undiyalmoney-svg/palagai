@@ -90,7 +90,8 @@ export const PAPER_DESKS: { id: string; label: string; rule: string }[] = [
     id: 'momentum',
     label: 'Daily ₹370',
     rule:
-      'Paper always records. Live Kite on the Arise tab is Bank Nifty mom 0.6× both, Nifty 50 vwap stretch, and Sensex mom 0.8× no confirm only. ' +
+      'Paper always records. Index tickets from 09:45 IST after the 09:15–09:30 opening range. ' +
+      'Live Kite on the Arise tab is Bank Nifty mom 0.6× both, Nifty 50 vwap stretch, and Sensex mom 0.8× no confirm only. ' +
       'Target nets ₹370 after charges, fill at the live bid. When target hits, Live cancels the resting SL and sells MARKET. ' +
       'Hunt stays paper-only. Not a guaranteed profit.',
   },
@@ -187,6 +188,7 @@ function deskPatch(under: string): Partial<LiveAssumeBookCfg> {
 export const PAPER_MOMENTUM: Partial<LiveAssumeBookCfg> = { ...EXIT, ...deskPatch('nifty') };
 export const PAPER_TEST_HONEST =
   'Index-proxy pick, not a lock. ATM CE (up) or PE (down), 1 lot at the live ask, exact charges. ' +
+  'Index tickets from 09:45 IST after the 09:15–09:30 opening range. ' +
   'Live Kite on the Arise tab is Bank Nifty mom 0.6× both, Nifty 50 vwap stretch, and Sensex mom 0.8× no confirm only — today\'s paper hunt leaders, sample only. ' +
   'Daily bank ₹370 net after charges / stop ₹370. When the paper target hits, Live cancels the resting SL and sells MARKET. ' +
   'Hunt on all four names stays paper tickets — Live Kite never sees the hunt. ' +
