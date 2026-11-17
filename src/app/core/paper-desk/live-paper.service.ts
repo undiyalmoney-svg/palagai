@@ -53,7 +53,14 @@ export class LivePaperService {
   private timer: ReturnType<typeof setInterval> | null = null;
   private ticking = false;
   private dropletLoop = false;
+  /** Bumped on Start/Stop so a late Kite tick cannot resurrect a stopped desk. */
+  private tickGen = 0;
+  /** Last-write-wins so a stale PUT cannot undo Stop. */
+  private dropletSeq = 0;
+  private csvAt = 0;
+  private csvDump = '';
   private readonly placing = new Set<string>();
+  private static readonly CSV_TTL_MS = 30 * 60 * 1000;
 
   readonly session = signal<LivePaperSession>(readStored() || emptySession(istDay()));
   readonly busy = signal(false);
@@ -141,11 +148,12 @@ export class LivePaperService {
       prev.day === day
         ? { ...prev, running: true, startedAt: prev.startedAt || new Date().toISOString(), kiteError: null }
         : { ...emptySession(day), running: true, startedAt: new Date().toISOString() };
+    this.tickGen += 1;
     this.session.set({ ...base, liveOrders: this.liveArmed() });
     persist(this.session());
-    await this.pushDroplet();
     this.loop();
-    await this.tick();
+    void this.pushDroplet({ takeSession: false });
+    void this.tick();
   }
 
   /** Latest hunt numbers without starting. Pulls the droplet, then ticks only if already watching. */
@@ -164,6 +172,10 @@ export class LivePaperService {
   }
 
   stop(): void {
+    this.tickGen += 1;
+    this.ticking = false;
+    this.busy.set(false);
+    this.clearTimer();
     this.dropletLoop = false;
     const cur = this.session();
     const books = cur.books.map((b) => {
@@ -185,7 +197,7 @@ export class LivePaperService {
     this.session.set(snap);
     persist(snap);
     this.ledger.sync(snap.day, snap.books.flatMap((b) => b.fills));
-    void this.pushDroplet();
+    void this.pushDroplet({ takeSession: false });
   }
 
   private loop(): void {
@@ -204,6 +216,7 @@ export class LivePaperService {
 
   async tick(): Promise<void> {
     if (this.ticking) return;
+    if (!this.session().running) return;
     const tabHidden = typeof document !== 'undefined' && document.hidden === true;
     if (tabHidden && this.dropletWatching() && this.dropletLoop) {
       await this.pullDroplet();
@@ -222,6 +235,7 @@ export class LivePaperService {
       persist(snap);
       return;
     }
+    const gen = this.tickGen;
     this.ticking = true;
     this.busy.set(true);
     try {
@@ -232,7 +246,7 @@ export class LivePaperService {
         session: this.session(),
         evolve: readPaperEvolve(),
         fetchMargins: () => firstValueFrom(this.kiteApi.getUserMargins(auth)).catch(() => null),
-        fetchCsv: () => firstValueFrom(this.kiteApi.getInstrumentsCsv(auth)).catch(() => ''),
+        fetchCsv: () => this.instrumentsCsv(auth),
         fetchQuotes: async (keys) => {
           if (!keys.length) return {};
           const res = (await firstValueFrom(this.kiteApi.getQuotes(auth, keys))) as {
@@ -253,6 +267,7 @@ export class LivePaperService {
           return hist?.data?.candles || [];
         },
       });
+      if (gen !== this.tickGen || !this.session().running) return;
       if (!this.dropletPlacing()) {
         const nextBooks: LivePaperBookState[] = [];
         for (const next of snap.books) {
@@ -272,21 +287,35 @@ export class LivePaperService {
           hunt: snap.hunt,
         });
       }
+      if (gen !== this.tickGen || !this.session().running) return;
       this.session.set(snap);
       persist(snap);
       if (snap.evolve) writePaperEvolve(snap.evolve);
       this.ledger.sync(snap.day, snap.books.flatMap((b) => b.fills));
-      await this.pushDroplet({ takeSession: false });
+      void this.pushDroplet({ takeSession: false });
     } catch (err) {
+      if (gen !== this.tickGen || !this.session().running) return;
       const message = err instanceof Error ? err.message : 'Kite fetch failed';
       const cur = this.session();
       const snap = { ...cur, kiteError: message, source: cur.source || 'kite' };
       this.session.set(snap);
       persist(snap);
     } finally {
-      this.ticking = false;
-      this.busy.set(false);
+      if (gen === this.tickGen) {
+        this.ticking = false;
+        this.busy.set(false);
+      }
     }
+  }
+
+  private async instrumentsCsv(auth: string): Promise<string> {
+    if (this.csvDump && Date.now() - this.csvAt < LivePaperService.CSV_TTL_MS) return this.csvDump;
+    const csv = await firstValueFrom(this.kiteApi.getInstrumentsCsv(auth)).catch(() => '');
+    if (csv && csv.length > 80) {
+      this.csvDump = csv;
+      this.csvAt = Date.now();
+    }
+    return csv;
   }
 
   private applyDroplet(view: PaperLiveView | null, opts?: { takeSession?: boolean }): boolean {
@@ -363,7 +392,9 @@ export class LivePaperService {
   }
 
   private async pushDroplet(opts?: { takeSession?: boolean }): Promise<void> {
+    const seq = ++this.dropletSeq;
     const view = await this.paperLiveApi.set(this.dropletBody());
+    if (seq !== this.dropletSeq) return;
     const watching = this.applyDroplet(view, opts);
     this.dropletLoop = watching && this.session().running;
   }

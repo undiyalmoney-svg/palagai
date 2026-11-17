@@ -85,4 +85,33 @@ describe('paper tick 1-min history windows', () => {
     expect(calls.some((c) => c[2] === '2026-11-16')).toBe(true);
     expect(calls.some((c) => c[2] === '2026-11-08')).toBe(false);
   });
+
+  it('loads 1-min bars for all four names together instead of one after another', async () => {
+    let inflight = 0;
+    let max = 0;
+    const tokens = new Set<string>();
+    await runPaperTick({
+      now: new Date('2026-11-16T04:21:00.000Z'),
+      live: false,
+      liveBooks: emptyPaperLiveBooks(),
+      session: emptySession('2026-11-16', '2026-11-16T04:21:00.000Z'),
+      fetchMargins: async () => null,
+      fetchCsv: async () =>
+        [
+          'instrument_token,exchange_token,tradingsymbol,name,last_price,expiry,strike,tick_size,lot_size,instrument_type,segment,exchange',
+          '111,0,CRUDEOILM26NOVFUT,CRUDEOILM,0,2026-11-17,0,1,1,FUT,MCX-FUT,MCX',
+        ].join('\n'),
+      fetchQuotes: async () => ({}),
+      fetchHistorical: async (token) => {
+        tokens.add(token);
+        inflight += 1;
+        max = Math.max(max, inflight);
+        await Promise.resolve();
+        inflight -= 1;
+        return [];
+      },
+    });
+    expect(tokens.size).toBe(4);
+    expect(max).toBeGreaterThan(1);
+  });
 });

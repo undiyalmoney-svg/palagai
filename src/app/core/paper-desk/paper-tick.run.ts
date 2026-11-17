@@ -109,11 +109,15 @@ export async function runPaperTick(io: PaperTickIo): Promise<LivePaperSession> {
   if (extraKeys.length) {
     quotes = { ...quotes, ...((await io.fetchQuotes(extraKeys)) || {}) };
   }
-  const barCache = new Map<string, LiveAssumeBar[]>();
-  for (const under of UNDERS) {
-    const inst = instOf(under, crude, nifty, bank, sensex);
-    barCache.set(under, inst?.token ? await loadMinuteBars(io.fetchHistorical, String(inst.token), day) : []);
-  }
+  const barCache = new Map(
+    await Promise.all(
+      UNDERS.map(async (under) => {
+        const inst = instOf(under, crude, nifty, bank, sensex);
+        const bars = inst?.token ? await loadMinuteBars(io.fetchHistorical, String(inst.token), day) : [];
+        return [under, bars] as const;
+      }),
+    ),
+  );
   const nextById = new Map<string, LivePaperBookState>();
   for (const cfg of paperTickOrder(LIVE_PAPER_BOOKS)) {
     const under = underOf(cfg.id);

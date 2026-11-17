@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { of, Subject } from 'rxjs';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Instrument } from '../models/instrument.model';
 import { pickCheapOtm } from '../utils/pick-cheap-otm.util';
 import { emptyBook, emptySession, LIVE_PAPER_BOOKS } from './live-paper.engine';
@@ -14,6 +15,16 @@ describe('LivePaperService', () => {
     TestBed.configureTestingModule({
       providers: [provideHttpClient()],
     });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    try {
+      TestBed.inject(LivePaperService).stop();
+    } catch {
+      /* module already reset */
+    }
+    TestBed.resetTestingModule();
   });
 
   it('refresh does not start a stopped hunt', async () => {
@@ -189,5 +200,67 @@ describe('LivePaperService', () => {
         underLast: 58_040,
       }),
     ).toBe(162);
+  });
+
+  it('Start arms the desk without waiting for the first Kite tick', async () => {
+    const svc = TestBed.inject(LivePaperService);
+    vi.spyOn(svc['kite'], 'getAuthorizationHeader').mockReturnValue('token key:secret');
+    vi.spyOn(svc['paperLiveApi'], 'set').mockResolvedValue(null);
+    const csv$ = new Subject<string>();
+    vi.spyOn(svc['kiteApi'], 'getInstrumentsCsv').mockReturnValue(csv$.asObservable());
+    vi.spyOn(svc['kiteApi'], 'getUserMargins').mockReturnValue(of(null));
+    vi.spyOn(svc['kiteApi'], 'getQuotes').mockReturnValue(of({ data: {} }));
+    vi.spyOn(svc['kiteApi'], 'getHistoricalData').mockReturnValue(of({ data: { candles: [] } }));
+    await svc.start();
+    expect(svc.session().running).toBe(true);
+    expect(svc.session().kiteError).toBeNull();
+    csv$.next('');
+    csv$.complete();
+  });
+
+  it('Stop clears the 8s loop so a later tick cannot start the desk again', async () => {
+    const svc = TestBed.inject(LivePaperService);
+    vi.spyOn(svc['kite'], 'getAuthorizationHeader').mockReturnValue('token key:secret');
+    vi.spyOn(svc['paperLiveApi'], 'set').mockResolvedValue(null);
+    const tick = vi.spyOn(svc, 'tick').mockResolvedValue();
+    vi.useFakeTimers();
+    await svc.start();
+    expect(tick).toHaveBeenCalledTimes(1);
+    svc.stop();
+    expect(svc.session().running).toBe(false);
+    await vi.advanceTimersByTimeAsync(24_000);
+    expect(tick).toHaveBeenCalledTimes(1);
+    vi.useRealTimers();
+  });
+
+  it('a Kite tick that finishes after Stop leaves the desk stopped', async () => {
+    const svc = TestBed.inject(LivePaperService);
+    vi.spyOn(svc['kite'], 'getAuthorizationHeader').mockReturnValue('token key:secret');
+    vi.spyOn(svc['paperLiveApi'], 'set').mockResolvedValue(null);
+    const csv$ = new Subject<string>();
+    vi.spyOn(svc['kiteApi'], 'getInstrumentsCsv').mockReturnValue(csv$.asObservable());
+    vi.spyOn(svc['kiteApi'], 'getUserMargins').mockReturnValue(of(null));
+    vi.spyOn(svc['kiteApi'], 'getQuotes').mockReturnValue(of({ data: {} }));
+    vi.spyOn(svc['kiteApi'], 'getHistoricalData').mockReturnValue(of({ data: { candles: [] } }));
+    void svc.start();
+    await Promise.resolve();
+    expect(svc.session().running).toBe(true);
+    svc.stop();
+    expect(svc.session().running).toBe(false);
+    csv$.next(
+      'instrument_token,exchange_token,tradingsymbol,name,last_price,expiry,strike,tick_size,lot_size,instrument_type,segment,exchange\n',
+    );
+    csv$.complete();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(svc.session().running).toBe(false);
+  });
+
+  it('tick does nothing when the desk is stopped', async () => {
+    const svc = TestBed.inject(LivePaperService);
+    vi.spyOn(svc['kite'], 'getAuthorizationHeader').mockReturnValue('token key:secret');
+    const csv = vi.spyOn(svc['kiteApi'], 'getInstrumentsCsv');
+    await svc.tick();
+    expect(csv).not.toHaveBeenCalled();
+    expect(svc.session().running).toBe(false);
   });
 });
