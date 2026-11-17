@@ -17,7 +17,7 @@ describe('CrudeOilComponent', () => {
     fixture.detectChanges();
   });
 
-  it('is the Arise desk: Bank mix + MACD, Nifty RSI 14, Sensex EMA 21, Crude Mini Bollinger', () => {
+  it('is the Arise desk: mom 0.8× skip range on all four names', () => {
     const text = fixture.nativeElement.textContent as string;
     expect(fixture.nativeElement.querySelector('[data-testid="crude-oil-page"]')).toBeTruthy();
     expect(text).toMatch(/Arise/);
@@ -25,12 +25,12 @@ describe('CrudeOilComponent', () => {
     expect(text).toMatch(/Nifty 50/);
     expect(text).toMatch(/Sensex/);
     expect(text).toMatch(/Crude Mini/);
-    expect(text).toMatch(/mix \+ MACD/);
-    expect(text).toMatch(/algo RSI 14 bounce/);
-    expect(text).toMatch(/algo EMA 21 pullback/);
-    expect(text).toMatch(/algo Bollinger mean/);
+    expect(text).toMatch(/mom 0\.8× skip range/);
     expect(text).not.toMatch(/algo OR retest/);
-    expect(text).not.toMatch(/mom 0\.6× both/);
+    expect(text).not.toMatch(/mix \+ MACD/);
+    expect(text).not.toMatch(/algo RSI 14 bounce/);
+    expect(text).not.toMatch(/algo EMA 21 pullback/);
+    expect(text).not.toMatch(/algo Bollinger mean/);
     expect(text).not.toMatch(/vwap stretch/);
     expect(text).toMatch(/cancels the SL and sells MARKET/);
     expect(text).toMatch(/Paper only/);
