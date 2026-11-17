@@ -132,7 +132,12 @@ export class CrudeOilComponent implements OnDestroy {
         tone: 'info',
         badge: 'not watching',
         title: 'Not watching. Hit Start. Paper always. Live Kite is extra on ticked books.',
-        lines: ['Bank Nifty mom 0.6× both, Nifty 50 vwap stretch, Sensex mom 0.8× no confirm.', today, foot].filter(Boolean),
+        lines: [
+          'Bank Nifty mom 0.6× both, Nifty 50 vwap stretch, Sensex mom 0.8× no confirm.',
+          'First tickets from 09:45 IST after the 09:15–09:30 opening range.',
+          today,
+          foot,
+        ].filter(Boolean),
       };
     }
     if (busy && !s.asOf) {
@@ -142,8 +147,8 @@ export class CrudeOilComponent implements OnDestroy {
       tone: this.paper.liveArmed() ? 'down' : 'info',
       badge: this.paper.liveArmed() ? 'Live Kite on' : 'watching',
       title: this.paper.liveArmed()
-        ? 'Watching Bank Nifty, Nifty 50 and Sensex. Live Kite sends a MARKET buy and a resting SL on ticked books.'
-        : 'Watching Bank Nifty, Nifty 50 and Sensex on paper. Switch to Live Kite to send orders.',
+        ? 'Watching Bank Nifty, Nifty 50 and Sensex. First tickets from 09:45 IST. Live Kite sends a MARKET buy and a resting SL on ticked books.'
+        : 'Watching Bank Nifty, Nifty 50 and Sensex on paper. First tickets from 09:45 IST. Switch to Live Kite to send orders.',
       lines: [checked, today, droplet, foot].filter(Boolean),
     };
   }

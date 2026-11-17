@@ -150,7 +150,7 @@ export class Paper14kComponent implements OnDestroy {
     return {
       tone: feed ? 'warn' : 'info',
       badge: 'watching',
-      title: `Watching Nifty, Bank Nifty, Sensex and Crude Mini from 09:00. ${this.huntMethodCount} methods each, paper only.`,
+      title: `Watching ${this.huntMethodCount} methods. Index tickets from 09:45 IST, Crude Mini from 09:15 IST. Paper only.`,
       lines: [checked, today, feed, droplet, foot].filter(Boolean),
     };
   }

@@ -140,7 +140,7 @@ describe('Paper14kComponent', () => {
     });
     fixture.detectChanges();
     const title = (fixture.nativeElement.querySelector('[data-testid="paper-now-title"]') as HTMLElement).textContent || '';
-    expect(title).toMatch(/Nifty, Bank Nifty, Sensex and Crude Mini from 09:00/);
+    expect(title).toMatch(/Index tickets from 09:45 IST, Crude Mini from 09:15 IST/);
     expect(title).toMatch(new RegExp(`${PAPER_HUNT_METHODS.length} methods`));
     expect(title).not.toMatch(/watch-only/);
   });

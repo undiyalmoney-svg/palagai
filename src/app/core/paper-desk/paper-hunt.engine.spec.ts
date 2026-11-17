@@ -72,6 +72,8 @@ describe('paper hunt methods', () => {
     expect(PAPER_HUNT_HONEST).toMatch(/max loss reached/i);
     expect(PAPER_HUNT_HONEST).toMatch(/not a guaranteed next move/i);
     expect(PAPER_HUNT_HONEST).toMatch(/Not a guaranteed profit/);
+    expect(PAPER_HUNT_HONEST).toMatch(/Index tickets from 09:45 IST/);
+    expect(PAPER_HUNT_HONEST).toMatch(/Crude Mini from 09:15 IST/);
   });
 
   it('builds isolated hunt books (methods × 4) that never sit on the live four', () => {
@@ -118,6 +120,12 @@ describe('paper hunt methods', () => {
     expect(rsi.primary['trend']).toBe('rsi14');
     const skip = huntMethodCfg('sensex', PAPER_HUNT_METHODS.find((m) => m.id === 'algo-ema-skip-range')!);
     expect(skip.skipStructures).toEqual(['range']);
+    const mom = huntMethodCfg('bank', PAPER_HUNT_METHODS.find((m) => m.id === 'mom-06')!);
+    expect(mom.entryS).toBe(9 * 60 + 45);
+    const vwap = huntMethodCfg('nifty', PAPER_HUNT_METHODS.find((m) => m.id === 'vwap-stretch')!);
+    expect(vwap.entryS).toBe(9 * 60 + 45);
+    const crudeMom = huntMethodCfg('crude', PAPER_HUNT_METHODS.find((m) => m.id === 'mom-08')!);
+    expect(crudeMom.entryS).toBe(9 * 60 + 15);
     const zone = huntMethodCfg('nifty', PAPER_HUNT_METHODS.find((m) => m.id === 'open5-zone')!);
     expect(zone.strategy).toBe('rules');
     expect(zone.primary['trend']).toBe('open5_zone');

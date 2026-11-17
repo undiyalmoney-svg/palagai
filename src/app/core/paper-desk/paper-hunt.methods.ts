@@ -143,5 +143,6 @@ export const PAPER_HUNT_HONEST =
   `Each of Nifty, Bank, Sensex and Crude Mini runs the same ${PAPER_HUNT_METHODS.length} methods (momentum, pattern, mix, rule and algo) as paper tickets. ` +
   `Each method may take up to 50 fills, so a full session can print up to ${huntCapText} paper tickets — not ${huntCapText} Kite orders. ` +
   'Every ticket stores max profit reached and max loss reached after entry. That is what that paper ticket did, not a guaranteed next move. ' +
-  'EOD ranks the method. Start from the open; a late Start does not catch up stale bars. ' +
+  'EOD ranks the method. Index tickets from 09:45 IST after the 09:15–09:30 opening range. Crude Mini from 09:15 IST. ' +
+  'Start before then; a late Start does not catch up stale bars. ' +
   'Live Kite never sees the hunt. Not a guaranteed profit.';
