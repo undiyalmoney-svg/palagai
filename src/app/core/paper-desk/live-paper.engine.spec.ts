@@ -720,6 +720,13 @@ describe('Live paper desk', () => {
     expect(paperTickOrder(LIVE_PAPER_BOOKS).map((b) => b.under)).toEqual(['bank', 'sensex', 'nifty', 'crude']);
   });
 
+  it('retags a persisted OR-retest book to mix + MACD on the next tick', () => {
+    const cfg = LIVE_PAPER_BOOKS.find((b) => b.id === 'bank-momentum')!;
+    const stale = { ...emptyBook(cfg), label: 'Bank Nifty · algo OR retest' };
+    const next = tickBook(stale, cfg, [], null, '2026-11-17', 14 * 60 + 45, cfg.label);
+    expect(next.label).toBe('Bank Nifty · mix + MACD');
+  });
+
   it('arms Crude Mini from 09:15, not only after 17:15', () => {
     const cfg = asMomentum(LIVE_PAPER_BOOKS.find((b) => b.id === 'crude-momentum')!, LIVE_PAPER_CRUDE_MOM_K);
     const bars = [...flatBars('2026-11-03', 20, 13 * 60 + 35, 5400), ...flatBars('2026-11-04', 7, 9 * 60, 5400)];
