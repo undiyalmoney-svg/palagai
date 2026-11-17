@@ -18,9 +18,8 @@ const bar = (min: number, close: number, open = close, day = '2026-11-05') => ({
 });
 
 describe('paper mix', () => {
-  it('is on Bank mix + MACD and off the other three plus Scalp', () => {
-    expect(LIVE_PAPER_BOOKS.filter((b) => b.id === 'bank-momentum').every((b) => usesMix(b))).toBe(true);
-    expect(LIVE_PAPER_BOOKS.filter((b) => b.id !== 'bank-momentum').every((b) => !usesMix(b))).toBe(true);
+  it('is off every Arise book and off Scalp', () => {
+    expect(LIVE_PAPER_BOOKS.every((b) => !usesMix(b))).toBe(true);
     expect(PAPER_SCALP_BOOKS.every((b) => !usesMix(b))).toBe(true);
     expect(mixGate([], 0, PAPER_SCALP_BOOKS[0], { dir: -1, mode: 'vwap_fade' }, 'range').ok).toBe(true);
   });

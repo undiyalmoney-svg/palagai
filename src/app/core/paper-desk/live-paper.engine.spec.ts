@@ -652,55 +652,65 @@ describe('Live paper desk', () => {
     expect(LIVE_PAPER_BOOKS).toHaveLength(4);
     expect(LIVE_PAPER_BOOKS.every((b) => b.desk === 'momentum')).toBe(true);
     expect(by('nifty')).toMatchObject({
-      strategy: 'rules',
-      primary: { trend: 'rsi14', range: 'rsi14', quiet: 'rsi14', stand: 'rsi14' },
+      strategy: 'momentum',
+      momK: 0.8,
+      skipStructures: ['range'],
+      maxTradesPerDay: 1,
+      minDayNetRs: LIVE_PAPER_BANK_RS,
       stopRs: LIVE_PAPER_STOP_RS,
       targetRs: LIVE_PAPER_TARGET_RS,
-      label: 'Nifty 50 · algo RSI 14 bounce',
+      label: 'Nifty 50 · mom 0.8× skip range',
       entryS: 9 * 60 + 45,
       orS: 9 * 60 + 15,
       orE: 9 * 60 + 30,
     });
     expect(by('bank')).toMatchObject({
-      strategy: 'rules',
-      primary: { trend: 'macd', range: 'macd', quiet: 'macd', stand: 'macd' },
-      mix: true,
+      strategy: 'momentum',
+      momK: 0.8,
+      mix: false,
+      skipStructures: ['range'],
+      maxTradesPerDay: 1,
+      minDayNetRs: LIVE_PAPER_BANK_RS,
       stopRs: LIVE_PAPER_STOP_RS,
       targetRs: LIVE_PAPER_TARGET_RS,
-      label: 'Bank Nifty · mix + MACD',
+      label: 'Bank Nifty · mom 0.8× skip range',
       entryS: 9 * 60 + 45,
       orS: 9 * 60 + 15,
       orE: 9 * 60 + 30,
     });
     expect(by('sensex')).toMatchObject({
-      strategy: 'rules',
-      primary: { trend: 'ema_pull', range: 'ema_pull', quiet: 'ema_pull', stand: 'ema_pull' },
-      mix: false,
+      strategy: 'momentum',
+      momK: 0.8,
+      skipStructures: ['range'],
+      maxTradesPerDay: 1,
+      minDayNetRs: LIVE_PAPER_BANK_RS,
       stopRs: LIVE_PAPER_STOP_RS,
       targetRs: LIVE_PAPER_TARGET_RS,
-      label: 'Sensex · algo EMA 21 pullback',
+      label: 'Sensex · mom 0.8× skip range',
       entryS: 9 * 60 + 45,
       orS: 9 * 60 + 15,
       orE: 9 * 60 + 30,
     });
     expect(LIVE_PAPER_CRUDE_MOM_K).toBe(0.8);
     expect(by('crude')).toMatchObject({
-      strategy: 'rules',
-      primary: { trend: 'bb_mean', range: 'bb_mean', quiet: 'bb_mean', stand: 'bb_mean' },
+      strategy: 'momentum',
+      momK: 0.8,
+      skipStructures: ['range'],
+      maxTradesPerDay: 1,
+      minDayNetRs: LIVE_PAPER_BANK_RS,
       stopRs: LIVE_PAPER_STOP_RS,
       targetRs: LIVE_PAPER_TARGET_RS,
       barMinutes: 1,
       entryS: 9 * 60 + 15,
       orS: 9 * 60,
       orE: 9 * 60 + 15,
-      maxTradesPerDay: 5,
-      label: 'Crude Mini · algo Bollinger mean',
+      label: 'Crude Mini · mom 0.8× skip range',
     });
     expect(LIVE_TAKE_METHOD).toEqual({
-      bank: 'mix + MACD',
-      nifty: 'algo RSI 14 bounce',
-      sensex: 'algo EMA 21 pullback',
-      crude: 'algo Bollinger mean',
+      bank: 'mom 0.8× skip range',
+      nifty: 'mom 0.8× skip range',
+      sensex: 'mom 0.8× skip range',
+      crude: 'mom 0.8× skip range',
     });
     expect(PAPER_TEST_HONEST).toMatch(/Index tickets from 09:45 IST/);
     expect(PAPER_TEST_HONEST).toMatch(/Not a guaranteed profit/);
@@ -708,10 +718,8 @@ describe('Live paper desk', () => {
     expect(PAPER_TEST_HONEST).not.toMatch(/Crude Oil tab/);
     expect(PAPER_TEST_HONEST).not.toMatch(/Crude Mini tab/);
     expect(PAPER_TEST_HONEST).toContain(LIVE_TAKE_LINE);
-    expect(PAPER_TEST_HONEST).toMatch(/mix \+ MACD/);
-    expect(PAPER_TEST_HONEST).toMatch(/algo RSI 14 bounce/);
-    expect(PAPER_TEST_HONEST).toMatch(/algo EMA 21 pullback/);
-    expect(PAPER_TEST_HONEST).toMatch(/algo Bollinger mean/);
+    expect(PAPER_TEST_HONEST).toMatch(/mom 0\.8× skip range/);
+    expect(PAPER_TEST_HONEST).toMatch(/8\/10 not proven/);
     expect(PAPER_TEST_HONEST).toMatch(/cancels the resting SL/);
     expect(PAPER_TEST_HONEST).toMatch(/Daily bank ₹370/);
     expect(PAPER_TEST_HONEST).toMatch(/Live Kite never sees the hunt/);
@@ -720,11 +728,11 @@ describe('Live paper desk', () => {
     expect(paperTickOrder(LIVE_PAPER_BOOKS).map((b) => b.under)).toEqual(['bank', 'sensex', 'nifty', 'crude']);
   });
 
-  it('retags a persisted OR-retest book to mix + MACD on the next tick', () => {
+  it('retags a persisted OR-retest book to mom 0.8× skip range on the next tick', () => {
     const cfg = LIVE_PAPER_BOOKS.find((b) => b.id === 'bank-momentum')!;
     const stale = { ...emptyBook(cfg), label: 'Bank Nifty · algo OR retest' };
     const next = tickBook(stale, cfg, [], null, '2026-11-17', 14 * 60 + 45, cfg.label);
-    expect(next.label).toBe('Bank Nifty · mix + MACD');
+    expect(next.label).toBe('Bank Nifty · mom 0.8× skip range');
   });
 
   it('arms Crude Mini from 09:15, not only after 17:15', () => {
@@ -755,14 +763,11 @@ describe('Live paper desk', () => {
       mode: 'momentum',
     });
     const afterOne = tickBook({ ...book, fills: [fill({ rs: 224.6 })] }, cfg, bars, 5420, '2026-11-04', 9 * 60 + 31, 'CRUDEOILM');
-    expect(afterOne.pendingDir).toBe(1);
-    const five = Array.from({ length: 5 }, () => fill({ rs: 10 }));
-    const capped = tickBook({ ...book, fills: five }, cfg, bars, 5420, '2026-11-04', 9 * 60 + 31, 'CRUDEOILM');
-    expect(capped.pendingDir).toBe(0);
-    expect(capped.reason).toBe('max 5 trades today');
+    expect(afterOne.pendingDir).toBe(0);
+    expect(afterOne.reason).toBe('max 1 trade today');
     const afterBank = tickBook({ ...book, fills: [fill({ rs: 370 })] }, cfg, bars, 5420, '2026-11-04', 9 * 60 + 31, 'CRUDEOILM');
-    expect(afterBank.pendingDir).toBe(1);
-    expect(afterBank.reason).toMatch(/confirm momentum/);
+    expect(afterBank.pendingDir).toBe(0);
+    expect(afterBank.reason).toMatch(/banked ₹370 today|max 1 trade today/);
   });
 
   it('fires momentum only past 1.5×√6 × the 20-bar mean range, from the 7th bar of the day', () => {
@@ -831,7 +836,7 @@ describe('Live paper desk', () => {
     expect(netRs(cfg, { lot: 65 }, 336.6, dear.tp!, dear.tp! - 336.6)).toBeGreaterThanOrEqual(LIVE_PAPER_BANK_RS);
   });
 
-  it('lets every book take further fills after a ₹370 win, up to 5 that day', () => {
+  it('sits after one fill or a ₹370 bank, and does not revenge-trade', () => {
     const barsFor = (under: string) => {
       const px = under === 'crude' ? 5400 : 24000;
       const start = under === 'crude' ? 9 * 60 : 9 * 60 + 15;
@@ -867,12 +872,12 @@ describe('Live paper desk', () => {
         nowMin,
         cfg.label,
       );
-      expect(afterWin.pendingDir).toBe(1);
-      expect(afterWin.reason).not.toMatch(/banked/);
-      const five = { ...emptyBook(cfg), lastBarMin, fills: Array.from({ length: 5 }, () => ({ ...win, rs: 10 })) };
-      const capped = tickBook(five, cfg, bars, bars[bars.length - 1].close, '2026-11-04', nowMin, cfg.label);
+      expect(afterWin.pendingDir).toBe(0);
+      expect(afterWin.reason).toMatch(/banked ₹370 today|max 1 trade today/);
+      const once = { ...emptyBook(cfg), lastBarMin, fills: [{ ...win, rs: 10 }] };
+      const capped = tickBook(once, cfg, bars, bars[bars.length - 1].close, '2026-11-04', nowMin, cfg.label);
       expect(capped.pendingDir).toBe(0);
-      expect(capped.reason).toBe('max 5 trades today');
+      expect(capped.reason).toBe('max 1 trade today');
     }
     const bank = asMomentum(LIVE_PAPER_BOOKS.find((b) => b.id === 'bank-momentum')!);
     const bars = barsFor('bank');

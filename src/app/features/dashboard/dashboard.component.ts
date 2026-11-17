@@ -137,7 +137,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     },
     '/dashboard/crude-oil': {
       title: 'Arise',
-      subtitle: 'Bank mix + MACD, Nifty RSI 14 bounce, Sensex EMA 21 pullback, Crude Mini Bollinger mean. Paper always. Live Kite is extra. Not guaranteed.',
+      subtitle: 'mom 0.8× skip range on all four. One fill, sit ₹370, skip range mornings. Paper always. Live Kite is extra. 8/10 not proven.',
     },
     '/dashboard/settings': {
       title: 'Settings',
