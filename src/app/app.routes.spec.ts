@@ -4,7 +4,6 @@ import { serverRoutes } from './app.routes.server';
 import { routes } from './app.routes';
 import { CrudeBestComponent } from './features/dashboard/crude-best/crude-best.component';
 import { CrudeOilComponent } from './features/dashboard/crude-oil/crude-oil.component';
-import { Paper14kComponent } from './features/dashboard/paper-14k/paper-14k.component';
 import { OrderTestComponent } from './features/dashboard/order-test/order-test.component';
 
 describe('dashboard desk routes', () => {
@@ -17,8 +16,8 @@ describe('dashboard desk routes', () => {
     expect(backtest?.redirectTo).toBe('get-token');
 
     const paper = children.find((r) => r.path === 'paper-14k');
-    expect(paper?.component).toBe(Paper14kComponent);
-    expect(paper?.loadComponent).toBeUndefined();
+    expect(paper?.component).toBeUndefined();
+    expect(paper?.redirectTo).toBe('crude-oil');
 
     const test = children.find((r) => r.path === 'order-test');
     expect(test?.component).toBe(OrderTestComponent);
@@ -43,7 +42,6 @@ describe('dashboard desk routes', () => {
     expect(crudeBest?.renderMode).toBe(RenderMode.Client);
     const crude = serverRoutes.find((r) => r.path === 'dashboard/crude-oil');
     expect(crude?.renderMode).toBe(RenderMode.Client);
-    const paper = serverRoutes.find((r) => r.path === 'dashboard/paper-14k');
-    expect(paper?.renderMode).toBe(RenderMode.Client);
+    expect(serverRoutes.find((r) => r.path === 'dashboard/paper-14k')).toBeUndefined();
   });
 });

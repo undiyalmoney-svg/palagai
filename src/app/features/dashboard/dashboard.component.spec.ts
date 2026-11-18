@@ -41,7 +41,6 @@ describe('DashboardComponent navigation', () => {
           { path: 'dashboard/get-token', component: DashboardComponent },
           { path: 'dashboard/crude-best', component: DashboardComponent },
           { path: 'dashboard/crude-oil', component: DashboardComponent },
-          { path: 'dashboard/paper-14k', component: DashboardComponent },
           { path: 'dashboard/order-test', component: DashboardComponent },
           { path: 'login', component: DashboardComponent },
         ]),
@@ -112,13 +111,9 @@ describe('DashboardComponent navigation', () => {
     expect(router.url).toBe('/dashboard/crude-best');
   });
 
-  it('lists Paper test on its own tab', async () => {
+  it('does not list Paper test', () => {
     const el = fixture.nativeElement as HTMLElement;
-    const link = el.querySelector('[data-testid="nav-paper-14k"]') as HTMLAnchorElement | null;
-    expect(link).toBeTruthy();
-    expect(link?.textContent).toMatch(/Paper test/i);
-    fixture.componentInstance['go']('/dashboard/paper-14k');
-    await fixture.whenStable();
-    expect(router.url).toBe('/dashboard/paper-14k');
+    expect(el.querySelector('[data-testid="nav-paper-14k"]')).toBeNull();
+    expect(el.textContent).not.toMatch(/Paper test/i);
   });
 });

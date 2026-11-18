@@ -71,7 +71,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   protected readonly clockLabel = signal('');
   protected readonly pageTitle = signal('Palagai');
   protected readonly pageSubtitle = signal(
-    'Token, Crude Best, Arise, Paper test, and Test.',
+    'Token, Crude Best, Arise, and Test.',
   );
   protected readonly sidebarOpen = signal(true);
   protected readonly profileOpen = signal(false);
@@ -101,14 +101,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
       testId: 'crude',
     },
     {
-      label: 'Paper test',
-      shortLabel: 'Paper',
-      route: '/dashboard/paper-14k',
-      icon: 'candles',
-      module: 'test',
-      testId: 'paper-14k',
-    },
-    {
       label: 'Test',
       shortLabel: 'Test',
       route: '/dashboard/order-test',
@@ -119,13 +111,9 @@ export class DashboardComponent implements OnInit, OnDestroy {
   ];
 
   private readonly titles: Record<string, { title: string; subtitle: string }> = {
-    '/dashboard/paper-14k': {
-      title: 'Paper test',
-      subtitle: 'Paper hunt only. Live Kite is on Arise.',
-    },
     '/dashboard/order-test': {
       title: 'Test',
-      subtitle: 'Live paper. ₹14,000 each. Start watches Kite. SL, target, P/L. No order is placed.',
+      subtitle: 'RELIANCE IP smoke on the droplet. Not the Arise desk.',
     },
     '/dashboard/get-token': {
       title: 'Get Token',
@@ -155,7 +143,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   protected readonly hideFunds = computed(() => this.authService.isPublic());
 
-  /** Bottom tab bar on phone — Token, Crude Best, Arise, Paper test, Test. */
+  /** Bottom tab bar on phone — Token, Crude Best, Arise, Test. */
   protected readonly mobileTabItems = computed(() => this.navItems());
 
   protected readonly username = computed(() => {
@@ -348,9 +336,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
         : typeof raw === 'string'
           ? raw
           : 'Could not open that desk.';
-    if (/paper-14k/i.test(`${event.url} ${msg}`)) {
-      return 'Could not open Paper test. Retry, or hard-refresh the tab.';
-    }
     if (/crude-best/i.test(`${event.url} ${msg}`)) {
       return 'Could not open Crude Best. Retry, or hard-refresh the tab.';
     }
