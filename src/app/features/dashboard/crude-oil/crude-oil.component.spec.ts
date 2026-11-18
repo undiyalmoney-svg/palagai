@@ -17,7 +17,7 @@ describe('CrudeOilComponent', () => {
     fixture.detectChanges();
   });
 
-  it('is the Arise desk: mom 0.8× skip range on all four names', () => {
+  it('is the Arise desk: mom 0.8× skip range on four option names and five cash stocks', () => {
     const text = fixture.nativeElement.textContent as string;
     expect(fixture.nativeElement.querySelector('[data-testid="crude-oil-page"]')).toBeTruthy();
     expect(text).toMatch(/Arise/);
@@ -39,7 +39,7 @@ describe('CrudeOilComponent', () => {
     expect(text).toMatch(/Closed today/);
     expect(text).toMatch(/Copy night log/);
     expect(text).toMatch(/Not a guaranteed profit/);
-    expect(text).toMatch(/Hunt stays paper-only on Paper test/);
+    expect(text).toMatch(/Hunt stays paper-only on the four index names/);
     expect(text).toMatch(/09:45 IST/);
     expect(fixture.nativeElement.querySelector('[data-testid="paper-live-kite"]')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('[data-testid="paper-live-radio-on"]')).toBeTruthy();
@@ -47,10 +47,14 @@ describe('CrudeOilComponent', () => {
     expect(fixture.nativeElement.querySelector('[data-testid="paper-live-book-sensex"]')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('[data-testid="paper-live-book-nifty"]')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('[data-testid="paper-live-book-crude"]')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('[data-testid="paper-live-book-hdfcbank"]')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('[data-testid="paper-live-book-tcs"]')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('[data-testid="book-bank"]')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('[data-testid="book-sensex"]')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('[data-testid="book-nifty"]')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('[data-testid="book-crude"]')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('[data-testid="book-reliance"]')).toBeTruthy();
+    expect(text).toMatch(/50 shares/);
     expect(fixture.nativeElement.querySelector('[data-testid="live-paper-fills"]')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('[data-testid="start-live-paper"]')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('[data-testid="stop-live-paper"]')).toBeTruthy();

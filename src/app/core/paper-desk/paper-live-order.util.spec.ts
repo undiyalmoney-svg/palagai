@@ -100,13 +100,29 @@ describe('paper live Kite tickets', () => {
     expect(paperLiveQuantity('nifty', 65)).toBe(65);
     expect(paperLiveQuantity('bank', 30)).toBe(30);
     expect(paperLiveQuantity('sensex', 20)).toBe(20);
+    expect(paperLiveQuantity('reliance', 50)).toBe(50);
     expect(paperLiveExchange('crude')).toBe('MCX');
     expect(paperLiveExchange('sensex')).toBe('BFO');
     expect(paperLiveExchange('bank')).toBe('NFO');
+    expect(paperLiveExchange('hdfcbank')).toBe('NSE');
+    expect(paperLiveExchange('tcs')).toBe('NSE');
   });
 
   it('refuses a synthetic contract and builds MARKET buy + SL + exit', () => {
     expect(paperLiveBuyFields({ ...nifty, optionToken: 0 })).toBeNull();
+    const stockBuy = paperLiveBuyFields({
+      under: 'infy',
+      optionSymbol: 'INFY',
+      optionToken: 408065,
+      lot: 50,
+    })!;
+    expect(stockBuy).toMatchObject({
+      exchange: 'NSE',
+      tradingsymbol: 'INFY',
+      quantity: '50',
+      product: 'MIS',
+      order_type: 'MARKET',
+    });
     const buy = paperLiveBuyFields(nifty)!;
     expect(buy).toMatchObject({
       exchange: 'NFO',
@@ -127,6 +143,15 @@ describe('paper live Kite tickets', () => {
       tag: PAPER_LIVE_SL_TAG,
     });
     expect(Number(sl['price'])).toBeLessThan(Number(sl['trigger_price']));
+    const stock = paperLiveStopFields({ under: 'reliance', optionSymbol: 'RELIANCE', optionToken: 738561, lot: 50 }, 1392.6)!;
+    expect(stock).toMatchObject({
+      exchange: 'NSE',
+      tradingsymbol: 'RELIANCE',
+      order_type: 'SL-M',
+      quantity: '50',
+      trigger_price: '1392.60',
+    });
+    expect(stock['price']).toBeUndefined();
     const exit = paperLiveExitFields(crude)!;
     expect(exit).toMatchObject({
       exchange: 'MCX',

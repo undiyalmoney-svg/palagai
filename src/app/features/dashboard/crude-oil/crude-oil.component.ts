@@ -116,7 +116,10 @@ export class CrudeOilComponent implements OnDestroy {
     const nifty = this.liveBooks().find((d) => d.under === 'nifty');
     const sensex = this.liveBooks().find((d) => d.under === 'sensex');
     const crude = this.liveBooks().find((d) => d.under === 'crude');
-    const today = `Today ${s.day}: Bank ₹${Math.round(bank?.book.closedRs || 0).toLocaleString('en-IN')} · Nifty ₹${Math.round(nifty?.book.closedRs || 0).toLocaleString('en-IN')} · Sensex ₹${Math.round(sensex?.book.closedRs || 0).toLocaleString('en-IN')} · Crude ₹${Math.round(crude?.book.closedRs || 0).toLocaleString('en-IN')}.`;
+    const stocksRs = this.liveBooks()
+      .filter((d) => !['bank', 'nifty', 'sensex', 'crude'].includes(d.under))
+      .reduce((n, d) => n + (d.book.closedRs || 0), 0);
+    const today = `Today ${s.day}: Bank ₹${Math.round(bank?.book.closedRs || 0).toLocaleString('en-IN')} · Nifty ₹${Math.round(nifty?.book.closedRs || 0).toLocaleString('en-IN')} · Sensex ₹${Math.round(sensex?.book.closedRs || 0).toLocaleString('en-IN')} · Crude ₹${Math.round(crude?.book.closedRs || 0).toLocaleString('en-IN')} · Stocks ₹${Math.round(stocksRs).toLocaleString('en-IN')}.`;
     const droplet = this.paper.dropletNote();
     const foot = `Paper always records. Arise Live Kite is ${LIVE_TAKE_LINE}. Hunt stays on Paper test. Not a guaranteed profit.`;
 
@@ -130,7 +133,7 @@ export class CrudeOilComponent implements OnDestroy {
         title: 'Not watching. Hit Start. Paper always. Live Kite is extra on ticked books.',
         lines: [
           LIVE_TAKE_LINE + '.',
-          'Index tickets from 09:45 IST after the 09:15–09:30 opening range. Crude Mini from 09:15 IST.',
+          'Index tickets from 09:45 IST after the 09:15–09:30 opening range. Crude Mini from 09:15 IST. Cash stocks 50 shares from 09:45 IST.',
           today,
           foot,
         ].filter(Boolean),

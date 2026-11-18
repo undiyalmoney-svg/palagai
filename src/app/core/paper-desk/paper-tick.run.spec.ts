@@ -21,6 +21,7 @@ describe('spot from Kite quotes', () => {
     };
     expect(lastPrice(quotes, 'bank', 'NIFTY BANK')).toBe(58_040);
     expect(lastPrice(quotes, 'sensex', 'SENSEX')).toBe(82_100);
+    expect(lastPrice({ 'NSE:RELIANCE': { last_price: 1_401.5 } }, 'reliance', 'RELIANCE')).toBe(1_401.5);
   });
 
   it('returns null for Bank when only the option quote is present, so ATM is not 162', () => {
@@ -86,7 +87,7 @@ describe('paper tick 1-min history windows', () => {
     expect(calls.some((c) => c[2] === '2026-11-08')).toBe(false);
   });
 
-  it('loads 1-min bars for all four names together instead of one after another', async () => {
+  it('loads 1-min bars for the four option names and five cash stocks together', async () => {
     let inflight = 0;
     let max = 0;
     const tokens = new Set<string>();
@@ -100,6 +101,11 @@ describe('paper tick 1-min history windows', () => {
         [
           'instrument_token,exchange_token,tradingsymbol,name,last_price,expiry,strike,tick_size,lot_size,instrument_type,segment,exchange',
           '111,0,CRUDEOILM26NOVFUT,CRUDEOILM,0,2026-11-17,0,1,1,FUT,MCX-FUT,MCX',
+          '738561,0,RELIANCE,RELIANCE,0,,,0.05,1,EQ,NSE,NSE',
+          '341249,0,HDFCBANK,HDFCBANK,0,,,0.05,1,EQ,NSE,NSE',
+          '1270529,0,ICICIBANK,ICICIBANK,0,,,0.05,1,EQ,NSE,NSE',
+          '408065,0,INFY,INFY,0,,,0.05,1,EQ,NSE,NSE',
+          '2953217,0,TCS,TCS,0,,,0.05,1,EQ,NSE,NSE',
         ].join('\n'),
       fetchQuotes: async () => ({}),
       fetchHistorical: async (token) => {
@@ -111,7 +117,7 @@ describe('paper tick 1-min history windows', () => {
         return [];
       },
     });
-    expect(tokens.size).toBe(4);
+    expect(tokens.size).toBe(9);
     expect(max).toBeGreaterThan(1);
   });
 });

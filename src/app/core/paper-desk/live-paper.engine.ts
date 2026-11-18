@@ -10,6 +10,7 @@ import {
   momentumGauge,
   morningStructure,
 } from './live-assume.engine';
+import { ARISE_STOCK_QTY, ARISE_STOCKS, ariseStockOf, isAriseStock } from './arise-stocks';
 import { OPTION_14K_BOOKS, OPTION_14K_LIST, Option14kBookId, option14kToPaperCfg } from './option-14k-plan';
 import { mixGate } from './paper-mix.util';
 import { PaperEvolveFlags, PaperEvolveState, emptyEvolve, reviewEvolvingDesk } from './paper-evolve.util';
@@ -71,22 +72,42 @@ const EXIT: Partial<LiveAssumeBookCfg> = {
 };
 
 /** Live Kite on the Arise tab — mom 0.8× skip range, one fill, sit ₹370. 8/10 green days is not proven. */
-export const LIVE_TAKE_UNDERS = ['bank', 'nifty', 'sensex', 'crude'] as const;
+export const LIVE_TAKE_UNDERS = [
+  'bank',
+  'nifty',
+  'sensex',
+  'crude',
+  'hdfcbank',
+  'reliance',
+  'icicibank',
+  'infy',
+  'tcs',
+] as const;
 export type LiveTakeUnder = (typeof LIVE_TAKE_UNDERS)[number];
 export const LIVE_TAKE_METHOD: Record<LiveTakeUnder, string> = {
   bank: 'mom 0.8× skip range',
   nifty: 'mom 0.8× skip range',
   sensex: 'mom 0.8× skip range',
   crude: 'mom 0.8× skip range',
+  hdfcbank: `mom 0.8× skip range · ${ARISE_STOCK_QTY} shares`,
+  reliance: `mom 0.8× skip range · ${ARISE_STOCK_QTY} shares`,
+  icicibank: `mom 0.8× skip range · ${ARISE_STOCK_QTY} shares`,
+  infy: `mom 0.8× skip range · ${ARISE_STOCK_QTY} shares`,
+  tcs: `mom 0.8× skip range · ${ARISE_STOCK_QTY} shares`,
 };
 export const LIVE_TAKE_LABEL: Record<LiveTakeUnder, string> = {
   bank: 'Bank Nifty',
   nifty: 'Nifty 50',
   sensex: 'Sensex',
   crude: 'Crude Mini',
+  hdfcbank: 'HDFC Bank',
+  reliance: 'Reliance',
+  icicibank: 'ICICI Bank',
+  infy: 'Infosys',
+  tcs: 'TCS',
 };
 export const LIVE_TAKE_LINE =
-  'mom 0.8× skip range on Bank Nifty, Nifty 50, Sensex, and Crude Mini (one fill, sit at ₹370, skip range mornings)';
+  `mom 0.8× skip range on Bank Nifty, Nifty 50, Sensex, Crude Mini, and five cash names at ${ARISE_STOCK_QTY} shares (one fill, sit at ₹370, skip range mornings)`;
 
 const INDEX_CLOCK: Partial<LiveAssumeBookCfg> = {
   orS: 9 * 60 + 15,
@@ -118,7 +139,7 @@ export const PAPER_DESKS: { id: string; label: string; rule: string }[] = [
     id: 'momentum',
     label: 'Daily ₹370',
     rule:
-      'Paper always records. Index tickets from 09:45 IST after the 09:15–09:30 opening range. Crude Mini from 09:15 IST. ' +
+      'Paper always records. Index tickets from 09:45 IST after the 09:15–09:30 opening range. Crude Mini from 09:15 IST. Cash stocks from 09:45 IST, 50 shares. ' +
       `Live Kite on the Arise tab is ${LIVE_TAKE_LINE} only. ` +
       'Target nets ₹370 after charges, fill at the live bid. When target hits, Live cancels the resting SL and sells MARKET. ' +
       'Hunt stays paper-only. 8 of 10 green days is the aim, not a claim. Not a guaranteed profit.',
@@ -149,28 +170,55 @@ function deskPatch(under: string): Partial<LiveAssumeBookCfg> {
   if (under === 'sensex') {
     return { ...INDEX_CLOCK, ...GREEN_DAY, label: 'Sensex · mom 0.8× skip range' };
   }
+  if (isAriseStock(under)) {
+    const stock = ariseStockOf(under);
+    return {
+      ...INDEX_CLOCK,
+      ...GREEN_DAY,
+      label: `${stock?.label || under} · mom 0.8× skip range`,
+    };
+  }
   return { ...INDEX_CLOCK, ...GREEN_DAY };
 }
 
 export const PAPER_MOMENTUM: Partial<LiveAssumeBookCfg> = { ...EXIT, ...deskPatch('nifty') };
 export const PAPER_TEST_HONEST =
   'Index-proxy pick, not a lock. ATM CE (up) or PE (down), 1 lot at the live ask, exact charges. ' +
-  'Index tickets from 09:45 IST after the 09:15–09:30 opening range. Crude Mini from 09:15 IST. ' +
+  'Index tickets from 09:45 IST after the 09:15–09:30 opening range. Crude Mini from 09:15 IST. Cash stocks 50 shares from 09:45 IST. ' +
   `Live Kite on the Arise tab is ${LIVE_TAKE_LINE} only — locked for more green/flat days, sample only, 8/10 not proven. ` +
   'Daily bank ₹370 net after charges / stop ₹370. When the paper target hits, Live cancels the resting SL and sells MARKET. ' +
   'Hunt on all four names stays paper tickets — Live Kite never sees the hunt. ' +
   'Paper always records, Live on or off. Live Kite on a ticked book adds a 1 lot MARKET buy and a resting SL — a Kite reject does not drop the paper fill. A refresh does not arm Live. ' +
   'Nothing here is a guaranteed ₹370. Not a guaranteed profit.';
 
-export const LIVE_PAPER_BOOKS: LiveAssumeBookCfg[] = OPTION_14K_LIST.map((plan) => ({
-  ...option14kToPaperCfg(plan),
-  ...EXIT,
-  ...deskPatch(plan.id),
-  id: `${plan.id}-momentum`,
-  under: plan.id,
-  desk: 'momentum',
-  product: `ATM CE/PE ×${plan.lot}`,
-}));
+export const LIVE_PAPER_BOOKS: LiveAssumeBookCfg[] = [
+  ...OPTION_14K_LIST.map((plan) => ({
+    ...option14kToPaperCfg(plan),
+    ...EXIT,
+    ...deskPatch(plan.id),
+    id: `${plan.id}-momentum`,
+    under: plan.id,
+    desk: 'momentum',
+    product: `ATM CE/PE ×${plan.lot}`,
+  })),
+  ...ARISE_STOCKS.map((stock) => ({
+    ...option14kToPaperCfg(OPTION_14K_BOOKS.nifty),
+    ...EXIT,
+    ...deskPatch(stock.id),
+    id: `${stock.id}-momentum`,
+    under: stock.id,
+    desk: 'momentum',
+    product: `MIS ×${ARISE_STOCK_QTY}`,
+    kind: 'eq' as const,
+    buyOption: false,
+    atm: false,
+    qty: ARISE_STOCK_QTY,
+    rsPt: ARISE_STOCK_QTY,
+    nseSymbol: stock.symbol,
+    misPct: 0.2,
+    onlyDir: 1 as const,
+  })),
+];
 
 /** Separate from the five CE/PE desks. VWAP fade on Crude Mini futures + three cash stocks. */
 export const PAPER_SCALP = {
@@ -255,9 +303,13 @@ export function paperCfg(id: string): LiveAssumeBookCfg {
   return ALL_PAPER_BOOKS.find((b) => b.id === id) || LIVE_PAPER_BOOKS[0];
 }
 
-export function underOf(id: string): Option14kBookId {
-  const u = id.split('-')[0];
-  return (u === 'crude' || u === 'nifty' || u === 'bank' || u === 'sensex' ? u : 'nifty') as Option14kBookId;
+export function underOf(id: string): string {
+  return id.split('-')[0] || 'nifty';
+}
+
+export function optionUnderOf(id: string): Option14kBookId {
+  const u = underOf(id);
+  return u === 'crude' || u === 'nifty' || u === 'bank' || u === 'sensex' ? u : 'nifty';
 }
 
 export function isIndexMomentumBook(id: string): boolean {
@@ -265,14 +317,16 @@ export function isIndexMomentumBook(id: string): boolean {
   return u === 'nifty' || u === 'bank' || u === 'sensex';
 }
 
-/** Bank, then Sensex, then Nifty, then Crude — so one same-tick thrust keeps Bank, not Nifty+Bank. */
+/** Bank, then Sensex, then Nifty, then Crude, then the five cash names. */
 export function paperTickOrder<T extends { id: string }>(cfgs: readonly T[]): T[] {
   const rank = (id: string) => {
     const u = underOf(id);
     if (u === 'bank') return 0;
     if (u === 'sensex') return 1;
     if (u === 'nifty') return 2;
-    return 3;
+    if (u === 'crude') return 3;
+    const stock = ARISE_STOCKS.findIndex((s) => s.id === u);
+    return stock >= 0 ? 4 + stock : 9;
   };
   return [...cfgs].sort((a, b) => rank(a.id) - rank(b.id));
 }
@@ -402,7 +456,7 @@ export function expiryShort(expiry: string | undefined): string {
 /** "SENSEX 77000 CE · exp 6 Nov" — the contract the book bought. */
 export function optionPickLabel(pick: OptionPickView): string {
   if (!pick.optionType || pick.strike == null) return pick.optionSymbol || '';
-  const name = OPTION_14K_BOOKS[underOf(pick.id)]?.name ?? pick.id.toUpperCase();
+  const name = OPTION_14K_BOOKS[optionUnderOf(pick.id)]?.name ?? pick.id.toUpperCase();
   const exp = expiryShort(pick.expiry);
   return `${name} ${pick.strike} ${pick.optionType}${exp ? ` · exp ${exp}` : ''}`;
 }
@@ -1010,12 +1064,23 @@ function openAt(
   book.side = d === 1 ? 'long' : 'short';
   book.entry = entry;
   if (cfg.kind === 'eq' || cfg.kind === 'fut') {
-    const stop = entry * (cfg.stopPct || 0.0015);
-    const tgt = entry * (cfg.targetPct || 0.0025);
+    const lot = cfg.qty || book.lot || 1;
+    let stop = entry * (cfg.stopPct || 0.0015);
+    let tgt = entry * (cfg.targetPct || 0.0025);
+    if (cfg.stopRs != null && lot > 0) stop = cfg.stopRs / lot;
+    if (cfg.targetRs != null && lot > 0) {
+      tgt = cfg.targetRs / lot;
+      if (cfg.kind === 'eq' && entry > 0) {
+        for (let i = 0; i < 3; i++) {
+          const charges = equityMisRoundTripCharges(entry, Math.max(0, entry + d * tgt), lot);
+          tgt = (cfg.targetRs + charges) / lot;
+        }
+      }
+    }
     book.sl = Math.round((entry - d * stop) * 100) / 100;
     book.tp = Math.round((entry + d * tgt) * 100) / 100;
     book.scratch = book.sl;
-    book.lot = cfg.qty || book.lot;
+    book.lot = lot;
   } else if (isOptionBuy(cfg)) {
     book.sl = Math.max(0.05, entry - cfg.sl);
     book.tp = entry + cfg.tp;

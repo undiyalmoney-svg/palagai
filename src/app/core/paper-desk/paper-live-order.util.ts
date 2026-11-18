@@ -1,19 +1,41 @@
 /**
  * Paper-desk live Kite tickets. Off until Live Kite radio is on AND that
  * book's checkbox is ticked. Crude Mini order qty is 1, never CSV lot 10.
+ * Cash stocks are NSE MIS at 50 shares.
  */
+import { isAriseStock } from './arise-stocks';
 
 export const PAPER_LIVE_BUY_TAG = 'PALAGAI_PAPER';
 export const PAPER_LIVE_SL_TAG = 'PALAGAI_PAPER_SL';
 export const PAPER_LIVE_EXIT_TAG = 'PALAGAI_PAPER_X';
 
-export const PAPER_LIVE_UNDERS = ['nifty', 'bank', 'sensex', 'crude'] as const;
+export const PAPER_LIVE_UNDERS = [
+  'nifty',
+  'bank',
+  'sensex',
+  'crude',
+  'hdfcbank',
+  'reliance',
+  'icicibank',
+  'infy',
+  'tcs',
+] as const;
 export type PaperLiveUnder = (typeof PAPER_LIVE_UNDERS)[number];
 
 export type PaperLiveBooks = Record<PaperLiveUnder, boolean>;
 
 export function emptyPaperLiveBooks(): PaperLiveBooks {
-  return { nifty: false, bank: false, sensex: false, crude: false };
+  return {
+    nifty: false,
+    bank: false,
+    sensex: false,
+    crude: false,
+    hdfcbank: false,
+    reliance: false,
+    icicibank: false,
+    infy: false,
+    tcs: false,
+  };
 }
 
 /** Desk-wide: Live radio on and at least one book ticked. */
@@ -90,7 +112,8 @@ export function paperLiveOpenBuyId(
   return null;
 }
 
-export function paperLiveExchange(under: string): 'NFO' | 'BFO' | 'MCX' {
+export function paperLiveExchange(under: string): 'NFO' | 'BFO' | 'MCX' | 'NSE' {
+  if (isAriseStock(under)) return 'NSE';
   if (under === 'crude') return 'MCX';
   if (under === 'sensex') return 'BFO';
   return 'NFO';
@@ -138,9 +161,23 @@ export function paperLiveStopFields(
   const tick = tickSize > 0 ? tickSize : 0.05;
   const trig = roundToTick(Number(triggerPremium), tick);
   if (!(trig > 0) || trig >= 1e9) return null;
+  const exchange = paperLiveExchange(ticket.under);
+  if (exchange === 'NSE') {
+    return {
+      exchange,
+      tradingsymbol: ticket.optionSymbol,
+      transaction_type: 'SELL',
+      order_type: 'SL-M',
+      quantity: String(paperLiveQuantity(ticket.under, ticket.lot)),
+      product: 'MIS',
+      validity: 'DAY',
+      trigger_price: trig.toFixed(2),
+      tag: PAPER_LIVE_SL_TAG,
+    };
+  }
   const limit = roundToTick(Math.max(tick, trig * 0.9), tick);
   return {
-    exchange: paperLiveExchange(ticket.under),
+    exchange,
     tradingsymbol: ticket.optionSymbol,
     transaction_type: 'SELL',
     order_type: 'SL',

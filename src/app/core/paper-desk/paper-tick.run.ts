@@ -23,6 +23,7 @@ import {
   paperTickOrder,
   summarizePaper,
   tickBook,
+  optionUnderOf,
   underOf,
 } from './live-paper.engine';
 import { optionRoundTripCharges, venueForBook } from './option-charges.util';
@@ -38,8 +39,11 @@ import { SkippedSignal } from './paper-analytics.models';
 import { buildSignalCard } from './signal-card.util';
 import { HuntSideQuote, tickPaperHunt } from './paper-hunt.engine';
 import { kiteBar } from './kite-bar.util';
+import { ARISE_STOCKS, isAriseStock } from './arise-stocks';
 
-const UNDERS = ['crude', 'nifty', 'bank', 'sensex'] as const;
+const OPTION_UNDERS = ['crude', 'nifty', 'bank', 'sensex'] as const;
+const STOCK_UNDERS = ARISE_STOCKS.map((s) => s.id);
+const UNDERS = [...OPTION_UNDERS, ...STOCK_UNDERS];
 const NO_BUDGET_CAP = 10_000_000;
 /** Calendar days before today. One Kite 1-min request cannot span this window — Crude Mini alone is ~870 bars/day, cap 2000. */
 export const HIST_MINUTE_LOOKBACK_DAYS = 3;
@@ -82,20 +86,26 @@ export async function runPaperTick(io: PaperTickIo): Promise<LivePaperSession> {
   const nifty = findNamed(dump, ['NIFTY 50']) || { tradingSymbol: 'NIFTY 50', token: 256265, exchange: 'NSE' };
   const bank = findNamed(dump, ['NIFTY BANK']) || { tradingSymbol: 'NIFTY BANK', token: 260105, exchange: 'NSE' };
   const sensex = findNamed(dump, ['SENSEX']) || { tradingSymbol: 'SENSEX', token: 265, exchange: 'BSE' };
+  const stocks = Object.fromEntries(ARISE_STOCKS.map((s) => [s.id, findEquity(dump, s.symbol)])) as Record<
+    string,
+    NamedInst | null
+  >;
+  const named: Record<string, NamedInst | null> = { crude, nifty, bank, sensex, ...stocks };
   const underKeys = [
     crude ? `MCX:${crude.tradingSymbol}` : '',
     'NSE:NIFTY 50',
     'NSE:NIFTY BANK',
     'BSE:SENSEX',
+    ...ARISE_STOCKS.map((s) => `NSE:${s.symbol}`),
   ].filter(Boolean);
   const openOptKeys = cur.books.filter((b) => b.side !== 'flat' && b.optionSymbol).map((b) => optionKey(b));
   const keys = [...new Set([...underKeys, ...openOptKeys])];
   let quotes = keys.length ? (await io.fetchQuotes(keys)) || {} : {};
   const cheapByUnder = new Map<string, { ce: CheapOtmPick; pe: CheapOtmPick }>();
   const cheapKeys: string[] = [];
-  const asOfCfg = LIVE_PAPER_BOOKS[0];
-  for (const under of UNDERS) {
-    const inst = instOf(under, crude, nifty, bank, sensex);
+  const asOfCfg = LIVE_PAPER_BOOKS.find((b) => b.buyOption) || LIVE_PAPER_BOOKS[0];
+  for (const under of OPTION_UNDERS) {
+    const inst = named[under];
     const spot = lastPrice(quotes, under, inst?.tradingSymbol || '') ?? 0;
     const pair = cheapPair(chain, under, spot, pickAsOf(asOfCfg, now), asOfCfg.atm ? 0 : undefined);
     cheapByUnder.set(under, pair);
@@ -109,10 +119,10 @@ export async function runPaperTick(io: PaperTickIo): Promise<LivePaperSession> {
   if (extraKeys.length) {
     quotes = { ...quotes, ...((await io.fetchQuotes(extraKeys)) || {}) };
   }
-  const barCache = new Map(
+  const barCache = new Map<string, LiveAssumeBar[]>(
     await Promise.all(
       UNDERS.map(async (under) => {
-        const inst = instOf(under, crude, nifty, bank, sensex);
+        const inst = named[under];
         const bars = inst?.token ? await loadMinuteBars(io.fetchHistorical, String(inst.token), day) : [];
         return [under, bars] as const;
       }),
@@ -121,7 +131,7 @@ export async function runPaperTick(io: PaperTickIo): Promise<LivePaperSession> {
   const nextById = new Map<string, LivePaperBookState>();
   for (const cfg of paperTickOrder(LIVE_PAPER_BOOKS)) {
     const under = underOf(cfg.id);
-    const inst = instOf(under, crude, nifty, bank, sensex);
+    const inst = named[under];
     const prev = cur.books.find((b) => b.id === cfg.id) || emptySession(day).books.find((b) => b.id === cfg.id)!;
     const bars = barCache.get(under) || [];
     const underLast = lastPrice(quotes, under, inst?.tradingSymbol || '');
@@ -160,6 +170,15 @@ export async function runPaperTick(io: PaperTickIo): Promise<LivePaperSession> {
       optionBars,
       { bid: optBid, ask: optAsk, blockOpen: indexDeskBlockReason(cfg.id, peers, day), evolve: flags },
     );
+    if (cfg.kind === 'eq' && inst) {
+      next = {
+        ...next,
+        optionSymbol: inst.tradingSymbol,
+        optionToken: inst.token,
+        lot: cfg.qty || next.lot,
+        instrument: inst.tradingSymbol,
+      };
+    }
     if (cfg.buyOption && needsOption(next)) {
       const spot = underLast ?? 0;
       const pair = cheapByUnder.get(under);
@@ -201,8 +220,8 @@ export async function runPaperTick(io: PaperTickIo): Promise<LivePaperSession> {
   }
   const books = LIVE_PAPER_BOOKS.map((c) => nextById.get(c.id) || cur.books.find((b) => b.id === c.id)!);
   const quotesByUnder = new Map<string, { ce: HuntSideQuote; pe: HuntSideQuote; underLast: number | null }>();
-  for (const under of UNDERS) {
-    const inst = instOf(under, crude, nifty, bank, sensex);
+  for (const under of OPTION_UNDERS) {
+    const inst = named[under];
     const pair = cheapByUnder.get(under);
     quotesByUnder.set(under, {
       ce: huntSideQuote(quotes, pair?.ce),
@@ -251,7 +270,7 @@ async function bindCheap(
   pair: { ce: CheapOtmPick; pe: CheapOtmPick } | undefined,
   now: Date,
 ): Promise<LivePaperBookState> {
-  const id = underOf(cfg.id);
+  const id = optionUnderOf(cfg.id);
   const pick =
     (book.side === 'long' ? pair?.ce : pair?.pe) ||
     pickCheapOtm({
@@ -530,7 +549,9 @@ export function findCrudeMini(csv: string, today: string): { tradingSymbol: stri
   );
 }
 
-function findNamed(csv: string, names: string[]): { tradingSymbol: string; token: number; exchange: string } | null {
+type NamedInst = { tradingSymbol: string; token: number; exchange: string };
+
+function findNamed(csv: string, names: string[]): NamedInst | null {
   const want = names.map((n) => n.toUpperCase());
   for (const line of csv.split(/\r?\n/).slice(1)) {
     const cols = splitCsvLine(line);
@@ -539,6 +560,21 @@ function findNamed(csv: string, names: string[]): { tradingSymbol: string; token
     const name = cols[3].trim().toUpperCase();
     if (want.includes(sym) || want.includes(name)) {
       return { tradingSymbol: cols[2].trim(), token: Number(cols[0]) || 0, exchange: cols[11].trim() };
+    }
+  }
+  return null;
+}
+
+/** Cash equity row only — skip the futures that share the same name. */
+function findEquity(csv: string, symbol: string): NamedInst | null {
+  const want = symbol.toUpperCase();
+  for (const line of csv.split(/\r?\n/).slice(1)) {
+    const cols = splitCsvLine(line);
+    if (cols.length < 12) continue;
+    const sym = cols[2].trim().toUpperCase();
+    const itype = cols[9].trim().toUpperCase();
+    if (sym === want && itype === 'EQ') {
+      return { tradingSymbol: cols[2].trim(), token: Number(cols[0]) || 0, exchange: cols[11].trim() || 'NSE' };
     }
   }
   return null;
@@ -602,19 +638,9 @@ export function optionMarkLast(args: {
   return prem;
 }
 
-function instOf(
-  under: string,
-  crude: { tradingSymbol: string; token: number; exchange: string } | null,
-  nifty: { tradingSymbol: string; token: number; exchange: string },
-  bank: { tradingSymbol: string; token: number; exchange: string },
-  sensex: { tradingSymbol: string; token: number; exchange: string },
-) {
-  return under === 'crude' ? crude : under === 'nifty' ? nifty : under === 'bank' ? bank : sensex;
-}
-
 function optionKey(book: Pick<LivePaperBookState, 'optionSymbol' | 'id'>): string {
   const under = underOf(book.id);
-  const ex = under === 'crude' ? 'MCX' : under === 'sensex' ? 'BFO' : 'NFO';
+  const ex = isAriseStock(under) ? 'NSE' : under === 'crude' ? 'MCX' : under === 'sensex' ? 'BFO' : 'NFO';
   return `${ex}:${book.optionSymbol}`;
 }
 
@@ -622,6 +648,7 @@ function underKeyFor(id: string, symbol: string | undefined, exchange: string | 
   if (id === 'nifty') return 'NSE:NIFTY 50';
   if (id === 'bank') return 'NSE:NIFTY BANK';
   if (id === 'sensex') return 'BSE:SENSEX';
+  if (isAriseStock(id)) return `NSE:${symbol || ''}`;
   return `${exchange || 'MCX'}:${symbol || ''}`;
 }
 
@@ -676,6 +703,10 @@ export function lastPrice(quotes: Record<string, PaperTickQuote>, id: string, sy
   if (want) {
     const n = Number(findQuote(quotes, want)?.last_price);
     return Number.isFinite(n) && n > 0 ? n : null;
+  }
+  if (isAriseStock(id) && symbol) {
+    const n = Number(findQuote(quotes, `NSE:${symbol}`)?.last_price);
+    if (Number.isFinite(n) && n > 0) return n;
   }
   if (id === 'crude' && symbol) {
     const exact = findQuote(quotes, `MCX:${symbol}`);

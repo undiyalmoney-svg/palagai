@@ -2,7 +2,7 @@
   <div class="mp-card" data-testid="crude-banner">
     <div class="mp-card-head">
       <div>
-        <h2>Arise · Bank Nifty, Nifty 50, Sensex and Crude Mini</h2>
+        <h2>Arise · Bank Nifty, Nifty 50, Sensex, Crude Mini and 5 stocks</h2>
         <p class="mp-sub" data-testid="crude-now-title">{{ now().title }}</p>
       </div>
       <div class="mp-row">
@@ -48,8 +48,8 @@
         <h2>Live Kite · Arise</h2>
         <p class="mp-sub">
           Paper always records. Live Kite sends a MARKET buy and a resting SL only when Live is on and that book is ticked.
-          All four names use mom 0.8× skip range: one fill, sit at ₹370, skip range mornings. 8 of 10 green days is the aim, not a claim. When the paper target hits, Live cancels the SL and sells MARKET.
-          Hunt stays paper-only on Paper test. Sample only — not a guaranteed profit.
+          All four option names plus five cash names at 50 shares use mom 0.8× skip range: one fill, sit at ₹370, skip range mornings. 8 of 10 green days is the aim, not a claim. When the paper target hits, Live cancels the SL and sells MARKET.
+          Hunt stays paper-only on the four index names. Sample only — not a guaranteed profit.
         </p>
       </div>
       <span class="mp-badge" [attr.data-tone]="paper.liveArmed() ? 'down' : 'info'" data-testid="paper-live-badge">
@@ -138,6 +138,8 @@
                   {{ pick(d.book) || d.book.label }}
                   @if (d.book.optionType) {
                     <div class="mp-pick" data-testid="live-paper-pick">{{ pick(d.book) }} · {{ d.book.lot }} qty</div>
+                  } @else if (d.book.lot) {
+                    <div class="mp-pick" data-testid="live-paper-pick">{{ d.book.instrument || pick(d.book) }} · {{ d.book.lot }} shares</div>
                   }
                   @if (d.book.kiteNote) {
                     <div class="mp-pick" data-testid="live-paper-kite-note">{{ d.book.kiteNote }}</div>
@@ -165,14 +167,14 @@
     <div class="mp-card-head">
       <div>
         <h2>Closed today</h2>
-        <p class="mp-sub">Bank Nifty, Nifty 50 and Sensex paper fills. Live Kite cancels SL after target. Not a guaranteed profit.</p>
+        <p class="mp-sub">Arise paper fills. Live Kite cancels SL after target. Not a guaranteed profit.</p>
       </div>
       <button type="button" class="ui-btn" (click)="copyNightLog()" data-testid="copy-night-log">
         {{ copiedLeader() === 'log' ? 'Copied' : 'Copy night log' }}
       </button>
     </div>
     @if (!liveFills().length) {
-      <p class="mp-sub" data-testid="live-paper-fills-empty">No Bank Nifty, Nifty 50 or Sensex paper fill yet.</p>
+      <p class="mp-sub" data-testid="live-paper-fills-empty">No Arise paper fill yet.</p>
     } @else {
       <div class="mp-table-wrap">
         <table class="mp-table">

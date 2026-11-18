@@ -38,17 +38,20 @@ describe('Live paper desk', () => {
     expect(snap.guaranteed).toBe(false);
     expect(snap.armedOnCrudeBest).toBe(false);
     expect(snap.assumed).toBe(true);
-    expect(snap.books).toHaveLength(4);
-    expect(new Set(snap.books.map((b) => b.under))).toEqual(new Set(['crude', 'nifty', 'bank', 'sensex']));
+    expect(snap.books).toHaveLength(9);
+    expect(new Set(snap.books.map((b) => b.under))).toEqual(
+      new Set(['crude', 'nifty', 'bank', 'sensex', 'hdfcbank', 'reliance', 'icicibank', 'infy', 'tcs']),
+    );
     expect(new Set(snap.books.map((b) => b.desk))).toEqual(new Set(['momentum']));
     expect(snap.books.every((b) => b.fund === LIVE_PAPER_CAPITAL)).toBe(true);
-    expect(booksFundEnd(snap.books)).toBe(56_000);
+    expect(booksFundEnd(snap.books)).toBe(126_000);
     expect(snap.honest).toMatch(/Paper always records/);
     expect(snap.honest).toMatch(/No Kite order/i);
     expect(snap.honest).toMatch(/buy CE\/PE/);
-    expect(LIVE_PAPER_BOOKS).toHaveLength(4);
-    expect(LIVE_PAPER_BOOKS.every((b) => b.buyOption)).toBe(true);
-    expect(LIVE_PAPER_BOOKS.map((b) => b.product).join(' ')).toMatch(/CE\/PE/);
+    expect(LIVE_PAPER_BOOKS).toHaveLength(9);
+    expect(LIVE_PAPER_BOOKS.filter((b) => b.buyOption)).toHaveLength(4);
+    expect(LIVE_PAPER_BOOKS.filter((b) => b.kind === 'eq')).toHaveLength(5);
+    expect(LIVE_PAPER_BOOKS.filter((b) => b.buyOption).map((b) => b.product).join(' ')).toMatch(/CE\/PE/);
     const live = summarizePaper(snap.books, {
       running: true,
       day: snap.day,
@@ -649,7 +652,7 @@ describe('Live paper desk', () => {
 
   it('trades only Nifty, Bank, Sensex and Crude Mini momentum from 09:00', () => {
     const by = (under: string) => LIVE_PAPER_BOOKS.find((b) => b.id === `${under}-momentum`)!;
-    expect(LIVE_PAPER_BOOKS).toHaveLength(4);
+    expect(LIVE_PAPER_BOOKS).toHaveLength(9);
     expect(LIVE_PAPER_BOOKS.every((b) => b.desk === 'momentum')).toBe(true);
     expect(by('nifty')).toMatchObject({
       strategy: 'momentum',
@@ -711,8 +714,14 @@ describe('Live paper desk', () => {
       nifty: 'mom 0.8× skip range',
       sensex: 'mom 0.8× skip range',
       crude: 'mom 0.8× skip range',
+      hdfcbank: 'mom 0.8× skip range · 50 shares',
+      reliance: 'mom 0.8× skip range · 50 shares',
+      icicibank: 'mom 0.8× skip range · 50 shares',
+      infy: 'mom 0.8× skip range · 50 shares',
+      tcs: 'mom 0.8× skip range · 50 shares',
     });
     expect(PAPER_TEST_HONEST).toMatch(/Index tickets from 09:45 IST/);
+    expect(PAPER_TEST_HONEST).toMatch(/50 shares/);
     expect(PAPER_TEST_HONEST).toMatch(/Not a guaranteed profit/);
     expect(PAPER_TEST_HONEST).toMatch(/Arise tab/);
     expect(PAPER_TEST_HONEST).not.toMatch(/Crude Oil tab/);
@@ -725,7 +734,57 @@ describe('Live paper desk', () => {
     expect(PAPER_TEST_HONEST).toMatch(/Live Kite never sees the hunt/);
     expect(PAPER_TEST_HONEST).toMatch(/Paper always records/);
     expect(PAPER_TEST_HONEST).toMatch(/Kite reject does not drop the paper fill/);
-    expect(paperTickOrder(LIVE_PAPER_BOOKS).map((b) => b.under)).toEqual(['bank', 'sensex', 'nifty', 'crude']);
+    expect(paperTickOrder(LIVE_PAPER_BOOKS).map((b) => b.under)).toEqual([
+      'bank',
+      'sensex',
+      'nifty',
+      'crude',
+      'hdfcbank',
+      'reliance',
+      'icicibank',
+      'infy',
+      'tcs',
+    ]);
+    expect(by('hdfcbank')).toMatchObject({
+      kind: 'eq',
+      buyOption: false,
+      qty: 50,
+      onlyDir: 1,
+      nseSymbol: 'HDFCBANK',
+      strategy: 'momentum',
+      momK: 0.8,
+      skipStructures: ['range'],
+      maxTradesPerDay: 1,
+      stopRs: LIVE_PAPER_STOP_RS,
+      targetRs: LIVE_PAPER_TARGET_RS,
+      entryS: 9 * 60 + 45,
+    });
+  });
+
+  it('opens a cash stock at 50 shares with a ₹370 stop (₹7.40 a share)', () => {
+    const cfg = LIVE_PAPER_BOOKS.find((b) => b.id === 'reliance-momentum')!;
+    const confirm = {
+      day: '2026-11-18',
+      min: 9 * 60 + 46,
+      open: 1400,
+      high: 1412,
+      low: 1399,
+      close: 1410,
+    };
+    const next = tickBook(
+      { ...emptyBook(cfg), pendingDir: 1, pendingSig: 1400, pendingMode: 'momentum', lastBarMin: 9 * 60 + 45 },
+      cfg,
+      [confirm],
+      1410,
+      '2026-11-18',
+      9 * 60 + 47,
+      'RELIANCE',
+    );
+    expect(next.side).toBe('long');
+    expect(next.lot).toBe(50);
+    expect(next.entry).toBe(1400);
+    expect(next.sl).toBeCloseTo(1392.6, 1);
+    expect((next.tp || 0) - 1400).toBeGreaterThan(7.4);
   });
 
   it('retags a persisted OR-retest book to mom 0.8× skip range on the next tick', () => {

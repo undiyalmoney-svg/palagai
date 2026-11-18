@@ -82,7 +82,7 @@ describe('LivePaperService', () => {
     expect(snap.liveOrders).toBe(false);
     expect(snap.guaranteed).toBe(false);
     expect(snap.kiteError).toMatch(/Connect Kite/);
-    expect(snap.books).toHaveLength(4);
+    expect(snap.books).toHaveLength(9);
   });
 
   it('keeps liveOrders off until Live radio is on and a book is ticked', () => {
