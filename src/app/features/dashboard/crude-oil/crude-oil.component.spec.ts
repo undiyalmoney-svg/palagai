@@ -54,7 +54,7 @@ describe('CrudeOilComponent', () => {
     expect(fixture.nativeElement.querySelector('[data-testid="book-nifty"]')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('[data-testid="book-crude"]')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('[data-testid="book-reliance"]')).toBeTruthy();
-    expect(text).toMatch(/50 shares/);
+    expect(text).toMatch(/1% day is ₹370/);
     expect(fixture.nativeElement.querySelector('[data-testid="live-paper-fills"]')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('[data-testid="start-live-paper"]')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('[data-testid="stop-live-paper"]')).toBeTruthy();

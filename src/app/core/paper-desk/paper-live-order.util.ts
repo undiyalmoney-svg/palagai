@@ -1,7 +1,7 @@
 /**
  * Paper-desk live Kite tickets. Off until Live Kite radio is on AND that
  * book's checkbox is ticked. Crude Mini order qty is 1, never CSV lot 10.
- * Cash stocks are NSE MIS at 50 shares.
+ * Cash stocks are NSE MIS. Qty is sized so a 1% day is ₹370.
  */
 import { isAriseStock } from './arise-stocks';
 

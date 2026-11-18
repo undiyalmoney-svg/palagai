@@ -714,14 +714,14 @@ describe('Live paper desk', () => {
       nifty: 'mom 0.8× skip range',
       sensex: 'mom 0.8× skip range',
       crude: 'mom 0.8× skip range',
-      hdfcbank: 'mom 0.8× skip range · 50 shares',
-      reliance: 'mom 0.8× skip range · 50 shares',
-      icicibank: 'mom 0.8× skip range · 50 shares',
-      infy: 'mom 0.8× skip range · 50 shares',
-      tcs: 'mom 0.8× skip range · 50 shares',
+      hdfcbank: 'mom 0.8× skip range · qty so 1% day = ₹370',
+      reliance: 'mom 0.8× skip range · qty so 1% day = ₹370',
+      icicibank: 'mom 0.8× skip range · qty so 1% day = ₹370',
+      infy: 'mom 0.8× skip range · qty so 1% day = ₹370',
+      tcs: 'mom 0.8× skip range · qty so 1% day = ₹370',
     });
     expect(PAPER_TEST_HONEST).toMatch(/Index tickets from 09:45 IST/);
-    expect(PAPER_TEST_HONEST).toMatch(/50 shares/);
+    expect(PAPER_TEST_HONEST).toMatch(/1% day is ₹370/);
     expect(PAPER_TEST_HONEST).toMatch(/Not a guaranteed profit/);
     expect(PAPER_TEST_HONEST).toMatch(/Arise tab/);
     expect(PAPER_TEST_HONEST).not.toMatch(/Crude Oil tab/);
@@ -748,7 +748,7 @@ describe('Live paper desk', () => {
     expect(by('hdfcbank')).toMatchObject({
       kind: 'eq',
       buyOption: false,
-      qty: 50,
+      product: 'MIS · 1% day = ₹370',
       onlyDir: 1,
       nseSymbol: 'HDFCBANK',
       strategy: 'momentum',
@@ -761,7 +761,7 @@ describe('Live paper desk', () => {
     });
   });
 
-  it('opens a cash stock at 50 shares with a ₹370 stop (₹7.40 a share)', () => {
+  it('opens a cash stock with qty so a 1% day is ₹370 (₹100 last → 370 shares)', () => {
     const cfg = LIVE_PAPER_BOOKS.find((b) => b.id === 'reliance-momentum')!;
     const confirm = {
       day: '2026-11-18',
@@ -781,10 +781,10 @@ describe('Live paper desk', () => {
       'RELIANCE',
     );
     expect(next.side).toBe('long');
-    expect(next.lot).toBe(50);
+    expect(next.lot).toBe(26);
     expect(next.entry).toBe(1400);
-    expect(next.sl).toBeCloseTo(1392.6, 1);
-    expect((next.tp || 0) - 1400).toBeGreaterThan(7.4);
+    expect(next.sl).toBeCloseTo(1400 - 370 / 26, 1);
+    expect((next.tp || 0) - 1400).toBeGreaterThan(370 / 26);
   });
 
   it('retags a persisted OR-retest book to mom 0.8× skip range on the next tick', () => {

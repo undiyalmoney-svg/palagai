@@ -10,7 +10,7 @@ import {
   momentumGauge,
   morningStructure,
 } from './live-assume.engine';
-import { ARISE_STOCK_QTY, ARISE_STOCKS, ariseStockOf, isAriseStock } from './arise-stocks';
+import { ARISE_STOCKS, ariseStockOf, ariseStockQty, isAriseStock } from './arise-stocks';
 import { OPTION_14K_BOOKS, OPTION_14K_LIST, Option14kBookId, option14kToPaperCfg } from './option-14k-plan';
 import { mixGate } from './paper-mix.util';
 import { PaperEvolveFlags, PaperEvolveState, emptyEvolve, reviewEvolvingDesk } from './paper-evolve.util';
@@ -89,11 +89,11 @@ export const LIVE_TAKE_METHOD: Record<LiveTakeUnder, string> = {
   nifty: 'mom 0.8× skip range',
   sensex: 'mom 0.8× skip range',
   crude: 'mom 0.8× skip range',
-  hdfcbank: `mom 0.8× skip range · ${ARISE_STOCK_QTY} shares`,
-  reliance: `mom 0.8× skip range · ${ARISE_STOCK_QTY} shares`,
-  icicibank: `mom 0.8× skip range · ${ARISE_STOCK_QTY} shares`,
-  infy: `mom 0.8× skip range · ${ARISE_STOCK_QTY} shares`,
-  tcs: `mom 0.8× skip range · ${ARISE_STOCK_QTY} shares`,
+  hdfcbank: 'mom 0.8× skip range · qty so 1% day = ₹370',
+  reliance: 'mom 0.8× skip range · qty so 1% day = ₹370',
+  icicibank: 'mom 0.8× skip range · qty so 1% day = ₹370',
+  infy: 'mom 0.8× skip range · qty so 1% day = ₹370',
+  tcs: 'mom 0.8× skip range · qty so 1% day = ₹370',
 };
 export const LIVE_TAKE_LABEL: Record<LiveTakeUnder, string> = {
   bank: 'Bank Nifty',
@@ -107,7 +107,7 @@ export const LIVE_TAKE_LABEL: Record<LiveTakeUnder, string> = {
   tcs: 'TCS',
 };
 export const LIVE_TAKE_LINE =
-  `mom 0.8× skip range on Bank Nifty, Nifty 50, Sensex, Crude Mini, and five cash names at ${ARISE_STOCK_QTY} shares (one fill, sit at ₹370, skip range mornings)`;
+  'mom 0.8× skip range on Bank Nifty, Nifty 50, Sensex, Crude Mini, and five cash names sized so a 1% day is ₹370 (one fill, sit at ₹370, skip range mornings)';
 
 const INDEX_CLOCK: Partial<LiveAssumeBookCfg> = {
   orS: 9 * 60 + 15,
@@ -139,7 +139,7 @@ export const PAPER_DESKS: { id: string; label: string; rule: string }[] = [
     id: 'momentum',
     label: 'Daily ₹370',
     rule:
-      'Paper always records. Index tickets from 09:45 IST after the 09:15–09:30 opening range. Crude Mini from 09:15 IST. Cash stocks from 09:45 IST, 50 shares. ' +
+      'Paper always records. Index tickets from 09:45 IST after the 09:15–09:30 opening range. Crude Mini from 09:15 IST. Cash stocks from 09:45 IST, share count so a 1% day is ₹370. ' +
       `Live Kite on the Arise tab is ${LIVE_TAKE_LINE} only. ` +
       'Target nets ₹370 after charges, fill at the live bid. When target hits, Live cancels the resting SL and sells MARKET. ' +
       'Hunt stays paper-only. 8 of 10 green days is the aim, not a claim. Not a guaranteed profit.',
@@ -184,7 +184,7 @@ function deskPatch(under: string): Partial<LiveAssumeBookCfg> {
 export const PAPER_MOMENTUM: Partial<LiveAssumeBookCfg> = { ...EXIT, ...deskPatch('nifty') };
 export const PAPER_TEST_HONEST =
   'Index-proxy pick, not a lock. ATM CE (up) or PE (down), 1 lot at the live ask, exact charges. ' +
-  'Index tickets from 09:45 IST after the 09:15–09:30 opening range. Crude Mini from 09:15 IST. Cash stocks 50 shares from 09:45 IST. ' +
+  'Index tickets from 09:45 IST after the 09:15–09:30 opening range. Crude Mini from 09:15 IST. Cash stocks from 09:45 IST, qty so a 1% day is ₹370. ' +
   `Live Kite on the Arise tab is ${LIVE_TAKE_LINE} only — locked for more green/flat days, sample only, 8/10 not proven. ` +
   'Daily bank ₹370 net after charges / stop ₹370. When the paper target hits, Live cancels the resting SL and sells MARKET. ' +
   'Hunt on all four names stays paper tickets — Live Kite never sees the hunt. ' +
@@ -208,12 +208,11 @@ export const LIVE_PAPER_BOOKS: LiveAssumeBookCfg[] = [
     id: `${stock.id}-momentum`,
     under: stock.id,
     desk: 'momentum',
-    product: `MIS ×${ARISE_STOCK_QTY}`,
+    product: 'MIS · 1% day = ₹370',
     kind: 'eq' as const,
     buyOption: false,
     atm: false,
-    qty: ARISE_STOCK_QTY,
-    rsPt: ARISE_STOCK_QTY,
+    rsPt: 1,
     nseSymbol: stock.symbol,
     misPct: 0.2,
     onlyDir: 1 as const,
@@ -641,11 +640,11 @@ export function emptyBook(cfg: LiveAssumeBookCfg): LivePaperBookState {
 
 export function capitalUsedOf(
   cfg: LiveAssumeBookCfg,
-  book: Pick<LivePaperBookState, 'last' | 'entry'>,
+  book: Pick<LivePaperBookState, 'last' | 'entry'> & { lot?: number },
 ): number {
   if (cfg.capitalRs) return cfg.capitalRs;
   const px = book.last ?? book.entry ?? 0;
-  const qty = cfg.qty || cfg.rsPt || 0;
+  const qty = book.lot || cfg.qty || (cfg.kind === 'eq' ? ariseStockQty(px) : cfg.rsPt) || 0;
   const pct = cfg.misPct ?? 0.2;
   if (!(px > 0) || !(qty > 0)) return 0;
   return Math.round(px * qty * pct);
@@ -1064,7 +1063,7 @@ function openAt(
   book.side = d === 1 ? 'long' : 'short';
   book.entry = entry;
   if (cfg.kind === 'eq' || cfg.kind === 'fut') {
-    const lot = cfg.qty || book.lot || 1;
+    const lot = cfg.kind === 'eq' ? ariseStockQty(entry) || 1 : cfg.qty || book.lot || 1;
     let stop = entry * (cfg.stopPct || 0.0015);
     let tgt = entry * (cfg.targetPct || 0.0025);
     if (cfg.stopRs != null && lot > 0) stop = cfg.stopRs / lot;

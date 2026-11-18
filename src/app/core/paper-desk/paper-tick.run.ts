@@ -39,7 +39,7 @@ import { SkippedSignal } from './paper-analytics.models';
 import { buildSignalCard } from './signal-card.util';
 import { HuntSideQuote, tickPaperHunt } from './paper-hunt.engine';
 import { kiteBar } from './kite-bar.util';
-import { ARISE_STOCKS, isAriseStock } from './arise-stocks';
+import { ARISE_STOCKS, ariseStockQty, isAriseStock } from './arise-stocks';
 
 const OPTION_UNDERS = ['crude', 'nifty', 'bank', 'sensex'] as const;
 const STOCK_UNDERS = ARISE_STOCKS.map((s) => s.id);
@@ -175,7 +175,7 @@ export async function runPaperTick(io: PaperTickIo): Promise<LivePaperSession> {
         ...next,
         optionSymbol: inst.tradingSymbol,
         optionToken: inst.token,
-        lot: cfg.qty || next.lot,
+        lot: next.side !== 'flat' && next.lot ? next.lot : ariseStockQty(underLast ?? next.last ?? 0) || next.lot,
         instrument: inst.tradingSymbol,
       };
     }

@@ -133,7 +133,7 @@ export class CrudeOilComponent implements OnDestroy {
         title: 'Not watching. Hit Start. Paper always. Live Kite is extra on ticked books.',
         lines: [
           LIVE_TAKE_LINE + '.',
-          'Index tickets from 09:45 IST after the 09:15–09:30 opening range. Crude Mini from 09:15 IST. Cash stocks 50 shares from 09:45 IST.',
+          'Index tickets from 09:45 IST after the 09:15–09:30 opening range. Crude Mini from 09:15 IST. Cash stocks from 09:45 IST, qty so a 1% day is ₹370.',
           today,
           foot,
         ].filter(Boolean),
