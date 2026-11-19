@@ -4,6 +4,7 @@ import { serverRoutes } from './app.routes.server';
 import { routes } from './app.routes';
 import { CrudeBestComponent } from './features/dashboard/crude-best/crude-best.component';
 import { CrudeOilComponent } from './features/dashboard/crude-oil/crude-oil.component';
+import { SniperComponent } from './features/dashboard/sniper/sniper.component';
 import { OrderTestComponent } from './features/dashboard/order-test/order-test.component';
 
 describe('dashboard desk routes', () => {
@@ -32,6 +33,10 @@ describe('dashboard desk routes', () => {
     expect(crude?.component).toBe(CrudeOilComponent);
     expect(crude?.loadComponent).toBeUndefined();
     expect(crude?.canActivate?.length).toBe(1);
+
+    const sniper = children.find((r) => r.path === 'sniper');
+    expect(sniper?.component).toBe(SniperComponent);
+    expect(sniper?.canActivate?.length).toBe(1);
   });
 
   it('renders desks on the client so SSR cannot bounce a signed-in session to login', () => {
@@ -42,6 +47,8 @@ describe('dashboard desk routes', () => {
     expect(crudeBest?.renderMode).toBe(RenderMode.Client);
     const crude = serverRoutes.find((r) => r.path === 'dashboard/crude-oil');
     expect(crude?.renderMode).toBe(RenderMode.Client);
+    const sniper = serverRoutes.find((r) => r.path === 'dashboard/sniper');
+    expect(sniper?.renderMode).toBe(RenderMode.Client);
     expect(serverRoutes.find((r) => r.path === 'dashboard/paper-14k')).toBeUndefined();
   });
 });

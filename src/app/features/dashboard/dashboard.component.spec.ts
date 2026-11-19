@@ -41,6 +41,7 @@ describe('DashboardComponent navigation', () => {
           { path: 'dashboard/get-token', component: DashboardComponent },
           { path: 'dashboard/crude-best', component: DashboardComponent },
           { path: 'dashboard/crude-oil', component: DashboardComponent },
+          { path: 'dashboard/sniper', component: DashboardComponent },
           { path: 'dashboard/order-test', component: DashboardComponent },
           { path: 'login', component: DashboardComponent },
         ]),
@@ -109,6 +110,18 @@ describe('DashboardComponent navigation', () => {
     fixture.componentInstance['go']('/dashboard/crude-best');
     await fixture.whenStable();
     expect(router.url).toBe('/dashboard/crude-best');
+  });
+
+  it('lists 5-Minute Sniper as its own tab', async () => {
+    const el = fixture.nativeElement as HTMLElement;
+    const link = el.querySelector('[data-testid="nav-sniper"]') as HTMLAnchorElement | null;
+    expect(link).toBeTruthy();
+    expect(link?.textContent).toMatch(/5-Minute Sniper/);
+    expect(el.querySelector('[data-testid="nav-crude"]')?.textContent).toMatch(/Arise/);
+
+    fixture.componentInstance['go']('/dashboard/sniper');
+    await fixture.whenStable();
+    expect(router.url).toBe('/dashboard/sniper');
   });
 
   it('does not list Paper test', () => {

@@ -1,0 +1,35 @@
+.sniper-charts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+  color: var(--pg-bull-deep);
+}
+.sniper-table {
+  overflow-x: auto;
+}
+.sniper-table td.mp-up,
+.sniper-table tr.mp-up td.num:nth-last-child(2) {
+  color: var(--pg-bull-deep);
+}
+.sniper-table tr.mp-down td.num:nth-last-child(2) {
+  color: var(--pg-bear-deep);
+}
+.mp-live-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem 1.15rem;
+}
+.mp-hunt-kv {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.55rem;
+  margin: 0.18rem 0;
+  font-size: 0.78rem;
+  color: var(--pg-muted);
+}
+.mp-hunt-kv strong {
+  color: var(--pg-ink);
+  font-weight: 650;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}

@@ -71,7 +71,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   protected readonly clockLabel = signal('');
   protected readonly pageTitle = signal('Palagai');
   protected readonly pageSubtitle = signal(
-    'Token, Crude Best, Arise, and Test.',
+    'Token, Crude Best, Arise, 5-Minute Sniper, and Test.',
   );
   protected readonly sidebarOpen = signal(true);
   protected readonly profileOpen = signal(false);
@@ -101,6 +101,14 @@ export class DashboardComponent implements OnInit, OnDestroy {
       testId: 'crude',
     },
     {
+      label: '5-Minute Sniper',
+      shortLabel: 'Sniper',
+      route: '/dashboard/sniper',
+      icon: 'candles',
+      module: 'crude',
+      testId: 'sniper',
+    },
+    {
       label: 'Test',
       shortLabel: 'Test',
       route: '/dashboard/order-test',
@@ -127,6 +135,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
       title: 'Arise',
       subtitle: 'mom 0.8× skip range on Bank Nifty, Nifty 50, Sensex. Crude Mini is watch. Cash skips range and quiet, qty so a 1% day is ₹370. Paper always. Live Kite is extra. 8/10 not proven.',
     },
+    '/dashboard/sniper': {
+      title: '5-Minute Sniper',
+      subtitle: 'Previous 5-minute candle: green ATM CE, red ATM PE. Four books × ₹50,000. ₹100 max loss after Kite charges. Paper runs on the droplet with the tab closed. Not Arise. Not a guaranteed profit.',
+    },
     '/dashboard/settings': {
       title: 'Settings',
       subtitle: 'Lots preference, instruments, and local data tools.',
@@ -143,7 +155,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   protected readonly hideFunds = computed(() => this.authService.isPublic());
 
-  /** Bottom tab bar on phone — Token, Crude Best, Arise, Test. */
+  /** Bottom tab bar on phone — Token, Crude Best, Arise, Sniper, Test. */
   protected readonly mobileTabItems = computed(() => this.navItems());
 
   protected readonly username = computed(() => {
@@ -341,6 +353,9 @@ export class DashboardComponent implements OnInit, OnDestroy {
     }
     if (/crude-oil/i.test(`${event.url} ${msg}`)) {
       return 'Could not open Arise. Retry, or hard-refresh the tab.';
+    }
+    if (/sniper/i.test(`${event.url} ${msg}`)) {
+      return 'Could not open 5-Minute Sniper. Retry, or hard-refresh the tab.';
     }
     return msg || 'Could not open that desk.';
   }
