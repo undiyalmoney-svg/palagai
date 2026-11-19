@@ -37,6 +37,10 @@ describe('paper live Kite tickets', () => {
     expect(paperLiveArmedFor(true, nifty, 'bank')).toBe(false);
     expect(paperLiveArmedFor(true, nifty, 'sensex')).toBe(false);
     expect(paperLiveArmedFor(true, nifty, 'crude')).toBe(false);
+    const crudeOn = { ...none, crude: true, hdfcbank: true };
+    expect(paperLiveArmed(true, crudeOn)).toBe(false);
+    expect(paperLiveArmedFor(true, crudeOn, 'crude')).toBe(false);
+    expect(paperLiveArmedFor(true, crudeOn, 'hdfcbank')).toBe(false);
   });
 
   it('keeps the paper fill when Kite overlay fails or returns a flat book', () => {

@@ -1,5 +1,5 @@
 /**
- * Arise cash MIS books. Same mom 0.8× skip range as the four index names.
+ * Arise cash MIS books. Mom 0.8× skip range and quiet (trend mornings only).
  * Share count is not a fixed 50. A cheap name that only moves ₹1 a day needs
  * 370 shares to bank ₹370; a ₹3,500 name that moves ~₹35 needs about 11.
  * Qty = round(₹370 / (1% of last)). Not a guaranteed profit.

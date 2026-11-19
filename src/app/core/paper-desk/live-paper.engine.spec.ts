@@ -5,6 +5,7 @@ import {
   LIVE_PAPER_BOOKS,
   LIVE_TAKE_LINE,
   LIVE_TAKE_METHOD,
+  LIVE_TAKE_UNDERS,
   LIVE_PAPER_CAPITAL,
   LIVE_PAPER_BANK_RS,
   LIVE_PAPER_MAX_STOP_RS,
@@ -651,7 +652,7 @@ describe('Live paper desk', () => {
   const flatBars = (day: string, n: number, startMin: number, px = 100, rng = 2) =>
     Array.from({ length: n }, (_, k) => ({ day, min: startMin + 5 * k, open: px, high: px + rng / 2, low: px - rng / 2, close: px }));
 
-  it('trades only Nifty, Bank, Sensex and Crude Mini momentum from 09:00', () => {
+  it('trades Nifty, Bank, Sensex mom 0.8× skip range; Crude is watch; cash skips quiet', () => {
     const by = (under: string) => LIVE_PAPER_BOOKS.find((b) => b.id === `${under}-momentum`)!;
     expect(LIVE_PAPER_BOOKS).toHaveLength(9);
     expect(LIVE_PAPER_BOOKS.every((b) => b.desk === 'momentum')).toBe(true);
@@ -697,31 +698,20 @@ describe('Live paper desk', () => {
     });
     expect(LIVE_PAPER_CRUDE_MOM_K).toBe(0.8);
     expect(by('crude')).toMatchObject({
-      strategy: 'momentum',
-      momK: 0.8,
-      skipStructures: ['range'],
-      maxTradesPerDay: 1,
-      minDayNetRs: LIVE_PAPER_BANK_RS,
-      stopRs: LIVE_PAPER_STOP_RS,
-      targetRs: LIVE_PAPER_TARGET_RS,
+      strategy: 'watch',
       barMinutes: 1,
       entryS: 9 * 60 + 15,
       orS: 9 * 60,
       orE: 9 * 60 + 15,
-      label: 'Crude Mini · mom 0.8× skip range',
+      label: 'Crude Mini · watch (no 60m mom)',
     });
     expect(LIVE_TAKE_METHOD).toEqual({
       bank: 'mom 0.8× skip range',
       nifty: 'mom 0.8× skip range',
       sensex: 'mom 0.8× skip range',
-      crude: 'mom 0.8× skip range',
-      hdfcbank: 'mom 0.8× skip range · qty so 1% day = ₹370',
-      reliance: 'mom 0.8× skip range · qty so 1% day = ₹370',
-      icicibank: 'mom 0.8× skip range · qty so 1% day = ₹370',
-      infy: 'mom 0.8× skip range · qty so 1% day = ₹370',
-      tcs: 'mom 0.8× skip range · qty so 1% day = ₹370',
     });
     expect(PAPER_TEST_HONEST).toMatch(/Index tickets from 09:45 IST/);
+    expect(LIVE_TAKE_UNDERS).toEqual(['bank', 'nifty', 'sensex']);
     expect(PAPER_TEST_HONEST).toMatch(/1% day is ₹370/);
     expect(PAPER_TEST_HONEST).toMatch(/Not a guaranteed profit/);
     expect(PAPER_TEST_HONEST).toMatch(/Arise tab/);
@@ -754,12 +744,25 @@ describe('Live paper desk', () => {
       nseSymbol: 'HDFCBANK',
       strategy: 'momentum',
       momK: 0.8,
-      skipStructures: ['range'],
+      skipStructures: ['range', 'quiet'],
       maxTradesPerDay: 1,
       stopRs: LIVE_PAPER_STOP_RS,
       targetRs: LIVE_PAPER_TARGET_RS,
       entryS: 9 * 60 + 45,
+      label: 'HDFC Bank · mom 0.8× skip range+quiet',
     });
+  });
+
+  it('skips a quiet cash morning instead of taking the one long', () => {
+    const cfg = LIVE_PAPER_BOOKS.find((b) => b.id === 'hdfcbank-momentum')!;
+    const bars = [...flatBars('2026-11-18', 20, 13 * 60 + 35, 800), ...flatBars('2026-11-19', 8, 9 * 60 + 15, 800)];
+    const last = bars.length - 1;
+    bars[last] = { ...bars[last], close: 830, high: 831 };
+    const book = { ...emptyBook(cfg), lastBarMin: 9 * 60 + 40 };
+    const next = tickBook(book, cfg, bars, 830, '2026-11-19', 9 * 60 + 51, 'HDFCBANK');
+    expect(next.side).toBe('flat');
+    expect(next.pendingDir).toBe(0);
+    expect(next.reason).toMatch(/skipped: quiet/);
   });
 
   it('opens a cash stock with qty so a 1% day is ₹370 (₹100 last → 370 shares)', () => {
@@ -795,39 +798,17 @@ describe('Live paper desk', () => {
     expect(next.label).toBe('Bank Nifty · mom 0.8× skip range');
   });
 
-  it('arms Crude Mini from 09:15, not only after 17:15', () => {
-    const cfg = asMomentum(LIVE_PAPER_BOOKS.find((b) => b.id === 'crude-momentum')!, LIVE_PAPER_CRUDE_MOM_K);
+  it('does not arm Crude Mini mom — watch only after 18–19 Nov time-exits', () => {
+    const cfg = LIVE_PAPER_BOOKS.find((b) => b.id === 'crude-momentum')!;
+    expect(cfg.strategy).toBe('watch');
     const bars = [...flatBars('2026-11-03', 20, 13 * 60 + 35, 5400), ...flatBars('2026-11-04', 7, 9 * 60, 5400)];
     const last = bars.length - 1;
     bars[last] = { ...bars[last], close: 5420, high: 5421 };
     const book = { ...emptyBook(cfg), lastBarMin: 9 * 60 + 25 };
-    const pending = tickBook(book, cfg, bars, 5420, '2026-11-04', 9 * 60 + 31, 'CRUDEOILM');
-    expect(pending.side).toBe('flat');
-    expect(pending.pendingDir).toBe(1);
-    expect(pending.reason).toMatch(/confirm momentum/);
-    const eveningOnly = { ...cfg, entryS: 17 * 60 + 15, orS: 17 * 60, orE: 17 * 60 + 15 };
-    const blocked = tickBook(book, eveningOnly, bars, 5420, '2026-11-04', 9 * 60 + 31, 'CRUDEOILM');
-    expect(blocked.pendingDir).toBe(0);
-    const fill = (over: { rs: number }): (typeof pending.fills)[number] => ({
-      day: '2026-11-04',
-      book: 'crude-momentum',
-      label: 'Crude',
-      side: 'long',
-      entry: 1,
-      exit: 1,
-      sl: 1,
-      tp: 1,
-      pts: 0,
-      rs: over.rs,
-      reason: 'time',
-      mode: 'momentum',
-    });
-    const afterOne = tickBook({ ...book, fills: [fill({ rs: 224.6 })] }, cfg, bars, 5420, '2026-11-04', 9 * 60 + 31, 'CRUDEOILM');
-    expect(afterOne.pendingDir).toBe(0);
-    expect(afterOne.reason).toBe('max 1 trade today');
-    const afterBank = tickBook({ ...book, fills: [fill({ rs: 370 })] }, cfg, bars, 5420, '2026-11-04', 9 * 60 + 31, 'CRUDEOILM');
-    expect(afterBank.pendingDir).toBe(0);
-    expect(afterBank.reason).toMatch(/banked ₹370 today|max 1 trade today/);
+    const next = tickBook(book, cfg, bars, 5420, '2026-11-04', 9 * 60 + 31, 'CRUDEOILM');
+    expect(next.side).toBe('flat');
+    expect(next.pendingDir).toBe(0);
+    expect(next.reason).toMatch(/watch only/);
   });
 
   it('fires momentum only past 1.5×√6 × the 20-bar mean range, from the 7th bar of the day', () => {
@@ -895,9 +876,11 @@ describe('Live paper desk', () => {
     expect(Math.round(((dear.tp ?? 0) - 336.6) * 65)).toBeGreaterThan(LIVE_PAPER_TARGET_RS);
     expect(netRs(cfg, { lot: 65 }, 336.6, dear.tp!, dear.tp! - 336.6)).toBeGreaterThanOrEqual(LIVE_PAPER_BANK_RS);
     expect(LIVE_PAPER_MAX_STOP_RS).toBe(LIVE_PAPER_STOP_RS);
-    expect(LIVE_PAPER_BOOKS.every((b) => b.maxStopRs === LIVE_PAPER_STOP_RS && b.stopRs === LIVE_PAPER_STOP_RS)).toBe(
-      true,
-    );
+    expect(
+      LIVE_PAPER_BOOKS.filter((b) => b.under !== 'crude').every(
+        (b) => b.maxStopRs === LIVE_PAPER_STOP_RS && b.stopRs === LIVE_PAPER_STOP_RS,
+      ),
+    ).toBe(true);
   });
 
   it('sits after one fill or a ₹370 bank, and does not revenge-trade', () => {

@@ -71,8 +71,8 @@ const EXIT: Partial<LiveAssumeBookCfg> = {
   freshCross: true,
 };
 
-/** Live Kite on the Arise tab — mom 0.8× skip range, one fill, sit ₹370. 8/10 green days is not proven. */
-export const LIVE_TAKE_UNDERS = [
+/** Paper cards: three index names plus Crude (watch) plus five cash books. */
+export const ARISE_UNDERS = [
   'bank',
   'nifty',
   'sensex',
@@ -83,19 +83,27 @@ export const LIVE_TAKE_UNDERS = [
   'infy',
   'tcs',
 ] as const;
+export type AriseUnder = (typeof ARISE_UNDERS)[number];
+/** Live Kite on the Arise tab — mom 0.8× skip range on the three index names only. */
+export const LIVE_TAKE_UNDERS = ['bank', 'nifty', 'sensex'] as const;
 export type LiveTakeUnder = (typeof LIVE_TAKE_UNDERS)[number];
-export const LIVE_TAKE_METHOD: Record<LiveTakeUnder, string> = {
+export const ARISE_METHOD: Record<AriseUnder, string> = {
   bank: 'mom 0.8× skip range',
   nifty: 'mom 0.8× skip range',
   sensex: 'mom 0.8× skip range',
-  crude: 'mom 0.8× skip range',
-  hdfcbank: 'mom 0.8× skip range · qty so 1% day = ₹370',
-  reliance: 'mom 0.8× skip range · qty so 1% day = ₹370',
-  icicibank: 'mom 0.8× skip range · qty so 1% day = ₹370',
-  infy: 'mom 0.8× skip range · qty so 1% day = ₹370',
-  tcs: 'mom 0.8× skip range · qty so 1% day = ₹370',
+  crude: 'watch — 60m mom bled 18–19 Nov',
+  hdfcbank: 'mom 0.8× skip range+quiet · qty so 1% day = ₹370',
+  reliance: 'mom 0.8× skip range+quiet · qty so 1% day = ₹370',
+  icicibank: 'mom 0.8× skip range+quiet · qty so 1% day = ₹370',
+  infy: 'mom 0.8× skip range+quiet · qty so 1% day = ₹370',
+  tcs: 'mom 0.8× skip range+quiet · qty so 1% day = ₹370',
 };
-export const LIVE_TAKE_LABEL: Record<LiveTakeUnder, string> = {
+export const LIVE_TAKE_METHOD: Record<LiveTakeUnder, string> = {
+  bank: ARISE_METHOD.bank,
+  nifty: ARISE_METHOD.nifty,
+  sensex: ARISE_METHOD.sensex,
+};
+export const LIVE_TAKE_LABEL: Record<AriseUnder, string> = {
   bank: 'Bank Nifty',
   nifty: 'Nifty 50',
   sensex: 'Sensex',
@@ -107,7 +115,7 @@ export const LIVE_TAKE_LABEL: Record<LiveTakeUnder, string> = {
   tcs: 'TCS',
 };
 export const LIVE_TAKE_LINE =
-  'mom 0.8× skip range on Bank Nifty, Nifty 50, Sensex, Crude Mini, and five cash names sized so a 1% day is ₹370 (one fill, sit at ₹370, skip range mornings)';
+  'mom 0.8× skip range on Bank Nifty, Nifty 50, Sensex only (one fill, sit at ₹370, skip range mornings). Crude Mini is watch. Cash skips range and quiet';
 
 const INDEX_CLOCK: Partial<LiveAssumeBookCfg> = {
   orS: 9 * 60 + 15,
@@ -121,7 +129,7 @@ const INDEX_CLOCK: Partial<LiveAssumeBookCfg> = {
   targetRs: LIVE_PAPER_TARGET_RS,
 };
 
-/** Same mom 0.8× on every Arise name. Skip range. One fill. Sit at ₹370. Not 8/10 proven. */
+/** Same mom 0.8× on the three index names. Skip range. One fill. Sit at ₹370. Not 8/10 proven. */
 const GREEN_DAY: Partial<LiveAssumeBookCfg> = {
   strategy: 'momentum',
   primary: ALL('momentum'),
@@ -134,13 +142,13 @@ const GREEN_DAY: Partial<LiveAssumeBookCfg> = {
   noConfirm: false,
 };
 
-/** The only paper desk: four daily ₹370 books. Live Kite is mom 0.8× skip range. */
+/** The only paper desk. Live Kite is the three index names. Crude is watch. Cash skips quiet. */
 export const PAPER_DESKS: { id: string; label: string; rule: string }[] = [
   {
     id: 'momentum',
     label: 'Daily ₹370',
     rule:
-      'Paper always records. Index tickets from 09:45 IST after the 09:15–09:30 opening range. Crude Mini from 09:15 IST. Cash stocks from 09:45 IST, share count so a 1% day is ₹370. ' +
+      'Paper always records. Index tickets from 09:45 IST after the 09:15–09:30 opening range. Crude Mini is watch (no 60m mom). Cash stocks from 09:45 IST, share count so a 1% day is ₹370, skip range and quiet mornings. ' +
       `Live Kite on the Arise tab is ${LIVE_TAKE_LINE} only. ` +
       'Target nets ₹370 after charges, fill at the live bid. When target hits, Live cancels the resting SL and sells MARKET. ' +
       'Hunt stays paper-only. 8 of 10 green days is the aim, not a claim. Not a guaranteed profit.',
@@ -151,6 +159,7 @@ function deskPatch(under: string): Partial<LiveAssumeBookCfg> {
   if (under === 'crude') {
     return {
       ...GREEN_DAY,
+      strategy: 'watch',
       orS: 9 * 60,
       orE: 9 * 60 + 15,
       entryS: 9 * 60 + 15,
@@ -159,7 +168,7 @@ function deskPatch(under: string): Partial<LiveAssumeBookCfg> {
       holdBars: 60,
       stopRs: LIVE_PAPER_CRUDE_STOP_RS,
       targetRs: LIVE_PAPER_CRUDE_TARGET_RS,
-      label: 'Crude Mini · mom 0.8× skip range',
+      label: 'Crude Mini · watch (no 60m mom)',
     };
   }
   if (under === 'bank') {
@@ -176,7 +185,8 @@ function deskPatch(under: string): Partial<LiveAssumeBookCfg> {
     return {
       ...INDEX_CLOCK,
       ...GREEN_DAY,
-      label: `${stock?.label || under} · mom 0.8× skip range`,
+      skipStructures: ['range', 'quiet'],
+      label: `${stock?.label || under} · mom 0.8× skip range+quiet`,
     };
   }
   return { ...INDEX_CLOCK, ...GREEN_DAY };
@@ -185,7 +195,7 @@ function deskPatch(under: string): Partial<LiveAssumeBookCfg> {
 export const PAPER_MOMENTUM: Partial<LiveAssumeBookCfg> = { ...EXIT, ...deskPatch('nifty') };
 export const PAPER_TEST_HONEST =
   'Index-proxy pick, not a lock. ATM CE (up) or PE (down), 1 lot at the live ask, exact charges. ' +
-  'Index tickets from 09:45 IST after the 09:15–09:30 opening range. Crude Mini from 09:15 IST. Cash stocks from 09:45 IST, qty so a 1% day is ₹370. ' +
+  'Index tickets from 09:45 IST after the 09:15–09:30 opening range. Crude Mini is watch. Cash stocks from 09:45 IST, qty so a 1% day is ₹370, skip range and quiet. ' +
   `Live Kite on the Arise tab is ${LIVE_TAKE_LINE} only — locked for more green/flat days, sample only, 8/10 not proven. ` +
   'Daily bank ₹370 net after charges / stop ₹370. When the paper target hits, Live cancels the resting SL and sells MARKET. ' +
   'Hunt on all four names stays paper tickets — Live Kite never sees the hunt. ' +

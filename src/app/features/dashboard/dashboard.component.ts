@@ -125,7 +125,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     },
     '/dashboard/crude-oil': {
       title: 'Arise',
-      subtitle: 'mom 0.8× skip range on four option names plus five cash stocks sized so a 1% day is ₹370. One fill, sit ₹370, skip range mornings. Paper always. Live Kite is extra. 8/10 not proven.',
+      subtitle: 'mom 0.8× skip range on Bank Nifty, Nifty 50, Sensex. Crude Mini is watch. Cash skips range and quiet, qty so a 1% day is ₹370. Paper always. Live Kite is extra. 8/10 not proven.',
     },
     '/dashboard/settings': {
       title: 'Settings',

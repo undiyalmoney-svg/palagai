@@ -23,6 +23,8 @@ export const PAPER_LIVE_UNDERS = [
   'tcs',
 ] as const;
 export type PaperLiveUnder = (typeof PAPER_LIVE_UNDERS)[number];
+/** Live Kite may only tick the three index books. Crude and cash stay paper. */
+export const PAPER_LIVE_TAKE_UNDERS: readonly PaperLiveUnder[] = ['nifty', 'bank', 'sensex'];
 
 export type PaperLiveBooks = Record<PaperLiveUnder, boolean>;
 
@@ -40,14 +42,18 @@ export function emptyPaperLiveBooks(): PaperLiveBooks {
   };
 }
 
-/** Desk-wide: Live radio on and at least one book ticked. */
+/** Desk-wide: Live radio on and at least one index book ticked. */
 export function paperLiveArmed(live: boolean, books: PaperLiveBooks): boolean {
-  return !!live && PAPER_LIVE_UNDERS.some((u) => !!books[u]);
+  return !!live && PAPER_LIVE_TAKE_UNDERS.some((u) => !!books[u]);
 }
 
-/** This book sends a Kite order only when Live is on and its checkbox is ticked. */
+/** This book sends a Kite order only when Live is on and an index checkbox is ticked. */
 export function paperLiveArmedFor(live: boolean, books: PaperLiveBooks, under: string): boolean {
-  return !!live && !!books[under as PaperLiveUnder];
+  return (
+    !!live &&
+    PAPER_LIVE_TAKE_UNDERS.includes(under as PaperLiveUnder) &&
+    !!books[under as PaperLiveUnder]
+  );
 }
 
 export type PaperKiteOverlay = {

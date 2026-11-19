@@ -3,6 +3,8 @@ import { Component, OnDestroy, computed, inject, signal } from '@angular/core';
 import { LivePaperService } from '../../../core/paper-desk/live-paper.service';
 import { PaperLiveUnder } from '../../../core/paper-desk/paper-live-order.util';
 import {
+  ARISE_METHOD,
+  ARISE_UNDERS,
   LIVE_TAKE_LABEL,
   LIVE_TAKE_LINE,
   LIVE_TAKE_METHOD,
@@ -36,20 +38,28 @@ export class CrudeOilComponent implements OnDestroy {
     label: LIVE_TAKE_LABEL[under],
     method: LIVE_TAKE_METHOD[under],
   }));
+  protected readonly paperBookRows = ARISE_UNDERS.map((under) => ({
+    under,
+    label: LIVE_TAKE_LABEL[under],
+    method: ARISE_METHOD[under],
+  }));
   protected readonly liveBooks = computed(() => {
     const books = this.paper.session().books;
-    return this.liveBookRows
+    return this.paperBookRows
       .map((row) => {
         const book = books.find((b) => (b.under || underOf(b.id)) === row.under && (b.desk || deskOf(b.id)) === 'momentum');
         return book ? { ...row, book } : null;
       })
-      .filter((row): row is { under: (typeof LIVE_TAKE_UNDERS)[number]; label: string; method: string; book: LivePaperBookState } => !!row);
+      .filter((row): row is { under: (typeof ARISE_UNDERS)[number]; label: string; method: string; book: LivePaperBookState } => !!row);
   });
   protected readonly liveFills = computed(() =>
     allClosedFills(this.paper.session().books).filter((f) =>
-      LIVE_TAKE_UNDERS.includes((f.under || underOf(f.book)) as (typeof LIVE_TAKE_UNDERS)[number]),
+      ARISE_UNDERS.includes((f.under || underOf(f.book)) as (typeof ARISE_UNDERS)[number]),
     ),
   );
+  protected isLiveTake(under: string): boolean {
+    return LIVE_TAKE_UNDERS.includes(under as (typeof LIVE_TAKE_UNDERS)[number]);
+  }
   protected readonly copiedLeader = signal('');
   protected readonly startOff = computed(() => this.paper.session().running || this.paper.busy());
   protected readonly stopOff = computed(() => !this.paper.session().running);
@@ -133,7 +143,7 @@ export class CrudeOilComponent implements OnDestroy {
         title: 'Not watching. Hit Start. Paper always. Live Kite is extra on ticked books.',
         lines: [
           LIVE_TAKE_LINE + '.',
-          'Index tickets from 09:45 IST after the 09:15–09:30 opening range. Crude Mini from 09:15 IST. Cash stocks from 09:45 IST, qty so a 1% day is ₹370.',
+          'Index tickets from 09:45 IST after the 09:15–09:30 opening range. Crude Mini is watch. Cash stocks from 09:45 IST, qty so a 1% day is ₹370, skip range and quiet.',
           today,
           foot,
         ].filter(Boolean),
@@ -145,9 +155,9 @@ export class CrudeOilComponent implements OnDestroy {
     return {
       tone: this.paper.liveArmed() ? 'down' : 'info',
       badge: this.paper.liveArmed() ? 'Live Kite on' : 'watching',
-      title: this.paper.liveArmed()
-        ? 'Watching Bank Nifty, Nifty 50, Sensex and Crude Mini. Index from 09:45 IST, Crude Mini from 09:15 IST. Live Kite sends a MARKET buy and a resting SL on ticked books.'
-        : 'Watching Bank Nifty, Nifty 50, Sensex and Crude Mini on paper. Index from 09:45 IST, Crude Mini from 09:15 IST. Switch to Live Kite to send orders.',
+        title: this.paper.liveArmed()
+        ? 'Watching Bank Nifty, Nifty 50, Sensex. Index from 09:45 IST. Crude Mini is watch. Cash skips quiet. Live Kite sends a MARKET buy and a resting SL on ticked index books.'
+        : 'Watching Bank Nifty, Nifty 50, Sensex on paper. Index from 09:45 IST. Crude Mini is watch. Cash skips quiet. Switch to Live Kite to send orders on the three index names.',
       lines: [checked, today, droplet, foot].filter(Boolean),
     };
   }
