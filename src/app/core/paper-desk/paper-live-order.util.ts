@@ -8,6 +8,8 @@ import { isAriseStock } from './arise-stocks';
 export const PAPER_LIVE_BUY_TAG = 'PALAGAI_PAPER';
 export const PAPER_LIVE_SL_TAG = 'PALAGAI_PAPER_SL';
 export const PAPER_LIVE_EXIT_TAG = 'PALAGAI_PAPER_X';
+/** Extra rupees the F&O SL LIMIT may sit below the ₹370 trigger. 10% of premium was ~₹1,400 on Nifty/Bank. */
+export const PAPER_LIVE_SL_LIMIT_SLIP_RS = 80;
 
 export const PAPER_LIVE_UNDERS = [
   'nifty',
@@ -149,8 +151,20 @@ export function paperLiveBuyFields(ticket: PaperLiveTicket): Record<string, stri
 }
 
 /**
- * Resting SELL stop. F&O no longer accepts SL-M, so this is SL LIMIT 10% under
- * the trigger — same shape as the Charts protective stop.
+ * F&O SL LIMIT just under the ₹370 trigger. A 10% drop from a ₹400 premium is
+ * ~₹1,400–₹1,600 on Nifty/Bank/Sensex — that is not the desk stop.
+ */
+export function paperLiveSlLimitPx(trigger: number, lot: number, tickSize = 0.05): number {
+  const tick = tickSize > 0 ? tickSize : 0.05;
+  const trig = roundToTick(Number(trigger), tick);
+  const qty = Math.max(1, Math.floor(Number(lot) || 0) || 1);
+  const drop = PAPER_LIVE_SL_LIMIT_SLIP_RS / qty;
+  return roundToTick(Math.max(tick, trig - drop), tick);
+}
+
+/**
+ * Resting SELL stop. F&O no longer accepts SL-M, so this is SL LIMIT with at
+ * most ₹80 extra below the trigger (not 10% of premium).
  */
 export function paperLiveStopFields(
   ticket: PaperLiveTicket,
@@ -175,7 +189,7 @@ export function paperLiveStopFields(
       tag: PAPER_LIVE_SL_TAG,
     };
   }
-  const limit = roundToTick(Math.max(tick, trig * 0.9), tick);
+  const limit = paperLiveSlLimitPx(trig, ticket.lot, tick);
   return {
     exchange,
     tradingsymbol: ticket.optionSymbol,

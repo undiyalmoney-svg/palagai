@@ -7,6 +7,7 @@ import {
   LIVE_TAKE_METHOD,
   LIVE_PAPER_CAPITAL,
   LIVE_PAPER_BANK_RS,
+  LIVE_PAPER_MAX_STOP_RS,
   LIVE_PAPER_STOP_RS,
   LIVE_PAPER_TARGET_RS,
   LIVE_PAPER_CRUDE_MOM_K,
@@ -893,6 +894,10 @@ describe('Live paper desk', () => {
     expect(Math.round((336.6 - (dear.sl ?? 0)) * 65)).toBe(LIVE_PAPER_STOP_RS);
     expect(Math.round(((dear.tp ?? 0) - 336.6) * 65)).toBeGreaterThan(LIVE_PAPER_TARGET_RS);
     expect(netRs(cfg, { lot: 65 }, 336.6, dear.tp!, dear.tp! - 336.6)).toBeGreaterThanOrEqual(LIVE_PAPER_BANK_RS);
+    expect(LIVE_PAPER_MAX_STOP_RS).toBe(LIVE_PAPER_STOP_RS);
+    expect(LIVE_PAPER_BOOKS.every((b) => b.maxStopRs === LIVE_PAPER_STOP_RS && b.stopRs === LIVE_PAPER_STOP_RS)).toBe(
+      true,
+    );
   });
 
   it('sits after one fill or a ₹370 bank, and does not revenge-trade', () => {

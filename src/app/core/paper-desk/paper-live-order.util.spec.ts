@@ -17,7 +17,9 @@ import {
   paperLiveExchange,
   paperLiveExitFields,
   paperLiveQuantity,
+  paperLiveSlLimitPx,
   paperLiveStopFields,
+  PAPER_LIVE_SL_LIMIT_SLIP_RS,
 } from './paper-live-order.util';
 
 describe('paper live Kite tickets', () => {
@@ -143,6 +145,9 @@ describe('paper live Kite tickets', () => {
       tag: PAPER_LIVE_SL_TAG,
     });
     expect(Number(sl['price'])).toBeLessThan(Number(sl['trigger_price']));
+    expect((Number(sl['trigger_price']) - Number(sl['price'])) * 20).toBeLessThanOrEqual(
+      PAPER_LIVE_SL_LIMIT_SLIP_RS + 1,
+    );
     const stock = paperLiveStopFields({ under: 'reliance', optionSymbol: 'RELIANCE', optionToken: 738561, lot: 50 }, 1392.6)!;
     expect(stock).toMatchObject({
       exchange: 'NSE',
@@ -160,6 +165,23 @@ describe('paper live Kite tickets', () => {
       transaction_type: 'SELL',
       tag: PAPER_LIVE_EXIT_TAG,
     });
+  });
+
+  it('caps the F&O SL limit at ₹80 extra, not 10% of premium', () => {
+    const bankTrig = 383.75;
+    const tenPctLoss = (bankTrig - bankTrig * 0.9) * 30;
+    expect(tenPctLoss).toBeGreaterThan(1100);
+    const limit = paperLiveSlLimitPx(bankTrig, 30);
+    expect((bankTrig - limit) * 30).toBeLessThanOrEqual(PAPER_LIVE_SL_LIMIT_SLIP_RS + 2);
+    const nifty = paperLiveStopFields(
+      { under: 'nifty', optionSymbol: 'NIFTY26NOV25250PE', optionToken: 11, lot: 65 },
+      165.2,
+    )!;
+    expect((165.2 - Number(nifty['price'])) * 65).toBeLessThanOrEqual(PAPER_LIVE_SL_LIMIT_SLIP_RS + 4);
+    const sensexSl = paperLiveStopFields(sensex, 626.45)!;
+    expect((Number(sensexSl['trigger_price']) - Number(sensexSl['price'])) * 20).toBeLessThanOrEqual(
+      PAPER_LIVE_SL_LIMIT_SLIP_RS + 2,
+    );
   });
 
   it('reads a Kite order id and error body', () => {

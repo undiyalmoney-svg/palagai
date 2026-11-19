@@ -25,8 +25,8 @@ import {
 import { SignalCard, SkippedSignal } from './paper-analytics.models';
 
 const ALL = (mode: string) => ({ trend: mode, range: mode, quiet: mode, stand: mode });
-/** One failed Nifty ATM cannot take more than this. 40% of a ₹300+ premium is ~₹8k — too much for a ₹14k book. */
-export const LIVE_PAPER_MAX_STOP_RS = 3_000;
+/** Hard cap on stop width. Same as the ₹370 SL — a 10% premium crash is ~₹1,400–₹3,000, not allowed. */
+export const LIVE_PAPER_MAX_STOP_RS = 370;
 /** Sit when today's closed net (after charges) is at least this. */
 export const LIVE_PAPER_BANK_RS = 370;
 /** Bank this many rupees on a win, after exact charges. */
@@ -130,6 +130,7 @@ const GREEN_DAY: Partial<LiveAssumeBookCfg> = {
   skipStructures: ['range'],
   maxTradesPerDay: 1,
   minDayNetRs: LIVE_PAPER_BANK_RS,
+  maxStopRs: LIVE_PAPER_MAX_STOP_RS,
   noConfirm: false,
 };
 
