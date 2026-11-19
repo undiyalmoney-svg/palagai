@@ -15,6 +15,7 @@ import { OrderTestComponent } from './features/dashboard/order-test/order-test.c
 import { GetTokenComponent } from './features/dashboard/get-token/get-token.component';
 import { CrudeBestComponent } from './features/dashboard/crude-best/crude-best.component';
 import { CrudeOilComponent } from './features/dashboard/crude-oil/crude-oil.component';
+import { SniperComponent } from './features/dashboard/sniper/sniper.component';
 import { SettingsComponent } from './features/dashboard/settings/settings.component';
 import { PnlRecordsComponent } from './features/dashboard/pnl-records/pnl-records.component';
 import { VaultPageComponent } from './features/dashboard/vault/vault-page.component';
@@ -93,6 +94,11 @@ export const routes: Routes = [
         path: 'crude-oil',
         canActivate: [moduleGuard('crude')],
         component: CrudeOilComponent,
+      },
+      {
+        path: 'sniper',
+        canActivate: [moduleGuard('crude')],
+        component: SniperComponent,
       },
       { path: 'momentum', redirectTo: 'get-token', pathMatch: 'prefix' },
       { path: 'research', redirectTo: 'get-token', pathMatch: 'full' },

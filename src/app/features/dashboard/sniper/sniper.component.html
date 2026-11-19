@@ -1,0 +1,193 @@
+<div class="mp-page" data-testid="sniper-page">
+  <div class="mp-card" data-testid="sniper-banner">
+    <div class="mp-card-head">
+      <div>
+        <h2>5-Minute Sniper</h2>
+        <p class="mp-sub">Four books × ₹50,000. Green 5-minute candle buys ATM CE. Red buys ATM PE. Doji skips. ₹100 max loss after Kite charges. Not Arise.</p>
+      </div>
+      <div class="mp-row">
+        <button type="button" class="ui-btn ui-btn-primary" [disabled]="startOff()" (click)="startDesk()" data-testid="sniper-start">
+          {{ sniper.busy() && !sniper.session().running ? 'Starting…' : 'Start' }}
+        </button>
+        <button type="button" class="ui-btn" [disabled]="stopOff()" (click)="stopDesk()" data-testid="sniper-stop">Stop</button>
+        <span class="mp-badge" [attr.data-tone]="sniper.session().liveArmed ? 'down' : 'info'" data-testid="sniper-badge">
+          {{ sniper.session().liveArmed ? 'Live Kite on' : sniper.session().running ? 'paper watching' : 'idle' }}
+        </span>
+      </div>
+    </div>
+    <p class="mp-sub" data-testid="sniper-honest">{{ honest }}</p>
+    @if (sniper.dropletNote()) {
+      <p class="mp-sub">{{ sniper.dropletNote() }}{{ sniper.dropletWatching() ? ' · droplet keeps this running with the tab closed.' : '' }}</p>
+    }
+    @if (sniper.session().kiteError) {
+      <p class="mp-sub mp-down">{{ sniper.session().kiteError }}</p>
+    }
+  </div>
+
+  <div class="mp-card" data-testid="sniper-modes">
+    <div class="mp-card-head">
+      <div>
+        <h2>Mode</h2>
+        <p class="mp-sub">Default is Live Paper. Real Kite needs a second confirm. Historical replay uses actual 5-minute candles and option quotes — incomplete if a quote is missing.</p>
+      </div>
+    </div>
+    <div class="mp-live-row">
+      <label class="ui-check">
+        <input type="radio" name="sniper-mode" [checked]="sniper.session().mode === 'paper'" (change)="setMode('paper')" data-testid="sniper-mode-paper" />
+        Live Paper
+      </label>
+      <label class="ui-check">
+        <input type="radio" name="sniper-mode" [checked]="sniper.session().mode === 'replay'" (change)="setMode('replay')" data-testid="sniper-mode-replay" />
+        Historical Replay
+      </label>
+      <label class="ui-check">
+        <input type="radio" name="sniper-mode" [checked]="sniper.session().mode === 'live'" (change)="sniper.session().liveArmed ? disarm() : arm()" data-testid="sniper-mode-live" />
+        Live Real (confirm)
+      </label>
+    </div>
+    @if (sniper.session().mode === 'replay') {
+      <div class="mp-row" style="margin-top: 0.75rem">
+        <input class="ui-input" type="date" [value]="replayDay()" (change)="onReplayDay($event)" data-testid="sniper-replay-day" />
+        <button type="button" class="ui-btn" (click)="runReplay()" data-testid="sniper-replay-run">Replay date</button>
+      </div>
+    }
+    @if (sniper.session().liveArmed) {
+      <p class="mp-sub mp-down" data-testid="sniper-live-warn">REAL MONEY — all four books send a MARKET buy and a ₹100 SL. Switch to Live Paper to stop sending.</p>
+    }
+  </div>
+
+  <div class="mp-stats" data-testid="sniper-summary">
+    <div class="mp-stat"><span class="mp-stat-label">Starting</span><span class="mp-stat-value">₹{{ totals().startRs | number : '1.0-0' }}</span></div>
+    <div class="mp-stat"><span class="mp-stat-label">Current capital</span><span class="mp-stat-value" [class.mp-up]="totals().netRs > 0" [class.mp-down]="totals().netRs < 0">₹{{ totals().capital | number : '1.0-0' }}</span></div>
+    <div class="mp-stat"><span class="mp-stat-label">Gross profit</span><span class="mp-stat-value mp-up">₹{{ totals().grossProfit | number : '1.0-0' }}</span></div>
+    <div class="mp-stat"><span class="mp-stat-label">Gross loss</span><span class="mp-stat-value mp-down">₹{{ totals().grossLoss | number : '1.0-0' }}</span></div>
+    <div class="mp-stat"><span class="mp-stat-label">Total charges</span><span class="mp-stat-value">₹{{ totals().totalCharges | number : '1.0-0' }}</span></div>
+    <div class="mp-stat"><span class="mp-stat-label">Net P/L</span><span class="mp-stat-value" [class.mp-up]="totals().netRs > 0" [class.mp-down]="totals().netRs < 0" data-testid="sniper-net">₹{{ totals().netRs | number : '1.0-0' }}</span></div>
+    <div class="mp-stat"><span class="mp-stat-label">Trades</span><span class="mp-stat-value">{{ totals().trades }}</span></div>
+    <div class="mp-stat"><span class="mp-stat-label">Wins</span><span class="mp-stat-value mp-up">{{ totals().wins }}</span></div>
+    <div class="mp-stat"><span class="mp-stat-label">Losses</span><span class="mp-stat-value mp-down">{{ totals().losses }}</span></div>
+    <div class="mp-stat"><span class="mp-stat-label">Win rate</span><span class="mp-stat-value">{{ totals().winRate | number : '1.0-0' }}%</span></div>
+  </div>
+
+  <div class="mp-stats">
+    <div class="mp-stat"><span class="mp-stat-label">Max profit / trade</span><span class="mp-stat-value mp-up">₹{{ totals().maxWin | number : '1.0-0' }}</span></div>
+    <div class="mp-stat"><span class="mp-stat-label">Max loss / trade</span><span class="mp-stat-value mp-down">₹{{ totals().maxLoss | number : '1.0-0' }}</span></div>
+    <div class="mp-stat"><span class="mp-stat-label">Highest capital</span><span class="mp-stat-value">₹{{ totals().highCapital | number : '1.0-0' }}</span></div>
+    <div class="mp-stat"><span class="mp-stat-label">Lowest capital</span><span class="mp-stat-value">₹{{ totals().lowCapital | number : '1.0-0' }}</span></div>
+    <div class="mp-stat"><span class="mp-stat-label">Max drawdown</span><span class="mp-stat-value mp-down">₹{{ totals().maxDrawdown | number : '1.0-0' }}</span></div>
+    <div class="mp-stat"><span class="mp-stat-label">Max win streak</span><span class="mp-stat-value">{{ totals().streakWin }}</span></div>
+    <div class="mp-stat"><span class="mp-stat-label">Max loss streak</span><span class="mp-stat-value">{{ totals().streakLoss }}</span></div>
+    <div class="mp-stat"><span class="mp-stat-label">Best interval</span><span class="mp-stat-value">{{ totals().bestSlot }}</span></div>
+    <div class="mp-stat"><span class="mp-stat-label">Worst interval</span><span class="mp-stat-value">{{ totals().worstSlot }}</span></div>
+  </div>
+
+  <div class="mp-grid">
+    @for (b of sniper.session().books; track b.id) {
+      <div class="mp-card mp-col-6" [attr.data-testid]="'sniper-book-' + b.id">
+        <div class="mp-card-head">
+          <div>
+            <h2>{{ b.label }}</h2>
+            <p class="mp-sub">{{ b.id === 'crude' ? 'MCX · 09:05–23:25 IST' : '09:20–15:25 IST' }} · ₹50,000 · max loss ₹100</p>
+          </div>
+          <span class="mp-stat-value" [class.mp-up]="b.capital > startRs" [class.mp-down]="b.capital < startRs">₹{{ b.capital | number : '1.0-0' }}</span>
+        </div>
+        <p class="mp-sub">{{ b.reason || 'waiting' }}</p>
+        <div class="mp-hunt-kv"><span>Candle / next</span><strong>{{ b.dir || '—' }} {{ b.optionType || '' }}</strong></div>
+        <div class="mp-hunt-kv"><span>ATM</span><strong>{{ b.optionSymbol || '—' }}</strong></div>
+        <div class="mp-hunt-kv"><span>Entry / last</span><strong>{{ b.entry != null ? (b.entry | number : '1.0-2') : '—' }} / {{ b.last != null ? (b.last | number : '1.0-2') : '—' }}</strong></div>
+        <div class="mp-hunt-kv"><span>Unrealized net</span><strong [class.mp-up]="b.liveRs > 0" [class.mp-down]="b.liveRs < 0">{{ b.side === 'flat' ? '—' : ('₹' + (b.liveRs | number : '1.0-0')) }}</strong></div>
+        <div class="mp-hunt-kv"><span>Hold left / SL</span><strong>{{ b.side === 'long' ? remain(b) + 'm' : '—' }} / {{ b.sl != null ? (b.sl | number : '1.0-2') : '—' }}</strong></div>
+        @if (b.kiteNote) {
+          <p class="mp-sub">{{ b.kiteNote }}</p>
+        }
+      </div>
+    }
+  </div>
+
+  <div class="mp-card">
+    <div class="mp-card-head">
+      <div>
+        <h2>Net capital (after charges)</h2>
+        <p class="mp-sub">One line per book. Gross is never the headline.</p>
+      </div>
+    </div>
+    <div class="sniper-charts">
+      @for (row of equity(); track row.id) {
+        <div>
+          <p class="mp-small">{{ row.label }}</p>
+          <svg viewBox="0 0 220 64" width="220" height="64" aria-hidden="true">
+            <path [attr.d]="spark(row.pts)" fill="none" stroke="currentColor" stroke-width="1.6" />
+          </svg>
+        </div>
+      }
+    </div>
+  </div>
+
+  <div class="mp-card" data-testid="sniper-fills">
+    <div class="mp-card-head">
+      <div>
+        <h2>Trade history</h2>
+        <p class="mp-sub">Net P/L after brokerage, STT/CTT, exchange, SEBI, stamp, IPFT and GST. Not a guaranteed profit.</p>
+      </div>
+      <button type="button" class="ui-btn" (click)="copyReport()" data-testid="sniper-copy-report">
+        {{ copied() === 'ok' ? 'Copied' : 'Copy session report' }}
+      </button>
+    </div>
+    @if (!fills().length) {
+      <p class="mp-sub" data-testid="sniper-fills-empty">No sniper fill yet.</p>
+    } @else {
+      <div class="mp-table-wrap sniper-table">
+        <table class="mp-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>In</th>
+              <th>Out</th>
+              <th>Under O/C</th>
+              <th>Dir</th>
+              <th>Contract</th>
+              <th class="num">Entry</th>
+              <th class="num">Exit</th>
+              <th class="num">Qty</th>
+              <th class="num">Gross</th>
+              <th class="num">Brk</th>
+              <th class="num">STT</th>
+              <th class="num">Exch</th>
+              <th class="num">GST</th>
+              <th class="num">Stamp</th>
+              <th class="num">Charges</th>
+              <th class="num">Net</th>
+              <th class="num">Capital</th>
+              <th>Why</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (f of fills(); track f.under + f.n + f.entryAt) {
+              <tr [class.mp-up]="f.netRs > 0" [class.mp-down]="f.netRs < 0">
+                <td>{{ f.n }}</td>
+                <td>{{ clock(f.entryAt) }}</td>
+                <td>{{ clock(f.exitAt) }}</td>
+                <td>{{ f.underOpen | number : '1.0-1' }} / {{ f.underClose | number : '1.0-1' }}</td>
+                <td>{{ f.dir }} {{ f.optionType }}</td>
+                <td>{{ f.optionSymbol }}</td>
+                <td class="num">{{ f.entry | number : '1.0-2' }}</td>
+                <td class="num">{{ f.exit | number : '1.0-2' }}</td>
+                <td class="num">{{ f.qty }}</td>
+                <td class="num">{{ f.grossRs | number : '1.0-0' }}</td>
+                <td class="num">{{ f.charges.brokerage | number : '1.0-1' }}</td>
+                <td class="num">{{ f.charges.stt | number : '1.0-1' }}</td>
+                <td class="num">{{ f.charges.exchange | number : '1.0-1' }}</td>
+                <td class="num">{{ f.charges.gst | number : '1.0-1' }}</td>
+                <td class="num">{{ f.charges.stamp | number : '1.0-1' }}</td>
+                <td class="num">{{ f.charges.total | number : '1.0-1' }}</td>
+                <td class="num">{{ f.netRs | number : '1.0-0' }}</td>
+                <td class="num">{{ f.capitalAfter | number : '1.0-0' }}</td>
+                <td>{{ f.reason }}{{ f.incomplete ? ' · incomplete' : '' }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </div>
+</div>
