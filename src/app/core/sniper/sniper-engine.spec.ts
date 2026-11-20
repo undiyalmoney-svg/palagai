@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { optionChargeBreakdown } from '../paper-desk/option-charges.util';
 import { sniperCharges, sniperNetRs } from './sniper-charges';
 import { completedSniperBars, sniperCfg, sniperSlotStarts } from './sniper-clock';
-import { candleDir, emptySniperBook, tickSniperBook } from './sniper-engine';
+import { candleDir, emptySniperBook, emptySniperSession, summarizeSniper, tickSniperBook } from './sniper-engine';
 import { SNIPER_BOOKS, SNIPER_CAPITAL_RS, SniperBar, SniperPick } from './sniper.models';
 import { sniperSize } from './sniper-size';
 
@@ -190,6 +190,16 @@ describe('5-Minute Sniper engine', () => {
     expect(ok.lots).toBeGreaterThan(0);
     expect(ok.sl).toBeLessThan(101);
     expect(ok.sl).toBeGreaterThan(0);
+  });
+
+  it('keeps ticked books when summarizing a tick', () => {
+    const idle = emptySniperSession('2026-11-20');
+    const ticked = idle.books.map((b, i) => (i === 0 ? { ...b, side: 'long' as const, reason: 'green CE 25000', qty: 65 } : b));
+    const out = summarizeSniper(idle, { books: ticked, source: 'kite', running: true });
+    expect(out.books[0].side).toBe('long');
+    expect(out.books[0].reason).toMatch(/green CE/);
+    expect(out.source).toBe('kite');
+    expect(out.running).toBe(true);
   });
 
   it('breaks Kite charges into brokerage, STT, exchange, GST and stamp', () => {
