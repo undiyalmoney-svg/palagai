@@ -1,6 +1,6 @@
 /**
  * 5-Minute Sniper — independent of Arise. Four books, ₹50,000 each.
- * Green 5m candle → ATM CE. Red → ATM PE. Doji skips. ₹100 max loss.
+ * Fade the previous 5m candle: green → ATM PE, red → ATM CE. Doji skips. ₹100 max loss.
  * Not a guaranteed profit.
  */
 import { ChargeVenue } from '../paper-desk/option-charges.util';
@@ -204,7 +204,7 @@ export interface SniperSession {
 }
 
 export const SNIPER_HONEST =
-  '5-Minute Sniper is an experiment, not Arise. Previous completed 5-minute candle: green buys ATM CE, red buys ATM PE, doji skips. ' +
+  '5-Minute Sniper is an experiment, not Arise. Fade the previous completed 5-minute candle: green buys ATM PE, red buys ATM CE, doji skips. ' +
   'Each of Nifty 50, Bank Nifty, Sensex and Crude Mini starts at ₹50,000. Max loss ₹100 per ticket after Kite charges. ' +
   'Index 09:20–15:25 IST. Crude Mini 09:05–23:25 IST on MCX. Paper records on the droplet with the tab closed. ' +
   'Live Kite needs an extra confirm. Not a guaranteed profit.';

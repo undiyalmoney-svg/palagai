@@ -137,7 +137,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     },
     '/dashboard/sniper': {
       title: '5-Minute Sniper',
-      subtitle: 'Previous 5-minute candle: green ATM CE, red ATM PE. Four books × ₹50,000. ₹100 max loss after Kite charges. Paper runs on the droplet with the tab closed. Not Arise. Not a guaranteed profit.',
+      subtitle: 'Fade the previous 5-minute candle: green ATM PE, red ATM CE. Four books × ₹50,000. ₹100 max loss after Kite charges. Paper runs on the droplet with the tab closed. Not Arise. Not a guaranteed profit.',
     },
     '/dashboard/settings': {
       title: 'Settings',
