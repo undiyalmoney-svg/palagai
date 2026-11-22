@@ -35,6 +35,13 @@ export function candleDir(bar: SniperBar): SniperDir {
   return 'doji';
 }
 
+/** Last 5m candle up → buy the put. Last 5m down → buy the call. Doji has no side. */
+export function sniperFadeType(dir: SniperDir): 'CE' | 'PE' | null {
+  if (dir === 'green') return 'PE';
+  if (dir === 'red') return 'CE';
+  return null;
+}
+
 export function emptySniperBook(cfg: SniperBookCfg, capital = SNIPER_CAPITAL_RS): SniperBookState {
   return {
     id: cfg.id,
@@ -277,7 +284,8 @@ export function tickSniperBook(
     return skip(next, slot, nowIso, `skipped: no completed candle at ${hhmm(prevMin)}`);
   }
   const dir = candleDir(candle);
-  if (dir === 'doji') {
+  const fade = sniperFadeType(dir);
+  if (dir === 'doji' || !fade) {
     return skip(next, slot, nowIso, `skipped: doji at ${hhmm(prevMin)}`);
   }
   if (spot == null || !(spot > 0)) {
@@ -285,6 +293,9 @@ export function tickSniperBook(
   }
   if (!pick || !pick.listed || !pick.optionSymbol) {
     return skip(next, slot, nowIso, 'skipped: no listed ATM');
+  }
+  if (pick.optionType !== fade) {
+    return skip(next, slot, nowIso, `skipped: need fade ${fade} not ${pick.optionType}`);
   }
   const fillPx = ask ?? last;
   if (fillPx == null || !(fillPx > 0)) {
@@ -315,7 +326,7 @@ export function tickSniperBook(
   next.entryAsk = ask;
   next.last = fillPx;
   next.status = 'open';
-  next.reason = `${dir} ${pick.optionType} ${pick.strike} · hold to ${hhmm(slot + SNIPER_BAR_MIN)}`;
+  next.reason = `${dir} fade ${pick.optionType} ${pick.strike} · hold to ${hhmm(slot + SNIPER_BAR_MIN)}`;
   next.exception = false;
   markBook(next, fillPx, cfg.venue);
   return next;

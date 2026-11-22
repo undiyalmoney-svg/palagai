@@ -26,6 +26,8 @@ describe('SniperComponent', () => {
     expect(text).toMatch(/Sensex/);
     expect(text).toMatch(/Crude Mini/);
     expect(text).toMatch(/₹50,000/);
+    expect(text).toMatch(/green buys ATM PE/);
+    expect(text).toMatch(/red buys ATM CE/);
     expect(text).toMatch(/Live Paper/);
     expect(text).not.toMatch(/mom 0\.8× skip range/);
     expect(text).not.toMatch(/Daily ₹370/);

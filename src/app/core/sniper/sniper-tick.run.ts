@@ -1,6 +1,6 @@
 /**
- * One Sniper tick: completed 5-minute underlying candles, ATM CE/PE, bind, mark.
- * No Angular. Live Kite overlay is applied by the tab or droplet after this.
+ * One Sniper tick: completed 5-minute underlying candles, fade ATM CE/PE, bind, mark.
+ * Green 5m → ATM PE. Red 5m → ATM CE. No Angular. Live Kite overlay is after this.
  */
 import { Instrument } from '../models/instrument.model';
 import { kiteBar } from '../paper-desk/kite-bar.util';
@@ -16,7 +16,7 @@ import {
   SniperUnder,
 } from './sniper.models';
 import { barAt, completedSniperBars, sniperIstDay, sniperIstMinutes, sniperPrevCandleMin } from './sniper-clock';
-import { candleDir, emptySniperSession, summarizeSniper, tickSniperBook } from './sniper-engine';
+import { candleDir, emptySniperSession, sniperFadeType, summarizeSniper, tickSniperBook } from './sniper-engine';
 
 export type SniperTickQuote = {
   last_price?: number;
@@ -164,14 +164,14 @@ async function load5m(
 function atmPick(
   chain: Instrument[],
   cfg: SniperBookCfg,
-  dir: 'green' | 'red',
+  optionType: 'CE' | 'PE',
   spot: number,
   asOf: Date,
 ): SniperPick | null {
   const picked = pickCheapOtm({
     instruments: chain,
     book: cfg.id,
-    direction: dir === 'green' ? 'BUY' : 'SELL',
+    direction: optionType === 'CE' ? 'BUY' : 'SELL',
     spot,
     asOf,
     premiumBudgetRs: 10_000_000,
@@ -233,16 +233,14 @@ export async function runSniperTick(io: SniperTickIo): Promise<SniperSession> {
     const book = raw.books.find((b) => b.id === cfg.id);
     const bars = completedSniperBars(barsBy.get(cfg.id) || [], day, nowMin);
     const signal = barAt(bars, day, sniperPrevCandleMin(cfg, nowMin));
-    const dir =
-      book?.side === 'long' && book.optionType
-        ? book.optionType === 'CE'
-          ? 'green'
-          : 'red'
+    const fadeType =
+      book?.side === 'long' && (book.optionType === 'CE' || book.optionType === 'PE')
+        ? book.optionType
         : signal
-          ? candleDir(signal)
+          ? sniperFadeType(candleDir(signal))
           : null;
-    if (spot && dir && dir !== 'doji') {
-      const pick = atmPick(chain, cfg, dir, spot, now);
+    if (spot && fadeType) {
+      const pick = atmPick(chain, cfg, fadeType, spot, now);
       picks.set(cfg.id, pick);
       if (pick?.listed) extra.push(optionKey(cfg.exchange, pick.optionSymbol));
     } else {
