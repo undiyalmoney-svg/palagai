@@ -122,6 +122,15 @@ function skip(book: SniperBookState, min: number, at: string, reason: string): S
   };
 }
 
+/** Tape/quotes not ready — show the reason, do not burn the 5-minute slot. */
+function wait(book: SniperBookState, reason: string): SniperBookState {
+  return {
+    ...book,
+    status: 'watching',
+    reason,
+  };
+}
+
 function closeFill(
   book: SniperBookState,
   cfg: SniperBookCfg,
@@ -281,7 +290,7 @@ export function tickSniperBook(
   const prevMin = sniperPrevCandleMin(cfg, nowMin);
   const candle = barAt(done, day, prevMin);
   if (!candle) {
-    return skip(next, slot, nowIso, `skipped: no completed candle at ${hhmm(prevMin)}`);
+    return wait(next, `waiting completed candle at ${hhmm(prevMin)}`);
   }
   const dir = candleDir(candle);
   const fade = sniperFadeType(dir);
@@ -289,21 +298,21 @@ export function tickSniperBook(
     return skip(next, slot, nowIso, `skipped: doji at ${hhmm(prevMin)}`);
   }
   if (spot == null || !(spot > 0)) {
-    return skip(next, slot, nowIso, 'skipped: no spot');
+    return wait(next, 'waiting spot');
   }
   if (!pick || !pick.listed || !pick.optionSymbol) {
-    return skip(next, slot, nowIso, 'skipped: no listed ATM');
+    return wait(next, 'waiting listed ATM');
   }
   if (pick.optionType !== fade) {
-    return skip(next, slot, nowIso, `skipped: need fade ${fade} not ${pick.optionType}`);
+    return wait(next, `waiting fade ${fade} not ${pick.optionType}`);
   }
   const fillPx = ask ?? last;
   if (fillPx == null || !(fillPx > 0)) {
-    return skip(next, slot, nowIso, 'skipped: no option quote');
+    return wait(next, 'waiting option quote');
   }
   const size = sniperSize(next.capital, fillPx, pick.lotSize, cfg.venue);
   if (!size.lots) {
-    return skip(next, slot, nowIso, `skipped: ${size.skip}`);
+    return wait(next, `waiting size: ${size.skip}`);
   }
   next.side = 'long';
   next.dir = dir;
@@ -358,7 +367,11 @@ export function summarizeSniper(session: SniperSession, patch: Partial<SniperSes
     ...patch,
     books,
     honest: SNIPER_HONEST,
-    incomplete: books.some((b) => b.fills.some((f) => f.incomplete) || /no completed candle|no listed ATM|no option quote/.test(b.reason)),
+    incomplete: books.some(
+      (b) =>
+        b.fills.some((f) => f.incomplete) ||
+        /waiting completed candle|waiting listed ATM|waiting option quote|waiting spot/.test(b.reason),
+    ),
   };
 }
 

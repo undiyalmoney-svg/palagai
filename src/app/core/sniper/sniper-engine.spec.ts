@@ -50,6 +50,55 @@ describe('5-Minute Sniper engine', () => {
     expect(next.reason).toMatch(/waiting first candle/);
   });
 
+  it('retries the 09:20 slot when the 09:15 candle is not on the tape yet', () => {
+    const cfg = sniperCfg('nifty');
+    const waiting = tickSniperBook(
+      emptySniperBook(cfg),
+      cfg,
+      [],
+      '2026-11-19',
+      9 * 60 + 20,
+      '2026-11-19T03:50:00.000Z',
+      24020,
+      { bid: 100, ask: 101, last: 100.5 },
+      pick('PE'),
+    );
+    expect(waiting.side).toBe('flat');
+    expect(waiting.skips).toHaveLength(0);
+    expect(waiting.reason).toMatch(/waiting completed candle/);
+    const next = tickSniperBook(
+      waiting,
+      cfg,
+      [bar('2026-11-19', 555, 24000, 24020)],
+      '2026-11-19',
+      9 * 60 + 20,
+      '2026-11-19T03:50:08.000Z',
+      24020,
+      { bid: 100, ask: 101, last: 100.5 },
+      pick('PE'),
+    );
+    expect(next.side).toBe('long');
+    expect(next.optionType).toBe('PE');
+  });
+
+  it('retries when Kite has no ATM yet instead of burning the slot', () => {
+    const cfg = sniperCfg('nifty');
+    const waiting = tickSniperBook(
+      emptySniperBook(cfg),
+      cfg,
+      [bar('2026-11-19', 555, 24000, 24020)],
+      '2026-11-19',
+      9 * 60 + 20,
+      '2026-11-19T03:50:00.000Z',
+      24020,
+      { bid: 100, ask: 101, last: 100.5 },
+      { ...pick('PE'), listed: false, optionSymbol: '' },
+    );
+    expect(waiting.side).toBe('flat');
+    expect(waiting.skips).toHaveLength(0);
+    expect(waiting.reason).toMatch(/waiting listed ATM/);
+  });
+
   it('buys ATM PE on a completed green candle at 09:20', () => {
     const cfg = sniperCfg('nifty');
     const book = emptySniperBook(cfg);
@@ -86,7 +135,8 @@ describe('5-Minute Sniper engine', () => {
       pick('CE'),
     );
     expect(next.side).toBe('flat');
-    expect(next.reason).toMatch(/need fade PE not CE/);
+    expect(next.skips).toHaveLength(0);
+    expect(next.reason).toMatch(/waiting fade PE not CE/);
   });
 
   it('buys ATM CE on a completed red candle at 09:20', () => {
