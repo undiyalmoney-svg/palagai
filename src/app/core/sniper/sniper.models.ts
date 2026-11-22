@@ -13,8 +13,8 @@ export type SniperExit = 'sl' | 'time' | 'eod' | 'exception';
 export const SNIPER_CAPITAL_RS = 50_000;
 export const SNIPER_MAX_LOSS_RS = 100;
 export const SNIPER_BAR_MIN = 5;
-/** Missed the open of this 5-minute slot — do not catch up. */
-export const SNIPER_ENTRY_GRACE_MIN = 1;
+/** Missed the open of this 5-minute slot — do not catch up. Two minutes so the first Kite dump can land. */
+export const SNIPER_ENTRY_GRACE_MIN = 2;
 export const SNIPER_TICK_RS = 0.05;
 /** Circuit: no new tickets if a book is down half its bank. */
 export const SNIPER_DAY_FLOOR_RS = 25_000;
