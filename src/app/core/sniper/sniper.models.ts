@@ -1,23 +1,57 @@
 /**
- * 5-Minute Sniper — independent of Arise. Four books, ₹50,000 each.
- * Fade the previous 5m candle: green → ATM PE, red → ATM CE. Doji skips. ₹100 max loss.
- * Not a guaranteed profit.
+ * Sniper — independent of Arise.
+ * Nifty 50, Bank Nifty, Sensex. First 15-min ORB. First 5m close that cuts the range.
+ * Strong red → entry at that high. One trade. SL ₹750 default. Target ₹1000.
  */
 import { ChargeVenue } from '../paper-desk/option-charges.util';
 
-export type SniperUnder = 'nifty' | 'bank' | 'sensex' | 'crude';
-export type SniperMode = 'replay' | 'paper' | 'live';
+export type SniperUnder = 'nifty' | 'bank' | 'sensex';
+export type SniperMode = 'paper' | 'live';
 export type SniperDir = 'green' | 'red' | 'doji';
-export type SniperExit = 'sl' | 'time' | 'eod' | 'exception';
+export type SniperBreak = 'up' | 'down' | '';
+export type SniperExit = 'sl' | 'tp' | 'eod' | 'exception';
+export type SniperEvent =
+  | 'watching'
+  | 'orb_break'
+  | 'breakout_candle'
+  | 'found_entry'
+  | 'trade_taken'
+  | 'trade_closed'
+  | 'parked'
+  | 'off';
 
-export const SNIPER_CAPITAL_RS = 50_000;
-export const SNIPER_MAX_LOSS_RS = 100;
+export const SNIPER_EVENT_STEPS = [
+  { id: 'orb_break', label: 'ORB break' },
+  { id: 'breakout_candle', label: 'Breakout candle' },
+  { id: 'found_entry', label: 'Entry' },
+  { id: 'trade_taken', label: 'Trade taken' },
+  { id: 'trade_closed', label: 'Trade closed' },
+] as const;
+
+const EVENT_RANK: Record<SniperEvent, number> = {
+  off: 0,
+  watching: 0,
+  parked: 0,
+  orb_break: 1,
+  breakout_candle: 2,
+  found_entry: 3,
+  trade_taken: 4,
+  trade_closed: 5,
+};
+
+export function sniperEventRank(event: SniperEvent | '' | undefined): number {
+  return EVENT_RANK[(event || 'watching') as SniperEvent] ?? 0;
+}
+
+export const SNIPER_STOP_RS = 750;
+export const SNIPER_TARGET_RS = 1000;
+export const SNIPER_DEFAULT_LOTS = 1;
 export const SNIPER_BAR_MIN = 5;
-/** Missed the open of this 5-minute slot — do not catch up. Two minutes so the first Kite dump can land. */
-export const SNIPER_ENTRY_GRACE_MIN = 2;
+export const SNIPER_OR_MIN = 15;
+export const SNIPER_OPEN_MIN = 9 * 60 + 15;
+export const SNIPER_OR_END_MIN = 9 * 60 + 30;
 export const SNIPER_TICK_RS = 0.05;
-/** Circuit: no new tickets if a book is down half its bank. */
-export const SNIPER_DAY_FLOOR_RS = 25_000;
+export const SNIPER_STRONG_RED = 0.6;
 
 export interface SniperBookCfg {
   id: SniperUnder;
@@ -26,17 +60,17 @@ export interface SniperBookCfg {
   lastEntryMin: number;
   flatMin: number;
   venue: ChargeVenue;
-  exchange: 'NFO' | 'BFO' | 'MCX';
+  exchange: 'NFO' | 'BFO';
   underNames: string[];
-  underExchange: 'NSE' | 'BSE' | 'MCX';
+  underExchange: 'NSE' | 'BSE';
 }
 
 export const SNIPER_BOOKS: SniperBookCfg[] = [
   {
     id: 'nifty',
     label: 'Nifty 50',
-    openMin: 9 * 60 + 15,
-    lastEntryMin: 15 * 60 + 25,
+    openMin: SNIPER_OPEN_MIN,
+    lastEntryMin: 15 * 60 + 15,
     flatMin: 15 * 60 + 30,
     venue: 'NSE',
     exchange: 'NFO',
@@ -46,8 +80,8 @@ export const SNIPER_BOOKS: SniperBookCfg[] = [
   {
     id: 'bank',
     label: 'Bank Nifty',
-    openMin: 9 * 60 + 15,
-    lastEntryMin: 15 * 60 + 25,
+    openMin: SNIPER_OPEN_MIN,
+    lastEntryMin: 15 * 60 + 15,
     flatMin: 15 * 60 + 30,
     venue: 'NSE',
     exchange: 'NFO',
@@ -57,24 +91,13 @@ export const SNIPER_BOOKS: SniperBookCfg[] = [
   {
     id: 'sensex',
     label: 'Sensex',
-    openMin: 9 * 60 + 15,
-    lastEntryMin: 15 * 60 + 25,
+    openMin: SNIPER_OPEN_MIN,
+    lastEntryMin: 15 * 60 + 15,
     flatMin: 15 * 60 + 30,
     venue: 'BSE',
     exchange: 'BFO',
     underNames: ['SENSEX'],
     underExchange: 'BSE',
-  },
-  {
-    id: 'crude',
-    label: 'Crude Mini',
-    openMin: 9 * 60,
-    lastEntryMin: 23 * 60 + 25,
-    flatMin: 23 * 60 + 30,
-    venue: 'MCX',
-    exchange: 'MCX',
-    underNames: ['CRUDEOILM'],
-    underExchange: 'MCX',
   },
 ];
 
@@ -124,6 +147,7 @@ export interface SniperFill {
   underOpen: number;
   underClose: number;
   dir: SniperDir;
+  breakDir: SniperBreak;
   optionType: 'CE' | 'PE';
   strike: number;
   expiry: string;
@@ -153,11 +177,21 @@ export interface SniperSkip {
 export interface SniperBookState {
   id: SniperUnder;
   label: string;
+  watch: boolean;
+  orHigh: number | null;
+  orLow: number | null;
+  orReady: boolean;
+  cut: SniperBreak;
+  cutMin: number | null;
+  cutColor: SniperDir | '';
+  event: SniperEvent;
+  bars: SniperBar[];
   capital: number;
   peakCapital: number;
   troughCapital: number;
   side: 'flat' | 'long';
   dir: SniperDir | '';
+  breakDir: SniperBreak;
   optionType: 'CE' | 'PE' | '';
   strike: number | null;
   expiry: string;
@@ -168,6 +202,10 @@ export interface SniperBookState {
   qty: number;
   entry: number | null;
   sl: number | null;
+  tp: number | null;
+  stopRs: number | null;
+  indexSl: number | null;
+  redHigh: number | null;
   entryMin: number | null;
   entryAt: string;
   intervalEnd: number | null;
@@ -192,7 +230,12 @@ export interface SniperSession {
   day: string;
   running: boolean;
   mode: SniperMode;
+  paperOn: boolean;
   liveArmed: boolean;
+  lots: number;
+  stopRs: number;
+  targetRs: number;
+  selected: SniperUnder | '';
   replayDay: string;
   startedAt: string;
   asOf: string;
@@ -203,8 +246,4 @@ export interface SniperSession {
   incomplete: boolean;
 }
 
-export const SNIPER_HONEST =
-  '5-Minute Sniper is an experiment, not Arise. Fade the previous completed 5-minute candle: green buys ATM PE, red buys ATM CE, doji skips. ' +
-  'Each of Nifty 50, Bank Nifty, Sensex and Crude Mini starts at ₹50,000. Max loss ₹100 per ticket after Kite charges. ' +
-  'Index 09:20–15:25 IST. Crude Mini 09:05–23:25 IST on MCX. Paper records on the droplet with the tab closed. ' +
-  'Live Kite needs an extra confirm. Not a guaranteed profit.';
+export const SNIPER_HONEST = 'Sniper. First ORB cut. One trade. Token on the Token page.';

@@ -1,4 +1,12 @@
-import { SNIPER_BAR_MIN, SNIPER_BOOKS, SniperBar, SniperBookCfg, SniperUnder } from './sniper.models';
+import {
+  SNIPER_BAR_MIN,
+  SNIPER_BOOKS,
+  SNIPER_OPEN_MIN,
+  SNIPER_OR_END_MIN,
+  SniperBar,
+  SniperBookCfg,
+  SniperUnder,
+} from './sniper.models';
 
 export function sniperIstDay(d = new Date()): string {
   const ist = new Date(d.getTime() + 330 * 60 * 1000);
@@ -27,28 +35,6 @@ export function sniperCfg(id: SniperUnder): SniperBookCfg {
   return SNIPER_BOOKS.find((b) => b.id === id) || SNIPER_BOOKS[0];
 }
 
-/** Entry minutes: first trade is the second 5-minute slot (after the opening signal candle). */
-export function sniperSlotStarts(cfg: SniperBookCfg): number[] {
-  const out: number[] = [];
-  for (let m = cfg.openMin + SNIPER_BAR_MIN; m <= cfg.lastEntryMin; m += SNIPER_BAR_MIN) out.push(m);
-  return out;
-}
-
-export function sniperIntervalStart(cfg: SniperBookCfg, nowMin: number): number {
-  if (nowMin < cfg.openMin + SNIPER_BAR_MIN) return cfg.openMin;
-  const steps = Math.floor((nowMin - cfg.openMin) / SNIPER_BAR_MIN);
-  return cfg.openMin + steps * SNIPER_BAR_MIN;
-}
-
-export function sniperPrevCandleMin(cfg: SniperBookCfg, nowMin: number): number {
-  return sniperIntervalStart(cfg, nowMin) - SNIPER_BAR_MIN;
-}
-
-export function sniperRemainingMin(cfg: SniperBookCfg, nowMin: number): number {
-  const end = sniperIntervalStart(cfg, nowMin) + SNIPER_BAR_MIN;
-  return Math.max(0, end - nowMin);
-}
-
 export function hhmm(min: number): string {
   const h = Math.floor(min / 60);
   const m = min % 60;
@@ -61,4 +47,12 @@ export function completedSniperBars(bars: SniperBar[], day: string, nowMin: numb
 
 export function barAt(bars: SniperBar[], day: string, min: number): SniperBar | null {
   return bars.find((b) => b.day === day && b.min === min) || null;
+}
+
+export function sniperOrBars(bars: SniperBar[], day: string): SniperBar[] {
+  return bars.filter((b) => b.day === day && b.min >= SNIPER_OPEN_MIN && b.min < SNIPER_OR_END_MIN);
+}
+
+export function sniperOrbReady(nowMin: number): boolean {
+  return nowMin >= SNIPER_OR_END_MIN;
 }
