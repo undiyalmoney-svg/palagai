@@ -106,7 +106,9 @@ describe('paper hunt methods', () => {
     const dumped = tickBook(peaked, cfg, [], 88, '2026-11-16', 10 * 60 + 8, 'NIFTY', [], { bid: 88, ask: 89 });
     expect(dumped.side).toBe('flat');
     expect(dumped.fills[0].maxPx).toBe(140);
-    expect(dumped.fills[0].minPx).toBeLessThanOrEqual(90);
+    expect(dumped.fills[0].exit).toBeCloseTo(100 - 370 / 65, 2);
+    expect(dumped.fills[0].minPx).toBe(dumped.fills[0].exit);
+    expect(dumped.fills[0].rs).toBeGreaterThan(-800);
     expect((dumped.fills[0].mfeRs || 0) > (dumped.fills[0].rs || 0)).toBe(true);
     expect((dumped.fills[0].maeRs || 0) <= dumped.fills[0].rs).toBe(true);
   });

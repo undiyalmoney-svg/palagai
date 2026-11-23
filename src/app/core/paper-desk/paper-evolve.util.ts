@@ -51,7 +51,7 @@ export const PAPER_JUDGE_PATCHES: PaperJudgePatch[] = [
   {
     id: PAPER_PATCH_BID_THROUGH,
     change:
-      'In tickBook, do not let barsHandleExit skip the 8s hitExit when the live bid is already through SL, scratch, or TP. Keep tooSoon and the fill-minute skip.',
+      'In tickBook, do not let barsHandleExit or tooSoon skip the 8s hitExit when the live bid is already through SL, scratch, or TP. Fill the option SL at the written ₹370 level, not the crashed bid.',
     evidence: THROUGH_SL,
   },
   {
