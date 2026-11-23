@@ -135,7 +135,7 @@ function judgeOf(fills: PaperReviewFill[]): Pick<PaperAgent, 'body' | 'changeId'
   const same = fillsSamePoll(fills);
   if (through.length) {
     const change =
-      'In tickBook, do not let barsHandleExit skip the 8s hitExit when the live bid is already through SL, scratch, or TP. Keep tooSoon and the fill-minute skip. A lagged 1-min option candle must not block a bid that is already through the stop.';
+      'In tickBook, do not let barsHandleExit or tooSoon skip the 8s hitExit when the live bid is already through SL, scratch, or TP. Fill the option SL at the written ₹370 level, not the crashed bid. A lagged 1-min option candle must not block a bid that is already through the stop.';
     const why = same
       ? ` ${through.length} books stopped on the same poll, sold through the SL. That is a lagged candle, not two independent hits.`
       : ' The fill sold through the written SL. The live bid was not checked while option candles lagged.';

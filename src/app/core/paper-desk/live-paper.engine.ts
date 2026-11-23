@@ -720,9 +720,30 @@ export function optionBoundStops(
   lot: number,
   rangePts: number | null = null,
 ): { sl: number; tp: number } {
-  if (cfg.stopRs != null && cfg.targetRs != null && lot > 0) return optionRupeeStopPts(cfg, lot);
-  if (cfg.stopPct != null && cfg.targetPct != null) return optionPctStopPts(cfg, prem, lot);
-  return optionStopPts(cfg, rangePts);
+  const r = (n: number) => Math.round(n * 100) / 100;
+  const stop =
+    cfg.stopRs != null && cfg.targetRs != null && lot > 0
+      ? optionRupeeStopPts(cfg, lot)
+      : cfg.stopPct != null && cfg.targetPct != null
+        ? optionPctStopPts(cfg, prem, lot)
+        : optionStopPts(cfg, rangePts);
+  const cap = cfg.maxStopRs ?? cfg.stopRs ?? LIVE_PAPER_STOP_RS;
+  if (lot > 0 && cap > 0 && stop.sl > cap / lot) return { sl: r(cap / lot), tp: stop.tp };
+  return stop;
+}
+
+/** Never let an option SL sit wider than the ₹370 rupee cap (Bank 23 Nov wrote 50 pts = ₹1,500). */
+export function optionCappedSl(
+  cfg: LiveAssumeBookCfg,
+  entry: number,
+  lot: number,
+  written: number | null | undefined,
+): number {
+  const r = (n: number) => Math.round(n * 100) / 100;
+  const cap = cfg.maxStopRs ?? cfg.stopRs ?? LIVE_PAPER_STOP_RS;
+  const floor = lot > 0 && cap > 0 ? r(entry - cap / lot) : written ?? 0.05;
+  const sl = written != null ? Math.max(written, floor) : floor;
+  return Math.max(0.05, sl);
 }
 
 export function bindOptionFill(
@@ -856,9 +877,10 @@ function markLive(book: LivePaperBookState, last: number | null, cfg: LiveAssume
   const pts = isOptionBuy(cfg) ? px - book.entry : (book.side === 'long' ? 1 : -1) * (px - book.entry);
   book.livePts = Math.round(pts * 10) / 10;
   book.liveRs = netRs(cfg, book, book.entry, px, pts);
-  if (px != null) {
-    book.peakPx = book.peakPx == null ? px : Math.max(book.peakPx, px);
-    book.troughPx = book.troughPx == null ? px : Math.min(book.troughPx, px);
+  const peak = isOptionBuy(cfg) ? optionPremiumPx(px, underLast) : px;
+  if (peak != null) {
+    book.peakPx = book.peakPx == null ? peak : Math.max(book.peakPx, peak);
+    book.troughPx = book.troughPx == null ? peak : Math.min(book.troughPx, peak);
   }
 }
 
@@ -885,8 +907,11 @@ function closeAt(
       : isOptionBuy(cfg)
         ? optionRoundTripCharges(book.entry, Math.max(0, exitPx), qty, venueForBook(cfg.under || cfg.id))
         : LIVE_PAPER_CHARGE;
-  const hi = book.peakPx != null ? Math.max(book.peakPx, exitPx) : exitPx;
-  const lo = book.troughPx != null ? Math.min(book.troughPx, exitPx) : exitPx;
+  const exitMark = isOptionBuy(cfg) ? optionPremiumPx(exitPx, underLast) ?? exitPx : exitPx;
+  const peakMark = isOptionBuy(cfg) ? optionPremiumPx(book.peakPx, underLast) : book.peakPx;
+  const troughMark = isOptionBuy(cfg) ? optionPremiumPx(book.troughPx, underLast) : book.troughPx;
+  const hi = peakMark != null ? Math.max(peakMark, exitMark) : exitMark;
+  const lo = troughMark != null ? Math.min(troughMark, exitMark) : exitMark;
   const mfePts = isOptionBuy(cfg) ? hi - book.entry : (book.side === 'long' ? 1 : -1) * (hi - book.entry);
   const maePts = isOptionBuy(cfg) ? lo - book.entry : (book.side === 'long' ? 1 : -1) * (lo - book.entry);
   book.fills.push({
@@ -976,17 +1001,18 @@ function hitExit(
     const bidPx = optionPremiumPx(fillBid, underLast);
     const hi = optionPremiumPx(high, underLast);
     const lo = optionPremiumPx(low, underLast);
-    const openPx = optionPremiumPx(open, underLast) ?? hi ?? lo;
     if (bidPx == null && hi == null && lo == null) return false;
+    const sl = optionCappedSl(cfg, book.entry, book.lot || cfg.qty || cfg.rsPt, book.sl);
+    const scratch = Math.max(book.scratch, sl);
     const fill = (reason: 'sl' | 'scratch' | 'tp', px: number): boolean => {
       closeAt(book, cfg, px, reason, day, nowMin, underLast);
       return book.side === 'flat';
     };
-    if (bidPx != null && bidPx <= book.sl) return fill('sl', bidPx);
-    if (bidPx == null && lo != null && lo <= book.sl) return fill('sl', Math.min(book.sl, openPx ?? book.sl));
-    if (bidPx != null && bidPx <= book.scratch) return fill('scratch', bidPx);
-    if (bidPx == null && lo != null && lo <= book.scratch) {
-      return fill('scratch', Math.min(book.scratch, openPx ?? book.scratch));
+    if (bidPx != null && bidPx <= sl) return fill('sl', sl);
+    if (bidPx == null && lo != null && lo <= sl) return fill('sl', sl);
+    if (bidPx != null && bidPx <= scratch) return fill('scratch', scratch);
+    if (bidPx == null && lo != null && lo <= scratch) {
+      return fill('scratch', scratch);
     }
     if (bidPx != null && bidPx >= book.tp) return fill('tp', bidPx);
     if (bidPx == null && hi != null && hi >= book.tp) return fill('tp', book.tp);
@@ -1179,6 +1205,13 @@ export function tickBook(
   const barMin = cfg.barMinutes ?? 5;
   const sellPx = isOptionBuy(cfg) ? (optBid ?? optLast) : last;
   if (next.side === 'long' || next.side === 'short') {
+    if (isOptionBuy(cfg) && next.entry != null && next.sl != null) {
+      const capped = optionCappedSl(cfg, next.entry, next.lot || cfg.qty || cfg.rsPt, next.sl);
+      if (capped > next.sl) {
+        next.sl = capped;
+        if (next.scratch != null && next.scratch < capped) next.scratch = capped;
+      }
+    }
     // SL / TP / scratch are premium levels. Index bars (e.g. 76,500) must never be tested against them.
     const exitBars = isOptionBuy(cfg) ? completedBars(optionBars, day, nowMin, barMin) : done;
     for (const bar of exitBars) {
@@ -1211,7 +1244,7 @@ export function tickBook(
     }
     // Option books follow completed candles after the fill. A last-price check on the next
     // 8s tick would stop on the same bar's earlier low or a stale last sitting below the live bid.
-    // A live bid already through SL/TP must not wait for the next 1-min candle (13 Nov Nifty/Bank).
+    // A live bid already through SL/TP must not wait for the 2-min tooSoon window (23 Nov −₹1k+).
     const tickExitPx = sellPx ?? last;
     const tooSoon =
       isOptionBuy(cfg) && next.entryMin != null && nowMin <= next.entryMin + barMin;
@@ -1224,7 +1257,12 @@ export function tickBook(
         (next.scratch != null && bid <= next.scratch) ||
         (next.tp != null && bid >= next.tp));
     const barsHandleExit = isOptionBuy(cfg) && optionBars.length > 0 && !bidThrough;
-    if ((next.side === 'long' || next.side === 'short') && tickExitPx != null && !tooSoon && !barsHandleExit) {
+    if (
+      (next.side === 'long' || next.side === 'short') &&
+      tickExitPx != null &&
+      (!tooSoon || bidThrough) &&
+      !barsHandleExit
+    ) {
       hitExit(next, tickExitPx, tickExitPx, tickExitPx, cfg, day, tickExitPx, nowMin, bid, underLast);
     }
   }
