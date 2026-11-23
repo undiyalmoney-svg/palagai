@@ -5,7 +5,7 @@ import { KiteSessionService } from '../kite/kite-session.service';
 import { UiDialogService } from '../../shared/ui/dialog/ui-dialog.service';
 import { SniperApiService, SniperView } from './sniper-api.service';
 import { emptySniperSession, flattenSniperBook, summarizeSniper } from './sniper-engine';
-import { SNIPER_BOOKS, SNIPER_HONEST, SniperBookState, SniperMode, SniperSession } from './sniper.models';
+import { SNIPER_BOOKS, SNIPER_HONEST, SNIPER_STOP_RS, SniperBookState, SniperSession } from './sniper.models';
 import {
   keepSniperOnKite,
   kiteOrderErrorOf,
@@ -19,7 +19,7 @@ import {
 import { runSniperTick, SniperTickQuote } from './sniper-tick.run';
 import { sniperIstDay, sniperIstMinutes } from './sniper-clock';
 
-const STORAGE_KEY = 'palagai_sniper_v1';
+const STORAGE_KEY = 'palagai_sniper_v2';
 const TICK_MS = 8_000;
 
 function readStored(): SniperSession | null {
@@ -27,7 +27,7 @@ function readStored(): SniperSession | null {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as SniperSession;
-    if (!parsed || !Array.isArray(parsed.books) || parsed.books.length !== 4) return null;
+    if (!parsed || !Array.isArray(parsed.books) || parsed.books.length !== 3) return null;
     return { ...parsed, honest: SNIPER_HONEST };
   } catch {
     return null;
@@ -85,12 +85,19 @@ export class SniperService {
       persist(this.session());
       return;
     }
-    const day = this.session().replayDay || sniperIstDay();
+    const day = sniperIstDay();
     const prev = this.session();
     const base =
       prev.day === day
         ? { ...prev, running: true, startedAt: prev.startedAt || new Date().toISOString(), kiteError: null }
-        : { ...emptySniperSession(day), running: true, mode: prev.mode, liveArmed: prev.liveArmed, startedAt: new Date().toISOString() };
+        : {
+            ...emptySniperSession(day, new Date().toISOString(), prev),
+            running: true,
+            mode: prev.liveArmed ? ('live' as const) : ('paper' as const),
+            liveArmed: prev.liveArmed,
+            paperOn: prev.paperOn !== false,
+            startedAt: new Date().toISOString(),
+          };
     this.tickGen += 1;
     this.session.set(summarizeSniper(base, { running: true }));
     persist(this.session());
@@ -119,28 +126,32 @@ export class SniperService {
     void this.pushDroplet({ takeSession: false });
   }
 
-  async replay(day: string): Promise<void> {
-    const d = String(day || '').trim();
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return;
-    this.tickGen += 1;
-    const snap = {
-      ...emptySniperSession(d),
-      running: true,
-      mode: 'replay' as SniperMode,
-      replayDay: d,
-      startedAt: new Date().toISOString(),
-    };
+  setPaper(on: boolean): void {
+    const snap = summarizeSniper(this.session(), { paperOn: on, mode: this.session().liveArmed ? 'live' : 'paper' });
     this.session.set(snap);
     persist(snap);
-    this.loop();
     void this.pushDroplet({ takeSession: false });
-    void this.tick();
   }
 
-  setMode(mode: SniperMode): void {
-    if (mode === 'live') return;
-    const cur = this.session();
-    const snap = summarizeSniper(cur, { mode, liveArmed: false });
+  setLots(lots: number): void {
+    const n = Math.max(1, Math.floor(Number(lots) || 1));
+    const snap = summarizeSniper(this.session(), { lots: n });
+    this.session.set(snap);
+    persist(snap);
+    void this.pushDroplet({ takeSession: false });
+  }
+
+  setStopRs(stopRs: number): void {
+    const n = Math.max(1, Math.round(Number(stopRs) || SNIPER_STOP_RS));
+    const snap = summarizeSniper(this.session(), { stopRs: n });
+    this.session.set(snap);
+    persist(snap);
+    void this.pushDroplet({ takeSession: false });
+  }
+
+  setWatch(id: string, on: boolean): void {
+    const books = this.session().books.map((b) => (b.id === id ? { ...b, watch: on } : b));
+    const snap = summarizeSniper(this.session(), { books });
     this.session.set(snap);
     persist(snap);
     void this.pushDroplet({ takeSession: false });
@@ -148,15 +159,14 @@ export class SniperService {
 
   async armLive(): Promise<void> {
     const ok = await this.dialog.confirm({
-      title: 'Place real Kite orders?',
-      message:
-        '5-Minute Sniper will send MARKET buys and a ₹100 SL on all four books. Paper already records. This is real money. Not a guaranteed profit.',
-      confirmLabel: 'Enable Live Kite',
-      cancelLabel: 'Stay on paper',
+      title: 'Live Kite?',
+      message: `MARKET buy and ₹${this.session().stopRs} SL on the first ORB cut.`,
+      confirmLabel: 'Live on',
+      cancelLabel: 'Paper',
       tone: 'danger',
     });
     if (!ok) return;
-    const snap = summarizeSniper(this.session(), { mode: 'live', liveArmed: true });
+    const snap = summarizeSniper(this.session(), { mode: 'live', liveArmed: true, paperOn: true });
     this.session.set(snap);
     persist(snap);
     void this.pushDroplet({ takeSession: false });
@@ -206,7 +216,7 @@ export class SniperService {
     try {
       const prevBooks = this.session().books;
       let snap = await runSniperTick({
-        now: this.session().mode === 'replay' && this.session().replayDay ? this.replayNow() : undefined,
+        now: undefined,
         session: this.session(),
         fetchCsv: () => this.instrumentsCsv(auth),
         fetchQuotes: async (keys) => {
@@ -283,8 +293,18 @@ export class SniperService {
     this.dropletPlacing.set(!!view.dropletPlacing);
     this.dropletNote.set(view.lastError || view.lastMessage || '');
     const takeSession = opts?.takeSession !== false;
-    if (takeSession && view.session && Array.isArray(view.session.books) && view.session.books.length === 4) {
-      const snap = { ...view.session, honest: SNIPER_HONEST, liveArmed: this.session().liveArmed, mode: this.session().mode };
+    const books = Array.isArray(view.session?.books)
+      ? view.session.books.filter((b) => b.id === 'nifty' || b.id === 'bank' || b.id === 'sensex')
+      : [];
+    if (takeSession && view.session && books.length === 3) {
+      const snap = {
+        ...view.session,
+        books,
+        honest: SNIPER_HONEST,
+        liveArmed: this.session().liveArmed,
+        mode: this.session().mode,
+        stopRs: Number(view.session.stopRs) > 0 ? view.session.stopRs : SNIPER_STOP_RS,
+      };
       if (view.live != null) snap.liveArmed = !!view.live;
       this.session.set(snap);
       persist(snap);

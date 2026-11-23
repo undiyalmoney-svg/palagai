@@ -1,10 +1,16 @@
 import { DecimalPipe } from '@angular/common';
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, inject } from '@angular/core';
 import { SniperService } from '../../../core/sniper/sniper.service';
-import { SNIPER_BOOKS, SNIPER_CAPITAL_RS, SNIPER_HONEST, SniperBookState, SniperMode } from '../../../core/sniper/sniper.models';
-import { sniperIstClock, sniperRemainingMin, sniperCfg, hhmm, sniperIstMinutes } from '../../../core/sniper/sniper-clock';
-import { deskTotals, equityPoints, sessionReport, statsAll } from '../../../core/sniper/sniper-stats';
-import { allSniperFills } from '../../../core/sniper/sniper-engine';
+import {
+  SNIPER_EVENT_STEPS,
+  SniperBar,
+  SniperBookState,
+  SniperEvent,
+  sniperEventRank,
+} from '../../../core/sniper/sniper.models';
+import { hhmm, sniperIstClock } from '../../../core/sniper/sniper-clock';
+import { deskTotals } from '../../../core/sniper/sniper-stats';
+import { allSniperFills, candleDir } from '../../../core/sniper/sniper-engine';
 
 @Component({
   selector: 'app-sniper',
@@ -15,18 +21,12 @@ import { allSniperFills } from '../../../core/sniper/sniper-engine';
 })
 export class SniperComponent {
   protected readonly sniper = inject(SniperService);
-  protected readonly honest = SNIPER_HONEST;
-  protected readonly startRs = SNIPER_CAPITAL_RS;
-  protected readonly copied = signal('');
-  protected readonly replayDay = signal(new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }));
-
+  protected readonly steps = SNIPER_EVENT_STEPS;
   protected readonly totals = computed(() => deskTotals(this.sniper.session()));
-  protected readonly bookStats = computed(() => statsAll(this.sniper.session()));
   protected readonly fills = computed(() => allSniperFills(this.sniper.session()));
-  protected readonly report = computed(() => sessionReport(this.sniper.session()));
-  protected readonly equity = computed(() => {
+  protected readonly selected = computed(() => {
     const s = this.sniper.session();
-    return s.books.map((b) => ({ id: b.id, label: b.label, pts: equityPoints(b.fills) }));
+    return s.books.find((b) => b.id === s.selected) || null;
   });
   protected readonly startOff = computed(() => this.sniper.session().running || this.sniper.busy());
   protected readonly stopOff = computed(() => !this.sniper.session().running);
@@ -35,16 +35,41 @@ export class SniperComponent {
     return sniperIstClock(iso);
   }
 
-  protected remain(book: SniperBookState): number {
-    return sniperRemainingMin(sniperCfg(book.id), sniperIstMinutes());
+  protected hhmm(min: number | null | undefined): string {
+    return min == null ? '—' : hhmm(min);
   }
 
-  protected slotNow(book: SniperBookState): string {
-    const cfg = sniperCfg(book.id);
-    const m = sniperIstMinutes();
-    if (m < cfg.openMin) return `opens ${hhmm(cfg.openMin)}`;
-    if (m >= cfg.flatMin) return 'session closed';
-    return `${hhmm(book.entryMin ?? cfg.openMin)}–${hhmm((book.intervalEnd ?? cfg.openMin + 5))}`;
+  protected eventOf(b: SniperBookState | null | undefined): SniperEvent {
+    return b?.event || 'watching';
+  }
+
+  protected parked(b: SniperBookState): boolean {
+    return this.eventOf(b) === 'parked';
+  }
+
+  protected badge(b: SniperBookState): string {
+    const ev = this.eventOf(b);
+    if (ev === 'parked') return 'idle';
+    if (ev === 'orb_break') return `ORB break ${b.cut || ''}`.trim();
+    if (ev === 'breakout_candle') return 'breakout';
+    if (ev === 'found_entry') return 'entry';
+    if (ev === 'trade_taken') return 'taken';
+    if (ev === 'trade_closed') return 'closed';
+    if (ev === 'off') return 'off';
+    return b.orReady ? 'ORB' : 'ORB…';
+  }
+
+  protected chipOn(step: (typeof SNIPER_EVENT_STEPS)[number]['id'], b: SniperBookState | null): boolean {
+    if (!b || this.parked(b)) return false;
+    return sniperEventRank(this.eventOf(b)) >= sniperEventRank(step);
+  }
+
+  protected chipNow(step: (typeof SNIPER_EVENT_STEPS)[number]['id'], b: SniperBookState | null): boolean {
+    return !!b && !this.parked(b) && this.eventOf(b) === step;
+  }
+
+  protected dir(bar: SniperBar): 'green' | 'red' | 'doji' {
+    return candleDir(bar);
   }
 
   protected startDesk(): void {
@@ -57,54 +82,25 @@ export class SniperComponent {
     this.sniper.stop();
   }
 
-  protected setMode(mode: SniperMode): void {
-    this.sniper.setMode(mode);
+  protected onPaper(ev: Event): void {
+    this.sniper.setPaper((ev.target as HTMLInputElement).checked);
   }
 
-  protected arm(): void {
-    void this.sniper.armLive();
+  protected onLive(ev: Event): void {
+    const on = (ev.target as HTMLInputElement).checked;
+    if (on) void this.sniper.armLive();
+    else this.sniper.disarmLive();
   }
 
-  protected disarm(): void {
-    this.sniper.disarmLive();
+  protected onLots(ev: Event): void {
+    this.sniper.setLots(Number((ev.target as HTMLInputElement).value));
   }
 
-  protected onReplayDay(ev: Event): void {
-    this.replayDay.set((ev.target as HTMLInputElement).value);
+  protected onStop(ev: Event): void {
+    this.sniper.setStopRs(Number((ev.target as HTMLInputElement).value));
   }
 
-  protected runReplay(): void {
-    void this.sniper.replay(this.replayDay());
-  }
-
-  protected async copyReport(): Promise<void> {
-    try {
-      await navigator.clipboard.writeText(this.report());
-      this.copied.set('ok');
-      window.setTimeout(() => this.copied.set(''), 1600);
-    } catch {
-      this.copied.set('');
-    }
-  }
-
-  protected spark(pts: { t: string; y: number }[]): string {
-    if (pts.length < 2) return '';
-    const w = 220;
-    const h = 64;
-    const ys = pts.map((p) => p.y);
-    const min = Math.min(...ys);
-    const max = Math.max(...ys);
-    const span = max - min || 1;
-    return pts
-      .map((p, i) => {
-        const x = (i / (pts.length - 1)) * w;
-        const y = h - ((p.y - min) / span) * (h - 4) - 2;
-        return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`;
-      })
-      .join(' ');
-  }
-
-  protected books(): typeof SNIPER_BOOKS {
-    return SNIPER_BOOKS;
+  protected onWatch(id: SniperBookState['id'], ev: Event): void {
+    this.sniper.setWatch(id, (ev.target as HTMLInputElement).checked);
   }
 }

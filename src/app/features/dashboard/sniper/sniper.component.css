@@ -1,13 +1,6 @@
-.sniper-charts {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 1rem;
-  color: var(--pg-bull-deep);
-}
 .sniper-table {
   overflow-x: auto;
 }
-.sniper-table td.mp-up,
 .sniper-table tr.mp-up td.num:nth-last-child(2) {
   color: var(--pg-bull-deep);
 }
@@ -17,7 +10,19 @@
 .mp-live-row {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 0.7rem 1.15rem;
+  margin-top: 0.75rem;
+}
+.sniper-field {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.82rem;
+  color: var(--pg-muted);
+}
+.sniper-field .ui-input {
+  width: 5.5rem;
 }
 .mp-hunt-kv {
   display: flex;
@@ -32,4 +37,114 @@
   font-weight: 650;
   text-align: right;
   font-variant-numeric: tabular-nums;
+}
+
+.sniper-events {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+.sniper-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.22rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+  background: var(--pg-bg-muted);
+  color: var(--pg-muted);
+  border: 1px solid var(--pg-line);
+}
+.sniper-chip.on,
+.sniper-chip.now {
+  color: #fff;
+  border-color: transparent;
+}
+.sniper-chip[data-event='orb_break'].on,
+.sniper-chip[data-event='orb_break'].now {
+  background: #d97706;
+}
+.sniper-chip[data-event='breakout_candle'].on,
+.sniper-chip[data-event='breakout_candle'].now {
+  background: #c026d3;
+}
+.sniper-chip[data-event='found_entry'].on,
+.sniper-chip[data-event='found_entry'].now {
+  background: #0891b2;
+}
+.sniper-chip[data-event='trade_taken'].on,
+.sniper-chip[data-event='trade_taken'].now {
+  background: #059669;
+}
+.sniper-chip[data-event='trade_closed'].on,
+.sniper-chip[data-event='trade_closed'].now {
+  background: #4f46e5;
+}
+.sniper-chip[data-event='parked'].now,
+.sniper-chip[data-event='watching'].now,
+.sniper-chip[data-event='off'].now {
+  background: #64748b;
+}
+.sniper-chip.now {
+  box-shadow: 0 0 0 2px color-mix(in srgb, currentColor 18%, transparent);
+}
+
+.sniper-book[data-event='orb_break'] {
+  outline: 2px solid #d97706;
+}
+.sniper-book[data-event='breakout_candle'] {
+  outline: 2px solid #c026d3;
+}
+.sniper-book[data-event='found_entry'] {
+  outline: 2px solid #0891b2;
+}
+.sniper-book[data-event='trade_taken'] {
+  outline: 2px solid #059669;
+}
+.sniper-book[data-event='trade_closed'] {
+  outline: 2px solid #4f46e5;
+}
+.sniper-picked:not(.sniper-parked) {
+  box-shadow: 0 0 0 1px color-mix(in srgb, #059669 35%, transparent);
+}
+.sniper-parked {
+  outline: 1px dashed #94a3b8;
+  background: #f8fafc;
+  opacity: 0.72;
+  filter: grayscale(0.55);
+}
+
+.sniper-bars {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.28rem;
+  margin: 0.55rem 0 0.35rem;
+}
+.sniper-bar {
+  min-width: 2.55rem;
+  padding: 0.18rem 0.28rem;
+  border-radius: 6px;
+  text-align: center;
+  font-size: 0.62rem;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+  background: #94a3b8;
+}
+.sniper-bar[data-dir='green'] {
+  background: #0f9d58;
+}
+.sniper-bar[data-dir='red'] {
+  background: #e11d48;
+}
+.sniper-bar.cut {
+  box-shadow: 0 0 0 2px #d97706;
+}
+.sniper-bar.red-high {
+  box-shadow: 0 0 0 2px #c026d3;
+}
+.sniper-bar em {
+  font-style: normal;
+  display: block;
+  line-height: 1.2;
 }
