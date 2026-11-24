@@ -1,8 +1,10 @@
 import { DecimalPipe } from '@angular/common';
-import { Component, computed, inject } from '@angular/core';
+import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { SniperService } from '../../../core/sniper/sniper.service';
 import {
   SNIPER_EVENT_STEPS,
+  SNIPER_STOP_RS,
+  SNIPER_TARGET_RS,
   SniperBar,
   SniperBookState,
   SniperEvent,
@@ -22,14 +24,24 @@ import { allSniperFills, candleDir } from '../../../core/sniper/sniper-engine';
 export class SniperComponent {
   protected readonly sniper = inject(SniperService);
   protected readonly steps = SNIPER_EVENT_STEPS;
+  protected readonly stopRs = SNIPER_STOP_RS;
+  protected readonly targetRs = SNIPER_TARGET_RS;
+  protected readonly nowIst = signal(sniperIstClock(new Date().toISOString()));
   protected readonly totals = computed(() => deskTotals(this.sniper.session()));
   protected readonly fills = computed(() => allSniperFills(this.sniper.session()));
+  protected readonly book = computed(() => this.sniper.session().books.find((b) => b.id === 'bank') || null);
   protected readonly selected = computed(() => {
     const s = this.sniper.session();
-    return s.books.find((b) => b.id === s.selected) || null;
+    return s.books.find((b) => b.id === s.selected) || this.book();
   });
   protected readonly startOff = computed(() => this.sniper.session().running || this.sniper.busy());
   protected readonly stopOff = computed(() => !this.sniper.session().running);
+  protected readonly pulses = computed(() => [...(this.book()?.pulse || [])].reverse());
+
+  constructor() {
+    const tick = setInterval(() => this.nowIst.set(sniperIstClock(new Date().toISOString())), 1_000);
+    inject(DestroyRef).onDestroy(() => clearInterval(tick));
+  }
 
   protected clock(iso?: string): string {
     return sniperIstClock(iso);
@@ -49,9 +61,10 @@ export class SniperComponent {
 
   protected badge(b: SniperBookState): string {
     const ev = this.eventOf(b);
+    if (ev === 'parked' && b.cut === 'up') return 'skip up';
     if (ev === 'parked') return 'idle';
-    if (ev === 'orb_break') return `ORB break ${b.cut || ''}`.trim();
-    if (ev === 'breakout_candle') return 'breakout';
+    if (ev === 'orb_break') return `ORB ${b.cut || 'down'}`.trim();
+    if (ev === 'breakout_candle') return '40% red';
     if (ev === 'found_entry') return 'entry';
     if (ev === 'trade_taken') return 'taken';
     if (ev === 'trade_closed') return 'closed';
@@ -94,13 +107,5 @@ export class SniperComponent {
 
   protected onLots(ev: Event): void {
     this.sniper.setLots(Number((ev.target as HTMLInputElement).value));
-  }
-
-  protected onStop(ev: Event): void {
-    this.sniper.setStopRs(Number((ev.target as HTMLInputElement).value));
-  }
-
-  protected onWatch(id: SniperBookState['id'], ev: Event): void {
-    this.sniper.setWatch(id, (ev.target as HTMLInputElement).checked);
   }
 }

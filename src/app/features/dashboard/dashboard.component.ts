@@ -137,7 +137,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     },
     '/dashboard/sniper': {
       title: '5-Minute Sniper',
-      subtitle: 'Fade the previous 5-minute candle: green ATM PE, red ATM CE. Four books × ₹50,000. ₹100 max loss after Kite charges. Paper runs on the droplet with the tab closed. Not Arise. Not a guaranteed profit.',
+      subtitle: 'Bank Nifty PE. 09:15–09:30 ORB. First 5m close below the range, then the first 40% red tagged at its high. One trade. SL ₹750, sell ₹750. Paper and Live. Not Arise.',
     },
     '/dashboard/settings': {
       title: 'Settings',

@@ -58,8 +58,8 @@ export function deskTotals(session: SniperSession): SniperBookStats {
   const losses = fills.filter((f) => f.netRs < 0);
   const netRs = r1(fills.reduce((s, f) => s + f.netRs, 0));
   return {
-    under: 'nifty',
-    label: 'Sniper',
+    under: 'bank',
+    label: 'Bank Nifty PE',
     startRs: 0,
     capital: netRs,
     grossProfit: r1(wins.reduce((s, f) => s + f.grossRs, 0)),

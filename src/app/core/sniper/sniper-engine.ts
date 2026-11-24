@@ -8,6 +8,7 @@ import {
   SNIPER_HONEST,
   SNIPER_OPEN_MIN,
   SNIPER_OR_END_MIN,
+  SNIPER_PULSE_KEEP,
   SNIPER_STOP_RS,
   SNIPER_STRONG_RED,
   SNIPER_TARGET_RS,
@@ -19,6 +20,7 @@ import {
   SniperExit,
   SniperFill,
   SniperPick,
+  SniperPulse,
   SniperQuote,
   SniperSession,
   SniperUnder,
@@ -115,6 +117,14 @@ export function emptySniperBook(cfg: SniperBookCfg): SniperBookState {
     kiteNote: '',
     kiteHalt: false,
     exception: false,
+    spot: null,
+    minute: null,
+    minutes: [],
+    forming5m: null,
+    peBid: null,
+    peAsk: null,
+    peLast: null,
+    pulse: [],
   };
 }
 
@@ -126,7 +136,9 @@ export function emptySniperSession(
   const books = SNIPER_BOOKS.map((cfg) => {
     const b = emptySniperBook(cfg);
     const prev = keep?.books?.find((x) => x.id === cfg.id);
-    if (prev) b.watch = prev.watch !== false;
+    if (prev) {
+      b.pulse = Array.isArray(prev.pulse) ? prev.pulse.slice(-SNIPER_PULSE_KEEP) : [];
+    }
     return b;
   });
   return {
@@ -136,8 +148,8 @@ export function emptySniperSession(
     paperOn: keep?.paperOn !== false,
     liveArmed: keep?.liveArmed === true,
     lots: Math.max(1, Math.floor(Number(keep?.lots) || SNIPER_DEFAULT_LOTS)),
-    stopRs: Number(keep?.stopRs) > 0 ? Number(keep?.stopRs) : SNIPER_STOP_RS,
-    targetRs: Number(keep?.targetRs) > 0 ? Number(keep?.targetRs) : SNIPER_TARGET_RS,
+    stopRs: SNIPER_STOP_RS,
+    targetRs: SNIPER_TARGET_RS,
     selected: '',
     replayDay: '',
     startedAt: '',
@@ -232,21 +244,84 @@ function closeFill(
 }
 
 function nearbyBars(bars: SniperBar[]): SniperBar[] {
-  return bars.filter((b) => b.min >= SNIPER_OPEN_MIN).slice(-12);
+  return bars.filter((b) => b.min >= SNIPER_OPEN_MIN).slice(-24);
+}
+
+function completedMinutes(bars: SniperBar[], day: string, nowMin: number): SniperBar[] {
+  return (bars || []).filter((b) => b.day < day || (b.day === day && b.min + 1 <= nowMin));
+}
+
+export function formingMinuteBar(
+  bars: SniperBar[],
+  day: string,
+  nowMin: number,
+  spot: number | null,
+): SniperBar | null {
+  const exact = (bars || []).find((b) => b.day === day && b.min === nowMin);
+  if (exact) return exact;
+  const done = completedMinutes(bars, day, nowMin);
+  const last = done.length ? done[done.length - 1] : null;
+  if (spot == null && !last) return null;
+  const open = last ? last.close : spot!;
+  const px = spot != null ? spot : last!.close;
+  return {
+    day,
+    min: nowMin,
+    open,
+    high: Math.max(open, px),
+    low: Math.min(open, px),
+    close: px,
+  };
+}
+
+export function formingFiveBar(minutes: SniperBar[], day: string, nowMin: number): SniperBar | null {
+  const start = nowMin - (nowMin % SNIPER_BAR_MIN);
+  const slice = (minutes || []).filter((b) => b.day === day && b.min >= start && b.min <= nowMin);
+  if (!slice.length) return null;
+  return {
+    day,
+    min: start,
+    open: slice[0].open,
+    high: Math.max(...slice.map((b) => b.high)),
+    low: Math.min(...slice.map((b) => b.low)),
+    close: slice[slice.length - 1].close,
+  };
+}
+
+export function sniperPulseLine(book: SniperBookState, nowMin: number): string {
+  const t = hhmm(nowMin);
+  const spot = book.spot != null ? `Bank ${book.spot}` : 'Bank —';
+  const pe =
+    book.optionSymbol
+      ? ` · ${book.optionSymbol}${book.peAsk != null ? ` ask ${book.peAsk}` : book.peLast != null ? ` last ${book.peLast}` : ''}`
+      : '';
+  if (book.side === 'long') {
+    const live = book.liveRs ? ` · live ₹${book.liveRs}` : '';
+    return `${t} ${spot}${pe}${live} · SL ₹${book.sl ?? SNIPER_STOP_RS} sell ₹${book.tp ?? SNIPER_TARGET_RS}`;
+  }
+  if (book.fills.length) {
+    const last = book.fills[book.fills.length - 1];
+    return `${t} ${spot} · closed ${last.reason} ₹${last.netRs}${pe}`;
+  }
+  if (book.cut === 'up') {
+    return `${t} ${spot} · up ORB · skip CE · no trade today`;
+  }
+  return `${t} ${spot}${pe} · ${book.reason || 'watching'}`;
+}
+
+function appendPulse(book: SniperBookState, nowMin: number, nowIso: string): SniperPulse[] {
+  const text = sniperPulseLine(book, nowMin);
+  const row: SniperPulse = { min: nowMin, at: nowIso, spot: book.spot, peLast: book.peLast, text };
+  const prev = Array.isArray(book.pulse) ? book.pulse.filter((p) => p.min !== nowMin) : [];
+  return [...prev, row].slice(-SNIPER_PULSE_KEEP);
 }
 
 function paintOrb(book: SniperBookState, bars: SniperBar[], day: string, nowMin: number): SniperBookState {
-  const next = { ...book, bars: nearbyBars(bars) };
+  const next = { ...book, bars: nearbyBars(bars), watch: true };
   const or = sniperOrbLevels(bars, day);
   next.orReady = sniperOrbReady(nowMin) && !!or;
   next.orHigh = or?.high ?? null;
   next.orLow = or?.low ?? null;
-  if (!next.watch) {
-    next.event = 'off';
-    next.status = 'off';
-    next.reason = 'off';
-    return next;
-  }
   if (next.cut || next.side === 'long' || next.fills.length > 0 || next.event === 'parked') {
     return next;
   }
@@ -255,14 +330,13 @@ function paintOrb(book: SniperBookState, bars: SniperBar[], day: string, nowMin:
   next.reason =
     nowMin < SNIPER_OPEN_MIN || !next.orReady
       ? `ORB ${hhmm(SNIPER_OPEN_MIN)}–${hhmm(SNIPER_OR_END_MIN)}`
-      : `ORB ${next.orLow}–${next.orHigh}`;
+      : `ORB ${next.orLow}–${next.orHigh} · wait first close below`;
   return next;
 }
 
 function firstCut(
   books: SniperBookState[],
-  barsBy: Record<SniperUnder, SniperBar[]>,
-  day: string,
+  barsBy: Partial<Record<SniperUnder, SniperBar[]>>,
 ): { id: SniperUnder; dir: SniperBreak; min: number; color: SniperDir } | null {
   let best: { id: SniperUnder; dir: SniperBreak; min: number; dist: number; color: SniperDir } | null = null;
   for (const book of books) {
@@ -279,16 +353,6 @@ function firstCut(
     }
   }
   return best ? { id: best.id, dir: best.dir, min: best.min, color: best.color } : null;
-}
-
-function parkBook(book: SniperBookState, winner: string): SniperBookState {
-  if (book.side === 'long' || book.fills.length) return book;
-  return {
-    ...book,
-    event: 'parked',
-    status: 'parked',
-    reason: `idle · ${winner} first`,
-  };
 }
 
 function manageOpen(
@@ -323,39 +387,79 @@ function manageOpen(
   if (nowMin >= cfg.flatMin) {
     return closeFill(next, cfg, mark, nowMin, nowIso, day, 'eod', bid, opt.ask);
   }
-  next.reason = `open ${next.optionType} · SL ₹${next.sl}`;
+  next.reason = `open PE · SL ₹${next.sl} · sell ₹${next.tp}`;
   next.status = 'open';
   next.event = 'trade_taken';
   return next;
 }
 
+function stampLive(
+  book: SniperBookState,
+  spots: Partial<Record<SniperUnder, number | null>>,
+  feed: Partial<Record<SniperUnder, { opt: SniperQuote; pick: SniperPick | null }>>,
+  minutesBy: Partial<Record<SniperUnder, SniperBar[]>>,
+  day: string,
+  nowMin: number,
+  nowIso: string,
+): SniperBookState {
+  const opt = feed[book.id]?.opt || { bid: null, ask: null, last: null };
+  const pick = feed[book.id]?.pick || null;
+  const spot = spots[book.id] ?? book.spot ?? null;
+  const rawMins = minutesBy[book.id] || [];
+  const minute = formingMinuteBar(rawMins, day, nowMin, spot);
+  const doneMins = completedMinutes(rawMins, day, nowMin);
+  const minutes = [...doneMins, ...(minute && minute.min === nowMin ? [minute] : [])];
+  const next: SniperBookState = {
+    ...book,
+    watch: true,
+    spot,
+    minute,
+    minutes: nearbyBars(minutes).slice(-20),
+    forming5m: formingFiveBar(minutes, day, nowMin),
+    peBid: opt.bid,
+    peAsk: opt.ask,
+    peLast: opt.last ?? book.last,
+  };
+  if (next.side === 'flat' && !next.fills.length && pick?.listed) {
+    next.optionType = pick.optionType;
+    next.strike = pick.strike;
+    next.expiry = pick.expiry;
+    next.optionSymbol = pick.optionSymbol;
+    next.optionToken = pick.optionToken;
+    next.lotSize = pick.lotSize;
+  }
+  next.pulse = appendPulse(next, nowMin, nowIso);
+  return next;
+}
+
 export function tickSniperDesk(
   session: SniperSession,
-  barsBy: Record<SniperUnder, SniperBar[]>,
+  barsBy: Partial<Record<SniperUnder, SniperBar[]>>,
   spots: Partial<Record<SniperUnder, number | null>>,
   feed: Partial<Record<SniperUnder, { opt: SniperQuote; pick: SniperPick | null }>>,
   day: string,
   nowMin: number,
   nowIso: string,
+  minutesBy: Partial<Record<SniperUnder, SniperBar[]>> = {},
 ): SniperSession {
   const lots = Math.max(1, Math.floor(Number(session.lots) || SNIPER_DEFAULT_LOTS));
-  const stopRs = Number(session.stopRs) > 0 ? Number(session.stopRs) : SNIPER_STOP_RS;
-  const targetRs = Number(session.targetRs) > 0 ? Number(session.targetRs) : SNIPER_TARGET_RS;
+  const stopRs = SNIPER_STOP_RS;
+  const targetRs = SNIPER_TARGET_RS;
   const allowEntry = session.paperOn !== false || session.liveArmed === true;
-  const done: Record<SniperUnder, SniperBar[]> = {
-    nifty: completedSniperBars(barsBy.nifty || [], day, nowMin),
-    bank: completedSniperBars(barsBy.bank || [], day, nowMin),
-    sensex: completedSniperBars(barsBy.sensex || [], day, nowMin),
-  };
+  const done: Partial<Record<SniperUnder, SniperBar[]>> = {};
+  for (const cfg of SNIPER_BOOKS) {
+    done[cfg.id] = completedSniperBars(barsBy[cfg.id] || [], day, nowMin);
+  }
 
-  let books = session.books.map((b) =>
-    paintOrb({ ...b, fills: [...b.fills], skips: [...b.skips] }, done[b.id], day, nowMin),
-  );
+  let books = SNIPER_BOOKS.map((cfg) => {
+    const prev = session.books.find((b) => b.id === cfg.id) || emptySniperBook(cfg);
+    return paintOrb({ ...prev, fills: [...prev.fills], skips: [...prev.skips], pulse: [...(prev.pulse || [])] }, done[cfg.id] || [], day, nowMin);
+  });
 
   const taken = books.some((b) => b.side === 'long' || b.fills.length > 0);
-  let selected = session.selected;
+  let selected: SniperUnder | '' = session.selected === 'bank' ? 'bank' : '';
   if (!selected && !taken) {
-    const cut = firstCut(books, done, day);
+    const cut = firstCut(books, done);
     if (cut) {
       selected = cut.id;
       books = books.map((b) =>
@@ -366,9 +470,12 @@ export function tickSniperDesk(
               cutMin: cut.min,
               cutColor: cut.color,
               breakDir: cut.dir,
-              event: 'orb_break',
-              status: 'cut',
-              reason: `ORB break ${cut.dir} ${hhmm(cut.min)}`,
+              event: cut.dir === 'up' ? 'parked' : 'orb_break',
+              status: cut.dir === 'up' ? 'skip' : 'cut',
+              reason:
+                cut.dir === 'up'
+                  ? `up ORB ${hhmm(cut.min)} · skip CE · no trade today`
+                  : `ORB break down ${hhmm(cut.min)} · wait 40% red`,
             }
           : b,
       );
@@ -376,14 +483,13 @@ export function tickSniperDesk(
   } else if (selected) {
     books = books.map((b) => (b.id === selected && !b.cut ? { ...b, cut: b.breakDir || b.cut, status: b.status } : b));
   }
-  const winner = books.find((b) => b.id === selected)?.label || selected;
 
   books = books.map((book) => {
     const cfg = SNIPER_BOOKS.find((c) => c.id === book.id) || SNIPER_BOOKS[0];
     const opt = feed[book.id]?.opt || { bid: null, ask: null, last: null };
     const pick = feed[book.id]?.pick || null;
     const spot = spots[book.id] ?? null;
-    const bars = done[book.id];
+    const bars = done[book.id] || [];
 
     if (book.side === 'long' && book.entry != null) {
       return manageOpen(book, cfg, day, nowMin, nowIso, opt, stopRs, targetRs);
@@ -393,17 +499,22 @@ export function tickSniperDesk(
       return { ...book, event: 'trade_closed', status: 'done', reason: book.reason || 'done' };
     }
 
-    if (selected && book.id !== selected) {
-      return parkBook(book, winner);
-    }
-
     if (book.id !== selected) return book;
+
+    const breakDir: SniperBreak = book.cut || book.breakDir;
+    if (breakDir === 'up') {
+      return {
+        ...book,
+        event: 'parked',
+        status: 'skip',
+        reason: book.reason || `up ORB · skip CE · no trade today`,
+      };
+    }
 
     if (nowMin >= cfg.flatMin) return { ...book, event: book.event || 'orb_break', reason: 'session closed' };
     if (nowMin > cfg.lastEntryMin) return { ...book, event: book.event || 'orb_break', reason: 'last entry passed' };
     if (!allowEntry) return { ...book, event: book.event || 'orb_break', reason: book.reason || 'paper off' };
 
-    const breakDir: SniperBreak = book.cut || book.breakDir;
     if (!breakDir || book.cutMin == null) {
       return { ...book, event: 'orb_break', reason: 'ORB break' };
     }
@@ -411,7 +522,7 @@ export function tickSniperDesk(
     const after = bars.filter((b) => b.min >= book.cutMin!);
     const red = after.find((b) => sniperStrongRed(b)) || null;
     if (!red) {
-      return { ...book, breakDir, event: 'orb_break', reason: `ORB break ${breakDir} · wait red` };
+      return { ...book, breakDir, event: 'orb_break', reason: `ORB break down · wait 40% red` };
     }
     const green = sniperHighGreen(bars, red.min);
     const indexSl = green ? green.low : red.low;
@@ -423,22 +534,25 @@ export function tickSniperDesk(
         redHigh: red.high,
         indexSl,
         event: 'breakout_candle',
-        reason: `breakout ${hhmm(red.min)} · wait ${red.high}`,
+        reason: `40% red ${hhmm(red.min)} · wait tag ${red.high}`,
       };
     }
     if (spot == null || !(spot > 0)) {
-      return { ...book, breakDir, redHigh: red.high, indexSl, event: 'found_entry', reason: 'waiting spot' };
+      return { ...book, breakDir, redHigh: red.high, indexSl, event: 'found_entry', reason: 'waiting Bank spot' };
     }
-    const want: 'CE' | 'PE' = breakDir === 'up' ? 'CE' : 'PE';
+    const want = sniperWantType(breakDir);
+    if (want !== 'PE') {
+      return { ...book, breakDir, redHigh: red.high, indexSl, event: 'parked', reason: 'skip CE · no trade today' };
+    }
     if (!pick || !pick.listed || !pick.optionSymbol) {
-      return { ...book, breakDir, redHigh: red.high, indexSl, event: 'found_entry', reason: 'waiting ATM' };
+      return { ...book, breakDir, redHigh: red.high, indexSl, event: 'found_entry', reason: 'waiting ATM PE' };
     }
-    if (pick.optionType !== want) {
-      return { ...book, breakDir, redHigh: red.high, indexSl, event: 'found_entry', reason: `waiting ${want}` };
+    if (pick.optionType !== 'PE') {
+      return { ...book, breakDir, redHigh: red.high, indexSl, event: 'found_entry', reason: 'waiting PE' };
     }
     const fillPx = opt.ask ?? opt.last;
     if (fillPx == null || !(fillPx > 0)) {
-      return { ...book, breakDir, redHigh: red.high, indexSl, event: 'found_entry', reason: 'waiting quote' };
+      return { ...book, breakDir, redHigh: red.high, indexSl, event: 'found_entry', reason: 'waiting PE quote' };
     }
     const size = sniperSize(lots, pick.lotSize, fillPx, cfg.venue, stopRs, targetRs);
     if (!size.lots) {
@@ -449,7 +563,7 @@ export function tickSniperDesk(
       side: 'long',
       dir: 'red',
       breakDir,
-      optionType: pick.optionType,
+      optionType: 'PE',
       strike: pick.strike,
       expiry: pick.expiry,
       optionSymbol: pick.optionSymbol,
@@ -460,6 +574,7 @@ export function tickSniperDesk(
       entry: fillPx,
       sl: size.sl,
       tp: size.tp,
+      stopRs,
       indexSl,
       redHigh: red.high,
       entryMin: nowMin,
@@ -472,12 +587,14 @@ export function tickSniperDesk(
       last: fillPx,
       status: 'open',
       event: 'trade_taken',
-      reason: `open ${pick.optionType} · SL ₹${size.sl}`,
+      reason: `open PE · SL ₹${size.sl} · sell ₹${size.tp}`,
       exception: false,
     };
     markBook(next, fillPx, cfg.venue);
     return next;
   });
+
+  books = books.map((b) => stampLive(b, spots, feed, minutesBy, day, nowMin, nowIso));
 
   return summarizeSniper(session, {
     day,
@@ -514,12 +631,14 @@ export function summarizeSniper(session: SniperSession, patch: Partial<SniperSes
   return {
     ...session,
     ...patch,
+    stopRs: SNIPER_STOP_RS,
+    targetRs: SNIPER_TARGET_RS,
     books,
     honest: SNIPER_HONEST,
     incomplete: books.some(
       (b) =>
         b.fills.some((f) => f.incomplete) ||
-        /waiting ATM|waiting quote|waiting spot/.test(b.reason),
+        /waiting ATM|waiting quote|waiting PE|waiting Bank/.test(b.reason),
     ),
   };
 }
@@ -532,8 +651,8 @@ export function sniperBookCfg(id: SniperUnder): SniperBookCfg {
   return SNIPER_BOOKS.find((b) => b.id === id) || SNIPER_BOOKS[0];
 }
 
+/** Bank PE only. Up ORB is a skip, never CE. */
 export function sniperWantType(dir: SniperBreak): 'CE' | 'PE' | null {
-  if (dir === 'up') return 'CE';
   if (dir === 'down') return 'PE';
   return null;
 }

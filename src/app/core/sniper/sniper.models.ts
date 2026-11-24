@@ -1,11 +1,11 @@
 /**
- * Sniper — independent of Arise.
- * Nifty 50, Bank Nifty, Sensex. First 15-min ORB. First 5m close that cuts the range.
- * Strong red → entry at that high. One trade. SL ₹750 default. Target ₹1000.
+ * Sniper — Bank Nifty PE only.
+ * 09:15–09:30 ORB. First 5m close below the range. First 40% red, buy PE when a
+ * later 5m high tags that red high. Up-breaks skip the day. One trade. SL ₹750, sell ₹750.
  */
 import { ChargeVenue } from '../paper-desk/option-charges.util';
 
-export type SniperUnder = 'nifty' | 'bank' | 'sensex';
+export type SniperUnder = 'bank';
 export type SniperMode = 'paper' | 'live';
 export type SniperDir = 'green' | 'red' | 'doji';
 export type SniperBreak = 'up' | 'down' | '';
@@ -44,14 +44,15 @@ export function sniperEventRank(event: SniperEvent | '' | undefined): number {
 }
 
 export const SNIPER_STOP_RS = 750;
-export const SNIPER_TARGET_RS = 1000;
+export const SNIPER_TARGET_RS = 750;
 export const SNIPER_DEFAULT_LOTS = 1;
 export const SNIPER_BAR_MIN = 5;
 export const SNIPER_OR_MIN = 15;
 export const SNIPER_OPEN_MIN = 9 * 60 + 15;
 export const SNIPER_OR_END_MIN = 9 * 60 + 30;
 export const SNIPER_TICK_RS = 0.05;
-export const SNIPER_STRONG_RED = 0.6;
+export const SNIPER_STRONG_RED = 0.4;
+export const SNIPER_PULSE_KEEP = 40;
 
 export interface SniperBookCfg {
   id: SniperUnder;
@@ -67,17 +68,6 @@ export interface SniperBookCfg {
 
 export const SNIPER_BOOKS: SniperBookCfg[] = [
   {
-    id: 'nifty',
-    label: 'Nifty 50',
-    openMin: SNIPER_OPEN_MIN,
-    lastEntryMin: 15 * 60 + 15,
-    flatMin: 15 * 60 + 30,
-    venue: 'NSE',
-    exchange: 'NFO',
-    underNames: ['NIFTY 50'],
-    underExchange: 'NSE',
-  },
-  {
     id: 'bank',
     label: 'Bank Nifty',
     openMin: SNIPER_OPEN_MIN,
@@ -87,17 +77,6 @@ export const SNIPER_BOOKS: SniperBookCfg[] = [
     exchange: 'NFO',
     underNames: ['NIFTY BANK'],
     underExchange: 'NSE',
-  },
-  {
-    id: 'sensex',
-    label: 'Sensex',
-    openMin: SNIPER_OPEN_MIN,
-    lastEntryMin: 15 * 60 + 15,
-    flatMin: 15 * 60 + 30,
-    venue: 'BSE',
-    exchange: 'BFO',
-    underNames: ['SENSEX'],
-    underExchange: 'BSE',
   },
 ];
 
@@ -121,6 +100,14 @@ export type SniperPick = {
   lotSize: number;
   listed: boolean;
 };
+
+export interface SniperPulse {
+  min: number;
+  at: string;
+  spot: number | null;
+  peLast: number | null;
+  text: string;
+}
 
 export interface SniperCharges {
   entryTurnover: number;
@@ -224,6 +211,14 @@ export interface SniperBookState {
   kiteNote: string;
   kiteHalt: boolean;
   exception: boolean;
+  spot: number | null;
+  minute: SniperBar | null;
+  minutes: SniperBar[];
+  forming5m: SniperBar | null;
+  peBid: number | null;
+  peAsk: number | null;
+  peLast: number | null;
+  pulse: SniperPulse[];
 }
 
 export interface SniperSession {
@@ -246,4 +241,5 @@ export interface SniperSession {
   incomplete: boolean;
 }
 
-export const SNIPER_HONEST = 'Sniper. First ORB cut. One trade. Token on the Token page.';
+export const SNIPER_HONEST =
+  'Bank Nifty PE. Down ORB only. 40% red tagged at its high. One trade. SL ₹750, sell ₹750. Token on the Token page.';

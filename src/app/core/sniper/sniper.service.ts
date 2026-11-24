@@ -5,7 +5,14 @@ import { KiteSessionService } from '../kite/kite-session.service';
 import { UiDialogService } from '../../shared/ui/dialog/ui-dialog.service';
 import { SniperApiService, SniperView } from './sniper-api.service';
 import { emptySniperSession, flattenSniperBook, summarizeSniper } from './sniper-engine';
-import { SNIPER_BOOKS, SNIPER_HONEST, SNIPER_STOP_RS, SniperBookState, SniperSession } from './sniper.models';
+import {
+  SNIPER_BOOKS,
+  SNIPER_HONEST,
+  SNIPER_STOP_RS,
+  SNIPER_TARGET_RS,
+  SniperBookState,
+  SniperSession,
+} from './sniper.models';
 import {
   keepSniperOnKite,
   kiteOrderErrorOf,
@@ -19,16 +26,27 @@ import {
 import { runSniperTick, SniperTickQuote } from './sniper-tick.run';
 import { sniperIstDay, sniperIstMinutes } from './sniper-clock';
 
-const STORAGE_KEY = 'palagai_sniper_v2';
+const STORAGE_KEY = 'palagai_sniper_v3';
 const TICK_MS = 8_000;
+
+function bankBooks(books: SniperBookState[] | undefined | null): SniperBookState[] {
+  return Array.isArray(books) ? books.filter((b) => b.id === 'bank') : [];
+}
 
 function readStored(): SniperSession | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as SniperSession;
-    if (!parsed || !Array.isArray(parsed.books) || parsed.books.length !== 3) return null;
-    return { ...parsed, honest: SNIPER_HONEST };
+    const books = bankBooks(parsed?.books);
+    if (!parsed || books.length !== 1) return null;
+    return {
+      ...parsed,
+      books,
+      stopRs: SNIPER_STOP_RS,
+      targetRs: SNIPER_TARGET_RS,
+      honest: SNIPER_HONEST,
+    };
   } catch {
     return null;
   }
@@ -116,7 +134,7 @@ export class SniperService {
     const nowIso = new Date().toISOString();
     const nowMin = sniperIstMinutes();
     const books = cur.books.map((b) => {
-      const cfg = SNIPER_BOOKS.find((c) => c.id === b.id)!;
+      const cfg = SNIPER_BOOKS.find((c) => c.id === b.id) || SNIPER_BOOKS[0];
       if (b.side !== 'long') return b;
       return flattenSniperBook(b, cfg, nowMin, nowIso, b.last);
     });
@@ -141,26 +159,24 @@ export class SniperService {
     void this.pushDroplet({ takeSession: false });
   }
 
-  setStopRs(stopRs: number): void {
-    const n = Math.max(1, Math.round(Number(stopRs) || SNIPER_STOP_RS));
-    const snap = summarizeSniper(this.session(), { stopRs: n });
+  setStopRs(_stopRs?: number): void {
+    const snap = summarizeSniper(this.session(), { stopRs: SNIPER_STOP_RS, targetRs: SNIPER_TARGET_RS });
     this.session.set(snap);
     persist(snap);
     void this.pushDroplet({ takeSession: false });
   }
 
-  setWatch(id: string, on: boolean): void {
-    const books = this.session().books.map((b) => (b.id === id ? { ...b, watch: on } : b));
+  setWatch(_id: string, _on?: boolean): void {
+    const books = this.session().books.map((b) => (b.id === 'bank' ? { ...b, watch: true } : b));
     const snap = summarizeSniper(this.session(), { books });
     this.session.set(snap);
     persist(snap);
-    void this.pushDroplet({ takeSession: false });
   }
 
   async armLive(): Promise<void> {
     const ok = await this.dialog.confirm({
       title: 'Live Kite?',
-      message: `MARKET buy and ₹${this.session().stopRs} SL on the first ORB cut.`,
+      message: `Bank Nifty ATM PE. MARKET buy, ₹${SNIPER_STOP_RS} SL, sell ₹${SNIPER_TARGET_RS}. One trade. Paper still records if Kite rejects.`,
       confirmLabel: 'Live on',
       cancelLabel: 'Paper',
       tone: 'danger',
@@ -293,17 +309,16 @@ export class SniperService {
     this.dropletPlacing.set(!!view.dropletPlacing);
     this.dropletNote.set(view.lastError || view.lastMessage || '');
     const takeSession = opts?.takeSession !== false;
-    const books = Array.isArray(view.session?.books)
-      ? view.session.books.filter((b) => b.id === 'nifty' || b.id === 'bank' || b.id === 'sensex')
-      : [];
-    if (takeSession && view.session && books.length === 3) {
+    const books = bankBooks(view.session?.books);
+    if (takeSession && view.session && books.length === 1) {
       const snap = {
         ...view.session,
-        books,
+        books: books.map((b) => ({ ...b, watch: true })),
         honest: SNIPER_HONEST,
         liveArmed: this.session().liveArmed,
         mode: this.session().mode,
-        stopRs: Number(view.session.stopRs) > 0 ? view.session.stopRs : SNIPER_STOP_RS,
+        stopRs: SNIPER_STOP_RS,
+        targetRs: SNIPER_TARGET_RS,
       };
       if (view.live != null) snap.liveArmed = !!view.live;
       this.session.set(snap);

@@ -1,5 +1,6 @@
 /**
- * One Sniper tick: 15-min ORB on Nifty / Bank / Sensex, first 5m close through the range, ATM CE/PE.
+ * One Sniper tick: Bank Nifty 15-min ORB, first 5m close below the range, ATM PE.
+ * Always quotes the chosen Bank PE so the UI can show live market every minute.
  * No Angular. Live Kite overlay is after this.
  */
 import { Instrument } from '../models/instrument.model';
@@ -102,9 +103,7 @@ function lastOf(quotes: Record<string, SniperTickQuote>, key: string): number | 
 }
 
 function underKey(cfg: SniperBookCfg): string {
-  if (cfg.id === 'nifty') return 'NSE:NIFTY 50';
-  if (cfg.id === 'bank') return 'NSE:NIFTY BANK';
-  return 'BSE:SENSEX';
+  return `${cfg.underExchange}:${cfg.underNames[0]}`;
 }
 
 function optionKey(exchange: string, symbol: string): string {
@@ -125,13 +124,14 @@ function asBar(row: unknown[]): SniperBar {
   return { day: b.day, min: b.min, open: b.open, high: b.high, low: b.low, close: b.close };
 }
 
-async function load5m(
+async function loadBars(
   fetchHistorical: SniperTickIo['fetchHistorical'],
   token: string,
   day: string,
+  interval: '5minute' | 'minute',
 ): Promise<SniperBar[]> {
   if (!token) return [];
-  const candles = await fetchHistorical(token, '5minute', day, day).catch(() => [] as unknown[][]);
+  const candles = await fetchHistorical(token, interval, day, day).catch(() => [] as unknown[][]);
   return (candles || []).map(asBar).filter((b) => b.day);
 }
 
@@ -164,9 +164,7 @@ function atmPick(
 }
 
 const FALLBACK: Record<SniperUnder, Named> = {
-  nifty: { tradingSymbol: 'NIFTY 50', token: 256265, exchange: 'NSE' },
   bank: { tradingSymbol: 'NIFTY BANK', token: 260105, exchange: 'NSE' },
-  sensex: { tradingSymbol: 'SENSEX', token: 265, exchange: 'BSE' },
 };
 
 export async function runSniperTick(io: SniperTickIo): Promise<SniperSession> {
@@ -179,41 +177,48 @@ export async function runSniperTick(io: SniperTickIo): Promise<SniperSession> {
       : emptySniperSession(day, now.toISOString(), io.session);
   const csv = String((await io.fetchCsv()) || '');
   const chain = parseKiteInstrumentsCsv(csv);
-  const named: Record<SniperUnder, Named | null> = {
-    nifty: findNamed(csv, ['NIFTY 50']) || FALLBACK.nifty,
-    bank: findNamed(csv, ['NIFTY BANK']) || FALLBACK.bank,
-    sensex: findNamed(csv, ['SENSEX']) || FALLBACK.sensex,
-  };
+  const named: Partial<Record<SniperUnder, Named | null>> = {};
+  for (const cfg of SNIPER_BOOKS) {
+    named[cfg.id] = findNamed(csv, cfg.underNames) || FALLBACK[cfg.id];
+  }
   const underKeys = SNIPER_BOOKS.map((cfg) => underKey(cfg)).filter(Boolean);
   const openKeys = raw.books
     .filter((b) => b.side !== 'flat' && b.optionSymbol)
     .map((b) => optionKey(SNIPER_BOOKS.find((c) => c.id === b.id)?.exchange || 'NFO', b.optionSymbol));
   let quotes = await io.fetchQuotes([...new Set([...underKeys, ...openKeys])]);
 
-  const barsBy = {
-    nifty: [] as SniperBar[],
-    bank: [] as SniperBar[],
-    sensex: [] as SniperBar[],
-  };
+  const barsBy: Partial<Record<SniperUnder, SniperBar[]>> = {};
+  const minutesBy: Partial<Record<SniperUnder, SniperBar[]>> = {};
   await Promise.all(
     SNIPER_BOOKS.map(async (cfg) => {
       const inst = named[cfg.id];
-      barsBy[cfg.id] = inst?.token ? await load5m(io.fetchHistorical, String(inst.token), day) : [];
+      if (!inst?.token) {
+        barsBy[cfg.id] = [];
+        minutesBy[cfg.id] = [];
+        return;
+      }
+      const token = String(inst.token);
+      const [five, one] = await Promise.all([
+        loadBars(io.fetchHistorical, token, day, '5minute'),
+        loadBars(io.fetchHistorical, token, day, 'minute'),
+      ]);
+      barsBy[cfg.id] = five;
+      minutesBy[cfg.id] = one;
     }),
   );
 
   const nowIso = now.toISOString();
-  const spots: Record<SniperUnder, number | null> = {
-    nifty: lastOf(quotes, underKey(SNIPER_BOOKS[0])),
-    bank: lastOf(quotes, underKey(SNIPER_BOOKS[1])),
-    sensex: lastOf(quotes, underKey(SNIPER_BOOKS[2])),
-  };
+  const spots: Partial<Record<SniperUnder, number | null>> = {};
+  for (const cfg of SNIPER_BOOKS) {
+    spots[cfg.id] = lastOf(quotes, underKey(cfg));
+  }
   const probe =
     raw.selected || raw.books.some((b) => b.side === 'long' || b.fills.length > 0)
       ? raw
-      : tickSniperDesk(raw, barsBy, spots, {}, day, nowMin, nowIso);
+      : tickSniperDesk(raw, barsBy, spots, {}, day, nowMin, nowIso, minutesBy);
   const selected = probe.selected;
-  const want = selected ? sniperWantType(probe.books.find((b) => b.id === selected)?.cut || probe.books.find((b) => b.id === selected)?.breakDir || '') : null;
+  const cutDir = probe.books.find((b) => b.id === selected)?.cut || probe.books.find((b) => b.id === selected)?.breakDir || '';
+  const want = selected ? sniperWantType(cutDir) : 'PE';
 
   const extra: string[] = [];
   const picks = new Map<SniperUnder, SniperPick | null>();
@@ -221,7 +226,8 @@ export async function runSniperTick(io: SniperTickIo): Promise<SniperSession> {
     const book = probe.books.find((b) => b.id === cfg.id);
     const spot = spots[cfg.id];
     const openType = book?.side === 'long' && (book.optionType === 'CE' || book.optionType === 'PE') ? book.optionType : null;
-    const fadeType = cfg.id === selected ? openType || want : openType;
+    // Always quote ATM PE so the chosen instrument is on the tape before the cut.
+    const fadeType: 'CE' | 'PE' = openType || want || 'PE';
     if (spot && fadeType) {
       const pick = atmPick(chain, cfg, fadeType, spot, now);
       picks.set(cfg.id, pick);
@@ -233,11 +239,7 @@ export async function runSniperTick(io: SniperTickIo): Promise<SniperSession> {
   const need = extra.filter((k) => !underKeys.includes(k) && !openKeys.includes(k));
   if (need.length) quotes = { ...quotes, ...((await io.fetchQuotes(need)) || {}) };
 
-  const feed: Record<SniperUnder, { opt: SniperQuote; pick: SniperPick | null }> = {
-    nifty: { opt: { bid: null, ask: null, last: null }, pick: null },
-    bank: { opt: { bid: null, ask: null, last: null }, pick: null },
-    sensex: { opt: { bid: null, ask: null, last: null }, pick: null },
-  };
+  const feed: Partial<Record<SniperUnder, { opt: SniperQuote; pick: SniperPick | null }>> = {};
   for (const cfg of SNIPER_BOOKS) {
     const prev = probe.books.find((b) => b.id === cfg.id)!;
     const pick = picks.get(cfg.id) || null;
@@ -259,7 +261,7 @@ export async function runSniperTick(io: SniperTickIo): Promise<SniperSession> {
     };
   }
 
-  const next = tickSniperDesk(probe, barsBy, spots, feed, day, nowMin, nowIso);
+  const next = tickSniperDesk(probe, barsBy, spots, feed, day, nowMin, nowIso, minutesBy);
   return summarizeSniper(raw, {
     ...next,
     running: true,

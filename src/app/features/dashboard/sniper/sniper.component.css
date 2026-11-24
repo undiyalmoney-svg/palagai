@@ -24,6 +24,23 @@
 .sniper-field .ui-input {
   width: 5.5rem;
 }
+.sniper-lock {
+  font-size: 0.82rem;
+  font-weight: 650;
+  color: var(--pg-ink);
+}
+.sniper-tape .sniper-pulse {
+  margin: 0.65rem 0 0;
+  padding-left: 1.1rem;
+  max-height: 14rem;
+  overflow: auto;
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--pg-ink);
+}
+.sniper-tape .sniper-pulse li {
+  margin: 0.18rem 0;
+}
 .mp-hunt-kv {
   display: flex;
   justify-content: space-between;
